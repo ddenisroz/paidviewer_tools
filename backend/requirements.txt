@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+twitchio==2.8.1
+python-dotenv
+chatterbox-tts
+pydub
+sounddevice
+numpy
+requests
+aiohttp
+websockets
+python-jose[cryptography]
+python-multipart
+pydantic-settings
