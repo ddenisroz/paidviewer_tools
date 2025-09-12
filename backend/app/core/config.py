@@ -10,6 +10,11 @@ load_dotenv(BASE_DIR / ".env")
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "TTS_TTV"
+
+    # Project paths
+    BASE_DIR: Path = BASE_DIR
+    VOICES_PATH: Path = BASE_DIR / "voices"
+    AUDIO_CACHE_PATH: Path = BASE_DIR / "audio_cache"
     
     # Twitch API credentials
     TWITCH_CLIENT_ID: str

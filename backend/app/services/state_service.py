@@ -1,25 +1,16 @@
 import json
 from pathlib import Path
 import logging
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 class StateService:
-    _instance = None
-    _state_file_path = Path(__file__).resolve().parent.parent.parent / "state.json"
-
-    def __new__(cls, *args, **kwargs):
-        if not cls._instance:
-            cls._instance = super(StateService, cls).__new__(cls)
-        return cls._instance
-
     def __init__(self):
-        if hasattr(self, 'initialized'):
-            return
+        self._state_file_path = settings.BASE_DIR / "state.json"
         logger.info("Initializing State Service...")
         self.channels = {}
         self._load_state_from_disk()
-        self.initialized = True
         
     def _load_state_from_disk(self):
         try:
@@ -46,7 +37,7 @@ class StateService:
             self.channels[channel_name] = {
                 "tts_enabled": False,
                 "volume": 0.5,
-                "queue": []
+                "user_voices": {} # New field for user voice preferences
             }
             logger.info(f"Registered new channel: {channel_name}")
             self._save_state_to_disk()
@@ -80,13 +71,38 @@ class StateService:
             state["volume"] = max(0.0, min(1.0, volume))
             self._save_state_to_disk()
 
-    def get_queue(self, channel_name: str) -> list:
+    # Methods for managing user voices
+    def get_user_voice(self, channel_name: str, user_name: str) -> str | None:
         state = self.get_channel_state(channel_name)
-        return state["queue"] if state else []
+        if state:
+            return state.get("user_voices", {}).get(user_name)
+        return None
+
+    def set_user_voice(self, channel_name: str, user_name: str, voice_name: str):
+        state = self.get_channel_state(channel_name)
+        if state:
+            if "user_voices" not in state:
+                state["user_voices"] = {}
+            state["user_voices"][user_name] = voice_name
+            self._save_state_to_disk()
+    
+    def remove_user_voice(self, channel_name: str, user_name: str):
+        state = self.get_channel_state(channel_name)
+        if state and "user_voices" in state and user_name in state["user_voices"]:
+            del state["user_voices"][user_name]
+            self._save_state_to_disk()
+
+    def get_queue(self, channel_name: str) -> list:
+        # This seems to be unused, audio service has its own queue.
+        # Consider removing if it's truly redundant.
+        state = self.get_channel_state(channel_name)
+        return state.get("queue", [])
 
     def add_to_queue(self, channel_name: str, item):
         state = self.get_channel_state(channel_name)
         if state:
+            if "queue" not in state:
+                state["queue"] = []
             state["queue"].append(item)
             # No need to save state for queue changes as it's ephemeral
     
@@ -97,7 +113,7 @@ class StateService:
     def clear_queue(self, channel_name: str):
         state = self.get_channel_state(channel_name)
         if state:
-            state["queue"].clear()
+            state["queue"] = []
             logger.info(f"Queue cleared for channel {channel_name}")
 
-state_service_instance = StateService()
+# state_service_instance = StateService()

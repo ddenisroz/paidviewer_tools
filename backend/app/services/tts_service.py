@@ -7,19 +7,17 @@ from typing import Optional
 import soundfile as sf
 import logging
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 
 class TTSService:
     def __init__(self):
-        if hasattr(self, 'initialized'):
-            return
-
         logger.info("Initializing Chatterbox TTS Service...")
 
-        self.base_path = Path(__file__).resolve().parent.parent.parent
-        self.cache_path = self.base_path / "audio_cache"
-        self.voices_path = self.base_path / "voices"
+        self.cache_path = settings.AUDIO_CACHE_PATH
+        self.voices_path = settings.VOICES_PATH
 
         self.cache_path.mkdir(exist_ok=True)
         self.voices_path.mkdir(exist_ok=True)
@@ -45,7 +43,12 @@ class TTSService:
                 "The bot will use a generic built-in voice until a default is provided.")
             logger.warning("="*50)
 
-        self.initialized = True
+    def voice_exists(self, voice_name: str, channel_name: str) -> bool:
+        """Checks if a specific voice file exists for a channel."""
+        if not voice_name or not channel_name:
+            return False
+        voice_path = self.voices_path / channel_name / f"{voice_name}.wav"
+        return voice_path.exists()
 
     def _get_file_hash(self, text: str, voice_key: str) -> str:
         hasher = hashlib.sha256()
@@ -113,4 +116,4 @@ class TTSService:
             return None
 
 
-tts_service_instance = TTSService()
+# tts_service_instance = TTSService()

@@ -1,37 +1,41 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import auth, controls, voices
-from app.services.tts_service import tts_service_instance
-from app.services.audio_service import audio_service_instance
-from app.services.state_service import state_service_instance
+from app.services.tts_service import TTSService
+from app.services.audio_service import AudioService
+from app.services.state_service import StateService
 from app.bot import Bot
 
 # Basic logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-bot_instance = None
-bot_task = None
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global bot_instance, bot_task
     logger.info("Starting application lifespan...")
     
     # Initialize services
-    state_service = state_service_instance
+    state_service = StateService()
+    audio_service = AudioService()
+    tts_service = TTSService()
     
     # Create bot instance and store it on the app state
     bot_instance = Bot(
-        tts_service=tts_service_instance,
-        audio_service=audio_service_instance,
+        tts_service=tts_service,
+        audio_service=audio_service,
         state_service=state_service
     )
-    app.state.bot_instance = bot_instance
+    
+    # Store instances on the app state to make them accessible from endpoints
+    app.state.bot = bot_instance
+    app.state.state_service = state_service
+    app.state.tts_service = tts_service
+    app.state.audio_service = audio_service
+
 
     # Start the bot in a background task
     bot_task = asyncio.create_task(bot_instance.start())
@@ -55,12 +59,6 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down application lifespan...")
     if bot_instance:
         logger.info("Stopping Twitch bot...")
-        # Unregister all channels before closing
-        current_channels = state_service.get_registered_channels()
-        for channel in current_channels:
-             # This is optional, but good practice if you want a clean state on next startup
-             # state_service.unregister_channel(channel)
-             pass
         await bot_instance.close()
     
     if bot_task and not bot_task.done():
@@ -86,6 +84,13 @@ app.add_middleware(
 app.include_router(auth.router, tags=["Authentication"])
 app.include_router(controls.router, prefix="/api", tags=["Controls"])
 app.include_router(voices.router, prefix="/api", tags=["Voices"])
+
+# Dependency provider functions
+def get_bot(request: Request) -> Bot:
+    return request.app.state.bot
+
+def get_state_service(request: Request) -> StateService:
+    return request.app.state.state_service
 
 @app.get("/")
 async def root():
