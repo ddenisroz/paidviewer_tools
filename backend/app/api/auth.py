@@ -64,7 +64,7 @@ async def login_twitch_callback(request: Request, code: Optional[str] = None):
             jwt_token = create_access_token(data=jwt_data)
 
             # Tell the bot to join the user's channel
-            if bot := request.app.state.bot_instance:
+            if bot := request.app.state.bot:
                 await bot.add_channel(user_login)
 
             # Redirect to the frontend with the JWT token
@@ -91,7 +91,7 @@ async def logout(request: Request, user: dict = Depends(get_current_user)):
     channel_name = user["username"]
     
     try:
-        bot: TwitchBot = request.app.state.bot_instance
+        bot: TwitchBot = request.app.state.bot
         await bot.remove_channel(channel_name)
         return {"message": f"Bot has left channel {channel_name}"}
     except Exception as e:

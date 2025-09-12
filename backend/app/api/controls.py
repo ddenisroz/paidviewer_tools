@@ -3,9 +3,9 @@ from pydantic import BaseModel
 
 from app.core.security import get_current_user
 from app.bot import Bot as TwitchBot
-from app.main import get_bot
+from app.dependencies import get_bot
 from app.services.state_service import StateService
-from app.main import get_state_service
+from app.dependencies import get_state_service
 
 router = APIRouter()
 
@@ -14,6 +14,10 @@ class TTSState(BaseModel):
 
 class VolumeState(BaseModel):
     volume: float # Should be between 0.0 and 1.0
+
+class GenerationSettings(BaseModel):
+    temperature: float # [0.0, 1.0]
+    stability: float   # [0.0, 1.0]
 
 @router.post("/tts/toggle")
 async def toggle_tts(tts_state: TTSState, user: dict = Depends(get_current_user), state_service: StateService = Depends(get_state_service)):
@@ -32,6 +36,36 @@ async def set_volume(volume_state: VolumeState, user: dict = Depends(get_current
 
     state_service.set_volume(channel_name, volume_state.volume)
     return {"message": f"Volume for channel {channel_name} set to {volume_state.volume}"}
+
+@router.post("/generation")
+async def set_generation_params(settings: GenerationSettings, user: dict = Depends(get_current_user), state_service: StateService = Depends(get_state_service)):
+    channel_name = user.get("username")
+    if not channel_name:
+        raise HTTPException(status_code=400, detail="Channel name not found in token")
+    
+    state_service.set_generation_settings(channel_name, settings.temperature, settings.stability)
+    return {"message": "Generation settings updated successfully."}
+
+@router.get("/generation/global")
+async def get_global_generation_settings(
+    user: dict = Depends(get_current_user),
+    state_service: StateService = Depends(get_state_service)
+):
+    """Get global default generation settings"""
+    return state_service.get_global_generation_settings()
+
+@router.post("/generation/global")
+async def set_global_generation_settings(
+    settings: GenerationSettings,
+    user: dict = Depends(get_current_user),
+    state_service: StateService = Depends(get_state_service)
+):
+    """Set global default generation settings for all channels"""
+    state_service.set_global_generation_settings(
+        settings.temperature, 
+        settings.stability
+    )
+    return {"message": "Global generation settings updated successfully"}
 
 @router.post("/queue/clear")
 async def clear_queue(user: dict = Depends(get_current_user), bot: TwitchBot = Depends(get_bot)):
@@ -53,9 +87,18 @@ async def get_status(user: dict = Depends(get_current_user), state_service: Stat
     state = state_service.get_channel_state(channel_name)
     if not state:
         # Return a default "off" state if the user has never logged in before
-        return {"is_enabled": False, "volume": 0.5}
+        return {
+            "is_enabled": False, 
+            "volume": 0.5,
+            "temperature": 0.75,
+            "stability": 0.5
+        }
 
     return {
         "is_enabled": state.get("tts_enabled", False),
-        "volume": state.get("volume", 0.5)
+        "volume": state.get("volume", 0.5),
+        "temperature": state.get("temperature", 0.3),
+        "stability": state.get("stability", 0.7),
+        "channel_name": channel_name,
+        "note": "Settings apply to your channel only"
     }

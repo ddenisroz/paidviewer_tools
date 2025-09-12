@@ -66,16 +66,17 @@ class AudioService:
         try:
             audio = AudioSegment.from_wav(audio_path)
 
-            # Apply volume adjustment
+            # First normalize audio
+            normalized_audio = audio.apply_gain(-20.0 - audio.dBFS)
+            
+            # Then apply volume adjustment
             # Convert volume (0-1 linear) to dB change
             # A volume of 1.0 is 0dB (no change), 0.5 is -6dB, 0.0 is -inf dB.
             if self.volume > 0:
                 db_change = 20 * np.log10(self.volume)
-                audio = audio + db_change
+                normalized_audio = normalized_audio + db_change
             else:
-                audio = audio - 100 # Effectively silent
-
-            normalized_audio = audio.apply_gain(-20.0 - audio.dBFS)
+                normalized_audio = normalized_audio - 100 # Effectively silent
 
             samples = np.array(normalized_audio.get_array_of_samples()).astype(np.int16)
 

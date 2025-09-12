@@ -2,7 +2,8 @@ fastapi
 uvicorn[standard]
 twitchio==2.8.1
 python-dotenv
-chatterbox-tts
+TTS
+scipy
 pydub
 sounddevice
 numpy
@@ -12,3 +13,4 @@ websockets
 python-jose[cryptography]
 python-multipart
 pydantic-settings
+httpx

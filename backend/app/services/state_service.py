@@ -37,7 +37,9 @@ class StateService:
             self.channels[channel_name] = {
                 "tts_enabled": False,
                 "volume": 0.5,
-                "user_voices": {} # New field for user voice preferences
+                "user_voices": {}, # New field for user voice preferences
+                "temperature": 0.3, # Lower temperature to reduce repetition
+                "stability": 0.5   # Default stability (exaggeration)
             }
             logger.info(f"Registered new channel: {channel_name}")
             self._save_state_to_disk()
@@ -70,6 +72,34 @@ class StateService:
         if state:
             state["volume"] = max(0.0, min(1.0, volume))
             self._save_state_to_disk()
+
+    # Methods for managing generation settings
+    def get_generation_settings(self, channel_name: str) -> dict:
+        state = self.get_channel_state(channel_name)
+        if state:
+            return {
+                "temperature": state.get("temperature", 0.3),
+                "stability": state.get("stability", 0.7)
+            }
+        return {"temperature": 0.3, "stability": 0.7} # Default values
+    
+    def get_global_generation_settings(self) -> dict:
+        """Get global default generation settings for all channels"""
+        return {"temperature": 0.3, "stability": 0.7}
+    
+    def set_global_generation_settings(self, temperature: float, stability: float):
+        """Set global default generation settings for new channels"""
+        # This would be stored in a separate global config file
+        # For now, we'll just update the default values
+        pass
+
+    def set_generation_settings(self, channel_name: str, temperature: float, stability: float):
+        state = self.get_channel_state(channel_name)
+        if state:
+            state["temperature"] = max(0.0, min(1.0, temperature))
+            state["stability"] = max(0.0, min(1.0, stability))
+            self._save_state_to_disk()
+
 
     # Methods for managing user voices
     def get_user_voice(self, channel_name: str, user_name: str) -> str | None:

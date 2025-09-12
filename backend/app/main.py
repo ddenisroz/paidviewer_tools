@@ -85,13 +85,6 @@ app.include_router(auth.router, tags=["Authentication"])
 app.include_router(controls.router, prefix="/api", tags=["Controls"])
 app.include_router(voices.router, prefix="/api", tags=["Voices"])
 
-# Dependency provider functions
-def get_bot(request: Request) -> Bot:
-    return request.app.state.bot
-
-def get_state_service(request: Request) -> StateService:
-    return request.app.state.state_service
-
 @app.get("/")
 async def root():
     return {"message": "TTS_TTV API is running"}

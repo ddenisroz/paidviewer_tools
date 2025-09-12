@@ -1,7 +1,9 @@
 {
     "yourchy": {
         "tts_enabled": true,
-        "volume": 1.0,
-        "queue": []
+        "volume": 0.5,
+        "user_voices": {},
+        "temperature": 0.3,
+        "stability": 0.5
     }
 }

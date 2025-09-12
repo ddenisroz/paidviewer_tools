@@ -1,5 +1,5 @@
 // src/components/ControlPanel.jsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
 
@@ -22,9 +22,13 @@ function Switch({ isOn, handleToggle }) {
 export default function ControlPanel() {
   const [isTtsEnabled, setIsTtsEnabled] = useState(false);
   const [volume, setVolume] = useState(0.5); // Store volume as a float [0, 1]
+  const [temperature, setTemperature] = useState(0.3);  // Lower default to reduce repetition
+  const [stability, setStability] = useState(0.7);      // Higher default for stability
   const [error, setError] = useState('');
   const api = useApi();
   const { isAuthenticated } = useAuth();
+  const debounceTimeoutRef = useRef(null);
+
 
   // Fetches the current status from the backend and updates the state
   const fetchStatus = useCallback(async () => {
@@ -34,6 +38,8 @@ export default function ControlPanel() {
         const response = await api.get('/api/status');
         setIsTtsEnabled(response.data.is_enabled);
         setVolume(response.data.volume);
+        setTemperature(response.data.temperature);
+        setStability(response.data.stability);
       } catch (err) {
         console.error("Error fetching status:", err);
         setError('Could not fetch bot status.');
@@ -80,6 +86,29 @@ export default function ControlPanel() {
       await fetchStatus();
     }
   };
+
+  const handleGenerationChange = (newTemp, newStability) => {
+    // Update UI optimistically
+    setTemperature(newTemp);
+    setStability(newStability);
+
+    // Clear the previous timeout if it exists
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    // Set a new timeout to send the request after 500ms of inactivity
+    debounceTimeoutRef.current = setTimeout(async () => {
+      try {
+        setError('');
+        await api.post('/api/generation', { temperature: newTemp, stability: newStability });
+      } catch (err) {
+        console.error("Error setting generation params:", err);
+        setError('Failed to update generation settings.');
+        await fetchStatus(); // Revert on error
+      }
+    }, 500);
+  };
   
   const handleClearQueue = async () => {
     try {
@@ -101,7 +130,7 @@ export default function ControlPanel() {
           <span className="text-lg text-slate-200">Enable TTS Bot</span>
           <Switch isOn={isTtsEnabled} handleToggle={handleTtsToggle} />
         </div>
-        <div className="flex items-center justify-between">
+        <div className="space-y-2">
             <label htmlFor="volume-slider" className="text-lg text-slate-200 mr-4">Volume ({Math.round(volume * 100)}%)</label>
             <input
                 type="range"
@@ -110,6 +139,32 @@ export default function ControlPanel() {
                 max="100"
                 value={Math.round(volume * 100)}
                 onChange={handleVolumeChange}
+                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+            />
+        </div>
+         <div className="space-y-2">
+            <label htmlFor="temp-slider" className="text-lg text-slate-200 mr-4">Creativity ({Math.round(temperature * 100)}%)</label>
+            <p className="text-sm text-slate-400">Higher values make speech more expressive, but less predictable. Settings apply to your channel only.</p>
+            <input
+                type="range"
+                id="temp-slider"
+                min="0"
+                max="100"
+                value={Math.round(temperature * 100)}
+                onChange={(e) => handleGenerationChange(parseInt(e.target.value, 10) / 100.0, stability)}
+                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+            />
+        </div>
+         <div className="space-y-2">
+            <label htmlFor="stability-slider" className="text-lg text-slate-200 mr-4">Stability ({Math.round(stability * 100)}%)</label>
+            <p className="text-sm text-slate-400">Higher values make speech more stable, but can sound robotic. Lower values can sound more emotional, but risk artifacts.</p>
+            <input
+                type="range"
+                id="stability-slider"
+                min="0"
+                max="100"
+                value={Math.round(stability * 100)}
+                onChange={(e) => handleGenerationChange(temperature, parseInt(e.target.value, 10) / 100.0)}
                 className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
             />
         </div>

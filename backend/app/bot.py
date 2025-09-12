@@ -63,6 +63,7 @@ class Bot(commands.Bot):
 
 
     async def event_message(self, message):
+        from app.core.config import settings
         if message.echo or message.content.startswith(settings.BOT_PREFIX):
             # Let the command handler process the command
             await self.handle_commands(message)
@@ -77,6 +78,9 @@ class Bot(commands.Bot):
 
         logger.info(f"Received message from {author_name} in {channel_name}: {message.content}")
 
+        # Get generation settings for the channel
+        settings = self.state_service.get_generation_settings(channel_name)
+        
         # Determine which voice to use
         selected_voice_name = self.state_service.get_user_voice(channel_name, author_name) or "default"
         
@@ -90,7 +94,9 @@ class Bot(commands.Bot):
             wav_path = self.tts_service.synthesize_speech(
                 text=message.content, 
                 voice_name=selected_voice_name,
-                channel_name=channel_name
+                channel_name=channel_name,
+                temperature=settings["temperature"],
+                stability=settings["stability"]
             )
             if wav_path:
                 self.audio_service.add_to_queue(wav_path)
