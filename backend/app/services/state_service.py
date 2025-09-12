@@ -92,28 +92,4 @@ class StateService:
             del state["user_voices"][user_name]
             self._save_state_to_disk()
 
-    def get_queue(self, channel_name: str) -> list:
-        # This seems to be unused, audio service has its own queue.
-        # Consider removing if it's truly redundant.
-        state = self.get_channel_state(channel_name)
-        return state.get("queue", [])
-
-    def add_to_queue(self, channel_name: str, item):
-        state = self.get_channel_state(channel_name)
-        if state:
-            if "queue" not in state:
-                state["queue"] = []
-            state["queue"].append(item)
-            # No need to save state for queue changes as it's ephemeral
-    
-    def get_next_in_queue(self, channel_name: str):
-        queue = self.get_queue(channel_name)
-        return queue.pop(0) if queue else None
-
-    def clear_queue(self, channel_name: str):
-        state = self.get_channel_state(channel_name)
-        if state:
-            state["queue"] = []
-            logger.info(f"Queue cleared for channel {channel_name}")
-
 # state_service_instance = StateService()
