@@ -14,3 +14,5 @@ python-jose[cryptography]
 python-multipart
 pydantic-settings
 httpx
+transformers==4.41.2
+ruaccent

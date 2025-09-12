@@ -1,17 +1,59 @@
-import torch
-from TTS.api import TTS
-import os
-from pathlib import Path
-from typing import Optional
-import soundfile as sf
 import logging
 import tempfile
+from pathlib import Path
+from typing import Optional
+
+import torch  # Import torch first to prevent conflicts
 import numpy as np
+import soundfile as sf
+from ruaccent import RUAccent
 from scipy import signal
+
+from TTS.api import TTS
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Initialize the accentizer model once
+try:
+    accentizer = RUAccent()
+    accentizer.load(omograph_model_size='turbo', use_dictionary=True)
+    logger.info("RUAccent model loaded successfully.")
+except Exception as e:
+    logger.error(f"Failed to load RUAccent model: {e}", exc_info=True)
+    accentizer = None
+
+
+def _preprocess_text(text: str) -> str:
+    """Cleans, accentuates, and prepares text for TTS synthesis."""
+
+    # The acute accent is the proper unicode stress marker.
+    STRESS_MARKER = '´'
+    
+    accented_text = ""
+    # Handle manual stress marks first (priority)
+    if '+' in text:
+        # User is providing manual stress, replace '+' with the actual accent mark.
+        accented_text = text.replace('+', STRESS_MARKER)
+    elif accentizer:
+        # No manual stress, use automatic accentuation and then replace its marker.
+        text_with_plus = accentizer.process_all(text)
+        accented_text = text_with_plus.replace('+', STRESS_MARKER)
+    else:
+        # Accentizer failed to load, use text as is.
+        accented_text = text
+
+    # Standard text cleaning on the correctly accented text.
+    # We will pass the stress marker ´ to the TTS model this time.
+    processed_text = accented_text.replace('…', '.').replace('..', '.').replace(' -- ', ', ')
+    processed_text = processed_text.replace('—', '-').replace('"', '').replace('«', '').replace('»', '')
+    processed_text = processed_text.replace(',', ', ').replace('.', '. ').replace('!', '! ').replace('?', '? ')
+    
+    # Collapse multiple spaces into one
+    processed_text = ' '.join(processed_text.split())
+
+    return processed_text.strip()
 
 
 class TTSService:
@@ -72,7 +114,7 @@ class TTSService:
             return None
 
         # Preprocess text
-        text = text.strip()
+        text = _preprocess_text(text.strip()) # Use the new preprocessing function
         if not text:
             return None
         if len(text) > 250:  # Increased limit slightly
