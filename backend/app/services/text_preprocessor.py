@@ -7,6 +7,7 @@
 
 import re
 import logging
+from collections import Counter
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +35,6 @@ HUNDREDS = {
     '100': 'сто', '200': 'двести', '300': 'триста', '400': 'четыреста',
     '500': 'пятьсот', '600': 'шестьсот', '700': 'семьсот', '800': 'восемьсот', '900': 'девятьсот'
 }
-
-
-def filter_repeated_chars(text: str) -> str:
-    # Remove sequences of 3 or more identical characters
-    return re.sub(r'(.)\1{2,}', r'\1', text)
 
 
 def convert_digit_to_word(digit: str) -> str:
@@ -181,16 +177,38 @@ def preprocess_text_for_tts(text: str) -> str:
         text: Исходный текст
         
     Returns:
-        Обработанный текст с числами, конвертированными в слова
+        Обработанный текст с числами, конвертированными в слова, или пустую строку для спама.
     """
-    if not text or not text.strip():
-        return text
+    processed_text = text.strip()
+    if not processed_text:
+        return ""
     
-    logger.info(f"Original text: '{text}'")
+    logger.info(f"Original text: '{processed_text}'")
+
+    # --- Улучшенная фильтрация спама ---
+    text_no_spaces = processed_text.replace(" ", "")
+    if not text_no_spaces:
+        return ""  # Сообщение состояло только из пробелов
+
+    # 1. Фильтр сообщений с низкой вариативностью символов (например, "хххххххххххххada")
+    if len(text_no_spaces) >= 10:
+        counts = Counter(text_no_spaces)
+        most_common_char_count = counts.most_common(1)[0][1]
+        # Если самый частый символ составляет >80% сообщения, считаем это спамом
+        if (most_common_char_count / len(text_no_spaces)) > 0.8:
+            logger.info(f"Filtered spam message (low diversity): '{text}'")
+            return ""
+
+    # 2. Фильтр сообщений, состоящих в основном из не-буквенных/цифровых символов (например, "???!!!")
+    alnum_chars = sum(1 for char in text_no_spaces if char.isalnum())
+    total_chars = len(text_no_spaces)
     
-    # Убираем лишние пробелы
-    processed_text = ' '.join(text.split())
-    
+    # Если в сообщении 3+ символов и менее 30% из них - буквы или цифры, считаем это спамом
+    if total_chars >= 3 and (alnum_chars / total_chars) < 0.3:
+        logger.info(f"Filtered spam message (mostly non-alphanumeric): '{text}'")
+        return ""
+    # --- Конец улучшенной фильтрации ---
+
     # Обрабатываем никнеймы с числами
     processed_text = process_username_numbers(processed_text)
     
@@ -202,9 +220,6 @@ def preprocess_text_for_tts(text: str) -> str:
 
     # Убираем лишние пробелы после обработки
     processed_text = ' '.join(processed_text.split())
-
-    # Удаляем повторяющиеся символы
-    processed_text = filter_repeated_chars(processed_text)
     
     logger.info(f"Processed text: '{processed_text}'")
     
