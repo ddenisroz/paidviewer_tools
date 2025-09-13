@@ -80,8 +80,25 @@ def convert_number_to_words(number: str) -> str:
                     return f"{hundreds_word} {TENS[str(tens)]}"
                 else:
                     return f"{hundreds_word} {TENS[str(tens)]} {DIGITS_TO_WORDS[str(ones)]}"
+    elif num < 10000:
+        # Обработка тысяч (1000-9999)
+        thousands = num // 1000
+        remainder = num % 1000
+        
+        if thousands == 1:
+            thousands_word = "тысяча"
+        elif thousands in [2, 3, 4]:
+            thousands_word = f"{DIGITS_TO_WORDS[str(thousands)]} тысячи"
+        else:
+            thousands_word = f"{DIGITS_TO_WORDS[str(thousands)]} тысяч"
+        
+        if remainder == 0:
+            return thousands_word
+        else:
+            remainder_word = convert_number_to_words(str(remainder))
+            return f"{thousands_word} {remainder_word}"
     else:
-        # Для больших чисел просто произносим по цифрам
+        # Для очень больших чисел произносим по цифрам
         return ' '.join([DIGITS_TO_WORDS[digit] for digit in number])
 
 
@@ -98,10 +115,10 @@ def process_username_numbers(text: str) -> str:
         
         for part in parts:
             if part.isdigit():
-                # Для никнеймов используем более простую конвертацию
-                if len(part) <= 3:  # Для чисел до 999 используем полную конвертацию
+                # Для никнеймов используем полную конвертацию для чисел до 9999 (включая годы)
+                if len(part) <= 4:  # Для чисел до 9999 используем полную конвертацию
                     result_parts.append(convert_number_to_words(part))
-                else:  # Для больших чисел произносим по цифрам
+                else:  # Для очень больших чисел произносим по цифрам
                     result_parts.append(' '.join([DIGITS_TO_WORDS[digit] for digit in part]))
             else:
                 # Оставляем буквы как есть
@@ -138,10 +155,10 @@ def process_mixed_text(text: str) -> str:
         
         for part in parts:
             if part.isdigit():
-                # Для чисел в никнеймах используем более простую конвертацию
-                if len(part) <= 3:  # Для чисел до 999 используем полную конвертацию
+                # Для чисел в смешанном тексте используем полную конвертацию для чисел до 9999
+                if len(part) <= 4:  # Для чисел до 9999 используем полную конвертацию
                     result_parts.append(convert_number_to_words(part))
-                else:  # Для больших чисел произносим по цифрам
+                else:  # Для очень больших чисел произносим по цифрам
                     result_parts.append(' '.join([DIGITS_TO_WORDS[digit] for digit in part]))
             else:
                 result_parts.append(part)
