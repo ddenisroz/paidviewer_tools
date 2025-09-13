@@ -13,6 +13,7 @@ from huggingface_hub import hf_hub_download
 from fastapi.concurrency import run_in_threadpool
 
 from app.core.config import settings
+from app.services.text_preprocessor import preprocess_text_for_tts
 
 logger = logging.getLogger(__name__)
 
@@ -102,8 +103,8 @@ class TTSService:
             ref_text_to_use = DEFAULT_VOICE_TRANSCRIPTION
             logger.info("Using pre-defined transcription for default voice.")
 
-        # --- Text sanitization & processing ---
-        processed_text = text.strip()
+        # --- Text preprocessing for better TTS ---
+        processed_text = preprocess_text_for_tts(text.strip())
         if processed_text and not processed_text.endswith(('.', '!', '?')):
             processed_text += '.'
 
