@@ -6,17 +6,20 @@ from app.core.config import settings
 from app.services.state_service import StateService
 from app.services.tts_service import TTSService
 from app.services.audio_service import AudioService
+from app.services.seventv_service import SevenTVService
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
 class Bot(commands.Bot):
-    def __init__(self, tts_service: TTSService, audio_service: AudioService, state_service: StateService):
+    def __init__(self, tts_service: TTSService, audio_service: AudioService, state_service: StateService, seventv_service: SevenTVService):
         super().__init__(token=settings.TWITCH_BOT_TOKEN, prefix=settings.BOT_PREFIX, initial_channels=[])
         self.tts_service = tts_service
         self.audio_service = audio_service
         self.state_service = state_service
+        self.seventv_service = seventv_service
+        self.channel_emotes = {}
         logger.info("Bot initialized and waiting for channels...")
 
     async def event_ready(self):
@@ -30,6 +33,18 @@ class Bot(commands.Bot):
             await self.join_channels([channel_name_lower])
             logger.info(f"Successfully joined channel: {channel_name_lower}")
             self.state_service.register_channel(channel_name_lower)
+            
+            # Fetch 7TV emotes for the channel
+            try:
+                users = await self.fetch_users(names=[channel_name_lower])
+                if users:
+                    user_id = users[0].id
+                    emotes = await self.seventv_service.get_channel_emotes(user_id)
+                    self.channel_emotes[channel_name_lower] = emotes
+                    logger.info(f"Fetched {len(emotes)} 7TV emotes for channel '{channel_name_lower}'.")
+            except Exception as e:
+                logger.error(f"Failed to fetch 7TV emotes for {channel_name_lower}: {e}")
+
         else:
             logger.info(f"Bot is already in channel: {channel_name_lower}")
 
@@ -76,8 +91,26 @@ class Bot(commands.Bot):
         if not self.state_service.is_tts_enabled(channel_name):
             return
 
+        # Get channel settings
+        channel_settings = await self.state_service.get_channel_settings(channel_name)
+        read_emotes = channel_settings.get("read_emotes", False)
+
+        message_content = message.content
+        words = message_content.split()
+
+        # Filter out emotes if read_emotes is False
+        if not read_emotes:
+            channel_emotes = self.channel_emotes.get(channel_name, [])
+            words = [word for word in words if word not in channel_emotes]
+            message_content = " ".join(words)
+
+        # Skip single-character messages that are not emotes (or if emotes are disabled)
+        if len(message_content.strip()) <= 1:
+            logger.info(f"Skipping single-character message from {author_name} in {channel_name}.")
+            return
+
         # Limit character count to prevent crashes on very long messages
-        if len(message.content) > 350:
+        if len(message_content) > 350:
             logger.warning(f"Message from {author_name} exceeds character limit ({len(message.content)} > 350). Skipping TTS.")
             # Optionally send a message back to the channel
             # await message.channel.send(f"@{author_name}, ваше сообщение слишком длинное для TTS.")
@@ -99,7 +132,7 @@ class Bot(commands.Bot):
 
         try:
             wav_path = await self.tts_service.synthesize_speech(
-                text=message.content,
+                text=message_content,
                 voice_name=selected_voice_name,
                 channel_name=channel_name
             )

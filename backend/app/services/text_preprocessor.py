@@ -36,6 +36,11 @@ HUNDREDS = {
 }
 
 
+def filter_repeated_chars(text: str) -> str:
+    # Remove sequences of 3 or more identical characters
+    return re.sub(r'(.)\1{2,}', r'\1', text)
+
+
 def convert_digit_to_word(digit: str) -> str:
     """Конвертирует одну цифру в слово."""
     return DIGITS_TO_WORDS.get(digit, digit)
@@ -191,12 +196,15 @@ def preprocess_text_for_tts(text: str) -> str:
     
     # Обрабатываем смешанный текст
     processed_text = process_mixed_text(processed_text)
-    
+
     # Обрабатываем отдельно стоящие числа
     processed_text = process_standalone_numbers(processed_text)
-    
+
     # Убираем лишние пробелы после обработки
     processed_text = ' '.join(processed_text.split())
+
+    # Удаляем повторяющиеся символы
+    processed_text = filter_repeated_chars(processed_text)
     
     logger.info(f"Processed text: '{processed_text}'")
     

@@ -39,7 +39,10 @@ class StateService:
                 "volume": 0.5,
                 "user_voices": {}, # New field for user voice preferences
                 "temperature": 0.3, # Lower temperature to reduce repetition
-                "stability": 0.5   # Default stability (exaggeration)
+                "stability": 0.5,   # Default stability (exaggeration)
+                "settings": {
+                    "read_emotes": False
+                }
             }
             logger.info(f"Registered new channel: {channel_name}")
             self._save_state_to_disk()
@@ -121,5 +124,23 @@ class StateService:
         if state and "user_voices" in state and user_name in state["user_voices"]:
             del state["user_voices"][user_name]
             self._save_state_to_disk()
+
+    # Methods for managing channel settings
+    async def get_channel_settings(self, channel_name: str) -> dict:
+        state = self.get_channel_state(channel_name)
+        if not state:
+            raise ValueError(f"Channel '{channel_name}' not found.")
+        return state.get("settings", {"read_emotes": False})
+
+    async def update_channel_settings(self, channel_name: str, new_settings: dict):
+        state = self.get_channel_state(channel_name)
+        if not state:
+            raise ValueError(f"Channel '{channel_name}' not found.")
+        
+        if "settings" not in state:
+            state["settings"] = {}
+            
+        state["settings"].update(new_settings)
+        self._save_state_to_disk()
 
 # state_service_instance = StateService()

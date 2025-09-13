@@ -4,6 +4,9 @@
         "volume": 0.5,
         "user_voices": {},
         "temperature": 0.3,
-        "stability": 0.5
+        "stability": 0.5,
+        "settings": {
+            "read_emotes": false
+        }
     }
 }

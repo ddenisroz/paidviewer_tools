@@ -4,11 +4,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, controls, voices
+from app.api import auth, controls, voices, settings
 from app.services.tts_service import TTSService
 from app.services.audio_service import AudioService
 from app.services.state_service import StateService
 from app.bot import Bot
+from app.services.seventv_service import SevenTVService
 
 # Basic logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -22,12 +23,14 @@ async def lifespan(app: FastAPI):
     state_service = StateService()
     audio_service = AudioService()
     tts_service = TTSService(state_service=state_service)
+    seventv_service = SevenTVService()
     
     # Create bot instance and store it on the app state
     bot_instance = Bot(
         tts_service=tts_service,
         audio_service=audio_service,
-        state_service=state_service
+        state_service=state_service,
+        seventv_service=seventv_service
     )
     
     # Store instances on the app state to make them accessible from endpoints
@@ -81,9 +84,10 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(auth.router, tags=["Authentication"])
+app.include_router(auth.router, prefix="/api", tags=["Authentication"])
 app.include_router(controls.router, prefix="/api", tags=["Controls"])
 app.include_router(voices.router, prefix="/api", tags=["Voices"])
+app.include_router(settings.router, prefix="/api", tags=["Settings"])
 
 @app.get("/")
 async def root():

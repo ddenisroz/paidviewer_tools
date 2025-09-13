@@ -10,6 +10,7 @@ const AuthCallbackPage = () => {
 
   useEffect(() => {
     const token = searchParams.get('token');
+    
     if (token) {
       login(token);
       navigate('/dashboard', { replace: true });

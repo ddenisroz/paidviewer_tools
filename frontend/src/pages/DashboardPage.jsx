@@ -1,8 +1,12 @@
 // src/pages/DashboardPage.jsx
 import { useAuth } from "../context/AuthContext";
+import ControlPanel from '../components/ControlPanel';
+import VoiceManager from '../components/VoiceManager';
+import TtsSettings from '../components/TtsSettings';
 
 export default function DashboardPage() {
-    const { logout } = useAuth();
+    const { user, logout } = useAuth();
+    const channelName = user?.login;
 
     const handleLogout = () => {
         logout();
@@ -21,7 +25,15 @@ export default function DashboardPage() {
                     </button>
                 </header>
                 <main>
-                    <p>Welcome to your dashboard!</p>
+                    {channelName ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <ControlPanel channelName={channelName} />
+                            <VoiceManager channelName={channelName} />
+                            <TtsSettings channelName={channelName} />
+                        </div>
+                    ) : (
+                        <p>Loading user information...</p>
+                    )}
                 </main>
             </div>
         </div>

@@ -9,7 +9,7 @@ from app.bot import Bot as TwitchBot # Use the correct Bot class
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-@router.get("/twitch")
+@router.get("/twitch/login")
 async def login_twitch():
     """
     Redirects the user to the Twitch authorization page.
@@ -68,7 +68,7 @@ async def login_twitch_callback(request: Request, code: Optional[str] = None):
                 await bot.add_channel(user_login)
 
             # Redirect to the frontend with the JWT token
-            response = RedirectResponse(url=f"http://localhost:5173/auth/callback#{jwt_token}")
+            response = RedirectResponse(url=f"http://localhost:5173/auth/callback?token={jwt_token}")
             return response
 
     except httpx.HTTPStatusError as e:
