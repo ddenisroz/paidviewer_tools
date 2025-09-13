@@ -9,7 +9,8 @@ import soundfile as sf
 import torch
 import torchaudio
 from f5_tts.api import F5TTS
-from huggingface_hub import hf_hub_download # Import hf_hub_download
+from huggingface_hub import hf_hub_download
+from fastapi.concurrency import run_in_threadpool
 
 from app.core.config import settings
 
@@ -85,8 +86,8 @@ class TTSService:
         logger.warning("No voice sample found (neither channel-specific nor default).")
         return None
 
-    def synthesize_speech(self, text: str, voice_name: str, channel_name: str) -> Optional[str]:
-        """Synthesizes speech using the F5-TTS Russian model."""
+    async def synthesize_speech(self, text: str, voice_name: str, channel_name: str) -> Optional[str]:
+        """Synthesizes speech using the F5-TTS Russian model in a non-blocking way."""
         if not self.f5tts:
             logger.error("TTS Service is not ready. F5-TTS model is not loaded.")
             return None
@@ -117,8 +118,9 @@ class TTSService:
             output_filename = f"{hash(text + voice_name)}.wav"
             output_path = output_dir / output_filename
 
-            # Use F5-TTS to synthesize speech
-            wav, sr, spect = self.f5tts.infer(
+            # Use F5-TTS to synthesize speech in a thread pool to avoid blocking
+            wav, sr, spect = await run_in_threadpool(
+                self.f5tts.infer,
                 ref_file=voice_path,
                 ref_text=ref_text_to_use,  # Use pre-defined or empty text
                 gen_text=processed_text,

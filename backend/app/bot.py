@@ -76,10 +76,17 @@ class Bot(commands.Bot):
         if not self.state_service.is_tts_enabled(channel_name):
             return
 
+        # Limit character count to prevent crashes on very long messages
+        if len(message.content) > 350:
+            logger.warning(f"Message from {author_name} exceeds character limit ({len(message.content)} > 350). Skipping TTS.")
+            # Optionally send a message back to the channel
+            # await message.channel.send(f"@{author_name}, ваше сообщение слишком длинное для TTS.")
+            return
+
         logger.info(f"Received message from {author_name} in {channel_name}: {message.content}")
 
         # Get generation settings for the channel
-        settings = self.state_service.get_generation_settings(channel_name)
+        gen_settings = self.state_service.get_generation_settings(channel_name)
         
         # Determine which voice to use
         selected_voice_name = self.state_service.get_user_voice(channel_name, author_name) or "default"
@@ -91,7 +98,7 @@ class Bot(commands.Bot):
             selected_voice_name = "default"
 
         try:
-            wav_path = self.tts_service.synthesize_speech(
+            wav_path = await self.tts_service.synthesize_speech(
                 text=message.content,
                 voice_name=selected_voice_name,
                 channel_name=channel_name
