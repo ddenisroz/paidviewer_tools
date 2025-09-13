@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
     # Initialize services
     state_service = StateService()
     audio_service = AudioService()
-    tts_service = TTSService()
+    tts_service = TTSService(state_service=state_service)
     
     # Create bot instance and store it on the app state
     bot_instance = Bot(

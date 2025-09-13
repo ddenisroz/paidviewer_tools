@@ -1,0 +1,13 @@
+# Caching
+.cache
+.cache-loader
+.phpunit.cache
+.webpack_cache
+node_modules/
+npm-debug.log
+yarn-error.log
+f5_tts_cache/
+model_cache/
+
+# Environments
+.env

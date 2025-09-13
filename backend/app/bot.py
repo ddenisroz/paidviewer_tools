@@ -94,12 +94,7 @@ class Bot(commands.Bot):
             wav_path = self.tts_service.synthesize_speech(
                 text=message.content,
                 voice_name=selected_voice_name,
-                channel_name=channel_name,
-                temperature=settings.get("temperature", 0.75),
-                length_penalty=settings.get("length_penalty", 1.0),
-                repetition_penalty=settings.get("repetition_penalty", 5.0),
-                top_k=settings.get("top_k", 50),
-                top_p=settings.get("top_p", 0.85)
+                channel_name=channel_name
             )
             if wav_path:
                 self.audio_service.add_to_queue(wav_path)

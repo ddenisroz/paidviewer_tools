@@ -103,7 +103,8 @@ celerybeat.pid
 
 # Environments
 .env
-.venv
+.env*.local
+.env.development.local
 env/
 venv/
 ENV/
@@ -146,3 +147,12 @@ dist/
 .nuxt/
 .svelte-kit/
 .vercel/
+
+# Caching
+.cache
+.cache-loader
+/model_cache/
+/backend/model_cache/
+/backend/f5_tts_cache/
+.phpunit.cache
+.webpack_cache

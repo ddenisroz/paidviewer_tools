@@ -21,9 +21,9 @@ class Settings(BaseSettings):
     TWITCH_CLIENT_SECRET: str
     TWITCH_BOT_TOKEN: str
     TWITCH_REDIRECT_URI: str
-    # TMI_TOKEN: str # Deprecated, use TWITCH_BOT_TOKEN
-    BOT_NICK: str
+    TWITCH_BOT_NICK: str
     BOT_PREFIX: str = "!"
+    FRONTEND_URL: str
     
     # JWT settings
     SECRET_KEY: str

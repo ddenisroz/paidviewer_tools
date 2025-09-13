@@ -2,7 +2,6 @@ fastapi
 uvicorn[standard]
 twitchio==2.8.1
 python-dotenv
-TTS
 scipy
 pydub
 sounddevice
@@ -14,5 +13,6 @@ python-jose[cryptography]
 python-multipart
 pydantic-settings
 httpx
-transformers==4.41.2
-ruaccent
+f5-tts
+soundfile
+huggingface-hub

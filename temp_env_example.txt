@@ -1,0 +1,13 @@
+# Twitch API credentials - Get from https://dev.twitch.tv/
+TWITCH_CLIENT_ID=your_twitch_client_id
+TWITCH_CLIENT_SECRET=your_twitch_client_secret
+TWITCH_BOT_TOKEN=your_twitch_bot_token_including_oauth_prefix
+TWITCH_REDIRECT_URI=http://localhost:8000/api/auth/twitch/callback
+TWITCH_BOT_NICK=your_bot_twitch_username
+
+# Frontend URL
+FRONTEND_URL=http://localhost:5173
+
+# JWT settings - Generate a strong secret key
+# You can use: openssl rand -hex 32
+SECRET_KEY=your_strong_secret_key_here

@@ -1,6 +1,7 @@
 from fastapi import Request
 from app.bot import Bot
 from app.services.state_service import StateService
+from app.services.tts_service import TTSService
 
 # Dependency provider functions
 def get_bot(request: Request) -> Bot:
@@ -10,4 +11,8 @@ def get_bot(request: Request) -> Bot:
 def get_state_service(request: Request) -> StateService:
     """FastAPI dependency to get the state_service instance from the application state."""
     return request.app.state.state_service
+
+def get_tts_service(request: Request) -> TTSService:
+    """FastAPI dependency to get the tts_service instance from the application state."""
+    return request.app.state.tts_service
 

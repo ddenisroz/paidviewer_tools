@@ -1,0 +1,8 @@
+#!H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\backend\.venv\Scripts\python.exe
+# -*- coding: UTF-8 -*-
+from __future__ import print_function, division, absolute_import
+
+from numba.misc.numba_entry import main
+
+if __name__ == "__main__":
+    main()
