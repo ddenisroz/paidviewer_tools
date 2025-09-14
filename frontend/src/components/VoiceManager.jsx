@@ -1,8 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useApi } from '../hooks/useApi';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import api from '../services/api';
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
+
 
 const VoiceManager = () => {
-  const api = useApi();
   const [voices, setVoices] = useState([]);
   const [uploadInfo, setUploadInfo] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -146,135 +156,134 @@ const VoiceManager = () => {
   };
 
   return (
-    <div className="bg-slate-800 rounded-lg p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-white">Управление голосами</h2>
-        <div className="text-sm text-slate-400">
-          {voices.length} голосов
-        </div>
-      </div>
-
-      {/* Информация об ограничениях */}
-      {uploadInfo && (
-        <div className="bg-slate-700 rounded-md p-4 text-sm text-slate-300">
-          <div className="font-medium text-slate-200 mb-2">Требования к файлам:</div>
-          <ul className="space-y-1">
-            <li>• Максимальный размер: {uploadInfo.max_file_size_mb}МБ</li>
-            <li>• Максимальная длительность: {uploadInfo.max_duration_seconds}с (файл будет обрезан)</li>
-            <li>• Поддерживаемые форматы: {uploadInfo.supported_formats.join(', ')}</li>
-            <li>• Автоматическая конвертация в WAV, моно, 22kHz</li>
-          </ul>
-        </div>
-      )}
-
-      {/* Зона загрузки */}
-      <div
-        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-          dragActive 
-            ? 'border-purple-400 bg-purple-400/10' 
-            : 'border-slate-600 hover:border-slate-500'
-        } ${uploading ? 'pointer-events-none opacity-50' : ''}`}
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".mp3,.wav,.flac,.m4a,.ogg,.aac,.wma,.opus,.mp4,.webm"
-          onChange={(e) => handleFileSelect(e.target.files)}
-          className="hidden"
-        />
-
-        {uploading ? (
-          <div className="space-y-4">
-            <div className="text-purple-400 font-medium">Загружается...</div>
-            <div className="w-full bg-slate-700 rounded-full h-2">
-              <div 
-                className="bg-purple-500 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${uploadProgress}%` }}
-              />
+    <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+            <div className="space-y-1">
+                <CardTitle>Управление голосами</CardTitle>
+                <CardDescription>Загрузите свои собственные голоса для TTS.</CardDescription>
             </div>
-            <div className="text-sm text-slate-400">{uploadProgress}%</div>
-          </div>
-        ) : (
-          <>
-            <div className="text-2xl mb-4">🎤</div>
-            <div className="text-white font-medium mb-2">
-              Перетащите аудио файл сюда или 
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="text-purple-400 hover:text-purple-300 ml-1 underline"
-              >
-                выберите файл
-              </button>
+            <div className="text-sm text-muted-foreground bg-secondary px-3 py-1 rounded-md">
+                {voices.length} {voices.length === 1 ? 'голос' : 'голосов'}
             </div>
-            <div className="text-sm text-slate-400">
-              Файл будет автоматически конвертирован в подходящий формат
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Сообщения об ошибках и успехе */}
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-md p-3 text-red-400">
-          {error}
-        </div>
-      )}
-      
-      {success && (
-        <div className="bg-green-500/10 border border-green-500/20 rounded-md p-3 text-green-400">
-          {success}
-        </div>
-      )}
-
-      {/* Список голосов */}
-      <div>
-        <h3 className="text-lg font-semibold text-white mb-4">Загруженные голоса</h3>
-        
-        {loading ? (
-          <div className="text-center py-8 text-slate-400">
-            Загружается...
-          </div>
-        ) : voices.length === 0 ? (
-          <div className="text-center py-8 text-slate-400">
-            Голоса не найдены. Загрузите первый голос!
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {voices.map((voice, index) => (
-              <div key={index} className="bg-slate-700 rounded-md p-4 flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="font-medium text-white">{voice.name}</div>
-                  <div className="text-sm text-slate-400">
-                    {voice.size_kb}КБ • {formatDuration(voice.duration)}
-                  </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+            {/* Информация об ограничениях */}
+            {uploadInfo && (
+                <div className="bg-secondary rounded-md p-4 text-sm text-secondary-foreground">
+                    <div className="font-medium mb-2">Требования к файлам:</div>
+                    <ul className="space-y-1 list-disc list-inside text-muted-foreground">
+                        <li>Максимальный размер: {uploadInfo.max_file_size_mb}МБ</li>
+                        <li>Максимальная длительность: {uploadInfo.max_duration_seconds}с (файл будет обрезан)</li>
+                        <li>Поддерживаемые форматы: {uploadInfo.supported_formats.join(', ')}</li>
+                        <li>Автоматическая конвертация в WAV, моно, 22kHz</li>
+                    </ul>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => deleteVoice(voice.name)}
-                    disabled={loading}
-                    className="px-3 py-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
-                  >
-                    Удалить
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+            )}
 
-      {/* Информация о том, как использовать голоса */}
-      <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-4">
-        <div className="font-medium text-blue-300 mb-2">💡 Как использовать:</div>
-        <div className="text-sm text-blue-200">
-          Загруженные голоса можно использовать в чате командой: <code className="bg-slate-800 px-1 rounded">!voice название_голоса</code>
-        </div>
-      </div>
-    </div>
+            {/* Зона загрузки */}
+            <div
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                dragActive 
+                    ? 'border-primary bg-primary/10' 
+                    : 'border-border hover:border-muted-foreground'
+                } ${uploading ? 'pointer-events-none opacity-50' : ''}`}
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+            >
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept={uploadInfo?.supported_formats.join(',')}
+                    onChange={(e) => handleFileSelect(e.target.files)}
+                    className="hidden"
+                />
+
+                {uploading ? (
+                    <div className="space-y-2">
+                        <div className="font-medium">Загрузка...</div>
+                        <Progress value={uploadProgress} className="w-full" />
+                        <div className="text-sm text-muted-foreground">{uploadProgress}%</div>
+                    </div>
+                ) : (
+                    <>
+                        <div className="text-4xl mb-4">🎤</div>
+                        <div className="font-medium mb-2">
+                        Перетащите аудио файл сюда или{' '}
+                        <Button 
+                            variant="link" 
+                            className="p-0 h-auto text-base"
+                            onClick={() => fileInputRef.current?.click()}
+                        >
+                            выберите файл
+                        </Button>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                        Файл будет автоматически конвертирован в подходящий формат
+                        </div>
+                    </>
+                )}
+            </div>
+            
+            {/* Сообщения об ошибках и успехе */}
+            {error && (
+                <div className="bg-destructive/10 border border-destructive/20 rounded-md p-3 text-destructive-foreground">
+                    {error}
+                </div>
+            )}
+            
+            {success && (
+                <div className="bg-primary/10 border border-primary/20 rounded-md p-3 text-primary-foreground">
+                    {success}
+                </div>
+            )}
+
+            {/* Список голосов */}
+            <div>
+                <h3 className="text-lg font-semibold mb-4">Загруженные голоса</h3>
+                
+                {loading && !uploading ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                        Загрузка...
+                    </div>
+                ) : voices.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                        Голоса не найдены. Загрузите первый голос!
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {voices.map((voice, index) => (
+                            <div key={index} className="bg-secondary rounded-md p-4 flex items-center justify-between">
+                                <div>
+                                    <div className="font-medium">{voice.name}</div>
+                                    <div className="text-sm text-muted-foreground">
+                                        {voice.size_kb}КБ • {formatDuration(voice.duration)}
+                                    </div>
+                                </div>
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => deleteVoice(voice.name)}
+                                    disabled={loading}
+                                >
+                                    Удалить
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </CardContent>
+        <CardFooter>
+            <div className="w-full bg-secondary/50 rounded-md p-4">
+                <div className="font-medium text-foreground mb-2">💡 Как использовать:</div>
+                <div className="text-sm text-muted-foreground">
+                Загруженные голоса можно использовать в чате командой: <code className="bg-background px-1.5 py-0.5 rounded">!voice название_голоса</code>
+                </div>
+            </div>
+        </CardFooter>
+    </Card>
   );
 };
 

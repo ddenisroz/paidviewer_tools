@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.core.security import get_current_user
@@ -12,60 +12,24 @@ router = APIRouter()
 class TTSState(BaseModel):
     is_enabled: bool
 
-class VolumeState(BaseModel):
-    volume: float # Should be between 0.0 and 1.0
-
-class GenerationSettings(BaseModel):
-    temperature: float # [0.0, 1.0]
-    stability: float   # [0.0, 1.0]
-
 @router.post("/tts/toggle")
 async def toggle_tts(tts_state: TTSState, user: dict = Depends(get_current_user), state_service: StateService = Depends(get_state_service)):
     channel_name = user.get("username")
     if not channel_name:
         raise HTTPException(status_code=400, detail="Channel name not found in token")
     
+    # This will now control the bot joining/leaving the channel
+    bot: TwitchBot = get_bot()
+    if tts_state.is_enabled:
+        await bot.join_channels([channel_name])
+        state_service.set_bot_enabled_state(channel_name, True)
+    else:
+        await bot.part_channels([channel_name])
+        state_service.set_bot_enabled_state(channel_name, False)
+        
     state_service.set_tts_enabled(channel_name, tts_state.is_enabled)
     return {"message": f"TTS for channel {channel_name} has been {'enabled' if tts_state.is_enabled else 'disabled'}"}
 
-@router.post("/volume")
-async def set_volume(volume_state: VolumeState, user: dict = Depends(get_current_user), state_service: StateService = Depends(get_state_service)):
-    channel_name = user.get("username")
-    if not channel_name:
-        raise HTTPException(status_code=400, detail="Channel name not found in token")
-
-    state_service.set_volume(channel_name, volume_state.volume)
-    return {"message": f"Volume for channel {channel_name} set to {volume_state.volume}"}
-
-@router.post("/generation")
-async def set_generation_params(settings: GenerationSettings, user: dict = Depends(get_current_user), state_service: StateService = Depends(get_state_service)):
-    channel_name = user.get("username")
-    if not channel_name:
-        raise HTTPException(status_code=400, detail="Channel name not found in token")
-    
-    state_service.set_generation_settings(channel_name, settings.temperature, settings.stability)
-    return {"message": "Generation settings updated successfully."}
-
-@router.get("/generation/global")
-async def get_global_generation_settings(
-    user: dict = Depends(get_current_user),
-    state_service: StateService = Depends(get_state_service)
-):
-    """Get global default generation settings"""
-    return state_service.get_global_generation_settings()
-
-@router.post("/generation/global")
-async def set_global_generation_settings(
-    settings: GenerationSettings,
-    user: dict = Depends(get_current_user),
-    state_service: StateService = Depends(get_state_service)
-):
-    """Set global default generation settings for all channels"""
-    state_service.set_global_generation_settings(
-        settings.temperature, 
-        settings.stability
-    )
-    return {"message": "Global generation settings updated successfully"}
 
 @router.post("/queue/clear")
 async def clear_queue(user: dict = Depends(get_current_user), bot: TwitchBot = Depends(get_bot)):
@@ -77,28 +41,7 @@ async def clear_queue(user: dict = Depends(get_current_user), bot: TwitchBot = D
     # Note: audio queue is global, not per-channel in this implementation
     return {"message": f"Audio queue cleared for channel {channel_name}"}
 
-
-@router.get("/status")
-async def get_status(user: dict = Depends(get_current_user), state_service: StateService = Depends(get_state_service)):
-    channel_name = user.get("username")
-    if not channel_name:
-        raise HTTPException(status_code=400, detail="Channel name not found in token")
-
-    state = state_service.get_channel_state(channel_name)
-    if not state:
-        # Return a default "off" state if the user has never logged in before
-        return {
-            "is_enabled": False, 
-            "volume": 0.5,
-            "temperature": 0.75,
-            "stability": 0.5
-        }
-
-    return {
-        "is_enabled": state.get("tts_enabled", False),
-        "volume": state.get("volume", 0.5),
-        "temperature": state.get("temperature", 0.3),
-        "stability": state.get("stability", 0.7),
-        "channel_name": channel_name,
-        "note": "Settings apply to your channel only"
-    }
+@router.get("/status/{channel_name}")
+async def get_bot_status(channel_name: str, state_service: StateService = Depends(get_state_service)):
+    is_enabled = state_service.get_bot_enabled_state(channel_name)
+    return {"channel_name": channel_name, "is_enabled": is_enabled}

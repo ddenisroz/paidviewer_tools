@@ -1,13 +1,22 @@
-# Twitch API credentials - Get from https://dev.twitch.tv/
-TWITCH_CLIENT_ID=your_twitch_client_id
-TWITCH_CLIENT_SECRET=your_twitch_client_secret
-TWITCH_BOT_TOKEN=your_twitch_bot_token_including_oauth_prefix
-TWITCH_REDIRECT_URI=http://localhost:8000/api/auth/twitch/callback
-TWITCH_BOT_NICK=your_bot_twitch_username
+# General
+PROJECT_NAME="TTS_TTV"
 
-# Frontend URL
-FRONTEND_URL=http://localhost:5173
+# Paths (these are set automatically, no need to change)
+# VOICES_PATH=./backend/voices
+# AUDIO_CACHE_PATH=./backend/audio_cache
 
-# JWT settings - Generate a strong secret key
-# You can use: openssl rand -hex 32
-SECRET_KEY=your_strong_secret_key_here
+# Twitch API credentials
+TWITCH_CLIENT_ID="your_twitch_client_id"
+TWITCH_CLIENT_SECRET="your_twitch_client_secret"
+TWITCH_BOT_TOKEN="oauth:your_bot_token"
+TWITCH_BOT_NICK="your_bot_username"
+FRONTEND_URL="http://localhost:5173"
+
+# VK Video Live API credentials
+VK_CLIENT_ID="your_vk_client_id"
+VK_CLIENT_SECRET="your_vk_client_secret"
+
+# JWT settings
+SECRET_KEY="your_super_secret_key_for_jwt"
+ALGORITHM="HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES=43200

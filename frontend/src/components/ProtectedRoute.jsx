@@ -1,9 +1,20 @@
 // src/components/ProtectedRoute.jsx
+import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-export default function ProtectedRoute() {
-  const { isAuthenticated } = useAuth();
+const ProtectedRoute = () => {
+    const { token, loading } = useAuth();
 
-  return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
-}
+    if (loading) {
+        return <div>Загрузка...</div>; // Or a spinner component
+    }
+
+    if (!token) {
+        return <Navigate to="/login" replace />;
+    }
+
+    return <Outlet />;
+};
+
+export default ProtectedRoute;

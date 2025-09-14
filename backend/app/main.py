@@ -4,77 +4,88 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, controls, voices, settings
+from app.api import auth, bot_controls, voices, settings, commands, twitch_api, vk_api, bot_control, chat
+from app.core.config import settings as app_settings
+from app.bot import Bot
+from app.services.state_service import StateService
 from app.services.tts_service import TTSService
 from app.services.audio_service import AudioService
-from app.services.state_service import StateService
-from app.bot import Bot
-from app.services.seventv_service import SevenTVService
+from app.core.exceptions import http_exception_handler
 
 # Basic logging setup
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting application lifespan...")
-    
-    # Initialize services
+    # Startup logic
+    logger.info("Initializing services...")
     state_service = StateService()
-    audio_service = AudioService()
-    tts_service = TTSService(state_service=state_service)
-    seventv_service = SevenTVService()
+    await state_service.initialize()  # Asynchronously load state
     
-    # Create bot instance and store it on the app state
+    # Принудительно сохраняем состояние при запуске
+    await state_service._save_state_to_disk()
+    logger.info("State service initialized and saved to disk")
+
+    # TTS будет загружаться по требованию
+    tts_service = None
+    audio_service = AudioService()
+    logger.info("TTS service will be loaded on demand")
+
+    # Create the Bot instance within the lifespan context
     bot_instance = Bot(
+        state_service=state_service,
         tts_service=tts_service,
         audio_service=audio_service,
-        state_service=state_service,
-        seventv_service=seventv_service
     )
-    
-    # Store instances on the app state to make them accessible from endpoints
-    app.state.bot = bot_instance
+
     app.state.state_service = state_service
     app.state.tts_service = tts_service
     app.state.audio_service = audio_service
-
-
-    # Start the bot in a background task
-    bot_task = asyncio.create_task(bot_instance.start())
+    app.state.bot = bot_instance
+    
     logger.info("Twitch bot is starting...")
+    # Use bot.start() for integration with an existing asyncio loop
+    bot_task = asyncio.create_task(bot_instance.start())
     
-    # Wait for the bot to connect before trying to join channels
-    await asyncio.sleep(5)  
+    # Rejoin channels from the previous session only if Twitch integration is enabled
+    all_channels = state_service.get_all_channels()
+    logger.info(f"All channels found: {all_channels}")
     
-    # Rejoin channels from the previous session
-    registered_channels = state_service.get_registered_channels()
-    if registered_channels:
-        logger.info(f"Rejoining channels from previous session: {registered_channels}")
-        for channel in registered_channels:
-            # We use create_task to avoid blocking the startup process
-            asyncio.create_task(bot_instance.add_channel(channel))
+    channels_to_join = []
+    for channel in all_channels:
+        integrations = state_service.get_integrations(channel)
+        logger.info(f"Channel {channel} integrations: {integrations}")
+        if integrations.get("twitch_enabled"):
+            channels_to_join.append(channel)
+    
+    if channels_to_join:
+        logger.info(f"Rejoining channels with active Twitch integration: {channels_to_join}")
+        # Give the bot a moment to connect before trying to join channels
+        await asyncio.sleep(2) 
+        await bot_instance.join_channels(channels_to_join)
     else:
-        logger.info("No channels from previous session to rejoin.")
-    
+        logger.info("No channels to rejoin")
+
     yield
-    
-    logger.info("Shutting down application lifespan...")
-    if bot_instance:
-        logger.info("Stopping Twitch bot...")
-        await bot_instance.close()
-    
-    if bot_task and not bot_task.done():
+
+    # Shutdown
+    logger.info("Application shutdown: stopping Twitch bot.")
+    await bot_instance.close()
+    if not bot_task.done():
         bot_task.cancel()
-        try:
-            await bot_task
-        except asyncio.CancelledError:
-            logger.info("Bot task cancelled successfully.")
 
-app = FastAPI(title="TTS_TTV", version="0.0.1", lifespan=lifespan)
+app = FastAPI(title=app_settings.PROJECT_NAME, lifespan=lifespan)
 
-# CORS Configuration
-origins = ["http://localhost:5173"]
+# Add exception handlers
+app.add_exception_handler(Exception, http_exception_handler)
+
+# CORS Middleware - This needs to be defined BEFORE routes for some edge cases
+origins = [
+    app_settings.CLIENT_ORIGIN,
+    "http://localhost:5173",
+]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -83,12 +94,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(auth.router, prefix="/api", tags=["Authentication"])
-app.include_router(controls.router, prefix="/api", tags=["Controls"])
-app.include_router(voices.router, prefix="/api", tags=["Voices"])
-app.include_router(settings.router, prefix="/api", tags=["Settings"])
+# Include API routers
+app.include_router(auth.router)
+app.include_router(bot_controls.router)
+app.include_router(voices.router)
+app.include_router(settings.router)
+app.include_router(commands.router)
+app.include_router(twitch_api.router, prefix="/api/twitch", tags=["twitch"])
+app.include_router(vk_api.router, prefix="/api/vk", tags=["vk"])
+app.include_router(bot_control.router, prefix="/api/bot", tags=["bot"])
+app.include_router(chat.router)
 
 @app.get("/")
 async def root():
     return {"message": "TTS_TTV API is running"}
+
+@app.get("/api/status/{channel_name}")
+async def get_status(channel_name: str):
+    """Simple status endpoint for frontend compatibility."""
+    return {"channel_name": channel_name, "is_enabled": True}

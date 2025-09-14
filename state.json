@@ -1,12 +1,39 @@
 {
     "yourchy": {
         "tts_enabled": true,
-        "volume": 0.5,
+        "bot_enabled": false,
+        "integrations": {
+            "twitch_enabled": true,
+            "twitch_token": "gAAAAABoxvNKloqMu17SMnDzfk7AujlZ3_alOLq5_qCDsXW35YnYTQn8SwrjXeMbvpZVYpJ9kcBRU5ocxNTnfcu85MrOg9zLG9KuwOA9sPJDrJ7dixwtHuQ=",
+            "twitch_user_id": "75969278",
+            "vk_enabled": false
+        },
         "user_voices": {},
-        "temperature": 0.3,
-        "stability": 0.5,
-        "settings": {
-            "read_emotes": false
+        "default_settings": {
+            "read_emotes": false,
+            "speed": 1.0,
+            "cfg_strength": 2.0,
+            "nfe_step": 32,
+            "sway_sampling_coef": -1.0
+        },
+        "user_settings": {
+            "youtube_queue": [
+                {
+                    "url": "https://www.youtube.com/watch?v=a2LCXEOvqsw",
+                    "requested_by": "yourchy",
+                    "timestamp": 1757867995
+                },
+                {
+                    "url": "https://www.youtube.com/watch?v=a2LCXEOvqsw",
+                    "requested_by": "yourchy",
+                    "timestamp": 1757868275
+                },
+                {
+                    "url": "https://www.youtube.com/watch?v=a2LCXEOvqsw",
+                    "requested_by": "yourchy",
+                    "timestamp": 1757868463
+                }
+            ]
         }
     }
 }

@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     TWITCH_CLIENT_ID: str
     TWITCH_CLIENT_SECRET: str
     TWITCH_BOT_TOKEN: str
-    TWITCH_REDIRECT_URI: str
+    TWITCH_REDIRECT_URI: str = "http://localhost:8000/api/auth/twitch/callback"
     TWITCH_BOT_NICK: str
     BOT_PREFIX: str = "!"
     FRONTEND_URL: str
@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     # JWT settings
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7 # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30 * 24 * 60 # 30 days
+    CLIENT_ORIGIN: str = "http://localhost:5173" # Default for local dev
+
+    VK_CLIENT_ID: str = "YOUR_VK_CLIENT_ID"  # Replace with your VK client ID
+    VK_CLIENT_SECRET: str = "YOUR_VK_CLIENT_SECRET"  # Replace with your VK client secret
+    VK_REDIRECT_URI: str = "http://localhost:8000/api/auth/vk/callback"
 
 settings = Settings()

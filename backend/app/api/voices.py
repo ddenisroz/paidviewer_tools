@@ -1,17 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from typing import List
 import os
 from pathlib import Path
 import logging
+import asyncio
+from app.services.tts_service import TTSService
 
 from app.core.security import get_current_user
 from app.services.audio_processor import AudioProcessor
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(prefix="/api/voices", tags=["voices"])
 
-@router.get("/voices/info")
+@router.get("/info")
 async def get_upload_info():
     """Информация о требованиях к загружаемым файлам"""
     return {
@@ -34,7 +36,7 @@ def get_channel_voices_dir(username: str) -> Path:
     """Returns the voice directory for a specific channel."""
     return VOICES_BASE_DIR / username
 
-@router.get("/voices")
+@router.get("/")
 async def get_voices(user: dict = Depends(get_current_user)):
     """Получение списка голосов пользователя с подробной информацией"""
     if not user or "username" not in user:
@@ -73,7 +75,7 @@ async def get_voices(user: dict = Depends(get_current_user)):
         logger.error(f"Ошибка получения списка голосов: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Ошибка чтения голосов: {e}")
 
-@router.post("/voices/upload")
+@router.post("/upload")
 async def upload_voice(
     user: dict = Depends(get_current_user),
     file: UploadFile = File(...),
@@ -134,7 +136,7 @@ async def upload_voice(
     finally:
         await file.close()
 
-@router.delete("/voices/{voice_name}")
+@router.delete("/{voice_name}")
 async def delete_voice(voice_name: str, user: dict = Depends(get_current_user)):
     """Удаление голоса"""
     if not user or "username" not in user:
@@ -159,3 +161,139 @@ async def delete_voice(voice_name: str, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=f"Не удалось удалить голос: {e}")
         
     return {"message": f"Голос '{voice_name}' успешно удален"}
+
+@router.get("/tts/status")
+async def get_tts_status(request: Request):
+    """Получить статус TTS движка"""
+    tts_service = request.app.state.tts_service
+    loaded = tts_service is not None
+    ready = tts_service.is_ready() if tts_service else False
+    logger.info(f"TTS status: loaded={loaded}, ready={ready}")
+    return {
+        "loaded": loaded,
+        "ready": ready
+    }
+
+@router.post("/tts/load")
+async def load_tts_engine(request: Request):
+    """Загрузить TTS движок с прогрессом"""
+    logger.info("TTS load endpoint called")
+    tts_service = request.app.state.tts_service
+    
+    # Проверяем, действительно ли TTS сервис готов
+    if tts_service is not None and tts_service.is_ready():
+        logger.info("TTS service already loaded and ready")
+        return {"status": "already_loaded", "message": "TTS движок уже загружен"}
+    
+    try:
+        # Если TTS сервис существует, но не готов, перезапускаем его
+        if tts_service is not None:
+            logger.info("TTS service exists but not ready, reinitializing...")
+        
+        # Создаем новый TTS сервис
+        state_service = request.app.state.state_service
+        logger.info("Creating new TTS service...")
+        tts_service = TTSService(state_service=state_service)
+        
+        # Сохраняем в app state сразу
+        request.app.state.tts_service = tts_service
+        logger.info("TTS service saved to app state")
+        
+        # Обновляем ссылку на TTS сервис в боте
+        bot = request.app.state.bot
+        if bot:
+            bot.update_tts_service(tts_service)
+            logger.info("TTS service updated in bot")
+        
+        # Загружаем TTS в фоне
+        logger.info("Starting TTS initialization...")
+        asyncio.create_task(tts_service.initialize_async())
+        
+        # Включаем TTS для всех активных каналов
+        state_service = request.app.state.state_service
+        if state_service.channels:
+            for channel_name in state_service.channels.keys():
+                await state_service.set_tts_enabled(channel_name, True)
+                logger.info(f"TTS enabled for channel {channel_name}")
+        else:
+            logger.warning("No channels found in state service, TTS will be enabled when channels are registered")
+        
+        logger.info("TTS service created and initialization started")
+        return {"status": "loading", "message": "TTS движок загружается..."}
+    except Exception as e:
+        logger.error(f"Ошибка загрузки TTS: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка загрузки TTS: {str(e)}")
+
+@router.get("/tts/progress")
+async def get_tts_progress(request: Request):
+    """Получить прогресс загрузки TTS"""
+    tts_service = request.app.state.tts_service
+    
+    if tts_service is None:
+        logger.info("TTS progress: service is None")
+        return {"progress": 0, "status": "not_started", "message": "TTS не запущен"}
+    
+    if tts_service.is_ready():
+        logger.info("TTS progress: service is ready")
+        return {"progress": 100, "status": "ready", "message": "TTS готов к работе"}
+    
+    # Получаем прогресс из TTS сервиса
+    progress = getattr(tts_service, 'loading_progress', 0)
+    status = getattr(tts_service, 'loading_status', 'loading')
+    message = getattr(tts_service, 'loading_message', 'Загрузка...')
+    
+    logger.info(f"TTS progress: {progress}%, status: {status}, message: {message}")
+    return {
+        "progress": progress,
+        "status": status,
+        "message": message
+    }
+
+@router.post("/tts/reload")
+async def reload_tts_engine(request: Request):
+    """Принудительно перезагрузить TTS движок"""
+    try:
+        # Удаляем текущий TTS сервис
+        request.app.state.tts_service = None
+        
+        # Создаем новый TTS сервис
+        state_service = request.app.state.state_service
+        tts_service = TTSService(state_service=state_service)
+        
+        # Сохраняем в app state
+        request.app.state.tts_service = tts_service
+        
+        # Загружаем TTS в фоне
+        asyncio.create_task(tts_service.initialize_async())
+        
+        logger.info("TTS service force reloaded")
+        return {"status": "reloading", "message": "TTS движок перезагружается..."}
+    except Exception as e:
+        logger.error(f"Ошибка перезагрузки TTS: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка перезагрузки TTS: {str(e)}")
+
+@router.post("/tts/unload")
+async def unload_tts_engine(request: Request):
+    """Выгрузка TTS движка из памяти"""
+    try:
+        logger.info("TTS unload endpoint called")
+        
+        # Получаем существующий сервис из состояния приложения
+        tts_service = request.app.state.tts_service
+        
+        if tts_service:
+            # Останавливаем текущий сервис
+            logger.info("Unloading TTS service...")
+            
+            # Очищаем состояние приложения
+            request.app.state.tts_service = None
+            logger.info("TTS service unloaded successfully")
+            
+            return {"message": "TTS движок успешно выгружен из памяти"}
+        else:
+            logger.warning("TTS service was not loaded")
+            return {"message": "TTS движок не был загружен"}
+            
+    except Exception as e:
+        logger.error(f"Error unloading TTS engine: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Ошибка выгрузки TTS: {str(e)}")

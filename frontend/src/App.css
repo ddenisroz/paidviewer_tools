@@ -1,3 +1,132 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+ 
+@layer base {
+  :root {
+    --background: 260 25% 10%; /* Dark Purple */
+    --foreground: 270 20% 95%; /* Light Lavender */
+
+    --card: 260 25% 12%;
+    --card-foreground: 270 20% 95%;
+ 
+    --popover: 260 25% 10%;
+    --popover-foreground: 270 20% 95%;
+ 
+    --primary: 266 90% 60%; /* Twitch Purple */
+    --primary-foreground: 270 20% 98%;
+ 
+    --secondary: 260 25% 20%;
+    --secondary-foreground: 270 20% 98%;
+ 
+    --muted: 260 25% 20%;
+    --muted-foreground: 270 20% 70%;
+ 
+    --accent: 260 25% 25%;
+    --accent-foreground: 270 20% 98%;
+ 
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 86% 97%;
+
+    --border: 260 25% 20%;
+    --input: 260 25% 22%;
+    --ring: 266 90% 65%;
+ 
+    --radius: 0.5rem;
+  }
+ 
+  .dark {
+    /* Same as root for a forced dark theme */
+    --background: 260 25% 10%;
+    --foreground: 270 20% 95%;
+
+    --card: 260 25% 12%;
+    --card-foreground: 270 20% 95%;
+ 
+    --popover: 260 25% 10%;
+    --popover-foreground: 270 20% 95%;
+ 
+    --primary: 266 90% 60%;
+    --primary-foreground: 270 20% 98%;
+ 
+    --secondary: 260 25% 20%;
+    --secondary-foreground: 270 20% 98%;
+ 
+    --muted: 260 25% 20%;
+    --muted-foreground: 270 20% 70%;
+ 
+    --accent: 260 25% 25%;
+    --accent-foreground: 270 20% 98%;
+ 
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 86% 97%;
+
+    --border: 260 25% 20%;
+    --input: 260 25% 22%;
+    --ring: 266 90% 65%;
+  }
+}
+ 
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+}
+::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--accent));
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+/* Custom animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes progress-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out;
+}
+
+.animate-progress-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: progress-shimmer 2s infinite;
+}
