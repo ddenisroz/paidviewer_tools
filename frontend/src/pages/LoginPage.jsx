@@ -1,176 +1,133 @@
-import React, { useState } from 'react';
-import { TypingAnimation } from '@/components/ui/typing-animation';
-import HiddenAuth from '@/components/HiddenAuth';
+// src/pages/LoginPage.jsx
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import CookieConsent from '@/components/CookieConsent';
 
-const TwitchSvgIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M11.571 4.714h1.714v5.143H11.57zm4.714 0h1.714v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0H6zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714v9.429z" />
+// Иконка Twitch "Glitch" (точная)
+const TwitchIcon = (props) => (
+    <svg 
+        xmlns="http://www.w3.org/2000/svg" 
+        width="20" 
+        height="20" 
+        viewBox="0 0 24 24" 
+        fill="currentColor"
+        className={props.className}
+    >
+        <path d="M2.149 0l-2.149 4.774v16.452h5.71v3.226h4.774l4.774-4.774h3.816l6.657-6.657v-13.021h-23.581zm20.573 12.131l-3.816 3.816h-3.816l-3.816 3.816v-3.816h-4.774v-13.021h16.222v9.205zm-5.71-6.425h2.387v5.71h-2.387v-5.71zm-4.774 0h2.387v5.71h-2.387v-5.71z"/>
     </svg>
 );
 
-const VKSvgIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 48 48" fill="currentColor">
-        <path d="M0 23.04C0 12.1788 0 6.74826 3.37413 3.37413C6.74826 0 12.1788 0 23.04 0H24.96C35.8212 0 41.2517 0 44.6259 3.37413C48 6.74826 48 12.1788 48 23.04V24.96C48 35.8212 48 41.2517 44.6259 44.6259C41.2517 48 35.8212 48 24.96 48H23.04C12.1788 48 6.74826 48 3.37413 44.6259C0 41.2517 0 35.8212 0 24.96V23.04Z" fill="#0077FF"/>
-        <path d="M25.54 34.5801C14.6 34.5801 8.3601 27.0801 8.1001 14.2601H13.5801C13.7601 23.5601 17.8201 27.4601 21.0601 28.4601V14.2601H26.1601V22.1401C29.3401 21.7801 32.6601 18.1401 33.7801 14.2601H38.8801C38.0601 19.1201 34.4601 22.7601 31.8201 24.4201C34.4601 25.8801 38.4601 29.1801 40.1001 34.5801H34.4601C33.2201 30.9401 30.2601 28.0601 26.1601 27.6201V34.5801H25.54Z" fill="white"/>
+// Официальная иконка VK Video из @vkontakte/icons
+const VKIcon = (props) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 20 20" className={props.className}>
+        <path fillRule="evenodd" d="M5 7.6c0-1.96 0-2.94.381-3.689a3.5 3.5 0 0 1 1.53-1.53C7.66 2 8.64 2 10.6 2h.52c2.408 0 3.612 0 4.532.469a4.3 4.3 0 0 1 1.88 1.879C18 5.268 18 6.472 18 8.88v2.24c0 2.408 0 3.612-.469 4.532a4.3 4.3 0 0 1-1.879 1.88c-.92.468-2.124.468-4.532.468h-.52c-1.96 0-2.94 0-3.689-.381a3.5 3.5 0 0 1-1.53-1.53C5 15.34 5 14.36 5 12.4V7.6Zm8.607.971c.789.472 1.183.707 1.317 1.012.116.266.116.57 0 .835-.134.306-.528.541-1.317 1.012l-2.088 1.247c-.825.493-1.237.739-1.576.707a1.04 1.04 0 0 1-.741-.42C9 12.688 9 12.207 9 11.247V8.754c0-.96 0-1.44.202-1.716a1.04 1.04 0 0 1 .74-.42c.34-.032.752.214 1.577.706l2.088 1.247ZM3.5 7.881c0-2.41 0-3.613.469-4.533a4.3 4.3 0 0 1 .736-1.033 3.044 3.044 0 0 0-.357.154 4.3 4.3 0 0 0-1.88 1.879C2 5.268 2 6.472 2 8.88v2.24c0 2.408 0 3.612.469 4.532a4.3 4.3 0 0 0 1.879 1.88c.114.057.232.108.357.153a4.299 4.299 0 0 1-.736-1.033c-.469-.92-.469-2.124-.469-4.532V7.88Z" clipRule="evenodd"/>
     </svg>
 );
 
 
 const LoginPage = () => {
-    const [isRedirecting, setIsRedirecting] = useState(false);
+    const { login, setGuestMode } = useAuth();
+    const navigate = useNavigate();
+    const [title, setTitle] = useState('');
+    const [isTyping, setIsTyping] = useState(true);
+    const [subtitleText, setSubtitleText] = useState('');
+    const [subtitleVisible, setSubtitleVisible] = useState(false);
+    const [currentFeatureIndex, setCurrentFeatureIndex] = useState(0);
+    const fullTitle = 'Payedviewer_tools';
+    const features = ['TTS озвучка', 'Медиа запросы', 'Анализ чата'];
 
-    const handleTwitchLogin = () => {
-        setIsRedirecting(true);
-    };
+    useEffect(() => {
+        if (isTyping && title.length < fullTitle.length) {
+            const timeoutId = setTimeout(() => {
+                setTitle(fullTitle.slice(0, title.length + 1));
+            }, 60); 
+            return () => clearTimeout(timeoutId);
+        } else {
+            setIsTyping(false);
+        }
+    }, [title, isTyping]);
+
+    useEffect(() => {
+        if (!isTyping) {
+            const showFeature = () => {
+                setSubtitleText(features[currentFeatureIndex]);
+                setSubtitleVisible(true);
+                
+                setTimeout(() => {
+                    setSubtitleVisible(false);
+                    setTimeout(() => {
+                        setCurrentFeatureIndex((prev) => (prev + 1) % features.length);
+                    }, 500); // Время исчезновения
+                }, 2500); // Время показа текста
+            };
+            
+            const timeoutId = setTimeout(showFeature, 500);
+            return () => clearTimeout(timeoutId);
+        }
+    }, [isTyping, currentFeatureIndex]);
 
     const handleVkLogin = () => {
-        // Временно отключено до настройки VK приложения
-        alert('VK авторизация временно недоступна. Используйте Twitch.');
+        alert('VK Live авторизация пока не реализована');
     };
 
-    if (isRedirecting) {
-        return <HiddenAuth />;
-    }
+    const handleGuestMode = () => {
+        setGuestMode();
+        navigate('/dashboard');
+    };
 
-
-  return (
-        <div className="relative flex items-center justify-center min-h-screen text-foreground p-4">
-            {/* Плавно изменяющийся фон */}
-            <div className="absolute inset-0" 
-                 style={{
-                     background: `
-                         radial-gradient(circle at 20% 80%, #1e1b4b 0%, transparent 50%),
-                         radial-gradient(circle at 80% 20%, #312e81 0%, transparent 50%),
-                         radial-gradient(circle at 40% 40%, #3730a3 0%, transparent 50%),
-                         linear-gradient(135deg, #0f0f23, #1e1b4b)
-                     `,
-                     animation: 'smoothFlow 15s ease-in-out infinite'
-                 }}></div>
-
-            <style>
-                {`
-                    @keyframes smoothFlow {
-                        0%, 100% {
-                            filter: hue-rotate(0deg) brightness(0.8) saturate(1);
-                        }
-                        50% {
-                            filter: hue-rotate(20deg) brightness(0.9) saturate(1.1);
-                        }
-                    }
-                    
-                    .card-3d {
-                        box-shadow: 
-                            0 20px 40px rgba(0, 0, 0, 0.8),
-                            0 10px 20px rgba(0, 0, 0, 0.6),
-                            0 0 0 1px rgba(255, 255, 255, 0.05) inset;
-                        border: 1px solid rgba(255, 255, 255, 0.1);
-                        backdrop-filter: blur(20px);
-                        transition: all 0.3s ease;
-                    }
-                    
-                    .card-3d:hover {
-                        box-shadow: 
-                            0 30px 60px rgba(0, 0, 0, 0.9),
-                            0 20px 40px rgba(0, 0, 0, 0.7),
-                            0 0 0 2px rgba(16, 185, 129, 0.6),
-                            0 0 0 4px rgba(16, 185, 129, 0.2);
-                        border: 1px solid rgba(16, 185, 129, 0.8);
-                    }
-                    
-                    .title-glow {
-                        color: #10b981;
-                        text-shadow: 
-                            0 0 15px rgba(16, 185, 129, 0.8),
-                            0 0 30px rgba(52, 211, 153, 0.4),
-                            0 0 45px rgba(110, 231, 183, 0.2);
-                        font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-                        letter-spacing: 0.08em;
-                        font-weight: 800;
-                        filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.3));
-                    }
-                    
-                    .subtitle {
-                        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-                        letter-spacing: -0.01em;
-                        color: #e2e8f0;
-                    }
-                    
-                    .alpha-badge {
-                        font-family: 'JetBrains Mono', 'Fira Code', monospace;
-                        letter-spacing: 0.05em;
-                        color: #94a3b8;
-                    }
-                    
-                    .card-3d button {
-                        transition: all 0.2s ease;
-                    }
-                    
-                    .card-3d button:hover {
-                        transform: translateY(-1px);
-                        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-                    }
-                    
-                    .card-3d:hover {
-                        box-shadow: 
-                            0 10px 20px rgba(0, 0, 0, 0.8),
-                            0 5px 10px rgba(0, 0, 0, 0.6),
-                            0 0 0 1px rgba(255, 255, 255, 0.1) inset,
-                            0 0 30px rgba(139, 92, 246, 0.2),
-                            0 0 60px rgba(139, 92, 246, 0.1),
-                            0 0 90px rgba(139, 92, 246, 0.05),
-                            inset 0 2px 4px rgba(0, 0, 0, 0.3);
-                    }
-                `}
-            </style>
-
-            {/* Карточка авторизации */}
-            <div 
-                className="relative z-10 text-center p-8 md:p-10 bg-slate-900/95 rounded-3xl max-w-md w-full mx-4 card-3d animate-in fade-in-0 slide-in-from-bottom-4 duration-1000"
-            >
-                <div className="mb-6">
-                    <h1 className="text-2xl md:text-3xl font-bold mb-2 title-glow break-all">
-                        <TypingAnimation 
-                            text="PAYEDVIEWER_TOOLS" 
-                            speed={100}
-                            className="block font-mono"
-                            showCursor={true}
-                        />
+    return (
+        <div className="login-page-bg min-h-screen flex flex-col items-center justify-center text-white font-sans p-4">
+            <Card className="login-card w-full max-w-sm shadow-2xl">
+                <CardHeader className="text-center pt-10 pb-4">
+                    <h1 className="select-none text-3xl font-bold mb-3 text-green-400 h-10 font-mono tracking-wider">
+                        {title}
+                        <span className="blinking-cursor">{!isTyping ? '_' : ''}</span>
                     </h1>
-                    <div className="h-1 w-24 bg-gradient-to-r from-green-400 to-green-600 mx-auto rounded-full"></div>
-          </div>
-                
-                <div>
-                    <p className="text-xl font-semibold mb-3 subtitle">TTS/Media/Chat Bot для стрима</p>
-                    <p className="text-sm mb-8 alpha-badge">[ ALPHA VERSION FOR TESTING ]</p>
-          </div>
-
-                <div className="flex flex-col gap-4">
-        <button
-                        onClick={handleTwitchLogin}
-                        className="group flex items-center justify-center gap-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 w-full text-base md:text-lg hover:shadow-2xl border-2 border-purple-500/50 hover:border-purple-400/70"
-                    >
-                        <TwitchSvgIcon className="group-hover:scale-110 transition-transform duration-300" />
-                        <span className="flex-1 text-center">Войти через Twitch</span>
-                    </button>
-                    <button
-                        onClick={handleVkLogin}
-                        className="flex items-center justify-center gap-3 bg-slate-700/30 text-slate-500 font-bold py-4 px-6 rounded-xl w-full text-base md:text-lg border-2 border-slate-600/30 cursor-not-allowed opacity-60"
-                        disabled
-                    >
-                        <VKSvgIcon />
-                        <span className="flex-1 text-center">Войти через VK Video (скоро)</span>
-        </button>
-                </div>
-                
-                {/* Футер */}
-                <div className="mt-8 pt-4 border-t border-slate-700/50">
-                    <p className="text-xs text-slate-500 text-center">
-                        Полностью сделано ИИ 🤖
+                    <p className={`text-slate-400 text-sm h-6 subtitle-fade ${subtitleVisible ? 'opacity-100' : 'opacity-0'}`}>
+                        {subtitleText}
                     </p>
-                </div>
-      </div>
-    </div>
-  );
+                </CardHeader>
+                <CardContent className="px-8 pb-8">
+                    <div className="space-y-4">
+                        <button
+                            onClick={login}
+                            className="w-full bg-[#9146FF] hover:bg-[#7a3adc] text-white font-semibold py-3 px-5 rounded-lg transition-colors duration-300 flex items-center justify-center text-base"
+                        >
+                            <TwitchIcon className="mr-2 h-5 w-5" />
+                            Войти через Twitch
+                        </button>
+
+                        <button
+                            onClick={handleVkLogin}
+                            className="w-full bg-red-800 hover:bg-red-900 text-white font-semibold py-3 px-5 rounded-lg transition-colors duration-300 flex items-center justify-center text-base"
+                        >
+                            <VKIcon className="mr-2 h-5 w-5" />
+                            Войти через VK Live
+                        </button>
+                        
+                        <div className="relative py-2">
+                            <div className="absolute inset-0 flex items-center">
+                                <div className="w-full border-t border-slate-700/50"></div>
+                            </div>
+                            <div className="relative flex justify-center">
+                                <span className="bg-gradient-to-r from-[#2a2235] to-[#342a40] px-3 text-xs text-slate-300 uppercase font-medium">или</span>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={handleGuestMode}
+                            className="w-full bg-green-500/30 hover:bg-green-500/40 text-green-200 font-semibold py-3 px-5 rounded-lg transition-colors duration-300 flex items-center justify-center text-base border border-green-500/30 hover:border-green-500/50"
+                        >
+                            Гостевой режим
+                        </button>
+                    </div>
+                </CardContent>
+            </Card>
+            <CookieConsent />
+        </div>
+    );
 };
 
 export default LoginPage;

@@ -1,19 +1,23 @@
 // src/pages/SettingsPage.jsx
 import React from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Twitch, Video } from 'lucide-react';
-import { useIntegrations } from '../hooks/useIntegrations';
+import { useIntegrations } from '../context/IntegrationsContext';
 import { useAuth } from '../context/AuthContext';
+import { Loader } from '@/components/ui/loader';
 
 const SettingsPage = () => {
     const { user } = useAuth();
     const { integrations, isLoading, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
 
-    if (isLoading) {
+    // В гостевом режиме показываем настройки без загрузки
+    const isGuestMode = localStorage.getItem('guestModeEnabled') === 'true';
+    
+    if (isLoading && !isGuestMode) {
         return (
             <div className="flex items-center justify-center h-64">
                 <div className="text-center">
@@ -50,7 +54,7 @@ const SettingsPage = () => {
                         </div>
                         <Switch
                             id="twitch-integration"
-                            checked={integrations.twitch_enabled}
+                            checked={integrations.twitch?.enabled || false}
                             onCheckedChange={updateTwitchIntegration}
                         />
                     </div>
@@ -72,7 +76,7 @@ const SettingsPage = () => {
                         </div>
                         <Switch
                             id="vk-integration"
-                            checked={integrations.vk_enabled}
+                            checked={integrations.vk?.enabled || false}
                             onCheckedChange={updateVkIntegration}
                         />
                     </div>

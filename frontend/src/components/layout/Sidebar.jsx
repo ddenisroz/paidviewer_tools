@@ -1,30 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Mic, Clapperboard, AreaChart, Terminal, ChevronDown, ChevronRight, Youtube, Coins, Headphones, Settings } from 'lucide-react';
+import { Home, Mic, Clapperboard, AreaChart, Terminal, ChevronDown, ChevronRight, Youtube, Coins, Headphones, Settings, Shield } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
-const navItems = [
-    { to: '/dashboard', label: 'Главная', icon: Home },
-    { 
-        to: '/dashboard/tts', 
-        label: 'TTS ИИ озвучка', 
-        icon: Mic,
-        submenu: [
-            { to: '/dashboard/tts/voices', label: 'Управление голосами', icon: Headphones },
-        ]
-    },
-    { 
-        to: '/dashboard/media', 
-        label: 'Медиа интерактивность', 
-        icon: Clapperboard,
-        submenu: [
-            { to: '/dashboard/media/youtube', label: 'Youtube интеграция', icon: Youtube },
-            { to: '/dashboard/media/channel-points', label: 'Управление баллами канала', icon: Coins },
-        ]
-    },
-    { to: '/dashboard/analytics', label: 'Анализ и модерация чата', icon: AreaChart },
-    { to: '/dashboard/commands', label: 'Команды чата', icon: Terminal },
-    { to: '/dashboard/settings', label: 'Настройки', icon: Settings },
-];
+const getNavItems = (isYourchy) => {
+    const baseItems = [
+        { to: '/dashboard', label: 'Главная', icon: Home },
+        { 
+            to: '/dashboard/tts', 
+            label: 'TTS ИИ озвучка', 
+            icon: Mic,
+            submenu: [
+                { to: '/dashboard/tts/voices', label: 'Управление голосами', icon: Headphones },
+            ]
+        },
+        { 
+            to: '/dashboard/media', 
+            label: 'Медиа интерактивность', 
+            icon: Clapperboard,
+            submenu: [
+                { to: '/dashboard/media/youtube', label: 'Youtube интеграция', icon: Youtube },
+                { to: '/dashboard/media/channel-points', label: 'Баллы канала', icon: Coins },
+            ]
+        },
+        { to: '/dashboard/commands', label: 'Анализ и модерация чата', icon: Shield },
+        { to: '/dashboard/settings', label: 'Настройки', icon: Settings },
+    ];
+
+    // Добавляем админ панель только для пользователя yourchy
+    if (isYourchy) {
+        baseItems.push({ to: '/dolbaeb-admin-secure-panel', label: 'Админ панель', icon: Shield });
+    }
+
+    return baseItems;
+};
 
 const SidebarNavItem = ({ item }) => {
     const location = useLocation();
@@ -45,12 +54,16 @@ const SidebarNavItem = ({ item }) => {
     if (hasSubmenu) {
         return (
             <div>
-                <div className='flex items-center justify-between rounded-lg px-4 py-2.5 text-lg font-semibold transition-colors text-muted-foreground hover:bg-muted/50 hover:text-foreground'>
-                    <NavLink to={item.to} end className={({isActive}) => `flex items-center gap-4 flex-1 ${isActive ? 'text-primary' : ''}`}>
-                        <item.icon className={`h-6 w-6 ${isParentActive ? 'text-primary' : ''}`} />
+                <div className='flex items-center justify-between rounded-lg px-4 py-2.5 text-lg font-semibold'>
+                    <NavLink 
+                        to={item.to} 
+                        end 
+                        className={({isActive}) => `flex items-center gap-4 flex-1 transition-colors ${isActive || isParentActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                        <item.icon className="h-6 w-6" />
                         {item.label}
                     </NavLink>
-                    <button onClick={() => setIsOpen(!isOpen)} className="p-1 -mr-1 rounded-full hover:bg-accent">
+                    <button onClick={() => setIsOpen(!isOpen)} className="p-1 -mr-1 rounded-full hover:bg-accent text-muted-foreground">
                         {isOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                     </button>
                 </div>
@@ -90,22 +103,27 @@ const SidebarNavItem = ({ item }) => {
                 }`
             }
         >
-            <item.icon className={`h-6 w-6 ${location.pathname === item.to ? 'text-primary' : ''}`} />
+            <item.icon className="h-6 w-6" />
             {item.label}
         </NavLink>
     );
 };
 
 const Sidebar = () => {
+    const { user } = useAuth();
+    // Проверяем по username или login
+    const isYourchy = user?.username === 'yourchy' || user?.login === 'yourchy';
+    const navItems = getNavItems(isYourchy);
+
     return (
         <div className="hidden border-r bg-background md:block">
             <div className="flex h-full max-h-screen flex-col gap-2">
                 <div className="flex h-16 items-center border-b px-4 lg:h-[70px] lg:px-6">
-                    <a href="/" className="flex items-center gap-2 font-semibold">
+                    <NavLink to="/dashboard" className="flex items-center gap-2 font-semibold">
                         <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                             Payedviewer tools
                         </span>
-                    </a>
+                    </NavLink>
                 </div>
                 <div className="flex-1">
                     <nav className="grid items-start px-2 text-sm font-medium lg:px-4">

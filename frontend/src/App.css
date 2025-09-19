@@ -1,6 +1,35 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Кастомные анимации для авторизации */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.2);
+    opacity: 0;
+  }
+}
+
+.auth-spinner {
+  animation: spin-slow 2s linear infinite;
+}
+
+.auth-pulse {
+  animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
  
 @layer base {
   :root {
@@ -129,4 +158,150 @@ body {
   );
   background-size: 200% 100%;
   animation: progress-shimmer 2s infinite;
+}
+
+/* Кастомные анимации для индикатора авторизации */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spin-reverse {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes orbit {
+  0% {
+    transform: rotate(0deg) translateX(30px) rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg) translateX(30px) rotate(-360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+.animate-spin-reverse {
+  animation: spin-reverse 2s linear infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-orbit {
+  animation: orbit 4s linear infinite;
+}
+
+/* Стили для страницы логина, как на скриншоте */
+.login-page-bg {
+  background: radial-gradient(ellipse at center, #2a1d3a 0%, #1a0f2e 70%);
+  background-size: 200% 200%;
+  animation: gentle-glow 20s linear infinite;
+}
+
+@keyframes gentle-glow {
+  0% { 
+    background-position: 0% 50%;
+    filter: brightness(1);
+  }
+  25% {
+    background-position: 50% 0%;
+    filter: brightness(1.1);
+  }
+  50% { 
+    background-position: 100% 50%;
+    filter: brightness(1.05);
+  }
+  75% {
+    background-position: 50% 100%;
+    filter: brightness(1.1);
+  }
+  100% { 
+    background-position: 0% 50%;
+    filter: brightness(1);
+  }
+}
+
+.login-card {
+  position: relative;
+  background: linear-gradient(135deg, #2a2235, #342a40);
+  border: 1px solid #4a3f55;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(100, 80, 200, 0.1);
+  transition: all 0.3s ease;
+}
+
+.login-card:hover {
+  border-color: #34D399;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 0 20px rgba(52, 211, 153, 0.3);
+}
+
+/* Анимация появления/исчезания текста */
+.subtitle-fade {
+  transition: opacity 0.5s ease-in-out;
+}
+
+/* Эффект свечения сверху */
+.login-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 200px; /* Высота свечения */
+  background: radial-gradient(ellipse at top, rgba(167, 139, 250, 0.15), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.login-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes rotate-glow {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Анимация курсора для заголовка */
+.blinking-cursor {
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  from, to {
+    color: transparent;
+  }
+  50% {
+    color: #34D399; /* Зеленый цвет курсора */
+  }
 }

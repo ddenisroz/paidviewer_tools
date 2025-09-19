@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { useIntegrations } from '../../hooks/useIntegrations';
+import { useIntegrations } from '../../context/IntegrationsContext';
 import { useNavigate } from 'react-router-dom';
 
 const ChannelPointsPage = () => {

@@ -47,19 +47,34 @@ const AuthLoader = ({ platform = 'Twitch', countdown = 0 }) => {
             <div className="relative bg-card border border-border/40 rounded-lg p-8 max-w-md w-full mx-4 shadow-2xl">
                 <div className="text-center space-y-6">
                     {/* Анимированная иконка */}
-                    <div className="relative">
-                        <div className="w-16 h-16 mx-auto mb-4">
-                            <Loader size="lg" />
-                        </div>
+                    <div className="relative w-24 h-24 mx-auto mb-6">
+                        {/* Внешний статичный кружок */}
+                        <div className="absolute inset-0 border-4 border-purple-200/20 rounded-full"></div>
+                        
+                        {/* Основной вращающийся кружок */}
+                        <div className="absolute inset-0 border-4 border-transparent border-t-purple-500 border-r-purple-400 rounded-full animate-spin-slow"></div>
+                        
+                        {/* Внутренний кружок (обратное вращение) */}
+                        <div className="absolute inset-3 border-2 border-transparent border-b-blue-500 border-l-blue-400 rounded-full animate-spin-reverse"></div>
+                        
+                        {/* Центральная точка с пульсацией */}
                         <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-8 h-8 bg-purple-500/20 rounded-full animate-ping"></div>
+                            <div className="w-4 h-4 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full animate-pulse-glow shadow-lg shadow-purple-500/50"></div>
                         </div>
+                        
+                        {/* Орбитальные точки */}
                         <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-6 h-6 bg-purple-400/40 rounded-full animate-pulse"></div>
+                            <div className="relative w-16 h-16">
+                                <div className="absolute top-0 left-1/2 w-2 h-2 bg-purple-400 rounded-full animate-orbit transform -translate-x-1/2"></div>
+                                <div className="absolute bottom-0 left-1/2 w-2 h-2 bg-blue-400 rounded-full animate-orbit transform -translate-x-1/2" style={{ animationDelay: '1s' }}></div>
+                            </div>
                         </div>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-3 h-3 bg-purple-300 rounded-full animate-bounce"></div>
-                        </div>
+                        
+                        {/* Дополнительные пульсирующие точки */}
+                        <div className="absolute -top-2 -right-2 w-3 h-3 bg-purple-400/60 rounded-full animate-ping"></div>
+                        <div className="absolute -bottom-2 -left-2 w-3 h-3 bg-blue-400/60 rounded-full animate-ping" style={{ animationDelay: '0.7s' }}></div>
+                        <div className="absolute top-1/2 -right-3 w-2 h-2 bg-purple-300/80 rounded-full animate-ping" style={{ animationDelay: '1.4s' }}></div>
+                        <div className="absolute top-1/2 -left-3 w-2 h-2 bg-blue-300/80 rounded-full animate-ping" style={{ animationDelay: '2.1s' }}></div>
                     </div>
                     
                     {/* Заголовок и описание */}

@@ -1,5 +1,5 @@
 // src/context/AuthContext.jsx
-import { createContext, useState, useContext, useEffect } from 'react';
+import { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
@@ -7,88 +7,90 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
-    const [token, setToken] = useState(localStorage.getItem('token'));
     const [loading, setLoading] = useState(true);
+    // 'auth', 'guest', or null
+    const [userMode, setUserMode] = useState(() => localStorage.getItem('userMode') || null);
     const navigate = useNavigate();
 
-    useEffect(() => {
-        const fetchUser = async () => {
-            if (token) {
-                try {
-                    // Добавляем таймаут на запрос
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 секунд
-                    
-                    const { data } = await api.get('/api/auth/user/me', {
-                        signal: controller.signal
-                    });
-                    clearTimeout(timeoutId);
-                    setUser(data);
-                } catch (error) {
-                    console.error('Failed to fetch user', error);
-                    // Clear token if it's invalid or request failed
-                    setToken(null);
-                    localStorage.removeItem('token');
-                }
-            }
+    const updateUserMode = (mode) => {
+        if (mode) {
+            localStorage.setItem('userMode', mode);
+        } else {
+            localStorage.removeItem('userMode');
+        }
+        setUserMode(mode);
+    };
+
+    const fetchUser = useCallback(async () => {
+        const mode = localStorage.getItem('userMode');
+        if (mode === 'guest') {
+            setUser(null); // В гостевом режиме нет объекта user
             setLoading(false);
-        };
-
-        fetchUser();
-    }, [token]);
-
-    // Слушаем изменения в localStorage для обновления токена
-    useEffect(() => {
-        const handleStorageChange = (e) => {
-            if (e.key === 'token' && e.newValue !== token) {
-                setToken(e.newValue);
+            return;
+        }
+        
+        // Если есть сессия, но режим не установлен, считаем что это auth
+        if (mode === 'auth' || !mode) {
+            try {
+                const { data } = await api.get('/api/auth/user/me');
+                setUser(data);
+                updateUserMode('auth'); // Подтверждаем режим
+            } catch (error) {
+                setUser(null);
+                // Если была ошибка, но режим стоял 'auth', сбрасываем его
+                if (mode === 'auth') {
+                    updateUserMode(null);
+                }
+            } finally {
+                setLoading(false);
             }
-        };
+        } else {
+            setLoading(false);
+        }
+    }, []);
 
-        window.addEventListener('storage', handleStorageChange);
-        return () => window.removeEventListener('storage', handleStorageChange);
-    }, [token]);
+    useEffect(() => {
+        fetchUser();
+    }, [fetchUser]);
 
-    const login = (newToken) => {
-        setToken(newToken);
-        localStorage.setItem('token', newToken);
-        // No need to set user here, useEffect will fetch it
-        navigate('/dashboard');
+    const login = () => {
+        updateUserMode('auth');
+        window.location.href = `${api.defaults.baseURL}/api/auth/twitch/login`;
     };
 
-    const logout = () => {
-        setToken(null);
-        setUser(null);
-        localStorage.removeItem('token');
-        navigate('/login');
+    const setGuestMode = () => {
+        updateUserMode('guest');
+        setUser(null); // Убеждаемся, что нет пользователя в гостевом режиме
     };
+
+    const logout = async () => {
+        try {
+            await api.post('/api/auth/logout');
+        } catch (error) {
+            console.error('Logout failed on backend:', error);
+        } finally {
+            setUser(null);
+            updateUserMode(null); // Сбрасываем режим
+            navigate('/login');
+        }
+    };
+    
+    const isAuthenticated = !!user;
+
+    const value = useMemo(() => ({
+        user,
+        userMode,
+        login,
+        logout,
+        loading,
+        isAuthenticated,
+        fetchUser,
+        setGuestMode
+    }), [user, userMode, loading, isAuthenticated, fetchUser]);
 
     return (
-        <AuthContext.Provider value={{ user, token, login, logout, loading }}>
-            {loading ? (
-                <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-purple-800 text-white">
-                    <div className="text-center space-y-6">
-                        {/* Spinner */}
-                        <div className="relative mx-auto w-16 h-16">
-                            <div className="absolute inset-0 border-4 border-white/20 rounded-full"></div>
-                            <div className="absolute inset-0 border-4 border-t-white rounded-full animate-spin"></div>
-                        </div>
-                        
-                        {/* Text */}
-                        <div className="space-y-2">
-                            <h2 className="text-2xl font-bold text-white">Загрузка...</h2>
-                            <p className="text-lg text-white/80">Инициализация приложения</p>
-                            <div className="flex items-center justify-center space-x-1 text-white/60">
-                                <span>•</span>
-                                <span className="animate-pulse">Подключение к серверу</span>
-                                <span>•</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            ) : (
-                children
-            )}
+        <AuthContext.Provider value={value}>
+            {children}
         </AuthContext.Provider>
     );
 };

@@ -1,32 +1,87 @@
-# Environments
-.env
-.env*.local
-
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
 env/
 venv/
-.venv/
+ENV/
+env.bak/
+venv.bak/
 
-# Node
-node_modules/
-dist/
-.npm/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Cache folders
-audio_cache/
-f5_tts_cache/
-model_cache/
-speechbrain_spkrec-xvect-voxceleb/
-.cache/
-
-# IDE files
+# IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific
+backend/audio_cache/
+backend/audio_output/
+backend/f5_tts_cache/
+backend/model_cache/
+backend/TTS_rus_engine/__pycache__/
+backend/TTS_rus_engine/python-yoficator/yo.dat
+
+# Bot service
+bot-service/data/
+bot-service/audio_cache/
+bot-service/audio_output/
+bot-service/f5_tts_cache/
+bot-service/temp_audio/
+bot-service/user_configs/
+
+# TTS service
+tts-service/audio_cache/
+tts-service/audio_output/
+tts-service/f5_tts_cache/
+tts-service/temp_audio/
+tts-service/user_configs/
+tts-service/TTS_rus_engine/__pycache__/
+tts-service/TTS_rus_engine/f5_tts_cache/
+tts-service/TTS_rus_engine/audio_output/
+
+# Frontend
+frontend/dist/
+frontend/node_modules/
+frontend/.vite/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+temp_*

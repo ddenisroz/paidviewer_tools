@@ -77,32 +77,44 @@ const StreamCategoryPage = () => {
     };
 
     const updateTwitchCategory = async () => {
+        console.log('🚀 Начинаем обновление категории:', twitchCategory);
         setIsLoading(true);
         setStatus(prev => ({ ...prev, twitch: 'loading' }));
         
         try {
-            const response = await api.post('/api/twitch/update-category', {
+            console.log('📡 Отправляем API запрос с category_id:', twitchCategory);
+            const response = await api.post('/api/twitch/stream/category', {
                 category_id: twitchCategory
             });
+            
+            console.log('✅ Получен ответ от API:', response.data);
             
             if (response.data.success) {
                 setStatus(prev => ({ ...prev, twitch: 'success' }));
                 setLastUpdate(new Date());
                 toast.success(response.data.message);
+                console.log('🎉 Категория успешно обновлена!');
                 
                 // Обновляем информацию о стриме
                 await loadStreamInfo();
             } else {
-                throw new Error(response.data.message);
+                throw new Error(response.data.message || response.data.error);
             }
             
             setTimeout(() => {
                 setStatus(prev => ({ ...prev, twitch: 'idle' }));
             }, 3000);
         } catch (error) {
-            console.error('Error updating Twitch category:', error);
+            console.error('❌ Ошибка обновления категории:', error);
+            console.error('📄 Детали ошибки:', error.response?.data);
             setStatus(prev => ({ ...prev, twitch: 'error' }));
-            toast.error(error.response?.data?.message || 'Ошибка обновления категории');
+            
+            const errorMessage = error.response?.data?.detail || 
+                               error.response?.data?.message || 
+                               error.message || 
+                               'Неизвестная ошибка обновления категории';
+            
+            toast.error(errorMessage);
         } finally {
             setIsLoading(false);
         }

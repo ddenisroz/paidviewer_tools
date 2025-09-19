@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Edit3, Save, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
+import api from '../services/api';
+import { toast } from 'sonner';
 
 const StreamTitlePage = () => {
     const [twitchTitle, setTwitchTitle] = useState('');
@@ -17,24 +19,50 @@ const StreamTitlePage = () => {
     const [lastUpdate, setLastUpdate] = useState(null);
     const [status, setStatus] = useState({ twitch: 'idle', vk: 'idle' });
 
-    // Моковые данные
+    // Загрузка данных при монтировании
     useEffect(() => {
-        setTwitchTitle('Мой крутой стрим!');
-        setTwitchDescription('Играю в интересную игру и общаюсь с чатом');
-        setVkTitle('VK Live: Играем вместе!');
-        setVkDescription('Присоединяйтесь к стриму на VK Live');
-        setLastUpdate(new Date());
+        loadStreamInfo();
     }, []);
+
+    // Загружаем информацию о текущем стриме
+    const loadStreamInfo = async () => {
+        try {
+            const response = await api.get('/api/twitch/stream-info');
+            const data = response.data;
+            
+            if (data.title) {
+                setTwitchTitle(data.title);
+            }
+            
+            // VK данные пока моковые
+            setVkTitle('VK Live: Играем вместе!');
+            setVkDescription('Присоединяйтесь к стриму на VK Live');
+        } catch (error) {
+            console.error('Error loading stream info:', error);
+            // Fallback на моковые данные при ошибке
+            setTwitchTitle('Мой крутой стрим!');
+            setTwitchDescription('Играю в интересную игру и общаюсь с чатом');
+            setVkTitle('VK Live: Играем вместе!');
+            setVkDescription('Присоединяйтесь к стриму на VK Live');
+        }
+    };
 
     const updateTwitchTitle = async () => {
         setIsLoading(true);
         setStatus(prev => ({ ...prev, twitch: 'loading' }));
         
         try {
-            // Здесь будет реальный API вызов к Twitch API
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            setStatus(prev => ({ ...prev, twitch: 'success' }));
-            setLastUpdate(new Date());
+            const response = await api.post('/api/twitch/stream/title', {
+                title: twitchTitle
+            });
+            
+            if (response.data.success) {
+                setStatus(prev => ({ ...prev, twitch: 'success' }));
+                setLastUpdate(new Date());
+                toast.success(response.data.message || 'Название стрима обновлено');
+            } else {
+                throw new Error(response.data.message || 'Ошибка обновления');
+            }
             
             // Сброс статуса через 3 секунды
             setTimeout(() => {
@@ -43,6 +71,7 @@ const StreamTitlePage = () => {
         } catch (error) {
             console.error('Error updating Twitch title:', error);
             setStatus(prev => ({ ...prev, twitch: 'error' }));
+            toast.error(error.response?.data?.message || 'Ошибка обновления названия');
         } finally {
             setIsLoading(false);
         }

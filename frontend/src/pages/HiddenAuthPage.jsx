@@ -9,9 +9,7 @@ const HiddenAuthPage = () => {
         const error = searchParams.get('error');
 
         if (token) {
-            // Сохраняем токен
-            localStorage.setItem('token', token);
-            
+            // Не сохраняем токен в localStorage; полагаемся на httpOnly cookies, выставленные бэкендом
             // Отправляем сообщение родительскому окну
             if (window.opener) {
                 window.opener.postMessage({

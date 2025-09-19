@@ -2,6 +2,7 @@
 import { Outlet } from 'react-router-dom';
 import Sidebar from './layout/Sidebar';
 import Header from './layout/Header';
+import CookieConsent from './CookieConsent';
 
 const Layout = () => {
   return (
@@ -15,6 +16,9 @@ const Layout = () => {
             </div>
         </main>
       </div>
+      
+      {/* Уведомление о cookies рендерим один раз здесь (убрали дубликат со страниц) */}
+      <CookieConsent />
     </div>
   );
 };

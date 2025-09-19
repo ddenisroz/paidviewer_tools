@@ -1,0 +1,17 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydub==0.25.1
+numpy==1.24.3
+torch==2.1.0
+torchaudio==2.1.0
+transformers==4.42.4
+soundfile==0.12.1
+librosa==0.10.1
+scipy==1.11.4
+pydantic==2.5.0
+python-multipart==0.0.6
+accelerate==0.33.0
+scikit-learn==1.2.2
+f5-tts>=0.1.0
+ruaccent>=1.5.0
+PyJWT==2.8.0
