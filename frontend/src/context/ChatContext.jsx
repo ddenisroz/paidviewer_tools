@@ -1,8 +1,8 @@
 // src/context/ChatContext.jsx
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import api from '../services/api'; // Используем наш основной инстанс api
-import { useAuth } from './AuthContext';
-import { useIntegrations } from './IntegrationsContext';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { connectBot, disconnectBot, getBotStatus } from '../services/microservices';
+import { AuthContext } from './AuthContext';
+import { toast } from 'sonner';
 
 const ChatContext = createContext();
 

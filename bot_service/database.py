@@ -1,6 +1,6 @@
 
 import os
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, JSON, DateTime, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, JSON, DateTime, ForeignKey, Float
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.exc import SQLAlchemyError
 import logging
@@ -98,8 +98,25 @@ try:
     class BlockedBot(Base):
         __tablename__ = 'blocked_bots'
         id = Column(Integer, primary_key=True, index=True)
-        bot_name = Column(String, unique=True, nullable=False, index=True)
-        added_at = Column(DateTime(timezone=True), server_default=func.now())
+        bot_name = Column(String, unique=True, index=True, nullable=False)
+        added_at = Column(DateTime, default=datetime.utcnow)
+
+    class Voice(Base):
+        __tablename__ = 'voices'
+        id = Column(Integer, primary_key=True, index=True)
+        name = Column(String, unique=True, index=True, nullable=False)
+        file_path = Column(String, nullable=False)
+        reference_text = Column(String, nullable=True)
+        voice_type = Column(String, default='global') # 'global' or 'user'
+        owner_id = Column(String, nullable=True) # User ID from Twitch/etc.
+        is_public = Column(Boolean, default=True)
+        is_active = Column(Boolean, default=True)
+        created_at = Column(DateTime, default=datetime.utcnow)
+        # Voice settings
+        speed = Column(Float, default=1.0)
+        pitch = Column(Float, default=1.0)
+        volume = Column(Float, default=1.0)
+
 
     def get_db():
         """Функция-генератор для получения сессии БД"""

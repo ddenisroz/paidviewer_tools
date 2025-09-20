@@ -831,5 +831,5 @@ if __name__ == "__main__":
         "bot_service.main:app",
         host=os.getenv("HOST", "0.0.0.0"),
         port=int(os.getenv("PORT", 8000)),
-        reload=os.getenv("DEBUG", "false").lower() == "true"
+        reload=False # <-- Отключаем авто-перезагрузку для стабильной работы
     )

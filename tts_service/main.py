@@ -14,9 +14,11 @@ from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 import uvicorn
 import shutil
+import torch # <-- Импортируем torch
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import time
+import datetime as dt
 
 # --- РЕШЕНИЕ ПРОБЛЕМЫ ИМПОРТОВ ---
 project_root = Path(__file__).resolve().parent.parent
@@ -25,33 +27,59 @@ if str(project_root) not in sys.path:
 # --- КОНЕЦ РЕШЕНИЯ ---
 
 from tts_service.TTS_rus_engine.russian_tts import RussianTTS
-from tts_service.database import get_db, Voice, User, SessionLocal, engine, Base as DatabaseBase
+from tts_service.database import get_db, Voice as VoiceModel, User as UserModel, SessionLocal, engine, Base as DatabaseBase
 from tts_service.config import config
+
+# --- Pydantic Schemas ---
+class VoiceSchema(BaseModel):
+    id: int
+    name: str
+    file_path: str
+    reference_text: Optional[str] = None
+    voice_type: str
+    owner_id: Optional[str] = None
+    is_public: bool
+    is_active: bool
+    created_at: dt.datetime
+    speed: float
+    pitch: float
+    volume: float
+
+    class Config:
+        from_attributes = True
+
+class VoiceSettings(BaseModel):
+    speed: float
+    pitch: float
+    volume: float
 
 # Настройка логирования
 logging.basicConfig(level=config.log_level.upper())
 logger = logging.getLogger(__name__)
 
-# Инициализация TTS движка
-try:
-    tts_engine = RussianTTS()
-    logger.info("✅ TTS engine initialized successfully.")
-except Exception as e:
-    logger.error(f"❌ Critical error initializing TTS engine: {e}", exc_info=True)
-    tts_engine = None
-
-# Транскрибатор
+# --- Globals ---
+tts_engine = None
 transcriber = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global transcriber
+    global tts_engine, transcriber
+    
+    # Инициализация TTS движка
+    try:
+        tts_engine = RussianTTS()
+        logger.info("✅ TTS engine initialized successfully.")
+    except Exception as e:
+        logger.error(f"❌ Critical error initializing TTS engine: {e}", exc_info=True)
+        tts_engine = None
+
     try:
         from faster_whisper import WhisperModel
-        # Запускайте на GPU, если доступен CUDA, иначе на CPU
-        device = "cuda" if "cuda" in sys.modules else "cpu"
-        # Используем bfloat16 для ускорения на совместимых GPU
-        compute_type = "bfloat16" if device == "cuda" else "int8"
+        
+        # Правильная проверка доступности CUDA
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        # float16 является более распространенным и поддерживаемым типом для ускорения на GPU
+        compute_type = "float16" if device == "cuda" else "int8"
         
         logger.info(f"🎤 Initializing WhisperModel on device='{device}' with compute_type='{compute_type}'...")
         # Модель будет загружена при первом использовании
@@ -83,11 +111,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-class VoiceSettings(BaseModel):
-    speed: float
-    pitch: float
-    volume: float
 
 # --- HELPERS ---
 
@@ -208,12 +231,12 @@ async def synthesize_speech(
 
 # --- ADMIN VOICE MANAGEMENT ---
 
-@app.get("/api/admin/voices", response_model=List[Voice])
+@app.get("/api/admin/voices", response_model=List[VoiceSchema])
 def get_all_voices(db: Session = Depends(get_db)):
-    voices = db.query(Voice).all()
+    voices = db.query(VoiceModel).all()
     return voices
 
-@app.post("/api/admin/voices/upload")
+@app.post("/api/admin/voices/upload", response_model=VoiceSchema)
 async def upload_voice(
     file: UploadFile = File(...),
     voice_name: str = Form(...),
@@ -221,7 +244,7 @@ async def upload_voice(
     db: Session = Depends(get_db)
 ):
     # Проверка на существование голоса с таким именем
-    existing_voice = db.query(Voice).filter(Voice.name == voice_name).first()
+    existing_voice = db.query(VoiceModel).filter(VoiceModel.name == voice_name).first()
     if existing_voice:
         raise HTTPException(status_code=400, detail=f"Voice with name '{voice_name}' already exists.")
 
@@ -247,7 +270,7 @@ async def upload_voice(
         reference_text = transcribe_audio_file(str(file_path))
 
         # Сохранение в БД
-        new_voice = Voice(
+        new_voice = VoiceModel(
             name=voice_name,
             file_path=str(file_path),
             voice_type=voice_type,
@@ -269,7 +292,7 @@ async def upload_voice(
 
 @app.delete("/api/admin/voices/{voice_id}")
 def delete_voice(voice_id: int, db: Session = Depends(get_db)):
-    voice = db.query(Voice).filter(Voice.id == voice_id).first()
+    voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
     if not voice:
         raise HTTPException(status_code=404, detail="Voice not found")
 
@@ -286,9 +309,9 @@ def delete_voice(voice_id: int, db: Session = Depends(get_db)):
         logger.error(f"Error deleting voice ID {voice_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.put("/api/admin/voices/{voice_id}/settings", response_model=Voice)
+@app.put("/api/admin/voices/{voice_id}/settings", response_model=VoiceSchema)
 def update_voice_settings_admin(voice_id: int, settings: VoiceSettings, db: Session = Depends(get_db)):
-    voice = db.query(Voice).filter(Voice.id == voice_id).first()
+    voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
     if not voice:
         raise HTTPException(status_code=404, detail="Voice not found")
     
@@ -301,11 +324,11 @@ def update_voice_settings_admin(voice_id: int, settings: VoiceSettings, db: Sess
 
 # --- USER VOICE MANAGEMENT ---
 
-@app.get("/api/user/voices", response_model=List[Voice])
+@app.get("/api/user/voices", response_model=List[VoiceSchema])
 def get_user_voices(user_id: str, db: Session = Depends(get_db)):
     # Возвращаем голоса пользователя + все публичные/глобальные голоса
-    user_voices = db.query(Voice).filter(Voice.owner_id == user_id).all()
-    public_voices = db.query(Voice).filter(Voice.is_public == True).all()
+    user_voices = db.query(VoiceModel).filter(VoiceModel.owner_id == user_id).all()
+    public_voices = db.query(VoiceModel).filter(VoiceModel.is_public == True).all()
     
     # Объединяем списки, избегая дубликатов
     all_voices_dict = {v.id: v for v in user_voices}
@@ -316,7 +339,7 @@ def get_user_voices(user_id: str, db: Session = Depends(get_db)):
     return list(all_voices_dict.values())
 
 
-@app.post("/api/user/voices/upload")
+@app.post("/api/user/voices/upload", response_model=VoiceSchema)
 async def upload_user_voice(
     background_tasks: BackgroundTasks,
     user_id: str,
@@ -325,12 +348,12 @@ async def upload_user_voice(
     db: Session = Depends(get_db)
 ):
     # Проверка, чтобы имя не конфликтовало с глобальными
-    existing_global = db.query(Voice).filter(Voice.name == voice_name, Voice.voice_type == 'global').first()
+    existing_global = db.query(VoiceModel).filter(VoiceModel.name == voice_name, VoiceModel.voice_type == 'global').first()
     if existing_global:
         raise HTTPException(status_code=400, detail=f"Voice name '{voice_name}' is reserved for a global voice.")
 
     # Проверка, чтобы пользователь не создал дубликат
-    existing_user_voice = db.query(Voice).filter(Voice.name == voice_name, Voice.owner_id == user_id).first()
+    existing_user_voice = db.query(VoiceModel).filter(VoiceModel.name == voice_name, VoiceModel.owner_id == user_id).first()
     if existing_user_voice:
         raise HTTPException(status_code=400, detail=f"You already have a voice named '{voice_name}'.")
 
@@ -345,7 +368,7 @@ async def upload_user_voice(
         # Автоматическая транскрипция
         reference_text = transcribe_audio_file(str(file_path))
 
-        new_voice = Voice(
+        new_voice = VoiceModel(
             name=voice_name,
             file_path=str(file_path),
             voice_type="user",
@@ -367,7 +390,7 @@ async def upload_user_voice(
 
 @app.delete("/api/user/voices/{voice_id}")
 def delete_user_voice(voice_id: int, user_id: str, db: Session = Depends(get_db)):
-    voice = db.query(Voice).filter(Voice.id == voice_id, Voice.owner_id == user_id).first()
+    voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id, VoiceModel.owner_id == user_id).first()
     if not voice:
         raise HTTPException(status_code=404, detail="Voice not found or you don't have permission to delete it.")
 
@@ -384,9 +407,9 @@ def delete_user_voice(voice_id: int, user_id: str, db: Session = Depends(get_db)
         logger.error(f"Error deleting voice ID {voice_id} for user {user_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.put("/api/user/voices/{voice_id}/settings", response_model=Voice)
+@app.put("/api/user/voices/{voice_id}/settings", response_model=VoiceSchema)
 def update_user_voice_settings(voice_id: int, user_id: str, settings: VoiceSettings, db: Session = Depends(get_db)):
-    voice = db.query(Voice).filter(Voice.id == voice_id).first()
+    voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
     if not voice:
         raise HTTPException(status_code=404, detail="Voice not found.")
     
@@ -416,7 +439,7 @@ async def test_user_voice(
     if not tts_engine:
         raise HTTPException(status_code=500, detail="TTS engine is not initialized.")
 
-    voice = db.query(Voice).filter(Voice.name == voice_name).first()
+    voice = db.query(VoiceModel).filter(VoiceModel.name == voice_name).first()
     if not voice:
         raise HTTPException(status_code=404, detail=f"Voice '{voice_name}' not found.")
 
@@ -459,7 +482,6 @@ if __name__ == "__main__":
         "tts_service.main:app",
         host=config.host,
         port=config.port,
-        reload=config.debug,
-        reload_dirs=[str(config.base_dir)],
+        reload=False, # <-- Отключаем авто-перезагрузку для стабильной работы
         log_level=config.log_level.lower()
     )
