@@ -1,5 +1,5 @@
 // src/pages/tts/TtsMainPage.jsx
-import React, { useContext } from 'react';
+import React, { useContext, useEffect } from 'react';
 import { useTts } from '../../context/TtsContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,12 @@ import { Loader } from 'lucide-react';
 import { toast } from 'sonner';
 
 const TtsMainPage = () => {
-    const { ttsEnabled, toggleTts, isWhitelisted, engineStatus } = useTts();
+    const { ttsEnabled, toggleTts, isWhitelisted, engineStatus, initializeTts } = useTts();
+
+    // Инициализируем TTS только при загрузке этой страницы
+    useEffect(() => {
+        initializeTts();
+    }, [initializeTts]);
 
     const handleToggle = () => {
         if (engineStatus.error) {

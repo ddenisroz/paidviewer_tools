@@ -7,16 +7,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Trash2, Edit, Users, Globe, Settings, TestTube2 } from 'lucide-react';
+import { Upload, Trash2, Edit, Users, Globe, Settings, TestTube2, Mic } from 'lucide-react';
 import { Slider } from "@/components/ui/slider"
 import { toast } from 'sonner';
-import { getAdminVoices, uploadVoice, deleteVoice, updateVoiceSettings, testVoice } from '../../services/unified-api';
+import { getAdminVoices, uploadVoice, deleteVoice, updateVoiceSettings, testVoice, getUsers } from '../../services/unified-api';
 import { useAuth } from '../../context/AuthContext';
 
 const VoiceManagement = () => {
     const [voices, setVoices] = useState([]);
+    const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+    const [testText, setTestText] = useState("Ну так я гетеро, че мне пидоров бояться!");
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     
     const [currentVoice, setCurrentVoice] = useState(null);
@@ -35,17 +37,32 @@ const VoiceManagement = () => {
         try {
             setLoading(true);
             const data = await getAdminVoices();
-            setVoices(data || []);
+            // Убеждаемся, что data является массивом
+            const voicesData = Array.isArray(data) ? data : (data?.data || []);
+            setVoices(voicesData);
         } catch (error) {
             toast.error('Ошибка загрузки голосов');
             console.error('Error loading voices:', error);
+            setVoices([]); // Устанавливаем пустой массив в случае ошибки
         } finally {
             setLoading(false);
         }
     }, []);
 
+    const loadUsers = useCallback(async () => {
+        try {
+            const data = await getUsers();
+            setUsers(Array.isArray(data) ? data : []);
+        } catch (error) {
+            console.error('Error loading users:', error);
+            setUsers([]);
+        }
+    }, []);
+
     useEffect(() => {
         loadVoices();
+        // Временно отключаем загрузку пользователей
+        // loadUsers();
     }, [loadVoices]);
 
     const handleFileUpload = (event) => {
@@ -65,7 +82,14 @@ const VoiceManagement = () => {
 
         setIsUploading(true);
         try {
-            await uploadVoice(uploadFile, voiceName.trim(), ownerId.trim() || null);
+            const formData = new FormData();
+            formData.append('file', uploadFile);
+            formData.append('voice_name', voiceName.trim());
+            if (ownerId === 'user') {
+                formData.append('owner_id', 'temp_user_id');
+            }
+            
+            await uploadVoice(formData);
             
             toast.success(`Голос "${voiceName.trim()}" успешно загружен.`);
             setUploadDialogOpen(false);
@@ -100,21 +124,7 @@ const VoiceManagement = () => {
         setEditDialogOpen(true);
     };
 
-    const handleUpdateSettings = async () => {
-        if (!currentVoice) return;
-        try {
-            await updateVoiceSettings(currentVoice.id, {
-                speed: currentVoice.speed,
-                pitch: currentVoice.pitch,
-                volume: currentVoice.volume,
-            });
-            toast.success(`Настройки голоса "${currentVoice.name}" обновлены.`);
-            setEditDialogOpen(false);
-            loadVoices();
-        } catch (error) {
-            toast.error(error.message || 'Ошибка обновления настроек');
-        }
-    };
+    // Voice settings removed - F5-TTS uses dynamic settings based on text length
     
     const playAudio = (buffer) => {
         if (audioSource) {
@@ -135,19 +145,43 @@ const VoiceManagement = () => {
     const handleTestVoice = async () => {
         if (!currentVoice || !user) return;
         try {
-            const audioBlob = await testVoice(
+            const response = await testVoice(
                 currentVoice.name,
                 user.id,
-                currentVoice.speed,
-                currentVoice.pitch,
-                currentVoice.volume
+                testText
             );
-            const arrayBuffer = await audioBlob.arrayBuffer();
-            playAudio(arrayBuffer);
+            
+            // Получаем URL аудио из ответа
+            const audioUrl = response.data.audio_url;
+            if (audioUrl) {
+                // Создаем полный URL
+                const fullAudioUrl = `http://localhost:8001${audioUrl}`;
+                const audio = new Audio(fullAudioUrl);
+                audio.play().catch(() => {
+                    toast.error('Не удалось воспроизвести аудио');
+                });
+            } else {
+                toast.error('Не удалось получить аудио для воспроизведения');
+            }
         } catch (error) {
             toast.error(error.message || 'Ошибка тестирования голоса');
         }
     };
+
+            const handleUpdateSettings = async () => {
+                if (!currentVoice) return;
+                try {
+                    await updateVoiceSettings(currentVoice.id, {
+                        cfg_strength: currentVoice.cfg_strength
+                        // Только cfg_strength настраивается пользователем
+                    });
+                    toast.success(`Настройки голоса "${currentVoice.name}" обновлены.`);
+                    setEditDialogOpen(false);
+                    loadVoices();
+                } catch (error) {
+                    toast.error(error.message || 'Ошибка обновления настроек');
+                }
+            };
 
     const handleSliderChange = (value, field) => {
         if (currentVoice) {
@@ -186,9 +220,17 @@ const VoiceManagement = () => {
                                 <Input id="voiceName" value={voiceName} onChange={(e) => setVoiceName(e.target.value)} placeholder="e.g., speaker1" className="mt-1" />
                             </div>
                             <div>
-                                <Label htmlFor="ownerId">ID пользователя (опционально)</Label>
-                                <Input id="ownerId" value={ownerId} onChange={(e) => setOwnerId(e.target.value)} placeholder="e.g., 75969278" className="mt-1" />
-                                <p className="text-sm text-muted-foreground mt-1">Оставьте пустым для создания общего голоса.</p>
+                                <Label htmlFor="ownerId">Тип голоса</Label>
+                                <Select value={ownerId} onValueChange={setOwnerId}>
+                                    <SelectTrigger className="mt-1">
+                                        <SelectValue placeholder="Выберите тип голоса" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="global">Глобальный голос</SelectItem>
+                                        <SelectItem value="user">Пользовательский голос</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-sm text-muted-foreground mt-1">Глобальный голос доступен всем, пользовательский - только конкретному пользователю</p>
                             </div>
                         </div>
                          <DialogFooter>
@@ -209,7 +251,7 @@ const VoiceManagement = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                          {loading ? (
                              <p>Загрузка...</p>
-                         ) : voices.map((voice) => (
+                         ) : Array.isArray(voices) && voices.length > 0 ? voices.map((voice) => (
                              <Card key={voice.id} className="bg-slate-800 border-slate-700">
                                 <CardHeader>
                                     <div className="flex items-center justify-between">
@@ -219,7 +261,22 @@ const VoiceManagement = () => {
                                         </CardTitle>
                                         <Badge variant={voice.voice_type === 'global' ? 'default' : 'secondary'}>{voice.voice_type}</Badge>
                                     </div>
-                                    {voice.voice_type === 'user' && <p className="text-xs text-slate-400">Owner ID: {voice.owner_id}</p>}
+                                    {voice.voice_type === 'user' && (
+                                        <div className="text-xs text-slate-400">
+                                            {(() => {
+                                                const owner = users.find(u => u.id === voice.owner_id);
+                                                return owner ? (
+                                                    <div className="flex items-center gap-1">
+                                                        <Users className="h-3 w-3" />
+                                                        <span>{owner.display_name || owner.username}</span>
+                                                        {owner.is_online && <Badge variant="outline" className="text-xs">Онлайн</Badge>}
+                                                    </div>
+                                                ) : (
+                                                    <span>Owner ID: {voice.owner_id}</span>
+                                                );
+                                            })()}
+                                        </div>
+                                    )}
                                 </CardHeader>
                                  <CardContent>
                                      <p className="text-xs text-slate-400 italic break-words h-12 overflow-y-auto">
@@ -231,7 +288,11 @@ const VoiceManagement = () => {
                                      </div>
                                  </CardContent>
                              </Card>
-                         ))}
+                         )) : (
+                             <div className="col-span-full text-center py-8">
+                                 <p className="text-slate-400">Голосов не найдено</p>
+                             </div>
+                         )}
                      </div>
                  </CardContent>
              </Card>
@@ -254,23 +315,86 @@ const VoiceManagement = () => {
                                 />
                                 <p className="text-sm text-muted-foreground mt-1">Текст сгенерирован автоматически. Редактирование недоступно.</p>
                             </div>
-                            <div className="space-y-2">
-                                <Label>Скорость: {currentVoice.speed.toFixed(2)}</Label>
-                                <Slider value={[currentVoice.speed]} onValueChange={(v) => handleSliderChange(v, 'speed')} min={0.5} max={2.0} step={0.05} />
+                            
+                            <div>
+                                <Label htmlFor="test-text">Текст для тестирования</Label>
+                                <Textarea
+                                  id="test-text"
+                                  value={testText}
+                                  onChange={(e) => setTestText(e.target.value)}
+                                  className="mt-1"
+                                  rows={3}
+                                  placeholder="Введите текст для тестирования голоса..."
+                                />
+                                <p className="text-sm text-muted-foreground mt-1">Введите текст, который хотите озвучить для тестирования</p>
                             </div>
-                            <div className="space-y-2">
-                                <Label>Тон: {currentVoice.pitch.toFixed(2)}</Label>
-                                <Slider value={[currentVoice.pitch]} onValueChange={(v) => handleSliderChange(v, 'pitch')} min={0.5} max={2.0} step={0.05} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Громкость: {currentVoice.volume.toFixed(2)}</Label>
-                                <Slider value={[currentVoice.volume]} onValueChange={(v) => handleSliderChange(v, 'volume')} min={0.1} max={1.5} step={0.05} />
+                            
+                            {/* Настройки генерации TTS */}
+                            <div className="space-y-4">
+                                <h4 className="text-sm font-medium text-white">Настройки генерации</h4>
+                                
+                                {/* Единственный настраиваемый параметр */}
+                                <div>
+                                    <Label htmlFor="cfg-strength">CFG Strength: {currentVoice.cfg_strength}</Label>
+                                    <Slider
+                                        id="cfg-strength"
+                                        min={0.1}
+                                        max={10.0}
+                                        step={0.1}
+                                        value={[currentVoice.cfg_strength]}
+                                        onValueChange={(value) => setCurrentVoice(prev => ({ ...prev, cfg_strength: value[0] }))}
+                                        className="mt-2"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">Сила классификатора (0.1-10.0) - единственный настраиваемый параметр</p>
+                                </div>
+                                
+                                {/* Автоматически определяемые параметры (только для отображения) */}
+                                <div className="space-y-2 pt-2 border-t border-slate-600">
+                                    <h5 className="text-xs font-medium text-slate-300">Автоматически определяемые системой</h5>
+                                    
+                                    <div className="flex justify-between text-xs text-slate-400">
+                                        <span>Speed: 0.1-1.0</span>
+                                        <span className="text-slate-500">По длине текста</span>
+                                    </div>
+                                    
+                                    <div className="flex justify-between text-xs text-slate-400">
+                                        <span>NFE Steps: 18-26</span>
+                                        <span className="text-slate-500">По длине текста</span>
+                                    </div>
+                                </div>
+                                
+                                {/* Фиксированные параметры */}
+                                <div className="space-y-2 pt-2 border-t border-slate-600">
+                                    <h5 className="text-xs font-medium text-slate-300">Фиксированные параметры</h5>
+                                    
+                                    <div className="flex justify-between text-xs text-slate-400">
+                                        <span>Target RMS: 0.2</span>
+                                        <span className="text-slate-500">Фиксированное значение</span>
+                                    </div>
+                                    
+                                    <div className="flex justify-between text-xs text-slate-400">
+                                        <span>Cross Fade Duration: 0.15</span>
+                                        <span className="text-slate-500">Фиксированное значение</span>
+                                    </div>
+                                    
+                                    <div className="flex justify-between text-xs text-slate-400">
+                                        <span>Silence Duration: 100ms</span>
+                                        <span className="text-slate-500">Фиксированное значение</span>
+                                    </div>
+                                    
+                                    <div className="flex justify-between text-xs text-slate-400">
+                                        <span>Sway Sampling Coef: -1.0</span>
+                                        <span className="text-slate-500">Фиксированное значение</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
                     <DialogFooter>
                         <Button onClick={handleTestVoice} variant="outline"><TestTube2 className="h-4 w-4 mr-2"/>Тест</Button>
-                        <Button onClick={handleUpdateSettings}>Применить</Button>
+                        <Button onClick={handleUpdateSettings} className="bg-blue-600 hover:bg-blue-700">
+                            <Settings className="h-4 w-4 mr-2"/>Применить
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

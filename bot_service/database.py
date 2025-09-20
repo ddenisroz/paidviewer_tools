@@ -12,6 +12,9 @@ DEFAULT_BLOCKED_BOTS = [
     "StreamElements", "Nightbot", "Streamlabs", "Moobot", "TwirApp"
 ]
 
+# Убираем заглушки голосов - TTS сервис будет работать с реальными голосами
+DEFAULT_VOICES = []
+
 # Настройка логирования
 logger = logging.getLogger(__name__)
 
@@ -43,7 +46,6 @@ try:
         id = Column(String, primary_key=True, index=True) # Twitch User ID
         username = Column(String, unique=True, index=True)
         display_name = Column(String)
-        email = Column(String, nullable=True)
         avatar = Column(String, nullable=True)
         platform = Column(String)
         twitch_access_token = Column(String, nullable=True)
@@ -112,10 +114,17 @@ try:
         is_public = Column(Boolean, default=True)
         is_active = Column(Boolean, default=True)
         created_at = Column(DateTime, default=datetime.utcnow)
-        # Voice settings
-        speed = Column(Float, default=1.0)
-        pitch = Column(Float, default=1.0)
-        volume = Column(Float, default=1.0)
+        
+        # Настройки генерации TTS (настраиваемые пользователем)
+        cfg_strength = Column(Float, default=2.5)  # CFG strength (2.0-5.0 рекомендуется) - ЕДИНСТВЕННЫЙ настраиваемый параметр
+        
+        # Автоматически определяемые системой параметры (НЕ хранятся в БД)
+        # target_rms, speed, nfe_step - определяются динамически в коде
+        
+        # Фиксированные параметры (не настраиваемые пользователем)
+        cross_fade_duration = Column(Float, default=0.15)
+        silence_duration_ms = Column(Integer, default=100)
+        sway_sampling_coef = Column(Float, default=-1.0)
 
 
     def get_db():
@@ -141,6 +150,14 @@ try:
                     if bot_name not in existing_bots:
                         db_bot = BlockedBot(bot_name=bot_name)
                         db.add(db_bot)
+                
+                # Добавление голосов по умолчанию, если их нет
+                existing_voices = {voice.name for voice in db.query(Voice).all()}
+                for voice_data in DEFAULT_VOICES:
+                    if voice_data["name"] not in existing_voices:
+                        db_voice = Voice(**voice_data)
+                        db.add(db_voice)
+                
                 db.commit()
             finally:
                 db.close()

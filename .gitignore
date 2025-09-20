@@ -10,6 +10,10 @@ tts_service/audio_cache/
 tts_service/voices/user/
 tts_service/user_configs/
 
+# Audio files (temporary)
+tts_service/audio/
+tts_service/voices/global/
+
 # Database
 *.db
 *.sqlite3

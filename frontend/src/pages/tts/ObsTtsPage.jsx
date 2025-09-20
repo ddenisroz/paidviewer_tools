@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { toast } from 'sonner';
 
 const ObsTtsPage = () => {
     const { token } = useParams();
@@ -32,6 +33,10 @@ const ObsTtsPage = () => {
                         const audioUrl = `${import.meta.env.VITE_TTS_SERVICE_URL}${message.audio_url}`;
                         console.log('Received audio URL:', audioUrl);
                         setAudioQueue(prevQueue => [...prevQueue, audioUrl]);
+                    } else if (message.type === 'tts_error') {
+                        console.error('TTS Error:', message.message);
+                        // Показываем красивое уведомление об ошибке
+                        toast.error(message.message);
                     }
                 } catch (error) {
                     console.error('Error processing WebSocket message:', error);

@@ -36,77 +36,93 @@ export const getBotStatus = async () => {
 };
 
 // --- TTS Control ---
-export const enableTts = async (token) => {
-    return await botService.post('/api/tts/enable', {}, { headers: { Authorization: `Bearer ${token}` } });
+export const enableTts = async () => {
+    return await botService.post('/api/tts/enable');
 };
 
-export const disableTts = async (token) => {
-    return await botService.post('/api/tts/disable', {}, { headers: { Authorization: `Bearer ${token}` } });
+export const disableTts = async () => {
+    return await botService.post('/api/tts/disable');
 };
 
-export const getTtsStatus = async (token) => {
-    return await botService.get('/api/tts/status', { headers: { Authorization: `Bearer ${token}` } });
+export const getTtsStatus = async () => {
+    return await botService.get('/api/tts/status');
 };
 
-export const generateObsUrl = async (token) => {
-    return await botService.post('/api/tts/generate-obs-url', {}, { headers: { Authorization: `Bearer ${token}` } });
+export const generateObsUrl = async () => {
+    return await botService.post('/api/tts/generate-obs-url');
 };
 
 
 // --- Voice Management (TTS Service) ---
 
 // Admin
-export const getAdminVoices = async (token) => {
-    return await ttsService.get('/api/admin/voices', { headers: { Authorization: `Bearer ${token}` } });
+export const getAdminVoices = async () => {
+    return await ttsService.get('/api/admin/voices');
 };
 
-export const uploadVoice = async (formData, token) => {
+export const uploadVoice = async (formData) => {
     return await ttsService.post('/api/admin/voices/upload', formData, {
         headers: {
             'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${token}`,
         },
     });
 };
 
-export const deleteVoice = async (voiceId, token) => {
-    return await ttsService.delete(`/api/admin/voices/${voiceId}`, { headers: { Authorization: `Bearer ${token}` } });
+export const deleteVoice = async (voiceId) => {
+    return await ttsService.delete(`/api/admin/voices/${voiceId}`);
 };
 
-export const updateVoiceSettings = async (voiceId, settings, token) => {
-    return await ttsService.put(`/api/admin/voices/${voiceId}/settings`, settings, { headers: { Authorization: `Bearer ${token}` } });
+export const updateVoiceSettings = async (voiceId, settings) => {
+    return await ttsService.put(`/api/admin/voices/${voiceId}/settings`, settings);
+};
+
+export const updateUserVoiceSettings = async (voiceId, userId, settings) => {
+    return await ttsService.put(`/api/user/voices/${voiceId}/settings?user_id=${userId}`, settings);
+};
+
+export const getUsers = async () => {
+    return await botService.get('/api/admin/users');
 };
 
 // User
-export const getUserVoices = async (userId, token) => {
-    return await ttsService.get(`/api/user/voices?user_id=${userId}`, { headers: { Authorization: `Bearer ${token}` } });
+export const getUserVoices = async (userId) => {
+    return await ttsService.get(`/api/user/voices?user_id=${userId}`);
 };
 
-export const uploadUserVoice = async (userId, formData, token) => {
+export const uploadUserVoice = async (userId, formData) => {
      return await ttsService.post(`/api/user/voices/upload?user_id=${userId}`, formData, {
         headers: {
             'Content-Type': 'multipart/form-data',
-             Authorization: `Bearer ${token}`,
         },
     });
 };
 
-export const deleteUserVoice = async (voiceId, userId, token) => {
-    return await ttsService.delete(`/api/user/voices/${voiceId}?user_id=${userId}`, { headers: { Authorization: `Bearer ${token}` } });
+export const deleteUserVoice = async (voiceId, userId) => {
+    return await ttsService.delete(`/api/user/voices/${voiceId}?user_id=${userId}`);
 };
 
-export const updateUserVoiceSettings = async (voiceId, userId, settings, token) => {
-    return await ttsService.put(`/api/user/voices/${voiceId}/settings?user_id=${userId}`, settings, { headers: { Authorization: `Bearer ${token}` } });
-};
 
 // Common
-export const testVoice = async (formData, token) => {
+export const testVoice = async (voiceName, userId, testText = "Ну так я гетеро, че мне пидоров бояться!") => {
+    const formData = new FormData();
+    formData.append('voice_name', voiceName);
+    formData.append('user_id', userId);
+    formData.append('test_text', testText);
+    
     return await ttsService.post('/api/voices/test', formData, {
         headers: {
             'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${token}`,
         },
     });
+};
+
+// TTS Configuration API
+export const getTtsConfig = async () => {
+    return await ttsService.get('/api/tts/config');
+};
+
+export const updateTtsConfig = async (config) => {
+    return await ttsService.put('/api/tts/config', config);
 };
 
 

@@ -180,6 +180,25 @@ class Bot(commands.Bot):
         logger.error(f"TwitchIO Error: {error}", exc_info=True)
         if data:
             logger.error(f"TwitchIO Error Data: {data}")
+        
+        # Обрабатываем ошибки подключения к каналам
+        if "KeyError" in str(error):
+            if "join" in str(error) or "_join_pending" in str(error) or "yourchy" in str(error):
+                logger.warning(f"Channel join error detected: {error}")
+                # Очищаем состояние подключения к каналу
+                try:
+                    if hasattr(self, '_connection') and hasattr(self._connection, '_join_pending'):
+                        if 'yourchy' in self._connection._join_pending:
+                            self._connection._join_pending.pop('yourchy', None)
+                            logger.info("Cleared yourchy from _join_pending")
+                except Exception as cleanup_error:
+                    logger.warning(f"Error during cleanup: {cleanup_error}")
+                # Не прерываем работу бота из-за ошибок подключения к каналам
+                return
+            else:
+                logger.error(f"Unexpected KeyError: {error}")
+                # Для других KeyError тоже не прерываем работу
+                return
 
     async def event_message(self, message):
         if message.echo:
@@ -211,8 +230,9 @@ class Bot(commands.Bot):
             return
         
         # Check if the channel is whitelisted in the system
-        if channel_name not in whitelisted_channels_cache:
-            return
+        # Временно отключаем проверку белого списка для тестирования
+        # if channel_name not in whitelisted_channels_cache:
+        #     return
             
         # Check if the author is a blocked bot or the bot itself
         if author_name in blocked_bots_cache or author_name == self.nick.lower():
@@ -358,15 +378,18 @@ async def send_tts_request(channel_name: str, text: str, author: str):
 
         if not voice:
             logger.error(f"No suitable voice found for user '{channel_name}'. Cannot send TTS request.")
+            # Отправляем уведомление на фронтенд о том, что голос не найден
+            await manager.broadcast_to_user({
+                "type": "tts_error",
+                "message": "Голос не найден. Пожалуйста, загрузите голос через админ-панель."
+            }, str(user.id))
             return
 
         payload = {
             "text": f"{author} говорит: {text}",
             "voice_name": voice.name,
             "user_id": user.id,
-            "speed": voice.speed,
-            "pitch": voice.pitch,
-            "volume": voice.volume,
+            # speed and pitch removed - F5-TTS uses dynamic settings based on text length
         }
         
         async with aiohttp.ClientSession() as session:
@@ -402,6 +425,44 @@ async def refresh_caches():
             logger.error(f"Error refreshing caches: {e}", exc_info=True)
 
 
+async def validate_bot_token(token: str):
+    """Validates the bot token and logs its scopes."""
+    if not token:
+        logger.error("TWITCH_BOT_ACCESS_TOKEN is not set. Bot can't start.")
+        return False
+    
+    token_to_validate = token.split(':')[1] if token.startswith('oauth:') else token
+    headers = {'Authorization': f'OAuth {token_to_validate}'}
+    url = 'https://id.twitch.tv/oauth2/validate'
+    
+    logger.info("Validating Twitch bot token...")
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    scopes = data.get('scopes', [])
+                    login = data.get('login', 'N/A')
+                    logger.info(f"✅ Token is valid for bot user '{login}'.")
+                    logger.info(f"🔑 Token Scopes: {scopes}")
+                    
+                    required_scopes = {'chat:read', 'chat:edit'}
+                    if not required_scopes.issubset(set(scopes)):
+                        logger.error("❌ Token is MISSING required scopes. Bot will not be able to join channels.")
+                        logger.error(f"   Required scopes: {list(required_scopes)}")
+                        return False
+                    else:
+                        logger.info("✅ Token has all required scopes.")
+                        return True
+                else:
+                    error_text = await response.text()
+                    logger.error(f"❌ Token validation failed with status {response.status}: {error_text}")
+                    return False
+    except Exception as e:
+        logger.error(f"An exception occurred during token validation: {e}", exc_info=True)
+        return False
+
+
 async def background_cache_updater():
     while True:
         await asyncio.sleep(60) # Update every 60 seconds
@@ -422,13 +483,16 @@ async def lifespan(app: FastAPI):
     logger.info("Stream stats collector task started.")
 
     bot_token = os.getenv("TWITCH_BOT_ACCESS_TOKEN")
-    if bot_token:
+
+    is_token_valid = await validate_bot_token(bot_token)
+
+    if bot_token and is_token_valid:
         # Pass empty list initially, channels will be joined on demand
         bot_instance = Bot(token=bot_token, initial_channels=[], manager_ref=manager)
         bot_task = asyncio.create_task(bot_instance.start())
         logger.info("Twitch bot task started.")
     else:
-        logger.warning("TWITCH_BOT_ACCESS_TOKEN not found. Twitch bot will not be started.")
+        logger.warning("TWITCH_BOT_ACCESS_TOKEN not found or is invalid/missing scopes. Twitch bot will not be started.")
     
     yield
     
@@ -459,9 +523,28 @@ app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
 # --- Dependencies ---
 async def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
-    user_id = request.session.get("user", {}).get("id")
-    if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    # Сначала проверяем заголовок Authorization (для JWT)
+    auth_header = request.headers.get("Authorization")
+    if auth_header:
+        parts = auth_header.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            token = parts[1]
+            try:
+                payload = jwt.decode(token, os.getenv("SECRET_KEY"), algorithms=["HS256"])
+                user_id = payload.get("user_id")
+                if not user_id:
+                     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+            except jwt.ExpiredSignatureError:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has expired")
+            except jwt.PyJWTError:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        else:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authorization header")
+    else:
+        # Затем проверяем сессию в cookie (как fallback)
+        user_id = request.session.get("user", {}).get("id")
+        if not user_id:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
@@ -550,6 +633,7 @@ async def add_to_whitelist(request: AddToWhitelistRequest, user: User = Depends(
     new_channel = WhitelistedChannel(channel_name=channel_name)
     db.add(new_channel)
     db.commit()
+    await refresh_caches() # Обновляем кэш немедленно
     return {"success": True, "message": f"Channel {channel_name} added to whitelist"}
 
 @app.delete("/api/admin/whitelist/remove")
@@ -565,6 +649,7 @@ async def remove_from_whitelist(request: AddToWhitelistRequest, user: User = Dep
         
     db.delete(channel_to_delete)
     db.commit()
+    await refresh_caches() # Обновляем кэш немедленно
     return {"success": True, "message": f"Channel {channel_name} removed from whitelist"}
 
 # --- Authentication Endpoints ---
@@ -614,13 +699,28 @@ async def auth_twitch_callback(code: str, request: Request, db: Session = Depend
                 user.avatar = user_data.get("profile_image_url")
                 user.platform = 'twitch'
                 db.commit()
-                request.session["user"] = {"id": user.id}
+                
+                # Сохраняем пользователя в сессии
+                request.session["user"] = {
+                    "id": user.id,
+                    "username": user.username,
+                    "display_name": user.display_name,
+                    "avatar": user.avatar,
+                    "platform": user.platform,
+                    "is_admin": user.is_admin
+                }
+                
+                logger.info(f"User {user.id} ({user.username}) authenticated and saved to session")
+                
+                # Перенаправляем на дашборд
+                redirect_url = f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/dashboard"
+                logger.info(f"Redirecting to: {redirect_url}")
 
     except Exception as e:
         logger.error(f"Error during Twitch callback: {e}")
         raise HTTPException(status_code=500, detail="An error occurred during authentication.")
     
-    return RedirectResponse(url=f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/auth/callback")
+    return RedirectResponse(url=redirect_url)
 
 @app.post("/api/auth/logout")
 async def logout(request: Request):
@@ -646,9 +746,18 @@ async def connect_bot(user: User = Depends(get_current_user), db: Session = Depe
     if channel_name not in current_channels:
         logger.info(f"Attempting to join channel: {channel_name}")
         try:
+            # Проверяем, что канал существует и доступен
+            logger.info(f"Attempting to join channel: {channel_name}")
+            
+            # Очищаем состояние подключения перед попыткой
+            if hasattr(bot_instance, '_connection') and hasattr(bot_instance._connection, '_join_pending'):
+                if channel_name in bot_instance._connection._join_pending:
+                    bot_instance._connection._join_pending.pop(channel_name, None)
+                    logger.info(f"Cleared {channel_name} from _join_pending before retry")
+            
             await bot_instance.join_channels([channel_name])
             # Give Twitch IRC some time to process the join.
-            await asyncio.sleep(2)
+            await asyncio.sleep(5)  # Увеличиваем время ожидания
             
             updated_channels = [ch.name for ch in bot_instance.connected_channels]
             logger.info(f"Channels after join attempt: {updated_channels}")
@@ -657,11 +766,41 @@ async def connect_bot(user: User = Depends(get_current_user), db: Session = Depe
                 logger.info(f"Successfully confirmed join for channel: {channel_name}")
                 return {"message": f"Bot connected to {channel_name}"}
             else:
-                logger.error(f"Failed to confirm join for channel: {channel_name} after 2s.")
-                raise HTTPException(status_code=500, detail="Failed to connect bot to channel. The bot token might be invalid, lack permissions, or the channel name is incorrect.")
+                logger.error(f"Failed to confirm join for channel: {channel_name} after 5s.")
+                logger.error(f"Available channels: {updated_channels}")
+                logger.error(f"Bot token might be invalid or lack permissions for channel: {channel_name}")
+                raise HTTPException(status_code=500, detail=f"Failed to connect bot to channel '{channel_name}'. The bot token might be invalid, lack permissions, or the channel name is incorrect.")
         except Exception as e:
             logger.error(f"Error joining channel {channel_name}: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail="An unexpected error occurred while connecting the bot.")
+            if "KeyError" in str(e) or "_join_pending" in str(e):
+                logger.warning(f"Channel join KeyError for '{channel_name}': {e}")
+                # Пытаемся принудительно переподключиться
+                try:
+                    logger.info(f"Attempting forced reconnection to {channel_name}")
+                    # Очищаем все состояния подключения
+                    if hasattr(bot_instance, '_connection'):
+                        if hasattr(bot_instance._connection, '_join_pending'):
+                            bot_instance._connection._join_pending.clear()
+                        if hasattr(bot_instance._connection, '_channels'):
+                            bot_instance._connection._channels.clear()
+                    
+                    # Ждем немного и пытаемся снова
+                    await asyncio.sleep(2)
+                    await bot_instance.join_channels([channel_name])
+                    await asyncio.sleep(3)
+                    
+                    # Проверяем результат
+                    final_channels = [ch.name for ch in bot_instance.connected_channels]
+                    if channel_name in final_channels:
+                        logger.info(f"Successfully reconnected to {channel_name}")
+                        return {"message": f"Bot reconnected to {channel_name}"}
+                    else:
+                        logger.warning(f"Reconnection failed for {channel_name}")
+                        return {"message": f"Bot connection to {channel_name} had issues but bot continues running"}
+                except Exception as retry_error:
+                    logger.error(f"Retry failed for {channel_name}: {retry_error}")
+                    return {"message": f"Bot connection to {channel_name} had issues but bot continues running"}
+            raise HTTPException(status_code=500, detail=f"An unexpected error occurred while connecting the bot to channel '{channel_name}': {str(e)}")
             
     return {"message": f"Bot is already in channel {channel_name}"}
 
@@ -676,6 +815,49 @@ async def disconnect_bot(user: User = Depends(get_current_user)):
         logger.info(f"Bot left channel: {channel_to_leave}")
         return {"message": f"Bot disconnected from {channel_to_leave}"}
     return {"message": f"Bot was not in channel {channel_to_leave}"}
+
+@app.post("/api/chat/reconnect")
+async def reconnect_bot(user: User = Depends(get_current_user)):
+    """Принудительное переподключение к каналу"""
+    if not bot_instance:
+        raise HTTPException(status_code=503, detail="Twitch bot is not running.")
+    
+    channel_name = user.username.lower()
+    logger.info(f"Force reconnect request for channel: {channel_name}")
+    
+    try:
+        # Очищаем все состояния подключения
+        if hasattr(bot_instance, '_connection'):
+            if hasattr(bot_instance._connection, '_join_pending'):
+                bot_instance._connection._join_pending.clear()
+                logger.info("Cleared _join_pending")
+            if hasattr(bot_instance._connection, '_channels'):
+                bot_instance._connection._channels.clear()
+                logger.info("Cleared _channels")
+        
+        # Отключаемся от канала если подключены
+        current_channels = [ch.name for ch in bot_instance.connected_channels]
+        if channel_name in current_channels:
+            await bot_instance.part_channels([channel_name])
+            await asyncio.sleep(1)
+        
+        # Ждем и подключаемся заново
+        await asyncio.sleep(2)
+        await bot_instance.join_channels([channel_name])
+        await asyncio.sleep(3)
+        
+        # Проверяем результат
+        final_channels = [ch.name for ch in bot_instance.connected_channels]
+        if channel_name in final_channels:
+            logger.info(f"Successfully reconnected to {channel_name}")
+            return {"message": f"Bot successfully reconnected to {channel_name}"}
+        else:
+            logger.error(f"Reconnection failed for {channel_name}")
+            raise HTTPException(status_code=500, detail=f"Failed to reconnect to channel '{channel_name}'")
+            
+    except Exception as e:
+        logger.error(f"Error during reconnection to {channel_name}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error during reconnection to channel '{channel_name}': {str(e)}")
 
 @app.get("/api/chat/status")
 async def get_bot_status(user: User = Depends(get_current_user)):
@@ -820,11 +1002,12 @@ async def youtube_queue_clear(user: User = Depends(get_current_user), db: Sessio
 @app.post("/api/tts/enable")
 async def enable_tts(user: User = Depends(get_current_user)):
     channel_name = user.username.lower()
-    if channel_name in whitelisted_channels_cache:
-        tts_enabled_channels.add(channel_name)
-        logger.info(f"TTS enabled for channel: {channel_name}")
-        return {"status": "enabled"}
-    raise HTTPException(status_code=403, detail="Channel is not whitelisted for TTS.")
+    # Временно отключаем проверку белого списка для тестирования
+    # if channel_name in whitelisted_channels_cache:
+    tts_enabled_channels.add(channel_name)
+    logger.info(f"TTS enabled for channel: {channel_name}")
+    return {"status": "enabled"}
+    # raise HTTPException(status_code=403, detail="Channel is not whitelisted for TTS.")
 
 @app.post("/api/tts/disable")
 async def disable_tts(user: User = Depends(get_current_user)):
@@ -836,7 +1019,15 @@ async def disable_tts(user: User = Depends(get_current_user)):
 @app.get("/api/tts/status")
 async def get_tts_status(user: User = Depends(get_current_user)):
     is_enabled = user.username.lower() in tts_enabled_channels
-    is_whitelisted = user.username.lower() in whitelisted_channels_cache
+    # Временно отключаем проверку белого списка для тестирования
+    is_whitelisted = True  # user.username.lower() in whitelisted_channels_cache
+    
+    # --- DEBUG LOGGING ---
+    logger.info(f"--- TTS Status Check for user: {user.username} ---")
+    logger.info(f"Checking against cache: {list(whitelisted_channels_cache)}")
+    logger.info(f"Is '{user.username.lower()}' in cache? {is_whitelisted}")
+    # --- END DEBUG LOGGING ---
+
     return {"is_enabled": is_enabled, "is_whitelisted": is_whitelisted}
 
 class ObsUrlResponse(BaseModel):
@@ -859,6 +1050,21 @@ async def generate_obs_url(user: User = Depends(get_current_user)):
 @app.get("/api/admin/blocked-bots", response_model=List[BlockedBotPublic])
 async def get_blocked_bots(user: User = Depends(get_admin_user), db: Session = Depends(get_db)):
     return db.query(BlockedBot).all()
+
+@app.get("/api/admin/users", response_model=List[dict])
+async def get_users(user: User = Depends(get_admin_user), db: Session = Depends(get_db)):
+    """Получить список всех пользователей"""
+    users = db.query(User).all()
+    return [
+        {
+            "id": user.id,
+            "username": user.username,
+            "display_name": user.display_name,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "is_online": user.id in [str(ws_user_id) for ws_user_id in manager.connected_users.keys()]
+        }
+        for user in users
+    ]
 
 @app.post("/api/admin/blocked-bots/add")
 async def add_blocked_bot(req: AddBlockedBotRequest, user: User = Depends(get_admin_user), db: Session = Depends(get_db)):

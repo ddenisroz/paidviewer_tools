@@ -1,7 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
-import AuthCallbackPage from './pages/AuthCallbackPage';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
 import TtsMainPage from './pages/tts/TtsMainPage';
@@ -42,7 +41,6 @@ function App() {
         
         {/* Публичные роуты */}
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/tts-obs/:token" element={<ObsTtsPage />} />
         
         {/* Защищенные роуты, обернутые в AuthGuard */}

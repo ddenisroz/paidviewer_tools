@@ -3,11 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Upload, Trash2, Settings, TestTube2, Globe, User, Link, Copy } from 'lucide-react';
 import { Slider } from "@/components/ui/slider";
 import { toast } from 'sonner';
 import { useAuth } from '../../context/AuthContext';
+import { useTts } from '../../context/TtsContext';
 import { 
     getUserVoices, 
     uploadUserVoice, 
@@ -27,22 +29,33 @@ const VoiceManagementPage = () => {
     const [currentVoice, setCurrentVoice] = useState(null);
     const [uploadFile, setUploadFile] = useState(null);
     const [voiceName, setVoiceName] = useState('');
+    const [testText, setTestText] = useState("Ну так я гетеро, че мне пидоров бояться!");
     const [isUploading, setIsUploading] = useState(false);
     const [obsUrl, setObsUrl] = useState('');
     
-    const { user, token } = useAuth();
+    const { user } = useAuth();
+    const { initializeTts } = useTts();
     let audioContext = null;
     let audioSource = null;
+
+    // Инициализируем TTS только при загрузке этой страницы
+    useEffect(() => {
+        initializeTts();
+    }, [initializeTts]);
 
     const loadVoices = useCallback(async () => {
         if (!user) return;
         try {
             setLoading(true);
-            const data = await getUserVoices(user.id);
-            setVoices(data || []);
+            const response = await getUserVoices(user.id);
+            console.log('Voices response:', response);
+            // Проверяем, что response.data существует и является массивом
+            const voicesData = response?.data || response || [];
+            setVoices(Array.isArray(voicesData) ? voicesData : []);
         } catch (error) {
             toast.error('Ошибка загрузки голосов');
             console.error('Error loading voices:', error);
+            setVoices([]); // Устанавливаем пустой массив в случае ошибки
         } finally {
             setLoading(false);
         }
@@ -75,7 +88,12 @@ const VoiceManagementPage = () => {
 
         setIsUploading(true);
         try {
-            await uploadUserVoice(user.id, uploadFile, voiceName.trim());
+            const formData = new FormData();
+            formData.append('file', uploadFile);
+            formData.append('name', voiceName.trim());
+            formData.append('user_id', user.id);
+            
+            await uploadUserVoice(user.id, formData);
             toast.success(`Голос "${voiceName.trim()}" успешно загружен.`);
             setUploadDialogOpen(false);
             setUploadFile(null);
@@ -113,21 +131,7 @@ const VoiceManagementPage = () => {
         setEditDialogOpen(true);
     };
 
-    const handleUpdateSettings = async () => {
-        if (!currentVoice || !user) return;
-        try {
-            await updateUserVoiceSettings(currentVoice.id, user.id, {
-                speed: currentVoice.speed,
-                pitch: currentVoice.pitch,
-                volume: currentVoice.volume,
-            });
-            toast.success(`Настройки голоса "${currentVoice.name}" обновлены.`);
-            setEditDialogOpen(false);
-            loadVoices();
-        } catch (error) {
-            toast.error(error.message || 'Ошибка обновления настроек');
-        }
-    };
+    // Voice settings removed - F5-TTS uses dynamic settings based on text length
 
     const playAudio = (buffer) => {
         if (audioSource) {
@@ -148,19 +152,43 @@ const VoiceManagementPage = () => {
     const handleTestVoice = async () => {
         if (!currentVoice || !user) return;
         try {
-            const audioBlob = await testVoice(
+            const response = await testVoice(
                 currentVoice.name,
                 user.id,
-                currentVoice.speed,
-                currentVoice.pitch,
-                currentVoice.volume
+                testText
             );
-            const arrayBuffer = await audioBlob.arrayBuffer();
-            playAudio(arrayBuffer);
+            
+            // Получаем URL аудио из ответа
+            const audioUrl = response.data.audio_url;
+            if (audioUrl) {
+                // Создаем полный URL
+                const fullAudioUrl = `http://localhost:8001${audioUrl}`;
+                const audio = new Audio(fullAudioUrl);
+                audio.play().catch(() => {
+                    toast.error('Не удалось воспроизвести аудио');
+                });
+            } else {
+                toast.error('Не удалось получить аудио для воспроизведения');
+            }
         } catch (error) {
             toast.error(error.message || 'Ошибка тестирования голоса');
         }
     };
+
+            const handleUpdateSettings = async () => {
+                if (!currentVoice || !user) return;
+                try {
+                    await updateUserVoiceSettings(currentVoice.id, user.id, {
+                        cfg_strength: currentVoice.cfg_strength
+                        // Только cfg_strength настраивается пользователем
+                    });
+                    toast.success(`Настройки голоса "${currentVoice.name}" обновлены.`);
+                    setEditDialogOpen(false);
+                    loadVoices();
+                } catch (error) {
+                    toast.error(error.message || 'Ошибка обновления настроек');
+                }
+            };
 
     const handleSliderChange = (value, field) => {
         if (currentVoice) {
@@ -170,7 +198,7 @@ const VoiceManagementPage = () => {
 
     const handleGenerateObsUrl = async () => {
         try {
-            const response = await generateObsUrl(token);
+            const response = await generateObsUrl();
             const fullUrl = `${window.location.origin}/tts-obs/${response.data.obs_token}`;
             setObsUrl(fullUrl);
             toast.success('Ссылка для OBS успешно создана!');
@@ -269,44 +297,120 @@ const VoiceManagementPage = () => {
                               <p className="text-xs text-slate-400 italic break-words h-16 overflow-y-auto mb-4 p-2 bg-slate-900 rounded">
                                   "{voice.reference_text || "Нет референсного текста."}"
                               </p>
-                              <div className="flex space-x-2">
-                                  <Button className="flex-1" variant="outline" size="sm" onClick={() => handleEdit(voice)}><Settings className="h-4 w-4 mr-1"/>Настроить</Button>
-                                  {voice.voice_type === 'user' && (
-                                     <Button variant="destructive" size="icon" onClick={() => handleDelete(voice.id)}><Trash2 className="h-4 w-4"/></Button>
-                                  )}
-                              </div>
+                             <div className="flex space-x-2">
+                                 <Button className="flex-1" variant="outline" size="sm" onClick={() => handleEdit(voice)}><Settings className="h-4 w-4 mr-1"/>Настроить</Button>
+                                 <Button className="flex-1" variant="outline" size="sm" onClick={() => { setCurrentVoice(voice); handleTestVoice(); }}><TestTube2 className="h-4 w-4 mr-1"/>Тест</Button>
+                                 {voice.voice_type === 'user' && (
+                                    <Button variant="destructive" size="icon" onClick={() => handleDelete(voice.id)}><Trash2 className="h-4 w-4"/></Button>
+                                 )}
+                             </div>
                           </CardContent>
                      </Card>
                  ))}
              </div>
 
-             <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-                 <DialogContent>
-                     <DialogHeader>
-                         <DialogTitle>Настройки голоса "{currentVoice?.name}"</DialogTitle>
-                     </DialogHeader>
-                     {currentVoice && (
-                         <div className="grid gap-6 py-4">
-                            <div className="space-y-2">
-                                 <Label>Скорость: {currentVoice.speed.toFixed(2)}</Label>
-                                 <Slider value={[currentVoice.speed]} onValueChange={(v) => handleSliderChange(v, 'speed')} min={0.5} max={2.0} step={0.05} />
-                             </div>
-                             <div className="space-y-2">
-                                 <Label>Тон: {currentVoice.pitch.toFixed(2)}</Label>
-                                 <Slider value={[currentVoice.pitch]} onValueChange={(v) => handleSliderChange(v, 'pitch')} min={0.5} max={2.0} step={0.05} />
-                             </div>
-                             <div className="space-y-2">
-                                 <Label>Громкость: {currentVoice.volume.toFixed(2)}</Label>
-                                 <Slider value={[currentVoice.volume]} onValueChange={(v) => handleSliderChange(v, 'volume')} min={0.1} max={1.5} step={0.05} />
-                             </div>
-                         </div>
-                     )}
-                     <DialogFooter>
-                         <Button onClick={handleTestVoice} variant="outline"><TestTube2 className="h-4 w-4 mr-2"/>Тест</Button>
-                         <Button onClick={handleUpdateSettings}>Применить</Button>
-                     </DialogFooter>
-                 </DialogContent>
-             </Dialog>
+             {/* Диалог редактирования голоса */}
+            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Настройки голоса "{currentVoice?.name}"</DialogTitle>
+                    </DialogHeader>
+                    {currentVoice && (
+                        <div className="space-y-4 py-4">
+                            <div>
+                                <Label htmlFor="reference-text">Референсный текст</Label>
+                                <Textarea
+                                  id="reference-text"
+                                  value={currentVoice.reference_text || ''}
+                                  readOnly
+                                  className="mt-1 bg-slate-800"
+                                  rows={3}
+                                />
+                                <p className="text-sm text-muted-foreground mt-1">Текст сгенерирован автоматически. Редактирование недоступно.</p>
+                            </div>
+                            
+                            <div>
+                                <Label htmlFor="test-text">Текст для тестирования</Label>
+                                <Textarea
+                                  id="test-text"
+                                  value={testText}
+                                  onChange={(e) => setTestText(e.target.value)}
+                                  className="mt-1"
+                                  rows={3}
+                                  placeholder="Введите текст для тестирования голоса..."
+                                />
+                                <p className="text-sm text-muted-foreground mt-1">Введите текст, который хотите озвучить для тестирования</p>
+                            </div>
+                            
+                            {/* Настройки генерации TTS */}
+                            <div className="space-y-4">
+                                <h4 className="text-sm font-medium text-white">Настройки генерации</h4>
+                                
+                                {/* Единственный настраиваемый параметр */}
+                                <div>
+                                    <Label htmlFor="cfg-strength">CFG Strength: {currentVoice.cfg_strength}</Label>
+                                    <Slider
+                                        id="cfg-strength"
+                                        min={0.1}
+                                        max={10.0}
+                                        step={0.1}
+                                        value={[currentVoice.cfg_strength]}
+                                        onValueChange={(value) => setCurrentVoice(prev => ({ ...prev, cfg_strength: value[0] }))}
+                                        className="mt-2"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">Сила классификатора (0.1-10.0) - единственный настраиваемый параметр</p>
+                                </div>
+                                
+                                {/* Автоматически определяемые параметры (только для отображения) */}
+                                <div className="space-y-2 pt-2 border-t border-slate-600">
+                                    <h5 className="text-xs font-medium text-slate-300">Автоматически определяемые системой</h5>
+                                    
+                                    <div className="flex justify-between text-xs text-slate-400">
+                                        <span>Speed: 0.1-1.0</span>
+                                        <span className="text-slate-500">По длине текста</span>
+                                    </div>
+                                    
+                                    <div className="flex justify-between text-xs text-slate-400">
+                                        <span>NFE Steps: 18-26</span>
+                                        <span className="text-slate-500">По длине текста</span>
+                                    </div>
+                                </div>
+                                
+                                {/* Фиксированные параметры */}
+                                <div className="space-y-2 pt-2 border-t border-slate-600">
+                                    <h5 className="text-xs font-medium text-slate-300">Фиксированные параметры</h5>
+                                    
+                                    <div className="flex justify-between text-xs text-slate-400">
+                                        <span>Target RMS: 0.2</span>
+                                        <span className="text-slate-500">Фиксированное значение</span>
+                                    </div>
+                                    
+                                    <div className="flex justify-between text-xs text-slate-400">
+                                        <span>Cross Fade Duration: 0.15</span>
+                                        <span className="text-slate-500">Фиксированное значение</span>
+                                    </div>
+                                    
+                                    <div className="flex justify-between text-xs text-slate-400">
+                                        <span>Silence Duration: 100ms</span>
+                                        <span className="text-slate-500">Фиксированное значение</span>
+                                    </div>
+                                    
+                                    <div className="flex justify-between text-xs text-slate-400">
+                                        <span>Sway Sampling Coef: -1.0</span>
+                                        <span className="text-slate-500">Фиксированное значение</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button onClick={handleTestVoice} variant="outline"><TestTube2 className="h-4 w-4 mr-2"/>Тест</Button>
+                        <Button onClick={handleUpdateSettings} className="bg-blue-600 hover:bg-blue-700">
+                            <Settings className="h-4 w-4 mr-2"/>Применить
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

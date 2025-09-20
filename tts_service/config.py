@@ -12,17 +12,35 @@ class AppConfig(BaseModel):
     # --- Настройки путей ---
     base_dir: Path = Path(__file__).resolve().parent
     
-    @property
-    def audio_cache_path(self) -> Path:
-        return self.base_dir / "audio_cache"
-        
+    # Голоса
     @property
     def voices_path(self) -> Path:
         return self.base_dir / "voices"
         
     @property
+    def global_voices_path(self) -> Path:
+        return self.voices_path / "global"
+        
+    @property
     def user_voices_path(self) -> Path:
         return self.voices_path / "user"
+    
+    # Аудио файлы
+    @property
+    def audio_path(self) -> Path:
+        return self.base_dir / "audio"
+        
+    @property
+    def test_audio_path(self) -> Path:
+        return self.audio_path / "test"
+        
+    @property
+    def production_audio_path(self) -> Path:
+        return self.audio_path / "production"
+        
+    @property
+    def temp_audio_path(self) -> Path:
+        return self.audio_path / "temp"
         
     @property
     def user_configs_path(self) -> Path:
@@ -32,12 +50,26 @@ class AppConfig(BaseModel):
     log_level: str = Field(default="INFO", env="TTS_LOG_LEVEL")
     cors_origins: str = Field(default="http://localhost:5173,http://localhost:3000", env="CORS_ORIGINS")
     log_file: Optional[str] = Field(default=None, env="TTS_LOG_FILE")
+    
+    # --- F5-TTS настройки ---
+    # Настраиваемые параметры (рекомендации из официального репозитория)
+    cfg_strength: float = Field(default=2.5, env="TTS_CFG_STRENGTH")  # Рекомендуемое: 2.0-5.0
+    
+    # Фиксированные параметры (хардкод)
+    target_rms: float = 0.2  # Фиксированная громкость для всех голосов
+    cross_fade_duration: float = 0.15
+    silence_duration_ms: int = 100
+    sway_sampling_coef: float = -1.0
 
 # Создаем единственный экземпляр конфига
 config = AppConfig()
 
 # Создаем папки при импорте, если их нет
-config.audio_cache_path.mkdir(exist_ok=True)
 config.voices_path.mkdir(exist_ok=True)
+config.global_voices_path.mkdir(exist_ok=True)
 config.user_voices_path.mkdir(exist_ok=True)
+config.audio_path.mkdir(exist_ok=True)
+config.test_audio_path.mkdir(exist_ok=True)
+config.production_audio_path.mkdir(exist_ok=True)
+config.temp_audio_path.mkdir(exist_ok=True)
 config.user_configs_path.mkdir(exist_ok=True)

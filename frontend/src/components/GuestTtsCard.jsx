@@ -20,10 +20,11 @@ const GuestTtsCard = () => {
     const [voices, setVoices] = useState([]);
     const [selectedVoice, setSelectedVoice] = useState('');
 
-    useEffect(() => {
-        loadAllowedChannels();
-        loadTtsStatus();
-    }, []);
+    // Убираем автоматические запросы - они будут вызываться только при подключении к каналу
+    // useEffect(() => {
+    //     loadAllowedChannels();
+    //     loadTtsStatus();
+    // }, []);
 
     const loadAllowedChannels = async () => {
         try {
@@ -69,6 +70,9 @@ const GuestTtsCard = () => {
 
         setIsConnecting(true);
         try {
+            // Сначала загружаем разрешенные каналы
+            await loadAllowedChannels();
+            
             const response = await api.post('/api/tts/connect-guest', {
                 channel: channel.trim(),
                 platform
@@ -77,6 +81,7 @@ const GuestTtsCard = () => {
             if (response.data.success) {
                 setIsConnected(true);
                 toast.success(`Подключен к каналу ${channel} на ${platform}`);
+                // Загружаем TTS статус и голоса только после успешного подключения
                 await loadTtsStatus();
                 await loadVoices();
             }

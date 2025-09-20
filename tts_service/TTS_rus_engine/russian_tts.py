@@ -18,6 +18,7 @@ from f5_tts.api import F5TTS
 from huggingface_hub import hf_hub_download
 from ruaccent import RUAccent
 from .yoficator_module import yoficate_text
+from ..config import config
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -183,8 +184,13 @@ class RussianTTS:
         if not text_no_spaces:
             return True
         
-        # Проверяем, есть ли хотя бы одна буква или цифра
-        has_letter_or_digit = any(c.isalnum() for c in text_no_spaces)
+        # Проверяем, есть ли хотя бы одна буква или цифра (включая кириллицу)
+        has_letter_or_digit = any(
+            c.isalnum() or  # ASCII буквы и цифры
+            c.isalpha() or  # Любые буквы (включая кириллицу)
+            c.isdigit()     # Любые цифры
+            for c in text_no_spaces
+        )
         return not has_letter_or_digit
 
     def _remove_long_symbol_sequences(self, text: str) -> str:
@@ -199,6 +205,10 @@ class RussianTTS:
         if not self.accentizer or not text.strip():
             return text
         
+        # Очищаем пробелы перед обработкой
+        import re
+        text = re.sub(r'\s+', ' ', text.strip())
+        
         try:
             # Пробуем разные методы RUAccent
             if hasattr(self.accentizer, 'process_all'):
@@ -211,14 +221,17 @@ class RussianTTS:
                 return text
                 
             logger.info(f"Добавлены ударения: '{text[:50]}...' -> '{accented_text[:50]}...'")
-            return accented_text
+            # Очищаем пробелы в результате
+            return re.sub(r'\s+', ' ', accented_text).strip()
         except Exception as e:
             logger.warning(f"Ошибка добавления ударений: {e}")
             return text
 
     def preprocess_text_for_tts(self, text: str) -> str:
         """Предобработка текста с учетом языка и конвертацией чисел."""
-        processed_text = text.strip()
+        # Сначала убираем все лишние пробелы
+        import re
+        processed_text = re.sub(r'\s+', ' ', text.strip())
         if not processed_text:
             return ""
         
@@ -242,17 +255,17 @@ class RussianTTS:
         # Убираем лишние пробелы
         processed_text = ' '.join(processed_text.split())
         
-        # Применяем ёфикатор для русского текста (ВРЕМЕННО ОТКЛЮЧЕНО)
-        # if language == "russian":
-        #     try:
-        #         processed_text = yoficate_text(processed_text)
-        #         logger.info(f"После ёфикации: '{processed_text}'")
-        #     except Exception as e:
-        #         logger.warning(f"Ошибка ёфикации: {e}")
+        # Применяем ёфикатор для русского текста
+        if language == "russian":
+            try:
+                processed_text = yoficate_text(processed_text)
+                logger.info(f"После ёфикации: '{processed_text}'")
+            except Exception as e:
+                logger.warning(f"Ошибка ёфикации: {e}")
         
-        # Для русского текста добавляем ударения (ВРЕМЕННО ОТКЛЮЧЕНО)
-        # if language == "russian" and self.enable_accent:
-        #     processed_text = self.add_accents(processed_text)
+        # Для русского текста добавляем ударения
+        if language == "russian" and self.enable_accent:
+            processed_text = self.add_accents(processed_text)
         
         # Обработка окончаний - добавляем только точку если ее не было
         if processed_text:
@@ -263,16 +276,18 @@ class RussianTTS:
             if not processed_text.endswith(('.', '!', '?')):
                 processed_text += '.'
         
+        # Финальная очистка пробелов
+        processed_text = re.sub(r'\s+', ' ', processed_text).strip()
+        
         logger.info(f"Обработанный текст: '{processed_text}'")
         
         return processed_text
 
     def synthesize_speech(self, text: str, ref_audio_path: str, ref_text: str = "", 
-                         cross_fade_duration: float = 0.15, speed: float = None, 
-                         silence_duration_ms: int = 100, target_rms: float = 0.4,
-                         sway_sampling_coef: float = -1, cfg_strength: float = 2,
-                         nfe_step: int = None, fix_duration: Optional[float] = None,
-                         remove_silence: bool = False, seed: Optional[int] = None) -> Optional[str]:
+                         speed: float = None, nfe_step: int = None, 
+                         fix_duration: Optional[float] = None, remove_silence: bool = False, 
+                         seed: Optional[int] = None, cfg_strength: float = None, 
+                         target_rms: float = None) -> Optional[str]:
         """Синтезирует речь с автоматическим выбором модели по языку."""
         
         # Предобработка текста
@@ -283,6 +298,17 @@ class RussianTTS:
 
         # Определяем язык и выбираем модель
         language = self.detect_language(processed_text)
+        
+        # Используем настройки из конфигурации
+        if cfg_strength is None:
+            cfg_strength = config.cfg_strength
+        if target_rms is None:
+            target_rms = config.target_rms
+            
+        # Фиксированные параметры из конфигурации
+        cross_fade_duration = config.cross_fade_duration
+        silence_duration_ms = config.silence_duration_ms
+        sway_sampling_coef = config.sway_sampling_coef
         
         # Автоматическое определение скорости на основе длины обработанного текста
         if speed is None:
@@ -310,29 +336,27 @@ class RussianTTS:
                 nfe_step = 26
             logger.info(f"Автоматически определен NFE steps: {nfe_step} (длина обработанного текста: {length_without_spaces})")
         
-            # Используем русскую модель
-            tts_model = self.russian_tts
-            model_name = "Russian"
-            
-            if not tts_model:
-                logger.error(f"Модель {model_name} не загружена")
-                return None
-            
-            # ДИАГНОСТИКА: Проверяем статус модели
-            logger.info(f"ДИАГНОСТИКА модели: {model_name} загружена, device: {tts_model.device if hasattr(tts_model, 'device') else 'неизвестно'}")
-            if hasattr(tts_model, 'model') and hasattr(tts_model.model, 'training'):
-                logger.info(f"ДИАГНОСТИКА: Модель в режиме training: {tts_model.model.training}")
+        # Используем русскую модель
+        tts_model = self.russian_tts
+        model_name = "Russian"
+        
+        if not tts_model:
+            logger.error(f"Модель {model_name} не загружена")
+            return None
+        
+        # ДИАГНОСТИКА: Проверяем статус модели
+        logger.info(f"ДИАГНОСТИКА модели: {model_name} загружена, device: {tts_model.device if hasattr(tts_model, 'device') else 'неизвестно'}")
+        if hasattr(tts_model, 'model') and hasattr(tts_model.model, 'training'):
+            logger.info(f"ДИАГНОСТИКА: Модель в режиме training: {tts_model.model.training}")
 
         # Используем предопределенную транскрипцию если ref_text пустой
         ref_text_to_use = ref_text if ref_text else DEFAULT_VOICE_TRANSCRIPTION
 
         logger.info(f"Синтезируем аудио ({model_name}): '{processed_text}' используя голос '{ref_audio_path}'")
-        logger.info(f"Параметры: cross_fade={cross_fade_duration}, speed={speed}, silence={silence_duration_ms}ms")
-        logger.info(f"F5-TTS параметры: target_rms={target_rms}, sway={sway_sampling_coef}, cfg={cfg_strength}, nfe={nfe_step}")
 
         try:
-            # Создаем выходную директорию
-            output_dir = Path("audio_output")
+            # Создаем выходную директорию для временных файлов
+            output_dir = config.temp_audio_path
             output_dir.mkdir(exist_ok=True)
             
             # Создаем уникальное имя файла с временной меткой
@@ -361,8 +385,9 @@ class RussianTTS:
             if seed is not None:
                 infer_params["seed"] = seed
 
-            logger.info(f"Параметры: cross_fade={cross_fade_duration}, speed={speed}, silence={silence_duration_ms}ms")
-            logger.info(f"F5-TTS параметры: target_rms={target_rms}, sway={sway_sampling_coef}, cfg={cfg_strength}, nfe={nfe_step}")
+            logger.info(f"🎛️ Финальные параметры синтеза:")
+            logger.info(f"  - cross_fade={cross_fade_duration}, speed={speed}, silence={silence_duration_ms}ms")
+            logger.info(f"  - target_rms={target_rms}, sway={sway_sampling_coef}, cfg={cfg_strength}, nfe={nfe_step}")
 
             # ДИАГНОСТИКА: Проверяем параметры перед синтезом
             logger.info(f"ДИАГНОСТИКА F5-TTS параметров:")
@@ -433,18 +458,14 @@ class RussianTTS:
             post_silence = np.zeros(post_fade_silence, dtype=np.float32)
             wav_padded = np.concatenate([wav_padded, post_silence])
 
-            # Дополнительное усиление аудио для нормальной громкости
-            # Нормализуем RMS к целевому значению
+            # Нормализуем RMS к целевому значению из настроек
             current_rms = np.sqrt(np.mean(wav_padded**2))
             logger.info(f"ДИАГНОСТИКА: Исходный RMS: {current_rms:.10f}, Max амплитуда: {np.max(np.abs(wav_padded)):.10f}")
             
             if current_rms > 0:
-                target_rms_value = 0.25  # Целевой RMS для нормальной громкости
+                # Используем target_rms из настроек
+                target_rms_value = target_rms if target_rms is not None else 0.2
                 gain_factor = target_rms_value / current_rms
-                
-                # ВАЖНО: Увеличиваем максимальное усиление для очень тихих файлов
-                max_gain = 50000.0 if current_rms < 0.0001 else 100.0  # Для экстремально тихих файлов
-                gain_factor = min(gain_factor, max_gain)
                 
                 wav_padded = wav_padded * gain_factor
                 new_rms = np.sqrt(np.mean(wav_padded**2))
@@ -456,7 +477,7 @@ class RussianTTS:
             sf.write(str(output_path), wav_padded, sr)
             
             logger.info(f"Аудио синтезировано и сохранено в {output_path} (модель: {model_name})")
-            return str(output_path)
+            return str(output_path.resolve())
 
         except Exception as e:
             logger.error(f"Ошибка при синтезе: {e}", exc_info=True)

@@ -1,8 +1,10 @@
 // src/context/ChatContext.jsx
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { connectBot, disconnectBot, getBotStatus } from '../services/microservices';
-import { AuthContext } from './AuthContext';
+import { AuthContext, useAuth } from './AuthContext';
 import { toast } from 'sonner';
+import { useIntegrations } from './IntegrationsContext';
+import api from '../services/api';
 
 const ChatContext = createContext();
 
@@ -58,6 +60,14 @@ export const ChatProvider = ({ children }) => {
             console.log("WebSocket message received:", event.data);
             const messageData = JSON.parse(event.data);
             setLastJsonMessage(messageData); // <-- Добавлено: сохраняем все сообщение
+            
+            // Обрабатываем TTS ошибки
+            if (messageData.type === 'tts_error') {
+                console.error('TTS Error:', messageData.message);
+                // Показываем красивое уведомление об ошибке
+                toast.error(messageData.message);
+                return;
+            }
             
             // Фильтруем и добавляем только сообщения чата
             if (messageData.type === 'chat_message' || !messageData.type) {

@@ -9,9 +9,9 @@ const TtsContext = createContext();
 export const useTts = () => useContext(TtsContext);
 
 export const TtsProvider = ({ children }) => {
-    const { user, token } = useContext(AuthContext);
+    const { user } = useContext(AuthContext);
     const [ttsEnabled, setTtsEnabled] = useState(false);
-    const [isWhitelisted, setIsWhitelisted] = useState(false);
+    const [isWhitelisted, setIsWhitelisted] = useState(true); // Устанавливаем true по умолчанию
     const [voices, setVoices] = useState([]);
     const [engineStatus, setEngineStatus] = useState({ loaded: false, error: null });
 
@@ -30,9 +30,9 @@ export const TtsProvider = ({ children }) => {
     }, []);
 
     const checkTtsStatus = useCallback(async () => {
-        if (user && token) {
+        if (user) {
             try {
-                const response = await getTtsStatus(token);
+                const response = await getTtsStatus();
                 const { is_enabled, is_whitelisted } = response.data;
                 setTtsEnabled(is_enabled);
                 setIsWhitelisted(is_whitelisted);
@@ -41,31 +41,35 @@ export const TtsProvider = ({ children }) => {
                 setTtsEnabled(false);
             }
         }
-    }, [user, token]);
+    }, [user]);
 
     const loadVoices = useCallback(async () => {
-        if (user && token && engineStatus.loaded) {
+        if (user && engineStatus.loaded) {
              try {
-                const response = await getAdminVoices(token);
+                const response = await getAdminVoices();
                 setVoices(response.data);
             } catch (error) {
                 console.error("Failed to load voices:", error);
                 toast.error("Не удалось загрузить список голосов.");
             }
         }
-    }, [user, token, engineStatus.loaded]);
+    }, [user, engineStatus.loaded]);
 
 
-    useEffect(() => {
-        checkEngineStatus();
-    }, [checkEngineStatus]);
+    // Убираем автоматические запросы - они будут вызываться только при явном обращении к TTS функциям
+    // useEffect(() => {
+    //     // Проверяем статус TTS только для авторизованных пользователей
+    //     if (user) {
+    //         checkEngineStatus();
+    //     }
+    // }, [checkEngineStatus, user]);
 
-    useEffect(() => {
-        if (engineStatus.loaded) {
-            checkTtsStatus();
-            loadVoices();
-        }
-    }, [engineStatus.loaded, checkTtsStatus, loadVoices]);
+    // useEffect(() => {
+    //     if (engineStatus.loaded) {
+    //         checkTtsStatus();
+    //         loadVoices();
+    //     }
+    // }, [engineStatus.loaded, checkTtsStatus, loadVoices]);
 
 
     const toggleTts = async () => {
@@ -76,11 +80,11 @@ export const TtsProvider = ({ children }) => {
 
         try {
             if (ttsEnabled) {
-                await disableTts(token);
+                await disableTts();
                 setTtsEnabled(false);
                 toast.success("Озвучка сообщений отключена.");
             } else {
-                await enableTts(token);
+                await enableTts();
                 setTtsEnabled(true);
                 toast.success("Озвучка сообщений включена.");
             }
@@ -90,6 +94,17 @@ export const TtsProvider = ({ children }) => {
         }
     };
 
+    // Функция для инициализации TTS (вызывается только при переходе на TTS страницы)
+    const initializeTts = useCallback(async () => {
+        if (user && !engineStatus.loaded) {
+            await checkEngineStatus();
+        }
+        if (engineStatus.loaded) {
+            await checkTtsStatus();
+            await loadVoices();
+        }
+    }, [user, engineStatus.loaded, checkEngineStatus, checkTtsStatus, loadVoices]);
+
     const value = {
         ttsEnabled,
         isWhitelisted,
@@ -97,6 +112,7 @@ export const TtsProvider = ({ children }) => {
         engineStatus,
         toggleTts,
         loadVoices,
+        initializeTts,
     };
 
     return (

@@ -92,7 +92,10 @@ const LoginPage = () => {
                 <CardContent className="px-8 pb-8">
                     <div className="space-y-4">
                         <button
-                            onClick={login}
+                            onClick={() => {
+                                console.log('🖱️ Кнопка Twitch нажата!');
+                                login();
+                            }}
                             className="w-full bg-[#9146FF] hover:bg-[#7a3adc] text-white font-semibold py-3 px-5 rounded-lg transition-colors duration-300 flex items-center justify-center text-base"
                         >
                             <TwitchIcon className="mr-2 h-5 w-5" />

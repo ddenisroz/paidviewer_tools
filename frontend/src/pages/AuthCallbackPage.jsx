@@ -1,23 +1,32 @@
 import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AuthLoader from '../components/AuthLoader';
 
 const AuthCallbackPage = () => {
     const navigate = useNavigate();
-    const { fetchUser } = useAuth();
+    const { loginAndFetchUser } = useAuth();
+    const [searchParams] = useSearchParams();
 
     useEffect(() => {
-        // После редиректа с бэкенда, куки уже должны быть установлены.
-        // Мы просто вызываем fetchUser, чтобы обновить состояние в AuthContext.
+        const token = searchParams.get('token');
+        console.log('🔑 Токен из URL:', token);
+
         const handleCallback = async () => {
-            await fetchUser();
-            // После успешного получения пользователя, перенаправляем на дашборд.
-            navigate('/dashboard');
+            if (token) {
+                console.log('✅ Токен найден, пытаемся авторизоваться...');
+                await loginAndFetchUser(token);
+                // После успешного получения пользователя, перенаправляем на дашборд.
+                navigate('/dashboard', { replace: true });
+            } else {
+                // Если токена нет, возможно, произошла ошибка
+                console.error("❌ Токен не найден в URL после авторизации");
+                navigate('/login', { replace: true });
+            }
         };
 
         handleCallback();
-    }, [fetchUser, navigate]);
+    }, [loginAndFetchUser, navigate, searchParams]);
 
     return <AuthLoader platform="Twitch" />;
 };

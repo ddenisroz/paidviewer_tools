@@ -15,7 +15,7 @@ Base = declarative_base()
 
 # Определяем модели, которые нужны этому сервису
 # (они должны быть идентичны моделям в bot_service.database)
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, JSON, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, JSON, ForeignKey, Float
 from sqlalchemy.sql import func
 
 class User(Base):
@@ -29,7 +29,7 @@ class User(Base):
     twitch_refresh_token = Column(String, nullable=True)
     is_admin = Column(Boolean, default=False)
     settings = Column(JSON, default={})
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), default=func.now())
 
 class Voice(Base):
     __tablename__ = 'voices'
@@ -37,13 +37,22 @@ class Voice(Base):
     name = Column(String, unique=True, nullable=False)
     voice_type = Column(String, default='global') # 'global' or 'user'
     file_path = Column(String, nullable=False)
-    ref_text_path = Column(String, nullable=True)
+    reference_text = Column(String, nullable=True)  # Исправлено: было ref_text_path
     owner_id = Column(String, ForeignKey('users.id'), nullable=True)
     is_public = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
-    settings = Column(JSON, default={})
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), default=func.now())
+    
+    # Настройки генерации TTS (настраиваемые пользователем)
+    cfg_strength = Column(Float, default=2.5)  # CFG strength (2.0-5.0 рекомендуется) - ЕДИНСТВЕННЫЙ настраиваемый параметр
+    
+    # Автоматически определяемые системой параметры (НЕ хранятся в БД)
+    # target_rms, speed, nfe_step - определяются динамически в коде
+    
+    # Фиксированные параметры (не настраиваемые пользователем)
+    cross_fade_duration = Column(Float, default=0.15)
+    silence_duration_ms = Column(Integer, default=100)
+    sway_sampling_coef = Column(Float, default=-1.0)
 
 
 def get_db():

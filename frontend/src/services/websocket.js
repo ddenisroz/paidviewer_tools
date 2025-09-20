@@ -88,6 +88,9 @@ class WebSocketService {
             case 'pong':
                 this.emit('pong');
                 break;
+            case 'tts_error':
+                this.emit('tts_error', messageData);
+                break;
             default:
                 console.log('Unknown WebSocket message type:', type);
         }
