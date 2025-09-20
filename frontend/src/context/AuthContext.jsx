@@ -1,9 +1,9 @@
 // src/context/AuthContext.jsx
-import { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import React, { createContext, useState, useEffect, useCallback } from 'react';
+import { getUser, logout as logoutUser } from '../services/microservices'; // Import new functions
+import { toast } from 'sonner';
 
-const AuthContext = createContext();
+export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
@@ -21,57 +21,45 @@ export const AuthProvider = ({ children }) => {
         setUserMode(mode);
     };
 
-    const fetchUser = useCallback(async () => {
-        const mode = localStorage.getItem('userMode');
-        if (mode === 'guest') {
-            setUser(null); // В гостевом режиме нет объекта user
-            setLoading(false);
-            return;
-        }
-        
-        // Если есть сессия, но режим не установлен, считаем что это auth
-        if (mode === 'auth' || !mode) {
-            try {
-                const { data } = await api.get('/api/auth/user/me');
-                setUser(data);
-                updateUserMode('auth'); // Подтверждаем режим
-            } catch (error) {
+    const checkUserStatus = useCallback(async () => {
+        setLoading(true);
+        try {
+            const response = await getUser();
+            if (response.data) {
+                setUser(response.data);
+                // Fake token for local dev; server handles real auth via httpOnly cookie
+                setToken('fake-local-token'); 
+            } else {
                 setUser(null);
-                // Если была ошибка, но режим стоял 'auth', сбрасываем его
-                if (mode === 'auth') {
-                    updateUserMode(null);
-                }
-            } finally {
-                setLoading(false);
+                setToken(null);
             }
-        } else {
+        } catch (error) {
+            setUser(null);
+            setToken(null);
+            console.error("No active session or user not found:", error.response?.data?.detail || error.message);
+        } finally {
             setLoading(false);
         }
     }, []);
 
     useEffect(() => {
-        fetchUser();
-    }, [fetchUser]);
+        checkUserStatus();
+    }, [checkUserStatus]);
 
-    const login = () => {
-        updateUserMode('auth');
-        window.location.href = `${api.defaults.baseURL}/api/auth/twitch/login`;
-    };
-
-    const setGuestMode = () => {
-        updateUserMode('guest');
-        setUser(null); // Убеждаемся, что нет пользователя в гостевом режиме
+    const login = (userData, userToken) => {
+        setUser(userData);
+        setToken(userToken);
     };
 
     const logout = async () => {
         try {
-            await api.post('/api/auth/logout');
-        } catch (error) {
-            console.error('Logout failed on backend:', error);
-        } finally {
+            await logoutUser();
             setUser(null);
-            updateUserMode(null); // Сбрасываем режим
-            navigate('/login');
+            setToken(null);
+            toast.success('Вы успешно вышли из системы.');
+        } catch (error) {
+            console.error('Logout failed:', error);
+            toast.error('Ошибка при выходе из системы.');
         }
     };
     
@@ -84,9 +72,9 @@ export const AuthProvider = ({ children }) => {
         logout,
         loading,
         isAuthenticated,
-        fetchUser,
+        checkUserStatus,
         setGuestMode
-    }), [user, userMode, loading, isAuthenticated, fetchUser]);
+    }), [user, userMode, loading, isAuthenticated, checkUserStatus]);
 
     return (
         <AuthContext.Provider value={value}>

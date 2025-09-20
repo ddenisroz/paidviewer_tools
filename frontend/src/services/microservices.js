@@ -1,302 +1,197 @@
-/**
- * Микросервисы API клиент
- * Работает с отдельными сервисами Bot и TTS
- */
+import axios from 'axios';
 
-// Конфигурация сервисов
-const BOT_SERVICE_URL = import.meta.env.VITE_BOT_SERVICE_URL || 'http://localhost:8000';
-const TTS_SERVICE_URL = import.meta.env.VITE_TTS_SERVICE_URL || 'http://localhost:8001';
+const botService = axios.create({
+    baseURL: import.meta.env.VITE_BOT_SERVICE_URL || 'http://localhost:8000',
+    withCredentials: true,
+});
 
-// WebSocket для Bot сервиса
-const BOT_WS_URL = import.meta.env.VITE_BOT_WS_URL || 'ws://localhost:8000/ws';
+const ttsService = axios.create({
+    baseURL: import.meta.env.VITE_TTS_SERVICE_URL || 'http://localhost:8001',
+});
 
-class MicroservicesAPI {
-    constructor() {
-        this.botServiceUrl = BOT_SERVICE_URL;
-        this.ttsServiceUrl = TTS_SERVICE_URL;
-        this.wsUrl = BOT_WS_URL;
-        this.ws = null;
-        this.isConnected = false;
-        this.pingInterval = null;
-        this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 5;
+// --- Authentication ---
+export const loginTwitch = () => {
+    window.location.href = `${botService.defaults.baseURL}/api/auth/twitch/login`;
+};
+
+export const logout = async () => {
+    return await botService.post('/api/auth/logout');
+};
+
+export const getUser = async () => {
+    return await botService.get('/api/auth/user/me');
+};
+
+// --- Bot Control ---
+export const connectBot = async () => {
+    return await botService.post('/api/chat/connect');
+};
+
+export const disconnectBot = async () => {
+    return await botService.post('/api/chat/disconnect');
+};
+
+export const getBotStatus = async () => {
+    return await botService.get('/api/chat/status');
+};
+
+// --- TTS Control ---
+export const enableTts = async (token) => {
+    return await botService.post('/api/tts/enable', {}, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+export const disableTts = async (token) => {
+    return await botService.post('/api/tts/disable', {}, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+export const getTtsStatus = async (token) => {
+    return await botService.get('/api/tts/status', { headers: { Authorization: `Bearer ${token}` } });
+};
+
+export const generateObsUrl = async (token) => {
+    return await botService.post('/api/tts/generate-obs-url', {}, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+
+// --- Voice Management (TTS Service) ---
+
+// Admin
+export const getAdminVoices = async (token) => {
+    return await ttsService.get('/api/admin/voices', { headers: { Authorization: `Bearer ${token}` } });
+};
+
+export const uploadVoice = async (formData, token) => {
+    return await ttsService.post('/api/admin/voices/upload', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${token}`,
+        },
+    });
+};
+
+export const deleteVoice = async (voiceId, token) => {
+    return await ttsService.delete(`/api/admin/voices/${voiceId}`, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+export const updateVoiceSettings = async (voiceId, settings, token) => {
+    return await ttsService.put(`/api/admin/voices/${voiceId}/settings`, settings, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+// User
+export const getUserVoices = async (userId, token) => {
+    return await ttsService.get(`/api/user/voices?user_id=${userId}`, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+export const uploadUserVoice = async (userId, formData, token) => {
+     return await ttsService.post(`/api/user/voices/upload?user_id=${userId}`, formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+             Authorization: `Bearer ${token}`,
+        },
+    });
+};
+
+export const deleteUserVoice = async (voiceId, userId, token) => {
+    return await ttsService.delete(`/api/user/voices/${voiceId}?user_id=${userId}`, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+export const updateUserVoiceSettings = async (voiceId, userId, settings, token) => {
+    return await ttsService.put(`/api/user/voices/${voiceId}/settings?user_id=${userId}`, settings, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+// Common
+export const testVoice = async (formData, token) => {
+    return await ttsService.post('/api/voices/test', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${token}`,
+        },
+    });
+};
+
+
+// --- Whitelist Management ---
+export const getWhitelist = async (token) => {
+    return await botService.get('/api/admin/whitelist', { headers: { Authorization: `Bearer ${token}` } });
+};
+
+export const addToWhitelist = async (username, token) => {
+    return await botService.post('/api/admin/whitelist/add', { username }, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+export const removeFromWhitelist = async (username, token) => {
+    return await botService.delete('/api/admin/whitelist/remove', { 
+        data: { username },
+        headers: { Authorization: `Bearer ${token}` } 
+    });
+};
+
+// --- Blocked Bots Management ---
+export const getBlockedBots = async (token) => {
+    return await botService.get('/api/admin/blocked-bots', { headers: { Authorization: `Bearer ${token}` } });
+};
+
+export const addBlockedBot = async (botName, token) => {
+    return await botService.post('/api/admin/blocked-bots/add', { bot_name: botName }, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+export const removeBlockedBot = async (botName, token) => {
+    return await botService.delete(`/api/admin/blocked-bots/remove/${botName}`, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+
+// --- YouTube Queue ---
+export const getYoutubeQueue = async (token) => {
+    return await botService.get('/api/youtube/queue', { headers: { Authorization: `Bearer ${token}` } });
+};
+
+export const youtubePlayerNext = async (token) => {
+    return await botService.post('/api/youtube/player/next', {}, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+export const youtubeQueueClear = async (token) => {
+    return await botService.post('/api/youtube/queue/clear', {}, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+// --- Twitch Stream Info ---
+export const getStreamInfo = async (token) => {
+    return await botService.get('/api/twitch/stream-info', { headers: { Authorization: `Bearer ${token}` } });
+};
+
+export const getTwitchCategories = async (search, token) => {
+    return await botService.get(`/api/twitch/categories?search=${search}`, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+export const updateStreamTitle = async (title, token) => {
+    return await botService.post('/api/twitch/stream/title', { title }, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+export const updateStreamCategory = async (categoryId, token) => {
+    return await botService.post('/api/twitch/stream/category', { category_id: categoryId }, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+// --- Stream Stats ---
+export const getStreamHistory = async (token) => {
+    return await botService.get('/api/stream/history', { headers: { Authorization: `Bearer ${token}` } });
+};
+
+// --- Health ---
+export const getBotHealth = async () => {
+    try {
+        const response = await botService.get('/health');
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching bot health:", error);
+        return { status: 'unhealthy' };
     }
+};
 
-    // Bot Service API
-    async getBotHealth() {
-        try {
-            const response = await fetch(`${this.botServiceUrl}/health`, {
-                credentials: 'include'
-            });
-            
-            if (!response.ok) {
-                throw new Error(`Bot сервис недоступен: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            
-            // Если TTS недоступен, добавляем информацию об ошибке
-            if (data.status === 'degraded' && data.tts_error) {
-                data.tts_available = false;
-                data.tts_ready = false;
-                data.tts_error = data.tts_error;
-            }
-            
-            return data;
-        } catch (error) {
-            console.error('Bot Health check failed:', error);
-            return {
-                status: 'unhealthy',
-                tts_available: false,
-                tts_ready: false,
-                tts_error: error.message || 'Bot сервис недоступен'
-            };
-        }
+export const getTtsHealth = async () => {
+    try {
+        const response = await ttsService.get('/health');
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching TTS health:", error);
+        return { status: 'unhealthy', tts_engine_loaded: false };
     }
-
-    async getChatMessages(limit = 50) {
-        const response = await fetch(`${this.botServiceUrl}/api/chat/messages?limit=${limit}`, {
-            credentials: 'include'
-        });
-        return response.json();
-    }
-
-    async muteUser(username) {
-        const response = await fetch(`${this.botServiceUrl}/chat/mute/${username}`, {
-            method: 'POST',
-            credentials: 'include'
-        });
-        return response.json();
-    }
-
-    async unmuteUser(username) {
-        const response = await fetch(`${this.botServiceUrl}/chat/unmute/${username}`, {
-            method: 'POST',
-            credentials: 'include'
-        });
-        return response.json();
-    }
-
-    async getMutedUsers() {
-        const response = await fetch(`${this.botServiceUrl}/chat/muted`, {
-            credentials: 'include'
-        });
-        return response.json();
-    }
-
-    async enableTts() {
-        const response = await fetch(`${this.botServiceUrl}/tts/enable`, {
-            method: 'POST',
-            credentials: 'include'
-        });
-        return response.json();
-    }
-
-    async disableTts() {
-        const response = await fetch(`${this.botServiceUrl}/tts/disable`, {
-            method: 'POST',
-            credentials: 'include'
-        });
-        return response.json();
-    }
-
-    async getTtsStatus() {
-        const response = await fetch(`${this.botServiceUrl}/tts/status`, {
-            credentials: 'include'
-        });
-        return response.json();
-    }
-
-    async getTtsVoicesStatus() {
-        const response = await fetch(`${this.botServiceUrl}/api/voices/tts/status`, {
-            credentials: 'include'
-        });
-        return response.json();
-    }
-
-    async updateTtsSettings(settings) {
-        const response = await fetch(`${this.botServiceUrl}/tts/settings`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            credentials: 'include',
-            body: JSON.stringify(settings)
-        });
-        return response.json();
-    }
-
-    // TTS Service API
-    async getTtsHealth() {
-        try {
-            const response = await fetch(`${this.ttsServiceUrl}/health`);
-            if (!response.ok) {
-                throw new Error(`TTS сервис недоступен: ${response.status}`);
-            }
-            return response.json();
-        } catch (error) {
-            console.error('TTS Health check failed:', error);
-            return {
-                ready: false,
-                engine_type: 'none',
-                error: error.message || 'TTS сервис недоступен'
-            };
-        }
-    }
-
-    async synthesizeSpeech(text, voiceName, channelName, settings = {}) {
-        const response = await fetch(`${this.ttsServiceUrl}/api/tts/synthesize`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                text,
-                voice_name: voiceName,
-                channel_name: channelName,
-                settings
-            })
-        });
-        return response.json();
-    }
-
-    async getVoices() {
-        const response = await fetch(`${this.ttsServiceUrl}/api/voices`);
-        return response.json();
-    }
-
-    async getTtsServiceStatus() {
-        const response = await fetch(`${this.ttsServiceUrl}/api/tts/status`);
-        return response.json();
-    }
-
-    // Админ панель API
-    async getAdminDashboard() {
-        const response = await fetch(`${this.ttsServiceUrl}/api/admin/dashboard`);
-        return response.json();
-    }
-
-    async getVoiceAnalytics() {
-        const response = await fetch(`${this.ttsServiceUrl}/api/admin/voices/analytics`);
-        return response.json();
-    }
-
-    async updateVoiceSettings(voiceName, settings) {
-        const response = await fetch(`${this.ttsServiceUrl}/api/admin/voices/settings/${voiceName}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(settings)
-        });
-        return response.json();
-    }
-
-    getAudioUrl(filename) {
-        return `${this.ttsServiceUrl}/audio/${filename}`;
-    }
-
-    // WebSocket для Bot сервиса
-    connectWebSocket(onMessage, onConnect, onDisconnect) {
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            return;
-        }
-
-        // Закрываем существующее соединение если есть
-        if (this.ws) {
-            this.ws.close();
-        }
-
-        console.log('Подключение к WebSocket:', this.wsUrl);
-        this.ws = new WebSocket(this.wsUrl);
-        
-        this.ws.onopen = () => {
-            this.isConnected = true;
-            this.reconnectAttempts = 0; // Сбрасываем счетчик при успешном подключении
-            console.log('WebSocket подключен к Bot сервису');
-            
-            // Отправляем ping сообщение для поддержания соединения
-            this.ws.send(JSON.stringify({ type: 'ping' }));
-            
-            // Запускаем периодический ping каждые 60 секунд
-            this.pingInterval = setInterval(() => {
-                if (this.ws && this.isConnected && this.ws.readyState === WebSocket.OPEN) {
-                    this.ws.send(JSON.stringify({ type: 'ping' }));
-                }
-            }, 60000);
-            
-            if (onConnect) onConnect();
-        };
-
-        this.ws.onmessage = (event) => {
-            try {
-                // Пытаемся парсить как JSON
-                const message = JSON.parse(event.data);
-                
-                // Обрабатываем ping сообщения
-                if (message.type === 'ping' || message.type === 'echo') {
-                    console.log('WebSocket ping получен');
-                    return;
-                }
-                
-                console.log('WebSocket сообщение получено:', message);
-                
-                if (onMessage) onMessage(message);
-            } catch (error) {
-                // Если не JSON, обрабатываем как текстовое сообщение
-                if (event.data === 'ping') {
-                    console.log('WebSocket ping получен');
-                    return;
-                }
-                console.log('WebSocket текстовое сообщение:', event.data);
-            }
-        };
-
-        this.ws.onclose = () => {
-            this.isConnected = false;
-            console.log('WebSocket отключен от Bot сервиса');
-            if (onDisconnect) onDisconnect();
-            
-            // Переподключение только если не превышен лимит попыток
-            if (this.reconnectAttempts < this.maxReconnectAttempts) {
-                this.reconnectAttempts++;
-                const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000); // Экспоненциальная задержка
-                console.log(`Попытка переподключения WebSocket... (${this.reconnectAttempts}/${this.maxReconnectAttempts}) через ${delay}мс`);
-                
-                setTimeout(() => {
-                    this.connectWebSocket(onMessage, onConnect, onDisconnect);
-                }, delay);
-            } else {
-                console.log('Превышен лимит попыток переподключения WebSocket');
-            }
-        };
-
-        this.ws.onerror = (error) => {
-            console.error('WebSocket ошибка:', error);
-        };
-    }
-
-    disconnectWebSocket() {
-        if (this.pingInterval) {
-            clearInterval(this.pingInterval);
-            this.pingInterval = null;
-        }
-        
-        if (this.ws) {
-            this.ws.close();
-            this.ws = null;
-            this.isConnected = false;
-        }
-    }
-
-    sendWebSocketMessage(type, data) {
-        if (this.ws && this.isConnected) {
-            this.ws.send(JSON.stringify({ type, data }));
-        }
-    }
-}
-
-// Создаем единственный экземпляр
-const microservicesAPI = new MicroservicesAPI();
-
-export default microservicesAPI;
+};

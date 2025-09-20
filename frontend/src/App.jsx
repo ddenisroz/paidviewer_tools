@@ -16,6 +16,7 @@ import ChannelPointsPage from './pages/media/ChannelPointsPage';
 import YoutubeIntegrationPage from './pages/media/YoutubeIntegrationPage';
 import CommandsPage from './pages/CommandsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
+import ObsTtsPage from './pages/tts/ObsTtsPage';
 
 function App() {
   const { loading, userMode } = useAuth();
@@ -41,6 +42,7 @@ function App() {
         {/* Публичные роуты */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
+        <Route path="/tts-obs/:token" element={<ObsTtsPage />} />
         
         {/* Защищенные роуты, обернутые в AuthGuard */}
         <Route element={<AuthGuard />}>

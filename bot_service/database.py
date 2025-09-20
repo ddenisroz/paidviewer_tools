@@ -5,6 +5,12 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.exc import SQLAlchemyError
 import logging
 from datetime import datetime
+from sqlalchemy.sql import func
+
+# --- Constants ---
+DEFAULT_BLOCKED_BOTS = [
+    "StreamElements", "Nightbot", "Streamlabs", "Moobot", "TwirApp"
+]
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
@@ -89,6 +95,12 @@ try:
         category_name = Column(String, nullable=True)
         timestamp = Column(DateTime, default=datetime.utcnow, index=True)
 
+    class BlockedBot(Base):
+        __tablename__ = 'blocked_bots'
+        id = Column(Integer, primary_key=True, index=True)
+        bot_name = Column(String, unique=True, nullable=False, index=True)
+        added_at = Column(DateTime(timezone=True), server_default=func.now())
+
     def get_db():
         """Функция-генератор для получения сессии БД"""
         db = SessionLocal()
@@ -103,6 +115,19 @@ try:
             # Создаем все таблицы
             Base.metadata.create_all(bind=engine)
             logger.info("✅ База данных успешно инициализирована.")
+
+            # Добавление ботов по умолчанию, если их нет
+            db = SessionLocal()
+            try:
+                existing_bots = {bot.bot_name for bot in db.query(BlockedBot).all()}
+                for bot_name in DEFAULT_BLOCKED_BOTS:
+                    if bot_name not in existing_bots:
+                        db_bot = BlockedBot(bot_name=bot_name)
+                        db.add(db_bot)
+                db.commit()
+            finally:
+                db.close()
+
         except Exception as e:
             logger.error(f"❌ Ошибка инициализации базы данных: {e}")
             raise
