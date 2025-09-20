@@ -1,6 +1,6 @@
 // src/pages/tts/TtsMainPage.jsx
 import React, { useContext } from 'react';
-import { useTts } from '../context/TtsContext';
+import { useTts } from '../../context/TtsContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader } from 'lucide-react';

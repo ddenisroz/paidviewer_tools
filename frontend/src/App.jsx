@@ -17,6 +17,7 @@ import YoutubeIntegrationPage from './pages/media/YoutubeIntegrationPage';
 import CommandsPage from './pages/CommandsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import ObsTtsPage from './pages/tts/ObsTtsPage';
+import ViewersPage from './pages/ViewersPage';
 
 function App() {
   const { loading, userMode } = useAuth();

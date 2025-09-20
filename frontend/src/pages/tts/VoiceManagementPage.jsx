@@ -4,11 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Trash2, Settings, TestTube2, Globe, User } from 'lucide-react';
+import { Upload, Trash2, Settings, TestTube2, Globe, User, Link, Copy } from 'lucide-react';
 import { Slider } from "@/components/ui/slider";
 import { toast } from 'sonner';
 import { useAuth } from '../../context/AuthContext';
-import { getUserVoices, uploadUserVoice, deleteUserVoice, updateUserVoiceSettings, testVoice } from '../../services/unified-api';
+import { 
+    getUserVoices, 
+    uploadUserVoice, 
+    deleteUserVoice, 
+    updateUserVoiceSettings, 
+    testVoice 
+} from '../../services/unified-api';
+import { generateObsUrl } from '../../services/microservices'; // Import directly
 import { Badge } from '@/components/ui/badge';
 
 
@@ -21,8 +28,9 @@ const VoiceManagementPage = () => {
     const [uploadFile, setUploadFile] = useState(null);
     const [voiceName, setVoiceName] = useState('');
     const [isUploading, setIsUploading] = useState(false);
+    const [obsUrl, setObsUrl] = useState('');
     
-    const { user } = useAuth();
+    const { user, token } = useAuth();
     let audioContext = null;
     let audioSource = null;
 
@@ -160,6 +168,23 @@ const VoiceManagementPage = () => {
         }
     };
 
+    const handleGenerateObsUrl = async () => {
+        try {
+            const response = await generateObsUrl(token);
+            const fullUrl = `${window.location.origin}/tts-obs/${response.data.obs_token}`;
+            setObsUrl(fullUrl);
+            toast.success('Ссылка для OBS успешно создана!');
+        } catch (error) {
+            toast.error('Не удалось создать ссылку для OBS.');
+            console.error('Failed to generate OBS URL:', error);
+        }
+    };
+
+    const copyToClipboard = () => {
+        navigator.clipboard.writeText(obsUrl);
+        toast.success('Ссылка скопирована в буфер обмена!');
+    };
+
     return (
         <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -197,6 +222,34 @@ const VoiceManagementPage = () => {
                     </DialogContent>
                 </Dialog>
             </div>
+
+            {/* OBS Integration Card */}
+            <Card className="bg-slate-800 border-slate-700">
+                <CardHeader>
+                    <CardTitle className="text-white flex items-center gap-2">
+                        <Link className="h-5 w-5 text-purple-400" />
+                        Интеграция с OBS
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-slate-400 mb-4">
+                        Используйте эту ссылку как источник браузера в OBS для вывода звука TTS в прямой эфир.
+                        Ссылка уникальна для вашего аккаунта, не делитесь ей ни с кем.
+                    </p>
+                    {obsUrl ? (
+                        <div className="flex items-center gap-2">
+                            <Input type="text" value={obsUrl} readOnly className="bg-slate-900" />
+                            <Button onClick={copyToClipboard} variant="outline" size="icon">
+                                <Copy className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    ) : (
+                        <Button onClick={handleGenerateObsUrl} className="bg-purple-600 hover:bg-purple-700">
+                            Сгенерировать ссылку
+                        </Button>
+                    )}
+                </CardContent>
+            </Card>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                  {loading ? (

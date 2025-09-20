@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from typing import Optional, Dict, Any, List, Set
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timedelta
 from twitchio.ext import commands
 from pytube import YouTube
 from pytube.exceptions import PytubeError
@@ -108,31 +108,45 @@ class UpdateCategoryRequest(BaseModel):
 # --- WebSocket, Caches, and TTS State ---
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: Dict[str, WebSocket] = {}
+        self.active_connections: Dict[str, List[WebSocket]] = {} # user_id -> List[WebSocket]
         self.channel_to_user_map: Dict[str, str] = {} # channel_name -> user_id
 
-    async def connect(self, websocket: WebSocket, user_id: str, channel_name: str):
+    async def connect(self, websocket: WebSocket, user_id: str, channel_name: Optional[str] = None):
         await websocket.accept()
-        self.active_connections[user_id] = websocket
-        self.channel_to_user_map[channel_name.lower()] = user_id
-        logger.info(f"WebSocket connected for user {user_id} (channel: {channel_name})")
+        if user_id not in self.active_connections:
+            self.active_connections[user_id] = []
+        self.active_connections[user_id].append(websocket)
+        
+        if channel_name:
+            self.channel_to_user_map[channel_name.lower()] = user_id
+        
+        logger.info(f"WebSocket connected for user {user_id} (channel: {channel_name or 'N/A'})")
 
-    def disconnect(self, user_id: str):
+    def disconnect(self, websocket: WebSocket, user_id: str):
         if user_id in self.active_connections:
-            del self.active_connections[user_id]
-            channels_to_remove = [ch for ch, uid in self.channel_to_user_map.items() if uid == user_id]
-            for ch in channels_to_remove:
-                del self.channel_to_user_map[ch]
+            if websocket in self.active_connections[user_id]:
+                self.active_connections[user_id].remove(websocket)
+                if not self.active_connections[user_id]:
+                    del self.active_connections[user_id]
+                    # Also remove from channel map if this was the last connection
+                    channels_to_remove = [ch for ch, uid in self.channel_to_user_map.items() if uid == user_id]
+                    for ch in channels_to_remove:
+                        del self.channel_to_user_map[ch]
             logger.info(f"WebSocket for user {user_id} disconnected.")
 
     async def broadcast_to_user(self, message: dict, user_id: str):
         if user_id in self.active_connections:
-            websocket = self.active_connections[user_id]
-            try:
-                await websocket.send_json(message)
-            except (WebSocketDisconnect, ConnectionClosedOK):
-                self.disconnect(user_id)
-    
+            disconnected_websockets = []
+            for websocket in self.active_connections[user_id]:
+                try:
+                    await websocket.send_json(message)
+                except (WebSocketDisconnect, ConnectionClosedOK, RuntimeError):
+                    disconnected_websockets.append(websocket)
+            
+            # Clean up disconnected sockets
+            for ws in disconnected_websockets:
+                self.disconnect(ws, user_id)
+
     async def broadcast_to_channel_owner(self, message: dict, channel_name: str):
         user_id = self.channel_to_user_map.get(channel_name.lower())
         if user_id:
@@ -481,7 +495,38 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
             await websocket.receive_text()
     except WebSocketDisconnect:
         logger.info(f"WebSocket for user {user_id} gracefully disconnected.")
-        manager.disconnect(user_id)
+        manager.disconnect(websocket, user_id)
+
+@app.websocket("/ws/chat/obs/{token}")
+async def websocket_obs_endpoint(websocket: WebSocket, token: str, db: Session = Depends(get_db)):
+    SECRET_KEY = os.getenv("SECRET_KEY")
+    if not SECRET_KEY:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Server misconfiguration")
+        return
+        
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        user_id = payload.get("user_id")
+        if not user_id:
+            raise jwt.InvalidTokenError
+
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise jwt.InvalidTokenError
+
+    except jwt.PyJWTError:
+        logger.warning(f"Invalid OBS token received: {token}")
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token")
+        return
+
+    await manager.connect(websocket, user_id)
+    try:
+        while True:
+            # Keep connection alive
+            await websocket.receive_text() 
+    except WebSocketDisconnect:
+        logger.info(f"OBS WebSocket for user {user_id} disconnected.")
+        manager.disconnect(websocket, user_id)
 
 # --- Admin Endpoints ---
 @app.get("/api/admin/whitelist", response_model=WhitelistResponse)
@@ -793,6 +838,22 @@ async def get_tts_status(user: User = Depends(get_current_user)):
     is_enabled = user.username.lower() in tts_enabled_channels
     is_whitelisted = user.username.lower() in whitelisted_channels_cache
     return {"is_enabled": is_enabled, "is_whitelisted": is_whitelisted}
+
+class ObsUrlResponse(BaseModel):
+    obs_token: str
+
+@app.post("/api/tts/generate-obs-url", response_model=ObsUrlResponse)
+async def generate_obs_url(user: User = Depends(get_current_user)):
+    SECRET_KEY = os.getenv("SECRET_KEY")
+    if not SECRET_KEY:
+        raise HTTPException(status_code=500, detail="Server is not configured for OBS URL generation.")
+    
+    # Create a long-lived token for OBS
+    expiration = datetime.utcnow() + timedelta(days=365 * 5) # 5 years
+    to_encode = {"user_id": user.id, "exp": expiration}
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm="HS256")
+    
+    return {"obs_token": encoded_jwt}
 
 # --- BLOCKED BOTS ADMIN ENDPOINTS ---
 @app.get("/api/admin/blocked-bots", response_model=List[BlockedBotPublic])
