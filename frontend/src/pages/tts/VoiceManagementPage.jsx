@@ -10,6 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { toast } from 'sonner';
 import { useAuth } from '../../context/AuthContext';
 import { useTts } from '../../context/TtsContext';
+import { useTtsHealth, TtsHealthProvider } from '../../context/TtsHealthContext';
 import { 
     getUserVoices, 
     uploadUserVoice, 
@@ -17,13 +18,14 @@ import {
     updateUserVoiceSettings, 
     transcribeUserVoice,
     testVoice,
-    renameUserVoice
+    renameUserVoice,
+    getGlobalVoices
 } from '../../services/unified-api';
 import { generateObsUrl } from '../../services/microservices'; // Import directly
 import { Badge } from '@/components/ui/badge';
 
 
-const VoiceManagementPage = () => {
+const VoiceManagementPageContent = () => {
     const [voices, setVoices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -38,6 +40,7 @@ const VoiceManagementPage = () => {
     
     const { user } = useAuth();
     const { initializeTts } = useTts();
+    const { isHealthy, isChecking } = useTtsHealth();
     let audioContext = null;
     let audioSource = null;
 
@@ -50,7 +53,14 @@ const VoiceManagementPage = () => {
         if (!user) return;
         try {
             setLoading(true);
-            const response = await getUserVoices(user.id);
+            let response;
+            if (user.isGuest) {
+                // Для гостей загружаем только глобальные голоса
+                response = await getGlobalVoices();
+            } else {
+                // Для авторизованных пользователей загружаем их голоса
+                response = await getUserVoices(user.id);
+            }
             console.log('Voices response:', response);
             // Проверяем, что response.data существует и является массивом
             const voicesData = response?.data || response || [];
@@ -302,20 +312,56 @@ const VoiceManagementPage = () => {
         toast.success('Ссылка скопирована в буфер обмена!');
     };
 
+    // Заглушка когда TTS недоступен
+    if (!isHealthy && !isChecking) {
+        return (
+            <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold text-white">Управление голосами</h1>
+                        <p className="text-slate-400 mt-1">Загружайте и настраивайте свои уникальные голоса для TTS.</p>
+                    </div>
+                </div>
+                
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-6 text-center">
+                    <div className="flex items-center justify-center gap-2 mb-4">
+                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                        <h2 className="text-xl font-semibold text-red-400">TTS сервер недоступен</h2>
+                    </div>
+                    <p className="text-red-300 mb-4">
+                        В данный момент сервис TTS недоступен. Управление голосами временно отключено.
+                    </p>
+                    <p className="text-slate-400 text-sm">
+                        Попробуйте обновить страницу через несколько минут.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-white">Управление голосами</h1>
-                    <p className="text-slate-400 mt-1">Загружайте и настраивайте свои уникальные голоса для TTS.</p>
+                    {user?.isGuest ? (
+                        <div className="mt-1">
+                            <p className="text-slate-400">Гостевой режим: используйте только глобальные голоса.</p>
+                            <p className="text-slate-500 text-sm">Для загрузки собственных голосов войдите в систему.</p>
+                        </div>
+                    ) : (
+                        <p className="text-slate-400 mt-1">Загружайте и настраивайте свои уникальные голоса для TTS.</p>
+                    )}
                 </div>
                 <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button className="bg-purple-600 hover:bg-purple-700 w-full md:w-auto">
-                            <Upload className="h-4 w-4 mr-2" />
-                            Загрузить свой голос
-                        </Button>
-                    </DialogTrigger>
+                    {!user?.isGuest && (
+                        <DialogTrigger asChild>
+                            <Button className="bg-purple-600 hover:bg-purple-700 w-full md:w-auto">
+                                <Upload className="h-4 w-4 mr-2" />
+                                Загрузить свой голос
+                            </Button>
+                        </DialogTrigger>
+                    )}
                     <DialogContent className="max-w-md">
                         <DialogHeader>
                             <DialogTitle>Загрузка нового голоса</DialogTitle>
@@ -510,6 +556,14 @@ const VoiceManagementPage = () => {
                 </DialogContent>
             </Dialog>
         </div>
+    );
+};
+
+const VoiceManagementPage = () => {
+    return (
+        <TtsHealthProvider>
+            <VoiceManagementPageContent />
+        </TtsHealthProvider>
     );
 };
 

@@ -32,29 +32,7 @@ const MediaMainPage = () => {
     const { integrations } = useIntegrations();
     const navigate = useNavigate();
     
-    const isFunctionEnabled = integrations.twitch?.enabled;
-
-    if (!isFunctionEnabled) {
-        return (
-            <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
-                 <div className="text-8xl mb-4">😔</div>
-                <h2 className="text-3xl font-bold text-foreground mb-2">
-                    Интеграции отключены
-                </h2>
-                <p className="text-xl text-muted-foreground mb-6 max-w-lg">
-                    Для доступа к этому разделу необходимо включить интеграцию с Twitch
-                </p>
-                <Button 
-                    size="lg"
-                    className="flex items-center gap-2"
-                    onClick={() => navigate('/dashboard/settings')}
-                >
-                    <Settings className="h-5 w-5" />
-                    Перейти в настройки
-                </Button>
-            </div>
-        );
-    }
+    const isTwitchEnabled = integrations.twitch?.enabled;
 
     return (
         <div className="flex flex-col items-center justify-center flex-1 p-8">
@@ -63,14 +41,14 @@ const MediaMainPage = () => {
                     title="Youtube интеграция"
                     icon={<Youtube className="h-16 w-16 text-red-500" />}
                     path="/dashboard/media/youtube"
-                    enabled={isFunctionEnabled}
+                    enabled={true} // Всегда доступно
                     description="Управление очередью видео"
                 />
                 <MediaFeatureCard 
                     title="Управление баллами канала"
                     icon={<Coins className="h-16 w-16 text-yellow-500" />}
                     path="/dashboard/media/channel-points"
-                    enabled={isFunctionEnabled}
+                    enabled={isTwitchEnabled} // Только для Twitch
                     description="Настройка звуков для наград"
                 />
             </div>

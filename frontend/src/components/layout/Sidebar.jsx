@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Mic, Clapperboard, AreaChart, Terminal, ChevronDown, ChevronRight, Youtube, Coins, Headphones, Settings, Shield } from 'lucide-react';
+import { Home, Mic, Clapperboard, AreaChart, Terminal, ChevronDown, ChevronRight, Youtube, Coins, Headphones, Settings, Shield, MessageSquare, Command } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { getAdminList } from '../../services/microservices';
 
 const getNavItems = (isYourchy) => {
     const baseItems = [
@@ -23,7 +24,8 @@ const getNavItems = (isYourchy) => {
                 { to: '/dashboard/media/channel-points', label: 'Баллы канала', icon: Coins },
             ]
         },
-        { to: '/dashboard/commands', label: 'Анализ и модерация чата', icon: Shield },
+        { to: '/dashboard/chat-analysis', label: 'Анализ и модерация чата', icon: MessageSquare },
+        { to: '/dashboard/commands', label: 'Команды', icon: Command },
         { to: '/dashboard/settings', label: 'Настройки', icon: Settings },
     ];
 
@@ -110,10 +112,36 @@ const SidebarNavItem = ({ item, openSection, onToggleSection }) => {
 };
 
 const Sidebar = () => {
-    const { user } = useAuth();
-    // Проверяем по username или login
-    const isYourchy = user?.username === 'yourchy' || user?.login === 'yourchy';
-    const navItems = getNavItems(isYourchy);
+    const { user, isAuthenticated } = useAuth();
+    const [adminUsers, setAdminUsers] = useState([]);
+    const [isAdmin, setIsAdmin] = useState(false);
+    
+    // Загружаем список админов при монтировании компонента
+    useEffect(() => {
+        const loadAdminList = async () => {
+            try {
+                const response = await getAdminList();
+                setAdminUsers(response.data.admins || []);
+            } catch (error) {
+                console.error('Failed to load admin list:', error);
+                setAdminUsers([]);
+            }
+        };
+        
+        loadAdminList();
+    }, []);
+    
+    // Проверяем, является ли пользователь админом
+    useEffect(() => {
+        if (isAuthenticated && user && adminUsers.length > 0) {
+            const userIsAdmin = adminUsers.includes(user.username) || adminUsers.includes(user.login);
+            setIsAdmin(userIsAdmin);
+        } else {
+            setIsAdmin(false);
+        }
+    }, [isAuthenticated, user, adminUsers]);
+    
+    const navItems = getNavItems(isAdmin);
     
     // Состояние для управления открытыми разделами
     const [openSection, setOpenSection] = useState(null);
@@ -145,6 +173,23 @@ const Sidebar = () => {
                         ))}
                     </nav>
                 </div>
+                
+                {/* Блок для гостей в низу сайдбара */}
+                {!isAuthenticated && (
+                    <div className="p-4 border-t">
+                        <div className="flex flex-col items-center justify-center gap-4 text-center">
+                            <div className="text-4xl mb-2">
+                                😔
+                            </div>
+                            <h3 className="text-lg font-bold text-foreground">
+                                Интеграции отключены
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                                Для доступа к полному функционалу необходимо авторизоваться через Twitch
+                            </p>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

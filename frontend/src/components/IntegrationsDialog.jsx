@@ -49,7 +49,7 @@ const IntegrationsDialog = ({ open, onOpenChange }) => {
                             id="twitch-integration"
                             checked={!isGuestMode && integrations?.twitch?.enabled}
                             onCheckedChange={updateTwitchIntegration}
-                            disabled={isLoading || isGuestMode || !user}
+                            disabled={isLoading || !user}
                         />
                     </div>
 
@@ -68,17 +68,10 @@ const IntegrationsDialog = ({ open, onOpenChange }) => {
                             id="vk-integration"
                             checked={!isGuestMode && integrations?.vk?.enabled}
                             onCheckedChange={updateVkIntegration}
-                            disabled={isLoading || isGuestMode}
+                            disabled={isLoading}
                         />
                     </div>
 
-                    {isGuestMode && (
-                        <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                            <p className="text-sm text-amber-600 dark:text-amber-400">
-                                💡 Авторизуйтесь для доступа ко всем функциям интеграций
-                            </p>
-                        </div>
-                    )}
                 </div>
 
                 <DialogFooter className="!mt-6 sm:justify-center items-center">

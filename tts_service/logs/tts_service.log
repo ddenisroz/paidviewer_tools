@@ -1,0 +1,114 @@
+2025-09-21 19:39:37 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-21 19:39:37 - tts_service - INFO - ==================================================
+2025-09-21 19:39:37 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-21 19:39:37
+2025-09-21 19:39:37 - tts_service - INFO - ==================================================
+2025-09-21 19:39:37 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-21 19:39:37 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-21 19:39:37 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-21 19:39:37 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-21 19:39:37 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-21 19:39:37 - tts_service - INFO - ==================================================
+2025-09-21 19:39:37 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-21 19:39:37 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-21 19:39:37 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-21 19:39:37 - tts_service - INFO - ⏰ Время: 2025-09-21 19:39:37
+2025-09-21 19:39:37 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-21 19:39:38 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-21 19:39:38 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-21 19:39:38 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-21 19:39:46 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-21 19:39:46 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-21 19:39:46 - tts_service.TTS_rus_engine.russian_tts - INFO - Checkpoint скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base_v2\model_last_inference.safetensors
+2025-09-21 19:39:46 - tts_service.TTS_rus_engine.russian_tts - INFO - Vocab.txt скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base\vocab.txt
+2025-09-21 19:39:49 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS модель загружена успешно.
+2025-09-21 19:39:49 - tts_service.tts_engine - ERROR - Failed to initialize TTS engine: 'RussianTTS' object has no attribute 'initialize'
+2025-09-21 19:41:05 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-21 19:41:05 - tts_service - INFO - ==================================================
+2025-09-21 19:41:05 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-21 19:41:05
+2025-09-21 19:41:05 - tts_service - INFO - ==================================================
+2025-09-21 19:41:05 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-21 19:41:05 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-21 19:41:05 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-21 19:41:05 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-21 19:41:05 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-21 19:41:05 - tts_service - INFO - ==================================================
+2025-09-21 19:41:05 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-21 19:41:05 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-21 19:41:05 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-21 19:41:05 - tts_service - INFO - ⏰ Время: 2025-09-21 19:41:05
+2025-09-21 19:41:05 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-21 19:41:05 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-21 19:41:05 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-21 19:41:05 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-21 19:41:12 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-21 19:41:12 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-21 19:41:12 - tts_service.TTS_rus_engine.russian_tts - INFO - Checkpoint скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base_v2\model_last_inference.safetensors
+2025-09-21 19:41:12 - tts_service.TTS_rus_engine.russian_tts - INFO - Vocab.txt скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base\vocab.txt
+2025-09-21 19:41:15 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS модель загружена успешно.
+2025-09-21 19:41:15 - tts_service.tts_engine - WARNING - Failed to load Whisper transcriber: argument of type 'NoneType' is not iterable
+2025-09-21 19:41:15 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-21 19:41:15 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-21 19:46:51 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-21 19:46:51 - tts_service - INFO - ⏰ Время: 2025-09-21 19:46:51
+2025-09-21 19:46:51 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-21 19:46:51 - tts_service.tts_engine - ERROR - Error during TTS engine shutdown: 'RussianTTS' object has no attribute 'cleanup'
+2025-09-21 19:47:04 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-21 19:47:04 - tts_service - INFO - ==================================================
+2025-09-21 19:47:04 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-21 19:47:04
+2025-09-21 19:47:04 - tts_service - INFO - ==================================================
+2025-09-21 19:47:04 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-21 19:47:04 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-21 19:47:04 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-21 19:47:04 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-21 19:47:04 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-21 19:47:04 - tts_service - INFO - ==================================================
+2025-09-21 19:47:04 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-21 19:47:04 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-21 19:47:04 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-21 19:47:04 - tts_service - INFO - ⏰ Время: 2025-09-21 19:47:04
+2025-09-21 19:47:04 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-21 19:47:05 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-21 19:47:05 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-21 19:47:05 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-21 19:47:12 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-21 19:47:12 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-21 19:47:13 - tts_service.TTS_rus_engine.russian_tts - INFO - Checkpoint скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base_v2\model_last_inference.safetensors
+2025-09-21 19:47:13 - tts_service.TTS_rus_engine.russian_tts - INFO - Vocab.txt скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base\vocab.txt
+2025-09-21 19:47:16 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS модель загружена успешно.
+2025-09-21 19:47:16 - tts_service.tts_engine - WARNING - Failed to load Whisper transcriber: argument of type 'NoneType' is not iterable
+2025-09-21 19:47:16 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-21 19:47:16 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-21 21:11:03 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-21 21:11:03 - tts_service - INFO - ⏰ Время: 2025-09-21 21:11:03
+2025-09-21 21:11:03 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-21 21:11:03 - tts_service.tts_engine - ERROR - Error during TTS engine shutdown: 'RussianTTS' object has no attribute 'cleanup'
+2025-09-21 21:12:08 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-21 21:12:08 - tts_service - INFO - ==================================================
+2025-09-21 21:12:08 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-21 21:12:08
+2025-09-21 21:12:08 - tts_service - INFO - ==================================================
+2025-09-21 21:12:08 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-21 21:12:08 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-21 21:12:08 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-21 21:12:08 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-21 21:12:08 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-21 21:12:08 - tts_service - INFO - ==================================================
+2025-09-21 21:12:08 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-21 21:12:08 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-21 21:12:08 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-21 21:12:08 - tts_service - INFO - ⏰ Время: 2025-09-21 21:12:08
+2025-09-21 21:12:08 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-21 21:12:08 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-21 21:12:08 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-21 21:12:08 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-21 21:12:14 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-21 21:12:14 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-21 21:12:14 - tts_service.TTS_rus_engine.russian_tts - INFO - Checkpoint скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base_v2\model_last_inference.safetensors
+2025-09-21 21:12:15 - tts_service.TTS_rus_engine.russian_tts - INFO - Vocab.txt скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base\vocab.txt
+2025-09-21 21:12:18 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS модель загружена успешно.
+2025-09-21 21:12:18 - tts_service.tts_engine - WARNING - Failed to load Whisper transcriber: argument of type 'NoneType' is not iterable
+2025-09-21 21:12:18 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-21 21:12:18 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-21 21:14:22 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-21 21:14:22 - tts_service - INFO - ⏰ Время: 2025-09-21 21:14:22
+2025-09-21 21:14:22 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-21 21:14:22 - tts_service.tts_engine - ERROR - Error during TTS engine shutdown: 'RussianTTS' object has no attribute 'cleanup'

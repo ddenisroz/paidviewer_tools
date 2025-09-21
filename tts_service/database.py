@@ -83,3 +83,8 @@ def close_all_connections():
         engine.dispose()
     except Exception:
         pass
+
+def init_db():
+    """Инициализация базы данных"""
+    # Создаем все таблицы
+    Base.metadata.create_all(bind=engine)

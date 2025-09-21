@@ -11,19 +11,33 @@ export const useTts = () => useContext(TtsContext);
 export const TtsProvider = ({ children }) => {
     const { user } = useContext(AuthContext);
     const [ttsEnabled, setTtsEnabled] = useState(false);
-    const [isWhitelisted, setIsWhitelisted] = useState(true); // Устанавливаем true по умолчанию
+    const [isWhitelisted, setIsWhitelisted] = useState(null); // null = не проверено, true/false = результат проверки
     const [voices, setVoices] = useState([]);
     const [engineStatus, setEngineStatus] = useState({ loaded: false, error: null });
+    const [notificationCallback, setNotificationCallback] = useState(null);
+
+    // Функция для регистрации callback уведомлений
+    const setNotificationHandler = useCallback((callback) => {
+        console.log('TtsContext: setNotificationHandler called with callback:', !!callback);
+        if (callback) {
+            setNotificationCallback(() => callback);
+        }
+    }, []);
 
     const checkEngineStatus = useCallback(async () => {
         try {
+            console.log('TtsContext: Checking engine status...');
             const response = await getTtsHealth();
+            console.log('TtsContext: Engine status response:', response);
             if (response.tts_engine_loaded) {
+                console.log('TtsContext: Engine loaded successfully');
                 setEngineStatus({ loaded: true, error: null });
             } else {
+                console.log('TtsContext: Engine not loaded');
                 setEngineStatus({ loaded: false, error: "TTS engine failed to load on the server." });
             }
         } catch (error) {
+            console.log('TtsContext: Engine check failed:', error);
             setEngineStatus({ loaded: false, error: "TTS service is unavailable." });
             console.error("TTS Health check failed:", error);
         }
@@ -31,13 +45,15 @@ export const TtsProvider = ({ children }) => {
 
     const checkTtsStatus = useCallback(async () => {
         if (user) {
+            console.log("TtsContext: Checking TTS status for user:", user.username);
             try {
                 const response = await getTtsStatus();
                 const { is_enabled, is_whitelisted } = response.data;
+                console.log("TtsContext: TTS status response:", { is_enabled, is_whitelisted });
                 setTtsEnabled(is_enabled);
                 setIsWhitelisted(is_whitelisted);
             } catch (error) {
-                console.error("Could not get TTS status:", error);
+                console.error("TtsContext: Could not get TTS status:", error);
                 setTtsEnabled(false);
             }
         }
@@ -50,7 +66,11 @@ export const TtsProvider = ({ children }) => {
                 setVoices(response.data);
             } catch (error) {
                 console.error("Failed to load voices:", error);
-                toast.error("Не удалось загрузить список голосов.");
+                if (notificationCallback) {
+                    notificationCallback("Не удалось загрузить список голосов.");
+                } else {
+                    toast.error("Не удалось загрузить список голосов.");
+                }
             }
         }
     }, [user, engineStatus.loaded]);
@@ -72,9 +92,23 @@ export const TtsProvider = ({ children }) => {
     // }, [engineStatus.loaded, checkTtsStatus, loadVoices]);
 
 
-    const toggleTts = async () => {
+    const toggleTts = useCallback(async () => {
+        if (!engineStatus.loaded) {
+            console.log('TtsContext: TTS engine not loaded, notificationCallback:', !!notificationCallback);
+            // Всегда используем toast для ошибок движка, так как callback может быть не зарегистрирован
+            toast.error("Неполадки на сервере, TTS не работает");
+            return;
+        }
+
         if (!isWhitelisted) {
-            toast.error("Ваш канал не в белом списке для использования TTS.");
+            console.log('TtsContext: Channel not whitelisted, notificationCallback:', !!notificationCallback);
+            if (notificationCallback) {
+                console.log('TtsContext: Using notification callback for whitelist');
+                notificationCallback("Ваш канал не в белом списке для использования TTS.");
+            } else {
+                console.log('TtsContext: Using fallback toast for whitelist');
+                toast.error("Ваш канал не в белом списке для использования TTS.");
+            }
             return;
         }
 
@@ -82,37 +116,53 @@ export const TtsProvider = ({ children }) => {
             if (ttsEnabled) {
                 await disableTts();
                 setTtsEnabled(false);
-                toast.success("Озвучка сообщений отключена.");
+                if (notificationCallback) {
+                    notificationCallback("Озвучка сообщений отключена.", "success");
+                } else {
+                    toast.success("Озвучка сообщений отключена.");
+                }
             } else {
                 await enableTts();
                 setTtsEnabled(true);
-                toast.success("Озвучка сообщений включена.");
+                if (notificationCallback) {
+                    notificationCallback("Озвучка сообщений включена.", "success");
+                } else {
+                    toast.success("Озвучка сообщений включена.");
+                }
             }
         } catch (error) {
             console.error("Failed to toggle TTS status:", error);
-            toast.error("Не удалось изменить статус озвучки.");
+            if (notificationCallback) {
+                notificationCallback("Не удалось изменить статус озвучки.");
+            } else {
+                toast.error("Не удалось изменить статус озвучки.");
+            }
         }
-    };
+    }, [engineStatus.loaded, isWhitelisted, ttsEnabled, notificationCallback]);
 
     // Функция для инициализации TTS (вызывается только при переходе на TTS страницы)
     const initializeTts = useCallback(async () => {
-        if (user && !engineStatus.loaded) {
+        // Всегда проверяем статус движка, независимо от пользователя
+        if (!engineStatus.loaded) {
             await checkEngineStatus();
         }
-        if (engineStatus.loaded) {
+        // Проверяем статус TTS только если есть пользователь
+        if (engineStatus.loaded && user) {
             await checkTtsStatus();
             await loadVoices();
         }
-    }, [user, engineStatus.loaded, checkEngineStatus, checkTtsStatus, loadVoices]);
+    }, [engineStatus.loaded, checkEngineStatus, checkTtsStatus, loadVoices, user]);
 
     const value = {
         ttsEnabled,
         isWhitelisted,
+        setIsWhitelisted,
         voices,
         engineStatus,
         toggleTts,
         loadVoices,
         initializeTts,
+        setNotificationHandler,
     };
 
     return (

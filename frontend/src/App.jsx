@@ -53,8 +53,8 @@ function App() {
             <Route path="media" element={<MediaMainPage />} />
             <Route path="media/channel-points" element={<ChannelPointsPage />} />
             <Route path="media/youtube" element={<YoutubeIntegrationPage />} />
+            <Route path="chat-analysis" element={<AnalyticsPage />} />
             <Route path="commands" element={<CommandsPage />} />
-            <Route path="analytics" element={<AnalyticsPage />} />
           </Route>
         </Route>
 

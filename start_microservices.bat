@@ -50,10 +50,15 @@ echo 🤖 Bot API:   http://localhost:8000/docs
 echo 🎤 TTS API:   http://localhost:8001/docs
 echo 📈 Health:    http://localhost:8001/health
 echo.
+echo 📁 Логи:
+echo 📄 Bot Service:  logs/bot_service.log
+echo 📄 TTS Service:  logs/tts_service.log
+echo 🔍 Просмотр:     view_logs.bat
+echo.
 echo 💡 Тестирование:
 echo 1. Откройте http://localhost:5173
-echo 2. Проверьте http://localhost:8001/health - должно показать правильные голоса
-echo 3. В логах TTS сервиса должно появиться: "Загружен референсный текст из speaker1.txt"
+echo 2. Проверьте http://localhost:8001/health
+echo 3. Просмотрите логи: view_logs.bat
 echo.
 echo ⚠️  Убедитесь что порты 5173, 8000, 8001 свободны!
 echo.

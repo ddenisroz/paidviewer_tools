@@ -31,6 +31,11 @@ export const DataProvider = ({ children }) => {
     });
 
     const loadStreamData = useCallback(async (force = false) => {
+        // Не загружаем данные для неавторизованных пользователей
+        if (!isAuthenticated) {
+            return;
+        }
+        
         setLoading(prev => ({ ...prev, streamData: true }));
         try {
             const streamData = await twitchApi.getStreamInfo(force);
@@ -46,9 +51,14 @@ export const DataProvider = ({ children }) => {
         } finally {
             setLoading(prev => ({ ...prev, streamData: false }));
         }
-    }, []);
+    }, [isAuthenticated]);
 
     const loadStreamHistory = useCallback(async () => {
+        // Не загружаем данные для неавторизованных пользователей
+        if (!isAuthenticated) {
+            return;
+        }
+        
         setLoading(prev => ({ ...prev, history: true }));
         try {
             const response = await api.get('/api/stream/history');
@@ -75,9 +85,14 @@ export const DataProvider = ({ children }) => {
         } finally {
             setLoading(prev => ({ ...prev, history: false }));
         }
-    }, []);
+    }, [isAuthenticated]);
     
     const loadCategories = useCallback(async (search = '', force = false) => {
+        // Не загружаем данные для неавторизованных пользователей
+        if (!isAuthenticated) {
+            return;
+        }
+        
         setLoading(prev => ({ ...prev, categories: true }));
         try {
             const categoriesData = await twitchApi.getCategories(search, force);
@@ -89,7 +104,7 @@ export const DataProvider = ({ children }) => {
         } finally {
             setLoading(prev => ({ ...prev, categories: false }));
         }
-    }, []);
+    }, [isAuthenticated]);
 
     const updateStreamTitle = useCallback(async (newTitle) => {
         setStatus(prev => ({ ...prev, title: 'loading' }));

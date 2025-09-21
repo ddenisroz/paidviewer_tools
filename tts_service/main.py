@@ -1,781 +1,259 @@
-# -*- coding: utf-8 -*-
-"""
-TTS Microservice
-"""
+# tts_service/main.py
 import sys
 import os
 from pathlib import Path
-import asyncio
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
+from typing import List
 import uvicorn
-import shutil
-import tempfile
-import torch # <-- Импортируем torch
-from typing import List, Optional
-from pydantic import BaseModel, Field
-import time
-import datetime as dt
 
-# --- РЕШЕНИЕ ПРОБЛЕМЫ ИМПОРТОВ ---
+# --- Logging Configuration ---
+import sys
+from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
-# --- КОНЕЦ РЕШЕНИЯ ---
+from logging_config import setup_logging, log_system_info, log_service_start, log_service_stop, log_error, log_api_call, log_tts_event
 
-from tts_service.TTS_rus_engine.russian_tts import RussianTTS
-from tts_service.database import get_db, Voice as VoiceModel, User as UserModel, SessionLocal, engine, Base as DatabaseBase
-from tts_service.config import config
-from tts_service.audio_converter import convert_audio_for_f5tts, validate_audio_for_f5tts
+from tts_service.database import get_db, init_db, Voice as VoiceModel
+from tts_service.models import *
+from tts_service.tts_engine import tts_engine_manager
+from tts_service.file_manager import file_manager
+from tts_service.api_endpoints import tts_api
+from tts_service.background_tasks import background_task_manager
 
-# --- Pydantic Schemas ---
-class VoiceSchema(BaseModel):
-    id: int
-    name: str
-    file_path: str
-    reference_text: Optional[str] = None
-    voice_type: str
-    owner_id: Optional[str] = None
-    is_public: bool
-    is_active: bool
-    created_at: Optional[dt.datetime] = None
-    
-    # Настройки генерации TTS
-    cfg_strength: float = 2.0
-    speed_preset: str = 'normal'
-    cross_fade_duration: float = 0.15
-    silence_duration_ms: int = 100
-    sway_sampling_coef: float = -1.0
+# --- Logging Configuration ---
+logger = setup_logging("tts_service", "INFO")
+logger.info("=== TTS SERVICE STARTED ===")
 
-    class Config:
-        from_attributes = True
-
-class VoiceSettingsSchema(BaseModel):
-    """Схема для обновления настроек голоса"""
-    cfg_strength: Optional[float] = Field(None, ge=0.1, le=10.0, description="CFG strength (0.1-10.0)")
-    speed_preset: Optional[str] = Field(None, description="Пресет скорости: very_slow, slow, normal, fast")
-    reference_text: Optional[str] = Field(None, description="Референсный текст для синтеза")
-    # target_rms, speed, nfe_step - определяются автоматически системой
-
-class TtsConfigSchema(BaseModel):
-    cfg_strength: float = Field(ge=0.1, le=10.0, description="CFG strength (0.1-10.0)")
-
-class TtsConfigResponse(BaseModel):
-    cfg_strength: float
-    target_rms: float  # Только для отображения (фиксированное значение)
-    cross_fade_duration: float
-    silence_duration_ms: int
-    sway_sampling_coef: float
-
-# Настройка логирования
-logging.basicConfig(level=config.log_level.upper())
-logger = logging.getLogger(__name__)
-
-# --- Globals ---
-tts_engine = None
-transcriber = None
-
+# --- Lifespan Events ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global tts_engine, transcriber
+    # Startup
+    log_system_info(logger)
+    log_service_start(logger, "tts_service", 8001)
+    
+    # Инициализация базы данных
+    init_db()
     
     # Инициализация TTS движка
-    try:
-        tts_engine = RussianTTS()
-        logger.info("✅ TTS engine initialized successfully.")
-    except Exception as e:
-        logger.error(f"❌ Critical error initializing TTS engine: {e}", exc_info=True)
-        tts_engine = None
-
-    try:
-        from faster_whisper import WhisperModel
-        
-        # Правильная проверка доступности CUDA
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        # float16 является более распространенным и поддерживаемым типом для ускорения на GPU
-        compute_type = "float16" if device == "cuda" else "int8"
-        
-        logger.info(f"🎤 Initializing WhisperModel on device='{device}' with compute_type='{compute_type}'...")
-        # Модель будет загружена при первом использовании
-        transcriber = WhisperModel("medium", device=device, compute_type=compute_type)
-        logger.info("✅ WhisperModel initialized successfully.")
-
-    except Exception as e:
-        logger.error(f"❌ Failed to initialize WhisperModel: {e}", exc_info=True)
-        transcriber = None
-
-    logger.info("--- TTS Service starting up ---")
-    DatabaseBase.metadata.create_all(bind=engine)
+    await tts_engine_manager.initialize()
     
-    # Запуск фоновой задачи очистки кэша
-    asyncio.create_task(cleanup_cache_periodically())
+    # Запуск фоновых задач
+    await background_task_manager.start()
     
     yield
     
-    logger.info("--- TTS Service shutting down ---")
+    # Shutdown
+    log_service_stop(logger, "tts_service")
     
-    # Закрываем все соединения с базой данных
-    try:
-        from tts_service.database import close_all_connections
-        close_all_connections()
-        logger.info("✅ Database connections closed")
-    except Exception as e:
-        logger.error(f"❌ Error closing database connections: {e}")
+    # Остановка фоновых задач
+    await background_task_manager.stop()
+    
+    # Завершение работы TTS движка
+    await tts_engine_manager.shutdown()
 
+# --- FastAPI App ---
+app = FastAPI(
+    title="TTS Service API",
+    description="API для синтеза речи и управления голосами",
+    version="1.0.0",
+    lifespan=lifespan
+)
 
-app = FastAPI(lifespan=lifespan)
-
+# --- Middleware ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=config.cors_origins,
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:8000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-# --- HELPERS ---
-
-async def cleanup_cache_periodically():
-    """Периодически удаляет старые .wav файлы из папок с разными временами хранения."""
-    while True:
-        try:
-            now = time.time()
-            
-            # Очищаем папки с разными временами хранения
-            cleanup_rules = [
-                (config.test_audio_path, 300),      # Тестовые файлы: 5 минут
-                (config.production_audio_path, 300), # Производственные файлы: 5 минут
-                (config.temp_audio_path, 1800)      # Временные файлы: 30 минут
-            ]
-            
-            for cache_dir, max_age_seconds in cleanup_rules:
-                if cache_dir.exists():
-                    for filename in os.listdir(cache_dir):
-                        file_path = cache_dir / filename
-                        if file_path.suffix == '.wav':
-                            # Время последней модификации файла
-                            file_mod_time = os.path.getmtime(file_path)
-                            file_age = now - file_mod_time
-                            
-                            # Если файл старше максимального возраста
-                            if file_age > max_age_seconds:
-                                os.remove(file_path)
-                                logger.info(f"🗑️ Removed old {cache_dir.name} file after {file_age:.0f}s: {filename}")
-            
-            # Проверка каждые 5 минут
-            await asyncio.sleep(300)
-        except Exception as e:
-            logger.error(f"Error during cache cleanup: {e}", exc_info=True)
-            # В случае ошибки ждем 2 минуты перед повторной попыткой
-            await asyncio.sleep(120)
-
-def cleanup_temp_file(file_path: Path):
-    """Удаляет временный файл."""
-    try:
-        if file_path.exists():
-            os.remove(file_path)
-            logger.info(f"🗑️ Cleaned up temp file: {file_path}")
-    except Exception as e:
-        logger.error(f"Error cleaning up temp file {file_path}: {e}", exc_info=True)
-
-async def cleanup_test_file_delayed(file_path: Path, delay_seconds: int):
-    """Удаляет тестовый файл через указанное количество секунд."""
-    try:
-        await asyncio.sleep(delay_seconds)
-        if file_path.exists():
-            os.remove(file_path)
-            logger.info(f"🗑️ Cleaned up test file after {delay_seconds}s: {file_path}")
-    except Exception as e:
-        logger.error(f"Error cleaning up test file {file_path} after {delay_seconds}s: {e}", exc_info=True)
-
-async def cleanup_production_file_delayed(file_path: Path, delay_seconds: int):
-    """Удаляет производственный файл через указанное количество секунд (5 минут)."""
-    try:
-        await asyncio.sleep(delay_seconds)
-        if file_path.exists():
-            os.remove(file_path)
-            logger.info(f"🗑️ Cleaned up production file after {delay_seconds}s: {file_path}")
-    except Exception as e:
-        logger.error(f"Error cleaning up production file {file_path} after {delay_seconds}s: {e}", exc_info=True)
-
-def transcribe_audio_file(file_path: str) -> str:
-    """Транскрибирует аудиофайл и возвращает текст."""
-    if not transcriber:
-        raise HTTPException(status_code=500, detail="Transcriber model not available.")
-    try:
-        logger.info(f"🎤 Starting transcription for {file_path}...")
-        segments, info = transcriber.transcribe(file_path, beam_size=5)
-        
-        # segments - это генератор, мы объединяем все части в один текст
-        # Очищаем лишние пробелы из каждого сегмента и объединяем
-        cleaned_segments = []
-        for segment in segments:
-            # Убираем лишние пробелы в начале и конце каждого сегмента
-            cleaned_text = segment.text.strip()
-            if cleaned_text:  # Добавляем только непустые сегменты
-                cleaned_segments.append(cleaned_text)
-        
-        # Объединяем сегменты одним пробелом
-        full_text = " ".join(cleaned_segments).strip()
-        
-        # Дополнительная очистка: убираем множественные пробелы
-        import re
-        full_text = re.sub(r'\s+', ' ', full_text).strip()
-        
-        logger.info(f"Transcription result: Language '{info.language}', Probability: {info.language_probability:.2f}")
-        logger.info(f"📝 Transcription for {file_path} completed: '{full_text}'")
-        return full_text
-    except Exception as e:
-        logger.error(f"Error during transcription for {file_path}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to transcribe audio: {str(e)}")
-
-
-# --- API ENDPOINTS ---
-
+# --- Health Check ---
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "tts_engine_loaded": tts_engine is not None}
+    return await tts_api.health_check()
 
-@app.get("/api/voices/audio/{voice_name}")
-async def get_audio_file(voice_name: str):
-    # Ищем файл в разных папках по приоритету
-    search_paths = [
-        config.test_audio_path / f"{voice_name}.wav",
-        config.production_audio_path / f"{voice_name}.wav",
-        config.temp_audio_path / f"{voice_name}.wav"
-    ]
-    
-    for file_path in search_paths:
-        if file_path.exists():
-            return FileResponse(file_path)
-    
-    raise HTTPException(status_code=404, detail="Audio file not found")
-
-@app.delete("/api/voices/audio/{voice_name}")
-async def delete_audio_file(voice_name: str):
-    """Удаляет аудиофайл (для тестовых файлов)"""
-    # Ищем файл в разных папках
-    search_paths = [
-        config.test_audio_path / f"{voice_name}.wav",
-        config.production_audio_path / f"{voice_name}.wav",
-        config.temp_audio_path / f"{voice_name}.wav"
-    ]
-    
-    file_path = None
-    for path in search_paths:
-        if path.exists():
-            file_path = path
-            break
-    
-    if not file_path:
-        raise HTTPException(status_code=404, detail="Audio file not found")
-    
-    try:
-        os.remove(file_path)
-        logger.info(f"🗑️ Manually deleted audio file: {voice_name} from {file_path}")
-        return {"message": "Audio file deleted successfully"}
-    except Exception as e:
-        logger.error(f"Error deleting audio file {voice_name}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error deleting audio file: {str(e)}")
-
-@app.post("/api/tts/synthesize")
-async def synthesize_speech(
-    background_tasks: BackgroundTasks,
-    text: str = Form(...),
-    voice_name: str = Form(...),
-    user_id: str = Form(...),
-    db: Session = Depends(get_db)
-    # speed and pitch removed - F5-TTS uses dynamic settings based on text length
-):
-    if not tts_engine:
-        raise HTTPException(status_code=500, detail="TTS engine is not initialized.")
-
-    try:
-        # Уникальное имя файла на основе времени и ID пользователя
-        timestamp = int(time.time() * 1000)
-        output_filename = f"tts_{user_id}_{timestamp}.wav"
-        output_path = config.production_audio_path / output_filename
-        
-        # Путь к файлу голоса - ищем в глобальных и пользовательских голосах
-        voice_path = config.global_voices_path / f"{voice_name}.wav"
-        if not voice_path.exists():
-            voice_path = config.user_voices_path / user_id / f"{voice_name}.wav"
-            if not voice_path.exists():
-                raise HTTPException(status_code=404, detail=f"Voice '{voice_name}' not found.")
-
-        logger.info(f"Synthesizing speech for user {user_id} with voice {voice_name}")
-        
-        # Получаем настройки голоса из базы данных
-        voice_settings = db.query(VoiceModel).filter(VoiceModel.name == voice_name).first()
-        if not voice_settings:
-            # Используем настройки по умолчанию
-            cfg_strength = 2.5  # Значение по умолчанию
-            speed_preset = 'normal'  # Значение по умолчанию
-        else:
-            cfg_strength = voice_settings.cfg_strength
-            speed_preset = voice_settings.speed_preset or 'normal'
-        
-        # target_rms, speed, nfe_step - определяются автоматически системой
-        target_rms = config.target_rms  # Всегда из конфига
-        speed = None  # F5-TTS определит автоматически
-        nfe_step = None  # F5-TTS определит автоматически
-        
-        # Синтез речи с настройками из базы данных
-        # speed и nfe_step передаем как None, чтобы TTS движок определил их автоматически
-        synthesized_path = await asyncio.to_thread(
-            tts_engine.synthesize_speech,
-            text=text,
-            ref_audio_path=str(voice_path),
-            ref_text="",  # Для основного синтеза не используем референсный текст
-            cfg_strength=cfg_strength,
-            target_rms=target_rms,
-            speed=None,  # Автоматическое определение на основе длины текста
-            nfe_step=None,  # Автоматическое определение на основе длины текста
-            speed_preset=speed_preset  # Пресет скорости из базы данных
-        )
-        
-        if not synthesized_path:
-            raise HTTPException(status_code=500, detail="Failed to synthesize speech")
-        
-        # Копируем синтезированный файл в наш кеш
-        if Path(synthesized_path).exists():
-            shutil.copy2(synthesized_path, str(output_path))
-            logger.info(f"Copied synthesized file from {synthesized_path} to {output_path}")
-        else:
-            logger.error(f"Synthesized file not found at {synthesized_path}")
-            raise HTTPException(status_code=500, detail="Synthesized file not found")
-        
-        # URL для доступа к файлу
-        audio_url = f"/api/voices/audio/{output_filename.replace('.wav', '')}"
-        
-        # Удаляем производственный файл через 5 минут после создания
-        background_tasks.add_task(cleanup_production_file_delayed, output_path, 300)  # 300 секунд = 5 минут
-        
-        return {"audio_url": audio_url, "message": "Speech synthesized successfully."}
-
-    except Exception as e:
-        logger.error(f"Error during speech synthesis: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# --- ADMIN VOICE MANAGEMENT ---
-
-@app.get("/api/admin/voices", response_model=List[VoiceSchema])
+# --- Voice Management ---
+@app.get("/api/voices", response_model=List[VoiceSchema])
 def get_all_voices(db: Session = Depends(get_db)):
-    voices = db.query(VoiceModel).all()
-    
-    # Обновляем created_at для старых записей, где он None
-    for voice in voices:
-        if voice.created_at is None:
-            voice.created_at = dt.datetime.utcnow()
-    
-    db.commit()
-    return voices
+    return tts_api.get_all_voices(db)
 
-@app.post("/api/admin/voices/upload", response_model=VoiceSchema)
+@app.post("/api/voices/upload", response_model=VoiceUploadResponse)
 async def upload_voice(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     voice_name: str = Form(...),
-    owner_id: Optional[str] = Form(None),
+    voice_type: str = Form("user"),
+    is_public: bool = Form(False),
+    owner_id: str = Form(None),
     db: Session = Depends(get_db)
 ):
-    # Проверка на существование голоса с таким именем
-    existing_voice = db.query(VoiceModel).filter(VoiceModel.name == voice_name).first()
-    if existing_voice:
-        raise HTTPException(status_code=400, detail=f"Voice with name '{voice_name}' already exists.")
+    return await tts_api.upload_voice(
+        background_tasks, file, voice_name, voice_type, is_public, owner_id, db
+    )
 
-    if owner_id:
-        # Пользовательский голос
-        upload_dir = config.user_voices_path / owner_id
-        is_public = False
-        voice_type = "user"
-    else:
-        # Глобальный голос
-        upload_dir = config.global_voices_path
-        is_public = True
-        voice_type = "global"
-
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    file_path = upload_dir / f"{voice_name}.wav"
-
-    try:
-        # Сначала сохраняем во временный файл
-        original_extension = os.path.splitext(file.filename)[1] if file.filename else '.wav'
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=original_extension)
-        temp_path = temp_file.name
-        temp_file.close()
-        
-        with open(temp_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        # Конвертируем аудио в формат, подходящий для F5-TTS
-        converted_path = None
-        try:
-            # Создаем временный файл для конвертированного аудио
-            converted_temp = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
-            converted_path = converted_temp.name
-            converted_temp.close()
-            
-            logger.info(f"Converting {temp_path} to {converted_path}")
-            
-            # Конвертируем аудио
-            success = convert_audio_for_f5tts(temp_path, converted_path)
-            if not success or not os.path.exists(converted_path):
-                raise HTTPException(status_code=422, detail="Failed to convert audio file")
-            
-            # Копируем конвертированный файл в финальное место
-            shutil.copy2(converted_path, str(file_path))
-            
-            logger.info(f"✅ Audio converted and saved: {file_path}")
-            
-        except Exception as e:
-            logger.error(f"❌ Audio conversion failed: {e}", exc_info=True)
-            raise HTTPException(status_code=422, detail=f"Failed to convert audio: {str(e)}")
-        finally:
-            # Очищаем временные файлы
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
-            if converted_path and os.path.exists(converted_path):
-                os.unlink(converted_path)
-
-        # Автоматическая транскрипция
-        reference_text = transcribe_audio_file(str(file_path))
-
-        # Сохранение в БД
-        new_voice = VoiceModel(
-            name=voice_name,
-            file_path=str(file_path),
-            voice_type=voice_type,
-            owner_id=owner_id,
-            is_public=is_public,
-            reference_text=reference_text,
-            created_at=dt.datetime.utcnow()
-        )
-        db.add(new_voice)
-        db.commit()
-        db.refresh(new_voice)
-
-        return new_voice
-    except Exception as e:
-        # Если что-то пошло не так, удаляем загруженный файл
-        if file_path.exists():
-            os.remove(file_path)
-        logger.error(f"Error uploading voice '{voice_name}': {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.delete("/api/admin/voices/{voice_id}")
+@app.delete("/api/voices/{voice_id}")
 def delete_voice(voice_id: int, db: Session = Depends(get_db)):
-    voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
-    if not voice:
-        raise HTTPException(status_code=404, detail="Voice not found")
+    return tts_api.delete_voice(voice_id, db)
 
-    try:
-        file_path = Path(voice.file_path)
-        if file_path.exists():
-            os.remove(file_path)
-        
-        db.delete(voice)
-        db.commit()
-        return {"message": "Voice deleted successfully."}
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error deleting voice ID {voice_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-# --- TTS CONFIGURATION MANAGEMENT ---
-
+# --- TTS Configuration ---
 @app.get("/api/tts/config", response_model=TtsConfigResponse)
 def get_tts_config():
-    """Получить текущие настройки TTS"""
-    return TtsConfigResponse(
-        cfg_strength=config.cfg_strength,
-        target_rms=config.target_rms,
-        cross_fade_duration=config.cross_fade_duration,
-        silence_duration_ms=config.silence_duration_ms,
-        sway_sampling_coef=config.sway_sampling_coef
-    )
+    return tts_api.get_tts_config()
 
-@app.put("/api/tts/config", response_model=TtsConfigResponse)
+@app.post("/api/tts/config", response_model=TtsConfigResponse)
 def update_tts_config(settings: TtsConfigSchema):
-    """Обновить настраиваемые параметры TTS (только cfg_strength)"""
-    # Обновляем настройки в конфигурации
-    config.cfg_strength = settings.cfg_strength
-    # target_rms - фиксированный параметр, не изменяется
-    
-    logger.info(f"TTS config updated: cfg_strength={settings.cfg_strength}")
-    
-    return TtsConfigResponse(
-        cfg_strength=config.cfg_strength,
-        target_rms=config.target_rms,  # Фиксированное значение
-        cross_fade_duration=config.cross_fade_duration,
-        silence_duration_ms=config.silence_duration_ms,
-        sway_sampling_coef=config.sway_sampling_coef
-    )
+    return tts_api.update_tts_config(settings)
 
-# --- USER VOICE MANAGEMENT ---
-
-@app.get("/api/user/voices", response_model=List[VoiceSchema])
+# --- User Voices ---
+@app.get("/api/user/voices/{user_id}", response_model=List[VoiceSchema])
 def get_user_voices(user_id: str, db: Session = Depends(get_db)):
-    # Возвращаем только голоса пользователя (не глобальные)
-    user_voices = db.query(VoiceModel).filter(
-        VoiceModel.owner_id == user_id,
-        VoiceModel.voice_type == "user"
-    ).all()
-    
-    # Обновляем created_at для старых записей, где он None
-    for voice in user_voices:
-        if voice.created_at is None:
-            voice.created_at = dt.datetime.utcnow()
-    
-    db.commit()
-    return user_voices
+    return tts_api.get_user_voices(user_id, db)
 
 @app.get("/api/voices/global", response_model=List[VoiceSchema])
 def get_global_voices(db: Session = Depends(get_db)):
-    # Возвращаем только глобальные голоса
-    global_voices = db.query(VoiceModel).filter(
-        VoiceModel.voice_type == "global"
-    ).all()
-    
-    # Обновляем created_at для старых записей, где он None
-    for voice in global_voices:
-        if voice.created_at is None:
-            voice.created_at = dt.datetime.utcnow()
-    
-    db.commit()
-    return global_voices
+    return tts_api.get_global_voices(db)
 
-
-@app.post("/api/user/voices/upload", response_model=VoiceSchema)
+# --- Voice Upload for Users ---
+@app.post("/api/user/voices/upload", response_model=VoiceUploadResponse)
 async def upload_user_voice(
     background_tasks: BackgroundTasks,
-    user_id: str,
     file: UploadFile = File(...),
     voice_name: str = Form(...),
+    user_id: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    # Проверка, чтобы имя не конфликтовало с глобальными
-    existing_global = db.query(VoiceModel).filter(VoiceModel.name == voice_name, VoiceModel.voice_type == 'global').first()
-    if existing_global:
-        raise HTTPException(status_code=400, detail=f"Voice name '{voice_name}' is reserved for a global voice.")
-
-    # Проверка, чтобы пользователь не создал дубликат
-    existing_user_voice = db.query(VoiceModel).filter(VoiceModel.name == voice_name, VoiceModel.owner_id == user_id).first()
-    if existing_user_voice:
-        raise HTTPException(status_code=400, detail=f"You already have a voice named '{voice_name}'.")
-
-    upload_dir = config.user_voices_path / user_id
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    file_path = upload_dir / f"{voice_name}.wav"
-    
-    try:
-        # Сначала сохраняем во временный файл
-        original_extension = os.path.splitext(file.filename)[1] if file.filename else '.wav'
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=original_extension)
-        temp_path = temp_file.name
-        temp_file.close()
-        
-        with open(temp_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        # Конвертируем аудио в формат, подходящий для F5-TTS
-        converted_path = None
-        try:
-            # Создаем временный файл для конвертированного аудио
-            converted_temp = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
-            converted_path = converted_temp.name
-            converted_temp.close()
-            
-            logger.info(f"Converting {temp_path} to {converted_path}")
-            
-            # Конвертируем аудио
-            success = convert_audio_for_f5tts(temp_path, converted_path)
-            if not success or not os.path.exists(converted_path):
-                raise HTTPException(status_code=422, detail="Failed to convert audio file")
-            
-            # Копируем конвертированный файл в финальное место
-            shutil.copy2(converted_path, str(file_path))
-            
-            logger.info(f"✅ Audio converted and saved: {file_path}")
-            
-        except Exception as e:
-            logger.error(f"❌ Audio conversion failed: {e}", exc_info=True)
-            raise HTTPException(status_code=422, detail=f"Failed to convert audio: {str(e)}")
-        finally:
-            # Очищаем временные файлы
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
-            if converted_path and os.path.exists(converted_path):
-                os.unlink(converted_path)
-
-        # Используем фиксированный референсный текст
-        reference_text = "Создавая уникальные цифровые объекты, вы размышляете о том насколько интересны ваши идеи миру, но задумываетель ли вы, как защитить права на свои произведения."
-
-        new_voice = VoiceModel(
-            name=voice_name,
-            file_path=str(file_path),
-            voice_type="user",
-            owner_id=user_id,
-            is_public=False, # Пользовательские голоса по умолчанию приватные
-            reference_text=reference_text,
-            created_at=dt.datetime.utcnow()
-        )
-        db.add(new_voice)
-        db.commit()
-        db.refresh(new_voice)
-
-        return new_voice
-    except Exception as e:
-        if file_path.exists():
-            os.remove(file_path)
-        logger.error(f"Error uploading voice for user {user_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
+    return await tts_api.upload_voice(
+        background_tasks, file, voice_name, "user", False, user_id, db
+    )
 
 @app.delete("/api/user/voices/{voice_id}")
 def delete_user_voice(voice_id: int, user_id: str, db: Session = Depends(get_db)):
-    voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id, VoiceModel.owner_id == user_id).first()
+    voice = db.query(VoiceModel).filter(
+        VoiceModel.id == voice_id, 
+        VoiceModel.owner_id == user_id
+    ).first()
+    
     if not voice:
-        raise HTTPException(status_code=404, detail="Voice not found or you don't have permission to delete it.")
+        raise HTTPException(status_code=404, detail="Voice not found")
+    
+    # Удаляем файл
+    file_manager.delete_voice_file(voice.name)
+    
+    # Удаляем из базы данных
+    db.delete(voice)
+    db.commit()
 
-    try:
-        file_path = Path(voice.file_path)
-        if file_path.exists():
-            os.remove(file_path)
+    return {"message": f"Voice {voice.name} deleted successfully"}
 
-        db.delete(voice)
-        db.commit()
-        return {"message": "Voice deleted successfully."}
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error deleting voice ID {voice_id} for user {user_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-# --- VOICE SETTINGS ENDPOINTS ---
-
-@app.put("/api/admin/voices/{voice_id}/settings", response_model=VoiceSchema)
+# --- Voice Settings ---
+@app.put("/api/voices/{voice_id}/settings")
 def update_voice_settings(
     voice_id: int,
     settings: VoiceSettingsSchema,
     db: Session = Depends(get_db)
 ):
-    """Обновить настройки голоса (админ) - только cfg_strength"""
     voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
     if not voice:
         raise HTTPException(status_code=404, detail="Voice not found")
     
-    # Обновляем настройки голоса
-    if settings.cfg_strength is not None:
-        voice.cfg_strength = settings.cfg_strength
-        logger.info(f"Voice settings updated for {voice.name}: cfg_strength={voice.cfg_strength}")
-    
-    if settings.speed_preset is not None:
-        voice.speed_preset = settings.speed_preset
-        logger.info(f"Voice speed preset updated for {voice.name}: speed_preset={voice.speed_preset}")
-    
-    if settings.reference_text is not None:
-        voice.reference_text = settings.reference_text
-        logger.info(f"Voice reference text updated for {voice.name}: '{settings.reference_text[:50]}...'")
-    
-    if settings.cfg_strength is None and settings.speed_preset is None and settings.reference_text is None:
-        logger.warning(f"No settings provided for voice {voice.name}")
+    # Обновляем настройки
+    for field, value in settings.dict(exclude_unset=True).items():
+        setattr(voice, field, value)
     
     db.commit()
-    db.refresh(voice)
+    return {"message": "Voice settings updated successfully"}
     
-    return voice
-
-@app.put("/api/user/voices/{voice_id}/settings", response_model=VoiceSchema)
+@app.put("/api/user/voices/{voice_id}/settings")
 def update_user_voice_settings(
     voice_id: int,
     user_id: str,
     settings: VoiceSettingsSchema,
     db: Session = Depends(get_db)
 ):
-    """Обновить настройки пользовательского голоса - только cfg_strength"""
     voice = db.query(VoiceModel).filter(
         VoiceModel.id == voice_id,
         VoiceModel.owner_id == user_id
     ).first()
+    
     if not voice:
         raise HTTPException(status_code=404, detail="Voice not found")
     
-    # Обновляем настройки голоса
-    if settings.cfg_strength is not None:
-        voice.cfg_strength = settings.cfg_strength
-        logger.info(f"User voice settings updated for {voice.name}: cfg_strength={voice.cfg_strength}")
-    
-    if settings.speed_preset is not None:
-        voice.speed_preset = settings.speed_preset
-        logger.info(f"User voice speed preset updated for {voice.name}: speed_preset={voice.speed_preset}")
-    
-    if settings.reference_text is not None:
-        voice.reference_text = settings.reference_text
-        logger.info(f"User voice reference text updated for {voice.name}: '{settings.reference_text[:50]}...'")
-    
-    if settings.cfg_strength is None and settings.speed_preset is None and settings.reference_text is None:
-        logger.warning(f"No settings provided for user voice {voice.name}")
+    # Обновляем настройки
+    for field, value in settings.dict(exclude_unset=True).items():
+        setattr(voice, field, value)
     
     db.commit()
-    db.refresh(voice)
-    
-    return voice
+    return {"message": "Voice settings updated successfully"}
 
-@app.post("/api/admin/voices/{voice_id}/transcribe")
+# --- Transcription ---
+@app.post("/api/voices/{voice_id}/transcribe", response_model=TranscriptionResponse)
 def transcribe_voice_audio(voice_id: int, db: Session = Depends(get_db)):
-    """Автоматически транскрибировать аудиофайл голоса"""
     voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
     if not voice:
         raise HTTPException(status_code=404, detail="Voice not found")
     
+    if not tts_engine_manager.transcriber:
+        raise HTTPException(status_code=503, detail="Transcriber not available")
+    
     try:
-        # Транскрибируем аудиофайл
-        reference_text = transcribe_audio_file(voice.file_path)
-        
-        # Обновляем reference_text в БД
-        voice.reference_text = reference_text
+        text = tts_engine_manager.transcribe(voice.file_path)
+        voice.reference_text = text
         db.commit()
-        db.refresh(voice)
         
-        logger.info(f"Voice {voice.name} transcribed successfully: '{reference_text[:50]}...'")
-        return {"message": "Transcription completed", "reference_text": reference_text}
+        return TranscriptionResponse(
+            success=True,
+            text=text,
+            message="Transcription completed successfully"
+        )
     except Exception as e:
-        logger.error(f"Error transcribing voice {voice.name}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to transcribe audio: {str(e)}")
+        logger.error(f"Error transcribing voice {voice_id}: {e}")
+        return TranscriptionResponse(
+            success=False,
+            text=None,
+            message=f"Transcription failed: {str(e)}"
+        )
 
-@app.post("/api/user/voices/{voice_id}/transcribe")
+@app.post("/api/user/voices/{voice_id}/transcribe", response_model=TranscriptionResponse)
 def transcribe_user_voice_audio(voice_id: int, user_id: str, db: Session = Depends(get_db)):
-    """Автоматически транскрибировать аудиофайл пользовательского голоса"""
     voice = db.query(VoiceModel).filter(
         VoiceModel.id == voice_id,
         VoiceModel.owner_id == user_id
     ).first()
+    
     if not voice:
         raise HTTPException(status_code=404, detail="Voice not found")
     
+    if not tts_engine_manager.transcriber:
+        raise HTTPException(status_code=503, detail="Transcriber not available")
+    
     try:
-        # Транскрибируем аудиофайл
-        reference_text = transcribe_audio_file(voice.file_path)
-        
-        # Обновляем reference_text в БД
-        voice.reference_text = reference_text
+        text = tts_engine_manager.transcribe(voice.file_path)
+        voice.reference_text = text
         db.commit()
-        db.refresh(voice)
         
-        logger.info(f"User voice {voice.name} transcribed successfully: '{reference_text[:50]}...'")
-        return {"message": "Transcription completed", "reference_text": reference_text}
+        return TranscriptionResponse(
+            success=True,
+            text=text,
+            message="Transcription completed successfully"
+        )
     except Exception as e:
-        logger.error(f"Error transcribing user voice {voice.name}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to transcribe audio: {str(e)}")
+        logger.error(f"Error transcribing voice {voice_id}: {e}")
+        return TranscriptionResponse(
+            success=False,
+            text=None,
+            message=f"Transcription failed: {str(e)}"
+        )
 
-@app.put("/api/admin/voices/{voice_id}/rename")
+# --- Voice Renaming ---
+@app.put("/api/voices/{voice_id}/rename")
 def rename_voice(voice_id: int, new_name: str = Form(...), db: Session = Depends(get_db)):
-    """Переименовать голос (только админ)"""
     voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
     if not voice:
         raise HTTPException(status_code=404, detail="Voice not found")
@@ -783,135 +261,79 @@ def rename_voice(voice_id: int, new_name: str = Form(...), db: Session = Depends
     # Проверяем, что новое имя не занято
     existing_voice = db.query(VoiceModel).filter(VoiceModel.name == new_name).first()
     if existing_voice and existing_voice.id != voice_id:
-        raise HTTPException(status_code=400, detail="Voice name already exists")
+        raise HTTPException(status_code=400, detail="Voice with this name already exists")
     
     old_name = voice.name
     voice.name = new_name
     db.commit()
-    db.refresh(voice)
     
-    logger.info(f"Voice renamed: '{old_name}' -> '{new_name}'")
-    return {"message": "Voice renamed successfully", "new_name": new_name}
+    return {"message": f"Voice renamed from {old_name} to {new_name}"}
 
 @app.put("/api/user/voices/{voice_id}/rename")
 def rename_user_voice(voice_id: int, user_id: str, new_name: str = Form(...), db: Session = Depends(get_db)):
-    """Переименовать пользовательский голос"""
     voice = db.query(VoiceModel).filter(
         VoiceModel.id == voice_id,
         VoiceModel.owner_id == user_id
     ).first()
+    
     if not voice:
         raise HTTPException(status_code=404, detail="Voice not found")
     
     # Проверяем, что новое имя не занято
     existing_voice = db.query(VoiceModel).filter(VoiceModel.name == new_name).first()
     if existing_voice and existing_voice.id != voice_id:
-        raise HTTPException(status_code=400, detail="Voice name already exists")
+        raise HTTPException(status_code=400, detail="Voice with this name already exists")
     
     old_name = voice.name
     voice.name = new_name
     db.commit()
-    db.refresh(voice)
     
-    logger.info(f"User voice renamed: '{old_name}' -> '{new_name}' (user: {user_id})")
-    return {"message": "Voice renamed successfully", "new_name": new_name}
+    return {"message": f"Voice renamed from {old_name} to {new_name}"}
 
-@app.post("/api/voices/test")
-async def test_user_voice(
+# --- TTS Synthesis ---
+@app.post("/api/tts/synthesize", response_model=SynthesisResponse)
+async def synthesize_speech(
     background_tasks: BackgroundTasks,
-    voice_name: str = Form(...),
-    user_id: str = Form(...),
-    test_text: str = Form("Ну так я гетеро, че мне пидоров бояться!"),  # Добавляем возможность ввода текста
-    cfg_strength: float = Form(None),  # Параметр для тестирования с текущим значением ползунка
-    speed_preset: str = Form(None),  # Параметр для тестирования с текущим пресетом скорости
+    request: SynthesisRequest,
     db: Session = Depends(get_db)
-    # speed and pitch removed - F5-TTS uses dynamic settings based on text length
 ):
-    if not tts_engine:
-        raise HTTPException(status_code=500, detail="TTS engine is not initialized.")
+    return await tts_api.synthesize_speech(background_tasks, request, db)
 
-    # Ищем голос по имени и проверяем права доступа
-    voice = db.query(VoiceModel).filter(VoiceModel.name == voice_name).first()
+# --- Voice Testing ---
+@app.post("/api/voices/{voice_id}/test", response_model=SynthesisResponse)
+async def test_voice(
+    background_tasks: BackgroundTasks,
+    voice_id: int,
+    text: str = Form(...),
+    user_id: str = Form(None),
+    db: Session = Depends(get_db)
+):
+    voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
     if not voice:
-        raise HTTPException(status_code=404, detail=f"Voice '{voice_name}' not found.")
+        raise HTTPException(status_code=404, detail="Voice not found")
     
-    # Проверяем права доступа: пользователь может тестировать только свои голоса или глобальные
-    if voice.voice_type == "user" and voice.owner_id != user_id:
-        raise HTTPException(status_code=403, detail="You can only test your own voices.")
+    # Проверяем права доступа
+    if voice.owner_id and voice.owner_id != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     
-    # Глобальные голоса может тестировать любой пользователь
-    if voice.voice_type == "global":
-        logger.info(f"User {user_id} testing global voice '{voice_name}'")
-
-    voice_path = Path(voice.file_path)
-    if not voice_path.exists():
-        raise HTTPException(status_code=404, detail=f"Voice file for '{voice_name}' not found at {voice_path}.")
-
-    try:
-        timestamp = int(time.time() * 1000)
-        output_filename = f"test_{user_id}_{timestamp}.wav"
-        output_path = config.test_audio_path / output_filename
-        
-        # Используем переданный текст или дефолтный
-        if not test_text or test_text.strip() == "":
-            test_text = "Ну так я гетеро, че мне пидоров бояться!"
-        
-        # Определяем настройки для теста
-        test_cfg_strength = cfg_strength if cfg_strength is not None else voice.cfg_strength
-        test_speed_preset = speed_preset if speed_preset is not None else (voice.speed_preset or 'normal')
-        
-        # Логируем настройки голоса для диагностики
-        logger.info(f"🎛️ Voice settings for '{voice_name}':")
-        logger.info(f"  - cfg_strength (тест): {test_cfg_strength} {'(из ползунка)' if cfg_strength is not None else '(из базы данных)'}")
-        logger.info(f"  - speed_preset (тест): {test_speed_preset} {'(из ползунка)' if speed_preset is not None else '(из базы данных)'}")
-        logger.info(f"  - cross_fade_duration: {voice.cross_fade_duration}")
-        logger.info(f"  - silence_duration_ms: {voice.silence_duration_ms}")
-        logger.info(f"  - sway_sampling_coef: {voice.sway_sampling_coef}")
-        logger.info(f"  - target_rms, speed, nfe_step: определяются автоматически")
-        
-        # Синтезируем речь с настройками для теста
-        # target_rms, speed и nfe_step передаем как None, чтобы TTS движок определил их автоматически
-        synthesized_path = await asyncio.to_thread(
-            tts_engine.synthesize_speech,
-            text=test_text,
-            ref_audio_path=str(voice_path),
-            ref_text=voice.reference_text or "",
-            cfg_strength=test_cfg_strength,
-            target_rms=None,  # Автоматическое определение
-            speed=None,  # Автоматическое определение на основе длины текста
-            nfe_step=None,  # Автоматическое определение на основе длины текста
-            speed_preset=test_speed_preset  # Пресет скорости для теста
-        )
-        
-        if not synthesized_path:
-            raise HTTPException(status_code=500, detail="Failed to synthesize speech")
-        
-        # Копируем синтезированный файл в наш кеш
-        if Path(synthesized_path).exists():
-            shutil.copy2(synthesized_path, str(output_path))
-            logger.info(f"Copied synthesized file from {synthesized_path} to {output_path}")
-        else:
-            logger.error(f"Synthesized file not found at {synthesized_path}")
-            raise HTTPException(status_code=500, detail="Synthesized file not found")
-        
-        audio_url = f"/api/voices/audio/{output_filename.replace('.wav', '')}"
-        
-        # Удаляем тестовый файл через 5 минут после создания
-        background_tasks.add_task(cleanup_test_file_delayed, output_path, 300)  # 300 секунд = 5 минут
-        
-        return {"audio_url": audio_url, "message": "Test speech synthesized."}
-    except Exception as e:
-        logger.error(f"Error during voice test for user {user_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-if __name__ == "__main__":
-    # Запускаем uvicorn с правильным путем для --reload-dir
-    # Используем str(config.base_dir) для корректного пути
-    uvicorn.run(
-        "tts_service.main:app",
-        host=config.host,
-        port=config.port,
-        reload=False, # <-- Отключаем авто-перезагрузку для стабильной работы
-        log_level=config.log_level.lower()
+    request = SynthesisRequest(
+        text=text,
+        voice_name=voice.name,
+        user_id=user_id
     )
+    
+    return await tts_api.synthesize_speech(background_tasks, request, db)
+
+# --- File Operations ---
+@app.get("/api/voices/{voice_name}/audio")
+async def get_audio_file(voice_name: str):
+    file_path = await tts_api.get_audio_file(voice_name)
+    return FileResponse(file_path)
+
+@app.delete("/api/voices/{voice_name}/audio")
+async def delete_audio_file(voice_name: str):
+    return await tts_api.delete_audio_file(voice_name)
+
+# --- Main ---
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8001)

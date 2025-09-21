@@ -187,6 +187,11 @@ export const getBlockedBots = async (token) => {
     return await botService.get('/api/admin/blocked-bots', { headers: { Authorization: `Bearer ${token}` } });
 };
 
+// --- Admin List ---
+export const getAdminList = async () => {
+    return await botService.get('/api/admin/list');
+};
+
 export const addBlockedBot = async (botName, token) => {
     return await botService.post('/api/admin/blocked-bots/add', { bot_name: botName }, { headers: { Authorization: `Bearer ${token}` } });
 };

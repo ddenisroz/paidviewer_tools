@@ -1,0 +1,277 @@
+2025-09-21 18:30:29,586 - __main__ - INFO - === BOT SERVICE STARTED ===
+2025-09-21 18:30:29,646 - bot_service.main - INFO - === BOT SERVICE STARTED ===
+2025-09-21 18:30:29,663 - bot_service.main - INFO - --- Bot service starting up ---
+2025-09-21 18:30:29,665 - bot_service.database - INFO - ✅ База данных успешно инициализирована.
+2025-09-21 18:30:29,673 - bot_service.main - INFO - Caches refreshed: 0 whitelisted channels, 5 blocked bots.
+2025-09-21 18:30:29,673 - bot_service.main - INFO - Background cache updater started.
+2025-09-21 18:30:29,673 - bot_service.main - INFO - Stream stats collector task started.
+2025-09-21 18:30:29,673 - bot_service.main - INFO - Validating Twitch bot token...
+2025-09-21 18:30:30,432 - bot_service.main - INFO - ✅ Token is valid for bot user 'payedviewer'.
+2025-09-21 18:30:30,432 - bot_service.main - INFO - 🔑 Token Scopes: ['channel:manage:broadcast', 'channel:moderate', 'channel:read:redemptions', 'channel:read:subscriptions', 'chat:edit', 'chat:read', 'whispers:edit', 'whispers:read']
+2025-09-21 18:30:30,432 - bot_service.main - INFO - ✅ Token has all required scopes.
+2025-09-21 18:30:30,432 - bot_service.main - INFO - Twitch bot task started.
+2025-09-21 18:30:32,187 - twitchio.websocket - INFO - Successfully logged onto Twitch WS: payedviewer
+2025-09-21 18:30:32,187 - bot_service.main - INFO - Twitch bot logged in as | payedviewer
+2025-09-21 18:30:59,708 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:30:59,708 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:31:29,710 - bot_service.main - INFO - Caches refreshed: 0 whitelisted channels, 5 blocked bots.
+2025-09-21 18:31:29,710 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:31:29,712 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:31:59,724 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:31:59,724 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:32:29,716 - bot_service.main - INFO - Caches refreshed: 0 whitelisted channels, 5 blocked bots.
+2025-09-21 18:32:29,717 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:32:29,717 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:32:59,738 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:32:59,739 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:33:29,720 - bot_service.main - INFO - Caches refreshed: 0 whitelisted channels, 5 blocked bots.
+2025-09-21 18:33:29,738 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:33:29,739 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:33:59,749 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:33:59,750 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:34:29,713 - bot_service.main - INFO - Caches refreshed: 0 whitelisted channels, 5 blocked bots.
+2025-09-21 18:34:29,773 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:34:29,773 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:34:59,775 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:34:59,775 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:35:29,717 - bot_service.main - INFO - Caches refreshed: 0 whitelisted channels, 5 blocked bots.
+2025-09-21 18:35:29,776 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:35:29,777 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:35:59,801 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:35:59,802 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:36:14,519 - bot_service.main - INFO - === ACTIVE CHANNELS REQUEST START ===
+2025-09-21 18:36:14,519 - bot_service.main - INFO - Current user ID from session: None
+2025-09-21 18:36:14,519 - bot_service.main - INFO - No active session, returning empty list
+2025-09-21 18:36:14,827 - bot_service.main - WARNING - WebSocket connection attempt for unknown user_id: guest
+2025-09-21 18:36:20,143 - bot_service.main - WARNING - WebSocket connection attempt for unknown user_id: guest
+2025-09-21 18:36:25,457 - bot_service.main - WARNING - WebSocket connection attempt for unknown user_id: guest
+2025-09-21 18:36:29,727 - bot_service.main - INFO - Caches refreshed: 0 whitelisted channels, 5 blocked bots.
+2025-09-21 18:36:29,816 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:36:29,816 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:36:30,773 - bot_service.main - WARNING - WebSocket connection attempt for unknown user_id: guest
+2025-09-21 18:36:36,093 - bot_service.main - WARNING - WebSocket connection attempt for unknown user_id: guest
+2025-09-21 18:36:41,600 - bot_service.main - WARNING - WebSocket connection attempt for unknown user_id: guest
+2025-09-21 18:36:45,281 - bot_service.main - INFO - === ACTIVE CHANNELS REQUEST START ===
+2025-09-21 18:36:45,281 - bot_service.main - INFO - Current user ID from session: None
+2025-09-21 18:36:45,281 - bot_service.main - INFO - No active session, returning empty list
+2025-09-21 18:36:47,588 - bot_service.main - WARNING - WebSocket connection attempt for unknown user_id: guest
+2025-09-21 18:36:53,590 - bot_service.main - WARNING - WebSocket connection attempt for unknown user_id: guest
+2025-09-21 18:36:59,613 - bot_service.main - WARNING - WebSocket connection attempt for unknown user_id: guest
+2025-09-21 18:36:59,811 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:36:59,812 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:37:05,579 - bot_service.main - WARNING - WebSocket connection attempt for unknown user_id: guest
+2025-09-21 18:37:10,900 - bot_service.main - WARNING - WebSocket connection attempt for unknown user_id: guest
+2025-09-21 18:37:29,727 - bot_service.main - INFO - Caches refreshed: 0 whitelisted channels, 5 blocked bots.
+2025-09-21 18:37:29,792 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:37:29,793 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:37:50,872 - bot_service.main - INFO - === ACTIVE CHANNELS REQUEST START ===
+2025-09-21 18:37:50,872 - bot_service.main - INFO - Current user ID from session: None
+2025-09-21 18:37:50,872 - bot_service.main - INFO - No active session, returning empty list
+2025-09-21 18:37:51,179 - bot_service.main - WARNING - WebSocket connection attempt for unknown user_id: guest
+2025-09-21 18:37:56,508 - bot_service.main - WARNING - WebSocket connection attempt for unknown user_id: guest
+2025-09-21 18:37:59,820 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:37:59,820 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:38:02,589 - bot_service.main - WARNING - WebSocket connection attempt for unknown user_id: guest
+2025-09-21 18:38:08,594 - bot_service.main - WARNING - WebSocket connection attempt for unknown user_id: guest
+2025-09-21 18:38:14,593 - bot_service.main - WARNING - WebSocket connection attempt for unknown user_id: guest
+2025-09-21 18:38:20,595 - bot_service.main - WARNING - WebSocket connection attempt for unknown user_id: guest
+2025-09-21 18:38:21,282 - bot_service.main - INFO - === ACTIVE CHANNELS REQUEST START ===
+2025-09-21 18:38:21,282 - bot_service.main - INFO - Current user ID from session: None
+2025-09-21 18:38:21,282 - bot_service.main - INFO - No active session, returning empty list
+2025-09-21 18:38:26,591 - bot_service.main - WARNING - WebSocket connection attempt for unknown user_id: guest
+2025-09-21 18:38:28,467 - bot_service.main - INFO - --- Bot service shutting down ---
+2025-09-21 18:38:28,467 - bot_service.main - INFO - Stopping Twitch bot task...
+2025-09-21 18:38:28,467 - bot_service.main - INFO - Twitch bot task stopped.
+2025-09-21 18:39:12,620 - __main__ - INFO - === BOT SERVICE STARTED ===
+2025-09-21 18:39:12,675 - bot_service.main - INFO - === BOT SERVICE STARTED ===
+2025-09-21 18:39:12,692 - bot_service.main - INFO - --- Bot service starting up ---
+2025-09-21 18:39:12,694 - bot_service.database - INFO - ✅ База данных успешно инициализирована.
+2025-09-21 18:39:12,705 - bot_service.main - INFO - Caches refreshed: 0 whitelisted channels, 5 blocked bots.
+2025-09-21 18:39:12,705 - bot_service.main - INFO - Background cache updater started.
+2025-09-21 18:39:12,705 - bot_service.main - INFO - Stream stats collector task started.
+2025-09-21 18:39:12,705 - bot_service.main - INFO - Validating Twitch bot token...
+2025-09-21 18:39:13,488 - bot_service.main - INFO - ✅ Token is valid for bot user 'payedviewer'.
+2025-09-21 18:39:13,491 - bot_service.main - INFO - 🔑 Token Scopes: ['channel:manage:broadcast', 'channel:moderate', 'channel:read:redemptions', 'channel:read:subscriptions', 'chat:edit', 'chat:read', 'whispers:edit', 'whispers:read']
+2025-09-21 18:39:13,491 - bot_service.main - INFO - ✅ Token has all required scopes.
+2025-09-21 18:39:13,491 - bot_service.main - INFO - Twitch bot task started.
+2025-09-21 18:39:13,618 - bot_service.main - WARNING - WebSocket connection attempt for unknown user_id: guest
+2025-09-21 18:39:15,254 - twitchio.websocket - INFO - Successfully logged onto Twitch WS: payedviewer
+2025-09-21 18:39:15,258 - bot_service.main - INFO - Twitch bot logged in as | payedviewer
+2025-09-21 18:39:42,716 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:39:42,718 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:39:52,482 - bot_service.main - INFO - === ACTIVE CHANNELS REQUEST START ===
+2025-09-21 18:39:52,482 - bot_service.main - INFO - Current user ID from session: None
+2025-09-21 18:39:52,482 - bot_service.main - INFO - No active session, returning empty list
+2025-09-21 18:40:12,729 - bot_service.main - INFO - Caches refreshed: 0 whitelisted channels, 5 blocked bots.
+2025-09-21 18:40:12,729 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:40:12,729 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:40:23,280 - bot_service.main - INFO - === ACTIVE CHANNELS REQUEST START ===
+2025-09-21 18:40:23,280 - bot_service.main - INFO - Current user ID from session: None
+2025-09-21 18:40:23,280 - bot_service.main - INFO - No active session, returning empty list
+2025-09-21 18:40:42,756 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:40:42,756 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:40:53,593 - bot_service.main - INFO - === ACTIVE CHANNELS REQUEST START ===
+2025-09-21 18:40:53,594 - bot_service.main - INFO - Current user ID from session: None
+2025-09-21 18:40:53,594 - bot_service.main - INFO - No active session, returning empty list
+2025-09-21 18:41:02,262 - bot_service.main - INFO - --- Bot service shutting down ---
+2025-09-21 18:41:02,262 - bot_service.main - INFO - Stopping Twitch bot task...
+2025-09-21 18:41:02,264 - bot_service.main - INFO - Twitch bot task stopped.
+2025-09-21 18:43:13,045 - __main__ - INFO - === BOT SERVICE STARTED ===
+2025-09-21 18:43:13,090 - bot_service.main - INFO - === BOT SERVICE STARTED ===
+2025-09-21 18:43:13,105 - bot_service.main - INFO - --- Bot service starting up ---
+2025-09-21 18:43:13,106 - bot_service.database - INFO - ✅ База данных успешно инициализирована.
+2025-09-21 18:43:13,115 - bot_service.main - INFO - Caches refreshed: 0 whitelisted channels, 5 blocked bots.
+2025-09-21 18:43:13,116 - bot_service.main - INFO - Background cache updater started.
+2025-09-21 18:43:13,116 - bot_service.main - INFO - Stream stats collector task started.
+2025-09-21 18:43:13,116 - bot_service.main - INFO - Validating Twitch bot token...
+2025-09-21 18:43:13,896 - bot_service.main - INFO - ✅ Token is valid for bot user 'payedviewer'.
+2025-09-21 18:43:13,896 - bot_service.main - INFO - 🔑 Token Scopes: ['channel:manage:broadcast', 'channel:moderate', 'channel:read:redemptions', 'channel:read:subscriptions', 'chat:edit', 'chat:read', 'whispers:edit', 'whispers:read']
+2025-09-21 18:43:13,896 - bot_service.main - INFO - ✅ Token has all required scopes.
+2025-09-21 18:43:13,896 - bot_service.main - INFO - Twitch bot task started.
+2025-09-21 18:43:15,649 - twitchio.websocket - INFO - Successfully logged onto Twitch WS: payedviewer
+2025-09-21 18:43:15,649 - bot_service.main - INFO - Twitch bot logged in as | payedviewer
+2025-09-21 18:43:43,143 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:43:43,143 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:43:49,285 - bot_service.main - INFO - === ACTIVE CHANNELS REQUEST START ===
+2025-09-21 18:43:49,285 - bot_service.main - INFO - Current user ID from session: None
+2025-09-21 18:43:49,285 - bot_service.main - INFO - No active session, returning empty list
+2025-09-21 18:44:13,140 - bot_service.main - INFO - Caches refreshed: 0 whitelisted channels, 5 blocked bots.
+2025-09-21 18:44:13,141 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:44:13,141 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:44:43,153 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:44:43,154 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:44:49,591 - bot_service.main - INFO - === ACTIVE CHANNELS REQUEST START ===
+2025-09-21 18:44:49,591 - bot_service.main - INFO - Current user ID from session: None
+2025-09-21 18:44:49,591 - bot_service.main - INFO - No active session, returning empty list
+2025-09-21 18:45:13,153 - bot_service.main - INFO - Caches refreshed: 0 whitelisted channels, 5 blocked bots.
+2025-09-21 18:45:13,153 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:45:13,153 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:45:43,176 - bot_service.main - INFO - Collecting stream stats...
+2025-09-21 18:45:43,176 - bot_service.main - INFO - No authenticated users to check for stats.
+2025-09-21 18:45:49,583 - bot_service.main - INFO - === ACTIVE CHANNELS REQUEST START ===
+2025-09-21 18:45:49,583 - bot_service.main - INFO - Current user ID from session: None
+2025-09-21 18:45:49,583 - bot_service.main - INFO - No active session, returning empty list
+2025-09-21 18:46:05,062 - bot_service.main - INFO - --- Bot service shutting down ---
+2025-09-21 18:46:05,062 - bot_service.main - INFO - Stopping Twitch bot task...
+2025-09-21 18:46:05,062 - bot_service.main - INFO - Twitch bot task stopped.
+2025-09-21 19:07:31,141 - bot_service.main - INFO - === BOT SERVICE STARTED ===
+2025-09-21 19:21:06,100 - bot_service.main - INFO - === BOT SERVICE STARTED ===
+2025-09-21 19:41:23 - bot_service - INFO - === BOT SERVICE STARTED ===
+2025-09-21 19:41:23 - bot_service - INFO - ==================================================
+2025-09-21 19:41:23 - bot_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-21 19:41:23
+2025-09-21 19:41:23 - bot_service - INFO - ==================================================
+2025-09-21 19:41:23 - bot_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-21 19:41:23 - bot_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-21 19:41:23 - bot_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-21 19:41:23 - bot_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-21 19:41:23 - bot_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service
+2025-09-21 19:41:23 - bot_service - INFO - ==================================================
+2025-09-21 19:41:23 - bot_service - INFO - 🚀 BOT_SERVICE ЗАПУЩЕН
+2025-09-21 19:41:23 - bot_service - INFO - 🌐 Порт: 8000
+2025-09-21 19:41:23 - bot_service - INFO - 📁 Логи: logs/bot_service.log
+2025-09-21 19:41:23 - bot_service - INFO - ⏰ Время: 2025-09-21 19:41:23
+2025-09-21 19:41:23 - bot_service.database - INFO - ✅ База данных успешно инициализирована.
+2025-09-21 19:46:48 - bot_service - INFO - 🛑 BOT_SERVICE ОСТАНОВЛЕН
+2025-09-21 19:46:48 - bot_service - INFO - ⏰ Время: 2025-09-21 19:46:48
+2025-09-21 19:51:25 - bot_service - INFO - === BOT SERVICE STARTED ===
+2025-09-21 19:51:25 - bot_service - INFO - ==================================================
+2025-09-21 19:51:25 - bot_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-21 19:51:25
+2025-09-21 19:51:25 - bot_service - INFO - ==================================================
+2025-09-21 19:51:25 - bot_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-21 19:51:25 - bot_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-21 19:51:25 - bot_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-21 19:51:25 - bot_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-21 19:51:25 - bot_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service
+2025-09-21 19:51:25 - bot_service - INFO - ==================================================
+2025-09-21 19:51:25 - bot_service - INFO - 🚀 BOT_SERVICE ЗАПУЩЕН
+2025-09-21 19:51:25 - bot_service - INFO - 🌐 Порт: 8000
+2025-09-21 19:51:25 - bot_service - INFO - 📁 Логи: logs/bot_service.log
+2025-09-21 19:51:25 - bot_service - INFO - ⏰ Время: 2025-09-21 19:51:25
+2025-09-21 19:51:25 - bot_service.database - INFO - ✅ База данных успешно инициализирована.
+2025-09-21 19:51:30 - bot_service - INFO - 🛑 BOT_SERVICE ОСТАНОВЛЕН
+2025-09-21 19:51:30 - bot_service - INFO - ⏰ Время: 2025-09-21 19:51:30
+2025-09-21 19:51:38 - bot_service - INFO - === BOT SERVICE STARTED ===
+2025-09-21 19:51:38 - bot_service - INFO - ==================================================
+2025-09-21 19:51:38 - bot_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-21 19:51:38
+2025-09-21 19:51:38 - bot_service - INFO - ==================================================
+2025-09-21 19:51:38 - bot_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-21 19:51:38 - bot_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-21 19:51:38 - bot_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-21 19:51:38 - bot_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-21 19:51:38 - bot_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service
+2025-09-21 19:51:38 - bot_service - INFO - ==================================================
+2025-09-21 19:51:38 - bot_service - INFO - 🚀 BOT_SERVICE ЗАПУЩЕН
+2025-09-21 19:51:38 - bot_service - INFO - 🌐 Порт: 8000
+2025-09-21 19:51:38 - bot_service - INFO - 📁 Логи: logs/bot_service.log
+2025-09-21 19:51:38 - bot_service - INFO - ⏰ Время: 2025-09-21 19:51:38
+2025-09-21 19:51:38 - bot_service.database - INFO - ✅ База данных успешно инициализирована.
+2025-09-21 19:54:06 - bot_service - INFO - 🛑 BOT_SERVICE ОСТАНОВЛЕН
+2025-09-21 19:54:06 - bot_service - INFO - ⏰ Время: 2025-09-21 19:54:06
+2025-09-21 19:56:17 - bot_service - INFO - === BOT SERVICE STARTED ===
+2025-09-21 19:56:17 - bot_service - INFO - ==================================================
+2025-09-21 19:56:17 - bot_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-21 19:56:17
+2025-09-21 19:56:17 - bot_service - INFO - ==================================================
+2025-09-21 19:56:17 - bot_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-21 19:56:17 - bot_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-21 19:56:17 - bot_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-21 19:56:17 - bot_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-21 19:56:17 - bot_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service
+2025-09-21 19:56:17 - bot_service - INFO - ==================================================
+2025-09-21 19:56:17 - bot_service - INFO - 🚀 BOT_SERVICE ЗАПУЩЕН
+2025-09-21 19:56:17 - bot_service - INFO - 🌐 Порт: 8000
+2025-09-21 19:56:17 - bot_service - INFO - 📁 Логи: logs/bot_service.log
+2025-09-21 19:56:17 - bot_service - INFO - ⏰ Время: 2025-09-21 19:56:17
+2025-09-21 19:56:17 - bot_service.database - INFO - ✅ База данных успешно инициализирована.
+2025-09-21 19:56:29 - bot_service.bot - INFO - Bot logged in as payedviewer
+2025-09-21 19:56:29 - bot_service.bot - INFO - Bot user id: 1317705797
+2025-09-21 19:56:29 - bot_service.bot - INFO - Connected to channels: []
+2025-09-21 19:56:29 - bot_service.bot - INFO - Joined channel: yourchy
+2025-09-21 19:56:30 - bot_service.bot - INFO - Joined channel: yourchy
+2025-09-21 19:57:01 - bot_service.bot - INFO - Joined channel: yourchy
+2025-09-21 19:57:01 - bot_service.bot - INFO - Joined channel: yourchy
+2025-09-21 19:57:22 - bot_service.bot - INFO - Joined channel: yourchy
+2025-09-21 19:57:22 - bot_service.bot - INFO - Joined channel: yourchy
+2025-09-21 20:07:51 - bot_service.bot - INFO - Joined channel: yourchy
+2025-09-21 20:07:52 - bot_service.bot - INFO - Joined channel: yourchy
+2025-09-21 20:11:05 - bot_service.bot - INFO - Joined channel: yourchy
+2025-09-21 20:11:05 - bot_service.bot - INFO - Joined channel: yourchy
+2025-09-21 20:13:33 - bot_service.bot - INFO - Joined channel: yourchy
+2025-09-21 20:13:33 - bot_service.bot - INFO - Joined channel: yourchy
+2025-09-21 20:20:13 - bot_service.bot - INFO - Joined channel: yourchy
+2025-09-21 20:20:13 - bot_service.bot - INFO - Joined channel: yourchy
+2025-09-21 20:54:38 - bot_service - INFO - 🛑 BOT_SERVICE ОСТАНОВЛЕН
+2025-09-21 20:54:38 - bot_service - INFO - ⏰ Время: 2025-09-21 20:54:38
+2025-09-21 20:55:18 - bot_service - INFO - === BOT SERVICE STARTED ===
+2025-09-21 20:55:18 - bot_service - INFO - ==================================================
+2025-09-21 20:55:18 - bot_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-21 20:55:18
+2025-09-21 20:55:18 - bot_service - INFO - ==================================================
+2025-09-21 20:55:18 - bot_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-21 20:55:18 - bot_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-21 20:55:18 - bot_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-21 20:55:18 - bot_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-21 20:55:18 - bot_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service
+2025-09-21 20:55:18 - bot_service - INFO - ==================================================
+2025-09-21 20:55:18 - bot_service - INFO - 🚀 BOT_SERVICE ЗАПУЩЕН
+2025-09-21 20:55:18 - bot_service - INFO - 🌐 Порт: 8000
+2025-09-21 20:55:18 - bot_service - INFO - 📁 Логи: logs/bot_service.log
+2025-09-21 20:55:18 - bot_service - INFO - ⏰ Время: 2025-09-21 20:55:18
+2025-09-21 20:55:18 - bot_service.database - INFO - ✅ База данных успешно инициализирована.
+2025-09-21 21:10:54 - bot_service - INFO - 🛑 BOT_SERVICE ОСТАНОВЛЕН
+2025-09-21 21:10:54 - bot_service - INFO - ⏰ Время: 2025-09-21 21:10:54
+2025-09-21 21:10:57 - bot_service - INFO - === BOT SERVICE STARTED ===
+2025-09-21 21:10:57 - bot_service - INFO - ==================================================
+2025-09-21 21:10:57 - bot_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-21 21:10:57
+2025-09-21 21:10:57 - bot_service - INFO - ==================================================
+2025-09-21 21:10:57 - bot_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-21 21:10:57 - bot_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-21 21:10:57 - bot_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-21 21:10:57 - bot_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-21 21:10:57 - bot_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service
+2025-09-21 21:10:57 - bot_service - INFO - ==================================================
+2025-09-21 21:10:57 - bot_service - INFO - 🚀 BOT_SERVICE ЗАПУЩЕН
+2025-09-21 21:10:57 - bot_service - INFO - 🌐 Порт: 8000
+2025-09-21 21:10:57 - bot_service - INFO - 📁 Логи: logs/bot_service.log
+2025-09-21 21:10:57 - bot_service - INFO - ⏰ Время: 2025-09-21 21:10:57
+2025-09-21 21:10:57 - bot_service.database - INFO - ✅ База данных успешно инициализирована.
+2025-09-21 21:14:21 - bot_service - INFO - 🛑 BOT_SERVICE ОСТАНОВЛЕН
+2025-09-21 21:14:21 - bot_service - INFO - ⏰ Время: 2025-09-21 21:14:21

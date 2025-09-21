@@ -41,7 +41,8 @@ export const ChatProvider = ({ children }) => {
     
     // Функция для установки WebSocket соединения
     const setupWebSocket = useCallback(() => {
-        if (!user?.id || websocket.current) return;
+        // WebSocket только для авторизованных пользователей (не гостей)
+        if (!isAuthenticated || !user?.id || user?.id === 'guest' || websocket.current) return;
 
         const baseWsUrl = import.meta.env.VITE_BOT_WS_URL || 'ws://localhost:8000/ws';
         const wsUrl = `${baseWsUrl}/chat/${user.id}`;
@@ -89,7 +90,7 @@ export const ChatProvider = ({ children }) => {
             setTimeout(setupWebSocket, 5000); 
         };
 
-    }, [user?.id]);
+    }, [isAuthenticated, user?.id]);
 
     // Функция для закрытия WebSocket соединения
     const closeWebSocket = () => {
@@ -102,9 +103,13 @@ export const ChatProvider = ({ children }) => {
 
     // Основной useEffect для управления соединением
     useEffect(() => {
-        if (isAuthenticated && user?.id) {
+        console.log(`ChatContext: useEffect triggered - isAuthenticated: ${isAuthenticated}, user: ${user?.username || 'none'}, user.id: ${user?.id}`);
+        
+        if (isAuthenticated && user?.id && user?.id !== 'guest') {
+            console.log("ChatContext: Setting up WebSocket for authenticated user");
             setupWebSocket();
         } else {
+            console.log("ChatContext: Closing WebSocket - not authenticated, no user, or guest mode");
             closeWebSocket();
             setIsConnected(false);
             setMessages([]);
@@ -125,24 +130,25 @@ export const ChatProvider = ({ children }) => {
 
             const hasTwitch = integrations.twitch?.enabled;
             
-            if (isAuthenticated && hasTwitch && !isConnected) {
-                console.log("ChatContext: Twitch integration is active, attempting to auto-connect bot.");
-                try {
-                    await api.post('/api/chat/connect');
-                    setIsConnected(true);
-                } catch (err) {
-                    console.error("ChatContext: Failed to auto-connect bot.", err);
-                    setIsConnected(false);
-                }
-            } else if ((!isAuthenticated || !hasTwitch) && isConnected) {
-                console.log("ChatContext: User logged out or Twitch integration disabled, disconnecting bot.");
-                 try {
-                    await api.post('/api/chat/disconnect');
-                    setIsConnected(false);
-                } catch (err) {
-                    console.error("ChatContext: Failed to auto-disconnect bot.", err);
-                }
-            }
+            // Убираем автоматическое подключение бота
+            // if (isAuthenticated && hasTwitch && !isConnected) {
+            //     console.log("ChatContext: Twitch integration is active, attempting to auto-connect bot.");
+            //     try {
+            //         await api.post('/api/chat/connect');
+            //         setIsConnected(true);
+            //     } catch (err) {
+            //         console.error("ChatContext: Failed to auto-connect bot.", err);
+            //         setIsConnected(false);
+            //     }
+            // } else if ((!isAuthenticated || !hasTwitch) && isConnected) {
+            //     console.log("ChatContext: User logged out or Twitch integration disabled, disconnecting bot.");
+            //     try {
+            //         await api.post('/api/chat/disconnect');
+            //         setIsConnected(false);
+            //     } catch (err) {
+            //         console.error("ChatContext: Failed to auto-disconnect bot.", err);
+            //     }
+            // }
         };
 
         manageBotConnection();

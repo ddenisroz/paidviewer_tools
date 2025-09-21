@@ -41,10 +41,13 @@ const Header = () => {
             </Button>
             
             {userMode === 'guest' ? (
-                <Button onClick={handleLoginRedirect} variant="outline" size="lg">
-                    <LogIn className="mr-2 h-4 w-4" />
-                    Войти
-                </Button>
+                <div className="flex items-center space-x-3">
+                    <span className="text-sm text-slate-400">Режим гостя</span>
+                    <Button onClick={handleLoginRedirect} variant="outline" size="lg">
+                        <LogIn className="mr-2 h-4 w-4" />
+                        Войти
+                    </Button>
+                </div>
             ) : user ? (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>

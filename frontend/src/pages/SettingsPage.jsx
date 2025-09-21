@@ -92,11 +92,7 @@ const SettingsPage = () => {
                     <div className="space-y-2">
                         <div className="flex justify-between">
                             <span className="text-sm text-muted-foreground">Имя пользователя:</span>
-                            <span className="text-sm font-medium">{user?.username || user?.id}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">ID:</span>
-                            <span className="text-sm font-medium">{user?.id}</span>
+                            <span className="text-sm font-medium">{user?.username || user?.display_name}</span>
                         </div>
                     </div>
                 </CardContent>
