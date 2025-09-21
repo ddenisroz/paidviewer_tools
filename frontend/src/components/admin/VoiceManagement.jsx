@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Trash2, Edit, Users, Globe, Settings, TestTube2, Mic } from 'lucide-react';
+import { Upload, Trash2, Edit, Users, Globe, Settings, TestTube2, Mic, ChevronDown, ChevronRight } from 'lucide-react';
 import { Slider } from "@/components/ui/slider"
 import { toast } from 'sonner';
 import { getAdminVoices, uploadVoice, deleteVoice, updateVoiceSettings, transcribeVoice, testVoice, getUsers, renameVoice } from '../../services/unified-api';
@@ -23,6 +23,12 @@ const VoiceManagement = () => {
     
     const [currentVoice, setCurrentVoice] = useState(null);
     
+    // Состояние для сворачивания разделов
+    const [expandedSections, setExpandedSections] = useState({
+        global: true,
+        user: true
+    });
+    
     // Состояние для загрузки
     const [uploadFile, setUploadFile] = useState(null);
     const [voiceName, setVoiceName] = useState('');
@@ -33,6 +39,22 @@ const VoiceManagement = () => {
     const { user } = useAuth();
     let audioContext = null;
     let audioSource = null;
+
+    // Функция для переключения раздела
+    const toggleSection = (sectionType) => {
+        setExpandedSections(prev => {
+            const newState = {
+                global: false,
+                user: false
+            };
+            // Если раздел был свернут, разворачиваем его
+            // Если был развернут, оставляем свернутым
+            if (!prev[sectionType]) {
+                newState[sectionType] = true;
+            }
+            return newState;
+        });
+    };
 
     const loadVoices = useCallback(async () => {
         try {
@@ -188,6 +210,7 @@ const VoiceManagement = () => {
         try {
             const settings = {
                 cfg_strength: currentVoice.cfg_strength,
+                speed_preset: currentVoice.speed_preset,
                 reference_text: currentVoice.reference_text
             };
             
@@ -233,7 +256,8 @@ const VoiceManagement = () => {
                 currentVoice.name,
                 user.id,
                 testText,
-                currentVoice.cfg_strength  // Передаем текущее значение ползунка
+                currentVoice.cfg_strength,  // Передаем текущее значение ползунка
+                currentVoice.speed_preset   // Передаем текущий пресет скорости
             );
             
             // Получаем URL аудио из ответа
@@ -333,47 +357,146 @@ const VoiceManagement = () => {
                     <CardTitle>Список голосов</CardTitle>
                  </CardHeader>
                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="space-y-4">
                          {loading ? (
                              <p>Загрузка...</p>
-                         ) : Array.isArray(voices) && voices.length > 0 ? voices.map((voice) => (
-                             <Card key={voice.id} className="bg-slate-800 border-slate-700">
-                                <CardHeader>
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle className="text-base font-medium text-white flex items-center gap-2">
-                                            {voice.voice_type === 'global' ? <Globe className="h-4 w-4 text-blue-400"/> : <Users className="h-4 w-4 text-green-400"/>}
-                                            {voice.name}
-                                        </CardTitle>
-                                        <Badge variant={voice.voice_type === 'global' ? 'default' : 'secondary'}>{voice.voice_type}</Badge>
-                                    </div>
-                                    {voice.voice_type === 'user' && (
-                                        <div className="text-xs text-slate-400">
-                                            {(() => {
-                                                const owner = users.find(u => u.id === voice.owner_id);
-                                                return owner ? (
-                                                    <div className="flex items-center gap-1">
-                                                        <Users className="h-3 w-3" />
-                                                        <span>{owner.display_name || owner.username}</span>
-                                                        {owner.is_online && <Badge variant="outline" className="text-xs">Онлайн</Badge>}
-                                                    </div>
-                                                ) : (
-                                                    <span>Owner ID: {voice.owner_id}</span>
-                                                );
-                                            })()}
-                                        </div>
-                                    )}
-                                </CardHeader>
-                                 <CardContent>
-                                     <p className="text-xs text-slate-400 italic break-words h-12 overflow-y-auto">
-                                         "{voice.reference_text || "Нет референсного текста."}"
-                                     </p>
-                                     <div className="flex space-x-2 pt-4">
-                                         <Button variant="outline" size="sm" onClick={() => handleEdit(voice)}><Settings className="h-4 w-4 mr-1"/>Настроить</Button>
-                                         <Button variant="destructive" size="sm" onClick={() => handleDelete(voice.id)}><Trash2 className="h-4 w-4"/></Button>
+                         ) : Array.isArray(voices) && voices.length > 0 ? (
+                             <>
+                                 {/* Глобальные голоса */}
+                                 {voices.filter(voice => voice.voice_type === 'global').length > 0 && (
+                                     <div className="mb-6">
+                                         <div 
+                                             className="flex items-center gap-2 mb-3 cursor-pointer hover:bg-slate-700 p-2 rounded-lg transition-colors"
+                                             onClick={() => toggleSection('global')}
+                                         >
+                                             <Globe className="h-5 w-5 text-blue-400"/>
+                                             <h3 className="text-lg font-semibold text-white">Глобальные голоса</h3>
+                                             <Badge variant="outline" className="ml-auto">
+                                                 {voices.filter(voice => voice.voice_type === 'global').length}
+                                             </Badge>
+                                             {expandedSections.global ? 
+                                                 <ChevronDown className="h-4 w-4 text-slate-400"/> : 
+                                                 <ChevronRight className="h-4 w-4 text-slate-400"/>
+                                             }
+                                         </div>
+                                         {expandedSections.global && (
+                                             <div className="space-y-3">
+                                                 {voices.filter(voice => voice.voice_type === 'global').map((voice) => (
+                                                     <Card key={voice.id} className="bg-slate-800 border-slate-700">
+                                                         <CardHeader>
+                                                             <div className="flex items-center justify-between">
+                                                                 <CardTitle className="text-base font-medium text-white flex items-center gap-2">
+                                                                     <Globe className="h-4 w-4 text-blue-400"/>
+                                                                     {voice.name}
+                                                                 </CardTitle>
+                                                                 <Badge variant="default">global</Badge>
+                                                             </div>
+                                                         </CardHeader>
+                                                         <CardContent>
+                                                             <p className="text-xs text-slate-400 italic break-words h-12 overflow-y-auto">
+                                                                 {voice.reference_text || 'Нет референсного текста'}
+                                                             </p>
+                                                             <div className="flex gap-2 mt-3">
+                                                                 <Button 
+                                                                     onClick={() => handleEdit(voice)} 
+                                                                     size="sm" 
+                                                                     variant="outline"
+                                                                     className="flex-1"
+                                                                 >
+                                                                     <Settings className="h-4 w-4 mr-2"/>
+                                                                     Настройки
+                                                                 </Button>
+                                                                 <Button 
+                                                                     onClick={() => handleDelete(voice.id)} 
+                                                                     size="sm" 
+                                                                     variant="destructive"
+                                                                 >
+                                                                     <Trash2 className="h-4 w-4"/>
+                                                                 </Button>
+                                                             </div>
+                                                         </CardContent>
+                                                     </Card>
+                                                 ))}
+                                             </div>
+                                         )}
                                      </div>
-                                 </CardContent>
-                             </Card>
-                         )) : (
+                                 )}
+
+                                 {/* Пользовательские голоса */}
+                                 {voices.filter(voice => voice.voice_type === 'user').length > 0 && (
+                                     <div className="mb-6">
+                                         <div 
+                                             className="flex items-center gap-2 mb-3 cursor-pointer hover:bg-slate-700 p-2 rounded-lg transition-colors"
+                                             onClick={() => toggleSection('user')}
+                                         >
+                                             <Users className="h-5 w-5 text-green-400"/>
+                                             <h3 className="text-lg font-semibold text-white">Пользовательские голоса</h3>
+                                             <Badge variant="outline" className="ml-auto">
+                                                 {voices.filter(voice => voice.voice_type === 'user').length}
+                                             </Badge>
+                                             {expandedSections.user ? 
+                                                 <ChevronDown className="h-4 w-4 text-slate-400"/> : 
+                                                 <ChevronRight className="h-4 w-4 text-slate-400"/>
+                                             }
+                                         </div>
+                                         {expandedSections.user && (
+                                             <div className="space-y-3">
+                                                 {voices.filter(voice => voice.voice_type === 'user').map((voice) => (
+                                                     <Card key={voice.id} className="bg-slate-800 border-slate-700">
+                                                         <CardHeader>
+                                                             <div className="flex items-center justify-between">
+                                                                 <CardTitle className="text-base font-medium text-white flex items-center gap-2">
+                                                                     <Users className="h-4 w-4 text-green-400"/>
+                                                                     {voice.name}
+                                                                 </CardTitle>
+                                                                 <Badge variant="secondary">user</Badge>
+                                                             </div>
+                                                             <div className="text-xs text-slate-400">
+                                                                 {(() => {
+                                                                     const owner = users.find(u => u.id === voice.owner_id);
+                                                                     return owner ? (
+                                                                         <div className="flex items-center gap-1">
+                                                                             <Users className="h-3 w-3" />
+                                                                             <span>{owner.display_name || owner.username}</span>
+                                                                             {owner.is_online && <Badge variant="outline" className="text-xs">Онлайн</Badge>}
+                                                                         </div>
+                                                                     ) : (
+                                                                         <span>Owner ID: {voice.owner_id}</span>
+                                                                     );
+                                                                 })()}
+                                                             </div>
+                                                         </CardHeader>
+                                                         <CardContent>
+                                                             <p className="text-xs text-slate-400 italic break-words h-12 overflow-y-auto">
+                                                                 {voice.reference_text || 'Нет референсного текста'}
+                                                             </p>
+                                                             <div className="flex gap-2 mt-3">
+                                                                 <Button 
+                                                                     onClick={() => handleEdit(voice)} 
+                                                                     size="sm" 
+                                                                     variant="outline"
+                                                                     className="flex-1"
+                                                                 >
+                                                                     <Settings className="h-4 w-4 mr-2"/>
+                                                                     Настройки
+                                                                 </Button>
+                                                                 <Button 
+                                                                     onClick={() => handleDelete(voice.id)} 
+                                                                     size="sm" 
+                                                                     variant="destructive"
+                                                                 >
+                                                                     <Trash2 className="h-4 w-4"/>
+                                                                 </Button>
+                                                             </div>
+                                                         </CardContent>
+                                                     </Card>
+                                                 ))}
+                                             </div>
+                                         )}
+                                     </div>
+                                 )}
+                             </>
+                         ) : (
                              <div className="col-span-full text-center py-8">
                                  <p className="text-slate-400">Голосов не найдено</p>
                              </div>
@@ -425,7 +548,6 @@ const VoiceManagement = () => {
                                   rows={3}
                                   placeholder="Введите текст для тестирования голоса..."
                                 />
-                                <p className="text-sm text-muted-foreground mt-1">Введите текст, который хотите озвучить для тестирования</p>
                             </div>
                             
                             {/* Настройки генерации TTS */}
@@ -434,7 +556,7 @@ const VoiceManagement = () => {
                                 
                                 {/* Единственный настраиваемый параметр */}
                                 <div>
-                                    <Label htmlFor="cfg-strength">CFG Strength: {currentVoice.cfg_strength}</Label>
+                                    <Label htmlFor="cfg-strength">Качество синтеза: {currentVoice.cfg_strength}</Label>
                                     <Slider
                                         id="cfg-strength"
                                         min={0.1}
@@ -444,48 +566,41 @@ const VoiceManagement = () => {
                                         onValueChange={(value) => setCurrentVoice(prev => ({ ...prev, cfg_strength: value[0] }))}
                                         className="mt-2"
                                     />
-                                    <p className="text-xs text-muted-foreground mt-1">Сила классификатора (0.1-10.0) - единственный настраиваемый параметр</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Влияет на качество и стабильность речи (0.1-10.0) • Рекомендуемое: 2.0</p>
                                 </div>
                                 
-                                {/* Автоматически определяемые параметры (только для отображения) */}
-                                <div className="space-y-2 pt-2 border-t border-slate-600">
-                                    <h5 className="text-xs font-medium text-slate-300">Автоматически определяемые системой</h5>
-                                    
-                                    <div className="flex justify-between text-xs text-slate-400">
-                                        <span>Speed: 0.1-1.0</span>
-                                        <span className="text-slate-500">По длине текста</span>
-                                    </div>
-                                    
-                                    <div className="flex justify-between text-xs text-slate-400">
-                                        <span>NFE Steps: 18-26</span>
-                                        <span className="text-slate-500">По длине текста</span>
+                                <div>
+                                    <Label htmlFor="speed-preset">Скорость речи: {
+                                        currentVoice.speed_preset === 'very_slow' ? 'Очень медленный' :
+                                        currentVoice.speed_preset === 'slow' ? 'Медленный' :
+                                        currentVoice.speed_preset === 'normal' ? 'Нормальный' : 'Быстрый'
+                                    }</Label>
+                                    <Slider
+                                        id="speed-preset"
+                                        min={0}
+                                        max={3}
+                                        step={1}
+                                        value={[
+                                            currentVoice.speed_preset === 'very_slow' ? 0 :
+                                            currentVoice.speed_preset === 'slow' ? 1 :
+                                            currentVoice.speed_preset === 'normal' ? 2 : 3
+                                        ]}
+                                        onValueChange={(value) => {
+                                            const preset = value[0] === 0 ? 'very_slow' : 
+                                                         value[0] === 1 ? 'slow' : 
+                                                         value[0] === 2 ? 'normal' : 'fast';
+                                            setCurrentVoice(prev => ({ ...prev, speed_preset: preset }));
+                                        }}
+                                        className="mt-2"
+                                    />
+                                    <div className="flex justify-between text-xs text-muted-foreground mt-1 px-1">
+                                        <span>Очень медл.</span>
+                                        <span>Медленный</span>
+                                        <span>Нормальный</span>
+                                        <span>Быстрый</span>
                                     </div>
                                 </div>
                                 
-                                {/* Фиксированные параметры */}
-                                <div className="space-y-2 pt-2 border-t border-slate-600">
-                                    <h5 className="text-xs font-medium text-slate-300">Фиксированные параметры</h5>
-                                    
-                                    <div className="flex justify-between text-xs text-slate-400">
-                                        <span>Target RMS: 0.2</span>
-                                        <span className="text-slate-500">Фиксированное значение</span>
-                                    </div>
-                                    
-                                    <div className="flex justify-between text-xs text-slate-400">
-                                        <span>Cross Fade Duration: 0.15</span>
-                                        <span className="text-slate-500">Фиксированное значение</span>
-                                    </div>
-                                    
-                                    <div className="flex justify-between text-xs text-slate-400">
-                                        <span>Silence Duration: 100ms</span>
-                                        <span className="text-slate-500">Фиксированное значение</span>
-                                    </div>
-                                    
-                                    <div className="flex justify-between text-xs text-slate-400">
-                                        <span>Sway Sampling Coef: -1.0</span>
-                                        <span className="text-slate-500">Фиксированное значение</span>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     )}

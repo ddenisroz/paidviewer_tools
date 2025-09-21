@@ -7,6 +7,7 @@ Converts uploaded audio to F5-TTS compatible format
 
 import logging
 import tempfile
+import os
 from pathlib import Path
 from typing import Optional
 import soundfile as sf
@@ -45,8 +46,21 @@ def convert_audio_for_f5tts(input_path: str, output_path: str) -> bool:
     try:
         logger.info(f"Converting audio: {input_path} -> {output_path}")
         
+        # Check if input file exists and has content
+        if not os.path.exists(input_path):
+            logger.error(f"Input file does not exist: {input_path}")
+            return False
+            
+        if os.path.getsize(input_path) == 0:
+            logger.error(f"Input file is empty: {input_path}")
+            return False
+        
         # Load audio with librosa (handles various formats)
-        audio_data, original_sr = librosa.load(input_path, sr=None, mono=False)
+        try:
+            audio_data, original_sr = librosa.load(input_path, sr=None, mono=False)
+        except Exception as e:
+            logger.error(f"Failed to load audio file {input_path}: {e}")
+            return False
         
         # Convert to mono if stereo
         if len(audio_data.shape) > 1:

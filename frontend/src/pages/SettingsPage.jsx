@@ -9,7 +9,6 @@ import { Twitch, Video } from 'lucide-react';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useAuth } from '../context/AuthContext';
 import { Loader } from '@/components/ui/loader';
-import TtsConfigPanel from '../components/TtsConfigPanel';
 
 const SettingsPage = () => {
     const { user } = useAuth();
@@ -103,8 +102,6 @@ const SettingsPage = () => {
                 </CardContent>
             </Card>
 
-            {/* TTS Configuration Panel */}
-            <TtsConfigPanel />
         </div>
     );
 };

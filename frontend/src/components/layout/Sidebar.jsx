@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Home, Mic, Clapperboard, AreaChart, Terminal, ChevronDown, ChevronRight, Youtube, Coins, Headphones, Settings, Shield } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -35,7 +35,7 @@ const getNavItems = (isYourchy) => {
     return baseItems;
 };
 
-const SidebarNavItem = ({ item }) => {
+const SidebarNavItem = ({ item, openSection, onToggleSection }) => {
     const location = useLocation();
     const hasSubmenu = item.submenu && item.submenu.length > 0;
 
@@ -43,13 +43,13 @@ const SidebarNavItem = ({ item }) => {
         ? location.pathname.startsWith(item.to)
         : location.pathname === item.to;
 
-    const [isOpen, setIsOpen] = useState(isParentActive);
+    const isOpen = openSection === item.to;
 
     useEffect(() => {
-        if (isParentActive) {
-            setIsOpen(true);
+        if (isParentActive && !isOpen) {
+            onToggleSection(item.to);
         }
-    }, [isParentActive, location.pathname]);
+    }, [isParentActive, item.to, onToggleSection, isOpen]);
 
     if (hasSubmenu) {
         return (
@@ -63,7 +63,7 @@ const SidebarNavItem = ({ item }) => {
                         <item.icon className="h-6 w-6" />
                         {item.label}
                     </NavLink>
-                    <button onClick={() => setIsOpen(!isOpen)} className="p-1 -mr-1 rounded-full hover:bg-accent text-muted-foreground">
+                    <button onClick={() => onToggleSection(item.to)} className="p-1 -mr-1 rounded-full hover:bg-accent text-muted-foreground">
                         {isOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                     </button>
                 </div>
@@ -114,6 +114,14 @@ const Sidebar = () => {
     // Проверяем по username или login
     const isYourchy = user?.username === 'yourchy' || user?.login === 'yourchy';
     const navItems = getNavItems(isYourchy);
+    
+    // Состояние для управления открытыми разделами
+    const [openSection, setOpenSection] = useState(null);
+    
+    // Функция для переключения разделов
+    const handleToggleSection = useCallback((sectionTo) => {
+        setOpenSection(prev => prev === sectionTo ? null : sectionTo);
+    }, []);
 
     return (
         <div className="hidden border-r bg-background md:block">
@@ -128,7 +136,12 @@ const Sidebar = () => {
                 <div className="flex-1">
                     <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
                         {navItems.map((item) => (
-                            <SidebarNavItem key={item.to} item={item} />
+                            <SidebarNavItem 
+                                key={item.to} 
+                                item={item} 
+                                openSection={openSection}
+                                onToggleSection={handleToggleSection}
+                            />
                         ))}
                     </nav>
                 </div>

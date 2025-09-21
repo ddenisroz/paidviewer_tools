@@ -137,13 +137,16 @@ export const deleteUserVoice = async (voiceId, userId) => {
 
 
 // Common
-export const testVoice = async (voiceName, userId, testText = "Ну так я гетеро, че мне пидоров бояться!", cfgStrength = null) => {
+export const testVoice = async (voiceName, userId, testText = "Ну так я гетеро, че мне пидоров бояться!", cfgStrength = null, speedPreset = null) => {
     const formData = new FormData();
     formData.append('voice_name', voiceName);
     formData.append('user_id', userId);
     formData.append('test_text', testText);
     if (cfgStrength !== null) {
         formData.append('cfg_strength', cfgStrength);
+    }
+    if (speedPreset !== null) {
+        formData.append('speed_preset', speedPreset);
     }
     
     return await ttsService.post('/api/voices/test', formData, {

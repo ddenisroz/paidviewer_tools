@@ -9,7 +9,15 @@ from sqlalchemy.ext.declarative import declarative_base
 DATABASE_DIR = Path(__file__).resolve().parent.parent / "bot_service" / "data"
 DATABASE_URL = f"sqlite:///{DATABASE_DIR / 'app_data.db'}"
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(
+    DATABASE_URL, 
+    connect_args={"check_same_thread": False},
+    pool_size=20,  # Увеличиваем размер пула
+    max_overflow=30,  # Увеличиваем максимальное количество соединений
+    pool_timeout=60,  # Увеличиваем таймаут
+    pool_recycle=3600,  # Переиспользуем соединения каждый час
+    pool_pre_ping=True  # Проверяем соединения перед использованием
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -44,7 +52,8 @@ class Voice(Base):
     created_at = Column(DateTime(timezone=True), default=func.now())
     
     # Настройки генерации TTS (настраиваемые пользователем)
-    cfg_strength = Column(Float, default=2.0)  # CFG strength (2.0-5.0 рекомендуется) - ЕДИНСТВЕННЫЙ настраиваемый параметр
+    cfg_strength = Column(Float, default=2.5)  # CFG strength (2.0-5.0 рекомендуется)
+    speed_preset = Column(String, default='normal')  # 'very_slow', 'slow', 'normal'
     
     # Автоматически определяемые системой параметры (НЕ хранятся в БД)
     # target_rms, speed, nfe_step - определяются динамически в коде
@@ -59,5 +68,18 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception as e:
+        db.rollback()
+        raise e
     finally:
-        db.close()
+        try:
+            db.close()
+        except Exception:
+            pass  # Игнорируем ошибки при закрытии
+
+def close_all_connections():
+    """Закрывает все соединения с базой данных"""
+    try:
+        engine.dispose()
+    except Exception:
+        pass

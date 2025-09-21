@@ -294,11 +294,47 @@ class RussianTTS:
         
         return processed_text
 
+    # Пресеты скорости для разных режимов
+    SPEED_PRESETS = {
+        'very_slow': {
+            'name': 'Очень медленный',
+            'description': 'Максимально медленная речь',
+            'settings': {
+                'russian': [0.1, 0.3, 0.6, 0.8, 0.9, 1.0],
+                'english': [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+            }
+        },
+        'slow': {
+            'name': 'Медленный', 
+            'description': 'Замедленная речь',
+            'settings': {
+                'russian': [0.3, 0.6, 0.8, 0.9, 0.9, 1.0],
+                'english': [0.2, 0.4, 0.5, 0.7, 0.7, 0.8]
+            }
+        },
+        'normal': {
+            'name': 'Нормальный',
+            'description': 'Обычная скорость речи',
+            'settings': {
+                'russian': [0.5, 0.8, 1.0, 1.0, 1.0, 1.0],
+                'english': [0.3, 0.7, 0.8, 0.9, 1.0, 1.0]
+            }
+        },
+        'fast': {
+            'name': 'Быстрый',
+            'description': 'Ускоренная речь',
+            'settings': {
+                'russian': [0.8, 1.0, 1.2, 1.3, 1.4, 1.5],
+                'english': [0.7, 1.0, 1.1, 1.2, 1.3, 1.3]
+            }
+        }
+    }
+
     def synthesize_speech(self, text: str, ref_audio_path: str, ref_text: str = "", 
                          speed: float = None, nfe_step: int = None, 
                          fix_duration: Optional[float] = None, remove_silence: bool = False, 
                          seed: Optional[int] = None, cfg_strength: float = None, 
-                         target_rms: float = None) -> Optional[str]:
+                         target_rms: float = None, speed_preset: str = 'normal') -> Optional[str]:
         """Синтезирует речь с автоматическим выбором модели по языку."""
         
         # Предобработка текста
@@ -321,40 +357,61 @@ class RussianTTS:
         silence_duration_ms = config.silence_duration_ms
         sway_sampling_coef = config.sway_sampling_coef
         
-        # Автоматическое определение скорости на основе длины обработанного текста
+        # Определение скорости на основе длины текста и пресета
         if speed is None:
             length_without_spaces = len(processed_text.replace(" ", ""))
             
-            if language == "english":
-                # Гибкая логика для английского текста (более медленные скорости)
+            # Получаем настройки пресета
+            if speed_preset in self.SPEED_PRESETS:
+                preset_settings = self.SPEED_PRESETS[speed_preset]['settings']
+                language_key = language if language in preset_settings else 'russian'
+                speed_values = preset_settings[language_key]
+                
+                # Определяем скорость по длине текста
                 if length_without_spaces <= 3:
-                    speed = 0.1
+                    speed = speed_values[0]
                 elif length_without_spaces <= 8:
-                    speed = 0.2
+                    speed = speed_values[1]
                 elif length_without_spaces <= 18:
-                    speed = 0.3
+                    speed = speed_values[2]
                 elif length_without_spaces <= 35:
-                    speed = 0.4
+                    speed = speed_values[3]
                 elif length_without_spaces <= 45:
-                    speed = 0.5
+                    speed = speed_values[4]
                 else:
-                    speed = 0.6
-                logger.info(f"Автоматически определена скорость для английского: {speed} (длина обработанного текста: {length_without_spaces})")
+                    speed = speed_values[5]
+                
+                logger.info(f"Применен пресет скорости '{speed_preset}': {self.SPEED_PRESETS[speed_preset]['name']}")
+                logger.info(f"Скорость для {language} (длина: {length_without_spaces}): {speed}")
             else:
-                # Обычная логика для русского текста
-                if length_without_spaces <= 3:
-                    speed = 0.1
-                elif length_without_spaces <= 8:
-                    speed = 0.3
-                elif length_without_spaces <= 18:
-                    speed = 0.6
-                elif length_without_spaces <= 35:
-                    speed = 0.8
-                elif length_without_spaces <= 45:
-                    speed = 0.9
+                # Fallback на старую логику, если пресет не найден
+                if language == "english":
+                    if length_without_spaces <= 3:
+                        speed = 0.1
+                    elif length_without_spaces <= 8:
+                        speed = 0.2
+                    elif length_without_spaces <= 18:
+                        speed = 0.3
+                    elif length_without_spaces <= 35:
+                        speed = 0.4
+                    elif length_without_spaces <= 45:
+                        speed = 0.5
+                    else:
+                        speed = 0.6
                 else:
-                    speed = 1.0
-                logger.info(f"Автоматически определена скорость для русского: {speed} (длина обработанного текста: {length_without_spaces})")
+                    if length_without_spaces <= 3:
+                        speed = 0.1
+                    elif length_without_spaces <= 8:
+                        speed = 0.3
+                    elif length_without_spaces <= 18:
+                        speed = 0.6
+                    elif length_without_spaces <= 35:
+                        speed = 0.8
+                    elif length_without_spaces <= 45:
+                        speed = 0.9
+                    else:
+                        speed = 1.0
+                logger.info(f"Использована стандартная скорость для {language}: {speed} (длина: {length_without_spaces})")
         
         # Убеждаемся, что скорость в правильном диапазоне
         if speed is not None:

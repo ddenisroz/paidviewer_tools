@@ -42,4 +42,4 @@ export const transcribeUserVoice = (voiceId, userId) => transcribeUserVoiceApi(v
 export const renameUserVoice = (voiceId, userId, newName) => renameUserVoiceApi(voiceId, userId, newName);
 
 // Common
-export const testVoice = (voiceName, userId, testText, cfgStrength) => testVoiceApi(voiceName, userId, testText, cfgStrength);
+export const testVoice = (voiceName, userId, testText, cfgStrength, speedPreset) => testVoiceApi(voiceName, userId, testText, cfgStrength, speedPreset);

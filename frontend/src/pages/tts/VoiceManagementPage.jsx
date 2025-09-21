@@ -197,6 +197,7 @@ const VoiceManagementPage = () => {
         try {
             const settings = {
                 cfg_strength: currentVoice.cfg_strength,
+                speed_preset: currentVoice.speed_preset,
                 reference_text: currentVoice.reference_text
             };
             
@@ -242,7 +243,8 @@ const VoiceManagementPage = () => {
                 currentVoice.name,
                 user.id,
                 testText,
-                currentVoice.cfg_strength  // Передаем текущее значение ползунка
+                currentVoice.cfg_strength,  // Передаем текущее значение ползунка
+                currentVoice.speed_preset   // Передаем текущий пресет скорости
             );
             
             // Получаем URL аудио из ответа
@@ -440,7 +442,6 @@ const VoiceManagementPage = () => {
                                   rows={3}
                                   placeholder="Введите текст для тестирования голоса..."
                                 />
-                                <p className="text-sm text-muted-foreground mt-1">Введите текст, который хотите озвучить для тестирования</p>
                             </div>
                             
                             {/* Настройки генерации TTS */}
@@ -449,7 +450,7 @@ const VoiceManagementPage = () => {
                                 
                                 {/* Единственный настраиваемый параметр */}
                                 <div>
-                                    <Label htmlFor="cfg-strength">CFG Strength: {currentVoice.cfg_strength}</Label>
+                                    <Label htmlFor="cfg-strength">Качество синтеза: {currentVoice.cfg_strength}</Label>
                                     <Slider
                                         id="cfg-strength"
                                         min={0.1}
@@ -459,48 +460,41 @@ const VoiceManagementPage = () => {
                                         onValueChange={(value) => setCurrentVoice(prev => ({ ...prev, cfg_strength: value[0] }))}
                                         className="mt-2"
                                     />
-                                    <p className="text-xs text-muted-foreground mt-1">Сила классификатора (0.1-10.0) - единственный настраиваемый параметр</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Влияет на качество и стабильность речи (0.1-10.0) • Рекомендуемое: 2.0</p>
                                 </div>
                                 
-                                {/* Автоматически определяемые параметры (только для отображения) */}
-                                <div className="space-y-2 pt-2 border-t border-slate-600">
-                                    <h5 className="text-xs font-medium text-slate-300">Автоматически определяемые системой</h5>
-                                    
-                                    <div className="flex justify-between text-xs text-slate-400">
-                                        <span>Speed: 0.1-1.0</span>
-                                        <span className="text-slate-500">По длине текста</span>
-                                    </div>
-                                    
-                                    <div className="flex justify-between text-xs text-slate-400">
-                                        <span>NFE Steps: 18-26</span>
-                                        <span className="text-slate-500">По длине текста</span>
+                                <div>
+                                    <Label htmlFor="speed-preset">Скорость речи: {
+                                        currentVoice.speed_preset === 'very_slow' ? 'Очень медленный' :
+                                        currentVoice.speed_preset === 'slow' ? 'Медленный' :
+                                        currentVoice.speed_preset === 'normal' ? 'Нормальный' : 'Быстрый'
+                                    }</Label>
+                                    <Slider
+                                        id="speed-preset"
+                                        min={0}
+                                        max={3}
+                                        step={1}
+                                        value={[
+                                            currentVoice.speed_preset === 'very_slow' ? 0 :
+                                            currentVoice.speed_preset === 'slow' ? 1 :
+                                            currentVoice.speed_preset === 'normal' ? 2 : 3
+                                        ]}
+                                        onValueChange={(value) => {
+                                            const preset = value[0] === 0 ? 'very_slow' : 
+                                                         value[0] === 1 ? 'slow' : 
+                                                         value[0] === 2 ? 'normal' : 'fast';
+                                            setCurrentVoice(prev => ({ ...prev, speed_preset: preset }));
+                                        }}
+                                        className="mt-2"
+                                    />
+                                    <div className="flex justify-between text-xs text-muted-foreground mt-1 px-1">
+                                        <span>Очень медл.</span>
+                                        <span>Медленный</span>
+                                        <span>Нормальный</span>
+                                        <span>Быстрый</span>
                                     </div>
                                 </div>
                                 
-                                {/* Фиксированные параметры */}
-                                <div className="space-y-2 pt-2 border-t border-slate-600">
-                                    <h5 className="text-xs font-medium text-slate-300">Фиксированные параметры</h5>
-                                    
-                                    <div className="flex justify-between text-xs text-slate-400">
-                                        <span>Target RMS: 0.2</span>
-                                        <span className="text-slate-500">Фиксированное значение</span>
-                                    </div>
-                                    
-                                    <div className="flex justify-between text-xs text-slate-400">
-                                        <span>Cross Fade Duration: 0.15</span>
-                                        <span className="text-slate-500">Фиксированное значение</span>
-                                    </div>
-                                    
-                                    <div className="flex justify-between text-xs text-slate-400">
-                                        <span>Silence Duration: 100ms</span>
-                                        <span className="text-slate-500">Фиксированное значение</span>
-                                    </div>
-                                    
-                                    <div className="flex justify-between text-xs text-slate-400">
-                                        <span>Sway Sampling Coef: -1.0</span>
-                                        <span className="text-slate-500">Фиксированное значение</span>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     )}

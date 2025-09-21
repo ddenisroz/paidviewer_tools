@@ -46,6 +46,7 @@ class VoiceSchema(BaseModel):
     
     # Настройки генерации TTS
     cfg_strength: float = 2.0
+    speed_preset: str = 'normal'
     cross_fade_duration: float = 0.15
     silence_duration_ms: int = 100
     sway_sampling_coef: float = -1.0
@@ -56,6 +57,7 @@ class VoiceSchema(BaseModel):
 class VoiceSettingsSchema(BaseModel):
     """Схема для обновления настроек голоса"""
     cfg_strength: Optional[float] = Field(None, ge=0.1, le=10.0, description="CFG strength (0.1-10.0)")
+    speed_preset: Optional[str] = Field(None, description="Пресет скорости: very_slow, slow, normal, fast")
     reference_text: Optional[str] = Field(None, description="Референсный текст для синтеза")
     # target_rms, speed, nfe_step - определяются автоматически системой
 
@@ -115,6 +117,14 @@ async def lifespan(app: FastAPI):
     yield
     
     logger.info("--- TTS Service shutting down ---")
+    
+    # Закрываем все соединения с базой данных
+    try:
+        from tts_service.database import close_all_connections
+        close_all_connections()
+        logger.info("✅ Database connections closed")
+    except Exception as e:
+        logger.error(f"❌ Error closing database connections: {e}")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -304,9 +314,11 @@ async def synthesize_speech(
         voice_settings = db.query(VoiceModel).filter(VoiceModel.name == voice_name).first()
         if not voice_settings:
             # Используем настройки по умолчанию
-            cfg_strength = config.cfg_strength
+            cfg_strength = 2.5  # Значение по умолчанию
+            speed_preset = 'normal'  # Значение по умолчанию
         else:
             cfg_strength = voice_settings.cfg_strength
+            speed_preset = voice_settings.speed_preset or 'normal'
         
         # target_rms, speed, nfe_step - определяются автоматически системой
         target_rms = config.target_rms  # Всегда из конфига
@@ -323,7 +335,8 @@ async def synthesize_speech(
             cfg_strength=cfg_strength,
             target_rms=target_rms,
             speed=None,  # Автоматическое определение на основе длины текста
-            nfe_step=None  # Автоматическое определение на основе длины текста
+            nfe_step=None,  # Автоматическое определение на основе длины текста
+            speed_preset=speed_preset  # Пресет скорости из базы данных
         )
         
         if not synthesized_path:
@@ -392,21 +405,43 @@ async def upload_voice(
 
     try:
         # Сначала сохраняем во временный файл
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+        original_extension = os.path.splitext(file.filename)[1] if file.filename else '.wav'
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=original_extension)
         temp_path = temp_file.name
         temp_file.close()
         
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Проверяем, что файл уже в правильном формате (WAV)
-        if not file.filename.lower().endswith('.wav'):
-            os.unlink(temp_path)
-            raise HTTPException(status_code=400, detail="Only WAV files are supported")
-        
-        # Просто копируем файл, так как он уже WAV
-        shutil.copy2(temp_path, str(file_path))
-        os.unlink(temp_path)
+        # Конвертируем аудио в формат, подходящий для F5-TTS
+        converted_path = None
+        try:
+            # Создаем временный файл для конвертированного аудио
+            converted_temp = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
+            converted_path = converted_temp.name
+            converted_temp.close()
+            
+            logger.info(f"Converting {temp_path} to {converted_path}")
+            
+            # Конвертируем аудио
+            success = convert_audio_for_f5tts(temp_path, converted_path)
+            if not success or not os.path.exists(converted_path):
+                raise HTTPException(status_code=422, detail="Failed to convert audio file")
+            
+            # Копируем конвертированный файл в финальное место
+            shutil.copy2(converted_path, str(file_path))
+            
+            logger.info(f"✅ Audio converted and saved: {file_path}")
+            
+        except Exception as e:
+            logger.error(f"❌ Audio conversion failed: {e}", exc_info=True)
+            raise HTTPException(status_code=422, detail=f"Failed to convert audio: {str(e)}")
+        finally:
+            # Очищаем временные файлы
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            if converted_path and os.path.exists(converted_path):
+                os.unlink(converted_path)
 
         # Автоматическая транскрипция
         reference_text = transcribe_audio_file(str(file_path))
@@ -540,21 +575,43 @@ async def upload_user_voice(
     
     try:
         # Сначала сохраняем во временный файл
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+        original_extension = os.path.splitext(file.filename)[1] if file.filename else '.wav'
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=original_extension)
         temp_path = temp_file.name
         temp_file.close()
         
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Проверяем, что файл уже в правильном формате (WAV)
-        if not file.filename.lower().endswith('.wav'):
-            os.unlink(temp_path)
-            raise HTTPException(status_code=400, detail="Only WAV files are supported")
-        
-        # Просто копируем файл, так как он уже WAV
-        shutil.copy2(temp_path, str(file_path))
-        os.unlink(temp_path)
+        # Конвертируем аудио в формат, подходящий для F5-TTS
+        converted_path = None
+        try:
+            # Создаем временный файл для конвертированного аудио
+            converted_temp = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
+            converted_path = converted_temp.name
+            converted_temp.close()
+            
+            logger.info(f"Converting {temp_path} to {converted_path}")
+            
+            # Конвертируем аудио
+            success = convert_audio_for_f5tts(temp_path, converted_path)
+            if not success or not os.path.exists(converted_path):
+                raise HTTPException(status_code=422, detail="Failed to convert audio file")
+            
+            # Копируем конвертированный файл в финальное место
+            shutil.copy2(converted_path, str(file_path))
+            
+            logger.info(f"✅ Audio converted and saved: {file_path}")
+            
+        except Exception as e:
+            logger.error(f"❌ Audio conversion failed: {e}", exc_info=True)
+            raise HTTPException(status_code=422, detail=f"Failed to convert audio: {str(e)}")
+        finally:
+            # Очищаем временные файлы
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            if converted_path and os.path.exists(converted_path):
+                os.unlink(converted_path)
 
         # Используем фиксированный референсный текст
         reference_text = "Создавая уникальные цифровые объекты, вы размышляете о том насколько интересны ваши идеи миру, но задумываетель ли вы, как защитить права на свои произведения."
@@ -617,11 +674,15 @@ def update_voice_settings(
         voice.cfg_strength = settings.cfg_strength
         logger.info(f"Voice settings updated for {voice.name}: cfg_strength={voice.cfg_strength}")
     
+    if settings.speed_preset is not None:
+        voice.speed_preset = settings.speed_preset
+        logger.info(f"Voice speed preset updated for {voice.name}: speed_preset={voice.speed_preset}")
+    
     if settings.reference_text is not None:
         voice.reference_text = settings.reference_text
         logger.info(f"Voice reference text updated for {voice.name}: '{settings.reference_text[:50]}...'")
     
-    if settings.cfg_strength is None and settings.reference_text is None:
+    if settings.cfg_strength is None and settings.speed_preset is None and settings.reference_text is None:
         logger.warning(f"No settings provided for voice {voice.name}")
     
     db.commit()
@@ -649,11 +710,15 @@ def update_user_voice_settings(
         voice.cfg_strength = settings.cfg_strength
         logger.info(f"User voice settings updated for {voice.name}: cfg_strength={voice.cfg_strength}")
     
+    if settings.speed_preset is not None:
+        voice.speed_preset = settings.speed_preset
+        logger.info(f"User voice speed preset updated for {voice.name}: speed_preset={voice.speed_preset}")
+    
     if settings.reference_text is not None:
         voice.reference_text = settings.reference_text
         logger.info(f"User voice reference text updated for {voice.name}: '{settings.reference_text[:50]}...'")
     
-    if settings.cfg_strength is None and settings.reference_text is None:
+    if settings.cfg_strength is None and settings.speed_preset is None and settings.reference_text is None:
         logger.warning(f"No settings provided for user voice {voice.name}")
     
     db.commit()
@@ -758,6 +823,7 @@ async def test_user_voice(
     user_id: str = Form(...),
     test_text: str = Form("Ну так я гетеро, че мне пидоров бояться!"),  # Добавляем возможность ввода текста
     cfg_strength: float = Form(None),  # Параметр для тестирования с текущим значением ползунка
+    speed_preset: str = Form(None),  # Параметр для тестирования с текущим пресетом скорости
     db: Session = Depends(get_db)
     # speed and pitch removed - F5-TTS uses dynamic settings based on text length
 ):
@@ -790,12 +856,14 @@ async def test_user_voice(
         if not test_text or test_text.strip() == "":
             test_text = "Ну так я гетеро, че мне пидоров бояться!"
         
-        # Определяем cfg_strength для теста
+        # Определяем настройки для теста
         test_cfg_strength = cfg_strength if cfg_strength is not None else voice.cfg_strength
+        test_speed_preset = speed_preset if speed_preset is not None else (voice.speed_preset or 'normal')
         
         # Логируем настройки голоса для диагностики
         logger.info(f"🎛️ Voice settings for '{voice_name}':")
         logger.info(f"  - cfg_strength (тест): {test_cfg_strength} {'(из ползунка)' if cfg_strength is not None else '(из базы данных)'}")
+        logger.info(f"  - speed_preset (тест): {test_speed_preset} {'(из ползунка)' if speed_preset is not None else '(из базы данных)'}")
         logger.info(f"  - cross_fade_duration: {voice.cross_fade_duration}")
         logger.info(f"  - silence_duration_ms: {voice.silence_duration_ms}")
         logger.info(f"  - sway_sampling_coef: {voice.sway_sampling_coef}")
@@ -811,7 +879,8 @@ async def test_user_voice(
             cfg_strength=test_cfg_strength,
             target_rms=None,  # Автоматическое определение
             speed=None,  # Автоматическое определение на основе длины текста
-            nfe_step=None  # Автоматическое определение на основе длины текста
+            nfe_step=None,  # Автоматическое определение на основе длины текста
+            speed_preset=test_speed_preset  # Пресет скорости для теста
         )
         
         if not synthesized_path:

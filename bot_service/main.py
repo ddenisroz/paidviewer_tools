@@ -230,9 +230,8 @@ class Bot(commands.Bot):
             return
         
         # Check if the channel is whitelisted in the system
-        # Временно отключаем проверку белого списка для тестирования
-        # if channel_name not in whitelisted_channels_cache:
-        #     return
+        if channel_name not in whitelisted_channels_cache:
+            return
             
         # Check if the author is a blocked bot or the bot itself
         if author_name in blocked_bots_cache or author_name == self.nick.lower():
@@ -1002,12 +1001,12 @@ async def youtube_queue_clear(user: User = Depends(get_current_user), db: Sessio
 @app.post("/api/tts/enable")
 async def enable_tts(user: User = Depends(get_current_user)):
     channel_name = user.username.lower()
-    # Временно отключаем проверку белого списка для тестирования
-    # if channel_name in whitelisted_channels_cache:
+    if channel_name not in whitelisted_channels_cache:
+        raise HTTPException(status_code=403, detail="Channel is not whitelisted for TTS.")
+    
     tts_enabled_channels.add(channel_name)
     logger.info(f"TTS enabled for channel: {channel_name}")
     return {"status": "enabled"}
-    # raise HTTPException(status_code=403, detail="Channel is not whitelisted for TTS.")
 
 @app.post("/api/tts/disable")
 async def disable_tts(user: User = Depends(get_current_user)):
@@ -1019,8 +1018,7 @@ async def disable_tts(user: User = Depends(get_current_user)):
 @app.get("/api/tts/status")
 async def get_tts_status(user: User = Depends(get_current_user)):
     is_enabled = user.username.lower() in tts_enabled_channels
-    # Временно отключаем проверку белого списка для тестирования
-    is_whitelisted = True  # user.username.lower() in whitelisted_channels_cache
+    is_whitelisted = user.username.lower() in whitelisted_channels_cache
     
     # --- DEBUG LOGGING ---
     logger.info(f"--- TTS Status Check for user: {user.username} ---")
