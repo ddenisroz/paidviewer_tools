@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Upload, Trash2, Edit, Users, Globe, Settings, TestTube2, Mic } from 'lucide-react';
 import { Slider } from "@/components/ui/slider"
 import { toast } from 'sonner';
-import { getAdminVoices, uploadVoice, deleteVoice, updateVoiceSettings, testVoice, getUsers } from '../../services/unified-api';
+import { getAdminVoices, uploadVoice, deleteVoice, updateVoiceSettings, transcribeVoice, testVoice, getUsers, renameVoice } from '../../services/unified-api';
 import { useAuth } from '../../context/AuthContext';
 
 const VoiceManagement = () => {
@@ -28,6 +28,7 @@ const VoiceManagement = () => {
     const [voiceName, setVoiceName] = useState('');
     const [ownerId, setOwnerId] = useState('');
     const [isUploading, setIsUploading] = useState(false);
+    const [isTranscribing, setIsTranscribing] = useState(false);
     
     const { user } = useAuth();
     let audioContext = null;
@@ -124,6 +125,89 @@ const VoiceManagement = () => {
         setEditDialogOpen(true);
     };
 
+    const handleTranscribe = async () => {
+        if (!currentVoice) return;
+        
+        setIsTranscribing(true);
+        try {
+            const response = await transcribeVoice(currentVoice.id);
+            const newReferenceText = response.data.reference_text;
+            
+            // Обновляем локальное состояние
+            setCurrentVoice(prev => ({...prev, reference_text: newReferenceText}));
+            
+            // Обновляем в списке голосов
+            setVoices(prev => prev.map(voice => 
+                voice.id === currentVoice.id 
+                    ? {...voice, reference_text: newReferenceText}
+                    : voice
+            ));
+            
+            toast.success('Транскрипция завершена успешно!');
+        } catch (error) {
+            console.error('Error transcribing voice:', error);
+            toast.error('Ошибка при транскрипции аудио');
+        } finally {
+            setIsTranscribing(false);
+        }
+    };
+
+    const handleReferenceTextChange = (value) => {
+        setCurrentVoice(prev => ({...prev, reference_text: value}));
+    };
+
+    const handleRenameVoice = async () => {
+        if (!currentVoice) return;
+        
+        const newName = prompt('Введите новое имя голоса:', currentVoice.name);
+        if (!newName || newName.trim() === '' || newName === currentVoice.name) return;
+        
+        try {
+            await renameVoice(currentVoice.id, newName.trim());
+            
+            // Обновляем в списке голосов
+            setVoices(prev => prev.map(voice => 
+                voice.id === currentVoice.id 
+                    ? {...voice, name: newName.trim()}
+                    : voice
+            ));
+            
+            // Обновляем currentVoice
+            setCurrentVoice(prev => ({...prev, name: newName.trim()}));
+            
+            toast.success('Голос переименован успешно!');
+        } catch (error) {
+            console.error('Error renaming voice:', error);
+            toast.error('Ошибка при переименовании голоса');
+        }
+    };
+
+    const handleSaveSettings = async () => {
+        if (!currentVoice) return;
+        
+        try {
+            const settings = {
+                cfg_strength: currentVoice.cfg_strength,
+                reference_text: currentVoice.reference_text
+            };
+            
+            await updateVoiceSettings(currentVoice.id, settings);
+            
+            // Обновляем в списке голосов
+            setVoices(prev => prev.map(voice => 
+                voice.id === currentVoice.id 
+                    ? {...voice, ...settings}
+                    : voice
+            ));
+            
+            setEditDialogOpen(false);
+            toast.success('Настройки голоса сохранены!');
+        } catch (error) {
+            console.error('Error updating voice settings:', error);
+            toast.error('Ошибка при сохранении настроек');
+        }
+    };
+
     // Voice settings removed - F5-TTS uses dynamic settings based on text length
     
     const playAudio = (buffer) => {
@@ -148,7 +232,8 @@ const VoiceManagement = () => {
             const response = await testVoice(
                 currentVoice.name,
                 user.id,
-                testText
+                testText,
+                currentVoice.cfg_strength  // Передаем текущее значение ползунка
             );
             
             // Получаем URL аудио из ответа
@@ -309,11 +394,25 @@ const VoiceManagement = () => {
                                 <Textarea
                                   id="reference-text"
                                   value={currentVoice.reference_text || ''}
-                                  readOnly
+                                  onChange={(e) => handleReferenceTextChange(e.target.value)}
                                   className="mt-1 bg-slate-800"
                                   rows={3}
+                                  placeholder="Введите референсный текст для синтеза..."
                                 />
-                                <p className="text-sm text-muted-foreground mt-1">Текст сгенерирован автоматически. Редактирование недоступно.</p>
+                                <div className="flex gap-2 mt-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleTranscribe}
+                                        disabled={isTranscribing}
+                                    >
+                                        {isTranscribing ? 'Транскрибирую...' : 'Авто-транскрипция'}
+                                    </Button>
+                                </div>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    Редактируйте текст или используйте автоматическую транскрипцию аудиофайла.
+                                </p>
                             </div>
                             
                             <div>
@@ -392,8 +491,11 @@ const VoiceManagement = () => {
                     )}
                     <DialogFooter>
                         <Button onClick={handleTestVoice} variant="outline"><TestTube2 className="h-4 w-4 mr-2"/>Тест</Button>
-                        <Button onClick={handleUpdateSettings} className="bg-blue-600 hover:bg-blue-700">
-                            <Settings className="h-4 w-4 mr-2"/>Применить
+                        <Button onClick={handleRenameVoice} variant="outline" className="text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white">
+                            <Edit className="h-4 w-4 mr-2"/>Переименовать
+                        </Button>
+                        <Button onClick={handleSaveSettings} className="bg-blue-600 hover:bg-blue-700">
+                            <Settings className="h-4 w-4 mr-2"/>Сохранить
                         </Button>
                     </DialogFooter>
                 </DialogContent>

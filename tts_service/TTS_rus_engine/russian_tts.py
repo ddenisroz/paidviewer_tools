@@ -18,16 +18,19 @@ from f5_tts.api import F5TTS
 from huggingface_hub import hf_hub_download
 from ruaccent import RUAccent
 from .yoficator_module import yoficate_text
-from ..config import config
+try:
+    from ..config import config
+except ImportError:
+    from config import config
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Константы для русской модели F5-TTS
-RUSSIAN_MODEL = "Misha24-10/F5-TTS_RUSSIAN"
-RUSSIAN_CHECKPOINT = "F5TTS_v1_Base_v2/model_last_inference.safetensors"
-RUSSIAN_VOCAB = "F5TTS_v1_Base/vocab.txt"
+# Константы для модели F5-TTS (поддерживает русский и английский)
+MODEL_ID = "Misha24-10/F5-TTS_RUSSIAN"
+CHECKPOINT = "F5TTS_v1_Base_v2/model_last_inference.safetensors"
+VOCAB = "F5TTS_v1_Base/vocab.txt"
 
 # Транскрипция для референсного голоса (из speaker1.txt)  
 DEFAULT_VOICE_TRANSCRIPTION = "Создавая уникальные цифровые объекты, вы размышляете о том насколько интересны ваши идеи миру, но задумываетель ли вы, как защитить права на свои произведения."
@@ -57,8 +60,8 @@ class RussianTTS:
         self.use_ema = use_ema
         logger.info(f"F5-TTS использует устройство: {self.device}")
 
-        # F5-TTS модели
-        self.russian_tts = None
+        # F5-TTS модель (поддерживает русский и английский)
+        self.tts_model = None
         self.accentizer = None
         
         # Загружаем модели
@@ -80,36 +83,36 @@ class RussianTTS:
                     logger.warning(f"Не удалось загрузить RUAccent: {e}")
                     self.accentizer = None
             
-            # Загружаем русскую модель
-            self._load_russian_model()
+            # Загружаем единую модель F5-TTS
+            self._load_tts_model()
 
         except Exception as e:
             logger.error(f"КРИТИЧЕСКАЯ ОШИБКА: Не удалось загрузить модели. Ошибка: {e}", exc_info=True)
 
 
-    def _load_russian_model(self):
-        """Загружает русскую F5-TTS модель."""
+    def _load_tts_model(self):
+        """Загружает F5-TTS модель (поддерживает русский и английский)."""
         try:
-            logger.info("Загружаем русскую F5-TTS модель...")
+            logger.info("Загружаем F5-TTS модель...")
             
             cache_dir = Path("f5_tts_cache")
             cache_dir.mkdir(exist_ok=True)
 
-            # Скачиваем русскую модель checkpoint
-            russian_ckpt_path = hf_hub_download(
-                repo_id=RUSSIAN_MODEL,
-                filename=RUSSIAN_CHECKPOINT,
+            # Скачиваем модель checkpoint
+            ckpt_path = hf_hub_download(
+                repo_id=MODEL_ID,
+                filename=CHECKPOINT,
                 cache_dir=cache_dir
             )
-            logger.info(f"Русский checkpoint скачан в: {russian_ckpt_path}")
+            logger.info(f"Checkpoint скачан в: {ckpt_path}")
 
-            # Скачиваем vocab.txt для русской модели
-            russian_vocab_path = hf_hub_download(
-                repo_id=RUSSIAN_MODEL,
-                filename=RUSSIAN_VOCAB,
+            # Скачиваем vocab.txt
+            vocab_path = hf_hub_download(
+                repo_id=MODEL_ID,
+                filename=VOCAB,
                 cache_dir=cache_dir
             )
-            logger.info(f"Русский vocab.txt скачан в: {russian_vocab_path}")
+            logger.info(f"Vocab.txt скачан в: {vocab_path}")
 
             # Инициализируем F5TTS с безопасными параметрами для CUDA
             try:
@@ -118,10 +121,10 @@ class RussianTTS:
                     torch.cuda.empty_cache()
                     torch.cuda.synchronize()
                 
-                self.russian_tts = F5TTS(
+                self.tts_model = F5TTS(
                     model="F5TTS_v1_Base",
-                    ckpt_file=russian_ckpt_path,
-                    vocab_file=russian_vocab_path,
+                    ckpt_file=ckpt_path,
+                    vocab_file=vocab_path,
                     ode_method=self.ode_method,
                     use_ema=self.use_ema,
                     device=self.device,
@@ -129,8 +132,8 @@ class RussianTTS:
                 )
                 
                 # Устанавливаем модель в режим eval для безопасности
-                if hasattr(self.russian_tts, 'model'):
-                    self.russian_tts.model.eval()
+                if hasattr(self.tts_model, 'model'):
+                    self.tts_model.model.eval()
                     
             except Exception as e:
                 logger.error(f"Ошибка инициализации F5TTS: {e}")
@@ -140,11 +143,12 @@ class RussianTTS:
                     torch.cuda.reset_peak_memory_stats()
                 raise
             
-            logger.info("Русская F5-TTS модель загружена успешно.")
+            logger.info("F5-TTS модель загружена успешно.")
 
         except Exception as e:
-            logger.error(f"Ошибка загрузки русской модели: {e}", exc_info=True)
-            self.russian_tts = None
+            logger.error(f"Ошибка загрузки модели: {e}", exc_info=True)
+            self.tts_model = None
+
 
     def detect_language(self, text: str) -> str:
         """Определяет язык текста."""
@@ -267,6 +271,13 @@ class RussianTTS:
         if language == "russian" and self.enable_accent:
             processed_text = self.add_accents(processed_text)
         
+        # Для английского текста применяем специальную обработку
+        elif language == "english":
+            # Английский текст не требует дополнительной обработки
+            # но убеждаемся, что он правильно отформатирован
+            processed_text = processed_text.strip()
+            logger.info(f"Английский текст готов к синтезу: '{processed_text}'")
+        
         # Обработка окончаний - добавляем только точку если ее не было
         if processed_text:
             # Убираем лишние пробелы в конце
@@ -313,19 +324,41 @@ class RussianTTS:
         # Автоматическое определение скорости на основе длины обработанного текста
         if speed is None:
             length_without_spaces = len(processed_text.replace(" ", ""))
-            if length_without_spaces <= 3:
-                speed = 0.1
-            elif length_without_spaces <= 8:
-                speed = 0.3
-            elif length_without_spaces <= 18:
-                speed = 0.6
-            elif length_without_spaces <= 35:
-                speed = 0.8
-            elif length_without_spaces <= 45:
-                speed = 0.9
+            
+            if language == "english":
+                # Гибкая логика для английского текста (более медленные скорости)
+                if length_without_spaces <= 3:
+                    speed = 0.1
+                elif length_without_spaces <= 8:
+                    speed = 0.2
+                elif length_without_spaces <= 18:
+                    speed = 0.3
+                elif length_without_spaces <= 35:
+                    speed = 0.4
+                elif length_without_spaces <= 45:
+                    speed = 0.5
+                else:
+                    speed = 0.6
+                logger.info(f"Автоматически определена скорость для английского: {speed} (длина обработанного текста: {length_without_spaces})")
             else:
-                speed = 1.0
-            logger.info(f"Автоматически определена скорость: {speed} (длина обработанного текста: {length_without_spaces})")
+                # Обычная логика для русского текста
+                if length_without_spaces <= 3:
+                    speed = 0.1
+                elif length_without_spaces <= 8:
+                    speed = 0.3
+                elif length_without_spaces <= 18:
+                    speed = 0.6
+                elif length_without_spaces <= 35:
+                    speed = 0.8
+                elif length_without_spaces <= 45:
+                    speed = 0.9
+                else:
+                    speed = 1.0
+                logger.info(f"Автоматически определена скорость для русского: {speed} (длина обработанного текста: {length_without_spaces})")
+        
+        # Убеждаемся, что скорость в правильном диапазоне
+        if speed is not None:
+            speed = max(0.1, min(2.0, speed))
         
         # Автоматическое определение NFE steps на основе длины обработанного текста
         if nfe_step is None:
@@ -336,9 +369,9 @@ class RussianTTS:
                 nfe_step = 26
             logger.info(f"Автоматически определен NFE steps: {nfe_step} (длина обработанного текста: {length_without_spaces})")
         
-        # Используем русскую модель
-        tts_model = self.russian_tts
-        model_name = "Russian"
+        # Используем единую модель для всех языков
+        tts_model = self.tts_model
+        model_name = "F5-TTS (Russian/English)"
         
         if not tts_model:
             logger.error(f"Модель {model_name} не загружена")
@@ -349,8 +382,8 @@ class RussianTTS:
         if hasattr(tts_model, 'model') and hasattr(tts_model.model, 'training'):
             logger.info(f"ДИАГНОСТИКА: Модель в режиме training: {tts_model.model.training}")
 
-        # Используем предопределенную транскрипцию если ref_text пустой
-        ref_text_to_use = ref_text if ref_text else DEFAULT_VOICE_TRANSCRIPTION
+        # Используем переданный ref_text
+        ref_text_to_use = ref_text
 
         logger.info(f"Синтезируем аудио ({model_name}): '{processed_text}' используя голос '{ref_audio_path}'")
 
@@ -362,7 +395,7 @@ class RussianTTS:
             # Создаем уникальное имя файла с временной меткой
             import time
             timestamp = int(time.time() * 1000)
-            output_filename = f"russian_{language}_{timestamp}.wav"
+            output_filename = f"{language}_{timestamp}.wav"
             output_path = output_dir / output_filename
 
             # Параметры для F5-TTS
@@ -378,6 +411,10 @@ class RussianTTS:
                 "nfe_step": nfe_step,
                 "remove_silence": remove_silence
             }
+            
+            # Убеждаемся, что скорость передается как float
+            if speed is not None:
+                infer_params["speed"] = float(speed)
             
             # Добавляем опциональные параметры
             if fix_duration is not None:
@@ -397,6 +434,8 @@ class RussianTTS:
             logger.info(f"  - target_rms: {target_rms}")
             logger.info(f"  - cfg_strength: {cfg_strength}")
             logger.info(f"  - sway_sampling_coef: {sway_sampling_coef}")
+            logger.info(f"  - speed: {speed} (тип: {type(speed)})")
+            logger.info(f"  - nfe_step: {nfe_step} (тип: {type(nfe_step)})")
 
             # Безопасный синтез с обработкой CUDA ошибок
             try:
@@ -412,6 +451,17 @@ class RussianTTS:
                 
                 # Синтезируем аудио без seed
                 wav, sr, spect = tts_model.infer(**infer_params_safe)
+                
+                # ДИАГНОСТИКА: Проверяем результат синтеза
+                duration_seconds = len(wav) / sr
+                expected_duration = len(processed_text.split()) * 0.5  # Примерно 0.5 сек на слово
+                if speed and speed != 1.0:
+                    expected_duration = expected_duration / speed
+                
+                logger.info(f"ДИАГНОСТИКА результата синтеза:")
+                logger.info(f"  - Длительность аудио: {duration_seconds:.2f} сек")
+                logger.info(f"  - Ожидаемая длительность (speed={speed}): {expected_duration:.2f} сек")
+                logger.info(f"  - Соотношение: {duration_seconds/expected_duration:.2f}x")
                 
             except RuntimeError as cuda_error:
                 if "CUDA error" in str(cuda_error):
@@ -458,19 +508,11 @@ class RussianTTS:
             post_silence = np.zeros(post_fade_silence, dtype=np.float32)
             wav_padded = np.concatenate([wav_padded, post_silence])
 
-            # Нормализуем RMS к целевому значению из настроек
+            # Проверяем качество аудио без усиления
             current_rms = np.sqrt(np.mean(wav_padded**2))
-            logger.info(f"ДИАГНОСТИКА: Исходный RMS: {current_rms:.10f}, Max амплитуда: {np.max(np.abs(wav_padded)):.10f}")
+            logger.info(f"ДИАГНОСТИКА: RMS: {current_rms:.10f}, Max амплитуда: {np.max(np.abs(wav_padded)):.10f}")
             
-            if current_rms > 0:
-                # Используем target_rms из настроек
-                target_rms_value = target_rms if target_rms is not None else 0.2
-                gain_factor = target_rms_value / current_rms
-                
-                wav_padded = wav_padded * gain_factor
-                new_rms = np.sqrt(np.mean(wav_padded**2))
-                logger.info(f"Применено усиление: {gain_factor:.2f}x (RMS: {current_rms:.10f} -> {new_rms:.6f})")
-            else:
+            if current_rms == 0:
                 logger.error("КРИТИЧЕСКАЯ ОШИБКА: Сгенерированное аудио полностью пустое (RMS=0)!")
             
             # Сохраняем аудио

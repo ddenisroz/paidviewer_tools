@@ -56,7 +56,7 @@ class AppConfig(BaseModel):
     cfg_strength: float = Field(default=2.5, env="TTS_CFG_STRENGTH")  # Рекомендуемое: 2.0-5.0
     
     # Фиксированные параметры (хардкод)
-    target_rms: float = 0.2  # Фиксированная громкость для всех голосов
+    target_rms: float = 0.1  # Фиксированная громкость для всех голосов
     cross_fade_duration: float = 0.15
     silence_duration_ms: int = 100
     sway_sampling_coef: float = -1.0

@@ -15,7 +15,9 @@ import {
     uploadUserVoice, 
     deleteUserVoice, 
     updateUserVoiceSettings, 
-    testVoice 
+    transcribeUserVoice,
+    testVoice,
+    renameUserVoice
 } from '../../services/unified-api';
 import { generateObsUrl } from '../../services/microservices'; // Import directly
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +34,7 @@ const VoiceManagementPage = () => {
     const [testText, setTestText] = useState("Ну так я гетеро, че мне пидоров бояться!");
     const [isUploading, setIsUploading] = useState(false);
     const [obsUrl, setObsUrl] = useState('');
+    const [isTranscribing, setIsTranscribing] = useState(false);
     
     const { user } = useAuth();
     const { initializeTts } = useTts();
@@ -131,6 +134,89 @@ const VoiceManagementPage = () => {
         setEditDialogOpen(true);
     };
 
+    const handleTranscribe = async () => {
+        if (!currentVoice) return;
+        
+        setIsTranscribing(true);
+        try {
+            const response = await transcribeUserVoice(currentVoice.id, user.id);
+            const newReferenceText = response.data.reference_text;
+            
+            // Обновляем локальное состояние
+            setCurrentVoice(prev => ({...prev, reference_text: newReferenceText}));
+            
+            // Обновляем в списке голосов
+            setVoices(prev => prev.map(voice => 
+                voice.id === currentVoice.id 
+                    ? {...voice, reference_text: newReferenceText}
+                    : voice
+            ));
+            
+            toast.success('Транскрипция завершена успешно!');
+        } catch (error) {
+            console.error('Error transcribing voice:', error);
+            toast.error('Ошибка при транскрипции аудио');
+        } finally {
+            setIsTranscribing(false);
+        }
+    };
+
+    const handleReferenceTextChange = (value) => {
+        setCurrentVoice(prev => ({...prev, reference_text: value}));
+    };
+
+    const handleRenameVoice = async () => {
+        if (!currentVoice || !user) return;
+        
+        const newName = prompt('Введите новое имя голоса:', currentVoice.name);
+        if (!newName || newName.trim() === '' || newName === currentVoice.name) return;
+        
+        try {
+            await renameUserVoice(currentVoice.id, user.id, newName.trim());
+            
+            // Обновляем в списке голосов
+            setVoices(prev => prev.map(voice => 
+                voice.id === currentVoice.id 
+                    ? {...voice, name: newName.trim()}
+                    : voice
+            ));
+            
+            // Обновляем currentVoice
+            setCurrentVoice(prev => ({...prev, name: newName.trim()}));
+            
+            toast.success('Голос переименован успешно!');
+        } catch (error) {
+            console.error('Error renaming voice:', error);
+            toast.error('Ошибка при переименовании голоса');
+        }
+    };
+
+    const handleSaveSettings = async () => {
+        if (!currentVoice) return;
+        
+        try {
+            const settings = {
+                cfg_strength: currentVoice.cfg_strength,
+                reference_text: currentVoice.reference_text
+            };
+            
+            await updateUserVoiceSettings(currentVoice.id, user.id, settings);
+            
+            // Обновляем в списке голосов
+            setVoices(prev => prev.map(voice => 
+                voice.id === currentVoice.id 
+                    ? {...voice, ...settings}
+                    : voice
+            ));
+            
+            setEditDialogOpen(false);
+            toast.success('Настройки голоса сохранены!');
+        } catch (error) {
+            console.error('Error updating voice settings:', error);
+            toast.error('Ошибка при сохранении настроек');
+        }
+    };
+
     // Voice settings removed - F5-TTS uses dynamic settings based on text length
 
     const playAudio = (buffer) => {
@@ -155,7 +241,8 @@ const VoiceManagementPage = () => {
             const response = await testVoice(
                 currentVoice.name,
                 user.id,
-                testText
+                testText,
+                currentVoice.cfg_strength  // Передаем текущее значение ползунка
             );
             
             // Получаем URL аудио из ответа
@@ -322,11 +409,25 @@ const VoiceManagementPage = () => {
                                 <Textarea
                                   id="reference-text"
                                   value={currentVoice.reference_text || ''}
-                                  readOnly
+                                  onChange={(e) => handleReferenceTextChange(e.target.value)}
                                   className="mt-1 bg-slate-800"
                                   rows={3}
+                                  placeholder="Введите референсный текст для синтеза..."
                                 />
-                                <p className="text-sm text-muted-foreground mt-1">Текст сгенерирован автоматически. Редактирование недоступно.</p>
+                                <div className="flex gap-2 mt-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleTranscribe}
+                                        disabled={isTranscribing}
+                                    >
+                                        {isTranscribing ? 'Транскрибирую...' : 'Авто-транскрипция'}
+                                    </Button>
+                                </div>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    Редактируйте текст или используйте автоматическую транскрипцию аудиофайла.
+                                </p>
                             </div>
                             
                             <div>
@@ -405,8 +506,11 @@ const VoiceManagementPage = () => {
                     )}
                     <DialogFooter>
                         <Button onClick={handleTestVoice} variant="outline"><TestTube2 className="h-4 w-4 mr-2"/>Тест</Button>
-                        <Button onClick={handleUpdateSettings} className="bg-blue-600 hover:bg-blue-700">
-                            <Settings className="h-4 w-4 mr-2"/>Применить
+                        <Button onClick={handleRenameVoice} variant="outline" className="text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white">
+                            <Link className="h-4 w-4 mr-2"/>Переименовать
+                        </Button>
+                        <Button onClick={handleSaveSettings} className="bg-blue-600 hover:bg-blue-700">
+                            <Settings className="h-4 w-4 mr-2"/>Сохранить
                         </Button>
                     </DialogFooter>
                 </DialogContent>

@@ -60,6 +60,11 @@ export const getAdminVoices = async () => {
     return await ttsService.get('/api/admin/voices');
 };
 
+// Global voices
+export const getGlobalVoices = async () => {
+    return await ttsService.get('/api/voices/global');
+};
+
 export const uploadVoice = async (formData) => {
     return await ttsService.post('/api/admin/voices/upload', formData, {
         headers: {
@@ -78,6 +83,35 @@ export const updateVoiceSettings = async (voiceId, settings) => {
 
 export const updateUserVoiceSettings = async (voiceId, userId, settings) => {
     return await ttsService.put(`/api/user/voices/${voiceId}/settings?user_id=${userId}`, settings);
+};
+
+export const transcribeVoice = async (voiceId) => {
+    return await ttsService.post(`/api/admin/voices/${voiceId}/transcribe`);
+};
+
+export const transcribeUserVoice = async (voiceId, userId) => {
+    return await ttsService.post(`/api/user/voices/${voiceId}/transcribe?user_id=${userId}`);
+};
+
+// Rename voice functions
+export const renameVoice = async (voiceId, newName) => {
+    const formData = new FormData();
+    formData.append('new_name', newName);
+    return await ttsService.put(`/api/admin/voices/${voiceId}/rename`, formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+    });
+};
+
+export const renameUserVoice = async (voiceId, userId, newName) => {
+    const formData = new FormData();
+    formData.append('new_name', newName);
+    return await ttsService.put(`/api/user/voices/${voiceId}/rename?user_id=${userId}`, formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+    });
 };
 
 export const getUsers = async () => {
@@ -103,11 +137,14 @@ export const deleteUserVoice = async (voiceId, userId) => {
 
 
 // Common
-export const testVoice = async (voiceName, userId, testText = "Ну так я гетеро, че мне пидоров бояться!") => {
+export const testVoice = async (voiceName, userId, testText = "Ну так я гетеро, че мне пидоров бояться!", cfgStrength = null) => {
     const formData = new FormData();
     formData.append('voice_name', voiceName);
     formData.append('user_id', userId);
     formData.append('test_text', testText);
+    if (cfgStrength !== null) {
+        formData.append('cfg_strength', cfgStrength);
+    }
     
     return await ttsService.post('/api/voices/test', formData, {
         headers: {

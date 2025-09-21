@@ -45,7 +45,7 @@ class VoiceSchema(BaseModel):
     created_at: Optional[dt.datetime] = None
     
     # Настройки генерации TTS
-    cfg_strength: float = 2.5
+    cfg_strength: float = 2.0
     cross_fade_duration: float = 0.15
     silence_duration_ms: int = 100
     sway_sampling_coef: float = -1.0
@@ -54,8 +54,9 @@ class VoiceSchema(BaseModel):
         from_attributes = True
 
 class VoiceSettingsSchema(BaseModel):
-    """Схема для обновления настроек голоса - только cfg_strength настраивается пользователем"""
-    cfg_strength: Optional[float] = Field(None, ge=0.1, le=10.0, description="CFG strength (0.1-10.0) - единственный настраиваемый параметр")
+    """Схема для обновления настроек голоса"""
+    cfg_strength: Optional[float] = Field(None, ge=0.1, le=10.0, description="CFG strength (0.1-10.0)")
+    reference_text: Optional[str] = Field(None, description="Референсный текст для синтеза")
     # target_rms, speed, nfe_step - определяются автоматически системой
 
 class TtsConfigSchema(BaseModel):
@@ -485,23 +486,34 @@ def update_tts_config(settings: TtsConfigSchema):
 
 @app.get("/api/user/voices", response_model=List[VoiceSchema])
 def get_user_voices(user_id: str, db: Session = Depends(get_db)):
-    # Возвращаем голоса пользователя + все публичные/глобальные голоса
-    user_voices = db.query(VoiceModel).filter(VoiceModel.owner_id == user_id).all()
-    public_voices = db.query(VoiceModel).filter(VoiceModel.is_public == True).all()
-    
-    # Объединяем списки, избегая дубликатов
-    all_voices_dict = {v.id: v for v in user_voices}
-    for v in public_voices:
-        if v.id not in all_voices_dict:
-            all_voices_dict[v.id] = v
+    # Возвращаем только голоса пользователя (не глобальные)
+    user_voices = db.query(VoiceModel).filter(
+        VoiceModel.owner_id == user_id,
+        VoiceModel.voice_type == "user"
+    ).all()
     
     # Обновляем created_at для старых записей, где он None
-    for voice in all_voices_dict.values():
+    for voice in user_voices:
         if voice.created_at is None:
             voice.created_at = dt.datetime.utcnow()
     
     db.commit()
-    return list(all_voices_dict.values())
+    return user_voices
+
+@app.get("/api/voices/global", response_model=List[VoiceSchema])
+def get_global_voices(db: Session = Depends(get_db)):
+    # Возвращаем только глобальные голоса
+    global_voices = db.query(VoiceModel).filter(
+        VoiceModel.voice_type == "global"
+    ).all()
+    
+    # Обновляем created_at для старых записей, где он None
+    for voice in global_voices:
+        if voice.created_at is None:
+            voice.created_at = dt.datetime.utcnow()
+    
+    db.commit()
+    return global_voices
 
 
 @app.post("/api/user/voices/upload", response_model=VoiceSchema)
@@ -544,8 +556,8 @@ async def upload_user_voice(
         shutil.copy2(temp_path, str(file_path))
         os.unlink(temp_path)
 
-        # Автоматическая транскрипция
-        reference_text = transcribe_audio_file(str(file_path))
+        # Используем фиксированный референсный текст
+        reference_text = "Создавая уникальные цифровые объекты, вы размышляете о том насколько интересны ваши идеи миру, но задумываетель ли вы, как защитить права на свои произведения."
 
         new_voice = VoiceModel(
             name=voice_name,
@@ -600,12 +612,17 @@ def update_voice_settings(
     if not voice:
         raise HTTPException(status_code=404, detail="Voice not found")
     
-    # Обновляем только cfg_strength (единственный настраиваемый параметр)
+    # Обновляем настройки голоса
     if settings.cfg_strength is not None:
         voice.cfg_strength = settings.cfg_strength
         logger.info(f"Voice settings updated for {voice.name}: cfg_strength={voice.cfg_strength}")
-    else:
-        logger.warning(f"No cfg_strength provided for voice {voice.name}")
+    
+    if settings.reference_text is not None:
+        voice.reference_text = settings.reference_text
+        logger.info(f"Voice reference text updated for {voice.name}: '{settings.reference_text[:50]}...'")
+    
+    if settings.cfg_strength is None and settings.reference_text is None:
+        logger.warning(f"No settings provided for voice {voice.name}")
     
     db.commit()
     db.refresh(voice)
@@ -627,17 +644,112 @@ def update_user_voice_settings(
     if not voice:
         raise HTTPException(status_code=404, detail="Voice not found")
     
-    # Обновляем только cfg_strength (единственный настраиваемый параметр)
+    # Обновляем настройки голоса
     if settings.cfg_strength is not None:
         voice.cfg_strength = settings.cfg_strength
         logger.info(f"User voice settings updated for {voice.name}: cfg_strength={voice.cfg_strength}")
-    else:
-        logger.warning(f"No cfg_strength provided for user voice {voice.name}")
+    
+    if settings.reference_text is not None:
+        voice.reference_text = settings.reference_text
+        logger.info(f"User voice reference text updated for {voice.name}: '{settings.reference_text[:50]}...'")
+    
+    if settings.cfg_strength is None and settings.reference_text is None:
+        logger.warning(f"No settings provided for user voice {voice.name}")
     
     db.commit()
     db.refresh(voice)
     
     return voice
+
+@app.post("/api/admin/voices/{voice_id}/transcribe")
+def transcribe_voice_audio(voice_id: int, db: Session = Depends(get_db)):
+    """Автоматически транскрибировать аудиофайл голоса"""
+    voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
+    if not voice:
+        raise HTTPException(status_code=404, detail="Voice not found")
+    
+    try:
+        # Транскрибируем аудиофайл
+        reference_text = transcribe_audio_file(voice.file_path)
+        
+        # Обновляем reference_text в БД
+        voice.reference_text = reference_text
+        db.commit()
+        db.refresh(voice)
+        
+        logger.info(f"Voice {voice.name} transcribed successfully: '{reference_text[:50]}...'")
+        return {"message": "Transcription completed", "reference_text": reference_text}
+    except Exception as e:
+        logger.error(f"Error transcribing voice {voice.name}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to transcribe audio: {str(e)}")
+
+@app.post("/api/user/voices/{voice_id}/transcribe")
+def transcribe_user_voice_audio(voice_id: int, user_id: str, db: Session = Depends(get_db)):
+    """Автоматически транскрибировать аудиофайл пользовательского голоса"""
+    voice = db.query(VoiceModel).filter(
+        VoiceModel.id == voice_id,
+        VoiceModel.owner_id == user_id
+    ).first()
+    if not voice:
+        raise HTTPException(status_code=404, detail="Voice not found")
+    
+    try:
+        # Транскрибируем аудиофайл
+        reference_text = transcribe_audio_file(voice.file_path)
+        
+        # Обновляем reference_text в БД
+        voice.reference_text = reference_text
+        db.commit()
+        db.refresh(voice)
+        
+        logger.info(f"User voice {voice.name} transcribed successfully: '{reference_text[:50]}...'")
+        return {"message": "Transcription completed", "reference_text": reference_text}
+    except Exception as e:
+        logger.error(f"Error transcribing user voice {voice.name}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to transcribe audio: {str(e)}")
+
+@app.put("/api/admin/voices/{voice_id}/rename")
+def rename_voice(voice_id: int, new_name: str = Form(...), db: Session = Depends(get_db)):
+    """Переименовать голос (только админ)"""
+    voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
+    if not voice:
+        raise HTTPException(status_code=404, detail="Voice not found")
+    
+    # Проверяем, что новое имя не занято
+    existing_voice = db.query(VoiceModel).filter(VoiceModel.name == new_name).first()
+    if existing_voice and existing_voice.id != voice_id:
+        raise HTTPException(status_code=400, detail="Voice name already exists")
+    
+    old_name = voice.name
+    voice.name = new_name
+    db.commit()
+    db.refresh(voice)
+    
+    logger.info(f"Voice renamed: '{old_name}' -> '{new_name}'")
+    return {"message": "Voice renamed successfully", "new_name": new_name}
+
+@app.put("/api/user/voices/{voice_id}/rename")
+def rename_user_voice(voice_id: int, user_id: str, new_name: str = Form(...), db: Session = Depends(get_db)):
+    """Переименовать пользовательский голос"""
+    voice = db.query(VoiceModel).filter(
+        VoiceModel.id == voice_id,
+        VoiceModel.owner_id == user_id
+    ).first()
+    if not voice:
+        raise HTTPException(status_code=404, detail="Voice not found")
+    
+    # Проверяем, что новое имя не занято
+    existing_voice = db.query(VoiceModel).filter(VoiceModel.name == new_name).first()
+    if existing_voice and existing_voice.id != voice_id:
+        raise HTTPException(status_code=400, detail="Voice name already exists")
+    
+    old_name = voice.name
+    voice.name = new_name
+    db.commit()
+    db.refresh(voice)
+    
+    logger.info(f"User voice renamed: '{old_name}' -> '{new_name}' (user: {user_id})")
+    return {"message": "Voice renamed successfully", "new_name": new_name}
 
 @app.post("/api/voices/test")
 async def test_user_voice(
@@ -645,15 +757,25 @@ async def test_user_voice(
     voice_name: str = Form(...),
     user_id: str = Form(...),
     test_text: str = Form("Ну так я гетеро, че мне пидоров бояться!"),  # Добавляем возможность ввода текста
+    cfg_strength: float = Form(None),  # Параметр для тестирования с текущим значением ползунка
     db: Session = Depends(get_db)
     # speed and pitch removed - F5-TTS uses dynamic settings based on text length
 ):
     if not tts_engine:
         raise HTTPException(status_code=500, detail="TTS engine is not initialized.")
 
+    # Ищем голос по имени и проверяем права доступа
     voice = db.query(VoiceModel).filter(VoiceModel.name == voice_name).first()
     if not voice:
         raise HTTPException(status_code=404, detail=f"Voice '{voice_name}' not found.")
+    
+    # Проверяем права доступа: пользователь может тестировать только свои голоса или глобальные
+    if voice.voice_type == "user" and voice.owner_id != user_id:
+        raise HTTPException(status_code=403, detail="You can only test your own voices.")
+    
+    # Глобальные голоса может тестировать любой пользователь
+    if voice.voice_type == "global":
+        logger.info(f"User {user_id} testing global voice '{voice_name}'")
 
     voice_path = Path(voice.file_path)
     if not voice_path.exists():
@@ -668,22 +790,25 @@ async def test_user_voice(
         if not test_text or test_text.strip() == "":
             test_text = "Ну так я гетеро, че мне пидоров бояться!"
         
+        # Определяем cfg_strength для теста
+        test_cfg_strength = cfg_strength if cfg_strength is not None else voice.cfg_strength
+        
         # Логируем настройки голоса для диагностики
         logger.info(f"🎛️ Voice settings for '{voice_name}':")
-        logger.info(f"  - cfg_strength: {voice.cfg_strength}")
+        logger.info(f"  - cfg_strength (тест): {test_cfg_strength} {'(из ползунка)' if cfg_strength is not None else '(из базы данных)'}")
         logger.info(f"  - cross_fade_duration: {voice.cross_fade_duration}")
         logger.info(f"  - silence_duration_ms: {voice.silence_duration_ms}")
         logger.info(f"  - sway_sampling_coef: {voice.sway_sampling_coef}")
         logger.info(f"  - target_rms, speed, nfe_step: определяются автоматически")
         
-        # Синтезируем речь с настройками из базы данных
+        # Синтезируем речь с настройками для теста
         # target_rms, speed и nfe_step передаем как None, чтобы TTS движок определил их автоматически
         synthesized_path = await asyncio.to_thread(
             tts_engine.synthesize_speech,
             text=test_text,
             ref_audio_path=str(voice_path),
             ref_text=voice.reference_text or "",
-            cfg_strength=voice.cfg_strength,
+            cfg_strength=test_cfg_strength,
             target_rms=None,  # Автоматическое определение
             speed=None,  # Автоматическое определение на основе длины текста
             nfe_step=None  # Автоматическое определение на основе длины текста

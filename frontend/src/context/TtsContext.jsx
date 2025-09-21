@@ -1,6 +1,6 @@
 // src/context/TtsContext.jsx
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getTtsHealth, getAdminVoices, enableTts, disableTts, getTtsStatus } from '../services/microservices';
+import { getTtsHealth, getGlobalVoices, enableTts, disableTts, getTtsStatus } from '../services/microservices';
 import { AuthContext } from './AuthContext';
 import { toast } from 'sonner';
 
@@ -46,7 +46,7 @@ export const TtsProvider = ({ children }) => {
     const loadVoices = useCallback(async () => {
         if (user && engineStatus.loaded) {
              try {
-                const response = await getAdminVoices();
+                const response = await getGlobalVoices();
                 setVoices(response.data);
             } catch (error) {
                 console.error("Failed to load voices:", error);

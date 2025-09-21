@@ -1,0 +1,326 @@
+2025-09-21 11:16:42,788 - INFO - [synthesize_speech:341] - === НАЧАЛО ГЕНЕРАЦИИ #1758435402788 ===
+2025-09-21 11:16:42,788 - INFO - [synthesize_speech:342] - Входные параметры:
+2025-09-21 11:16:42,788 - INFO - [synthesize_speech:343] -   - text: 'Это тест русского'
+2025-09-21 11:16:42,788 - INFO - [synthesize_speech:344] -   - ref_audio_path: 'C:\Users\rozen\AppData\Local\Temp\gradio\c6aab9f04162d89c144e522210522a478f5ea47307463983e04c0c24efbd7a67\speaker1.wav'
+2025-09-21 11:16:42,788 - INFO - [synthesize_speech:345] -   - ref_text: 'Создавая уникальные цифровые объекты, вы размышляете о том, насколько интересны вашей диемиру. Но задумывайте, слевой, как защитить права на свои произведения.'
+2025-09-21 11:16:42,788 - INFO - [synthesize_speech:346] -   - speed: None
+2025-09-21 11:16:42,788 - INFO - [synthesize_speech:347] -   - cross_fade_duration: 0.15
+2025-09-21 11:16:42,788 - INFO - [synthesize_speech:348] -   - silence_duration_ms: 100
+2025-09-21 11:16:42,788 - INFO - [synthesize_speech:349] -   - target_rms: 0.1
+2025-09-21 11:16:42,788 - INFO - [synthesize_speech:350] -   - sway_sampling_coef: -1
+2025-09-21 11:16:42,788 - INFO - [synthesize_speech:351] -   - cfg_strength: 2
+2025-09-21 11:16:42,788 - INFO - [synthesize_speech:352] -   - nfe_step: None
+2025-09-21 11:16:42,788 - INFO - [synthesize_speech:353] -   - fix_duration: None
+2025-09-21 11:16:42,788 - INFO - [synthesize_speech:354] -   - remove_silence: False
+2025-09-21 11:16:42,788 - INFO - [synthesize_speech:355] -   - seed: None
+2025-09-21 11:16:42,788 - INFO - [synthesize_speech:358] - ШАГ 1: Начинаем предобработку текста
+2025-09-21 11:16:42,788 - INFO - [preprocess_text_for_tts:257] - ПОДШАГ 1.1: Начальная очистка текста
+2025-09-21 11:16:42,788 - INFO - [preprocess_text_for_tts:259] - Исходный текст: 'Это тест русского'
+2025-09-21 11:16:42,788 - INFO - [preprocess_text_for_tts:267] - ПОДШАГ 1.2: Проверка на символы
+2025-09-21 11:16:42,788 - INFO - [preprocess_text_for_tts:272] - Текст содержит буквы/цифры - продолжаем обработку
+2025-09-21 11:16:42,788 - INFO - [preprocess_text_for_tts:275] - ПОДШАГ 1.3: Удаление длинных последовательностей символов
+2025-09-21 11:16:42,788 - INFO - [preprocess_text_for_tts:277] - После удаления длинных последовательностей: 'Это тест русского'
+2025-09-21 11:16:42,788 - INFO - [preprocess_text_for_tts:284] - ПОДШАГ 1.4: Определение языка
+2025-09-21 11:16:42,791 - INFO - [preprocess_text_for_tts:286] - Определенный язык: russian
+2025-09-21 11:16:42,791 - INFO - [preprocess_text_for_tts:290] - ПОДШАГ 1.5: Нормализация пробелов
+2025-09-21 11:16:42,791 - INFO - [preprocess_text_for_tts:292] - После нормализации пробелов: 'Это тест русского'
+2025-09-21 11:16:42,791 - INFO - [preprocess_text_for_tts:296] - ПОДШАГ 1.6: Применение ёфикации для русского текста
+2025-09-21 11:16:42,791 - INFO - [preprocess_text_for_tts:299] - После ёфикации: 'Это тест русского'
+2025-09-21 11:16:42,791 - INFO - [preprocess_text_for_tts:307] - ПОДШАГ 1.7: Добавление ударений для русского текста
+2025-09-21 11:16:42,791 - INFO - [add_accents:224] - ПОДШАГ 1.7.1: Проверка доступности RUAccent
+2025-09-21 11:16:42,791 - INFO - [add_accents:229] - Исходный текст для добавления ударений: 'Это тест русского'
+2025-09-21 11:16:42,791 - INFO - [add_accents:233] - ПОДШАГ 1.7.2: Поиск доступного метода RUAccent
+2025-09-21 11:16:42,791 - INFO - [add_accents:235] - Используем метод process_all
+2025-09-21 11:16:42,801 - INFO - [add_accents:246] - Ударения добавлены успешно
+2025-09-21 11:16:42,801 - INFO - [add_accents:247] - Результат: 'Это тест русского...' -> '+Это т+ест р+усского...'
+2025-09-21 11:16:42,801 - INFO - [preprocess_text_for_tts:309] - После добавления ударений: '+Это т+ест р+усского'
+2025-09-21 11:16:42,802 - INFO - [preprocess_text_for_tts:314] - ПОДШАГ 1.8: Обработка окончаний
+2025-09-21 11:16:42,802 - INFO - [preprocess_text_for_tts:322] - Добавлена точка в конце предложения
+2025-09-21 11:16:42,802 - INFO - [preprocess_text_for_tts:326] - Финальный обработанный текст: '+Это т+ест р+усского.'
+2025-09-21 11:16:42,802 - INFO - [synthesize_speech:366] - ШАГ 2: Определение языка
+2025-09-21 11:16:42,802 - INFO - [synthesize_speech:368] - Определенный язык: russian
+2025-09-21 11:16:42,802 - INFO - [synthesize_speech:371] - ШАГ 3: Определение параметров синтеза
+2025-09-21 11:16:42,802 - INFO - [synthesize_speech:374] - Длина обработанного текста (без пробелов): 19
+2025-09-21 11:16:42,802 - INFO - [synthesize_speech:387] - Скорость: 0.8 (быстро) - длина 19-35 символов
+2025-09-21 11:16:42,802 - INFO - [synthesize_speech:407] - NFE steps: 26 (стандартное количество шагов для текста <= 120 символов)
+2025-09-21 11:16:42,802 - INFO - [synthesize_speech:414] - ШАГ 4: Выбор модели TTS
+2025-09-21 11:16:42,802 - INFO - [synthesize_speech:419] - Выбрана модель: Russian
+2025-09-21 11:16:42,802 - INFO - [synthesize_speech:420] - Модель ID: Misha24-10/F5-TTS_RUSSIAN
+2025-09-21 11:16:42,802 - INFO - [synthesize_speech:421] - Checkpoint: F5TTS_v1_Base_v2/model_last_inference.safetensors
+2025-09-21 11:16:42,802 - INFO - [synthesize_speech:422] - Vocab файл: F5TTS_v1_Base/vocab.txt
+2025-09-21 11:16:42,802 - INFO - [synthesize_speech:423] - Устройство: cuda
+2025-09-21 11:16:42,802 - INFO - [synthesize_speech:424] - ODE метод: euler
+2025-09-21 11:16:42,802 - INFO - [synthesize_speech:425] - Использование EMA: True
+2025-09-21 11:16:42,802 - INFO - [synthesize_speech:434] - Информация о загруженной модели:
+2025-09-21 11:16:42,802 - INFO - [synthesize_speech:435] -   - Тип модели: F5TTS_v1_Base
+2025-09-21 11:16:42,802 - INFO - [synthesize_speech:436] -   - Поддерживаемые языки: русский, английский
+2025-09-21 11:16:42,803 - INFO - [synthesize_speech:437] -   - Частота дискретизации: 24 кГц
+2025-09-21 11:16:42,803 - INFO - [synthesize_speech:438] -   - Формат аудио: WAV
+2025-09-21 11:16:42,803 - INFO - [synthesize_speech:439] -   - Поддержка ударений: Да
+2025-09-21 11:16:42,803 - INFO - [synthesize_speech:441] -   - Модель ударений: RUAccent (turbo)
+2025-09-21 11:16:42,803 - INFO - [synthesize_speech:445] - Текст референсного аудио: 'Создавая уникальные цифровые объекты, вы размышляете о том, насколько интересны вашей диемиру. Но задумывайте, слевой, как защитить права на свои произведения.'
+2025-09-21 11:16:42,803 - INFO - [synthesize_speech:447] - ШАГ 5: Подготовка к синтезу
+2025-09-21 11:16:42,803 - INFO - [synthesize_speech:448] - Обработанный текст для синтеза: '+Это т+ест р+усского.'
+2025-09-21 11:16:42,803 - INFO - [synthesize_speech:449] - Референсное аудио: 'C:\Users\rozen\AppData\Local\Temp\gradio\c6aab9f04162d89c144e522210522a478f5ea47307463983e04c0c24efbd7a67\speaker1.wav'
+2025-09-21 11:16:42,803 - INFO - [synthesize_speech:450] - Финальные параметры синтеза:
+2025-09-21 11:16:42,803 - INFO - [synthesize_speech:451] -   - cross_fade_duration: 0.15
+2025-09-21 11:16:42,803 - INFO - [synthesize_speech:452] -   - speed: 0.8
+2025-09-21 11:16:42,803 - INFO - [synthesize_speech:453] -   - silence_duration_ms: 100
+2025-09-21 11:16:42,803 - INFO - [synthesize_speech:454] -   - target_rms: 0.1
+2025-09-21 11:16:42,803 - INFO - [synthesize_speech:455] -   - sway_sampling_coef: -1
+2025-09-21 11:16:42,803 - INFO - [synthesize_speech:456] -   - cfg_strength: 2
+2025-09-21 11:16:42,803 - INFO - [synthesize_speech:457] -   - nfe_step: 26
+2025-09-21 11:16:42,803 - INFO - [synthesize_speech:458] -   - remove_silence: False
+2025-09-21 11:16:42,803 - INFO - [synthesize_speech:470] - ШАГ 6: Подготовка выходного файла
+2025-09-21 11:16:42,805 - INFO - [synthesize_speech:473] - Выходная директория: audio_output
+2025-09-21 11:16:42,805 - INFO - [synthesize_speech:479] - Имя выходного файла: russian_russian_1758435402805.wav
+2025-09-21 11:16:42,805 - INFO - [synthesize_speech:480] - Полный путь: audio_output\russian_russian_1758435402805.wav
+2025-09-21 11:16:42,805 - INFO - [synthesize_speech:483] - ШАГ 7: Подготовка параметров для F5-TTS
+2025-09-21 11:16:42,805 - INFO - [synthesize_speech:505] - Финальные параметры для F5-TTS:
+2025-09-21 11:16:42,805 - INFO - [synthesize_speech:507] -   - ref_file: C:\Users\rozen\AppData\Local\Temp\gradio\c6aab9f04162d89c144e522210522a478f5ea47307463983e04c0c24efbd7a67\speaker1.wav
+2025-09-21 11:16:42,805 - INFO - [synthesize_speech:507] -   - ref_text: Создавая уникальные цифровые объекты, вы размышляете о том, насколько интересны вашей диемиру. Но задумывайте, слевой, как защитить права на свои произведения.
+2025-09-21 11:16:42,805 - INFO - [synthesize_speech:507] -   - gen_text: +Это т+ест р+усского.
+2025-09-21 11:16:42,805 - INFO - [synthesize_speech:507] -   - cross_fade_duration: 0.15
+2025-09-21 11:16:42,805 - INFO - [synthesize_speech:507] -   - speed: 0.8
+2025-09-21 11:16:42,805 - INFO - [synthesize_speech:507] -   - target_rms: 0.1
+2025-09-21 11:16:42,805 - INFO - [synthesize_speech:507] -   - sway_sampling_coef: -1
+2025-09-21 11:16:42,805 - INFO - [synthesize_speech:507] -   - cfg_strength: 2
+2025-09-21 11:16:42,805 - INFO - [synthesize_speech:507] -   - nfe_step: 26
+2025-09-21 11:16:42,805 - INFO - [synthesize_speech:507] -   - remove_silence: False
+2025-09-21 11:16:42,805 - INFO - [synthesize_speech:513] - ШАГ 8: Начинаем синтез аудио с помощью F5-TTS
+2025-09-21 11:16:42,805 - INFO - [synthesize_speech:514] - Вызываем tts_model.infer()...
+2025-09-21 11:16:45,453 - INFO - [synthesize_speech:518] - Синтез завершен за 2.65 секунд
+2025-09-21 11:16:45,453 - INFO - [synthesize_speech:519] - Размер аудио: 33280 сэмплов, частота дискретизации: 24000 Гц
+2025-09-21 11:16:45,453 - INFO - [synthesize_speech:522] - ШАГ 9: Постобработка аудио
+2025-09-21 11:16:45,453 - INFO - [synthesize_speech:527] - Добавляем тишину в конец: 800ms (19200 сэмплов)
+2025-09-21 11:16:45,453 - INFO - [synthesize_speech:530] - Размер аудио после добавления тишины: 52480 сэмплов
+2025-09-21 11:16:45,453 - INFO - [synthesize_speech:534] - Добавляем fade-out: 300ms (7200 сэмплов)
+2025-09-21 11:16:45,453 - INFO - [synthesize_speech:539] - Fade-out применен успешно
+2025-09-21 11:16:45,453 - INFO - [synthesize_speech:547] - Добавлена дополнительная тишина: 100ms (2400 сэмплов)
+2025-09-21 11:16:45,453 - INFO - [synthesize_speech:548] - Финальный размер аудио: 54880 сэмплов
+2025-09-21 11:16:45,453 - INFO - [synthesize_speech:551] - ШАГ 10: Сохранение аудио файла
+2025-09-21 11:16:45,453 - INFO - [synthesize_speech:552] - Сохраняем в файл: audio_output\russian_russian_1758435402805.wav
+2025-09-21 11:16:45,455 - INFO - [synthesize_speech:556] - Файл сохранен за 0.00 секунд
+2025-09-21 11:16:45,455 - INFO - [synthesize_speech:560] - Размер файла: 109804 байт (107.2 KB)
+2025-09-21 11:16:45,455 - INFO - [synthesize_speech:564] - Длительность аудио: 2.29 секунд
+2025-09-21 11:16:45,455 - INFO - [synthesize_speech:570] - === ЗАВЕРШЕНИЕ ГЕНЕРАЦИИ #1758435402788 ===
+2025-09-21 11:16:45,455 - INFO - [synthesize_speech:571] - Общее время генерации: 2.67 секунд
+2025-09-21 11:16:45,455 - INFO - [synthesize_speech:572] - Время синтеза: 2.65 секунд
+2025-09-21 11:16:45,455 - INFO - [synthesize_speech:573] - Время сохранения: 0.00 секунд
+2025-09-21 11:16:45,455 - INFO - [synthesize_speech:574] - Результат: УСПЕШНО
+2025-09-21 11:16:45,455 - INFO - [synthesize_speech:575] - Выходной файл: audio_output\russian_russian_1758435402805.wav
+2025-09-21 11:16:45,455 - INFO - [synthesize_speech:576] - ==================================================
+2025-09-21 11:17:54,632 - INFO - [synthesize_speech:341] - === НАЧАЛО ГЕНЕРАЦИИ #1758435474632 ===
+2025-09-21 11:17:54,632 - INFO - [synthesize_speech:342] - Входные параметры:
+2025-09-21 11:17:54,632 - INFO - [synthesize_speech:343] -   - text: 'This english test'
+2025-09-21 11:17:54,632 - INFO - [synthesize_speech:344] -   - ref_audio_path: 'C:\Users\rozen\AppData\Local\Temp\gradio\c6aab9f04162d89c144e522210522a478f5ea47307463983e04c0c24efbd7a67\speaker1.wav'
+2025-09-21 11:17:54,632 - INFO - [synthesize_speech:345] -   - ref_text: 'Создавая уникальные цифровые объекты, вы размышляете о том, насколько интересны вашей диемиру. Но задумывайте, слевой, как защитить права на свои произведения.'
+2025-09-21 11:17:54,632 - INFO - [synthesize_speech:346] -   - speed: None
+2025-09-21 11:17:54,632 - INFO - [synthesize_speech:347] -   - cross_fade_duration: 0.15
+2025-09-21 11:17:54,632 - INFO - [synthesize_speech:348] -   - silence_duration_ms: 100
+2025-09-21 11:17:54,632 - INFO - [synthesize_speech:349] -   - target_rms: 0.1
+2025-09-21 11:17:54,632 - INFO - [synthesize_speech:350] -   - sway_sampling_coef: -1
+2025-09-21 11:17:54,632 - INFO - [synthesize_speech:351] -   - cfg_strength: 2
+2025-09-21 11:17:54,632 - INFO - [synthesize_speech:352] -   - nfe_step: None
+2025-09-21 11:17:54,632 - INFO - [synthesize_speech:353] -   - fix_duration: None
+2025-09-21 11:17:54,632 - INFO - [synthesize_speech:354] -   - remove_silence: False
+2025-09-21 11:17:54,632 - INFO - [synthesize_speech:355] -   - seed: None
+2025-09-21 11:17:54,632 - INFO - [synthesize_speech:358] - ШАГ 1: Начинаем предобработку текста
+2025-09-21 11:17:54,632 - INFO - [preprocess_text_for_tts:257] - ПОДШАГ 1.1: Начальная очистка текста
+2025-09-21 11:17:54,632 - INFO - [preprocess_text_for_tts:259] - Исходный текст: 'This english test'
+2025-09-21 11:17:54,632 - INFO - [preprocess_text_for_tts:267] - ПОДШАГ 1.2: Проверка на символы
+2025-09-21 11:17:54,632 - INFO - [preprocess_text_for_tts:272] - Текст содержит буквы/цифры - продолжаем обработку
+2025-09-21 11:17:54,635 - INFO - [preprocess_text_for_tts:275] - ПОДШАГ 1.3: Удаление длинных последовательностей символов
+2025-09-21 11:17:54,635 - INFO - [preprocess_text_for_tts:277] - После удаления длинных последовательностей: 'This english test'
+2025-09-21 11:17:54,635 - INFO - [preprocess_text_for_tts:284] - ПОДШАГ 1.4: Определение языка
+2025-09-21 11:17:54,635 - INFO - [preprocess_text_for_tts:286] - Определенный язык: english
+2025-09-21 11:17:54,635 - INFO - [preprocess_text_for_tts:290] - ПОДШАГ 1.5: Нормализация пробелов
+2025-09-21 11:17:54,635 - INFO - [preprocess_text_for_tts:292] - После нормализации пробелов: 'This english test'
+2025-09-21 11:17:54,635 - INFO - [preprocess_text_for_tts:311] - Пропускаем добавление ударений (не русский язык или отключено)
+2025-09-21 11:17:54,635 - INFO - [preprocess_text_for_tts:314] - ПОДШАГ 1.8: Обработка окончаний
+2025-09-21 11:17:54,635 - INFO - [preprocess_text_for_tts:322] - Добавлена точка в конце предложения
+2025-09-21 11:17:54,635 - INFO - [preprocess_text_for_tts:326] - Финальный обработанный текст: 'This english test.'
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:366] - ШАГ 2: Определение языка
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:368] - Определенный язык: english
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:371] - ШАГ 3: Определение параметров синтеза
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:374] - Длина обработанного текста (без пробелов): 16
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:384] - Скорость: 0.6 (нормально) - длина 9-18 символов
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:407] - NFE steps: 26 (стандартное количество шагов для текста <= 120 символов)
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:414] - ШАГ 4: Выбор модели TTS
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:419] - Выбрана модель: Russian
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:420] - Модель ID: Misha24-10/F5-TTS_RUSSIAN
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:421] - Checkpoint: F5TTS_v1_Base_v2/model_last_inference.safetensors
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:422] - Vocab файл: F5TTS_v1_Base/vocab.txt
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:423] - Устройство: cuda
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:424] - ODE метод: euler
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:425] - Использование EMA: True
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:434] - Информация о загруженной модели:
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:435] -   - Тип модели: F5TTS_v1_Base
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:436] -   - Поддерживаемые языки: русский, английский
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:437] -   - Частота дискретизации: 24 кГц
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:438] -   - Формат аудио: WAV
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:439] -   - Поддержка ударений: Да
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:441] -   - Модель ударений: RUAccent (turbo)
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:445] - Текст референсного аудио: 'Создавая уникальные цифровые объекты, вы размышляете о том, насколько интересны вашей диемиру. Но задумывайте, слевой, как защитить права на свои произведения.'
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:447] - ШАГ 5: Подготовка к синтезу
+2025-09-21 11:17:54,635 - INFO - [synthesize_speech:448] - Обработанный текст для синтеза: 'This english test.'
+2025-09-21 11:17:54,637 - INFO - [synthesize_speech:449] - Референсное аудио: 'C:\Users\rozen\AppData\Local\Temp\gradio\c6aab9f04162d89c144e522210522a478f5ea47307463983e04c0c24efbd7a67\speaker1.wav'
+2025-09-21 11:17:54,637 - INFO - [synthesize_speech:450] - Финальные параметры синтеза:
+2025-09-21 11:17:54,637 - INFO - [synthesize_speech:451] -   - cross_fade_duration: 0.15
+2025-09-21 11:17:54,637 - INFO - [synthesize_speech:452] -   - speed: 0.6
+2025-09-21 11:17:54,637 - INFO - [synthesize_speech:453] -   - silence_duration_ms: 100
+2025-09-21 11:17:54,637 - INFO - [synthesize_speech:454] -   - target_rms: 0.1
+2025-09-21 11:17:54,637 - INFO - [synthesize_speech:455] -   - sway_sampling_coef: -1
+2025-09-21 11:17:54,637 - INFO - [synthesize_speech:456] -   - cfg_strength: 2
+2025-09-21 11:17:54,637 - INFO - [synthesize_speech:457] -   - nfe_step: 26
+2025-09-21 11:17:54,637 - INFO - [synthesize_speech:458] -   - remove_silence: False
+2025-09-21 11:17:54,637 - INFO - [synthesize_speech:470] - ШАГ 6: Подготовка выходного файла
+2025-09-21 11:17:54,637 - INFO - [synthesize_speech:473] - Выходная директория: audio_output
+2025-09-21 11:17:54,638 - INFO - [synthesize_speech:479] - Имя выходного файла: russian_english_1758435474638.wav
+2025-09-21 11:17:54,638 - INFO - [synthesize_speech:480] - Полный путь: audio_output\russian_english_1758435474638.wav
+2025-09-21 11:17:54,638 - INFO - [synthesize_speech:483] - ШАГ 7: Подготовка параметров для F5-TTS
+2025-09-21 11:17:54,638 - INFO - [synthesize_speech:505] - Финальные параметры для F5-TTS:
+2025-09-21 11:17:54,638 - INFO - [synthesize_speech:507] -   - ref_file: C:\Users\rozen\AppData\Local\Temp\gradio\c6aab9f04162d89c144e522210522a478f5ea47307463983e04c0c24efbd7a67\speaker1.wav
+2025-09-21 11:17:54,638 - INFO - [synthesize_speech:507] -   - ref_text: Создавая уникальные цифровые объекты, вы размышляете о том, насколько интересны вашей диемиру. Но задумывайте, слевой, как защитить права на свои произведения.
+2025-09-21 11:17:54,638 - INFO - [synthesize_speech:507] -   - gen_text: This english test.
+2025-09-21 11:17:54,638 - INFO - [synthesize_speech:507] -   - cross_fade_duration: 0.15
+2025-09-21 11:17:54,638 - INFO - [synthesize_speech:507] -   - speed: 0.6
+2025-09-21 11:17:54,638 - INFO - [synthesize_speech:507] -   - target_rms: 0.1
+2025-09-21 11:17:54,638 - INFO - [synthesize_speech:507] -   - sway_sampling_coef: -1
+2025-09-21 11:17:54,638 - INFO - [synthesize_speech:507] -   - cfg_strength: 2
+2025-09-21 11:17:54,638 - INFO - [synthesize_speech:507] -   - nfe_step: 26
+2025-09-21 11:17:54,638 - INFO - [synthesize_speech:507] -   - remove_silence: False
+2025-09-21 11:17:54,638 - INFO - [synthesize_speech:513] - ШАГ 8: Начинаем синтез аудио с помощью F5-TTS
+2025-09-21 11:17:54,638 - INFO - [synthesize_speech:514] - Вызываем tts_model.infer()...
+2025-09-21 11:17:56,005 - INFO - [synthesize_speech:518] - Синтез завершен за 1.37 секунд
+2025-09-21 11:17:56,005 - INFO - [synthesize_speech:519] - Размер аудио: 22016 сэмплов, частота дискретизации: 24000 Гц
+2025-09-21 11:17:56,005 - INFO - [synthesize_speech:522] - ШАГ 9: Постобработка аудио
+2025-09-21 11:17:56,005 - INFO - [synthesize_speech:527] - Добавляем тишину в конец: 800ms (19200 сэмплов)
+2025-09-21 11:17:56,005 - INFO - [synthesize_speech:530] - Размер аудио после добавления тишины: 41216 сэмплов
+2025-09-21 11:17:56,005 - INFO - [synthesize_speech:534] - Добавляем fade-out: 300ms (7200 сэмплов)
+2025-09-21 11:17:56,005 - INFO - [synthesize_speech:539] - Fade-out применен успешно
+2025-09-21 11:17:56,005 - INFO - [synthesize_speech:547] - Добавлена дополнительная тишина: 100ms (2400 сэмплов)
+2025-09-21 11:17:56,005 - INFO - [synthesize_speech:548] - Финальный размер аудио: 43616 сэмплов
+2025-09-21 11:17:56,005 - INFO - [synthesize_speech:551] - ШАГ 10: Сохранение аудио файла
+2025-09-21 11:17:56,005 - INFO - [synthesize_speech:552] - Сохраняем в файл: audio_output\russian_english_1758435474638.wav
+2025-09-21 11:17:56,007 - INFO - [synthesize_speech:556] - Файл сохранен за 0.00 секунд
+2025-09-21 11:17:56,008 - INFO - [synthesize_speech:560] - Размер файла: 87276 байт (85.2 KB)
+2025-09-21 11:17:56,008 - INFO - [synthesize_speech:564] - Длительность аудио: 1.82 секунд
+2025-09-21 11:17:56,008 - INFO - [synthesize_speech:570] - === ЗАВЕРШЕНИЕ ГЕНЕРАЦИИ #1758435474632 ===
+2025-09-21 11:17:56,008 - INFO - [synthesize_speech:571] - Общее время генерации: 1.38 секунд
+2025-09-21 11:17:56,008 - INFO - [synthesize_speech:572] - Время синтеза: 1.37 секунд
+2025-09-21 11:17:56,008 - INFO - [synthesize_speech:573] - Время сохранения: 0.00 секунд
+2025-09-21 11:17:56,008 - INFO - [synthesize_speech:574] - Результат: УСПЕШНО
+2025-09-21 11:17:56,008 - INFO - [synthesize_speech:575] - Выходной файл: audio_output\russian_english_1758435474638.wav
+2025-09-21 11:17:56,008 - INFO - [synthesize_speech:576] - ==================================================
+2025-09-21 11:20:18,236 - INFO - [synthesize_speech:341] - === НАЧАЛО ГЕНЕРАЦИИ #1758435618236 ===
+2025-09-21 11:20:18,236 - INFO - [synthesize_speech:342] - Входные параметры:
+2025-09-21 11:20:18,236 - INFO - [synthesize_speech:343] -   - text: 'Testing мультиязычный engine проверка голоса'
+2025-09-21 11:20:18,236 - INFO - [synthesize_speech:344] -   - ref_audio_path: 'C:\Users\rozen\AppData\Local\Temp\gradio\c6aab9f04162d89c144e522210522a478f5ea47307463983e04c0c24efbd7a67\speaker1.wav'
+2025-09-21 11:20:18,236 - INFO - [synthesize_speech:345] -   - ref_text: 'Создавая уникальные цифровые объекты, вы размышляете о том, насколько интересны вашей диемиру. Но задумывайте, слевой, как защитить права на свои произведения.'
+2025-09-21 11:20:18,236 - INFO - [synthesize_speech:346] -   - speed: 1
+2025-09-21 11:20:18,236 - INFO - [synthesize_speech:347] -   - cross_fade_duration: 0.15
+2025-09-21 11:20:18,236 - INFO - [synthesize_speech:348] -   - silence_duration_ms: 100
+2025-09-21 11:20:18,236 - INFO - [synthesize_speech:349] -   - target_rms: 0.1
+2025-09-21 11:20:18,236 - INFO - [synthesize_speech:350] -   - sway_sampling_coef: -1
+2025-09-21 11:20:18,236 - INFO - [synthesize_speech:351] -   - cfg_strength: 2
+2025-09-21 11:20:18,236 - INFO - [synthesize_speech:352] -   - nfe_step: None
+2025-09-21 11:20:18,236 - INFO - [synthesize_speech:353] -   - fix_duration: None
+2025-09-21 11:20:18,236 - INFO - [synthesize_speech:354] -   - remove_silence: False
+2025-09-21 11:20:18,236 - INFO - [synthesize_speech:355] -   - seed: None
+2025-09-21 11:20:18,236 - INFO - [synthesize_speech:358] - ШАГ 1: Начинаем предобработку текста
+2025-09-21 11:20:18,236 - INFO - [preprocess_text_for_tts:257] - ПОДШАГ 1.1: Начальная очистка текста
+2025-09-21 11:20:18,236 - INFO - [preprocess_text_for_tts:259] - Исходный текст: 'Testing мультиязычный engine проверка голоса'
+2025-09-21 11:20:18,236 - INFO - [preprocess_text_for_tts:267] - ПОДШАГ 1.2: Проверка на символы
+2025-09-21 11:20:18,236 - INFO - [preprocess_text_for_tts:272] - Текст содержит буквы/цифры - продолжаем обработку
+2025-09-21 11:20:18,236 - INFO - [preprocess_text_for_tts:275] - ПОДШАГ 1.3: Удаление длинных последовательностей символов
+2025-09-21 11:20:18,236 - INFO - [preprocess_text_for_tts:277] - После удаления длинных последовательностей: 'Testing мультиязычный engine проверка голоса'
+2025-09-21 11:20:18,236 - INFO - [preprocess_text_for_tts:284] - ПОДШАГ 1.4: Определение языка
+2025-09-21 11:20:18,236 - INFO - [preprocess_text_for_tts:286] - Определенный язык: russian
+2025-09-21 11:20:18,236 - INFO - [preprocess_text_for_tts:290] - ПОДШАГ 1.5: Нормализация пробелов
+2025-09-21 11:20:18,236 - INFO - [preprocess_text_for_tts:292] - После нормализации пробелов: 'Testing мультиязычный engine проверка голоса'
+2025-09-21 11:20:18,236 - INFO - [preprocess_text_for_tts:296] - ПОДШАГ 1.6: Применение ёфикации для русского текста
+2025-09-21 11:20:18,236 - INFO - [preprocess_text_for_tts:299] - После ёфикации: 'Testing мультиязычный engine провёрка голоса'
+2025-09-21 11:20:18,236 - INFO - [preprocess_text_for_tts:307] - ПОДШАГ 1.7: Добавление ударений для русского текста
+2025-09-21 11:20:18,236 - INFO - [add_accents:224] - ПОДШАГ 1.7.1: Проверка доступности RUAccent
+2025-09-21 11:20:18,236 - INFO - [add_accents:229] - Исходный текст для добавления ударений: 'Testing мультиязычный engine провёрка голоса'
+2025-09-21 11:20:18,236 - INFO - [add_accents:233] - ПОДШАГ 1.7.2: Поиск доступного метода RUAccent
+2025-09-21 11:20:18,236 - INFO - [add_accents:235] - Используем метод process_all
+2025-09-21 11:20:18,275 - INFO - [add_accents:246] - Ударения добавлены успешно
+2025-09-21 11:20:18,275 - INFO - [add_accents:247] - Результат: 'Testing мультиязычный engine провёрка голоса...' -> 'Testing мультияз+ычный engine провёрка г+олоса...'
+2025-09-21 11:20:18,275 - INFO - [preprocess_text_for_tts:309] - После добавления ударений: 'Testing мультияз+ычный engine провёрка г+олоса'
+2025-09-21 11:20:18,275 - INFO - [preprocess_text_for_tts:314] - ПОДШАГ 1.8: Обработка окончаний
+2025-09-21 11:20:18,275 - INFO - [preprocess_text_for_tts:322] - Добавлена точка в конце предложения
+2025-09-21 11:20:18,275 - INFO - [preprocess_text_for_tts:326] - Финальный обработанный текст: 'Testing мультияз+ычный engine провёрка г+олоса.'
+2025-09-21 11:20:18,275 - INFO - [synthesize_speech:366] - ШАГ 2: Определение языка
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:368] - Определенный язык: russian
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:371] - ШАГ 3: Определение параметров синтеза
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:397] - Используется заданная скорость: 1
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:407] - NFE steps: 26 (стандартное количество шагов для текста <= 120 символов)
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:414] - ШАГ 4: Выбор модели TTS
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:419] - Выбрана модель: Russian
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:420] - Модель ID: Misha24-10/F5-TTS_RUSSIAN
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:421] - Checkpoint: F5TTS_v1_Base_v2/model_last_inference.safetensors
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:422] - Vocab файл: F5TTS_v1_Base/vocab.txt
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:423] - Устройство: cuda
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:424] - ODE метод: euler
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:425] - Использование EMA: True
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:434] - Информация о загруженной модели:
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:435] -   - Тип модели: F5TTS_v1_Base
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:436] -   - Поддерживаемые языки: русский, английский
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:437] -   - Частота дискретизации: 24 кГц
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:438] -   - Формат аудио: WAV
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:439] -   - Поддержка ударений: Да
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:441] -   - Модель ударений: RUAccent (turbo)
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:445] - Текст референсного аудио: 'Создавая уникальные цифровые объекты, вы размышляете о том, насколько интересны вашей диемиру. Но задумывайте, слевой, как защитить права на свои произведения.'
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:447] - ШАГ 5: Подготовка к синтезу
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:448] - Обработанный текст для синтеза: 'Testing мультияз+ычный engine провёрка г+олоса.'
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:449] - Референсное аудио: 'C:\Users\rozen\AppData\Local\Temp\gradio\c6aab9f04162d89c144e522210522a478f5ea47307463983e04c0c24efbd7a67\speaker1.wav'
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:450] - Финальные параметры синтеза:
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:451] -   - cross_fade_duration: 0.15
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:452] -   - speed: 1
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:453] -   - silence_duration_ms: 100
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:454] -   - target_rms: 0.1
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:455] -   - sway_sampling_coef: -1
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:456] -   - cfg_strength: 2
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:457] -   - nfe_step: 26
+2025-09-21 11:20:18,276 - INFO - [synthesize_speech:458] -   - remove_silence: False
+2025-09-21 11:20:18,279 - INFO - [synthesize_speech:470] - ШАГ 6: Подготовка выходного файла
+2025-09-21 11:20:18,283 - INFO - [synthesize_speech:473] - Выходная директория: audio_output
+2025-09-21 11:20:18,283 - INFO - [synthesize_speech:479] - Имя выходного файла: russian_russian_1758435618283.wav
+2025-09-21 11:20:18,283 - INFO - [synthesize_speech:480] - Полный путь: audio_output\russian_russian_1758435618283.wav
+2025-09-21 11:20:18,283 - INFO - [synthesize_speech:483] - ШАГ 7: Подготовка параметров для F5-TTS
+2025-09-21 11:20:18,283 - INFO - [synthesize_speech:505] - Финальные параметры для F5-TTS:
+2025-09-21 11:20:18,283 - INFO - [synthesize_speech:507] -   - ref_file: C:\Users\rozen\AppData\Local\Temp\gradio\c6aab9f04162d89c144e522210522a478f5ea47307463983e04c0c24efbd7a67\speaker1.wav
+2025-09-21 11:20:18,283 - INFO - [synthesize_speech:507] -   - ref_text: Создавая уникальные цифровые объекты, вы размышляете о том, насколько интересны вашей диемиру. Но задумывайте, слевой, как защитить права на свои произведения.
+2025-09-21 11:20:18,283 - INFO - [synthesize_speech:507] -   - gen_text: Testing мультияз+ычный engine провёрка г+олоса.
+2025-09-21 11:20:18,283 - INFO - [synthesize_speech:507] -   - cross_fade_duration: 0.15
+2025-09-21 11:20:18,283 - INFO - [synthesize_speech:507] -   - speed: 1
+2025-09-21 11:20:18,283 - INFO - [synthesize_speech:507] -   - target_rms: 0.1
+2025-09-21 11:20:18,283 - INFO - [synthesize_speech:507] -   - sway_sampling_coef: -1
+2025-09-21 11:20:18,283 - INFO - [synthesize_speech:507] -   - cfg_strength: 2
+2025-09-21 11:20:18,283 - INFO - [synthesize_speech:507] -   - nfe_step: 26
+2025-09-21 11:20:18,283 - INFO - [synthesize_speech:507] -   - remove_silence: False
+2025-09-21 11:20:18,283 - INFO - [synthesize_speech:513] - ШАГ 8: Начинаем синтез аудио с помощью F5-TTS
+2025-09-21 11:20:18,283 - INFO - [synthesize_speech:514] - Вызываем tts_model.infer()...
+2025-09-21 11:20:19,681 - INFO - [synthesize_speech:518] - Синтез завершен за 1.40 секунд
+2025-09-21 11:20:19,681 - INFO - [synthesize_speech:519] - Размер аудио: 54784 сэмплов, частота дискретизации: 24000 Гц
+2025-09-21 11:20:19,681 - INFO - [synthesize_speech:522] - ШАГ 9: Постобработка аудио
+2025-09-21 11:20:19,681 - INFO - [synthesize_speech:527] - Добавляем тишину в конец: 800ms (19200 сэмплов)
+2025-09-21 11:20:19,681 - INFO - [synthesize_speech:530] - Размер аудио после добавления тишины: 73984 сэмплов
+2025-09-21 11:20:19,681 - INFO - [synthesize_speech:534] - Добавляем fade-out: 300ms (7200 сэмплов)
+2025-09-21 11:20:19,681 - INFO - [synthesize_speech:539] - Fade-out применен успешно
+2025-09-21 11:20:19,681 - INFO - [synthesize_speech:547] - Добавлена дополнительная тишина: 100ms (2400 сэмплов)
+2025-09-21 11:20:19,681 - INFO - [synthesize_speech:548] - Финальный размер аудио: 76384 сэмплов
+2025-09-21 11:20:19,681 - INFO - [synthesize_speech:551] - ШАГ 10: Сохранение аудио файла
+2025-09-21 11:20:19,681 - INFO - [synthesize_speech:552] - Сохраняем в файл: audio_output\russian_russian_1758435618283.wav
+2025-09-21 11:20:19,686 - INFO - [synthesize_speech:556] - Файл сохранен за 0.00 секунд
+2025-09-21 11:20:19,686 - INFO - [synthesize_speech:560] - Размер файла: 152812 байт (149.2 KB)
+2025-09-21 11:20:19,686 - INFO - [synthesize_speech:564] - Длительность аудио: 3.18 секунд
+2025-09-21 11:20:19,686 - INFO - [synthesize_speech:570] - === ЗАВЕРШЕНИЕ ГЕНЕРАЦИИ #1758435618236 ===
+2025-09-21 11:20:19,686 - INFO - [synthesize_speech:571] - Общее время генерации: 1.45 секунд
+2025-09-21 11:20:19,686 - INFO - [synthesize_speech:572] - Время синтеза: 1.40 секунд
+2025-09-21 11:20:19,686 - INFO - [synthesize_speech:573] - Время сохранения: 0.00 секунд
+2025-09-21 11:20:19,686 - INFO - [synthesize_speech:574] - Результат: УСПЕШНО
+2025-09-21 11:20:19,686 - INFO - [synthesize_speech:575] - Выходной файл: audio_output\russian_russian_1758435618283.wav
+2025-09-21 11:20:19,686 - INFO - [synthesize_speech:576] - ==================================================

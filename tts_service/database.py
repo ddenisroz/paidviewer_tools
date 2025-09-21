@@ -44,7 +44,7 @@ class Voice(Base):
     created_at = Column(DateTime(timezone=True), default=func.now())
     
     # Настройки генерации TTS (настраиваемые пользователем)
-    cfg_strength = Column(Float, default=2.5)  # CFG strength (2.0-5.0 рекомендуется) - ЕДИНСТВЕННЫЙ настраиваемый параметр
+    cfg_strength = Column(Float, default=2.0)  # CFG strength (2.0-5.0 рекомендуется) - ЕДИНСТВЕННЫЙ настраиваемый параметр
     
     # Автоматически определяемые системой параметры (НЕ хранятся в БД)
     # target_rms, speed, nfe_step - определяются динамически в коде
