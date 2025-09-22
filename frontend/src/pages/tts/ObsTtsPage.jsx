@@ -36,7 +36,8 @@ const ObsTtsPage = () => {
                     } else if (message.type === 'tts_error') {
                         console.error('TTS Error:', message.message);
                         // Показываем красивое уведомление об ошибке
-                        toast.error(message.message);
+                        // Для OBS страницы используем console.error вместо toast
+                        console.error(message.message);
                     }
                 } catch (error) {
                     console.error('Error processing WebSocket message:', error);

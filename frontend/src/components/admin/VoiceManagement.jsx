@@ -9,11 +9,14 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Upload, Trash2, Edit, Users, Globe, Settings, TestTube2, Mic, ChevronDown, ChevronRight } from 'lucide-react';
 import { Slider } from "@/components/ui/slider"
-import { toast } from 'sonner';
 import { getAdminVoices, uploadVoice, deleteVoice, updateVoiceSettings, transcribeVoice, testVoice, getUsers, renameVoice } from '../../services/unified-api';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
+import { useButtonPosition } from '../../hooks/useButtonPosition';
 
 const VoiceManagement = () => {
+    const { showNotification } = useNotification();
+    const { getButtonPosition } = useButtonPosition();
     const [voices, setVoices] = useState([]);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -42,16 +45,14 @@ const VoiceManagement = () => {
 
     // Функция для переключения раздела
     const toggleSection = (sectionType) => {
+        console.log('toggleSection called with:', sectionType);
+        console.log('Current expandedSections:', expandedSections);
         setExpandedSections(prev => {
             const newState = {
-                global: false,
-                user: false
+                ...prev,
+                [sectionType]: !prev[sectionType]
             };
-            // Если раздел был свернут, разворачиваем его
-            // Если был развернут, оставляем свернутым
-            if (!prev[sectionType]) {
-                newState[sectionType] = true;
-            }
+            console.log('New state will be:', newState);
             return newState;
         });
     };
@@ -64,7 +65,7 @@ const VoiceManagement = () => {
             const voicesData = Array.isArray(data) ? data : (data?.data || []);
             setVoices(voicesData);
         } catch (error) {
-            toast.error('Ошибка загрузки голосов');
+            showNotification('Ошибка загрузки голосов', 'error');
             console.error('Error loading voices:', error);
             setVoices([]); // Устанавливаем пустой массив в случае ошибки
         } finally {
@@ -97,9 +98,10 @@ const VoiceManagement = () => {
         }
     };
 
-    const handleUpload = async () => {
+    const handleUpload = async (event) => {
         if (!uploadFile || !voiceName.trim()) {
-            toast.error('Выберите файл и введите имя голоса');
+            const position = getButtonPosition(event);
+            showNotification('Выберите файл и введите имя голоса', 'error', 4000, position);
             return;
         }
 
@@ -114,20 +116,22 @@ const VoiceManagement = () => {
             
             await uploadVoice(formData);
             
-            toast.success(`Голос "${voiceName.trim()}" успешно загружен.`);
+            const position = getButtonPosition(event);
+            showNotification(`Голос "${voiceName.trim()}" успешно загружен.`, 'success', 4000, position);
             setUploadDialogOpen(false);
             setUploadFile(null);
             setVoiceName('');
             setOwnerId('');
             loadVoices();
         } catch (error) {
-            toast.error(error.message || 'Ошибка загрузки голоса');
+            const position = getButtonPosition(event);
+            showNotification(error.message || 'Ошибка загрузки голоса', 'error', 4000, position);
         } finally {
             setIsUploading(false);
         }
     };
 
-    const handleDelete = async (voiceId) => {
+    const handleDelete = async (voiceId, event) => {
         const voiceToDelete = voices.find(v => v.id === voiceId);
         if (!voiceToDelete || !window.confirm(`Вы уверены, что хотите удалить голос "${voiceToDelete.name}"?`)) {
             return;
@@ -135,10 +139,12 @@ const VoiceManagement = () => {
 
         try {
             await deleteVoice(voiceId);
-            toast.success(`Голос "${voiceToDelete.name}" удален.`);
+            const position = getButtonPosition(event);
+            showNotification(`Голос "${voiceToDelete.name}" удален.`, 'success', 4000, position);
             loadVoices();
         } catch (error) {
-            toast.error(error.message || 'Ошибка удаления голоса');
+            const position = getButtonPosition(event);
+            showNotification(error.message || 'Ошибка удаления голоса', 'error', 4000, position);
         }
     };
     
@@ -165,10 +171,10 @@ const VoiceManagement = () => {
                     : voice
             ));
             
-            toast.success('Транскрипция завершена успешно!');
+            showNotification('Транскрипция завершена успешно!', 'success');
         } catch (error) {
             console.error('Error transcribing voice:', error);
-            toast.error('Ошибка при транскрипции аудио');
+            showNotification('Ошибка при транскрипции аудио', 'error');
         } finally {
             setIsTranscribing(false);
         }
@@ -197,10 +203,10 @@ const VoiceManagement = () => {
             // Обновляем currentVoice
             setCurrentVoice(prev => ({...prev, name: newName.trim()}));
             
-            toast.success('Голос переименован успешно!');
+            showNotification('Голос переименован успешно!', 'success');
         } catch (error) {
             console.error('Error renaming voice:', error);
-            toast.error('Ошибка при переименовании голоса');
+            showNotification('Ошибка при переименовании голоса', 'error');
         }
     };
 
@@ -224,10 +230,10 @@ const VoiceManagement = () => {
             ));
             
             setEditDialogOpen(false);
-            toast.success('Настройки голоса сохранены!');
+            showNotification('Настройки голоса сохранены!', 'success');
         } catch (error) {
             console.error('Error updating voice settings:', error);
-            toast.error('Ошибка при сохранении настроек');
+            showNotification('Ошибка при сохранении настроек', 'error');
         }
     };
 
@@ -245,7 +251,7 @@ const VoiceManagement = () => {
             audioSource.start(0);
         }, (error) => {
             console.error('Error decoding audio data', error);
-            toast.error('Не удалось воспроизвести аудио');
+            showNotification('Не удалось воспроизвести аудио', 'error');
         });
     };
 
@@ -267,13 +273,13 @@ const VoiceManagement = () => {
                 const fullAudioUrl = `http://localhost:8001${audioUrl}`;
                 const audio = new Audio(fullAudioUrl);
                 audio.play().catch(() => {
-                    toast.error('Не удалось воспроизвести аудио');
+                    showNotification('Не удалось воспроизвести аудио', 'error');
                 });
             } else {
-                toast.error('Не удалось получить аудио для воспроизведения');
+                showNotification('Не удалось получить аудио для воспроизведения', 'error');
             }
         } catch (error) {
-            toast.error(error.message || 'Ошибка тестирования голоса');
+            showNotification(error.message || 'Ошибка тестирования голоса', 'error');
         }
     };
 
@@ -284,11 +290,11 @@ const VoiceManagement = () => {
                         cfg_strength: currentVoice.cfg_strength
                         // Только cfg_strength настраивается пользователем
                     });
-                    toast.success(`Настройки голоса "${currentVoice.name}" обновлены.`);
+                    showNotification(`Настройки голоса "${currentVoice.name}" обновлены.`, 'success');
                     setEditDialogOpen(false);
                     loadVoices();
                 } catch (error) {
-                    toast.error(error.message || 'Ошибка обновления настроек');
+                    showNotification(error.message || 'Ошибка обновления настроек', 'error');
                 }
             };
 
@@ -344,7 +350,7 @@ const VoiceManagement = () => {
                         </div>
                          <DialogFooter>
                              <Button onClick={() => setUploadDialogOpen(false)} variant="outline">Отмена</Button>
-                             <Button onClick={handleUpload} disabled={isUploading || !uploadFile || !voiceName.trim()}>
+                             <Button onClick={(e) => handleUpload(e)} disabled={isUploading || !uploadFile || !voiceName.trim()}>
                                  {isUploading ? 'Загрузка...' : 'Загрузить и транскрибировать'}
                              </Button>
                          </DialogFooter>
@@ -378,6 +384,9 @@ const VoiceManagement = () => {
                                                  <ChevronDown className="h-4 w-4 text-slate-400"/> : 
                                                  <ChevronRight className="h-4 w-4 text-slate-400"/>
                                              }
+                                             <span className="text-xs text-slate-500 ml-2">
+                                                 {expandedSections.global ? 'open' : 'closed'}
+                                             </span>
                                          </div>
                                          {expandedSections.global && (
                                              <div className="space-y-3">
@@ -407,7 +416,7 @@ const VoiceManagement = () => {
                                                                      Настройки
                                                                  </Button>
                                                                  <Button 
-                                                                     onClick={() => handleDelete(voice.id)} 
+                                                                     onClick={(e) => handleDelete(voice.id, e)} 
                                                                      size="sm" 
                                                                      variant="destructive"
                                                                  >
@@ -438,6 +447,9 @@ const VoiceManagement = () => {
                                                  <ChevronDown className="h-4 w-4 text-slate-400"/> : 
                                                  <ChevronRight className="h-4 w-4 text-slate-400"/>
                                              }
+                                             <span className="text-xs text-slate-500 ml-2">
+                                                 {expandedSections.user ? 'open' : 'closed'}
+                                             </span>
                                          </div>
                                          {expandedSections.user && (
                                              <div className="space-y-3">
@@ -481,7 +493,7 @@ const VoiceManagement = () => {
                                                                      Настройки
                                                                  </Button>
                                                                  <Button 
-                                                                     onClick={() => handleDelete(voice.id)} 
+                                                                     onClick={(e) => handleDelete(voice.id, e)} 
                                                                      size="sm" 
                                                                      variant="destructive"
                                                                  >

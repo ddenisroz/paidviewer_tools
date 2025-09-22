@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useActiveChannels } from '../context/ActiveChannelsContext';
+// TtsHealthContext не нужен на странице логина
 import api from '../services/api';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -10,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Circle, Activity } from 'lucide-react';
+import { Circle, Activity, Copy, Check } from 'lucide-react';
 import CookieConsent from '@/components/CookieConsent';
 import '../components/ActiveChannelsCarousel.css';
 
@@ -39,6 +40,7 @@ const VKIcon = (props) => (
 const LoginPage = () => {
     const { login, setGuestMode } = useAuth();
     const { activeChannels } = useActiveChannels();
+    // TtsHealthContext не нужен на странице логина
     const navigate = useNavigate();
     const [title, setTitle] = useState('');
     const [isTyping, setIsTyping] = useState(true);
@@ -54,6 +56,15 @@ const LoginPage = () => {
     const [guestPlatform, setGuestPlatform] = useState('twitch');
     const [isCheckingChannel, setIsCheckingChannel] = useState(false);
     const [channelError, setChannelError] = useState('');
+    
+    // Состояние для верификации
+    const [verificationModalOpen, setVerificationModalOpen] = useState(false);
+    const [verificationCode, setVerificationCode] = useState('');
+    const [verificationTimeout, setVerificationTimeout] = useState(60);
+    const [isVerifying, setIsVerifying] = useState(false);
+    const [verificationTimers, setVerificationTimers] = useState({ timer: null, verificationTimer: null });
+    const [isCodeCopied, setIsCodeCopied] = useState(false);
+    const [isDisconnecting, setIsDisconnecting] = useState(false);
 
     useEffect(() => {
         if (isTyping && title.length < fullTitle.length) {
@@ -65,6 +76,9 @@ const LoginPage = () => {
             setIsTyping(false);
         }
     }, [title, isTyping]);
+
+    // Выполняем health check при загрузке страницы
+    // TtsHealthContext не нужен на странице логина
 
     useEffect(() => {
         if (!isTyping) {
@@ -85,6 +99,18 @@ const LoginPage = () => {
         }
     }, [isTyping, currentFeatureIndex]);
 
+    // Очищаем таймеры при размонтировании компонента
+    useEffect(() => {
+        return () => {
+            if (verificationTimers.timer) {
+                clearInterval(verificationTimers.timer);
+            }
+            if (verificationTimers.verificationTimer) {
+                clearInterval(verificationTimers.verificationTimer);
+            }
+        };
+    }, [verificationTimers]);
+
     const handleVkLogin = () => {
         alert('VK Live авторизация пока не реализована');
     };
@@ -103,19 +129,43 @@ const LoginPage = () => {
         setChannelError('');
 
         try {
-            // Подключаем бота к каналу
+            // Подключаем бота к каналу с верификацией
             const response = await api.post('/api/chat/guest/connect', {
                 channel_name: guestUsername.trim()
             });
             
-            // Если подключение успешно, входим в гостевой режим
-            setGuestMode({
-                username: guestUsername.trim(),
-                platform: guestPlatform,
-                isGuest: true
-            });
-            setGuestModalOpen(false);
-            navigate('/dashboard');
+            console.log('LoginPage: API response:', response.data);
+            console.log('LoginPage: verification_required:', response.data.verification_required);
+            console.log('LoginPage: verified:', response.data.verified);
+            
+            // Если требуется верификация, показываем попап с кодом
+            if (response.data.verification_required) {
+                console.log('LoginPage: Verification required, showing modal');
+                setVerificationCode(response.data.verification_code);
+                setVerificationTimeout(response.data.timeout);
+                setGuestModalOpen(false);
+                setVerificationModalOpen(true);
+                startVerificationTimer();
+            } else if (response.data.verified) {
+                // Если бот уже верифицирован, сразу входим в гостевой режим
+                console.log('LoginPage: Bot already verified, entering guest mode');
+                try {
+                    await setGuestMode({
+                        username: guestUsername.trim(),
+                        platform: guestPlatform,
+                        isGuest: true
+                    });
+                    setGuestModalOpen(false);
+                    navigate('/dashboard');
+                } catch (error) {
+                    console.error('LoginPage: Failed to set guest mode:', error);
+                    setChannelError(error.message || 'Ошибка входа в гостевой режим');
+                }
+            } else {
+                // Если верификация не требуется, показываем ошибку
+                console.log('LoginPage: No verification required, showing error');
+                setChannelError('Верификация обязательна для безопасности');
+            }
             
         } catch (error) {
             console.error('LoginPage: Failed to connect bot:', error);
@@ -123,6 +173,143 @@ const LoginPage = () => {
             setChannelError(errorMsg);
         } finally {
             setIsCheckingChannel(false);
+        }
+    };
+
+    const startVerificationTimer = () => {
+        const timer = setInterval(async () => {
+            setVerificationTimeout(prev => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    // Таймер истек, отключаем бота и перезагружаем страницу
+                    handleVerificationTimeout();
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        // Автоматически проверяем верификацию каждые 3 секунды
+        const verificationTimer = setInterval(async () => {
+            if (isDisconnecting) {
+                console.log('LoginPage: Disconnect in progress, skipping automatic verification check');
+                return;
+            }
+            
+            try {
+                const response = await api.get(`/api/chat/guest/status?channel_name=${guestUsername}`);
+                if (response.data.verified) {
+                    // Очищаем все таймеры
+                    clearInterval(verificationTimer);
+                    clearInterval(timer);
+                    setVerificationTimers({ timer: null, verificationTimer: null });
+                    
+                    // Верификация успешна, входим в гостевой режим
+                    try {
+                        await setGuestMode({
+                            username: guestUsername.trim(),
+                            platform: guestPlatform,
+                            isGuest: true
+                        });
+                        setVerificationModalOpen(false);
+                        navigate('/dashboard');
+                    } catch (error) {
+                        console.error('LoginPage: Failed to set guest mode after verification:', error);
+                        setChannelError(error.message || 'Ошибка входа в гостевой режим');
+                    }
+                } else if (!response.data.connected) {
+                    // Бот отключился, закрываем попап и перезагружаем страницу
+                    console.log('LoginPage: Bot disconnected, closing verification modal');
+                    clearInterval(verificationTimer);
+                    clearInterval(timer);
+                    setVerificationTimers({ timer: null, verificationTimer: null });
+                    setVerificationModalOpen(false);
+                    window.location.reload();
+                }
+            } catch (error) {
+                console.error('LoginPage: Failed to check verification automatically:', error);
+            }
+        }, 3000);
+
+        // Сохраняем ссылки на таймеры
+        setVerificationTimers({ timer, verificationTimer });
+    };
+
+    const handleVerificationTimeout = async () => {
+        if (isDisconnecting) {
+            console.log('LoginPage: Disconnect already in progress, skipping');
+            return;
+        }
+        
+        setIsDisconnecting(true);
+        try {
+            // Отключаем бота от канала
+            await api.post('/api/chat/guest/disconnect', {
+                channel_name: guestUsername.trim()
+            });
+            console.log('LoginPage: Bot disconnected due to verification timeout');
+        } catch (error) {
+            console.error('LoginPage: Failed to disconnect bot:', error);
+        } finally {
+            // Закрываем попап и перезагружаем страницу
+            setVerificationModalOpen(false);
+            window.location.reload();
+        }
+    };
+
+
+    const checkVerificationStatus = async () => {
+        if (isDisconnecting) {
+            console.log('LoginPage: Disconnect in progress, skipping verification check');
+            return;
+        }
+        
+        setIsVerifying(true);
+        try {
+            const response = await api.get(`/api/chat/guest/status?channel_name=${guestUsername}`);
+            if (response.data.verified) {
+                // Верификация успешна, входим в гостевой режим
+                try {
+                    await setGuestMode({
+                        username: guestUsername.trim(),
+                        platform: guestPlatform,
+                        isGuest: true
+                    });
+                    setVerificationModalOpen(false);
+                    navigate('/dashboard');
+                } catch (error) {
+                    console.error('LoginPage: Failed to set guest mode after manual verification:', error);
+                    setChannelError(error.message || 'Ошибка входа в гостевой режим');
+                }
+            } else if (!response.data.connected) {
+                // Бот отключился, закрываем попап и перезагружаем страницу
+                console.log('LoginPage: Bot disconnected, closing verification modal');
+                setVerificationModalOpen(false);
+                window.location.reload();
+            }
+        } catch (error) {
+            console.error('LoginPage: Failed to check verification:', error);
+        } finally {
+            setIsVerifying(false);
+        }
+    };
+
+    const copyVerificationCode = async () => {
+        try {
+            await navigator.clipboard.writeText(verificationCode);
+            setIsCodeCopied(true);
+            setTimeout(() => setIsCodeCopied(false), 2000); // Сбрасываем через 2 секунды
+        } catch (error) {
+            console.error('LoginPage: Failed to copy code:', error);
+            // Fallback для старых браузеров
+            const textArea = document.createElement('textarea');
+            textArea.value = verificationCode;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            setIsCodeCopied(true);
+            setTimeout(() => setIsCodeCopied(false), 2000);
         }
     };
 
@@ -301,6 +488,60 @@ const LoginPage = () => {
                                 onClick={() => setGuestModalOpen(false)}
                                 variant="outline"
                                 className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
+                            >
+                                Отмена
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Модальное окно верификации */}
+            <Dialog open={verificationModalOpen} onOpenChange={() => {}}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="text-center text-white">
+                            Требуется верификация
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="text-center">
+                            <div className="bg-yellow-500/20 p-4 rounded-lg border border-yellow-500/50 mb-4 relative">
+                                <code className="text-2xl font-mono font-bold text-yellow-100">
+                                    {verificationCode}
+                                </code>
+                                <Button
+                                    onClick={copyVerificationCode}
+                                    size="sm"
+                                    variant="outline"
+                                    className="absolute top-2 right-2 h-8 w-8 p-0 border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/20"
+                                >
+                                    {isCodeCopied ? (
+                                        <Check className="h-4 w-4 text-green-400" />
+                                    ) : (
+                                        <Copy className="h-4 w-4" />
+                                    )}
+                                </Button>
+                            </div>
+                            <p className="text-sm text-gray-300 mb-2">
+                                Отправьте этот код в чат канала от своего имени
+                            </p>
+                            <div className="flex items-center justify-center gap-2 text-yellow-400">
+                                <Activity className="h-4 w-4" />
+                                <span className="text-sm font-medium">
+                                    Осталось времени: {verificationTimeout} сек
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div className="flex justify-end">
+                            <Button
+                                onClick={() => {
+                                    setVerificationModalOpen(false);
+                                    window.location.reload();
+                                }}
+                                variant="outline"
+                                className="border-slate-600 text-slate-300 hover:bg-slate-700"
                             >
                                 Отмена
                             </Button>

@@ -7,10 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Upload, Trash2, Settings, TestTube2, Globe, User, Link, Copy } from 'lucide-react';
 import { Slider } from "@/components/ui/slider";
-import { toast } from 'sonner';
+import { useNotification } from '../../context/NotificationContext';
+import { useButtonPosition } from '../../hooks/useButtonPosition';
 import { useAuth } from '../../context/AuthContext';
 import { useTts } from '../../context/TtsContext';
-import { useTtsHealth, TtsHealthProvider } from '../../context/TtsHealthContext';
+import { useTtsHealth } from '../../context/TtsHealthContext';
+import TtsErrorCard from '../../components/TtsErrorCard';
 import { 
     getUserVoices, 
     uploadUserVoice, 
@@ -23,9 +25,13 @@ import {
 } from '../../services/unified-api';
 import { generateObsUrl } from '../../services/microservices'; // Import directly
 import { Badge } from '@/components/ui/badge';
+import { PageLoader } from '@/components/ui/loader';
+import { useLoadingState } from '../../hooks/useLoadingState';
 
 
 const VoiceManagementPageContent = () => {
+    const { showNotification } = useNotification();
+    const { getButtonPosition } = useButtonPosition();
     const [voices, setVoices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -39,10 +45,13 @@ const VoiceManagementPageContent = () => {
     const [isTranscribing, setIsTranscribing] = useState(false);
     
     const { user } = useAuth();
-    const { initializeTts } = useTts();
+    const { initializeTts, engineStatus } = useTts();
     const { isHealthy, isChecking } = useTtsHealth();
     let audioContext = null;
     let audioSource = null;
+    
+    // Используем хук для управления состоянием загрузки
+    const showLoader = useLoadingState(isChecking);
 
     // Инициализируем TTS только при загрузке этой страницы
     useEffect(() => {
@@ -66,7 +75,7 @@ const VoiceManagementPageContent = () => {
             const voicesData = response?.data || response || [];
             setVoices(Array.isArray(voicesData) ? voicesData : []);
         } catch (error) {
-            toast.error('Ошибка загрузки голосов');
+            showNotification('Ошибка загрузки голосов', 'error');
             console.error('Error loading voices:', error);
             setVoices([]); // Устанавливаем пустой массив в случае ошибки
         } finally {
@@ -89,13 +98,13 @@ const VoiceManagementPageContent = () => {
 
     const handleUpload = async () => {
         if (!uploadFile || !voiceName.trim() || !user) {
-            toast.error('Выберите файл и введите имя голоса');
+            showNotification('Выберите файл и введите имя голоса', 'error');
             return;
         }
         
         const userVoiceCount = voices.filter(v => v.voice_type === 'user').length;
         if (userVoiceCount >= 5) {
-            toast.error('Вы достигли лимита в 5 пользовательских голосов.');
+            showNotification('Вы достигли лимита в 5 пользовательских голосов.', 'error');
             return;
         }
 
@@ -107,13 +116,13 @@ const VoiceManagementPageContent = () => {
             formData.append('user_id', user.id);
             
             await uploadUserVoice(user.id, formData);
-            toast.success(`Голос "${voiceName.trim()}" успешно загружен.`);
+            showNotification(`Голос "${voiceName.trim()}" успешно загружен.`, 'success');
             setUploadDialogOpen(false);
             setUploadFile(null);
             setVoiceName('');
             loadVoices();
         } catch (error) {
-            toast.error(error.message || 'Ошибка загрузки голоса');
+            showNotification(error.message || 'Ошибка загрузки голоса', 'error');
         } finally {
             setIsUploading(false);
         }
@@ -126,16 +135,16 @@ const VoiceManagementPageContent = () => {
         }
         
         if (voiceToDelete.voice_type !== 'user') {
-            toast.error("Вы не можете удалять общие голоса.");
+            showNotification("Вы не можете удалять общие голоса.", 'error');
             return;
         }
 
         try {
             await deleteUserVoice(voiceId, user.id);
-            toast.success(`Голос "${voiceToDelete.name}" удален.`);
+            showNotification(`Голос "${voiceToDelete.name}" удален.`, 'success');
             loadVoices();
         } catch (error) {
-            toast.error(error.message || 'Ошибка удаления голоса');
+            showNotification(error.message || 'Ошибка удаления голоса', 'error');
         }
     };
 
@@ -162,10 +171,10 @@ const VoiceManagementPageContent = () => {
                     : voice
             ));
             
-            toast.success('Транскрипция завершена успешно!');
+            showNotification('Транскрипция завершена успешно!', 'success');
         } catch (error) {
             console.error('Error transcribing voice:', error);
-            toast.error('Ошибка при транскрипции аудио');
+            showNotification('Ошибка при транскрипции аудио', 'error');
         } finally {
             setIsTranscribing(false);
         }
@@ -194,10 +203,10 @@ const VoiceManagementPageContent = () => {
             // Обновляем currentVoice
             setCurrentVoice(prev => ({...prev, name: newName.trim()}));
             
-            toast.success('Голос переименован успешно!');
+            showNotification('Голос переименован успешно!', 'success');
         } catch (error) {
             console.error('Error renaming voice:', error);
-            toast.error('Ошибка при переименовании голоса');
+            showNotification('Ошибка при переименовании голоса', 'error');
         }
     };
 
@@ -221,10 +230,10 @@ const VoiceManagementPageContent = () => {
             ));
             
             setEditDialogOpen(false);
-            toast.success('Настройки голоса сохранены!');
+            showNotification('Настройки голоса сохранены!', 'success');
         } catch (error) {
             console.error('Error updating voice settings:', error);
-            toast.error('Ошибка при сохранении настроек');
+            showNotification('Ошибка при сохранении настроек', 'error');
         }
     };
 
@@ -242,7 +251,7 @@ const VoiceManagementPageContent = () => {
             audioSource.start(0);
         }, (error) => {
             console.error('Error decoding audio data', error);
-            toast.error('Не удалось воспроизвести аудио');
+            showNotification('Не удалось воспроизвести аудио', 'error');
         });
     };
     
@@ -264,13 +273,13 @@ const VoiceManagementPageContent = () => {
                 const fullAudioUrl = `http://localhost:8001${audioUrl}`;
                 const audio = new Audio(fullAudioUrl);
                 audio.play().catch(() => {
-                    toast.error('Не удалось воспроизвести аудио');
+                    showNotification('Не удалось воспроизвести аудио', 'error');
                 });
             } else {
-                toast.error('Не удалось получить аудио для воспроизведения');
+                showNotification('Не удалось получить аудио для воспроизведения', 'error');
             }
         } catch (error) {
-            toast.error(error.message || 'Ошибка тестирования голоса');
+            showNotification(error.message || 'Ошибка тестирования голоса', 'error');
         }
     };
 
@@ -281,11 +290,11 @@ const VoiceManagementPageContent = () => {
                         cfg_strength: currentVoice.cfg_strength
                         // Только cfg_strength настраивается пользователем
                     });
-                    toast.success(`Настройки голоса "${currentVoice.name}" обновлены.`);
+                    showNotification(`Настройки голоса "${currentVoice.name}" обновлены.`, 'success');
                     setEditDialogOpen(false);
                     loadVoices();
                 } catch (error) {
-                    toast.error(error.message || 'Ошибка обновления настроек');
+                    showNotification(error.message || 'Ошибка обновления настроек', 'error');
                 }
             };
 
@@ -300,20 +309,20 @@ const VoiceManagementPageContent = () => {
             const response = await generateObsUrl();
             const fullUrl = `${window.location.origin}/tts-obs/${response.data.obs_token}`;
             setObsUrl(fullUrl);
-            toast.success('Ссылка для OBS успешно создана!');
+            showNotification('Ссылка для OBS успешно создана!', 'success');
         } catch (error) {
-            toast.error('Не удалось создать ссылку для OBS.');
+            showNotification('Не удалось создать ссылку для OBS.', 'error');
             console.error('Failed to generate OBS URL:', error);
         }
     };
 
     const copyToClipboard = () => {
         navigator.clipboard.writeText(obsUrl);
-        toast.success('Ссылка скопирована в буфер обмена!');
+        showNotification('Ссылка скопирована в буфер обмена!', 'success');
     };
 
-    // Заглушка когда TTS недоступен
-    if (!isHealthy && !isChecking) {
+    // Показываем прелоадер пока проверяется health или загружаются голоса
+    if (showLoader || loading) {
         return (
             <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -322,19 +331,27 @@ const VoiceManagementPageContent = () => {
                         <p className="text-slate-400 mt-1">Загружайте и настраивайте свои уникальные голоса для TTS.</p>
                     </div>
                 </div>
-                
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-6 text-center">
-                    <div className="flex items-center justify-center gap-2 mb-4">
-                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                        <h2 className="text-xl font-semibold text-red-400">TTS сервер недоступен</h2>
+                <PageLoader message="Проверка состояния TTS сервиса..." />
+            </div>
+        );
+    }
+
+    // Заглушка когда TTS недоступен
+    if (!isHealthy) {
+        return (
+            <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-semibold text-white">Управление голосами</h1>
+                        <p className="text-slate-400 mt-1">Загружайте и настраивайте свои уникальные голоса для TTS.</p>
                     </div>
-                    <p className="text-red-300 mb-4">
-                        В данный момент сервис TTS недоступен. Управление голосами временно отключено.
-                    </p>
-                    <p className="text-slate-400 text-sm">
-                        Попробуйте обновить страницу через несколько минут.
-                    </p>
                 </div>
+                
+                <TtsErrorCard
+                    title="TTS сервер недоступен"
+                    description="В данный момент сервис TTS недоступен. Управление голосами временно отключено."
+                    suggestion="Попробуйте обновить страницу через несколько минут."
+                />
             </div>
         );
     }
@@ -560,11 +577,7 @@ const VoiceManagementPageContent = () => {
 };
 
 const VoiceManagementPage = () => {
-    return (
-        <TtsHealthProvider>
-            <VoiceManagementPageContent />
-        </TtsHealthProvider>
-    );
+    return <VoiceManagementPageContent />;
 };
 
 export default VoiceManagementPage;

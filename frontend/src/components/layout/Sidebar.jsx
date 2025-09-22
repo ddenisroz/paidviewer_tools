@@ -65,7 +65,14 @@ const SidebarNavItem = ({ item, openSection, onToggleSection }) => {
                         <item.icon className="h-6 w-6" />
                         {item.label}
                     </NavLink>
-                    <button onClick={() => onToggleSection(item.to)} className="p-1 -mr-1 rounded-full hover:bg-accent text-muted-foreground">
+                    <button 
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onToggleSection(item.to);
+                        }} 
+                        className="p-1 -mr-1 rounded-full hover:bg-accent text-muted-foreground"
+                    >
                         {isOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                     </button>
                 </div>
@@ -129,7 +136,7 @@ const Sidebar = () => {
         };
         
         loadAdminList();
-    }, []);
+    }, []); // Keep empty dependency array to load only once
     
     // Проверяем, является ли пользователь админом
     useEffect(() => {

@@ -1,12 +1,14 @@
 // src/pages/HomePage.jsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mic, Clapperboard, Power, PowerOff, MessageSquare } from 'lucide-react';
+import { Mic, Clapperboard, Power, PowerOff, MessageSquare, Loader } from 'lucide-react';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useTts } from '../context/TtsContext';
-import { useTtsHealth, TtsHealthProvider } from '../context/TtsHealthContext';
+import { useTtsHealth } from '../context/TtsHealthContext';
+import { useTtsCard } from '../context/TtsCardContext';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
+import { ToastProvider } from '../components/ui/toast';
 import FeatureCard from '../components/FeatureCard';
 import StreamStatsCard from '../components/StreamStatsCard';
 import StreamTitleCard from '../components/StreamTitleCard';
@@ -18,8 +20,9 @@ const HomePageContent = () => {
     const navigate = useNavigate();
     const { user, isAuthenticated } = useAuth();
     const { integrations } = useIntegrations();
-    const { ttsEnabled, toggleTts: onToggleTts } = useTts();
+    const { ttsEnabled, toggleTts: onToggleTts, isToggling, syncWithHealthContext } = useTts();
     const { isHealthy, isChecking } = useTtsHealth();
+    const { ttsCardStatus } = useTtsCard();
     const {
         streamTitle, setStreamTitle,
         streamCategory, setStreamCategory,
@@ -35,6 +38,15 @@ const HomePageContent = () => {
     } = useData();
 
     const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+    const prevIsHealthy = useRef(isHealthy);
+    
+    // Синхронизируем с TtsHealthContext
+    useEffect(() => {
+        if (prevIsHealthy.current !== isHealthy) {
+            syncWithHealthContext(isHealthy);
+            prevIsHealthy.current = isHealthy;
+        }
+    }, [isHealthy, syncWithHealthContext]);
     
     const handleCategorySearch = async (value) => {
         setCategorySearch(value);
@@ -91,11 +103,12 @@ const HomePageContent = () => {
                         icon={<Mic />} 
                         path="/dashboard/tts"
                         enabled={true}
-                        ttsStatus={{ isHealthy, isChecking }}
+                        ttsStatus={ttsCardStatus}
                         actionButton={{
-                            text: ttsEnabled ? 'Выключить озвучку' : 'Включить озвучку',
-                            icon: ttsEnabled ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />,
+                            text: isToggling ? 'Обработка...' : (ttsEnabled ? 'Выключить озвучку' : 'Включить озвучку'),
+                            icon: isToggling ? <Loader className="h-4 w-4 animate-spin" /> : (ttsEnabled ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />),
                             variant: ttsEnabled ? "destructive" : "default",
+                            disabled: isToggling
                         }}
                         onActionClick={onToggleTts}
                     />
@@ -162,9 +175,9 @@ const HomePageContent = () => {
 
 const HomePage = () => {
     return (
-        <TtsHealthProvider>
+        <ToastProvider>
             <HomePageContent />
-        </TtsHealthProvider>
+        </ToastProvider>
     );
 };
 

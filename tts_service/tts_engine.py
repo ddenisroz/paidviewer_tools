@@ -43,7 +43,11 @@ class TTSEngineManager:
         """Завершение работы TTS движка"""
         try:
             if self.tts_engine:
-                await self.tts_engine.cleanup()
+                # Проверяем, есть ли метод cleanup у движка
+                if hasattr(self.tts_engine, 'cleanup'):
+                    await self.tts_engine.cleanup()
+                else:
+                    logger.info("TTS engine does not have cleanup method, skipping")
                 self.tts_engine = None
             
             self.transcriber = None

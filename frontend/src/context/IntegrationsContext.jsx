@@ -7,7 +7,14 @@ const IntegrationsContext = createContext();
 export const useIntegrations = () => useContext(IntegrationsContext);
 
 export const IntegrationsProvider = ({ children }) => {
-    const { user, isAuthenticated, login, logout } = useAuth();
+    const auth = useAuth();
+    
+    // Проверяем, что auth инициализирован
+    if (!auth) {
+        return <div>Loading...</div>;
+    }
+    
+    const { user, isAuthenticated, login, logout } = auth;
     const [isLoading, setIsLoading] = useState(true);
     const [integrations, setIntegrations] = useState({
         twitch: { enabled: false },

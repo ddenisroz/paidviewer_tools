@@ -2,7 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useAuth } from './AuthContext';
 import api from '../services/api';
 import { twitchApi } from '../services/twitchApi';
-import { toast } from 'sonner';
+import { useToast } from '../components/ui/toast';
+import { useNotification } from './NotificationContext';
 
 const DataContext = createContext();
 
@@ -10,6 +11,8 @@ export const useData = () => useContext(DataContext);
 
 export const DataProvider = ({ children }) => {
     const { user, isAuthenticated } = useAuth();
+    const { addToast } = useToast();
+    const { showNotification } = useNotification();
     const dataLoadedRef = useRef(false);
 
     const [streamTitle, setStreamTitle] = useState('');
@@ -47,7 +50,7 @@ export const DataProvider = ({ children }) => {
             }
         } catch (error) {
             console.error('Error loading stream data:', error);
-            toast.error("Ошибка загрузки данных о стриме.");
+            showNotification("Ошибка загрузки данных о стриме.", 'error');
         } finally {
             setLoading(prev => ({ ...prev, streamData: false }));
         }
@@ -112,20 +115,20 @@ export const DataProvider = ({ children }) => {
             const response = await twitchApi.updateStreamTitle(newTitle);
             if (response.success) {
                 setStatus(prev => ({ ...prev, title: 'success' }));
-                toast.success(response.message || 'Название обновлено');
+                showNotification(response.message || 'Название обновлено', 'success');
                 await loadStreamData(true); // Force refresh
                 setTimeout(() => setStatus(prev => ({ ...prev, title: 'idle' })), 2000);
                 return { success: true };
             } else {
                 setStatus(prev => ({ ...prev, title: 'error' }));
-                toast.error(response.message || 'Ошибка обновления');
+                showNotification(response.message || 'Ошибка обновления', 'error');
                 setTimeout(() => setStatus(prev => ({ ...prev, title: 'idle' })), 3000);
                 return { success: false, message: response.message };
             }
         } catch (error) {
             setStatus(prev => ({ ...prev, title: 'error' }));
             console.error('Error updating title:', error);
-            toast.error(error.response?.data?.message || error.message || 'Ошибка обновления названия');
+            showNotification(error.response?.data?.message || error.message || 'Ошибка обновления названия', 'error');
             return { success: false, message: error.response?.data?.message || error.message };
         }
     }, [loadStreamData]);
@@ -136,20 +139,20 @@ export const DataProvider = ({ children }) => {
             const response = await twitchApi.updateCategory(newCategoryId);
             if (response.success) {
                 setStatus(prev => ({ ...prev, category: 'success' }));
-                toast.success(response.message || 'Категория обновлена');
+                showNotification(response.message || 'Категория обновлена', 'success');
                 await loadStreamData(true); // Force refresh
                 setTimeout(() => setStatus(prev => ({ ...prev, category: 'idle' })), 2000);
                 return { success: true };
             } else {
                 setStatus(prev => ({ ...prev, category: 'error' }));
-                toast.error(response.message || 'Ошибка обновления');
+                showNotification(response.message || 'Ошибка обновления', 'error');
                 setTimeout(() => setStatus(prev => ({ ...prev, category: 'idle' })), 3000);
                 return { success: false, message: response.message };
             }
         } catch (error) {
             setStatus(prev => ({ ...prev, category: 'error' }));
             console.error('Error updating category:', error);
-            toast.error(error.response?.data?.message || error.message || 'Ошибка обновления категории');
+            showNotification(error.response?.data?.message || error.message || 'Ошибка обновления категории', 'error');
             return { success: false, message: error.response?.data?.message || error.message };
         }
     }, [loadStreamData]);

@@ -14,19 +14,15 @@ class WebSocketService {
 
     connect() {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            console.log('WebSocket already connected');
             return;
         }
 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/api/ws/`;
         
-        console.log('Connecting to WebSocket:', wsUrl);
-        
         this.ws = new WebSocket(wsUrl);
         
         this.ws.onopen = () => {
-            console.log('WebSocket connected');
             this.isConnected = true;
             this.reconnectAttempts = 0;
             this.emit('connected');
@@ -46,14 +42,12 @@ class WebSocketService {
         };
         
         this.ws.onclose = (event) => {
-            console.log('WebSocket disconnected:', event.code, event.reason);
             this.isConnected = false;
             this.emit('disconnected');
             
             // Автоматическое переподключение
             if (this.reconnectAttempts < this.maxReconnectAttempts) {
                 this.reconnectAttempts++;
-                console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
                 setTimeout(() => this.connect(), this.reconnectDelay * this.reconnectAttempts);
             }
         };

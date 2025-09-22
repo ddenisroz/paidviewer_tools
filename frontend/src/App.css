@@ -33,32 +33,32 @@
  
 @layer base {
   :root {
-    --background: 260 25% 10%; /* Dark Purple */
+    --background: 260 30% 8%; /* Darker Purple */
     --foreground: 270 20% 95%; /* Light Lavender */
 
-    --card: 260 25% 12%;
+    --card: 260 30% 10%;
     --card-foreground: 270 20% 95%;
  
-    --popover: 260 25% 10%;
+    --popover: 260 30% 8%;
     --popover-foreground: 270 20% 95%;
  
     --primary: 266 90% 60%; /* Twitch Purple */
     --primary-foreground: 270 20% 98%;
  
-    --secondary: 260 25% 20%;
+    --secondary: 260 30% 15%;
     --secondary-foreground: 270 20% 98%;
  
-    --muted: 260 25% 20%;
+    --muted: 260 30% 15%;
     --muted-foreground: 270 20% 70%;
  
-    --accent: 260 25% 25%;
+    --accent: 260 30% 18%;
     --accent-foreground: 270 20% 98%;
  
     --destructive: 0 63% 31%;
     --destructive-foreground: 0 86% 97%;
 
-    --border: 260 25% 20%;
-    --input: 260 25% 22%;
+    --border: 260 30% 15%;
+    --input: 260 30% 18%;
     --ring: 266 90% 65%;
  
     --radius: 0.5rem;
@@ -66,32 +66,32 @@
  
   .dark {
     /* Same as root for a forced dark theme */
-    --background: 260 25% 10%;
+    --background: 260 30% 8%;
     --foreground: 270 20% 95%;
 
-    --card: 260 25% 12%;
+    --card: 260 30% 10%;
     --card-foreground: 270 20% 95%;
  
-    --popover: 260 25% 10%;
+    --popover: 260 30% 8%;
     --popover-foreground: 270 20% 95%;
  
     --primary: 266 90% 60%;
     --primary-foreground: 270 20% 98%;
  
-    --secondary: 260 25% 20%;
+    --secondary: 260 30% 15%;
     --secondary-foreground: 270 20% 98%;
  
-    --muted: 260 25% 20%;
+    --muted: 260 30% 15%;
     --muted-foreground: 270 20% 70%;
  
-    --accent: 260 25% 25%;
+    --accent: 260 30% 18%;
     --accent-foreground: 270 20% 98%;
  
     --destructive: 0 63% 31%;
     --destructive-foreground: 0 86% 97%;
 
-    --border: 260 25% 20%;
-    --input: 260 25% 22%;
+    --border: 260 30% 15%;
+    --input: 260 30% 18%;
     --ring: 266 90% 65%;
   }
 }
@@ -217,7 +217,7 @@ body {
 
 /* Стили для страницы логина, как на скриншоте */
 .login-page-bg {
-  background: radial-gradient(ellipse at center, #2a1d3a 0%, #1a0f2e 70%);
+  background: radial-gradient(ellipse at center, #1a0f2e 0%, #0f0818 70%);
   background-size: 200% 200%;
   animation: gentle-glow 20s linear infinite;
 }
@@ -247,11 +247,11 @@ body {
 
 .login-card {
   position: relative;
-  background: linear-gradient(135deg, #2a2235, #342a40);
-  border: 1px solid #4a3f55;
+  background: linear-gradient(135deg, #1a0f2e, #2a1d3a);
+  border: 1px solid #3a2a4a;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(100, 80, 200, 0.1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 20px rgba(100, 80, 200, 0.15);
   transition: all 0.3s ease;
 }
 
@@ -304,4 +304,35 @@ body {
   50% {
     color: #34D399; /* Зеленый цвет курсора */
   }
+}
+
+/* Анимации для уведомлений */
+@keyframes slide-in-bottom {
+  from {
+    transform: translate(-50%, 20px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-out-bottom {
+  from {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+  to {
+    transform: translate(-50%, 20px);
+    opacity: 0;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-bottom 0.3s ease-out forwards;
+}
+
+.animate-slide-out-right {
+  animation: slide-out-bottom 0.3s ease-in forwards;
 }

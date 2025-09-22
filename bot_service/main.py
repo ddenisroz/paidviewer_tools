@@ -2,8 +2,9 @@
 import os
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Depends, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, Depends, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.responses import RedirectResponse
@@ -22,10 +23,10 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 from logging_config import setup_logging, log_system_info, log_service_start, log_service_stop, log_error, log_api_call, log_websocket_event, log_bot_event
 
-from bot_service.database import get_db, init_db, User
+from bot_service.database import get_db, init_db, User, GuestVerification
 from bot_service.models import *
 from bot_service.connection_manager import ConnectionManager
-from bot_service.auth import get_current_user, get_admin_user, create_jwt_token
+from bot_service.auth import get_current_user, get_current_user_optional, get_admin_user, create_jwt_token
 from bot_service.twitch_api import TwitchAPI
 from bot_service.tts_api import TTSAPI
 from bot_service.youtube_api import YouTubeAPI
@@ -82,6 +83,37 @@ async def lifespan(app: FastAPI):
     
     # Инициализация базы данных
     init_db()
+    
+    # Загружаем данные верификации из базы данных при старте
+    try:
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            verifications = db.query(GuestVerification).filter(
+                GuestVerification.is_verified == True
+            ).all()
+            
+            for verification in verifications:
+                # Загружаем все верифицированные каналы без проверки таймаута
+                # Активные сессии существуют до тех пор, пока не будут заменены новой верификацией
+                from datetime import datetime, timedelta
+                if verification.verified_at:
+                    # Загружаем данные из базы данных, но НЕ помечаем как verified в памяти
+                    # Это позволяет требовать новую верификацию для новых сессий
+                    connection_manager.pending_verifications[verification.channel_name] = {
+                        "channel": verification.channel_name,
+                        "code": verification.verification_code,
+                        "timestamp": verification.verified_at.timestamp(),
+                        "verified": False  # Всегда False для новых сессий
+                    }
+                    logger.info(f"Loaded verification from database for channel: {verification.channel_name}")
+            
+            db.commit()
+            logger.info(f"Loaded {len(verifications)} verifications from database")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Failed to load verifications from database: {e}")
     
     # Запуск фоновых задач
     asyncio.create_task(collect_stream_stats())
@@ -155,6 +187,16 @@ async def login_twitch():
     auth_url = f"https://id.twitch.tv/oauth2/authorize?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope={scope}"
     return RedirectResponse(url=auth_url)
 
+@app.get("/api/auth/twitch/login")
+async def api_login_twitch():
+    """API endpoint для Twitch login (для совместимости с фронтендом)"""
+    client_id = os.getenv("TWITCH_CLIENT_ID")
+    redirect_uri = "http://localhost:8000/auth/twitch/callback"
+    scope = "user:read:email channel:manage:broadcast"
+    
+    auth_url = f"https://id.twitch.tv/oauth2/authorize?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope={scope}"
+    return {"auth_url": auth_url}
+
 @app.get("/auth/twitch/callback")
 async def auth_twitch_callback(code: str, request: Request, db: Session = Depends(get_db)):
     # Получаем access token
@@ -198,6 +240,12 @@ async def auth_twitch_callback(code: str, request: Request, db: Session = Depend
 
 @app.post("/auth/logout")
 async def logout(request: Request):
+    request.session.clear()
+    return {"message": "Logged out successfully"}
+
+@app.post("/api/auth/logout")
+async def api_logout(request: Request):
+    """API endpoint для logout (для совместимости с фронтендом)"""
     request.session.clear()
     return {"message": "Logged out successfully"}
 
@@ -270,6 +318,45 @@ async def reconnect_bot(user: User = Depends(get_current_user)):
     return {"message": f"Bot reconnected to {user.username}"}
 
 # --- Guest Bot Endpoints ---
+@app.post("/api/chat/guest/reconnect")
+async def reconnect_bot_guest(request: Request, db: Session = Depends(get_db)):
+    """Переподключение к уже верифицированному каналу (для перезагрузки страницы)"""
+    data = await request.json()
+    channel_name = data.get("channel_name", "").lower()
+    
+    if not channel_name:
+        raise HTTPException(status_code=400, detail="Channel name required")
+    
+    # Проверяем, верифицирован ли канал (сначала в памяти, потом в БД)
+    if connection_manager.is_verified(channel_name):
+        # Дополнительная проверка: верификация должна быть недавней (в течение 5 минут)
+        # Это предотвращает использование /reconnect с других устройств
+        try:
+            verification = db.query(GuestVerification).filter(
+                GuestVerification.channel_name == channel_name,
+                GuestVerification.is_verified == True
+            ).first()
+            
+            if verification and verification.verified_at:
+                # Канал верифицирован, разрешаем переподключение без проверки таймаута
+                # Активные сессии существуют до тех пор, пока не будут заменены новой верификацией
+                logger.info(f"Channel {channel_name} is verified, allowing reconnection")
+            
+        except Exception as e:
+            logger.error(f"Error checking verification age: {e}")
+            raise HTTPException(status_code=400, detail="Verification check failed")
+        
+        # Канал верифицирован и недавно, разрешаем переподключение
+        logger.info(f"Reconnecting to verified channel: {channel_name}")
+        return {
+            "message": f"Reconnected to {channel_name}",
+            "verification_required": False,
+            "verified": True
+        }
+    
+    # Если канал не верифицирован, возвращаем ошибку
+    raise HTTPException(status_code=400, detail="Channel not verified")
+
 @app.post("/api/chat/guest/connect")
 async def connect_bot_guest(request: Request, db: Session = Depends(get_db)):
     data = await request.json()
@@ -281,22 +368,105 @@ async def connect_bot_guest(request: Request, db: Session = Depends(get_db)):
     # Подключаемся к каналу (whitelist проверка только для TTS функций)
     global bot_instance
     if not bot_instance:
+        logger.info("Creating new bot instance...")
         bot_token = os.getenv("TWITCH_BOT_TOKEN")
         if not bot_token:
             raise HTTPException(status_code=500, detail="TWITCH_BOT_TOKEN not configured")
         
         bot_instance = Bot(bot_token, [], connection_manager)
+        logger.info("Bot instance created, starting bot...")
         asyncio.create_task(bot_instance.start_bot())
         await asyncio.sleep(2)
+        logger.info("Bot startup task created")
+    else:
+        logger.info("Bot instance already exists")
     
+    # Проверяем, не подключен ли уже бот к каналу
+    if channel_name in connection_manager.pending_verifications:
+        existing_verification = connection_manager.pending_verifications[channel_name]
+        # Всегда требуем новую верификацию для новых сессий
+        if True:  # Упрощаем логику - всегда требуем верификацию
+            # Бот уже верифицирован, но для безопасности всегда требуем новую верификацию
+            # Это предотвращает вход с других устройств без верификации
+            logger.info(f"Bot already verified for channel: {channel_name}, requiring new verification for security")
+            
+            # Генерируем новый код верификации
+            import secrets
+            verification_code = secrets.token_urlsafe(8)
+            
+            # Создаем новую запись верификации для нового пользователя
+            # НЕ сбрасываем существующую верификацию - она остается активной
+            new_verification_data = {
+                "channel": channel_name,
+                "code": verification_code,
+                "timestamp": time.time(),
+                "verified": False
+            }
+            
+            # Добавляем новую верификацию под другим ключом (например, с суффиксом)
+            new_key = f"{channel_name}_new"
+            connection_manager.pending_verifications[new_key] = new_verification_data
+            
+            return {
+                "message": f"Bot already connected to {channel_name}, new verification required",
+                "verification_required": True,
+                "verification_code": verification_code,
+                "timeout": 60
+            }
+        else:
+            # Бот подключен, но не верифицирован - всегда генерируем новый код
+            # Это предотвращает использование старых кодов
+            logger.info(f"Bot already connected to channel: {channel_name}, generating new verification code")
+            import secrets
+            verification_code = secrets.token_urlsafe(8)
+            
+            verification_data = {
+                "channel": channel_name,
+                "code": verification_code,
+                "timestamp": time.time(),
+                "verified": False
+            }
+            
+            connection_manager.pending_verifications[channel_name] = verification_data
+            
+            return {
+                "message": f"Bot already connected to {channel_name}, new verification code generated",
+                "verification_required": True,
+                "verification_code": verification_code,
+                "timeout": 60
+            }
+    
+    logger.info(f"Attempting to join channel: {channel_name}")
     success = await bot_instance.join_channel(channel_name)
     if not success:
+        logger.error(f"Failed to connect to channel: {channel_name}")
         raise HTTPException(status_code=500, detail="Failed to connect to channel")
     
-    return {"message": f"Bot connected to {channel_name}"}
+    # Генерируем код верификации
+    import secrets
+    verification_code = secrets.token_urlsafe(8)
+    
+    # Сохраняем код верификации в connection_manager для доступа из бота
+    verification_data = {
+        "channel": channel_name,
+        "code": verification_code,
+        "timestamp": time.time(),
+        "verified": False
+    }
+    
+    # Сохраняем в connection_manager для доступа из бота
+    connection_manager.pending_verifications[channel_name] = verification_data
+    
+    logger.info(f"Successfully connected to channel: {channel_name}, verification code: {verification_code}")
+    return {
+        "message": f"Bot connected to {channel_name}",
+        "verification_required": True,
+        "verification_code": verification_code,
+        "timeout": 60
+    }
 
 @app.post("/api/chat/guest/disconnect")
-async def disconnect_bot_guest(request: Request):
+async def disconnect_bot_guest(request: Request, db: Session = Depends(get_db)):
     data = await request.json()
     channel_name = data.get("channel_name", "").lower()
     
@@ -311,6 +481,23 @@ async def disconnect_bot_guest(request: Request):
     if not success:
         raise HTTPException(status_code=500, detail="Failed to disconnect from channel")
     
+    # Очищаем данные верификации из connection_manager
+    if channel_name in connection_manager.pending_verifications:
+        del connection_manager.pending_verifications[channel_name]
+        logger.info(f"Cleared verification data for channel: {channel_name}")
+    
+    # Очищаем данные верификации из базы данных
+    try:
+        verification = db.query(GuestVerification).filter(
+            GuestVerification.channel_name == channel_name
+        ).first()
+        if verification:
+            db.delete(verification)
+            db.commit()
+            logger.info(f"Cleared verification data from database for channel: {channel_name}")
+    except Exception as e:
+        logger.error(f"Failed to clear verification data from database: {e}")
+    
     return {"message": f"Bot disconnected from {channel_name}"}
 
 @app.get("/api/chat/guest/status")
@@ -322,7 +509,7 @@ async def get_bot_status_guest(channel_name: str, db: Session = Depends(get_db))
     
     global bot_instance
     if not bot_instance:
-        return {"connected": False, "is_whitelisted": False}
+        return {"connected": False, "is_whitelisted": False, "verified": False}
     
     is_connected = bot_instance.is_connected_to_channel(channel_name)
     
@@ -333,10 +520,42 @@ async def get_bot_status_guest(channel_name: str, db: Session = Depends(get_db))
         func.lower(WhitelistedChannel.channel_name) == channel_name
     ).first()
     
+    # Проверяем верификацию
+    is_verified = connection_manager.is_verified(channel_name)
+    
+    # Добавляем логирование для отладки
+    logger.info(f"Guest status check for {channel_name}: connected={is_connected}, verified={is_verified}, pending_verifications={list(connection_manager.pending_verifications.keys())}")
+    
     return {
         "connected": is_connected,
-        "is_whitelisted": whitelisted is not None
+        "is_whitelisted": whitelisted is not None,
+        "verified": is_verified
     }
+
+@app.get("/api/chat/guest/check-blocked")
+async def check_guest_blocked(channel_name: str, db: Session = Depends(get_db)):
+    """Проверяет, заблокирован ли канал для гостевого режима"""
+    channel_name = channel_name.lower()
+    
+    if not channel_name:
+        raise HTTPException(status_code=400, detail="Channel name required")
+    
+    # Проверяем, есть ли авторизованный пользователь с таким каналом
+    user = db.query(User).filter(
+        User.username == channel_name
+    ).first()
+    
+    if user:
+        return {
+            "blocked": True,
+            "message": "Этот канал заблокирован для гостевого режима. Пожалуйста, авторизуйтесь через Twitch."
+        }
+    
+    return {
+        "blocked": False,
+        "message": "Канал доступен для гостевого режима"
+    }
+
 
 # --- Twitch API Endpoints ---
 @app.get("/api/twitch/stream")
@@ -417,9 +636,21 @@ async def disable_tts(user: User = Depends(get_current_user)):
     return {"enabled": not success}
 
 @app.get("/api/tts/status")
-async def get_tts_status(user: User = Depends(get_current_user)):
-    is_enabled = connection_manager.is_tts_enabled(user.username)
-    return {"is_enabled": is_enabled}
+async def get_tts_status(request: Request, user: User = Depends(get_current_user_optional)):
+    # Получаем channel_name из query параметров для гостевых пользователей
+    channel_name = request.query_params.get("channel_name")
+    
+    if user and not user.is_guest:
+        # Авторизованный пользователь
+        is_enabled = connection_manager.is_tts_enabled(user.username)
+        return {"enabled": is_enabled}
+    elif channel_name:
+        # Гостевой пользователь с указанным каналом
+        is_enabled = connection_manager.is_tts_enabled(channel_name.lower())
+        return {"enabled": is_enabled}
+    else:
+        # Недостаточно данных для определения статуса
+        raise HTTPException(status_code=400, detail="Channel name required for guest users")
 
 # --- Guest TTS Endpoints ---
 @app.post("/api/tts/guest/enable")

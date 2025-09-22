@@ -16,7 +16,7 @@ const FeatureCard = ({ title, icon, path, enabled = true, actionButton, onAction
     const handleActionClick = (e) => {
         e.stopPropagation();
         if (enabled && onActionClick) {
-            onActionClick();
+            onActionClick(e);
         }
     };
 
@@ -62,7 +62,7 @@ const FeatureCard = ({ title, icon, path, enabled = true, actionButton, onAction
                     {actionButton && (
                          <Button 
                             onClick={handleActionClick} 
-                            disabled={!enabled}
+                            disabled={!enabled || actionButton.disabled}
                             size="sm"
                             className="w-full"
                             variant={actionButton.variant || "default"}

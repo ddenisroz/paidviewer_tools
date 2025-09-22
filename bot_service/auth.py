@@ -50,6 +50,13 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> U
     logger.info(f"User authenticated via session: {user.username}")
     return user
 
+async def get_current_user_optional(request: Request, db: Session = Depends(get_db)) -> Optional[User]:
+    """Получить текущего пользователя из сессии или JWT токена (опционально)"""
+    try:
+        return await get_current_user(request, db)
+    except HTTPException:
+        return None
+
 async def get_admin_user(request: Request, db: Session = Depends(get_db)) -> User:
     """Получить текущего пользователя и проверить админские права"""
     user = await get_current_user(request, db)

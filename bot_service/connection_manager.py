@@ -4,6 +4,7 @@ import time
 from typing import Dict, Set
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,7 @@ class ConnectionManager:
         self.blocked_bots: Set[str] = set()
         self.youtube_queues: Dict[str, list] = {}
         self.current_videos: Dict[str, dict] = {}
+        self.pending_verifications: Dict[str, dict] = {}  # Для верификации гостевых подключений
         
         # Кэш для Twitch API
         self.twitch_cache = {
@@ -163,3 +165,141 @@ class ConnectionManager:
             if time.time() - self.youtube_cache['last_update'] < max_age:
                 return self.youtube_cache[key]
         return None
+
+    # Методы для верификации гостевых подключений
+    def add_verification(self, channel: str, code: str):
+        """Добавляет код верификации для канала"""
+        self.pending_verifications[channel] = {
+            "code": code,
+            "timestamp": time.time(),
+            "verified": False
+        }
+        logger.info(f"Added verification code for channel {channel}: {code}")
+
+    def check_verification(self, channel: str, message: str, username: str) -> bool:
+        """Проверяет, содержит ли сообщение код верификации от владельца канала"""
+        if channel not in self.pending_verifications:
+            return False
+        
+        verification = self.pending_verifications[channel]
+        
+        # Проверяем, не истек ли код (60 секунд)
+        if time.time() - verification["timestamp"] > 60:
+            logger.info(f"Verification code expired for channel {channel}")
+            del self.pending_verifications[channel]
+            return False
+        
+        # Проверяем, что сообщение от владельца канала
+        if username.lower() != channel.lower():
+            logger.warning(f"Verification attempt from non-owner: {username} for channel {channel}")
+            return False
+        
+        # Проверяем, содержит ли сообщение код
+        if verification["code"] in message:
+            verification["verified"] = True
+            logger.info(f"Verification successful for channel {channel} by {username}")
+            
+            # Сохраняем в базу данных для персистентности
+            self.save_verification_to_db(channel, verification["code"])
+            
+            return True
+        
+        return False
+
+    def save_verification_to_db(self, channel: str, code: str):
+        """Сохраняет данные верификации в базу данных"""
+        try:
+            from .database import get_db, GuestVerification
+            db_gen = get_db()
+            db = next(db_gen)
+            try:
+                # Создаем или обновляем запись верификации
+                verification = db.query(GuestVerification).filter(
+                    GuestVerification.channel_name == channel
+                ).first()
+                
+                if verification:
+                    verification.verification_code = code
+                    verification.is_verified = True
+                    verification.verified_at = datetime.utcnow()
+                else:
+                    verification = GuestVerification(
+                        channel_name=channel,
+                        verification_code=code,
+                        is_verified=True,
+                        verified_at=datetime.utcnow()
+                    )
+                    db.add(verification)
+                
+                db.commit()
+                logger.info(f"Saved verification to database for channel: {channel}")
+            finally:
+                db.close()
+            
+        except Exception as e:
+            logger.error(f"Failed to save verification to database: {e}")
+
+    def load_verification_from_db(self, channel: str) -> bool:
+        """Загружает данные верификации из базы данных"""
+        try:
+            from .database import get_db, GuestVerification
+            db_gen = get_db()
+            db = next(db_gen)
+            try:
+                verification = db.query(GuestVerification).filter(
+                    GuestVerification.channel_name == channel,
+                    GuestVerification.is_verified == True
+                ).first()
+                
+                if verification:
+                    # Восстанавливаем данные в памяти
+                    self.pending_verifications[channel] = {
+                        "channel": channel,
+                        "code": verification.verification_code,
+                        "timestamp": verification.verified_at.timestamp(),
+                        "verified": True
+                    }
+                    logger.info(f"Loaded verification from database for channel: {channel}")
+                    return True
+                
+                return False
+            finally:
+                db.close()
+            
+        except Exception as e:
+            logger.error(f"Failed to load verification from database: {e}")
+            return False
+
+    def is_verified(self, channel: str) -> bool:
+        """Проверяет, верифицирован ли канал"""
+        if channel not in self.pending_verifications:
+            # НЕ загружаем из базы данных автоматически
+            # Данные из БД загружаются только при инициализации сервера
+            return False
+        
+        verification = self.pending_verifications[channel]
+        
+        # Если пользователь уже верифицирован, возвращаем True без проверки таймаута
+        # Активные сессии существуют до тех пор, пока не будут заменены новой верификацией
+        if verification.get("verified", False):
+            return True
+        
+        # Проверяем, не истек ли код только для неверифицированных пользователей (60 секунд)
+        if time.time() - verification["timestamp"] > 60:
+            del self.pending_verifications[channel]
+            return False
+        
+        return verification["verified"]
+
+    def cleanup_expired_verifications(self):
+        """Очищает истекшие коды верификации"""
+        current_time = time.time()
+        expired_channels = []
+        
+        for channel, verification in self.pending_verifications.items():
+            if current_time - verification["timestamp"] > 60:
+                expired_channels.append(channel)
+        
+        for channel in expired_channels:
+            del self.pending_verifications[channel]
+            logger.info(f"Cleaned up expired verification for channel {channel}")

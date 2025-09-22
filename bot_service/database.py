@@ -109,11 +109,16 @@ try:
         name = Column(String, unique=True, index=True, nullable=False)
         file_path = Column(String, nullable=False)
         reference_text = Column(String, nullable=True)
-        voice_type = Column(String, default='global') # 'global' or 'user'
-        owner_id = Column(String, nullable=True) # User ID from Twitch/etc.
-        is_public = Column(Boolean, default=True)
-        is_active = Column(Boolean, default=True)
+
+    class GuestVerification(Base):
+        """Модель для данных верификации гостевых подключений"""
+        __tablename__ = 'guest_verifications'
+        id = Column(Integer, primary_key=True, index=True)
+        channel_name = Column(String, unique=True, index=True, nullable=False)
+        verification_code = Column(String, nullable=False)
+        is_verified = Column(Boolean, default=False)
         created_at = Column(DateTime, default=datetime.utcnow)
+        verified_at = Column(DateTime, nullable=True)
         
         # Настройки генерации TTS (настраиваемые пользователем)
         cfg_strength = Column(Float, default=2.5)  # CFG strength (2.0-5.0 рекомендуется) - ЕДИНСТВЕННЫЙ настраиваемый параметр

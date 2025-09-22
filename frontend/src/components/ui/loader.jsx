@@ -1,55 +1,28 @@
 import React from 'react';
-import { cn } from '../../lib/utils';
+import { Loader2 } from 'lucide-react';
 
-const Loader = ({ className, size = "default", ...props }) => {
-  const sizeClasses = {
-    sm: "h-4 w-4",
-    default: "h-8 w-8", 
-    lg: "h-12 w-12",
-    xl: "h-16 w-16"
-  };
+export const Loader = ({ size = 'default', className = '' }) => {
+    const sizeClasses = {
+        sm: 'h-4 w-4',
+        default: 'h-6 w-6',
+        lg: 'h-8 w-8',
+        xl: 'h-12 w-12'
+    };
 
-  return (
-    <div
-      className={cn(
-        "animate-spin rounded-full border-2 border-muted border-t-purple-600",
-        sizeClasses[size],
-        className
-      )}
-      {...props}
-    />
-  );
+    return (
+        <div className={`flex items-center justify-center ${className}`}>
+            <Loader2 className={`animate-spin ${sizeClasses[size]}`} />
+        </div>
+    );
 };
 
-const LoaderWithText = ({ text = "Загрузка...", size = "default", className, ...props }) => {
-  return (
-    <div className={cn("flex items-center justify-center gap-2", className)} {...props}>
-      <Loader size={size} />
-      <span className="text-sm text-muted-foreground">{text}</span>
-    </div>
-  );
+export const PageLoader = ({ message = 'Загрузка...', className = '' }) => {
+    return (
+        <div className={`flex flex-col items-center justify-center min-h-[400px] space-y-4 ${className}`}>
+            <Loader size="xl" />
+            <p className="text-muted-foreground text-lg">{message}</p>
+        </div>
+    );
 };
 
-const PageLoader = ({ text = "Загрузка данных..." }) => {
-  return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <div className="flex flex-col items-center gap-4">
-        <Loader size="xl" />
-        <p className="text-lg text-muted-foreground">{text}</p>
-      </div>
-    </div>
-  );
-};
-
-const CardLoader = ({ text = "Загрузка..." }) => {
-  return (
-    <div className="flex items-center justify-center p-8">
-      <div className="flex flex-col items-center gap-3">
-        <Loader size="lg" />
-        <p className="text-sm text-muted-foreground">{text}</p>
-      </div>
-    </div>
-  );
-};
-
-export { Loader, LoaderWithText, PageLoader, CardLoader };
+export default Loader;

@@ -4,19 +4,17 @@ import { useAuth } from './AuthContext';
 
 const ActiveChannelsContext = createContext();
 
-export const useActiveChannels = () => {
-    const context = useContext(ActiveChannelsContext);
-    if (!context) {
-        throw new Error('useActiveChannels must be used within an ActiveChannelsProvider');
-    }
-    return context;
-};
-
 export const ActiveChannelsProvider = ({ children }) => {
     const [activeChannels, setActiveChannels] = useState([]);
+    const [isLoaded, setIsLoaded] = useState(false);
     const { isAuthenticated, user } = useAuth();
 
-    const loadActiveChannels = async () => {
+    const loadActiveChannels = async (forceReload = false) => {
+        // Если уже загружено и не принудительная перезагрузка, не обновляем
+        if (isLoaded && !forceReload) {
+            return;
+        }
+
         try {
             const channels = await getActiveChannels();
             
@@ -37,34 +35,38 @@ export const ActiveChannelsProvider = ({ children }) => {
                     avatar: getChannelAvatar(channel.username, channel.platform)
                 }));
                 setActiveChannels(channelsWithAvatars);
+                setIsLoaded(true);
             } else {
                 // Если API недоступен, показываем пустой список
                 setActiveChannels([]);
+                setIsLoaded(true);
             }
         } catch (error) {
             console.error('Failed to load active channels:', error);
             // В случае ошибки показываем пустой список
             setActiveChannels([]);
+            setIsLoaded(true);
         }
     };
 
     useEffect(() => {
-        // Загружаем каналы только если пользователь авторизован
-        if (isAuthenticated) {
+        // Загружаем каналы только если пользователь авторизован и еще не загружено
+        if (isAuthenticated && !isLoaded) {
             loadActiveChannels();
-        } else {
-            // Если не авторизован, очищаем список
+        } else if (!isAuthenticated) {
+            // Если не авторизован, очищаем список и сбрасываем флаг загрузки
             setActiveChannels([]);
+            setIsLoaded(false);
         }
-    }, [isAuthenticated, user?.id]); // Перезагружаем при изменении статуса авторизации
+    }, [isAuthenticated]); // Убрали user?.id из зависимостей
 
     useEffect(() => {
-        // Обновляем данные каждые 30 секунд только для авторизованных пользователей
+        // Обновляем данные каждые 60 секунд только для авторизованных пользователей
         if (!isAuthenticated) return;
         
         const interval = setInterval(() => {
-            loadActiveChannels();
-        }, 30000);
+            loadActiveChannels(true); // Принудительная перезагрузка
+        }, 60000); // Увеличили интервал до 60 секунд
 
         return () => clearInterval(interval);
     }, [isAuthenticated]);
@@ -79,4 +81,12 @@ export const ActiveChannelsProvider = ({ children }) => {
             {children}
         </ActiveChannelsContext.Provider>
     );
+};
+
+export const useActiveChannels = () => {
+    const context = useContext(ActiveChannelsContext);
+    if (!context) {
+        throw new Error('useActiveChannels must be used within an ActiveChannelsProvider');
+    }
+    return context;
 };

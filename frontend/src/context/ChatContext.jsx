@@ -2,7 +2,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { connectBot, disconnectBot, getBotStatus } from '../services/microservices';
 import { AuthContext, useAuth } from './AuthContext';
-import { toast } from 'sonner';
+import { useToast } from '../components/ui/toast';
+import { useNotification } from './NotificationContext';
 import { useIntegrations } from './IntegrationsContext';
 import api from '../services/api';
 
@@ -19,6 +20,8 @@ export const useChat = () => {
 export const ChatProvider = ({ children }) => {
     const { user, isAuthenticated } = useAuth();
     const { integrations, loading: integrationsLoading } = useIntegrations();
+    const { addToast } = useToast();
+    const { showNotification } = useNotification();
     const [messages, setMessages] = useState([]);
     const [lastJsonMessage, setLastJsonMessage] = useState(null); // <-- Добавлено
     const [isConnected, setIsConnected] = useState(false);
@@ -58,7 +61,6 @@ export const ChatProvider = ({ children }) => {
         };
 
         ws.onmessage = (event) => {
-            console.log("WebSocket message received:", event.data);
             const messageData = JSON.parse(event.data);
             setLastJsonMessage(messageData); // <-- Добавлено: сохраняем все сообщение
             
@@ -66,7 +68,7 @@ export const ChatProvider = ({ children }) => {
             if (messageData.type === 'tts_error') {
                 console.error('TTS Error:', messageData.message);
                 // Показываем красивое уведомление об ошибке
-                toast.error(messageData.message);
+                showNotification(messageData.message, 'error');
                 return;
             }
             
@@ -84,7 +86,6 @@ export const ChatProvider = ({ children }) => {
         };
 
         ws.onclose = () => {
-            console.log("WebSocket connection closed");
             websocket.current = null;
             // Попытка переподключения через 5 секунд
             setTimeout(setupWebSocket, 5000); 

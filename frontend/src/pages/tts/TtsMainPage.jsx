@@ -1,7 +1,7 @@
 // src/pages/tts/TtsMainPage.jsx
 import React, { useContext, useEffect, useState, useCallback } from 'react';
 import { useTts } from '../../context/TtsContext';
-import { useTtsHealth, TtsHealthProvider } from '../../context/TtsHealthContext';
+import { useTtsHealth } from '../../context/TtsHealthContext';
 import { useAuth } from '../../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,14 +10,20 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Loader, Link, Copy, Radio } from 'lucide-react';
 import { generateObsUrl } from '../../services/microservices';
+import { PageLoader } from '@/components/ui/loader';
+import { useLoadingState } from '../../hooks/useLoadingState';
+import TtsErrorCard from '../../components/TtsErrorCard';
 
 const TtsMainPageContent = () => {
-    const { ttsEnabled, toggleTts, isWhitelisted, engineStatus, initializeTts, setNotificationHandler } = useTts();
+    const { ttsEnabled, toggleTts, isWhitelisted, engineStatus, isToggling, initializeTts, setNotificationHandler, syncWithHealthContext } = useTts();
     const { isHealthy, isChecking } = useTtsHealth();
     const { isAuthenticated, user } = useAuth();
     const [notification, setNotification] = useState(null);
     const [listeningMode, setListeningMode] = useState('website'); // 'website' или 'obs'
     const [obsUrl, setObsUrl] = useState('');
+    
+    // Используем хук для управления состоянием загрузки
+    const showLoader = useLoadingState(isChecking);
     
     // Функция для показа уведомления
     const showNotification = useCallback((message, type = 'error') => {
@@ -95,20 +101,33 @@ const TtsMainPageContent = () => {
     useEffect(() => {
         initializeTts();
     }, [initializeTts]);
+
+    // Синхронизируем с TtsHealthContext при изменении isHealthy
+    useEffect(() => {
+        console.log('TtsMainPage: Syncing with health context, isHealthy:', isHealthy);
+        syncWithHealthContext(isHealthy);
+    }, [isHealthy, syncWithHealthContext]);
     
     // Регистрируем функцию уведомлений в TtsContext (после определения showNotification)
     useEffect(() => {
         console.log('TtsMainPage: Registering notification handler');
+        console.log('TtsMainPage: showNotification function:', typeof showNotification);
         setNotificationHandler(showNotification);
+        
+        // Проверяем, что handler установился
+        setTimeout(() => {
+            console.log('TtsMainPage: Notification handler should be set now');
+        }, 100);
     }, [setNotificationHandler, showNotification]);
 
     // Проверяем whitelist статус для гостей только при необходимости
     // (убрали автоматическую проверку при загрузке)
 
-    const handleToggle = useCallback(async () => {
+    const handleToggle = useCallback(async (event) => {
         console.log('TtsMainPage: handleToggle called');
         console.log('TtsMainPage: engineStatus.error:', engineStatus.error);
         console.log('TtsMainPage: ttsEnabled:', ttsEnabled);
+        console.log('TtsMainPage: showNotification function available:', typeof showNotification);
         
         if (engineStatus.error) {
             console.log('TtsMainPage: Showing error notification');
@@ -118,42 +137,41 @@ const TtsMainPageContent = () => {
         
         console.log('TtsMainPage: Calling toggleTts');
         // Переключаем TTS (whitelist проверка происходит внутри toggleTts)
-        await toggleTts();
+        try {
+            await toggleTts(event);
+        } catch (error) {
+            console.error('TtsMainPage: Error in toggleTts:', error);
+            showNotification('Произошла ошибка при переключении TTS');
+        }
     }, [engineStatus.error, showNotification, toggleTts, ttsEnabled]);
 
-    // Заглушка когда TTS недоступен
-    if (!isHealthy && !isChecking) {
+    // Показываем прелоадер пока проверяется health или не инициализирован TTS
+    if (showLoader) {
         return (
             <div className="container mx-auto p-4">
-                <h1 className="text-2xl font-bold mb-4">Озвучка сообщений</h1>
-                <Card className="bg-red-500/10 border-red-500/30">
-                    <CardHeader>
-                        <CardTitle className="text-red-400">TTS сервер недоступен</CardTitle>
-                        <CardDescription className="text-red-300">
-                            В данный момент сервис TTS недоступен. Озвучка сообщений временно отключена.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-center space-x-4">
-                            <Button disabled className="opacity-50">
-                                Включить озвучку
-                            </Button>
-                            <p className="text-sm text-red-500">
-                                Статус: Недоступно
-                            </p>
-                        </div>
-                        <p className="text-slate-400 text-sm mt-4">
-                            Попробуйте обновить страницу через несколько минут.
-                        </p>
-                    </CardContent>
-                </Card>
+                <h1 className="text-3xl font-bold mb-4">Озвучка сообщений</h1>
+                <PageLoader message="Проверка состояния TTS сервиса..." />
+            </div>
+        );
+    }
+
+    // Заглушка когда TTS недоступен
+    if (!isHealthy) {
+        return (
+            <div className="container mx-auto p-4">
+                <h1 className="text-2xl font-semibold text-white mb-6">Озвучка сообщений</h1>
+                <TtsErrorCard
+                    title="TTS сервер недоступен"
+                    description="В данный момент сервис TTS недоступен. Озвучка сообщений временно отключена."
+                    suggestion="Попробуйте обновить страницу через несколько минут."
+                />
             </div>
         );
     }
 
     return (
         <div className="container mx-auto p-4 relative">
-            <h1 className="text-2xl font-bold mb-4">Озвучка сообщений</h1>
+            <h1 className="text-3xl font-bold mb-4">Озвучка сообщений</h1>
             
             {/* Анимированное уведомление */}
             {notification && (
@@ -199,10 +217,8 @@ const TtsMainPageContent = () => {
                 <CardHeader>
                     <CardTitle>Управление озвучкой</CardTitle>
                     <CardDescription>
-                        Включите или выключите озвучку сообщений из чата.
-                        {!isAuthenticated && !isConnected && <span className="text-yellow-500 block mt-2">Сначала подключите бота к каналу.</span>}
-                        {isWhitelisted === null && isAuthenticated && <span className="text-yellow-500 block mt-2">Проверка whitelist...</span>}
-                        {engineStatus.error && <span className="text-red-500 block mt-2">Ошибка сервиса: {engineStatus.error}</span>}
+                        {!isAuthenticated && !isConnected && <span className="text-yellow-500">Сначала подключите бота к каналу.</span>}
+                        {isWhitelisted === null && isAuthenticated && <span className="text-yellow-500">Проверка whitelist...</span>}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -210,12 +226,15 @@ const TtsMainPageContent = () => {
                         <div className="flex items-center space-x-3">
                             <Switch
                                 checked={ttsEnabled}
-                                onCheckedChange={handleToggle}
-                                disabled={(!isAuthenticated && !isConnected) || !engineStatus.loaded}
+                                onCheckedChange={(checked) => handleToggle()}
+                                disabled={(!isAuthenticated && !isConnected) || !engineStatus.loaded || isToggling}
                             />
                             <span className="text-sm font-medium">
                                 {ttsEnabled ? 'Выключить озвучку чата' : 'Включить озвучку чата'}
                             </span>
+                            {isToggling && (
+                                <Loader className="h-4 w-4 animate-spin text-primary" />
+                            )}
                         </div>
                         
                         <div className="flex items-center space-x-2">
@@ -314,11 +333,7 @@ const TtsMainPageContent = () => {
 };
 
 const TtsMainPage = () => {
-    return (
-        <TtsHealthProvider>
-            <TtsMainPageContent />
-        </TtsHealthProvider>
-    );
+    return <TtsMainPageContent />;
 };
 
 export default TtsMainPage;

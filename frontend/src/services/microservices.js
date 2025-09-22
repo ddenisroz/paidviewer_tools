@@ -10,8 +10,19 @@ const ttsService = axios.create({
 });
 
 // --- Authentication ---
-export const loginTwitch = () => {
-    window.location.href = `${botService.defaults.baseURL}/api/auth/twitch/login`;
+export const loginTwitch = async () => {
+    try {
+        // Получаем URL авторизации от API
+        const response = await botService.get('/api/auth/twitch/login');
+        const { auth_url } = response.data;
+        
+        // Перенаправляем на Twitch OAuth
+        window.location.href = auth_url;
+    } catch (error) {
+        console.error('❌ Ошибка при получении URL авторизации:', error);
+        // Fallback на старый способ
+        window.location.href = `${botService.defaults.baseURL}/auth/twitch`;
+    }
 };
 
 export const logout = async () => {
@@ -44,8 +55,9 @@ export const disableTts = async () => {
     return await botService.post('/api/tts/disable');
 };
 
-export const getTtsStatus = async () => {
-    return await botService.get('/api/tts/status');
+export const getTtsStatus = async (channelName = null) => {
+    const params = channelName ? { channel_name: channelName } : {};
+    return await botService.get('/api/tts/status', { params });
 };
 
 export const generateObsUrl = async () => {

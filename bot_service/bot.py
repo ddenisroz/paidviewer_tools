@@ -39,6 +39,78 @@ class Bot(commands.Bot):
             logger.info(f"Message from blocked bot {message.author.name} ignored")
             return
 
+        # Проверяем верификацию для гостевых подключений
+        channel_name = message.channel.name.lower()
+        
+        # Если канал в процессе верификации, проверяем код
+        # Проверяем как основной ключ, так и новый ключ для дополнительной верификации
+        verification_keys = [channel_name, f"{channel_name}_new"]
+        verification_found = False
+        
+        for key in verification_keys:
+            if key in self.connection_manager.pending_verifications:
+                verification = self.connection_manager.pending_verifications[key]
+                if not verification.get("verified", False):
+                    # Проверяем, содержит ли сообщение код верификации
+                    if self.connection_manager.check_verification(key, message.content, message.author.name):
+                        logger.info(f"Channel {channel_name} verified by {message.author.name} using key {key}")
+                        
+                        # Если это новая верификация, отключаем предыдущую сессию
+                        if key == f"{channel_name}_new":
+                            # Очищаем старую верификацию
+                            if channel_name in self.connection_manager.pending_verifications:
+                                del self.connection_manager.pending_verifications[channel_name]
+                            # Переименовываем новую верификацию в основную
+                            self.connection_manager.pending_verifications[channel_name] = verification
+                            del self.connection_manager.pending_verifications[key]
+                        
+                        # Отправляем подтверждение в чат
+                        await message.channel.send(f"✅ Верификация успешна! Добро пожаловать, {message.author.name}!")
+                        verification_found = True
+                        break
+                    else:
+                        # Если код не найден, очищаем данные верификации для этого ключа
+                        logger.warning(f"Verification failed for channel {channel_name} by {message.author.name} using key {key}, clearing verification data...")
+                        del self.connection_manager.pending_verifications[key]
+                        
+                        # Если это была последняя попытка верификации, отключаем бота от канала
+                        remaining_verifications = [k for k in self.connection_manager.pending_verifications.keys() if k.startswith(channel_name)]
+                        if not remaining_verifications:
+                            logger.info(f"No more verification attempts for channel {channel_name}, disconnecting bot...")
+                            
+                            # Уведомляем пользователя о неудачной верификации
+                            await message.channel.send(f"❌ Верификация не удалась. Бот отключается от канала {channel_name}.")
+                            
+                            await self.leave_channel(channel_name)
+                            
+                            # Очищаем данные верификации из базы данных
+                            try:
+                                from bot_service.database import get_db, GuestVerification
+                                db_gen = get_db()
+                                db = next(db_gen)
+                                try:
+                                    db.query(GuestVerification).filter(
+                                        GuestVerification.channel_name == channel_name
+                                    ).delete()
+                                    db.commit()
+                                    logger.info(f"Cleared verification data from database for channel: {channel_name}")
+                                finally:
+                                    db.close()
+                            except Exception as e:
+                                logger.error(f"Failed to clear verification data from database: {e}")
+                        
+                        verification_found = True
+                        break
+                else:
+                    # Канал уже верифицирован, не проверяем повторно
+                    logger.debug(f"Channel {channel_name} already verified with key {key}, skipping verification check")
+                    verification_found = True
+                    break
+        
+        if not verification_found:
+            # Канал не в процессе верификации, значит он авторизованный или уже верифицирован
+            logger.debug(f"Channel {channel_name} not in verification process, skipping verification check")
+
         # Обрабатываем команды
         await self.handle_commands(message)
         
@@ -157,7 +229,7 @@ class Bot(commands.Bot):
     async def event_channel_joined(self, channel):
         """Вызывается когда бот присоединяется к каналу"""
         logger.info(f'Joined channel: {channel.name}')
-        await channel.send("🤖 Бот подключен! Используйте !help для списка команд")
+        # Убираем сообщение в чат для гостевого режима
 
     async def event_channel_left(self, channel):
         """Вызывается когда бот покидает канал"""

@@ -6,10 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Mic, Check, X, AlertCircle, Loader } from 'lucide-react';
-import { toast } from 'sonner';
+import { useNotification } from '../context/NotificationContext';
 import api from '../services/api';
 
 const GuestTtsCard = () => {
+    const { showNotification } = useNotification();
     const [channel, setChannel] = useState('');
     const [platform, setPlatform] = useState('twitch');
     const [isConnecting, setIsConnecting] = useState(false);
@@ -19,6 +20,19 @@ const GuestTtsCard = () => {
     const [ttsStatus, setTtsStatus] = useState({ ready: false, loaded: false });
     const [voices, setVoices] = useState([]);
     const [selectedVoice, setSelectedVoice] = useState('');
+    const [verificationRequired, setVerificationRequired] = useState(false);
+    const [verificationCode, setVerificationCode] = useState('');
+    const [verificationTimeout, setVerificationTimeout] = useState(0);
+    const [isVerified, setIsVerified] = useState(false);
+
+    // Отладочные логи для состояния верификации
+    useEffect(() => {
+        console.log('GuestTtsCard: verificationRequired changed:', verificationRequired);
+    }, [verificationRequired]);
+
+    useEffect(() => {
+        console.log('GuestTtsCard: verificationCode changed:', verificationCode);
+    }, [verificationCode]);
 
     // Убираем автоматические запросы - они будут вызываться только при подключении к каналу
     // useEffect(() => {
@@ -42,11 +56,21 @@ const GuestTtsCard = () => {
 
     const loadTtsStatus = async () => {
         try {
-            const response = await api.get('/api/tts/status');
-            setTtsStatus(response.data);
-            setTtsEnabled(response.data.enabled);
+            if (!channel) {
+                setTtsStatus({ enabled: false, message: 'Канал не выбран' });
+                setTtsEnabled(false);
+                return;
+            }
+            
+            // Используем универсальный endpoint с channel_name
+            const response = await api.get(`/api/tts/status?channel_name=${channel}`);
+            const { enabled } = response.data;
+            setTtsStatus({ enabled, ready: true, loaded: true });
+            setTtsEnabled(enabled);
         } catch (error) {
             console.error('Error loading TTS status:', error);
+            setTtsStatus({ enabled: false, message: 'Ошибка загрузки статуса TTS' });
+            setTtsEnabled(false);
         }
     };
 
@@ -62,9 +86,43 @@ const GuestTtsCard = () => {
         }
     };
 
+    const startVerificationTimer = () => {
+        let timeLeft = verificationTimeout;
+        const timer = setInterval(() => {
+            timeLeft -= 1;
+            setVerificationTimeout(timeLeft);
+            
+            if (timeLeft <= 0) {
+                clearInterval(timer);
+                // Проверяем статус верификации
+                checkVerificationStatus();
+            }
+        }, 1000);
+    };
+
+    const checkVerificationStatus = async () => {
+        try {
+            const response = await api.get(`/api/chat/guest/status?channel_name=${channel}`);
+            if (response.data.verified) {
+                setIsVerified(true);
+                setVerificationRequired(false);
+                showNotification('Верификация успешна! Добро пожаловать!', 'success');
+                await loadTtsStatus();
+                await loadVoices();
+            } else if (response.data.connected === false) {
+                // Бот отключился из-за неудачной верификации
+                setVerificationRequired(false);
+                setIsConnected(false);
+                showNotification('Верификация не пройдена. Бот отключился от канала.', 'error');
+            }
+        } catch (error) {
+            console.error('Error checking verification status:', error);
+        }
+    };
+
     const connectToChannel = async () => {
         if (!channel.trim()) {
-            toast.error('Введите название канала');
+            showNotification('Введите название канала', 'error');
             return;
         }
 
@@ -73,21 +131,33 @@ const GuestTtsCard = () => {
             // Сначала загружаем разрешенные каналы
             await loadAllowedChannels();
             
-            const response = await api.post('/api/tts/connect-guest', {
-                channel: channel.trim(),
-                platform
+            const response = await api.post('/api/chat/guest/connect', {
+                channel_name: channel.trim()
             });
 
-            if (response.data.success) {
+            console.log('GuestTtsCard: API response:', response.data);
+
+            if (response.data.verification_required) {
+                console.log('GuestTtsCard: Verification required, setting up verification UI');
+                setIsConnected(true); // Бот подключен, но требует верификации
+                setVerificationRequired(true);
+                setVerificationCode(response.data.verification_code);
+                setVerificationTimeout(response.data.timeout);
+                showNotification(`Бот подключен! Отправьте код "${response.data.verification_code}" в чат канала ${channel} для верификации`, 'warning');
+                
+                // Запускаем таймер верификации
+                startVerificationTimer();
+            } else if (response.data.message) {
                 setIsConnected(true);
-                toast.success(`Подключен к каналу ${channel} на ${platform}`);
+                setIsVerified(true);
+                showNotification(`Подключен к каналу ${channel}`, 'success');
                 // Загружаем TTS статус и голоса только после успешного подключения
                 await loadTtsStatus();
                 await loadVoices();
             }
         } catch (error) {
             const errorMessage = error.response?.data?.detail || 'Ошибка подключения';
-            toast.error(errorMessage);
+            showNotification(errorMessage, 'error');
         } finally {
             setIsConnecting(false);
         }
@@ -96,16 +166,16 @@ const GuestTtsCard = () => {
     const toggleTts = async () => {
         try {
             if (ttsEnabled) {
-                await api.post('/api/tts/disable');
+                await api.post('/api/tts/guest/disable', { channel_name: channel });
                 setTtsEnabled(false);
-                toast.success('TTS отключен');
+                showNotification('TTS отключен', 'success');
             } else {
-                await api.post('/api/tts/enable');
+                await api.post('/api/tts/guest/enable', { channel_name: channel });
                 setTtsEnabled(true);
-                toast.success('TTS включен');
+                showNotification('TTS включен', 'success');
             }
         } catch (error) {
-            toast.error('Ошибка переключения TTS');
+            showNotification('Ошибка переключения TTS', 'error');
         }
     };
 
@@ -129,10 +199,10 @@ const GuestTtsCard = () => {
             setTtsStatus({ ready: false, loaded: false });
             setVoices([]);
             setSelectedVoice('');
-            toast.success('Отключен от канала');
+            showNotification('Отключен от канала', 'success');
         } catch (error) {
             console.error('Error disconnecting:', error);
-            toast.error('Ошибка отключения от канала');
+            showNotification('Ошибка отключения от канала', 'error');
         }
     };
 
@@ -222,6 +292,38 @@ const GuestTtsCard = () => {
                             </Button>
                         )}
                     </div>
+
+                    {/* Верификация */}
+                    {console.log('GuestTtsCard: Rendering verificationRequired:', verificationRequired)}
+                    {verificationRequired && (
+                        <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                            <div className="flex items-center gap-2 mb-2">
+                                <AlertCircle className="h-5 w-5 text-yellow-500" />
+                                <span className="font-medium text-yellow-500">Требуется верификация</span>
+                            </div>
+                            <p className="text-sm text-yellow-300 mb-3">
+                                Отправьте в чат канала <strong>{channel}</strong> следующий код:
+                            </p>
+                            <div className="bg-yellow-500/20 p-3 rounded border border-yellow-500/50 mb-3">
+                                <code className="text-lg font-mono font-bold text-yellow-100">
+                                    {verificationCode}
+                                </code>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-yellow-300">
+                                    Осталось времени: {verificationTimeout} сек
+                                </span>
+                                <Button
+                                    onClick={checkVerificationStatus}
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-yellow-500 text-yellow-500 hover:bg-yellow-500/20"
+                                >
+                                    Проверить статус
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Статус подключения */}
@@ -234,8 +336,9 @@ const GuestTtsCard = () => {
                             </span>
                         </div>
 
-                        {/* TTS управление */}
-                        <div className="space-y-4">
+                        {/* TTS управление - только после верификации */}
+                        {isVerified && (
+                            <div className="space-y-4">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <h3 className="font-medium">TTS озвучка</h3>
@@ -304,7 +407,8 @@ const GuestTtsCard = () => {
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </CardContent>

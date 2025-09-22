@@ -43,7 +43,11 @@ const Header = () => {
             {userMode === 'guest' ? (
                 <div className="flex items-center space-x-3">
                     <span className="text-sm text-slate-400">Режим гостя</span>
-                    <Button onClick={handleLoginRedirect} variant="outline" size="lg">
+                    <Button onClick={logout} className="h-10 px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white border border-red-600 hover:border-red-700 rounded-md">
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Отключиться
+                    </Button>
+                    <Button onClick={handleLoginRedirect} className="h-10 px-4 py-2 text-sm font-medium bg-green-600 hover:bg-green-700 text-white border border-green-600 hover:border-green-700 rounded-md">
                         <LogIn className="mr-2 h-4 w-4" />
                         Войти
                     </Button>

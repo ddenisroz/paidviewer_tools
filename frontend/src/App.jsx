@@ -8,7 +8,6 @@ import VoiceManagementPage from './pages/tts/VoiceManagementPage';
 import SettingsPage from './pages/SettingsPage';
 import AdminPage from './pages/AdminPage';
 import AuthGuard from './components/AuthGuard'; // Импортируем нашего защитника
-import { Toaster } from 'sonner';
 import './App.css';
 import MediaMainPage from './pages/media/MediaMainPage';
 import ChannelPointsPage from './pages/media/ChannelPointsPage';
@@ -19,7 +18,7 @@ import ObsTtsPage from './pages/tts/ObsTtsPage';
 import ViewersPage from './pages/ViewersPage';
 
 function App() {
-  const { loading, userMode } = useAuth();
+  const { loading, userMode, user } = useAuth();
 
   // Пока идет проверка аутентификации, ничего не рендерим (или показываем лоадер)
   if (loading) {
@@ -32,11 +31,10 @@ function App() {
 
   return (
     <>
-      <Toaster position="bottom-right" richColors />
       <Routes>
         {/* Главная страница редиректит в зависимости от статуса */}
         <Route path="/" element={
-          userMode ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
+          user ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
         } />
         
         {/* Публичные роуты */}

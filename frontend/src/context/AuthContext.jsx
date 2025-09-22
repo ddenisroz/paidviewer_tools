@@ -3,7 +3,7 @@ import React, { createContext, useState, useEffect, useCallback, useMemo, useCon
 import { useNavigate } from 'react-router-dom';
 import { getUser, logout as logoutUser } from '../services/microservices';
 import api from '../services/api'; // Import the api instance
-import { toast } from 'sonner';
+import { useToast } from '../components/ui/toast';
 
 export const AuthContext = createContext();
 
@@ -39,8 +39,22 @@ export const AuthProvider = ({ children }) => {
         return null;
     };
     
-    const setGuestMode = (guestData = null) => {
+    const setGuestMode = async (guestData = null) => {
         if (guestData) {
+            // Проверяем, не заблокирован ли канал для гостевого режима
+            try {
+                const response = await api.get(`/api/chat/guest/check-blocked?channel_name=${guestData.username}`);
+                if (response.data.blocked) {
+                    throw new Error('Этот канал заблокирован для гостевого режима. Пожалуйста, авторизуйтесь через Twitch.');
+                }
+            } catch (error) {
+                if (error.message.includes('заблокирован')) {
+                    throw error;
+                }
+                // Если ошибка не связана с блокировкой, продолжаем
+                console.warn('Could not check channel block status:', error);
+            }
+
             const userData = {
                 id: 'guest',
                 username: guestData.username,
@@ -57,6 +71,7 @@ export const AuthProvider = ({ children }) => {
                 });
                 // Устанавливаем сессионный cookie (до закрытия браузера)
                 document.cookie = `guestData=${encodeURIComponent(cookieData)}; path=/; SameSite=Lax`;
+                console.log('AuthContext: Saved guest data to cookie:', cookieData);
             } catch (error) {
                 console.warn('Failed to save guest data to cookies:', error);
             }
@@ -70,6 +85,8 @@ export const AuthProvider = ({ children }) => {
             });
             // Удаляем cookie
             document.cookie = 'guestData=; max-age=0; path=/';
+            // Очищаем TTS health статус при отключении гостевого режима
+            localStorage.removeItem('tts_health_status');
         }
         updateUserMode('guest');
     };
@@ -101,8 +118,10 @@ export const AuthProvider = ({ children }) => {
             } else {
                 // Если нет авторизованного пользователя, проверяем режим гостя
                 const savedUserMode = localStorage.getItem('userMode');
+                console.log('AuthContext: Checking guest mode, savedUserMode:', savedUserMode);
                 if (savedUserMode === 'guest') {
                     const guestData = getCookie('guestData');
+                    console.log('AuthContext: Guest data from cookie:', guestData);
                     if (guestData && guestData.username) {
                         const guestUser = {
                             id: 'guest',
@@ -113,6 +132,28 @@ export const AuthProvider = ({ children }) => {
                         };
                         setUser(guestUser);
                         updateUserMode('guest');
+                        
+                        // Проверяем статус верификации гостевого режима
+                        try {
+                            const statusResponse = await api.get(`/api/chat/guest/status?channel_name=${guestData.username}`);
+                            console.log('AuthContext: Guest status check:', statusResponse.data);
+                            if (statusResponse.data.verified && statusResponse.data.connected) {
+                                // Гость верифицирован и бот подключен, восстанавливаем режим
+                                console.log('AuthContext: Guest mode verified and bot connected, restoring guest mode');
+                            } else {
+                                // Гость не верифицирован или бот не подключен, сбрасываем режим
+                                console.log('AuthContext: Guest mode not verified or bot not connected, clearing guest data');
+                                updateUserMode(null);
+                                document.cookie = 'guestData=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                                setUser(null);
+                            }
+                        } catch (error) {
+                            console.error('Failed to check guest verification status:', error);
+                            // При ошибке сбрасываем режим гостя
+                            updateUserMode(null);
+                            document.cookie = 'guestData=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                            setUser(null);
+                        }
                     } else {
                         setUser(null);
                     }
@@ -139,6 +180,9 @@ export const AuthProvider = ({ children }) => {
                     };
                     setUser(guestUser);
                     updateUserMode('guest');
+                    
+                    // НЕ подключаем бота автоматически - пользователь должен пройти верификацию заново
+                    console.log('Guest mode restored, but bot reconnection requires new verification');
                 } else {
                     setUser(null);
                 }
@@ -152,26 +196,54 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         checkUserStatus();
-    }, [checkUserStatus]);
+    }, []); // Remove checkUserStatus from dependencies to prevent infinite loop
 
-    const login = () => {
+    const login = async () => {
         console.log('🔐 Попытка входа через Twitch...');
-        // Перенаправляем на страницу авторизации Twitch
-        window.location.href = 'http://localhost:8000/api/auth/twitch/login';
+        try {
+            // Получаем URL авторизации от API
+            const response = await api.get('/api/auth/twitch/login');
+            const { auth_url } = response.data;
+            
+            // Перенаправляем на Twitch OAuth
+            window.location.href = auth_url;
+        } catch (error) {
+            console.error('❌ Ошибка при получении URL авторизации:', error);
+            // Fallback на старый способ
+            window.location.href = 'http://localhost:8000/auth/twitch';
+        }
     };
 
     const logout = async () => {
+        // Если пользователь в гостевом режиме, отключаем бота от канала
+        if (user && user.isGuest && user.username) {
+            try {
+                await api.post('/api/chat/guest/disconnect', {
+                    channel_name: user.username
+                });
+                console.log('Bot disconnected from channel:', user.username);
+            } catch (error) {
+                console.error('Failed to disconnect bot from channel:', error);
+            }
+        }
+        
         try {
             await logoutUser(); // Вызываем logout на сервере для очистки сессии
         } catch (error) {
-             console.error('Server logout failed, proceeding with client-side logout:', error);
+            console.error('Server logout failed, proceeding with client-side logout:', error);
         }
         
         // Очищаем состояние на клиенте
         setUser(null);
         updateUserMode(null);
-        // Удаляем cookie
+        
+        // Удаляем все гостевые данные
         document.cookie = 'guestData=; max-age=0; path=/';
+        localStorage.removeItem('userMode');
+        
+        // Очищаем TTS health статус из localStorage
+        localStorage.removeItem('tts_health_status');
+        
         navigate('/login');
     };
     
@@ -196,4 +268,10 @@ export const AuthProvider = ({ children }) => {
     );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+    const context = useContext(AuthContext);
+    if (context === undefined) {
+        throw new Error('useAuth must be used within an AuthProvider');
+    }
+    return context;
+};
