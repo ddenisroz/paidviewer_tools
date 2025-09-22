@@ -66,7 +66,7 @@ class UpdateTitleRequest(BaseModel):
     title: str
 
 class UpdateCategoryRequest(BaseModel):
-    category_id: str
+    categoryId: str
 
 # OBS models
 class ObsUrlResponse(BaseModel):

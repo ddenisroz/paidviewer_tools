@@ -53,6 +53,8 @@ try:
         created_at = Column(DateTime, default=datetime.utcnow)
         is_admin = Column(Boolean, default=False)
         settings = Column(JSON, default={}) # Хранение настроек (голос, громкость и т.д.)
+        session_id = Column(String, unique=True, index=True, nullable=True)  # ID активной сессии
+        last_activity = Column(DateTime, default=datetime.utcnow)
 
     class WhitelistedChannel(Base):
         """Модель канала в белом списке"""
@@ -131,6 +133,50 @@ try:
         silence_duration_ms = Column(Integer, default=100)
         sway_sampling_coef = Column(Float, default=-1.0)
 
+    class BlockedChannel(Base):
+        """Модель для заблокированных каналов"""
+        __tablename__ = 'blocked_channels'
+        id = Column(Integer, primary_key=True, index=True)
+        channel_name = Column(String, unique=True, index=True, nullable=False)
+        reason = Column(String, nullable=True)  # Причина блокировки
+        blocked_by = Column(String, nullable=True)  # Кто заблокировал
+        created_at = Column(DateTime, default=datetime.utcnow)
+        is_active = Column(Boolean, default=True)  # Активна ли блокировка
+
+    class UserToken(Base):
+        """Модель токенов пользователей для разных платформ"""
+        __tablename__ = 'user_tokens'
+        id = Column(Integer, primary_key=True, index=True)
+        user_id = Column(String, ForeignKey('users.id'), nullable=False)
+        platform = Column(String, nullable=False)  # 'twitch' или 'vk'
+        access_token = Column(String, nullable=False)
+        refresh_token = Column(String, nullable=True)
+        expires_at = Column(DateTime, nullable=True)
+        created_at = Column(DateTime, default=datetime.utcnow)
+        updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    class UserSession(Base):
+        """Модель активных сессий пользователей"""
+        __tablename__ = 'user_sessions'
+        id = Column(Integer, primary_key=True, index=True)
+        user_id = Column(String, ForeignKey('users.id'), nullable=False)
+        session_id = Column(String, unique=True, index=True, nullable=False)
+        platform_data = Column(JSON, default={})  # Какие платформы активны в сессии
+        device_info = Column(JSON, nullable=True)  # Информация об устройстве
+        created_at = Column(DateTime, default=datetime.utcnow)
+        last_activity = Column(DateTime, default=datetime.utcnow)
+        is_active = Column(Boolean, default=True)
+
+    class VkGuestVerification(Base):
+        """Модель для данных верификации VK Live гостевых подключений"""
+        __tablename__ = 'vk_guest_verifications'
+        id = Column(Integer, primary_key=True, index=True)
+        channel_name = Column(String, unique=True, index=True, nullable=False)
+        verification_code = Column(String, nullable=False)
+        is_verified = Column(Boolean, default=False)
+        created_at = Column(DateTime, default=datetime.utcnow)
+        verified_at = Column(DateTime, nullable=True)
+
 
     def get_db():
         """Функция-генератор для получения сессии БД"""
@@ -139,37 +185,6 @@ try:
             yield db
         finally:
             db.close()
-
-    def init_db():
-        """Инициализирует базу данных и создает таблицы, если их нет."""
-        try:
-            # Создаем все таблицы
-            Base.metadata.create_all(bind=engine)
-            logger.info("✅ База данных успешно инициализирована.")
-
-            # Добавление ботов по умолчанию, если их нет
-            db = SessionLocal()
-            try:
-                existing_bots = {bot.bot_name for bot in db.query(BlockedBot).all()}
-                for bot_name in DEFAULT_BLOCKED_BOTS:
-                    if bot_name not in existing_bots:
-                        db_bot = BlockedBot(bot_name=bot_name)
-                        db.add(db_bot)
-                
-                # Добавление голосов по умолчанию, если их нет
-                existing_voices = {voice.name for voice in db.query(Voice).all()}
-                for voice_data in DEFAULT_VOICES:
-                    if voice_data["name"] not in existing_voices:
-                        db_voice = Voice(**voice_data)
-                        db.add(db_voice)
-                
-                db.commit()
-            finally:
-                db.close()
-
-        except Exception as e:
-            logger.error(f"❌ Ошибка инициализации базы данных: {e}")
-            raise
 
 except Exception as e:
     logger.error(f"❌ Не удалось сконфигурировать базу данных: {e}")
@@ -182,3 +197,33 @@ except Exception as e:
         raise RuntimeError("База данных не сконфигурирована")
     def init_db():
         raise RuntimeError("База данных не сконфигурирована")
+
+def init_db():
+    """Инициализирует базу данных и создает таблицы, если их нет."""
+    if engine is None:
+        logger.error("❌ База данных не сконфигурирована")
+        return
+        
+    # Создаем все таблицы
+    Base.metadata.create_all(bind=engine)
+    logger.info("✅ База данных успешно инициализирована.")
+
+    # Добавление ботов по умолчанию, если их нет
+    db = SessionLocal()
+    try:
+        existing_bots = {bot.bot_name for bot in db.query(BlockedBot).all()}
+        for bot_name in DEFAULT_BLOCKED_BOTS:
+            if bot_name not in existing_bots:
+                db_bot = BlockedBot(bot_name=bot_name)
+                db.add(db_bot)
+        
+        # Добавление голосов по умолчанию, если их нет
+        existing_voices = {voice.name for voice in db.query(Voice).all()}
+        for voice_data in DEFAULT_VOICES:
+            if voice_data["name"] not in existing_voices:
+                db_voice = Voice(**voice_data)
+                db.add(db_voice)
+        
+        db.commit()
+    finally:
+        db.close()

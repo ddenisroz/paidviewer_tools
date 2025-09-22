@@ -31,17 +31,17 @@ const StreamStatsCard = ({
     loading 
 }) => {
     return (
-        <Card className={`h-80 transition-all duration-300 ${integrations.twitch?.enabled ? 'border-green-500/50 bg-green-500/5 shadow-lg' : 'border-muted/30 bg-muted/20 opacity-60'}`}>
+        <Card className={`transition-all duration-300 ${integrations.twitch?.enabled ? 'border-green-500/50 bg-green-500/5 shadow-lg' : 'border-muted/30 bg-muted/20 opacity-60'}`}>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Activity className={`h-6 w-6 ${integrations.twitch?.enabled ? 'text-green-500' : 'text-muted-foreground'}`} />
                     {currentViewers > 0 ? 'Онлайн' : 'Офлайн'}
                 </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
                 {integrations.twitch?.enabled ? (
-                    <div className="h-full flex flex-col justify-between">
-                        <div className="h-40 -ml-4 -mr-2 -mb-4">
+                    <div className="flex flex-col space-y-4">
+                        <div className="h-40">
                             {loading.history ? (
                                 <div className="flex justify-center items-center h-full"><Loader /></div>
                             ) : streamHistory.length > 0 ? (
@@ -58,7 +58,7 @@ const StreamStatsCard = ({
                                 <div className="flex justify-center items-center h-full text-muted-foreground text-sm">Нет данных для отображения. <br/> Сбор статистики начнется автоматически.</div>
                             )}
                         </div>
-                        <div className="flex justify-between items-center mt-4">
+                        <div className="flex justify-between items-center">
                             <div className="flex gap-4">
                                 <div className="flex items-center gap-2">
                                     <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
@@ -68,7 +68,7 @@ const StreamStatsCard = ({
                         </div>
                     </div>
                 ) : (
-                    <div className="h-full flex items-center justify-center text-muted-foreground">
+                    <div className="flex items-center justify-center text-muted-foreground">
                         <div className="text-center">
                             <Circle className="h-12 w-12 mx-auto mb-2" />
                             <p className="text-sm">Интеграция с Twitch отключена</p>

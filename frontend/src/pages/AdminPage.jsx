@@ -149,6 +149,46 @@ const AdminPage = () => {
                         <CardContent className="p-4">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-green-600/20 rounded-lg">
+                                    <Shield className="h-5 w-5 text-green-400" />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-slate-400">Активные сессии</p>
+                                    <Button
+                                        variant="link"
+                                        onClick={() => navigate('/dolbaeb-admin-secure-panel/sessions')}
+                                        className="p-0 h-auto text-white hover:text-green-400"
+                                    >
+                                        Управление
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    
+                    <Card className="bg-slate-800/50 border-slate-700">
+                        <CardContent className="p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-red-600/20 rounded-lg">
+                                    <Shield className="h-5 w-5 text-red-400" />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-slate-400">Заблокированные каналы</p>
+                                    <Button
+                                        variant="link"
+                                        onClick={() => navigate('/dolbaeb-admin-secure-panel/blocked-channels')}
+                                        className="p-0 h-auto text-white hover:text-red-400"
+                                    >
+                                        Управление
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    
+                    <Card className="bg-slate-800/50 border-slate-700">
+                        <CardContent className="p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-green-600/20 rounded-lg">
                                     <Settings className="h-5 w-5 text-green-400" />
                                 </div>
                                 <div>

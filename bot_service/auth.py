@@ -3,10 +3,11 @@ import os
 import jwt
 import time
 import logging
-from typing import Optional
+from typing import Optional, Dict, Any
 from fastapi import Request, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from bot_service.database import User, get_db
+from bot_service.session_manager import session_manager
 
 logger = logging.getLogger(__name__)
 
@@ -38,17 +39,25 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> U
         except jwt.InvalidTokenError:
             raise HTTPException(status_code=401, detail="Invalid token")
     
-    # Если JWT не найден, проверяем сессию
+    # Проверяем session_id в cookies
+    session_id = request.cookies.get("session_id")
+    if session_id:
+        session_data = session_manager.validate_session(session_id)
+        if session_data:
+            user = db.query(User).filter(User.id == session_data["user_id"]).first()
+            if user:
+                logger.info(f"User authenticated via session: {user.username}")
+                return user
+    
+    # Если session_id не найден, проверяем старую сессию (для обратной совместимости)
     user_id = request.session.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+    if user_id:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            logger.info(f"User authenticated via old session: {user.username}")
+            return user
     
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    
-    logger.info(f"User authenticated via session: {user.username}")
-    return user
+    raise HTTPException(status_code=401, detail="Not authenticated")
 
 async def get_current_user_optional(request: Request, db: Session = Depends(get_db)) -> Optional[User]:
     """Получить текущего пользователя из сессии или JWT токена (опционально)"""
@@ -77,3 +86,24 @@ def create_jwt_token(user_id: str) -> str:
     }
     
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+
+def get_session_data(request: Request) -> Optional[Dict[str, Any]]:
+    """Получить данные сессии"""
+    session_id = request.cookies.get("session_id")
+    if session_id:
+        return session_manager.validate_session(session_id)
+    return None
+
+def is_guest_session(request: Request) -> bool:
+    """Проверить, является ли сессия гостевой"""
+    session_data = get_session_data(request)
+    if session_data:
+        return session_data.get("device_info", {}).get("is_guest", False)
+    return False
+
+def get_active_platforms(request: Request) -> Dict[str, bool]:
+    """Получить активные платформы в текущей сессии"""
+    session_data = get_session_data(request)
+    if session_data:
+        return session_data.get("platforms", {})
+    return {}

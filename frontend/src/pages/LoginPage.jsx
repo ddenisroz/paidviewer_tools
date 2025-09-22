@@ -112,7 +112,8 @@ const LoginPage = () => {
     }, [verificationTimers]);
 
     const handleVkLogin = () => {
-        alert('VK Live авторизация пока не реализована');
+        console.log('🖱️ Кнопка VK Live нажата!');
+        window.location.href = 'http://localhost:8000/auth/vk';
     };
 
     const handleGuestMode = () => {
@@ -137,6 +138,14 @@ const LoginPage = () => {
             console.log('LoginPage: API response:', response.data);
             console.log('LoginPage: verification_required:', response.data.verification_required);
             console.log('LoginPage: verified:', response.data.verified);
+            
+            // Проверяем конфликт сессий
+            if (response.data.conflict) {
+                console.log('LoginPage: Session conflict detected');
+                toast.error(`Канал ${guestUsername} уже используется авторизованным пользователем. Гостевой доступ заблокирован.`);
+                setGuestModalOpen(false);
+                return;
+            }
             
             // Если требуется верификация, показываем попап с кодом
             if (response.data.verification_required) {

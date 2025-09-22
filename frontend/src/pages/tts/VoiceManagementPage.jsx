@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Upload, Trash2, Settings, TestTube2, Globe, User, Link, Copy } from 'lucide-react';
 import { Slider } from "@/components/ui/slider";
-import { useNotification } from '../../context/NotificationContext';
+import { useToast } from '../../components/ui/toast';
 import { useButtonPosition } from '../../hooks/useButtonPosition';
 import { useAuth } from '../../context/AuthContext';
 import { useTts } from '../../context/TtsContext';
@@ -30,7 +30,7 @@ import { useLoadingState } from '../../hooks/useLoadingState';
 
 
 const VoiceManagementPageContent = () => {
-    const { showNotification } = useNotification();
+    const { addToast } = useToast();
     const { getButtonPosition } = useButtonPosition();
     const [voices, setVoices] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -75,17 +75,19 @@ const VoiceManagementPageContent = () => {
             const voicesData = response?.data || response || [];
             setVoices(Array.isArray(voicesData) ? voicesData : []);
         } catch (error) {
-            showNotification('Ошибка загрузки голосов', 'error');
+            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось загрузить голоса.' });
             console.error('Error loading voices:', error);
             setVoices([]); // Устанавливаем пустой массив в случае ошибки
         } finally {
             setLoading(false);
         }
-    }, [user]);
+    }, [user, addToast]);
 
     useEffect(() => {
-        loadVoices();
-    }, [loadVoices]);
+        if (isHealthy) {
+            loadVoices();
+        }
+    }, [isHealthy, loadVoices]);
 
     const handleFileUpload = (event) => {
         const file = event.target.files[0];
@@ -98,13 +100,13 @@ const VoiceManagementPageContent = () => {
 
     const handleUpload = async () => {
         if (!uploadFile || !voiceName.trim() || !user) {
-            showNotification('Выберите файл и введите имя голоса', 'error');
+            addToast({ type: 'error', title: 'Ошибка', message: 'Выберите файл и введите имя голоса.' });
             return;
         }
         
         const userVoiceCount = voices.filter(v => v.voice_type === 'user').length;
         if (userVoiceCount >= 5) {
-            showNotification('Вы достигли лимита в 5 пользовательских голосов.', 'error');
+            addToast({ type: 'error', title: 'Лимит достигнут', message: 'Вы достигли лимита в 5 пользовательских голосов.' });
             return;
         }
 
@@ -116,13 +118,13 @@ const VoiceManagementPageContent = () => {
             formData.append('user_id', user.id);
             
             await uploadUserVoice(user.id, formData);
-            showNotification(`Голос "${voiceName.trim()}" успешно загружен.`, 'success');
+            addToast({ type: 'success', title: 'Успех', message: `Голос "${voiceName.trim()}" успешно загружен.` });
             setUploadDialogOpen(false);
             setUploadFile(null);
             setVoiceName('');
             loadVoices();
         } catch (error) {
-            showNotification(error.message || 'Ошибка загрузки голоса', 'error');
+            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось загрузить голос.' });
         } finally {
             setIsUploading(false);
         }
@@ -135,16 +137,16 @@ const VoiceManagementPageContent = () => {
         }
         
         if (voiceToDelete.voice_type !== 'user') {
-            showNotification("Вы не можете удалять общие голоса.", 'error');
+            addToast({ type: 'error', title: 'Ошибка', message: 'Вы не можете удалять общие голоса.' });
             return;
         }
 
         try {
             await deleteUserVoice(voiceId, user.id);
-            showNotification(`Голос "${voiceToDelete.name}" удален.`, 'success');
+            addToast({ type: 'success', title: 'Успех', message: `Голос "${voiceToDelete.name}" удален.` });
             loadVoices();
         } catch (error) {
-            showNotification(error.message || 'Ошибка удаления голоса', 'error');
+            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось удалить голос.' });
         }
     };
 
@@ -171,10 +173,10 @@ const VoiceManagementPageContent = () => {
                     : voice
             ));
             
-            showNotification('Транскрипция завершена успешно!', 'success');
+            addToast({ type: 'success', title: 'Успех', message: 'Транскрипция завершена успешно!' });
         } catch (error) {
             console.error('Error transcribing voice:', error);
-            showNotification('Ошибка при транскрипции аудио', 'error');
+            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось выполнить транскрипцию аудио.' });
         } finally {
             setIsTranscribing(false);
         }
@@ -203,10 +205,10 @@ const VoiceManagementPageContent = () => {
             // Обновляем currentVoice
             setCurrentVoice(prev => ({...prev, name: newName.trim()}));
             
-            showNotification('Голос переименован успешно!', 'success');
+            addToast({ type: 'success', title: 'Успех', message: 'Голос переименован успешно!' });
         } catch (error) {
             console.error('Error renaming voice:', error);
-            showNotification('Ошибка при переименовании голоса', 'error');
+            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось переименовать голос.' });
         }
     };
 
@@ -230,10 +232,10 @@ const VoiceManagementPageContent = () => {
             ));
             
             setEditDialogOpen(false);
-            showNotification('Настройки голоса сохранены!', 'success');
+            addToast({ type: 'success', title: 'Успех', message: 'Настройки голоса сохранены!' });
         } catch (error) {
             console.error('Error updating voice settings:', error);
-            showNotification('Ошибка при сохранении настроек', 'error');
+            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось сохранить настройки.' });
         }
     };
 
@@ -251,7 +253,7 @@ const VoiceManagementPageContent = () => {
             audioSource.start(0);
         }, (error) => {
             console.error('Error decoding audio data', error);
-            showNotification('Не удалось воспроизвести аудио', 'error');
+            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось воспроизвести аудио.' });
         });
     };
     
@@ -273,13 +275,13 @@ const VoiceManagementPageContent = () => {
                 const fullAudioUrl = `http://localhost:8001${audioUrl}`;
                 const audio = new Audio(fullAudioUrl);
                 audio.play().catch(() => {
-                    showNotification('Не удалось воспроизвести аудио', 'error');
+                    addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось воспроизвести аудио.' });
                 });
             } else {
-                showNotification('Не удалось получить аудио для воспроизведения', 'error');
+                addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось получить аудио для воспроизведения.' });
             }
         } catch (error) {
-            showNotification(error.message || 'Ошибка тестирования голоса', 'error');
+            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось протестировать голос.' });
         }
     };
 
@@ -290,11 +292,11 @@ const VoiceManagementPageContent = () => {
                         cfg_strength: currentVoice.cfg_strength
                         // Только cfg_strength настраивается пользователем
                     });
-                    showNotification(`Настройки голоса "${currentVoice.name}" обновлены.`, 'success');
+                    addToast({ type: 'success', title: 'Успех', message: `Настройки голоса "${currentVoice.name}" обновлены.` });
                     setEditDialogOpen(false);
                     loadVoices();
                 } catch (error) {
-                    showNotification(error.message || 'Ошибка обновления настроек', 'error');
+                    addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось обновить настройки.' });
                 }
             };
 
@@ -309,20 +311,20 @@ const VoiceManagementPageContent = () => {
             const response = await generateObsUrl();
             const fullUrl = `${window.location.origin}/tts-obs/${response.data.obs_token}`;
             setObsUrl(fullUrl);
-            showNotification('Ссылка для OBS успешно создана!', 'success');
+            addToast({ type: 'success', title: 'Успех', message: 'Ссылка для OBS успешно создана!' });
         } catch (error) {
-            showNotification('Не удалось создать ссылку для OBS.', 'error');
+            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось создать ссылку для OBS.' });
             console.error('Failed to generate OBS URL:', error);
         }
     };
 
     const copyToClipboard = () => {
         navigator.clipboard.writeText(obsUrl);
-        showNotification('Ссылка скопирована в буфер обмена!', 'success');
+        addToast({ type: 'success', title: 'Успех', message: 'Ссылка скопирована в буфер обмена!' });
     };
 
     // Показываем прелоадер пока проверяется health или загружаются голоса
-    if (showLoader || loading) {
+    if (showLoader) {
         return (
             <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -342,7 +344,7 @@ const VoiceManagementPageContent = () => {
             <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-semibold text-white">Управление голосами</h1>
+                        <h1 className="text-3xl font-bold text-white">Управление голосами</h1>
                         <p className="text-slate-400 mt-1">Загружайте и настраивайте свои уникальные голоса для TTS.</p>
                     </div>
                 </div>

@@ -145,10 +145,10 @@ const TtsMainPageContent = () => {
         }
     }, [engineStatus.error, showNotification, toggleTts, ttsEnabled]);
 
-    // Показываем прелоадер пока проверяется health или не инициализирован TTS
+    // Показываем прелоадер пока проверяется health
     if (showLoader) {
         return (
-            <div className="container mx-auto p-4">
+            <div className="container mx-auto p-4 md:p-6 lg:p-8">
                 <h1 className="text-3xl font-bold mb-4">Озвучка сообщений</h1>
                 <PageLoader message="Проверка состояния TTS сервиса..." />
             </div>
@@ -158,8 +158,9 @@ const TtsMainPageContent = () => {
     // Заглушка когда TTS недоступен
     if (!isHealthy) {
         return (
-            <div className="container mx-auto p-4">
-                <h1 className="text-2xl font-semibold text-white mb-6">Озвучка сообщений</h1>
+            <div className="container mx-auto p-4 md:p-6 lg:p-8">
+                <h1 className="text-3xl font-bold text-white mb-6">Озвучка сообщений</h1>
+                
                 <TtsErrorCard
                     title="TTS сервер недоступен"
                     description="В данный момент сервис TTS недоступен. Озвучка сообщений временно отключена."

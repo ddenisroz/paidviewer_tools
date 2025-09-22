@@ -3,5 +3,7 @@ uvicorn
 python-dotenv
 sqlalchemy
 aiohttp
+httpx
 twitchio
 pytube
+PyJWT

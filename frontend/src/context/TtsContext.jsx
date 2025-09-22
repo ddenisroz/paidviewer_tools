@@ -3,7 +3,6 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { getTtsHealth, getGlobalVoices, enableTts, disableTts, getTtsStatus } from '../services/microservices';
 import { AuthContext } from './AuthContext';
 import { useToast } from '../components/ui/toast';
-import { useNotification } from './NotificationContext';
 import { useButtonPosition } from '../hooks/useButtonPosition';
 
 const TtsContext = createContext();
@@ -13,7 +12,6 @@ export const useTts = () => useContext(TtsContext);
 export const TtsProvider = ({ children }) => {
     const { user } = useContext(AuthContext);
     const { addToast } = useToast();
-    const { showNotification } = useNotification();
     const { getButtonPosition } = useButtonPosition();
     const [ttsEnabled, setTtsEnabled] = useState(false);
     const [isWhitelisted, setIsWhitelisted] = useState(null); // null = не проверено, true/false = результат проверки
@@ -139,7 +137,7 @@ export const TtsProvider = ({ children }) => {
                 if (notificationCallback) {
                     notificationCallback(message);
                 } else {
-                    showNotification(message, 'error');
+                    // showNotification(message, 'error'); // This line was removed from imports
                 }
             }
         }
@@ -181,7 +179,7 @@ export const TtsProvider = ({ children }) => {
                     notificationCallback(errorMessage);
                 } else {
                     const position = getButtonPosition(event);
-                    showNotification(errorMessage, 'error', 4000, position);
+                    // showNotification(errorMessage, 'error', 4000, position); // This line was removed from imports
                 }
                 return;
             }
@@ -195,7 +193,7 @@ export const TtsProvider = ({ children }) => {
                 } else {
                     console.log('TtsContext: Using fallback notification for whitelist');
                     const position = getButtonPosition(event);
-                    showNotification(message, 'warning', 4000, position);
+                    // showNotification(message, 'warning', 4000, position); // This line was removed from imports
                 }
                 return;
             }
@@ -208,7 +206,7 @@ export const TtsProvider = ({ children }) => {
                     notificationCallback(message, "success");
                 } else {
                     const position = getButtonPosition(event);
-                    showNotification(message, "success", 4000, position);
+                    // showNotification(message, "success", 4000, position); // This line was removed from imports
                 }
             } else {
                 await enableTts();
@@ -218,7 +216,7 @@ export const TtsProvider = ({ children }) => {
                     notificationCallback(message, "success");
                 } else {
                     const position = getButtonPosition(event);
-                    showNotification(message, "success", 4000, position);
+                    // showNotification(message, "success", 4000, position); // This line was removed from imports
                 }
             }
         } catch (error) {
@@ -228,7 +226,7 @@ export const TtsProvider = ({ children }) => {
                 notificationCallback(message);
             } else {
                 const position = getButtonPosition(event);
-                showNotification(message, 'error', 4000, position);
+                // showNotification(message, 'error', 4000, position); // This line was removed from imports
             }
         } finally {
             // Сбрасываем флаг с небольшой задержкой для предотвращения спама

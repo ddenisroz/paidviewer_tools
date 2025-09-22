@@ -5,7 +5,7 @@ const twitchApi = {
     // Получить информацию о стриме
     async getStreamInfo(forceRefresh = false) {
         try {
-            const response = await api.get('/api/twitch/stream-info');
+            const response = await api.get(`/api/twitch/stream-info?force=${forceRefresh}`);
             return response.data;
         } catch (error) {
             console.error('Error fetching Twitch stream info:', error);
@@ -28,7 +28,7 @@ const twitchApi = {
     async getCategories(search = '', forceRefresh = false) {
         try {
             const response = await api.get(`/api/twitch/categories?search=${search}`);
-            return response.data;
+            return response.data; // Теперь API возвращает массив напрямую
         } catch (error) {
             console.error('Error fetching Twitch categories:', error);
             return [];
@@ -38,7 +38,7 @@ const twitchApi = {
     // Обновить категорию
     async updateCategory(categoryId) {
         try {
-            const response = await api.post('/api/twitch/stream/category', { category_id: categoryId });
+            const response = await api.post('/api/twitch/category', { categoryId: categoryId });
             return response.data;
         } catch (error) {
             console.error('API Error updating stream category:', error.response?.data || error);

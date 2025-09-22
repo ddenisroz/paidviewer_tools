@@ -61,7 +61,10 @@ const HomePageContent = () => {
     };
     
     const preparedStreamHistory = useMemo(() => {
-        if (!streamHistory || streamHistory.length < 1) return [];
+        // Защита от невалидных данных
+        if (!streamHistory || !Array.isArray(streamHistory) || streamHistory.length < 1) {
+            return [];
+        }
 
         // Сортируем на случай, если данные приходят не по порядку
         const sortedHistory = [...streamHistory].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
@@ -91,7 +94,12 @@ const HomePageContent = () => {
     };
 
     const handleUpdateCategory = async () => {
-        await updateStreamCategory(streamCategory);
+        if (streamCategory && streamCategory.id) {
+            await updateStreamCategory(streamCategory.id);
+        } else {
+            console.error("No category selected or category has no ID");
+            // Тут можно показать уведомление пользователю
+        }
     };
     
     return (
@@ -131,7 +139,7 @@ const HomePageContent = () => {
                 </div>
             </div>
             
-            <div className="grid gap-6 lg:grid-cols-3">
+            <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
                 {/* Заглушка для гостей */}
                 {!isAuthenticated ? (
                     <GuestStubs />
@@ -140,7 +148,7 @@ const HomePageContent = () => {
                         <StreamStatsCard 
                             integrations={integrations}
                             currentViewers={currentViewers}
-                            streamHistory={streamHistory}
+                            streamHistory={Array.isArray(streamHistory) ? streamHistory : []}
                             preparedStreamHistory={preparedStreamHistory}
                             loading={loading}
                         />

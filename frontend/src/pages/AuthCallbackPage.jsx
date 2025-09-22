@@ -8,9 +8,14 @@ const AuthCallbackPage = () => {
     const { loginAndFetchUser } = useAuth();
     const [searchParams] = useSearchParams();
 
+    // Определяем платформу по URL
+    const isVkCallback = window.location.pathname.includes('/auth/vk/callback');
+    const platform = isVkCallback ? 'VK Live' : 'Twitch';
+
     useEffect(() => {
         const token = searchParams.get('token');
         console.log('🔑 Токен из URL:', token);
+        console.log('🔗 Платформа:', platform);
 
         const handleCallback = async () => {
             if (token) {
@@ -26,9 +31,9 @@ const AuthCallbackPage = () => {
         };
 
         handleCallback();
-    }, [loginAndFetchUser, navigate, searchParams]);
+    }, [loginAndFetchUser, navigate, searchParams, platform]);
 
-    return <AuthLoader platform="Twitch" />;
+    return <AuthLoader platform={platform} />;
 };
 
 export default AuthCallbackPage;

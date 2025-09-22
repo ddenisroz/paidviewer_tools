@@ -3,7 +3,6 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { connectBot, disconnectBot, getBotStatus } from '../services/microservices';
 import { AuthContext, useAuth } from './AuthContext';
 import { useToast } from '../components/ui/toast';
-import { useNotification } from './NotificationContext';
 import { useIntegrations } from './IntegrationsContext';
 import api from '../services/api';
 
@@ -21,7 +20,6 @@ export const ChatProvider = ({ children }) => {
     const { user, isAuthenticated } = useAuth();
     const { integrations, loading: integrationsLoading } = useIntegrations();
     const { addToast } = useToast();
-    const { showNotification } = useNotification();
     const [messages, setMessages] = useState([]);
     const [lastJsonMessage, setLastJsonMessage] = useState(null); // <-- Добавлено
     const [isConnected, setIsConnected] = useState(false);
@@ -68,7 +66,11 @@ export const ChatProvider = ({ children }) => {
             if (messageData.type === 'tts_error') {
                 console.error('TTS Error:', messageData.message);
                 // Показываем красивое уведомление об ошибке
-                showNotification(messageData.message, 'error');
+                addToast({
+                    type: 'error',
+                    title: 'Ошибка TTS',
+                    message: messageData.message
+                });
                 return;
             }
             
@@ -91,7 +93,7 @@ export const ChatProvider = ({ children }) => {
             setTimeout(setupWebSocket, 5000); 
         };
 
-    }, [isAuthenticated, user?.id]);
+    }, [isAuthenticated, user?.id, addToast]);
 
     // Функция для закрытия WebSocket соединения
     const closeWebSocket = () => {
@@ -158,23 +160,49 @@ export const ChatProvider = ({ children }) => {
 
 
     // Функции управления ботом
-    const connect = useCallback(async () => {
+    const handleBotAction = useCallback(async (action) => {
         if (!isAuthenticated) return;
         setIsConnecting(true);
         setError(null);
         try {
-            await api.post('/api/chat/connect');
-            setIsConnected(true);
-        } catch (err) {
-            const errorMsg = err.response?.data?.detail || "Не удалось подключить бота.";
-            console.error("Failed to connect bot:", err);
-            setError(errorMsg);
-            setIsConnected(false);
-            throw err; // Пробрасываем ошибку дальше
+            await api.post(`/api/chat/${action}`);
+            setIsConnected(action === 'connect');
+            if (action === 'connect') {
+                addToast({
+                    type: 'success',
+                    title: 'Бот подключен',
+                    message: 'Вы успешно подключились к каналу.'
+                });
+            } else {
+                addToast({
+                    type: 'success',
+                    title: 'Бот отключен',
+                    message: 'Вы успешно отключились от канала.'
+                });
+                setMessages([]); // Очищаем чат при отключении
+            }
+        } catch (error) {
+            if (error.response) {
+                console.error("Chat API error:", error.response.data);
+                addToast({
+                    type: 'error',
+                    title: 'Ошибка чат-бота',
+                    message: `Не удалось ${action === 'connect' ? 'подключиться к' : 'отключиться от'} канала: ${error.response.data.detail}`
+                });
+            } else {
+                console.error("Chat connection error:", error);
+                addToast({
+                    type: 'error',
+                    title: 'Ошибка сети',
+                    message: 'Проверьте ваше интернет-соединение.'
+                });
+            }
         } finally {
             setIsConnecting(false);
         }
-    }, [isAuthenticated]);
+    }, [user, isAuthenticated, addToast, setIsConnecting, setIsConnected, setMessages]);
+    
+    const connectBot = useCallback(() => handleBotAction('connect'), [handleBotAction]);
 
     const disconnect = useCallback(async () => {
         if (!isAuthenticated) return;
@@ -202,7 +230,7 @@ export const ChatProvider = ({ children }) => {
         isConnected,
         isConnecting,
         error,
-        connect,
+        connect: connectBot,
         disconnect,
         clearChat,
         checkConnectionStatus,

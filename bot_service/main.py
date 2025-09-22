@@ -4,7 +4,7 @@ import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Depends, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, Request, Depends, WebSocket, WebSocketDisconnect, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.responses import RedirectResponse
@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from pathlib import Path
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # --- Logging Configuration ---
 import sys
@@ -23,22 +23,38 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 from logging_config import setup_logging, log_system_info, log_service_start, log_service_stop, log_error, log_api_call, log_websocket_event, log_bot_event
 
-from bot_service.database import get_db, init_db, User, GuestVerification
+from bot_service.database import get_db, init_db, User, GuestVerification, StreamData
+from bot_service.session_manager import session_manager
 from bot_service.models import *
 from bot_service.connection_manager import ConnectionManager
 from bot_service.auth import get_current_user, get_current_user_optional, get_admin_user, create_jwt_token
 from bot_service.twitch_api import TwitchAPI
+from bot_service.vk_auth import router as vk_auth_router
 from bot_service.tts_api import TTSAPI
 from bot_service.youtube_api import YouTubeAPI
 from bot_service.admin_api import AdminAPI
 from bot_service.bot import Bot
 
-# Load .env file from the root directory
-env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
-load_dotenv(dotenv_path=env_path)
+# Load .env file - сначала из bot_service, потом из корня
+bot_service_env = os.path.join(os.path.dirname(__file__), '.env')
+root_env = os.path.join(os.path.dirname(__file__), '..', '.env')
+
+# Загружаем сначала bot_service/.env, потом корневой .env (корневой перезаписывает)
+if os.path.exists(bot_service_env):
+    load_dotenv(dotenv_path=bot_service_env)
+    print(f"✅ Загружен .env из bot_service: {bot_service_env}")
+else:
+    print(f"⚠️  .env не найден в bot_service: {bot_service_env}")
+
+if os.path.exists(root_env):
+    load_dotenv(dotenv_path=root_env, override=True)
+    print(f"✅ Загружен .env из корня: {root_env}")
+else:
+    print(f"⚠️  .env не найден в корне: {root_env}")
 
 # --- Logging Configuration ---
-logger = setup_logging("bot_service", "INFO")
+log_level = os.getenv("LOG_LEVEL", "DEBUG")
+logger = setup_logging("bot_service", log_level)
 logger.info("=== BOT SERVICE STARTED ===")
 
 # --- Global Variables ---
@@ -53,14 +69,46 @@ bot_task = None
 
 # --- Background Tasks ---
 async def collect_stream_stats():
-    """Сбор статистики стримов"""
+    """Сбор статистики стримов для активных пользователей"""
     while True:
+        await asyncio.sleep(60)  # Каждую минуту
         try:
-            # Здесь должна быть логика сбора статистики
-            await asyncio.sleep(60)  # Каждую минуту
+            db = next(get_db())
+            if not db:
+                continue
+
+            # Получаем всех пользователей, у которых есть токен (т.е. они авторизованы)
+            active_users = db.query(User).filter(User.twitch_access_token.isnot(None)).all()
+            
+            for user in active_users:
+                try:
+                    stream_info = await twitch_api.get_stream_info(user.username)
+                    
+                    # Если стрим онлайн, сохраняем данные
+                    if stream_info and stream_info.get('type') == 'live':
+                        new_data = StreamData(
+                            user_id=user.id,
+                            platform='twitch',
+                            stream_id=stream_info.get('id'),
+                            viewer_count=stream_info.get('viewer_count', 0),
+                            category_name=stream_info.get('game_name', ''),
+                            timestamp=datetime.utcnow()
+                        )
+                        db.add(new_data)
+                    else:
+                        # Можно добавить логику для оффлайн статуса, если нужно
+                        pass
+
+                except Exception as e:
+                    logger.error(f"Error collecting stats for user {user.username}: {e}")
+            
+            db.commit()
+
         except Exception as e:
-            logger.error(f"Error in collect_stream_stats: {e}")
-            await asyncio.sleep(60)
+            logger.error(f"Error in collect_stream_stats task: {e}")
+        finally:
+            if db:
+                db.close()
 
 async def background_cache_updater():
     """Обновление кэша в фоне"""
@@ -96,7 +144,6 @@ async def lifespan(app: FastAPI):
             for verification in verifications:
                 # Загружаем все верифицированные каналы без проверки таймаута
                 # Активные сессии существуют до тех пор, пока не будут заменены новой верификацией
-                from datetime import datetime, timedelta
                 if verification.verified_at:
                     # Загружаем данные из базы данных, но НЕ помечаем как verified в памяти
                     # Это позволяет требовать новую верификацию для новых сессий
@@ -151,6 +198,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- Include Routers ---
+app.include_router(vk_auth_router)
+
 app.add_middleware(
     SessionMiddleware,
     secret_key=os.getenv("SECRET_KEY", "your-secret-key")
@@ -199,6 +249,7 @@ async def api_login_twitch():
 
 @app.get("/auth/twitch/callback")
 async def auth_twitch_callback(code: str, request: Request, db: Session = Depends(get_db)):
+    
     # Получаем access token
     token_data = await twitch_api.get_user_access_token(code)
     if not token_data:
@@ -218,40 +269,108 @@ async def auth_twitch_callback(code: str, request: Request, db: Session = Depend
             username=user_data["login"],
             display_name=user_data["display_name"],
             platform="twitch",
-            access_token=token_data["access_token"],
-            refresh_token=token_data.get("refresh_token"),
+            twitch_access_token=token_data["access_token"],
+            twitch_refresh_token=token_data.get("refresh_token"),
             is_admin=False
         )
         db.add(user)
     else:
-        user.access_token = token_data["access_token"]
-        user.refresh_token = token_data.get("refresh_token")
-        user.last_login = datetime.now()
+        user.twitch_access_token = token_data["access_token"]
+        user.twitch_refresh_token = token_data.get("refresh_token")
+        user.last_login = datetime.utcnow()
     
     db.commit()
-                
-    # Сохраняем в сессию
-    request.session["user_id"] = user.id
+    
+    # Создаем новую сессию
+    session_id = session_manager.create_session(
+        user_id=user_data["id"],
+        platform="twitch",
+        device_info={
+            "user_agent": request.headers.get("user-agent"),
+            "ip": request.client.host
+        }
+    )
+    
+    # Сохраняем токены в новой системе
+    expires_at = None
+    if "expires_in" in token_data:
+        expires_at = datetime.utcnow() + timedelta(seconds=token_data["expires_in"])
+    
+    session_manager.save_user_tokens(
+        user_id=user_data["id"],
+        platform="twitch",
+        access_token=token_data["access_token"],
+        refresh_token=token_data.get("refresh_token"),
+        expires_at=expires_at
+    )
     
     # Создаем JWT токен
     jwt_token = create_jwt_token(user.id)
     
-    return RedirectResponse(f"http://localhost:5173/dashboard?token={jwt_token}")
+    # Устанавливаем cookie с session_id
+    response = RedirectResponse(f"http://localhost:5173/dashboard?token={jwt_token}")
+    response.set_cookie(
+        key="session_id",
+        value=session_id,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=86400  # 24 часа
+    )
+    
+    return response
 
 @app.post("/auth/logout")
-async def logout(request: Request):
+async def logout(request: Request, response: Response):
+    
+    # Завершаем сессию
+    session_id = request.cookies.get("session_id")
+    if session_id:
+        session_manager.terminate_session(session_id, "logout")
+        response.delete_cookie("session_id")
+    
+    # Очищаем старую сессию
     request.session.clear()
     return {"message": "Logged out successfully"}
 
 @app.post("/api/auth/logout")
-async def api_logout(request: Request):
+async def api_logout(request: Request, response: Response):
     """API endpoint для logout (для совместимости с фронтендом)"""
+    
+    # Завершаем сессию
+    session_id = request.cookies.get("session_id")
+    if session_id:
+        session_manager.terminate_session(session_id, "logout")
+        response.delete_cookie("session_id")
+    
+    # Очищаем старую сессию
     request.session.clear()
     return {"message": "Logged out successfully"}
 
 @app.get("/api/auth/user/me")
 async def read_users_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+@app.get("/api/auth/session/status")
+async def get_session_status(request: Request):
+    """Получить статус текущей сессии"""
+    from bot_service.auth import get_session_data, is_guest_session, get_active_platforms
+    
+    session_data = get_session_data(request)
+    if not session_data:
+        return {"authenticated": False}
+    
+    return {
+        "authenticated": True,
+        "is_guest": is_guest_session(request),
+        "platforms": get_active_platforms(request),
+        "user": {
+            "id": session_data["user_id"],
+            "username": session_data["username"],
+            "display_name": session_data["display_name"],
+            "is_admin": session_data["is_admin"]
+        }
+    }
 
 # --- Bot Management Endpoints ---
 @app.post("/api/chat/connect")
@@ -365,6 +484,75 @@ async def connect_bot_guest(request: Request, db: Session = Depends(get_db)):
     if not channel_name:
         raise HTTPException(status_code=400, detail="Channel name required")
     
+    # Проверяем, не заблокирован ли канал
+    try:
+        from bot_service.database import get_db, BlockedChannel
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            blocked_channel = db.query(BlockedChannel).filter(
+                BlockedChannel.channel_name == channel_name,
+                BlockedChannel.is_active == True
+            ).first()
+            
+            if blocked_channel:
+                logger.warning(f"Attempt to connect to blocked channel: {channel_name}")
+                raise HTTPException(
+                    status_code=403, 
+                    detail=f"Channel {channel_name} is blocked. Reason: {blocked_channel.reason or 'No reason provided'}"
+                )
+        finally:
+            db.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to check if channel is blocked: {e}")
+        # В случае ошибки проверки блокировки, продолжаем (не блокируем подключение)
+    
+    # Проверяем, нет ли активных авторизованных сессий для этого канала
+    try:
+        from bot_service.database import get_db, User
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            # Ищем авторизованных пользователей с таким каналом
+            authorized_users = db.query(User).filter(
+                User.username == channel_name,
+                User.twitch_access_token.isnot(None)  # У пользователя есть активный токен
+            ).all()
+            
+            if authorized_users:
+                logger.warning(f"Guest attempt to connect to channel with active authorized session: {channel_name}")
+                
+                # Отправляем уведомление авторизованным пользователям о попытке гостевого входа
+                try:
+                    from bot_service.websocket_manager import websocket_manager
+                    websocket_manager.broadcast_to_channel(channel_name, {
+                        "type": "session_conflict",
+                        "data": {
+                            "message": f"Попытка гостевого входа в канал {channel_name}",
+                            "channel": channel_name,
+                            "timestamp": time.time()
+                        }
+                    })
+                except Exception as e:
+                    logger.error(f"Failed to send session conflict notification: {e}")
+                
+                # Возвращаем специальный код для обработки конфликта сессий
+                return {
+                    "message": f"Channel {channel_name} has an active authorized session",
+                    "conflict": True,
+                    "authorized_users": [user.username for user in authorized_users],
+                    "verification_required": True,
+                    "verification_code": "CONFLICT_SESSION",  # Специальный код для конфликта
+                    "timeout": 60
+                }
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Failed to check for session conflicts: {e}")
+        # В случае ошибки проверки конфликтов, продолжаем (не блокируем подключение)
+    
     # Подключаемся к каналу (whitelist проверка только для TTS функций)
     global bot_instance
     if not bot_instance:
@@ -383,58 +571,31 @@ async def connect_bot_guest(request: Request, db: Session = Depends(get_db)):
     
     # Проверяем, не подключен ли уже бот к каналу
     if channel_name in connection_manager.pending_verifications:
-        existing_verification = connection_manager.pending_verifications[channel_name]
-        # Всегда требуем новую верификацию для новых сессий
-        if True:  # Упрощаем логику - всегда требуем верификацию
-            # Бот уже верифицирован, но для безопасности всегда требуем новую верификацию
-            # Это предотвращает вход с других устройств без верификации
-            logger.info(f"Bot already verified for channel: {channel_name}, requiring new verification for security")
-            
-            # Генерируем новый код верификации
-            import secrets
-            verification_code = secrets.token_urlsafe(8)
-            
-            # Создаем новую запись верификации для нового пользователя
-            # НЕ сбрасываем существующую верификацию - она остается активной
-            new_verification_data = {
-                "channel": channel_name,
-                "code": verification_code,
-                "timestamp": time.time(),
-                "verified": False
-            }
-            
-            # Добавляем новую верификацию под другим ключом (например, с суффиксом)
-            new_key = f"{channel_name}_new"
-            connection_manager.pending_verifications[new_key] = new_verification_data
-            
-            return {
-                "message": f"Bot already connected to {channel_name}, new verification required",
-                "verification_required": True,
-                "verification_code": verification_code,
-                "timeout": 60
-            }
-        else:
-            # Бот подключен, но не верифицирован - всегда генерируем новый код
-            # Это предотвращает использование старых кодов
-            logger.info(f"Bot already connected to channel: {channel_name}, generating new verification code")
-            import secrets
-            verification_code = secrets.token_urlsafe(8)
-            
-            verification_data = {
-                "channel": channel_name,
-                "code": verification_code,
-                "timestamp": time.time(),
-                "verified": False
-            }
-            
-            connection_manager.pending_verifications[channel_name] = verification_data
-            
-            return {
-                "message": f"Bot already connected to {channel_name}, new verification code generated",
-                "verification_required": True,
-                "verification_code": verification_code,
-                "timeout": 60
-            }
+        # Очищаем старую верифицированную сессию для безопасности
+        connection_manager.clear_verified_session(channel_name)
+        
+        # Бот уже подключен, но для безопасности всегда требуем новую верификацию
+        # Это предотвращает вход с других устройств без верификации
+        logger.info(f"Bot already connected to channel: {channel_name}, requiring new verification for security")
+        
+        # Генерируем новый код верификации
+        import secrets
+        verification_code = secrets.token_urlsafe(8)
+        
+        # Обновляем существующую запись верификации
+        connection_manager.pending_verifications[channel_name] = {
+            "channel": channel_name,
+            "code": verification_code,
+            "timestamp": time.time(),
+            "verified": False
+        }
+        
+        return {
+            "message": f"Bot already connected to {channel_name}, new verification required",
+            "verification_required": True,
+            "verification_code": verification_code,
+            "timeout": 60
+        }
     
     logger.info(f"Attempting to join channel: {channel_name}")
     success = await bot_instance.join_channel(channel_name)
@@ -540,12 +701,15 @@ async def check_guest_blocked(channel_name: str, db: Session = Depends(get_db)):
     if not channel_name:
         raise HTTPException(status_code=400, detail="Channel name required")
     
-    # Проверяем, есть ли авторизованный пользователь с таким каналом
-    user = db.query(User).filter(
-        User.username == channel_name
-    ).first()
+    # Проверяем, есть ли АКТИВНАЯ сессия с таким каналом
     
-    if user:
+    # Проверяем активные сессии пользователей
+    active_user_sessions = db.query(User).filter(
+        User.username == channel_name,
+        User.session_id.isnot(None)  # Есть активная сессия
+    ).all()
+    
+    if active_user_sessions:
         return {
             "blocked": True,
             "message": "Этот канал заблокирован для гостевого режима. Пожалуйста, авторизуйтесь через Twitch."
@@ -563,24 +727,98 @@ async def get_stream_info(user: User = Depends(get_current_user)):
     stream_info = await twitch_api.get_stream_info(user.username)
     return stream_info or {"online": False}
 
+@app.get("/api/twitch/stream-info")
+async def get_stream_info_detailed(user: User = Depends(get_current_user), force: bool = False):
+    """Получить детальную информацию о стриме"""
+    # Проверяем кэш, если не принудительное обновление
+    if not force:
+        cache_key = f"stream_info_{user.username}"
+        cached = connection_manager.get_twitch_cache(cache_key)
+        if cached:
+            logger.info(f"Using cached stream info for {user.username}")
+            return cached
+    
+    stream_info = await twitch_api.get_stream_info(user.username)
+    
+    # Если стрим офлайн, получаем информацию о канале
+    if not stream_info:
+        channel_info = await twitch_api.get_channel_info(user.username)
+        if channel_info:
+            category_info = None
+            if channel_info.get("game_id"):
+                category_info = await twitch_api.get_category_info(channel_info["game_id"])
+
+            result = {
+                "online": False,
+                "title": channel_info.get("title", ""),
+                "game_id": channel_info.get("game_id", ""),
+                "game": channel_info.get("game_name", ""),
+                "viewer_count": 0,
+                "started_at": "",
+                "category_info": category_info
+            }
+        else:
+            result = {"online": False}
+    else:
+        # Получаем дополнительную информацию о категории
+        category_info = None
+        if stream_info.get("game_id"):
+            category_info = await twitch_api.get_category_info(stream_info["game_id"])
+        
+        result = {
+            "online": True,
+            "title": stream_info.get("title", ""),
+            "game_id": stream_info.get("game_id", ""),
+            "game": stream_info.get("game_name", ""),
+            "viewer_count": stream_info.get("viewer_count", 0),
+            "started_at": stream_info.get("started_at", ""),
+            "category_info": category_info
+        }
+    
+    # Кэшируем результат на 30 секунд
+    cache_key = f"stream_info_{user.username}"
+    connection_manager.update_twitch_cache(cache_key, result)
+    
+    logger.info(f"Stream info for {user.username}: {result}")
+    return result
+
 @app.get("/api/twitch/categories")
 async def get_categories(search: str, user: User = Depends(get_current_user)):
     categories = await twitch_api.search_categories(search)
-    return {"categories": categories}
+    return categories  # Возвращаем массив напрямую
 
 @app.post("/api/twitch/title")
 async def update_stream_title(request: UpdateTitleRequest, user: User = Depends(get_current_user)):
-    success = await twitch_api.update_stream_title(user.id, user.access_token, request.title)
+    success = await twitch_api.update_stream_title(user.id, user.twitch_access_token, request.title)
     if not success:
         raise HTTPException(status_code=500, detail="Failed to update title")
     return {"message": "Title updated successfully"}
 
+@app.post("/api/twitch/stream/title")
+async def update_stream_title_alt(request: UpdateTitleRequest, user: User = Depends(get_current_user)):
+    """Альтернативный endpoint для обновления названия стрима"""
+    success = await twitch_api.update_stream_title(user.id, user.twitch_access_token, request.title)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to update title")
+    return {"success": True, "message": "Title updated successfully"}
+
 @app.post("/api/twitch/category")
 async def update_stream_category(request: UpdateCategoryRequest, user: User = Depends(get_current_user)):
-    success = await twitch_api.update_stream_category(user.id, user.access_token, request.category_id)
+    logger.info(f"Update category request: {request}")
+    logger.info(f"CategoryId: {request.categoryId}")
+    logger.info(f"User ID: {user.id}")
+    logger.info(f"User access token exists: {bool(user.twitch_access_token)}")
+    
+    # Получаем текущую категорию для сравнения
+    current_stream_info = await twitch_api.get_stream_info(user.username)
+    if current_stream_info and current_stream_info.get("game_id") == request.categoryId:
+        logger.info(f"Category {request.categoryId} is already set, skipping update")
+        return {"success": True, "message": "Category is already set"}
+    
+    success = await twitch_api.update_stream_category(user.id, user.twitch_access_token, request.categoryId)
     if not success:
         raise HTTPException(status_code=500, detail="Failed to update category")
-    return {"message": "Category updated successfully"}
+    return {"success": True, "message": "Category updated successfully"}
 
 @app.get("/api/stream/history")
 async def get_stream_history(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -803,6 +1041,237 @@ async def get_admin_list():
     admins = [admin.strip() for admin in admin_users.split(",") if admin.strip()]
     return {"admins": admins}
 
+# --- Session Management Endpoints ---
+@app.get("/api/admin/sessions")
+async def get_active_sessions():
+    """Получить список активных сессий"""
+    sessions = []
+    
+    # Получаем все pending verifications
+    for channel, verification in connection_manager.pending_verifications.items():
+        is_verified = channel in connection_manager.verified_sessions
+        sessions.append({
+            "channel": channel,
+            "is_verified": is_verified,
+            "code": verification.get("code", ""),
+            "timestamp": verification.get("timestamp", 0),
+            "created_at": datetime.fromtimestamp(verification.get("timestamp", 0)).isoformat() if verification.get("timestamp") else None
+        })
+    
+    return {"sessions": sessions}
+
+@app.delete("/api/admin/sessions/{channel}")
+async def clear_session(channel: str):
+    """Очистить сессию для конкретного канала"""
+    channel = channel.lower()
+    
+    # Очищаем из pending_verifications
+    if channel in connection_manager.pending_verifications:
+        del connection_manager.pending_verifications[channel]
+    
+    # Очищаем из verified_sessions
+    connection_manager.clear_verified_session(channel)
+    
+    # Очищаем из базы данных
+    try:
+        from bot_service.database import get_db, GuestVerification
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            db.query(GuestVerification).filter(
+                GuestVerification.channel_name == channel
+            ).delete()
+            db.commit()
+            logger.info(f"Cleared session data from database for channel: {channel}")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Failed to clear session data from database: {e}")
+    
+    # Отключаем бота от канала
+    global bot_instance
+    if bot_instance and bot_instance.is_connected_to_channel(channel):
+        await bot_instance.leave_channel(channel)
+        logger.info(f"Bot disconnected from channel: {channel}")
+    
+    return {"message": f"Session cleared for channel: {channel}"}
+
+@app.delete("/api/admin/sessions")
+async def clear_all_sessions():
+    """Очистить все активные сессии"""
+    cleared_count = 0
+    
+    # Получаем список каналов для очистки
+    channels_to_clear = list(connection_manager.pending_verifications.keys())
+    
+    for channel in channels_to_clear:
+        # Очищаем из pending_verifications
+        if channel in connection_manager.pending_verifications:
+            del connection_manager.pending_verifications[channel]
+        
+        # Очищаем из verified_sessions
+        connection_manager.clear_verified_session(channel)
+        cleared_count += 1
+    
+    # Очищаем все из базы данных
+    try:
+        from bot_service.database import get_db, GuestVerification
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            deleted_count = db.query(GuestVerification).delete()
+            db.commit()
+            logger.info(f"Cleared {deleted_count} sessions from database")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Failed to clear sessions from database: {e}")
+    
+    # Отключаем бота от всех каналов
+    global bot_instance
+    if bot_instance:
+        for channel in channels_to_clear:
+            if bot_instance.is_connected_to_channel(channel):
+                await bot_instance.leave_channel(channel)
+                logger.info(f"Bot disconnected from channel: {channel}")
+    
+    return {"message": f"Cleared {cleared_count} sessions", "cleared_count": cleared_count}
+
+# --- Blocked Channels Management Endpoints ---
+@app.get("/api/admin/blocked-channels")
+async def get_blocked_channels():
+    """Получить список заблокированных каналов"""
+    try:
+        from bot_service.database import get_db, BlockedChannel
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            blocked_channels = db.query(BlockedChannel).filter(
+                BlockedChannel.is_active == True
+            ).all()
+            
+            channels = []
+            for channel in blocked_channels:
+                channels.append({
+                    "id": channel.id,
+                    "channel_name": channel.channel_name,
+                    "reason": channel.reason,
+                    "blocked_by": channel.blocked_by,
+                    "created_at": channel.created_at.isoformat() if channel.created_at else None
+                })
+            
+            return {"blocked_channels": channels}
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Failed to get blocked channels: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get blocked channels")
+
+@app.post("/api/admin/blocked-channels")
+async def block_channel(request: Request):
+    """Заблокировать канал"""
+    try:
+        data = await request.json()
+        channel_name = data.get("channel_name", "").lower()
+        reason = data.get("reason", "")
+        blocked_by = data.get("blocked_by", "admin")
+        
+        if not channel_name:
+            raise HTTPException(status_code=400, detail="Channel name required")
+        
+        from bot_service.database import get_db, BlockedChannel
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            # Проверяем, не заблокирован ли уже канал
+            existing = db.query(BlockedChannel).filter(
+                BlockedChannel.channel_name == channel_name,
+                BlockedChannel.is_active == True
+            ).first()
+            
+            if existing:
+                raise HTTPException(status_code=400, detail="Channel already blocked")
+            
+            # Создаем новую запись о блокировке
+            blocked_channel = BlockedChannel(
+                channel_name=channel_name,
+                reason=reason,
+                blocked_by=blocked_by
+            )
+            db.add(blocked_channel)
+            db.commit()
+            
+            logger.info(f"Channel {channel_name} blocked by {blocked_by}: {reason}")
+            return {"message": f"Channel {channel_name} blocked successfully"}
+        finally:
+            db.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to block channel: {e}")
+        raise HTTPException(status_code=500, detail="Failed to block channel")
+
+@app.delete("/api/admin/blocked-channels/{channel_name}")
+async def unblock_channel(channel_name: str):
+    """Разблокировать канал"""
+    try:
+        channel_name = channel_name.lower()
+        
+        from bot_service.database import get_db, BlockedChannel
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            # Находим активную блокировку
+            blocked_channel = db.query(BlockedChannel).filter(
+                BlockedChannel.channel_name == channel_name,
+                BlockedChannel.is_active == True
+            ).first()
+            
+            if not blocked_channel:
+                raise HTTPException(status_code=404, detail="Channel not found in blocked list")
+            
+            # Деактивируем блокировку
+            blocked_channel.is_active = False
+            db.commit()
+            
+            logger.info(f"Channel {channel_name} unblocked")
+            return {"message": f"Channel {channel_name} unblocked successfully"}
+        finally:
+            db.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to unblock channel: {e}")
+        raise HTTPException(status_code=500, detail="Failed to unblock channel")
+
+@app.get("/api/admin/check-blocked-channel/{channel_name}")
+async def check_channel_blocked(channel_name: str):
+    """Проверить, заблокирован ли канал"""
+    try:
+        channel_name = channel_name.lower()
+        
+        from bot_service.database import get_db, BlockedChannel
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            blocked_channel = db.query(BlockedChannel).filter(
+                BlockedChannel.channel_name == channel_name,
+                BlockedChannel.is_active == True
+            ).first()
+            
+            is_blocked = blocked_channel is not None
+            return {
+                "is_blocked": is_blocked,
+                "reason": blocked_channel.reason if blocked_channel else None,
+                "blocked_by": blocked_channel.blocked_by if blocked_channel else None,
+                "blocked_at": blocked_channel.created_at.isoformat() if blocked_channel and blocked_channel.created_at else None
+            }
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Failed to check if channel is blocked: {e}")
+        raise HTTPException(status_code=500, detail="Failed to check channel status")
+
 # --- Active Channels Endpoint ---
 @app.get("/api/active-channels")
 async def get_active_channels(request: Request, db: Session = Depends(get_db)):
@@ -825,8 +1294,7 @@ async def get_active_channels(request: Request, db: Session = Depends(get_db)):
         is_online = False
         if recent_stream:
             # Считаем онлайн, если последние данные были не более 5 минут назад
-            from datetime import datetime, timedelta
-            five_minutes_ago = datetime.now() - timedelta(minutes=5)
+            five_minutes_ago = datetime.utcnow() - timedelta(minutes=5)
             is_online = recent_stream.timestamp > five_minutes_ago
         
         channels.append({

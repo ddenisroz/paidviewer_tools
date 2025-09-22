@@ -24,10 +24,11 @@ export const IntegrationsProvider = ({ children }) => {
     useEffect(() => {
         setIsLoading(true);
         const twitchEnabled = isAuthenticated && user?.platform === 'twitch';
+        const vkEnabled = isAuthenticated && user?.platform === 'vk';
         
         setIntegrations({
             twitch: { enabled: twitchEnabled },
-            vk: { enabled: false },
+            vk: { enabled: vkEnabled },
         });
         setIsLoading(false);
     }, [user, isAuthenticated]);
@@ -41,8 +42,13 @@ export const IntegrationsProvider = ({ children }) => {
         }
     };
     
-    const updateVkIntegration = () => {
-        toast.info('Интеграция с VK Live пока не доступна.');
+    const updateVkIntegration = (enabled) => {
+        if (enabled) {
+            window.location.href = 'http://localhost:8000/auth/vk/login';
+        } else {
+            logout();
+            toast.success('Интеграция с VK Live отключена');
+        }
     };
 
     const value = {

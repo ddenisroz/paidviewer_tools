@@ -85,6 +85,9 @@ class WebSocketService {
             case 'tts_error':
                 this.emit('tts_error', messageData);
                 break;
+            case 'session_conflict':
+                this.emit('session_conflict', messageData);
+                break;
             default:
                 console.log('Unknown WebSocket message type:', type);
         }

@@ -68,7 +68,7 @@ const IntegrationsDialog = ({ open, onOpenChange }) => {
                             id="vk-integration"
                             checked={!isGuestMode && integrations?.vk?.enabled}
                             onCheckedChange={updateVkIntegration}
-                            disabled={isLoading}
+                            disabled={isLoading || !user}
                         />
                     </div>
 

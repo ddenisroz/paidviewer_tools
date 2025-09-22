@@ -3,7 +3,6 @@ import { useAuth } from './AuthContext';
 import api from '../services/api';
 import { twitchApi } from '../services/twitchApi';
 import { useToast } from '../components/ui/toast';
-import { useNotification } from './NotificationContext';
 
 const DataContext = createContext();
 
@@ -12,7 +11,6 @@ export const useData = () => useContext(DataContext);
 export const DataProvider = ({ children }) => {
     const { user, isAuthenticated } = useAuth();
     const { addToast } = useToast();
-    const { showNotification } = useNotification();
     const dataLoadedRef = useRef(false);
 
     const [streamTitle, setStreamTitle] = useState('');
@@ -36,25 +34,54 @@ export const DataProvider = ({ children }) => {
     const loadStreamData = useCallback(async (force = false) => {
         // Не загружаем данные для неавторизованных пользователей
         if (!isAuthenticated) {
+            console.log('Not authenticated, skipping stream data load');
             return;
         }
         
+        console.log('Loading stream data...', force ? '(forced)' : '(cached)');
         setLoading(prev => ({ ...prev, streamData: true }));
         try {
             const streamData = await twitchApi.getStreamInfo(force);
+            console.log('Stream data loaded:', streamData);
             if (streamData) {
+                console.log('Setting stream data:', {
+                    title: streamData.title,
+                    game_id: streamData.game_id,
+                    game: streamData.game,
+                    viewer_count: streamData.viewer_count
+                });
                 setStreamTitle(streamData.title || '');
-                setStreamCategory(streamData.game_id || '');
+                // Устанавливаем объект категории, а не только ID
+                if (streamData.game_id && streamData.game) {
+                    setStreamCategory({
+                        id: streamData.game_id,
+                        name: streamData.game,
+                        box_art_url: streamData.category_info?.box_art_url
+                    });
+                } else {
+                    setStreamCategory(null);
+                }
                 setCategorySearch(streamData.game || '');
-                setCurrentViewers(streamData.viewers || 0);
+                setCurrentViewers(streamData.viewer_count || 0);
+            } else {
+                console.log('No stream data received');
+                // Устанавливаем пустые значения если данных нет
+                setStreamTitle('');
+                setStreamCategory(null);
+                setCategorySearch('');
+                setCurrentViewers(0);
             }
         } catch (error) {
             console.error('Error loading stream data:', error);
-            showNotification("Ошибка загрузки данных о стриме.", 'error');
+            addToast({
+                type: 'error',
+                title: 'Ошибка',
+                message: 'Не удалось загрузить данные о стриме.'
+            });
         } finally {
             setLoading(prev => ({ ...prev, streamData: false }));
         }
-    }, [isAuthenticated]);
+    }, [isAuthenticated, addToast]);
 
     const loadStreamHistory = useCallback(async () => {
         // Не загружаем данные для неавторизованных пользователей
@@ -81,7 +108,7 @@ export const DataProvider = ({ children }) => {
                 }
             }
 
-            setStreamHistory(historyData);
+            setStreamHistory(Array.isArray(historyData) ? historyData : []);
         } catch (error) {
             console.error('Ошибка загрузки истории стрима:', error);
             setStreamHistory([]);
@@ -99,6 +126,7 @@ export const DataProvider = ({ children }) => {
         setLoading(prev => ({ ...prev, categories: true }));
         try {
             const categoriesData = await twitchApi.getCategories(search, force);
+            console.log('Categories loaded:', categoriesData);
             if (categoriesData) {
                 setCategories(categoriesData);
             }
@@ -115,20 +143,17 @@ export const DataProvider = ({ children }) => {
             const response = await twitchApi.updateStreamTitle(newTitle);
             if (response.success) {
                 setStatus(prev => ({ ...prev, title: 'success' }));
-                showNotification(response.message || 'Название обновлено', 'success');
                 await loadStreamData(true); // Force refresh
-                setTimeout(() => setStatus(prev => ({ ...prev, title: 'idle' })), 2000);
+                setTimeout(() => setStatus(prev => ({ ...prev, title: 'idle' })), 1500);
                 return { success: true };
             } else {
                 setStatus(prev => ({ ...prev, title: 'error' }));
-                showNotification(response.message || 'Ошибка обновления', 'error');
                 setTimeout(() => setStatus(prev => ({ ...prev, title: 'idle' })), 3000);
                 return { success: false, message: response.message };
             }
         } catch (error) {
             setStatus(prev => ({ ...prev, title: 'error' }));
             console.error('Error updating title:', error);
-            showNotification(error.response?.data?.message || error.message || 'Ошибка обновления названия', 'error');
             return { success: false, message: error.response?.data?.message || error.message };
         }
     }, [loadStreamData]);
@@ -139,20 +164,18 @@ export const DataProvider = ({ children }) => {
             const response = await twitchApi.updateCategory(newCategoryId);
             if (response.success) {
                 setStatus(prev => ({ ...prev, category: 'success' }));
-                showNotification(response.message || 'Категория обновлена', 'success');
                 await loadStreamData(true); // Force refresh
-                setTimeout(() => setStatus(prev => ({ ...prev, category: 'idle' })), 2000);
+                setTimeout(() => setStatus(prev => ({ ...prev, category: 'idle' })), 1500);
                 return { success: true };
             } else {
                 setStatus(prev => ({ ...prev, category: 'error' }));
-                showNotification(response.message || 'Ошибка обновления', 'error');
                 setTimeout(() => setStatus(prev => ({ ...prev, category: 'idle' })), 3000);
                 return { success: false, message: response.message };
             }
         } catch (error) {
             setStatus(prev => ({ ...prev, category: 'error' }));
             console.error('Error updating category:', error);
-            showNotification(error.response?.data?.message || error.message || 'Ошибка обновления категории', 'error');
+            setTimeout(() => setStatus(prev => ({ ...prev, category: 'idle' })), 3000);
             return { success: false, message: error.response?.data?.message || error.message };
         }
     }, [loadStreamData]);

@@ -16,13 +16,11 @@ export const Loader = ({ size = 'default', className = '' }) => {
     );
 };
 
-export const PageLoader = ({ message = 'Загрузка...', className = '' }) => {
-    return (
-        <div className={`flex flex-col items-center justify-center min-h-[400px] space-y-4 ${className}`}>
-            <Loader size="xl" />
-            <p className="text-muted-foreground text-lg">{message}</p>
-        </div>
-    );
-};
+export const PageLoader = ({ message }) => (
+    <div className="flex flex-col items-center justify-center p-8 text-center">
+        <Loader className="h-8 w-8 animate-spin text-purple-400 mb-4" />
+        <p className="text-slate-400">{message || "Загрузка..."}</p>
+    </div>
+);
 
 export default Loader;

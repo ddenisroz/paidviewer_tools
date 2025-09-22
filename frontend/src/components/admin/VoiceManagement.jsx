@@ -11,11 +11,11 @@ import { Upload, Trash2, Edit, Users, Globe, Settings, TestTube2, Mic, ChevronDo
 import { Slider } from "@/components/ui/slider"
 import { getAdminVoices, uploadVoice, deleteVoice, updateVoiceSettings, transcribeVoice, testVoice, getUsers, renameVoice } from '../../services/unified-api';
 import { useAuth } from '../../context/AuthContext';
-import { useNotification } from '../../context/NotificationContext';
+import { useToast } from '../ui/toast';
 import { useButtonPosition } from '../../hooks/useButtonPosition';
 
 const VoiceManagement = () => {
-    const { showNotification } = useNotification();
+    const { addToast } = useToast();
     const { getButtonPosition } = useButtonPosition();
     const [voices, setVoices] = useState([]);
     const [users, setUsers] = useState([]);
@@ -65,23 +65,24 @@ const VoiceManagement = () => {
             const voicesData = Array.isArray(data) ? data : (data?.data || []);
             setVoices(voicesData);
         } catch (error) {
-            showNotification('Ошибка загрузки голосов', 'error');
+            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось загрузить голоса.' });
             console.error('Error loading voices:', error);
             setVoices([]); // Устанавливаем пустой массив в случае ошибки
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [addToast]);
 
     const loadUsers = useCallback(async () => {
         try {
             const data = await getUsers();
             setUsers(Array.isArray(data) ? data : []);
         } catch (error) {
+            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось загрузить пользователей.' });
             console.error('Error loading users:', error);
             setUsers([]);
         }
-    }, []);
+    }, [addToast]);
 
     useEffect(() => {
         loadVoices();
@@ -100,8 +101,7 @@ const VoiceManagement = () => {
 
     const handleUpload = async (event) => {
         if (!uploadFile || !voiceName.trim()) {
-            const position = getButtonPosition(event);
-            showNotification('Выберите файл и введите имя голоса', 'error', 4000, position);
+            addToast({ type: 'error', title: 'Ошибка', message: 'Выберите файл и введите имя голоса.' });
             return;
         }
 
@@ -117,15 +117,14 @@ const VoiceManagement = () => {
             await uploadVoice(formData);
             
             const position = getButtonPosition(event);
-            showNotification(`Голос "${voiceName.trim()}" успешно загружен.`, 'success', 4000, position);
+            addToast({ type: 'success', title: 'Успех', message: `Голос "${voiceName.trim()}" успешно загружен.` });
             setUploadDialogOpen(false);
             setUploadFile(null);
             setVoiceName('');
             setOwnerId('');
             loadVoices();
         } catch (error) {
-            const position = getButtonPosition(event);
-            showNotification(error.message || 'Ошибка загрузки голоса', 'error', 4000, position);
+            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось загрузить голос.' });
         } finally {
             setIsUploading(false);
         }
@@ -140,11 +139,10 @@ const VoiceManagement = () => {
         try {
             await deleteVoice(voiceId);
             const position = getButtonPosition(event);
-            showNotification(`Голос "${voiceToDelete.name}" удален.`, 'success', 4000, position);
+            addToast({ type: 'success', title: 'Успех', message: `Голос "${voiceToDelete.name}" удален.` });
             loadVoices();
         } catch (error) {
-            const position = getButtonPosition(event);
-            showNotification(error.message || 'Ошибка удаления голоса', 'error', 4000, position);
+            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось удалить голос.' });
         }
     };
     
@@ -171,10 +169,10 @@ const VoiceManagement = () => {
                     : voice
             ));
             
-            showNotification('Транскрипция завершена успешно!', 'success');
+            addToast({ type: 'success', title: 'Успех', message: 'Транскрипция завершена успешно!' });
         } catch (error) {
             console.error('Error transcribing voice:', error);
-            showNotification('Ошибка при транскрипции аудио', 'error');
+            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось выполнить транскрипцию аудио.' });
         } finally {
             setIsTranscribing(false);
         }
@@ -203,10 +201,10 @@ const VoiceManagement = () => {
             // Обновляем currentVoice
             setCurrentVoice(prev => ({...prev, name: newName.trim()}));
             
-            showNotification('Голос переименован успешно!', 'success');
+            addToast({ type: 'success', title: 'Успех', message: 'Голос переименован успешно!' });
         } catch (error) {
             console.error('Error renaming voice:', error);
-            showNotification('Ошибка при переименовании голоса', 'error');
+            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось переименовать голос.' });
         }
     };
 
@@ -230,10 +228,10 @@ const VoiceManagement = () => {
             ));
             
             setEditDialogOpen(false);
-            showNotification('Настройки голоса сохранены!', 'success');
+            addToast({ type: 'success', title: 'Успех', message: 'Настройки голоса сохранены!' });
         } catch (error) {
             console.error('Error updating voice settings:', error);
-            showNotification('Ошибка при сохранении настроек', 'error');
+            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось сохранить настройки.' });
         }
     };
 
@@ -251,7 +249,7 @@ const VoiceManagement = () => {
             audioSource.start(0);
         }, (error) => {
             console.error('Error decoding audio data', error);
-            showNotification('Не удалось воспроизвести аудио', 'error');
+            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось воспроизвести аудио.' });
         });
     };
 
@@ -273,13 +271,13 @@ const VoiceManagement = () => {
                 const fullAudioUrl = `http://localhost:8001${audioUrl}`;
                 const audio = new Audio(fullAudioUrl);
                 audio.play().catch(() => {
-                    showNotification('Не удалось воспроизвести аудио', 'error');
+                    addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось воспроизвести аудио.' });
                 });
             } else {
-                showNotification('Не удалось получить аудио для воспроизведения', 'error');
+                addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось получить аудио для воспроизведения.' });
             }
         } catch (error) {
-            showNotification(error.message || 'Ошибка тестирования голоса', 'error');
+            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось протестировать голос.' });
         }
     };
 
@@ -290,11 +288,11 @@ const VoiceManagement = () => {
                         cfg_strength: currentVoice.cfg_strength
                         // Только cfg_strength настраивается пользователем
                     });
-                    showNotification(`Настройки голоса "${currentVoice.name}" обновлены.`, 'success');
+                    addToast({ type: 'success', title: 'Успех', message: `Настройки голоса "${currentVoice.name}" обновлены.` });
                     setEditDialogOpen(false);
                     loadVoices();
                 } catch (error) {
-                    showNotification(error.message || 'Ошибка обновления настроек', 'error');
+                    addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось обновить настройки.' });
                 }
             };
 
@@ -416,7 +414,7 @@ const VoiceManagement = () => {
                                                                      Настройки
                                                                  </Button>
                                                                  <Button 
-                                                                     onClick={(e) => handleDelete(voice.id, e)} 
+                                                                     onClick={(e) => handleDelete(voice.id, voice.name)} 
                                                                      size="sm" 
                                                                      variant="destructive"
                                                                  >
@@ -493,7 +491,7 @@ const VoiceManagement = () => {
                                                                      Настройки
                                                                  </Button>
                                                                  <Button 
-                                                                     onClick={(e) => handleDelete(voice.id, e)} 
+                                                                     onClick={(e) => handleDelete(voice.id, voice.name)} 
                                                                      size="sm" 
                                                                      variant="destructive"
                                                                  >

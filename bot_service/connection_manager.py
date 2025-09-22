@@ -17,6 +17,7 @@ class ConnectionManager:
         self.youtube_queues: Dict[str, list] = {}
         self.current_videos: Dict[str, dict] = {}
         self.pending_verifications: Dict[str, dict] = {}  # Для верификации гостевых подключений
+        self.verified_sessions: Set[str] = set()  # Отслеживаем верифицированные сессии
         
         # Кэш для Twitch API
         self.twitch_cache = {
@@ -196,7 +197,8 @@ class ConnectionManager:
         
         # Проверяем, содержит ли сообщение код
         if verification["code"] in message:
-            verification["verified"] = True
+            # Добавляем сессию в верифицированные
+            self.verified_sessions.add(channel)
             logger.info(f"Verification successful for channel {channel} by {username}")
             
             # Сохраняем в базу данных для персистентности
@@ -252,12 +254,13 @@ class ConnectionManager:
                 ).first()
                 
                 if verification:
-                    # Восстанавливаем данные в памяти
+                    # Восстанавливаем данные в памяти, но НЕ помечаем как verified
+                    # Это позволяет требовать новую верификацию для новых сессий
                     self.pending_verifications[channel] = {
                         "channel": channel,
                         "code": verification.verification_code,
                         "timestamp": verification.verified_at.timestamp(),
-                        "verified": True
+                        "verified": False  # Всегда False для новых сессий
                     }
                     logger.info(f"Loaded verification from database for channel: {channel}")
                     return True
@@ -271,25 +274,14 @@ class ConnectionManager:
             return False
 
     def is_verified(self, channel: str) -> bool:
-        """Проверяет, верифицирован ли канал"""
-        if channel not in self.pending_verifications:
-            # НЕ загружаем из базы данных автоматически
-            # Данные из БД загружаются только при инициализации сервера
-            return False
-        
-        verification = self.pending_verifications[channel]
-        
-        # Если пользователь уже верифицирован, возвращаем True без проверки таймаута
-        # Активные сессии существуют до тех пор, пока не будут заменены новой верификацией
-        if verification.get("verified", False):
-            return True
-        
-        # Проверяем, не истек ли код только для неверифицированных пользователей (60 секунд)
-        if time.time() - verification["timestamp"] > 60:
-            del self.pending_verifications[channel]
-            return False
-        
-        return verification["verified"]
+        """Проверяет, верифицирован ли канал для текущей сессии"""
+        # Проверяем, есть ли канал в верифицированных сессиях
+        return channel in self.verified_sessions
+    
+    def clear_verified_session(self, channel: str):
+        """Очищает верифицированную сессию для канала"""
+        self.verified_sessions.discard(channel)
+        logger.info(f"Cleared verified session for channel: {channel}")
 
     def cleanup_expired_verifications(self):
         """Очищает истекшие коды верификации"""
@@ -303,3 +295,43 @@ class ConnectionManager:
         for channel in expired_channels:
             del self.pending_verifications[channel]
             logger.info(f"Cleaned up expired verification for channel {channel}")
+    
+    async def notify_session_terminated(self, user_id: str, reason: str = "new_login", platform: str = None):
+        """Уведомить пользователя о завершении сессии"""
+        message = {
+            "type": "session_terminated",
+            "data": {
+                "reason": reason,
+                "platform": platform,
+                "message": "Вы вошли с другого устройства" if reason == "new_login" else "Сессия завершена"
+            }
+        }
+        
+        # Отправляем уведомление всем активным соединениям пользователя
+        for connection_id, websocket in self.active_connections.items():
+            if connection_id.startswith(f"{user_id}_"):
+                try:
+                    await websocket.send_json(message)
+                    logger.info(f"Sent session termination notification to {connection_id}")
+                except Exception as e:
+                    logger.error(f"Error sending session termination notification: {e}")
+    
+    async def notify_guest_session_terminated(self, channel_name: str, reason: str = "guest_login"):
+        """Уведомить о завершении гостевой сессии"""
+        message = {
+            "type": "session_terminated",
+            "data": {
+                "reason": reason,
+                "platform": "guest",
+                "message": "Гостевой вход с верификацией" if reason == "guest_login" else "Гостевая сессия завершена"
+            }
+        }
+        
+        # Отправляем уведомление всем активным соединениям канала
+        for connection_id, websocket in self.active_connections.items():
+            if connection_id.startswith(f"{channel_name}_"):
+                try:
+                    await websocket.send_json(message)
+                    logger.info(f"Sent guest session termination notification to {connection_id}")
+                except Exception as e:
+                    logger.error(f"Error sending guest session termination notification: {e}")
