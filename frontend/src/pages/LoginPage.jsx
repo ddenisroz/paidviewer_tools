@@ -38,7 +38,7 @@ const VKIcon = (props) => (
 
 
 const LoginPage = () => {
-    const { login, setGuestMode } = useAuth();
+    const { loginWithTwitch, loginWithVk, setGuestMode } = useAuth();
     const { activeChannels } = useActiveChannels();
     // TtsHealthContext не нужен на странице логина
     const navigate = useNavigate();
@@ -395,7 +395,7 @@ const LoginPage = () => {
                         <button
                             onClick={() => {
                                 console.log('🖱️ Кнопка Twitch нажата!');
-                                login();
+                                loginWithTwitch();
                             }}
                             className="w-full bg-[#9146FF] hover:bg-[#7a3adc] text-white font-semibold py-3 px-5 rounded-lg transition-colors duration-300 flex items-center justify-center text-base"
                         >
@@ -404,7 +404,10 @@ const LoginPage = () => {
                         </button>
 
                         <button
-                            onClick={handleVkLogin}
+                            onClick={() => {
+                                console.log('🖱️ Кнопка VK Live нажата!');
+                                loginWithVk();
+                            }}
                             className="w-full bg-red-800 hover:bg-red-900 text-white font-semibold py-3 px-5 rounded-lg transition-colors duration-300 flex items-center justify-center text-base"
                         >
                             <VKIcon className="mr-2 h-5 w-5" />

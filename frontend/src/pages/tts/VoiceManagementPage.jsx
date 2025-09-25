@@ -27,6 +27,7 @@ import { generateObsUrl } from '../../services/microservices'; // Import directl
 import { Badge } from '@/components/ui/badge';
 import { PageLoader } from '@/components/ui/loader';
 import { useLoadingState } from '../../hooks/useLoadingState';
+import { TTS_SERVICE_URL } from '@/services/microservices';
 
 
 const VoiceManagementPageContent = () => {
@@ -271,12 +272,18 @@ const VoiceManagementPageContent = () => {
             // Получаем URL аудио из ответа
             const audioUrl = response.data.audio_url;
             if (audioUrl) {
-                // Создаем полный URL
-                const fullAudioUrl = `http://localhost:8001${audioUrl}`;
-                const audio = new Audio(fullAudioUrl);
-                audio.play().catch(() => {
+                try {
+                    // Убираем кэш-бастинг, т.к. аудио уже проигрывается
+                    const audio = new Audio(`${TTS_SERVICE_URL}${audioUrl}`);
+                    audio.play();
+                    // Освобождаем ресурсы после проигрывания
+                    audio.onended = () => {
+                        URL.revokeObjectURL(audio.src);
+                    };
+                } catch (error) {
+                    console.error("Error playing audio:", error);
                     addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось воспроизвести аудио.' });
-                });
+                }
             } else {
                 addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось получить аудио для воспроизведения.' });
             }

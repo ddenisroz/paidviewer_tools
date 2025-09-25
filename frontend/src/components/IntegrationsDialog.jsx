@@ -1,87 +1,77 @@
 // src/components/IntegrationsDialog.jsx
 import React from 'react';
-import { Twitch, Video } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Button } from '@/components/ui/button';
+import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { TwitchIcon, VKIcon } from './PlatformIcons';
 
 const IntegrationsDialog = ({ open, onOpenChange }) => {
-    const { user, userMode } = useAuth();
-    const { integrations, isLoading, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
-    const navigate = useNavigate();
+    const { integrations, loading } = useIntegrations();
+    const { loginWithTwitch, loginWithVk, logout } = useAuth();
 
-    const isGuestMode = userMode === 'guest';
-
-    const goToSettings = () => {
-        onOpenChange(false); // Закрываем диалог
-        navigate('/dashboard/settings');
+    const handleToggle = (platform, isEnabled) => {
+        if (isEnabled) {
+            // Here you would call a disconnect function
+            // For now, we call the general logout as a placeholder
+            // A specific disconnect endpoint would be better
+            logout();
+        } else {
+            if (platform === 'twitch') {
+                loginWithTwitch();
+            } else if (platform === 'vk') {
+                loginWithVk();
+            }
+        }
     };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent>
                 <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <span>Интеграции</span>
-                    </DialogTitle>
-                    <DialogDescription className="sr-only">
-                        Быстрое включение и выключение интеграций
-                    </DialogDescription>
+                    <DialogTitle>Интеграции</DialogTitle>
                 </DialogHeader>
-                
-                <div className="space-y-6 py-4">
+                <div className="space-y-4">
                     {/* Twitch Integration */}
                     <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                            <Label htmlFor="twitch-integration" className="flex items-center gap-2 text-base font-medium cursor-pointer">
-                                <Twitch className="h-5 w-5 text-purple-500" />
-                                <span>Twitch</span>
-                            </Label>
-                            <p className="text-sm text-muted-foreground pl-7">
-                                Управление стримом и чатом
-                            </p>
+                        <div className="flex items-center space-x-2">
+                            <TwitchIcon />
+                            <div>
+                                <p className="font-semibold">Twitch</p>
+                                <p className="text-sm text-muted-foreground">Управление стримом и чатом</p>
+                            </div>
                         </div>
                         <Switch
-                            id="twitch-integration"
-                            checked={!isGuestMode && integrations?.twitch?.enabled}
-                            onCheckedChange={updateTwitchIntegration}
-                            disabled={isLoading || !user}
+                            checked={integrations.twitch?.enabled || false}
+                            onCheckedChange={() => handleToggle('twitch', integrations.twitch?.enabled)}
+                            disabled={loading}
                         />
                     </div>
-
-                    {/* VK Integration */}
+                    {/* VK Live Integration */}
                     <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                            <Label htmlFor="vk-integration" className="flex items-center gap-2 text-base font-medium cursor-pointer">
-                                <Video className="h-5 w-5 text-blue-500" />
-                                <span>VK Live</span>
-                            </Label>
-                             <p className="text-sm text-muted-foreground pl-7">
-                                Интеграция с VK Live
-                            </p>
+                        <div className="flex items-center space-x-2">
+                            <VKIcon />
+                            <div>
+                                <p className="font-semibold">VK Live</p>
+                                <p className="text-sm text-muted-foreground">Интеграция с VK Live</p>
+                            </div>
                         </div>
                         <Switch
-                            id="vk-integration"
-                            checked={!isGuestMode && integrations?.vk?.enabled}
-                            onCheckedChange={updateVkIntegration}
-                            disabled={isLoading || !user}
+                            checked={integrations.vk?.enabled || false}
+                            onCheckedChange={() => handleToggle('vk', integrations.vk?.enabled)}
+                            disabled={loading}
                         />
                     </div>
-
                 </div>
-
-                <DialogFooter className="!mt-6 sm:justify-center items-center">
+                <DialogFooter className="mt-4 flex justify-center">
                     <Button 
                         variant="outline" 
-                        className="w-full"
                         onClick={() => {
-                            onOpenChange(false); // Закрываем диалог
-                            navigate('/dashboard/settings'); // Переходим на страницу настроек
+                            onOpenChange(false);
+                            window.location.href = '/dashboard/settings';
                         }}
+                        className="w-full"
                     >
                         Перейти к полным настройкам
                     </Button>

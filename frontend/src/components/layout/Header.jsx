@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import IntegrationsDialog from '../IntegrationsDialog';
+import { TwitchIcon, VKIcon } from '../PlatformIcons';
 
 const Header = () => {
     const { user, logout, userMode } = useAuth();
@@ -64,9 +65,21 @@ const Header = () => {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-56" align="end" forceMount>
                         <DropdownMenuLabel className="font-normal">
-                            <div className="flex flex-col space-y-1">
+                            <div className="flex flex-col space-y-2">
                                 <p className="text-sm font-medium leading-none">{user.display_name || user.username}</p>
-                                <p className="text-xs leading-none text-muted-foreground">@{user.username}</p>
+                                <div className="flex flex-col space-y-1">
+                                    {user.integrations && Object.entries(user.integrations).map(([platform, data]) => (
+                                        data.platform_username && (
+                                            <div key={platform} className="flex items-center">
+                                                {platform === 'twitch' && <TwitchIcon width="14" height="14" className="mr-2" />}
+                                                {platform === 'vk' && <VKIcon width="14" height="14" className="mr-2" />}
+                                                <p className="text-xs leading-none text-muted-foreground">
+                                                    @{data.platform_username}
+                                                </p>
+                                            </div>
+                                        )
+                                    ))}
+                                </div>
                             </div>
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />

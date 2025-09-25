@@ -132,7 +132,8 @@ const GuestTtsCard = () => {
             await loadAllowedChannels();
             
             const response = await api.post('/api/chat/guest/connect', {
-                channel_name: channel.trim()
+                channel_name: channel.trim(),
+                platform: 'twitch' // По умолчанию Twitch для GuestTtsCard
             });
 
             console.log('GuestTtsCard: API response:', response.data);

@@ -1,14 +1,12 @@
 // src/pages/HomePage.jsx
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mic, Clapperboard, Power, PowerOff, MessageSquare, Loader } from 'lucide-react';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useTts } from '../context/TtsContext';
-import { useTtsHealth } from '../context/TtsHealthContext';
 import { useTtsCard } from '../context/TtsCardContext';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { ToastProvider } from '../components/ui/toast';
 import FeatureCard from '../components/FeatureCard';
 import StreamStatsCard from '../components/StreamStatsCard';
 import StreamTitleCard from '../components/StreamTitleCard';
@@ -16,91 +14,52 @@ import StreamCategoryCard from '../components/StreamCategoryCard';
 import GuestStubs from '../components/GuestStubs';
 
 
-const HomePageContent = () => {
+
+const HomePage = () => {
     const navigate = useNavigate();
-    const { user, isAuthenticated } = useAuth();
+    const { isAuthenticated } = useAuth();
     const { integrations } = useIntegrations();
-    const { ttsEnabled, toggleTts: onToggleTts, isToggling, syncWithHealthContext } = useTts();
-    const { isHealthy, isChecking } = useTtsHealth();
+    const { ttsEnabled, toggleTts: onToggleTts, isToggling } = useTts();
     const { ttsCardStatus } = useTtsCard();
-    const {
-        streamTitle, setStreamTitle,
-        streamCategory, setStreamCategory,
-        categorySearch, setCategorySearch,
-        categories, loadCategories,
-        streamHistory,
-        currentViewers,
-        loading,
-        status,
-        updateStreamTitle,
-        updateStreamCategory,
-        loadStreamData
-    } = useData();
+    const { streamHistory, loading } = useData();
 
-    const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
-    const prevIsHealthy = useRef(isHealthy);
-    
-    // Синхронизируем с TtsHealthContext
-    useEffect(() => {
-        if (prevIsHealthy.current !== isHealthy) {
-            syncWithHealthContext(isHealthy);
-            prevIsHealthy.current = isHealthy;
-        }
-    }, [isHealthy, syncWithHealthContext]);
-    
-    const handleCategorySearch = async (value) => {
-        setCategorySearch(value);
-        setShowCategoryDropdown(true);
-
-        if (value.length === 0) {
-            setStreamCategory('');
-            await loadCategories();
-        } else if (value.length > 2) {
-            await loadCategories(value);
-        }
-    };
-    
     const preparedStreamHistory = useMemo(() => {
-        // Защита от невалидных данных
         if (!streamHistory || !Array.isArray(streamHistory) || streamHistory.length < 1) {
             return [];
         }
-
-        // Сортируем на случай, если данные приходят не по порядку
         const sortedHistory = [...streamHistory].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
         const startTime = new Date(sortedHistory[0].timestamp).getTime();
-        if (isNaN(startTime)) return []; // Защита от невалидной даты
-
+        if (isNaN(startTime)) return [];
         return sortedHistory
             .filter(d => d.viewers >= 0)
             .map(d => {
                 const currentTime = new Date(d.timestamp).getTime();
-                if (isNaN(currentTime)) return null; // Пропускаем невалидные точки
-
+                if (isNaN(currentTime)) return null;
                 const diffSeconds = Math.round((currentTime - startTime) / 1000);
                 const minutes = Math.floor(diffSeconds / 60).toString().padStart(2, '0');
                 const seconds = (diffSeconds % 60).toString().padStart(2, '0');
-                
-                return {
-                    ...d,
-                    time: `${minutes}:${seconds}`,
-                };
-            }).filter(Boolean); // Убираем null значения
+                return { ...d, time: `${minutes}:${seconds}` };
+            }).filter(Boolean);
     }, [streamHistory]);
 
-    const handleUpdateTitle = async () => {
-        await updateStreamTitle(streamTitle);
-    };
-
-    const handleUpdateCategory = async () => {
-        if (streamCategory && streamCategory.id) {
-            await updateStreamCategory(streamCategory.id);
-        } else {
-            console.error("No category selected or category has no ID");
-            // Тут можно показать уведомление пользователю
+    const preparedVkStreamHistory = useMemo(() => {
+        if (!streamHistory?.vk_history || !Array.isArray(streamHistory.vk_history) || streamHistory.vk_history.length < 1) {
+            return [];
         }
-    };
+        const sortedHistory = [...streamHistory.vk_history].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        const startTime = new Date(sortedHistory[0].timestamp).getTime();
+        if (isNaN(startTime)) return [];
+        return sortedHistory
+            .filter(d => d.viewers >= 0)
+            .map(d => {
+                const currentTime = new Date(d.timestamp).getTime();
+                if (isNaN(currentTime)) return null;
+                const diffSeconds = Math.round((currentTime - startTime) / 1000);
+                const minutes = Math.floor(diffSeconds / 60).toString().padStart(2, '0');
+                const seconds = (diffSeconds % 60).toString().padStart(2, '0');
+                return { ...d, time: `${minutes}:${seconds}`};
+            }).filter(Boolean);
+    }, [streamHistory]);
     
     return (
         <div className="space-y-8">
@@ -139,53 +98,29 @@ const HomePageContent = () => {
                 </div>
             </div>
             
-            <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
-                {/* Заглушка для гостей */}
+            <div className="grid gap-6 lg:grid-cols-3">
                 {!isAuthenticated ? (
                     <GuestStubs />
                 ) : (
                     <>
                         <StreamStatsCard 
                             integrations={integrations}
-                            currentViewers={currentViewers}
-                            streamHistory={Array.isArray(streamHistory) ? streamHistory : []}
+                            currentViewers={streamHistory?.current_viewers || 0}
+                            streamHistory={Array.isArray(streamHistory?.history) ? streamHistory.history : []}
                             preparedStreamHistory={preparedStreamHistory}
                             loading={loading}
+                            vkViewers={streamHistory?.current_vk_viewers || 0}
+                            vkStreamHistory={streamHistory?.vk_history || []}
+                            preparedVkStreamHistory={preparedVkStreamHistory}
                         />
                         
-                        <StreamTitleCard 
-                            integrations={integrations}
-                            streamTitle={streamTitle}
-                            setStreamTitle={setStreamTitle}
-                            status={status}
-                            updateStreamTitle={handleUpdateTitle}
-                        />
+                        <StreamTitleCard />
                         
-                        <StreamCategoryCard 
-                            integrations={integrations}
-                            streamCategory={streamCategory}
-                            setStreamCategory={setStreamCategory}
-                            categorySearch={categorySearch}
-                            setCategorySearch={setCategorySearch}
-                            categories={categories}
-                            loadCategories={loadCategories}
-                            status={status}
-                            updateStreamCategory={handleUpdateCategory}
-                            showCategoryDropdown={showCategoryDropdown}
-                            setShowCategoryDropdown={setShowCategoryDropdown}
-                        />
+                        <StreamCategoryCard />
                     </>
                 )}
             </div>
         </div>
-    );
-};
-
-const HomePage = () => {
-    return (
-        <ToastProvider>
-            <HomePageContent />
-        </ToastProvider>
     );
 };
 

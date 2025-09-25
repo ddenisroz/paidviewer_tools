@@ -1,12 +1,14 @@
 import axios from 'axios';
 
-const botService = axios.create({
+export const TTS_SERVICE_URL = import.meta.env.VITE_TTS_SERVICE_URL || 'http://localhost:8001';
+
+export const botService = axios.create({
     baseURL: import.meta.env.VITE_BOT_SERVICE_URL || 'http://localhost:8000',
     withCredentials: true,
 });
 
-const ttsService = axios.create({
-    baseURL: import.meta.env.VITE_TTS_SERVICE_URL || 'http://localhost:8001',
+export const ttsService = axios.create({
+    baseURL: TTS_SERVICE_URL,
 });
 
 // --- Authentication ---

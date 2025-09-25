@@ -2,6 +2,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { useLocation } from 'react-router-dom';
 import { TtsHealthContext } from './TtsHealthContext';
+import { ttsService } from '../services/microservices';
 
 const TtsCardContext = createContext();
 
@@ -14,109 +15,36 @@ export const useTtsCard = () => {
 };
 
 export const TtsCardProvider = ({ children }) => {
-    const healthContext = useContext(TtsHealthContext);
-    const location = useLocation();
-    
-    // Проверяем, доступен ли TtsHealthContext
-    const hasHealthContext = healthContext !== null && healthContext !== undefined;
-    
-    // Безопасно получаем данные из TtsHealthContext
-    const isHealthy = hasHealthContext ? (healthContext.isHealthy || false) : false;
-    const isChecking = hasHealthContext ? (healthContext.isChecking || false) : false;
-    const [cachedStatus, setCachedStatus] = useState({
+    const [ttsCardStatus, setTtsCardStatus] = useState({
         isHealthy: false,
-        isChecking: true,
-        lastUpdate: null
+        isLoading: true,
+        error: null
     });
-    const [isInitialized, setIsInitialized] = useState(false);
 
-    // Функция для проверки health, если TtsHealthContext недоступен
     const checkTtsHealth = async () => {
-        if (hasHealthContext) {
-            return; // Если контекст доступен, не проверяем самостоятельно
-        }
-
+        setTtsCardStatus(prev => ({ ...prev, isLoading: true }));
         try {
-            const response = await fetch('http://localhost:8001/health');
-            const data = await response.json();
-            const healthy = response.ok && data.tts_engine_loaded;
-            
-            setCachedStatus({
-                isHealthy: healthy,
-                isChecking: false,
-                lastUpdate: Date.now()
-            });
-        } catch (error) {
-            setCachedStatus({
-                isHealthy: false,
-                isChecking: false,
-                lastUpdate: Date.now()
-            });
-        }
-    };
-
-    // Обновляем кэш только при реальных изменениях статуса
-    useEffect(() => {
-        // Обновляем статус только на дашборде и TTS страницах
-        const isDashboardPage = location.pathname.startsWith('/dashboard') || location.pathname === '/';
-        if (!isDashboardPage) {
-            return; // Не логируем, чтобы не засорять консоль
-        }
-        
-        // Если это первая инициализация, сразу устанавливаем статус
-        if (!isInitialized) {
-            setCachedStatus({
-                isHealthy,
-                isChecking,
-                lastUpdate: Date.now()
-            });
-            setIsInitialized(true);
-            
-            // Если TtsHealthContext недоступен, проверяем health самостоятельно
-            if (!hasHealthContext) {
-                checkTtsHealth();
+            const response = await ttsService.get('/health');
+            if (response.status === 200 && response.data.tts_engine_loaded) {
+                setTtsCardStatus({ isHealthy: true, isLoading: false, error: null });
+            } else {
+                setTtsCardStatus({ isHealthy: false, isLoading: false, error: 'TTS service is not responding correctly.' });
             }
-            return;
+        } catch (error) {
+            setTtsCardStatus({ isHealthy: false, isLoading: false, error: 'Failed to connect to TTS service.' });
+            console.error("TTS Health Check Error:", error);
         }
-
-        // Проверяем, изменилось ли что-то
-        const currentStatus = { isHealthy, isChecking };
-        const lastStatus = { isHealthy: cachedStatus.isHealthy, isChecking: cachedStatus.isChecking };
-        if (currentStatus.isHealthy === lastStatus.isHealthy && currentStatus.isChecking === lastStatus.isChecking) {
-            return;
-        }
-
-        // Обновляем кэш если:
-        // 1. Статус здоровья изменился (true/false)
-        // 2. isChecking изменился (завершилась проверка)
-        // 3. Или прошло больше 30 секунд с последнего обновления
-        const now = Date.now();
-        const shouldUpdate = 
-            cachedStatus.isHealthy !== isHealthy || 
-            cachedStatus.isChecking !== isChecking ||
-            (now - cachedStatus.lastUpdate > 30000); // 30 секунд
-
-        if (shouldUpdate) {
-            setCachedStatus({
-                isHealthy,
-                isChecking,
-                lastUpdate: now
-            });
-        }
-    }, [isHealthy, isChecking, location.pathname]);
-
-    // Функция для принудительного обновления (если нужно)
-    const refreshStatus = () => {
-        setCachedStatus({
-            isHealthy,
-            isChecking,
-            lastUpdate: Date.now()
-        });
     };
 
+    useEffect(() => {
+        checkTtsHealth();
+        const interval = setInterval(checkTtsHealth, 30000); // Check every 30 seconds
+        return () => clearInterval(interval);
+    }, []);
+    
     const value = {
-        ttsCardStatus: cachedStatus,
-        refreshStatus
+        ttsCardStatus,
+        refreshStatus: checkTtsHealth
     };
 
     return (

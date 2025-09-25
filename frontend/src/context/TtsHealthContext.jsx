@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
+import { ttsService } from '../services/microservices';
 
 export const TtsHealthContext = createContext();
 
@@ -17,7 +18,8 @@ export const TtsHealthProvider = ({ children }) => {
         const saved = localStorage.getItem('tts_health_status');
         return saved ? JSON.parse(saved).isHealthy : false;
     });
-    const [isChecking, setIsChecking] = useState(false);
+    const [isChecking, setIsChecking] = useState(true);
+    const [lastChecked, setLastChecked] = useState(null);
     const [lastCheck, setLastCheck] = useState(() => {
         const saved = localStorage.getItem('tts_health_status');
         if (saved) {
@@ -48,78 +50,19 @@ export const TtsHealthProvider = ({ children }) => {
         localStorage.setItem('tts_health_status', JSON.stringify(dataToSave));
     };
 
-    const checkTtsHealth = useCallback(async () => {
-        // Проверяем health только на дашборде и TTS страницах
-        const currentPath = window.location.pathname;
-        const isDashboardPage = currentPath.startsWith('/dashboard') || currentPath === '/';
-        const isLoginPage = currentPath === '/login';
-        
-        if (!isDashboardPage || isLoginPage) {
-            return false;
-        }
-
-        // Предотвращаем множественные проверки
-        if (isChecking) {
-            return false;
-        }
-        
+    const checkHealth = useCallback(async () => {
         setIsChecking(true);
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 секунд таймаут
-            
-            const response = await fetch('http://localhost:8001/health', {
-                signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-            const data = await response.json();
-            
-            const healthy = response.ok && data.tts_engine_loaded;
-            setIsHealthy(healthy);
-            setLastCheck(new Date());
-            
-            // Сохраняем в кэш
-            const newCachedData = {
-                isHealthy: healthy,
-                timestamp: Date.now(),
-                data: data
-            };
-            setCachedData(newCachedData);
-            
-            // Сохраняем в localStorage
-            saveHealthStatus({
-                isHealthy: healthy,
-                lastCheck: new Date(),
-                isInitialized: true,
-                cachedData: newCachedData
-            });
-            
-            return healthy;
+            const response = await ttsService.get('/health');
+            const data = response.data;
+            const isOk = response.status === 200 && data.tts_engine_loaded;
+            setIsHealthy(isOk);
         } catch (error) {
-            // Тихо обрабатываем ошибку без спама в консоль
+            console.error('TTS Health Check Failed:', error);
             setIsHealthy(false);
-            setLastCheck(new Date());
-            
-            // Сохраняем ошибку в кэш
-            const errorCachedData = {
-                isHealthy: false,
-                timestamp: Date.now(),
-                data: null
-            };
-            setCachedData(errorCachedData);
-            
-            // Сохраняем в localStorage
-            saveHealthStatus({
-                isHealthy: false,
-                lastCheck: new Date(),
-                isInitialized: true,
-                cachedData: errorCachedData
-            });
-            
-            return false;
         } finally {
             setIsChecking(false);
+            setLastChecked(Date.now());
         }
     }, []);
 
@@ -139,7 +82,7 @@ export const TtsHealthProvider = ({ children }) => {
         const maxAge = 5 * 60 * 1000; // 5 минут
         
         if (!isInitialized || dataAge > maxAge) {
-            checkTtsHealth();
+            checkHealth();
             setIsInitialized(true);
         } else {
             // Обновляем состояние из кэша только если значения изменились
@@ -151,14 +94,14 @@ export const TtsHealthProvider = ({ children }) => {
                 setLastCheck(newLastCheck);
             }
         }
-    }, [location.pathname, isInitialized, checkTtsHealth]);
+    }, [location.pathname, isInitialized, checkHealth]);
 
     const value = {
         isHealthy,
         isChecking,
         lastCheck,
-        checkTtsHealth,
-        refreshHealth: checkTtsHealth // Алиас для ручного обновления
+        checkTtsHealth: checkHealth, // Алиас для ручного обновления
+        refreshHealth: checkHealth // Алиас для ручного обновления
     };
 
     return (

@@ -17,7 +17,7 @@ export const useChat = () => {
 };
 
 export const ChatProvider = ({ children }) => {
-    const { user, isAuthenticated } = useAuth();
+    const { user, isAuthenticated, isLoading } = useAuth();
     const { integrations, loading: integrationsLoading } = useIntegrations();
     const { addToast } = useToast();
     const [messages, setMessages] = useState([]);
@@ -106,7 +106,13 @@ export const ChatProvider = ({ children }) => {
 
     // Основной useEffect для управления соединением
     useEffect(() => {
-        console.log(`ChatContext: useEffect triggered - isAuthenticated: ${isAuthenticated}, user: ${user?.username || 'none'}, user.id: ${user?.id}`);
+        // Не делаем ничего, пока идет проверка авторизации
+        if (isLoading) {
+            console.log('ChatContext: Waiting for auth check to complete...');
+            return;
+        }
+
+        console.log(`ChatContext: useEffect triggered - isLoading: ${isLoading}, isAuthenticated: ${isAuthenticated}, user.id: ${user?.id}`);
         
         if (isAuthenticated && user?.id && user?.id !== 'guest') {
             console.log("ChatContext: Setting up WebSocket for authenticated user");
@@ -121,7 +127,7 @@ export const ChatProvider = ({ children }) => {
         return () => {
             closeWebSocket();
         };
-    }, [isAuthenticated, user, setupWebSocket]);
+    }, [isAuthenticated, user, setupWebSocket, isLoading]);
 
     // useEffect для автоматического подключения/отключения бота
     useEffect(() => {

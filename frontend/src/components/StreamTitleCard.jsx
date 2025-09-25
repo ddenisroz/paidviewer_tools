@@ -1,70 +1,178 @@
 // src/components/StreamTitleCard.jsx
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Edit3, CheckCircle, XCircle, Save, Loader, Circle } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Edit3, CheckCircle, XCircle, Save, Loader, Link, Unlink } from 'lucide-react';
+import { TwitchIcon, VKIcon } from './PlatformIcons';
+import { useData } from '../context/DataContext';
+import { useIntegrations } from '../context/IntegrationsContext';
 
-const TwitchIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M11.571 4.714h1.714v5.143H11.57zm4.714 0h1.714v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0H6zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714v9.429z" />
-    </svg>
-);
+const StreamTitleCard = () => {
+    const { integrations } = useIntegrations();
+    const { initialData, currentData, setCurrentData, saveChanges, status } = useData();
+    
+    const [isLinked, setIsLinked] = useState(false);
 
-const StreamTitleCard = ({ 
-    integrations, 
-    streamTitle, 
-    setStreamTitle, 
-    status, 
-    updateStreamTitle 
-}) => {
-    const isIdle = !status.title || status.title === 'idle';
+    const twitchEnabled = integrations.twitch?.enabled;
+    const vkEnabled = integrations.vk?.enabled;
+    const bothEnabled = twitchEnabled && vkEnabled;
+    const hasAnyIntegration = twitchEnabled || vkEnabled;
+
+    const handleTitleChange = (platform, value) => {
+        if (isLinked && bothEnabled) {
+            setCurrentData(prev => ({
+                ...prev,
+                twitch: { ...prev.twitch, title: value },
+                vk: { ...prev.vk, title: value },
+            }));
+        } else {
+            setCurrentData(prev => ({
+                ...prev,
+                [platform]: { ...prev[platform], title: value },
+            }));
+        }
+    };
+
+    const handleSave = (mode) => {
+        const payload = {};
+        
+        if (mode === 'both') {
+            // Объединенный режим - сохраняем одно и то же название для обеих платформ
+            const title = currentData.twitch.title || '';
+            if (title !== initialData.twitch.title || title !== initialData.vk.title) {
+                if (twitchEnabled) payload.twitch = { title };
+                if (vkEnabled) payload.vk = { title };
+            }
+        } else {
+            // Индивидуальный режим - сохраняем только измененные поля
+            if (twitchEnabled && currentData.twitch.title !== initialData.twitch.title) {
+                payload.twitch = { title: currentData.twitch.title };
+            }
+            if (vkEnabled && currentData.vk.title !== initialData.vk.title) {
+                payload.vk = { title: currentData.vk.title };
+            }
+        }
+        
+        if (Object.keys(payload).length > 0) {
+            saveChanges(payload, 'saveTitle');
+        }
+    };
+    
+    const isChanged = useMemo(() => {
+        return JSON.stringify(initialData) !== JSON.stringify(currentData);
+    }, [initialData, currentData]);
+
+    if (!hasAnyIntegration) {
+        return (
+            <Card className="h-full border-red-500/50 bg-red-500/5 opacity-60">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-red-500">
+                        <Edit3 className="h-6 w-6" />
+                        Смена названия
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="flex items-center justify-center h-full text-center text-muted-foreground">
+                    <div>
+                        <p>Интеграции не подключены</p>
+                        <p className="text-xs">Перейдите в настройки для подключения</p>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
-        <Card className={`transition-all duration-300 ${integrations.twitch?.enabled ? 'border-green-500/50 bg-green-500/5 shadow-lg' : 'border-muted/30 bg-muted/20 opacity-60'}`}>
+        <Card className="h-full">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                    <Edit3 className={`h-6 w-6 ${integrations.twitch?.enabled ? 'text-green-500' : 'text-muted-foreground'}`} />
+                    <Edit3 className="h-6 w-6 text-green-500" />
                     Смена названия
                 </CardTitle>
             </CardHeader>
-            <CardContent className="p-6">
-                {integrations.twitch?.enabled ? (
-                    <div className="flex flex-col space-y-6">
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <TwitchIcon />
-                                <span>Twitch</span>
-                            </div>
-                            <Input
-                                value={streamTitle}
-                                onChange={(e) => setStreamTitle(e.target.value)}
-                                placeholder="Название стрима"
-                                className="w-full bg-background/20 focus:bg-background/50 transition-colors h-12 text-lg"
+            <CardContent className="p-6 space-y-4">
+                {/* Toggle объединения полей */}
+                {bothEnabled && (
+                    <div className="flex items-center justify-between p-3 bg-background/10 rounded-lg">
+                        <Label htmlFor="link-titles" className="flex items-center gap-2 cursor-pointer font-medium">
+                            {isLinked ? <Link className="h-4 w-4 text-green-500" /> : <Unlink className="h-4 w-4" />}
+                            Объединить поля
+                        </Label>
+                        <Switch 
+                            id="link-titles" 
+                            checked={isLinked} 
+                            onCheckedChange={setIsLinked} 
+                            disabled={!bothEnabled} 
+                        />
+                    </div>
+                )}
+
+                {/* Поля ввода */}
+                <div className="space-y-4">
+                    {isLinked && bothEnabled ? (
+                        <div className="space-y-3">
+                            <Label className="flex items-center gap-2 font-medium">
+                                <TwitchIcon /><VKIcon /> Общее название
+                            </Label>
+                            <Input 
+                                value={currentData.twitch.title || ''} 
+                                onChange={(e) => handleTitleChange('twitch', e.target.value)} 
+                                placeholder="Введите общее название для обеих платформ..."
+                                className="h-12 text-lg"
                             />
                         </div>
-                        <div className="flex flex-col">
-                            <Button 
-                                onClick={updateStreamTitle}
-                                disabled={status.title === 'loading'}
-                                className={`w-full ${
-                                    status.title === 'success' ? 'bg-green-500 hover:bg-green-600' : 
-                                    status.title === 'error' ? 'bg-red-500 hover:bg-red-600' : ''
-                                }`}
-                            >
-                                {status.title === 'loading' && <><Loader className="h-4 w-4 mr-2 animate-spin" /> Обновление...</>}
-                                {status.title === 'success' && <><CheckCircle className="h-4 w-4 mr-2" /> Успешно обновлено</>}
-                                {status.title === 'error' && <><XCircle className="h-4 w-4 mr-2" /> Ошибка обновления</>}
-                                {isIdle && <><Save className="h-4 w-4 mr-2" /> Сохранить</>}
-                            </Button>
+                    ) : (
+                        <div className="space-y-4">
+                            {/* Поле Twitch */}
+                            <div className={`space-y-2 ${!twitchEnabled ? 'opacity-50' : ''}`}>
+                                <Label className="flex items-center gap-2 font-medium">
+                                    <TwitchIcon /> Twitch
+                                    {!twitchEnabled && <span className="text-xs text-muted-foreground">(отключено)</span>}
+                                </Label>
+                                <Input 
+                                    value={currentData.twitch.title || ''} 
+                                    onChange={(e) => handleTitleChange('twitch', e.target.value)} 
+                                    placeholder={twitchEnabled ? "Название стрима на Twitch..." : "Интеграция отключена"}
+                                    className={`h-12 text-lg ${!twitchEnabled ? 'bg-muted cursor-not-allowed blur-sm' : ''}`}
+                                    disabled={!twitchEnabled}
+                                />
+                            </div>
+
+                            {/* Поле VK Live */}
+                            <div className={`space-y-2 ${!vkEnabled ? 'opacity-50' : ''}`}>
+                                <Label className="flex items-center gap-2 font-medium">
+                                    <VKIcon /> VK Live
+                                    {!vkEnabled && <span className="text-xs text-muted-foreground">(отключено)</span>}
+                                </Label>
+                                <Input 
+                                    value={currentData.vk.title || ''} 
+                                    onChange={(e) => handleTitleChange('vk', e.target.value)} 
+                                    placeholder={vkEnabled ? "Название стрима на VK Live..." : "Интеграция отключена"}
+                                    className={`h-12 text-lg ${!vkEnabled ? 'bg-muted cursor-not-allowed blur-sm' : ''}`}
+                                    disabled={!vkEnabled}
+                                />
+                            </div>
                         </div>
-                    </div>
-                ) : (
-                    <div className="flex items-center justify-center text-muted-foreground">
-                        <div className="text-center">
-                            <Circle className="h-12 w-12 mx-auto mb-2" />
-                            <p className="text-sm">Интеграция с Twitch отключена</p>
-                        </div>
+                    )}
+                </div>
+
+                {/* Кнопка сохранения */}
+                {hasAnyIntegration && (
+                    <div className="pt-2 flex justify-center">
+                        <Button 
+                            onClick={() => handleSave(isLinked && bothEnabled ? 'both' : 'individual')}
+                            disabled={status.saveTitle === 'loading' || !isChanged}
+                            className="w-full flex items-center gap-2"
+                        >
+                            {status.saveTitle === 'loading' ? (
+                                <Loader className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <Save className="h-4 w-4" />
+                            )}
+                            {status.saveTitle === 'loading' ? 'Сохранение...' : 'Сохранить'}
+                        </Button>
                     </div>
                 )}
             </CardContent>
