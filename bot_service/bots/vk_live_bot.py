@@ -491,21 +491,33 @@ class VKLiveBot:
             command_name = message_text.split()[0][1:].lower()  # Убираем ! и приводим к нижнему регистру
             
             # Получаем команды из базы данных
-            from core.database import get_db, BotCommand
+            from core.database import get_db, BotCommand, UserToken
             db_gen = get_db()
             db = next(db_gen)
             
             try:
-                # Ищем команду в базе данных
+                # Находим user_id по platform_user_id (VK ID)
+                user_token = db.query(UserToken).filter(
+                    UserToken.platform == 'vk',
+                    UserToken.platform_user_id == str(author_id)
+                ).first()
+                
+                if not user_token:
+                    logger.warning(f"User token not found for VK ID: {author_id}")
+                    return
+                
+                internal_user_id = user_token.user_id
+                
+                # Ищем команду в базе данных по user_id
                 command = db.query(BotCommand).filter(
-                    BotCommand.channel_name == channel_name,
+                    BotCommand.user_id == internal_user_id,
                     BotCommand.command_name == command_name,
                     BotCommand.is_enabled == True
                 ).first()
                 
                 if not command:
                     # Если команда не найдена, создаем базовую команду
-                    command = await self._create_basic_command(db, channel_name, command_name, author_id)
+                    command = await self._create_basic_command(db, channel_name, command_name, internal_user_id)
                     if not command:
                         return  # Не удалось создать команду
                 
@@ -551,7 +563,7 @@ class VKLiveBot:
         except Exception as e:
             logger.error(f"Error in handle_database_commands: {e}")
 
-    async def _create_basic_command(self, db, channel_name: str, command_name: str, user_id: str):
+    async def _create_basic_command(self, db, channel_name: str, command_name: str, internal_user_id: int):
         """Создает базовую команду если её нет в базе данных"""
         try:
             from datetime import datetime
@@ -617,7 +629,7 @@ class VKLiveBot:
             
             # Создаем команду
             command = BotCommand(
-                user_id=1,  # Временный ID для VK пользователей
+                user_id=internal_user_id,
                 channel_name=channel_name,
                 command_name=command_name,
                 command_type=config['command_type'],
