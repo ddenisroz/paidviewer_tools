@@ -279,7 +279,7 @@ try:
         response_text = Column(String, nullable=True)  # Ответ команды (для кастомных)
         is_enabled = Column(Boolean, default=True)  # Включена ли команда
         platforms = Column(String, nullable=False, default='twitch,vk')  # Платформы через запятую
-        allowed_roles = Column(String, nullable=False, default='all')  # all, mods, vips, broadcaster
+        allowed_roles = Column(String, nullable=False, default='all')  # all, broadcaster, moderator, subscriber, vip, founder (twitch) | all, owner, moderator (vk)
         cooldown_seconds = Column(Integer, default=0)  # Кулдаун в секундах
         last_used = Column(DateTime, nullable=True)  # Последнее использование
         usage_count = Column(Integer, default=0)  # Количество использований

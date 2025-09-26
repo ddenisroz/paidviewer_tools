@@ -4,6 +4,7 @@ import logging
 import re
 from typing import Dict, List, Optional, Callable
 from datetime import datetime, timedelta
+from utils.role_checker import RoleChecker
 
 logger = logging.getLogger('bot_service')
 

@@ -7,6 +7,7 @@ from twitchio.ext import commands
 from core.connection_manager import ConnectionManager
 from api.tts_api import TTSAPI
 from api.youtube_api import YouTubeAPI
+from utils.role_checker import RoleChecker
 
 # Включаем детальное логирование для TwitchIO
 logging.getLogger('twitchio').setLevel(logging.DEBUG)
@@ -227,6 +228,111 @@ class Bot(commands.Bot):
         except Exception as e:
             logger.error(f"Error in handle_tts_message: {e}")
 
+    async def handle_commands(self, message):
+        """Обработка команд из базы данных"""
+        try:
+            if not message or not message.channel or not message.author:
+                return
+                
+            channel_name = getattr(message.channel, 'name', None)
+            author_name = getattr(message.author, 'name', None)
+            content = getattr(message, 'content', '')
+            
+            if not channel_name or not author_name or not content:
+                return
+            
+            # Проверяем, является ли сообщение командой
+            if not content.startswith('!'):
+                return
+            
+            # Извлекаем название команды
+            command_name = content.split()[0][1:].lower()  # Убираем ! и приводим к нижнему регистру
+            
+            # Получаем команды из базы данных
+            from core.database import get_db, BotCommand
+            db_gen = get_db()
+            db = next(db_gen)
+            
+            try:
+                # Ищем команду в базе данных
+                command = db.query(BotCommand).filter(
+                    BotCommand.channel_name == channel_name,
+                    BotCommand.command_name == command_name,
+                    BotCommand.is_enabled == True
+                ).first()
+                
+                if not command:
+                    return  # Команда не найдена или отключена
+                
+                # Проверяем платформу
+                if 'twitch' not in command.platforms.split(','):
+                    return  # Команда не для Twitch
+                
+                # Получаем роли пользователя
+                user_badges = getattr(message.author, 'badges', [])
+                user_roles = RoleChecker.check_twitch_role(
+                    user_badges, 
+                    str(message.author.id), 
+                    str(message.channel.id)
+                )
+                
+                # Проверяем права доступа
+                if not RoleChecker.can_execute_command(user_roles, command.allowed_roles, 'twitch'):
+                    await message.channel.send(f"❌ У вас нет прав для выполнения команды !{command_name}")
+                    return
+                
+                # Проверяем кулдаун
+                from datetime import datetime, timedelta
+                if command.last_used and command.cooldown_seconds > 0:
+                    time_since_last_use = datetime.utcnow() - command.last_used
+                    if time_since_last_use.total_seconds() < command.cooldown_seconds:
+                        remaining_time = command.cooldown_seconds - int(time_since_last_use.total_seconds())
+                        await message.channel.send(f"⏰ Команда !{command_name} на кулдауне. Осталось: {remaining_time}с")
+                        return
+                
+                # Выполняем команду
+                if command.command_type == 'custom':
+                    # Кастомная команда - отправляем ответ
+                    response = command.response_text
+                    if response:
+                        await message.channel.send(response)
+                else:
+                    # Базовая команда - вызываем соответствующий обработчик
+                    await self.handle_basic_command(command_name, message, command)
+                
+                # Обновляем статистику использования
+                command.last_used = datetime.utcnow()
+                command.usage_count += 1
+                db.commit()
+                
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"Error in handle_commands: {e}")
+
+    async def handle_basic_command(self, command_name: str, message, command):
+        """Обработка базовых команд"""
+        try:
+            if command_name == 'tts':
+                await self.toggle_tts_from_message(message)
+            elif command_name == 'queue':
+                await self.show_queue_from_message(message)
+            elif command_name == 'next':
+                await self.next_video_from_message(message)
+            elif command_name == 'clear':
+                await self.clear_queue_from_message(message)
+            elif command_name == 'sr':
+                # Извлекаем URL из сообщения
+                parts = message.content.split()
+                url = parts[1] if len(parts) > 1 else None
+                await self.song_request_from_message(message, url)
+            elif command_name == 'help':
+                await self.help_command_from_message(message)
+            # Добавьте другие базовые команды по необходимости
+        except Exception as e:
+            logger.error(f"Error in handle_basic_command: {e}")
+
     @commands.command(name='tts')
     async def toggle_tts(self, ctx):
         """Команда для переключения TTS для Twitch"""
@@ -345,6 +451,98 @@ class Bot(commands.Bot):
 !help - Показать это сообщение
         """
         await ctx.send(help_text)
+
+    # Функции для работы с сообщениями (не ctx)
+    async def toggle_tts_from_message(self, message):
+        """Команда для переключения TTS для Twitch (из сообщения)"""
+        channel_name = message.channel.name.lower()
+        
+        if self.connection_manager.is_tts_enabled(channel_name, 'twitch'):
+            self.connection_manager.disable_tts(channel_name, 'twitch')
+            await message.channel.send("🔇 TTS отключен для Twitch")
+        else:
+            self.connection_manager.enable_tts(channel_name, 'twitch')
+            await message.channel.send("🔊 TTS включен для Twitch")
+
+    async def show_queue_from_message(self, message):
+        """Показать очередь YouTube видео (из сообщения)"""
+        channel_name = message.channel.name.lower()
+        queue = self.connection_manager.get_youtube_queue(channel_name)
+        
+        if not queue:
+            await message.channel.send("📺 Очередь пуста")
+            return
+        
+        current_video = self.connection_manager.get_current_video(channel_name)
+        if current_video:
+            await message.channel.send(f"🎵 Сейчас играет: {current_video.get('title', 'Unknown')}")
+        
+        queue_text = "📺 Очередь:\n"
+        for i, video in enumerate(queue[:5], 1):  # Показываем только первые 5
+            queue_text += f"{i}. {video.get('title', 'Unknown')}\n"
+        
+        if len(queue) > 5:
+            queue_text += f"... и еще {len(queue) - 5} видео"
+        
+        await message.channel.send(queue_text)
+
+    async def next_video_from_message(self, message):
+        """Переключить на следующее видео (из сообщения)"""
+        channel_name = message.channel.name.lower()
+        next_video = self.connection_manager.next_youtube_video(channel_name)
+        
+        if next_video:
+            await message.channel.send(f"⏭️ Переключено на: {next_video.get('title', 'Unknown')}")
+        else:
+            await message.channel.send("📺 В очереди нет видео")
+
+    async def clear_queue_from_message(self, message):
+        """Очистить очередь видео (из сообщения)"""
+        channel_name = message.channel.name.lower()
+        self.connection_manager.clear_youtube_queue(channel_name)
+        await message.channel.send("🗑️ Очередь очищена")
+
+    async def song_request_from_message(self, message, url: str = None):
+        """Заказать YouTube видео (из сообщения)"""
+        if not url:
+            await message.channel.send("❌ Укажите URL видео: !sr <url>")
+            return
+        
+        try:
+            from services.queue_service import QueueService
+            from core.database import get_db
+            
+            # Получаем информацию о пользователе
+            user_id = str(message.author.id)
+            user_name = message.author.name
+            channel_name = message.channel.name.lower()
+            
+            # Добавляем видео в очередь через сервис
+            queue_service = QueueService()
+            result = queue_service.add_to_queue(user_id, user_name, url, channel_name)
+            
+            if result['success']:
+                video_info = result['video_info']
+                await message.channel.send(f"✅ {user_name} добавил в очередь: {video_info['title']}")
+            else:
+                await message.channel.send(f"❌ Ошибка добавления видео: {result['error']}")
+                
+        except Exception as e:
+            logger.error(f"Error in song_request_from_message: {e}")
+            await message.channel.send("❌ Произошла ошибка при добавлении видео")
+
+    async def help_command_from_message(self, message):
+        """Показать список команд (из сообщения)"""
+        help_text = """
+🤖 Доступные команды:
+!tts - Включить/выключить TTS
+!queue - Показать очередь видео
+!next - Следующее видео
+!clear - Очистить очередь
+!sr <url> - Добавить видео в очередь
+!help - Показать это сообщение
+        """
+        await message.channel.send(help_text)
 
     async def event_channel_joined(self, channel):
         """Вызывается когда бот присоединяется к каналу"""

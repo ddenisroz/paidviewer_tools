@@ -160,7 +160,7 @@ class VKLiveBot:
             
             # Обрабатываем команды (если сообщение начинается с !)
             if message_text.startswith('!'):
-                await self.command_handler.handle_message(channel_name, message_data)
+                await self.handle_database_commands(channel_name, message_data)
             
             # Обрабатываем верификацию
             await self.handle_verification_message(channel_name, message_text, str(author_id))
@@ -476,3 +476,194 @@ class VKLiveBot:
                 
         except Exception as e:
             logger.error(f"Error handling TTS message for VK Live channel {channel_name}: {e}")
+
+    async def handle_database_commands(self, channel_name: str, message_data: dict):
+        """Обработка команд из базы данных для VK Live"""
+        try:
+            author_nick = message_data.get("author_nick", "Unknown")
+            message_text = message_data.get("message", "")
+            author_id = message_data.get("author_id")
+            
+            if not message_text.startswith('!'):
+                return
+            
+            # Извлекаем название команды
+            command_name = message_text.split()[0][1:].lower()  # Убираем ! и приводим к нижнему регистру
+            
+            # Получаем команды из базы данных
+            from core.database import get_db, BotCommand
+            db_gen = get_db()
+            db = next(db_gen)
+            
+            try:
+                # Ищем команду в базе данных
+                command = db.query(BotCommand).filter(
+                    BotCommand.channel_name == channel_name,
+                    BotCommand.command_name == command_name,
+                    BotCommand.is_enabled == True
+                ).first()
+                
+                if not command:
+                    return  # Команда не найдена или отключена
+                
+                # Проверяем платформу
+                if 'vk' not in command.platforms.split(','):
+                    return  # Команда не для VK Live
+                
+                # Получаем роли пользователя из VK Live API
+                user_roles = await self._get_user_roles(channel_name, author_id)
+                
+                # Проверяем права доступа
+                if not RoleChecker.can_execute_command(user_roles, command.allowed_roles, 'vk'):
+                    await self.send_message(channel_name, f"❌ У вас нет прав для выполнения команды !{command_name}")
+                    return
+                
+                # Проверяем кулдаун
+                from datetime import datetime, timedelta
+                if command.last_used and command.cooldown_seconds > 0:
+                    time_since_last_use = datetime.utcnow() - command.last_used
+                    if time_since_last_use.total_seconds() < command.cooldown_seconds:
+                        remaining_time = command.cooldown_seconds - int(time_since_last_use.total_seconds())
+                        await self.send_message(channel_name, f"⏰ Команда !{command_name} на кулдауне. Осталось: {remaining_time}с")
+                        return
+                
+                # Выполняем команду
+                if command.command_type == 'custom':
+                    # Кастомная команда - отправляем ответ
+                    response = command.response_text
+                    if response:
+                        await self.send_message(channel_name, response)
+                else:
+                    # Базовая команда - вызываем соответствующий обработчик
+                    await self.handle_basic_command_vk(command_name, channel_name, message_data, command)
+                
+                # Обновляем статистику использования
+                command.last_used = datetime.utcnow()
+                command.usage_count += 1
+                db.commit()
+                
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"Error in handle_database_commands: {e}")
+
+    async def _get_user_roles(self, channel_name: str, user_id: str) -> List[str]:
+        """Получение ролей пользователя в VK Live"""
+        try:
+            # Здесь нужно сделать запрос к VK Live API для получения информации о пользователе
+            # Пока возвращаем базовые роли
+            roles = []
+            
+            # TODO: Реализовать запрос к VK Live API для получения ролей пользователя
+            # Пока используем заглушку
+            return roles
+            
+        except Exception as e:
+            logger.error(f"Error getting user roles: {e}")
+            return []
+
+    async def handle_basic_command_vk(self, command_name: str, channel_name: str, message_data: dict, command):
+        """Обработка базовых команд для VK Live"""
+        try:
+            if command_name == 'tts':
+                await self.toggle_tts_vk(channel_name)
+            elif command_name == 'queue':
+                await self.show_queue_vk(channel_name)
+            elif command_name == 'next':
+                await self.next_video_vk(channel_name)
+            elif command_name == 'clear':
+                await self.clear_queue_vk(channel_name)
+            elif command_name == 'sr':
+                # Извлекаем URL из сообщения
+                message_text = message_data.get("message", "")
+                parts = message_text.split()
+                url = parts[1] if len(parts) > 1 else None
+                author_nick = message_data.get("author_nick", "Unknown")
+                await self.song_request_vk(channel_name, url, author_nick)
+            elif command_name == 'help':
+                await self.help_command_vk(channel_name)
+            # Добавьте другие базовые команды по необходимости
+        except Exception as e:
+            logger.error(f"Error in handle_basic_command_vk: {e}")
+
+    # Функции для базовых команд VK Live
+    async def toggle_tts_vk(self, channel_name: str):
+        """Команда для переключения TTS для VK Live"""
+        if self.connection_manager.is_tts_enabled(channel_name, 'vk'):
+            self.connection_manager.disable_tts(channel_name, 'vk')
+            await self.send_message(channel_name, "🔇 TTS отключен для VK Live")
+        else:
+            self.connection_manager.enable_tts(channel_name, 'vk')
+            await self.send_message(channel_name, "🔊 TTS включен для VK Live")
+
+    async def show_queue_vk(self, channel_name: str):
+        """Показать очередь YouTube видео для VK Live"""
+        queue = self.connection_manager.get_youtube_queue(channel_name)
+        
+        if not queue:
+            await self.send_message(channel_name, "📺 Очередь пуста")
+            return
+        
+        current_video = self.connection_manager.get_current_video(channel_name)
+        if current_video:
+            await self.send_message(channel_name, f"🎵 Сейчас играет: {current_video.get('title', 'Unknown')}")
+        
+        queue_text = "📺 Очередь:\n"
+        for i, video in enumerate(queue[:5], 1):  # Показываем только первые 5
+            queue_text += f"{i}. {video.get('title', 'Unknown')}\n"
+        
+        if len(queue) > 5:
+            queue_text += f"... и еще {len(queue) - 5} видео"
+        
+        await self.send_message(channel_name, queue_text)
+
+    async def next_video_vk(self, channel_name: str):
+        """Переключить на следующее видео для VK Live"""
+        next_video = self.connection_manager.next_youtube_video(channel_name)
+        
+        if next_video:
+            await self.send_message(channel_name, f"⏭️ Переключено на: {next_video.get('title', 'Unknown')}")
+        else:
+            await self.send_message(channel_name, "📺 В очереди нет видео")
+
+    async def clear_queue_vk(self, channel_name: str):
+        """Очистить очередь видео для VK Live"""
+        self.connection_manager.clear_youtube_queue(channel_name)
+        await self.send_message(channel_name, "🗑️ Очередь очищена")
+
+    async def song_request_vk(self, channel_name: str, url: str = None, author_nick: str = "Unknown"):
+        """Заказать YouTube видео для VK Live"""
+        if not url:
+            await self.send_message(channel_name, "❌ Укажите URL видео: !sr <url>")
+            return
+        
+        try:
+            from services.queue_service import QueueService
+            
+            # Добавляем видео в очередь через сервис
+            queue_service = QueueService()
+            result = queue_service.add_to_queue("vk_user", author_nick, url, channel_name)
+            
+            if result['success']:
+                video_info = result['video_info']
+                await self.send_message(channel_name, f"✅ {author_nick} добавил в очередь: {video_info['title']}")
+            else:
+                await self.send_message(channel_name, f"❌ Ошибка добавления видео: {result['error']}")
+                
+        except Exception as e:
+            logger.error(f"Error in song_request_vk: {e}")
+            await self.send_message(channel_name, "❌ Произошла ошибка при добавлении видео")
+
+    async def help_command_vk(self, channel_name: str):
+        """Показать список команд для VK Live"""
+        help_text = """
+🤖 Доступные команды:
+!tts - Включить/выключить TTS
+!queue - Показать очередь видео
+!next - Следующее видео
+!clear - Очистить очередь
+!sr <url> - Добавить видео в очередь
+!help - Показать это сообщение
+        """
+        await self.send_message(channel_name, help_text)

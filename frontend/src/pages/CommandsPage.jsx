@@ -26,7 +26,9 @@ import {
     Hash,
     MessageSquare,
     Twitch,
-    Volume2
+    Volume2,
+    Heart,
+    Star
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useIntegrations } from '../context/IntegrationsContext';
@@ -65,9 +67,15 @@ const CommandsPage = () => {
 
     const roleOptions = [
         { value: 'all', label: 'Все', icon: <Users className="h-3 w-3" /> },
-        { value: 'vips', label: 'VIP', icon: <Shield className="h-3 w-3" /> },
-        { value: 'mods', label: 'Модераторы', icon: <ShieldCheck className="h-3 w-3" /> },
-        { value: 'broadcaster', label: 'Стример', icon: <Crown className="h-3 w-3" /> }
+        // Twitch роли
+        { value: 'broadcaster', label: 'Broadcaster (Twitch)', icon: <Crown className="h-3 w-3" /> },
+        { value: 'moderator', label: 'Moderator (Twitch)', icon: <ShieldCheck className="h-3 w-3" /> },
+        { value: 'subscriber', label: 'Subscriber (Twitch)', icon: <Heart className="h-3 w-3" /> },
+        { value: 'vip', label: 'VIP (Twitch)', icon: <Shield className="h-3 w-3" /> },
+        { value: 'founder', label: 'Founder (Twitch)', icon: <Star className="h-3 w-3" /> },
+        // VK Live роли
+        { value: 'owner', label: 'Owner (VK Live)', icon: <Crown className="h-3 w-3" /> },
+        { value: 'moderator_vk', label: 'Moderator (VK Live)', icon: <ShieldCheck className="h-3 w-3" /> }
     ];
 
     const platformOptions = [
