@@ -504,7 +504,10 @@ class VKLiveBot:
                 ).first()
                 
                 if not command:
-                    return  # Команда не найдена или отключена
+                    # Если команда не найдена, создаем базовую команду
+                    command = await self._create_basic_command(db, channel_name, command_name, author_id)
+                    if not command:
+                        return  # Не удалось создать команду
                 
                 # Проверяем платформу
                 if 'vk' not in command.platforms.split(','):
@@ -547,6 +550,96 @@ class VKLiveBot:
                 
         except Exception as e:
             logger.error(f"Error in handle_database_commands: {e}")
+
+    async def _create_basic_command(self, db, channel_name: str, command_name: str, user_id: str):
+        """Создает базовую команду если её нет в базе данных"""
+        try:
+            from datetime import datetime
+            
+            # Определяем настройки для базовых команд
+            basic_commands_config = {
+                'sr': {
+                    'command_type': 'basic',
+                    'response_text': None,
+                    'is_enabled': True,
+                    'platforms': 'twitch,vk',
+                    'allowed_roles': 'all',
+                    'cooldown_seconds': 0
+                },
+                'tts': {
+                    'command_type': 'basic',
+                    'response_text': None,
+                    'is_enabled': True,
+                    'platforms': 'twitch,vk',
+                    'allowed_roles': 'all',
+                    'cooldown_seconds': 0
+                },
+                'queue': {
+                    'command_type': 'basic',
+                    'response_text': None,
+                    'is_enabled': True,
+                    'platforms': 'twitch,vk',
+                    'allowed_roles': 'all',
+                    'cooldown_seconds': 0
+                },
+                'next': {
+                    'command_type': 'basic',
+                    'response_text': None,
+                    'is_enabled': True,
+                    'platforms': 'twitch,vk',
+                    'allowed_roles': 'all',
+                    'cooldown_seconds': 0
+                },
+                'clear': {
+                    'command_type': 'basic',
+                    'response_text': None,
+                    'is_enabled': True,
+                    'platforms': 'twitch,vk',
+                    'allowed_roles': 'owner,moderator_vk',
+                    'cooldown_seconds': 0
+                },
+                'help': {
+                    'command_type': 'basic',
+                    'response_text': None,
+                    'is_enabled': True,
+                    'platforms': 'twitch,vk',
+                    'allowed_roles': 'all',
+                    'cooldown_seconds': 0
+                }
+            }
+            
+            # Проверяем, является ли это базовой командой
+            if command_name not in basic_commands_config:
+                logger.warning(f"Unknown command: {command_name}")
+                return None
+            
+            config = basic_commands_config[command_name]
+            
+            # Создаем команду
+            command = BotCommand(
+                user_id=1,  # Временный ID для VK пользователей
+                channel_name=channel_name,
+                command_name=command_name,
+                command_type=config['command_type'],
+                response_text=config['response_text'],
+                is_enabled=config['is_enabled'],
+                platforms=config['platforms'],
+                allowed_roles=config['allowed_roles'],
+                cooldown_seconds=config['cooldown_seconds'],
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+            
+            db.add(command)
+            db.commit()
+            
+            logger.info(f"Created basic command '{command_name}' for channel '{channel_name}'")
+            return command
+            
+        except Exception as e:
+            logger.error(f"Error creating basic command '{command_name}': {e}")
+            db.rollback()
+            return None
 
     async def _get_user_roles(self, channel_name: str, user_id: str) -> List[str]:
         """Получение ролей пользователя в VK Live"""
