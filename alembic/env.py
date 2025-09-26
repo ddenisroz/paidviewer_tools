@@ -19,7 +19,7 @@ if config.config_file_name is not None:
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'bot_service'))
-from database import Base
+from core.database import Base
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

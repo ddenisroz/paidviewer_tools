@@ -7,7 +7,7 @@ import websockets
 from typing import Dict, List, Optional, Callable
 from urllib.parse import urlencode
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('bot_service')
 
 class VKLiveWebSocketClient:
     """
@@ -30,42 +30,21 @@ class VKLiveWebSocketClient:
                 logger.error("Failed to get WebSocket JWT token")
                 return False
             
-            # Подключаемся к WebSocket
-            ws_url = f"wss://pubsub-dev.live.vkvideo.ru/connection/websocket?format=json&cf_protocol=1"
+            # ИСПРАВЛЕННЫЙ СПОСОБ: Подключаемся с токеном в URL параметре
+            ws_url = f"wss://pubsub-dev.live.vkvideo.ru/connection/websocket?token={jwt_token}"
             
-            logger.info(f"Connecting to VK Live WebSocket: {ws_url}")
+            logger.info(f"Connecting to VK Live WebSocket with token in URL")
             self.websocket = await websockets.connect(ws_url)
             self.is_connected = True
             
-            # Отправляем команду подключения
-            connect_msg = {
-                "id": 1,
-                "method": "connect",
-                "params": {
-                    "token": jwt_token
-                }
-            }
-            await self.websocket.send(json.dumps(connect_msg))
-            
-            # Ждем подтверждения подключения
-            response = await self.websocket.recv()
-            logger.info(f"VK Live WebSocket connected: {response}")
-            
-            # Парсим ответ
-            try:
-                response_data = json.loads(response)
-                if "result" in response_data:
-                    logger.info("✅ VK Live WebSocket connection established")
-                    return True
-                else:
-                    logger.error(f"❌ WebSocket connection failed: {response_data}")
-                    return False
-            except json.JSONDecodeError:
-                logger.error(f"❌ Invalid WebSocket response: {response}")
-                return False
+            # НЕ отправляем connect сообщение - токен уже в URL
+            logger.info("✅ VK Live WebSocket connection established")
+            return True
             
         except Exception as e:
+            import traceback
             logger.error(f"Failed to connect to VK Live WebSocket: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return False
     
     async def _get_websocket_token(self) -> Optional[str]:
@@ -83,7 +62,11 @@ class VKLiveWebSocketClient:
                         data = await response.json()
                         return data.get("data", {}).get("token")
                     else:
-                        logger.error(f"Failed to get WebSocket token: {response.status}")
+                        try:
+                            body = await response.text()
+                        except Exception:
+                            body = "<no body>"
+                        logger.error(f"Failed to get WebSocket token: {response.status} - {body}")
                         return None
                         
         except Exception as e:
@@ -99,39 +82,62 @@ class VKLiveWebSocketClient:
             
             # Получаем токен подписки для канала (если нужен)
             subscription_token = await self._get_subscription_token(channel_name)
+            logger.info(f"Subscription token for {channel_name}: {'Found' if subscription_token else 'Not available'}")
             
-            # Формируем команду подписки
-            subscribe_msg = {
-                "id": len(self.subscribed_channels) + 2,
-                "method": "subscribe",
-                "params": {
-                    "channel": f"api-channel-chat:{channel_name}"
+            # Пробуем разные форматы подписки
+            channel_formats = [
+                f"api-channel-chat:{channel_name}",
+                f"chat:{channel_name}",
+                channel_name
+            ]
+            
+            for channel_format in channel_formats:
+                logger.info(f"Trying to subscribe to channel format: {channel_format}")
+                
+                # Формируем команду подписки
+                subscribe_msg = {
+                    "id": len(self.subscribed_channels) + 2,
+                    "method": "subscribe",
+                    "params": {
+                        "channel": channel_format
+                    }
                 }
-            }
+                
+                # Добавляем токен подписки, если он есть
+                if subscription_token:
+                    subscribe_msg["params"]["token"] = subscription_token
+                
+                await self.websocket.send(json.dumps(subscribe_msg))
+                logger.info(f"Sent subscription message: {json.dumps(subscribe_msg)}")
+                
+                try:
+                    # Ждем подтверждения подписки
+                    response = await asyncio.wait_for(self.websocket.recv(), timeout=10.0)
+                    logger.info(f"Subscription response for {channel_format}: {response}")
+                    
+                    # Парсим ответ подписки
+                    try:
+                        response_data = json.loads(response)
+                        if "result" in response_data and response_data.get("result") is not False:
+                            self.subscribed_channels.add(channel_name)
+                            logger.info(f"✅ Successfully subscribed to channel: {channel_name} (format: {channel_format})")
+                            return True
+                        elif "error" in response_data:
+                            logger.warning(f"❌ Subscription error for {channel_format}: {response_data.get('error')}")
+                            continue  # Пробуем следующий формат
+                        else:
+                            logger.warning(f"❌ Unexpected subscription response for {channel_format}: {response_data}")
+                            continue
+                    except json.JSONDecodeError:
+                        logger.error(f"❌ Invalid subscription response: {response}")
+                        continue
+                        
+                except asyncio.TimeoutError:
+                    logger.warning(f"⏰ Subscription timeout for {channel_format}")
+                    continue
             
-            # Добавляем токен подписки, если он есть
-            if subscription_token:
-                subscribe_msg["params"]["token"] = subscription_token
-            
-            await self.websocket.send(json.dumps(subscribe_msg))
-            
-            # Ждем подтверждения подписки
-            response = await self.websocket.recv()
-            logger.info(f"Subscribed to channel {channel_name}: {response}")
-            
-            # Парсим ответ подписки
-            try:
-                response_data = json.loads(response)
-                if "result" in response_data:
-                    logger.info(f"✅ Successfully subscribed to channel {channel_name}")
-                    self.subscribed_channels.add(channel_name)
-                    return True
-                else:
-                    logger.error(f"❌ Failed to subscribe to channel {channel_name}: {response_data}")
-                    return False
-            except json.JSONDecodeError:
-                logger.error(f"❌ Invalid subscription response: {response}")
-                return False
+            logger.error(f"❌ Failed to subscribe to channel {channel_name} with any format")
+            return False
             
         except Exception as e:
             logger.error(f"Failed to subscribe to channel {channel_name}: {e}")
@@ -140,29 +146,59 @@ class VKLiveWebSocketClient:
     async def _get_subscription_token(self, channel_name: str) -> Optional[str]:
         """Получение токена подписки для канала"""
         try:
-            url = "https://apidev.live.vkvideo.ru/v1/websocket/subscription_token"
-            headers = {
-                "Authorization": f"Bearer {self.access_token}",
-                "Content-Type": "application/json"
-            }
-            params = {
-                "channels": f"api-channel-chat:{channel_name}"
-            }
+            # Пробуем разные форматы каналов для получения токена
+            channel_formats = [
+                f"api-channel-chat:{channel_name}",
+                f"chat:{channel_name}",
+                channel_name
+            ]
             
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers, params=params) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        tokens = data.get("data", {}).get("channel_tokens", [])
-                        for token_info in tokens:
-                            if token_info.get("channel") == f"api-channel-chat:{channel_name}":
-                                return token_info.get("token")
-                    else:
-                        logger.warning(f"Failed to get subscription token for {channel_name}: {response.status}")
-                        return None
+            for channel_format in channel_formats:
+                logger.info(f"Requesting subscription token for channel format: {channel_format}")
+                
+                url = "https://apidev.live.vkvideo.ru/v1/websocket/subscription_token"
+                headers = {
+                    "Authorization": f"Bearer {self.access_token}",
+                    "Content-Type": "application/json"
+                }
+                params = {
+                    "channels": channel_format
+                }
+                
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, headers=headers, params=params) as response:
+                        logger.info(f"Subscription token request status for {channel_format}: {response.status}")
+                        
+                        if response.status == 200:
+                            data = await response.json()
+                            logger.info(f"Subscription token response: {data}")
+                            
+                            channel_tokens = data.get("data", {}).get("channel_tokens", [])
+                            
+                            # Ищем токен для любого из возможных форматов канала
+                            for token_info in channel_tokens:
+                                token_channel = token_info.get("channel", "")
+                                token_value = token_info.get("token", "")
+                                
+                                if token_channel and token_value:
+                                    logger.info(f"✅ Found subscription token for channel: {token_channel}")
+                                    return token_value
+                            
+                            # Если токены есть, но не для нашего канала
+                            if channel_tokens:
+                                logger.warning(f"⚠️ Found tokens for other channels: {[t.get('channel') for t in channel_tokens]}")
+                        else:
+                            try:
+                                body = await response.text()
+                            except Exception:
+                                body = "<no body>"
+                            logger.warning(f"❌ Failed to get subscription token for {channel_format}: {response.status} - {body}")
+            
+            logger.warning(f"❌ No subscription token found for any format of channel: {channel_name}")
+            return None
                         
         except Exception as e:
-            logger.error(f"Error getting subscription token for {channel_name}: {e}")
+            logger.error(f"Error getting subscription token: {e}")
             return None
     
     async def listen_for_messages(self):

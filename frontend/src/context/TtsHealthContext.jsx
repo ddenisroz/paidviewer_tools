@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ttsService } from '../services/microservices';
+import { useAuth } from './AuthContext';
 
 export const TtsHealthContext = createContext();
 
@@ -13,6 +14,8 @@ export const useTtsHealth = () => {
 };
 
 export const TtsHealthProvider = ({ children }) => {
+    const { user } = useAuth();
+    
     // Загружаем сохраненный статус из localStorage при инициализации
     const [isHealthy, setIsHealthy] = useState(() => {
         const saved = localStorage.getItem('tts_health_status');
@@ -29,6 +32,9 @@ export const TtsHealthProvider = ({ children }) => {
         return null;
     });
     const location = useLocation();
+    
+    // Проверяем, является ли пользователь гостем
+    const isGuest = user?.is_guest || user?.id === -1;
     const [isInitialized, setIsInitialized] = useState(() => {
         const saved = localStorage.getItem('tts_health_status');
         return saved ? JSON.parse(saved).isInitialized : false;
@@ -51,6 +57,14 @@ export const TtsHealthProvider = ({ children }) => {
     };
 
     const checkHealth = useCallback(async () => {
+        // Не проверяем TTS для гостевых пользователей
+        if (isGuest) {
+            setIsHealthy(false);
+            setIsChecking(false);
+            setLastChecked(Date.now());
+            return;
+        }
+        
         setIsChecking(true);
         try {
             const response = await ttsService.get('/health');
@@ -64,7 +78,7 @@ export const TtsHealthProvider = ({ children }) => {
             setIsChecking(false);
             setLastChecked(Date.now());
         }
-    }, []);
+    }, [isGuest]);
 
     // Проверяем health при загрузке страницы и при смене пути
     useEffect(() => {

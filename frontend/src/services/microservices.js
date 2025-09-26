@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { toast } from 'sonner';
 
 export const TTS_SERVICE_URL = import.meta.env.VITE_TTS_SERVICE_URL || 'http://localhost:8001';
 
@@ -24,6 +25,20 @@ export const loginTwitch = async () => {
         console.error('❌ Ошибка при получении URL авторизации:', error);
         // Fallback на старый способ
         window.location.href = `${botService.defaults.baseURL}/auth/twitch`;
+    }
+};
+
+export const loginVk = async () => {
+    try {
+        // Получаем URL авторизации от API
+        const response = await botService.get('/auth/vk/login');
+        const { auth_url } = response.data;
+        
+        // Перенаправляем на VK OAuth
+        window.location.href = auth_url;
+    } catch (error) {
+        console.error('❌ Ошибка при получении VK URL авторизации:', error);
+        toast.error('Ошибка при входе через VK Live.');
     }
 };
 

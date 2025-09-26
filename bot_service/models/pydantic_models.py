@@ -22,6 +22,7 @@ class WhitelistResponse(BaseModel):
 # YouTube models
 class YouTubeVideoPublic(BaseModel):
     id: int
+    video_id: str
     title: str
     url: str
     duration: int
@@ -35,6 +36,7 @@ class YouTubeVideoPublic(BaseModel):
 class QueueResponse(BaseModel):
     current_video: Optional[YouTubeVideoPublic] = None
     queue: List[YouTubeVideoPublic] = []
+    is_playing: bool = False
 
 # Blocked bots models
 class BlockedBotPublic(BaseModel):

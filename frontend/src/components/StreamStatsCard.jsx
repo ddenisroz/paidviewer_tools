@@ -54,7 +54,12 @@ const StreamStatsCard = ({
     // Добавляем поддержку VK данных
     vkViewers = 0,
     vkStreamHistory = [],
-    preparedVkStreamHistory = []
+    preparedVkStreamHistory = [],
+    // Новые пропы для аналитики
+    peakInfo = null,
+    peakViewers = 0,
+    avgViewers = 0,
+    categories = []
 }) => {
     // Определяем активные платформы
     const twitchEnabled = integrations.twitch?.enabled || false;
@@ -185,13 +190,101 @@ const StreamStatsCard = ({
                                 </div>
                             )}
                         </div>
+
+                        {/* Блок статистики пиков */}
+                        {combinedData.length > 0 && (
+                            <div className="mt-6 pt-4 border-t border-gray-200">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                    {/* Пиковый онлайн */}
+                                    <div className="text-center">
+                                        <div className="text-xs text-gray-500 mb-1">Пик за стрим</div>
+                                        <div className="text-lg font-bold text-blue-600">{peakViewers.toLocaleString()}</div>
+                                    </div>
+                                    
+                                    {/* Средний онлайн */}
+                                    <div className="text-center">
+                                        <div className="text-xs text-gray-500 mb-1">Средний онлайн</div>
+                                        <div className="text-lg font-bold text-green-600">{avgViewers.toLocaleString()}</div>
+                                    </div>
+                                    
+                                    {/* Текущий онлайн */}
+                                    <div className="text-center">
+                                        <div className="text-xs text-gray-500 mb-1">Сейчас</div>
+                                        <div className="text-lg font-bold text-purple-600">{totalViewers.toLocaleString()}</div>
+                                    </div>
+                                </div>
+
+                                {/* Сообщение о прайме */}
+                                {peakInfo && (
+                                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 text-center">
+                                        <div className="flex items-center justify-center space-x-2">
+                                            <span className="text-2xl">{peakInfo.emoji}</span>
+                                            <div>
+                                                <div className="text-sm font-semibold text-gray-800">
+                                                    {peakInfo.message}
+                                                </div>
+                                                {peakInfo.highest_recent && (
+                                                    <div className="text-xs text-gray-600 mt-1">
+                                                        Последний пик: {peakInfo.highest_recent.viewers.toLocaleString()} зрителей
+                                                        {peakInfo.highest_recent.days_ago > 0 && 
+                                                            ` (${peakInfo.highest_recent.days_ago} дн. назад)`
+                                                        }
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Детали пиков */}
+                                        {peakInfo.peaks && (
+                                            <div className="mt-2 flex flex-wrap justify-center gap-1 text-xs">
+                                                {peakInfo.peaks.weekly && (
+                                                    <div className="bg-white/60 rounded px-2 py-1">
+                                                        Неделя: {peakInfo.peaks.weekly.viewers.toLocaleString()}
+                                                    </div>
+                                                )}
+                                                {peakInfo.peaks.monthly && (
+                                                    <div className="bg-white/60 rounded px-2 py-1">
+                                                        Месяц: {peakInfo.peaks.monthly.viewers.toLocaleString()}
+                                                    </div>
+                                                )}
+                                                {peakInfo.peaks.all_time && (
+                                                    <div className="bg-white/60 rounded px-2 py-1">
+                                                        Рекорд: {peakInfo.peaks.all_time.viewers.toLocaleString()}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Популярные категории */}
+                                {categories && categories.length > 0 && (
+                                    <div className="mt-3">
+                                        <div className="text-xs text-gray-500 mb-2">Категории сегодня:</div>
+                                        <div className="flex flex-wrap gap-1">
+                                            {categories.slice(0, 5).map((category, index) => (
+                                                <span 
+                                                    key={index}
+                                                    className="px-2 py-1 bg-gray-100 rounded-full text-xs text-gray-700"
+                                                >
+                                                    {category}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 ) : (
-                    <div className="flex items-center justify-center text-red-400">
-                        <div className="text-center">
-                            <Circle className="h-12 w-12 mx-auto mb-2" />
-                            <p className="text-sm">Интеграции с платформами отключены</p>
-                            <p className="text-xs text-muted-foreground mt-1">Подключите Twitch или VK Live для просмотра статистики</p>
+                    <div className="flex items-center justify-center h-full min-h-[300px]">
+                        <div className="text-center space-y-4">
+                            <div className="w-16 h-16 mx-auto flex items-center justify-center">
+                                <svg className="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </div>
+                            <p className="text-sm text-muted-foreground px-4">Авторизуйтесь для полного функционала</p>
                         </div>
                     </div>
                 )}

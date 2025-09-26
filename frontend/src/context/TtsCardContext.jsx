@@ -3,6 +3,7 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import { useLocation } from 'react-router-dom';
 import { TtsHealthContext } from './TtsHealthContext';
 import { ttsService } from '../services/microservices';
+import { useAuth } from './AuthContext';
 
 const TtsCardContext = createContext();
 
@@ -15,13 +16,24 @@ export const useTtsCard = () => {
 };
 
 export const TtsCardProvider = ({ children }) => {
+    const { user } = useAuth();
+    
     const [ttsCardStatus, setTtsCardStatus] = useState({
         isHealthy: false,
         isLoading: true,
         error: null
     });
 
+    // Проверяем, является ли пользователь гостем
+    const isGuest = user?.is_guest || user?.id === -1;
+
     const checkTtsHealth = async () => {
+        // Не проверяем TTS для гостевых пользователей
+        if (isGuest) {
+            setTtsCardStatus({ isHealthy: false, isLoading: false, error: 'Guest mode - TTS not available' });
+            return;
+        }
+        
         setTtsCardStatus(prev => ({ ...prev, isLoading: true }));
         try {
             const response = await ttsService.get('/health');
@@ -38,9 +50,12 @@ export const TtsCardProvider = ({ children }) => {
 
     useEffect(() => {
         checkTtsHealth();
-        const interval = setInterval(checkTtsHealth, 30000); // Check every 30 seconds
-        return () => clearInterval(interval);
-    }, []);
+        // Не запускаем интервал для гостевых пользователей
+        if (!isGuest) {
+            const interval = setInterval(checkTtsHealth, 30000); // Check every 30 seconds
+            return () => clearInterval(interval);
+        }
+    }, [isGuest]);
     
     const value = {
         ttsCardStatus,

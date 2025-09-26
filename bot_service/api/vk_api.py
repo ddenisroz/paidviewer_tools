@@ -391,5 +391,163 @@ class VKLiveAPI:
         if stream_info and stream_info.get("online"):
             return stream_info.get("viewer_count", 0)
         return 0
+    
+    # === CHANNEL POINTS METHODS ===
+    
+    async def get_channel_points_balance(self, channel_url: str, access_token: str) -> Optional[Dict[str, Any]]:
+        """Получить баланс баллов канала"""
+        try:
+            url = f"{self.base_url}/v1/channel_point"
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
+            params = {"channel_url": channel_url}
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, headers=headers, params=params, timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    logger.info(f"Got VK channel points balance for {channel_url}")
+                    return data.get("data")
+                else:
+                    logger.error(f"VK channel points balance error: {response.status_code} - {response.text}")
+                    return None
+                    
+        except Exception as e:
+            logger.error(f"Error getting VK channel points balance: {e}")
+            return None
+    
+    async def get_channel_rewards(self, channel_url: str, access_token: str) -> Optional[List[Dict[str, Any]]]:
+        """Получить список наград канала"""
+        try:
+            url = f"{self.base_url}/v1/channel_point/rewards"
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
+            params = {"channel_url": channel_url}
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, headers=headers, params=params, timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return data.get("data", {}).get("rewards", [])
+                else:
+                    logger.error(f"VK channel rewards error: {response.status_code} - {response.text}")
+                    return None
+                    
+        except Exception as e:
+            logger.error(f"Error getting VK channel rewards: {e}")
+            return None
+    
+    async def create_channel_reward(self, channel_url: str, access_token: str, reward_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Создать награду канала"""
+        try:
+            url = f"{self.base_url}/v1/channel_point/reward/create"
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
+            params = {"channel_url": channel_url}
+            
+            body = {"reward": reward_data}
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, headers=headers, params=params, json=body, timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    logger.info(f"Created VK channel reward: {reward_data.get('name')}")
+                    return data.get("data")
+                else:
+                    logger.error(f"VK create reward error: {response.status_code} - {response.text}")
+                    return None
+                    
+        except Exception as e:
+            logger.error(f"Error creating VK channel reward: {e}")
+            return None
+    
+    async def get_reward_demands(self, channel_url: str, access_token: str, limit: int = 20, offset: int = 0) -> Optional[Dict[str, Any]]:
+        """Получить список запросов наград"""
+        try:
+            url = f"{self.base_url}/v1/channel_point/reward/demands"
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
+            params = {
+                "channel_url": channel_url,
+                "limit": limit,
+                "offset": offset
+            }
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, headers=headers, params=params, timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return data.get("data")
+                else:
+                    logger.error(f"VK reward demands error: {response.status_code} - {response.text}")
+                    return None
+                    
+        except Exception as e:
+            logger.error(f"Error getting VK reward demands: {e}")
+            return None
+    
+    async def accept_reward_demands(self, channel_url: str, access_token: str, demand_ids: List[int]) -> bool:
+        """Принять запросы наград"""
+        try:
+            url = f"{self.base_url}/v1/channel_point/reward/demand/accept"
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
+            params = {"channel_url": channel_url}
+            
+            body = {"demands": [{"id": demand_id} for demand_id in demand_ids]}
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, headers=headers, params=params, json=body, timeout=10)
+                
+                if response.status_code == 200:
+                    logger.info(f"Accepted VK reward demands: {demand_ids}")
+                    return True
+                else:
+                    logger.error(f"VK accept demands error: {response.status_code} - {response.text}")
+                    return False
+                    
+        except Exception as e:
+            logger.error(f"Error accepting VK reward demands: {e}")
+            return False
+    
+    async def reject_reward_demands(self, channel_url: str, access_token: str, demand_ids: List[int]) -> bool:
+        """Отклонить запросы наград"""
+        try:
+            url = f"{self.base_url}/v1/channel_point/reward/demand/reject"
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
+            params = {"channel_url": channel_url}
+            
+            body = {"demands": [{"id": demand_id} for demand_id in demand_ids]}
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, headers=headers, params=params, json=body, timeout=10)
+                
+                if response.status_code == 200:
+                    logger.info(f"Rejected VK reward demands: {demand_ids}")
+                    return True
+                else:
+                    logger.error(f"VK reject demands error: {response.status_code} - {response.text}")
+                    return False
+                    
+        except Exception as e:
+            logger.error(f"Error rejecting VK reward demands: {e}")
+            return False
 
 vk_api = VKLiveAPI()

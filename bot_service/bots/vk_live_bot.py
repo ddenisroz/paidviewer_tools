@@ -5,8 +5,10 @@ import time
 from typing import List, Dict, Any, Optional
 from core.connection_manager import ConnectionManager
 from bots.vk_live_chat_reader import VKLiveChatReader
+from bots.vk_live_chat_reader_optimized import OptimizedVKLiveChatReader
+from utils.vk_live_websocket import VKLiveWebSocketClient
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('bot_service')
 
 class VKLiveBot:
     """
@@ -19,9 +21,18 @@ class VKLiveBot:
         self.connection_manager = connection_manager
         self.connected_channels: List[str] = []
         self.is_running = False
+        
         self.chat_reader: Optional[VKLiveChatReader] = None
+        self.ws_client: Optional[VKLiveWebSocketClient] = None
+        self.ws_task: Optional[asyncio.Task] = None
+        
+        # Инициализируем TTS API для обработки сообщений
         from api.tts_api import TTSAPI
         self.tts_api = TTSAPI()
+        
+        # Инициализируем обработчик команд
+        from vk_live_command_handler import VKLiveCommandHandler
+        self.command_handler = VKLiveCommandHandler(self)
         
     async def start_bot(self):
         """Запуск VK Live бота"""
@@ -30,14 +41,22 @@ class VKLiveBot:
             return
             
         self.is_running = True
-        logger.info("🚀 VK Live bot started")
+        logger.info("🚀 VK LIVE BOT STARTED - Ready to listen to chat")
+        print("🔔 VK LIVE BOT: Started and ready to connect to channels")
         
         try:
-            # Создаем REST API клиент для чтения чата
-            self.chat_reader = VKLiveChatReader(self.user_access_token, self.connection_manager)
-            
-            # Запускаем чтение чата
-            await self.chat_reader.start_reader()
+            # ИСПОЛЬЗУЕМ WEBSOCKET КЛИЕНТ ДЛЯ ЧАТА (реальный тайм)
+            self.ws_client = VKLiveWebSocketClient(self.user_access_token)
+            connected = await self.ws_client.connect()
+            if connected:
+                # Запускаем прослушивание в этом же таске (как и раньше с reader)
+                await self.ws_client.listen_for_messages()
+            else:
+                logger.error("Failed to initialize VK Live WebSocket client")
+                # Fallback: включаем ОПТИМИЗИРОВАННЫЙ REST-пуллинг для максимальной производительности
+                logger.info("🚀 Switching to OPTIMIZED REST API with intelligent polling...")
+                self.chat_reader = OptimizedVKLiveChatReader(self.user_access_token, self.connection_manager)
+                await self.chat_reader.start_reader()
                 
         except Exception as e:
             logger.error(f"VK Live bot error: {e}")
@@ -45,6 +64,8 @@ class VKLiveBot:
             self.is_running = False
             if self.chat_reader:
                 await self.chat_reader.stop_reader()
+            if self.ws_client:
+                await self.ws_client.disconnect()
             logger.info("🛑 VK Live bot stopped")
     
     async def stop_bot(self):
@@ -62,25 +83,45 @@ class VKLiveBot:
                 logger.info(f"VK Live bot already connected to channel: {channel_name}")
                 return True
             
-            if not self.chat_reader:
-                logger.error("Chat reader not initialized")
-                return False
-            
-            # Подключаемся к каналу через REST API
-            if await self.chat_reader.join_channel(channel_name):
+            # Подключаемся к каналу через WebSocket (подписка на канал) или REST fallback
+            subscribed = False
+            if self.ws_client:
+                subscribed = await self.ws_client.subscribe_to_channel(channel_name)
+
+            if subscribed:
                 self.connected_channels.append(channel_name)
                 
-                # Регистрируем обработчик сообщений для этого канала
-                self.chat_reader.register_message_handler(
-                    channel_name,
+                # Регистрируем обработчик сообщений для этого канала (единый путь в TTS)
+                self.ws_client.register_message_handler(
+                    f"api-channel-chat:{channel_name}",
                     lambda msg: self._handle_channel_message(channel_name, msg)
                 )
                 
-                logger.info(f"✅ VK Live bot connected to channel: {channel_name}")
+                logger.info(f"✅ VK LIVE BOT CONNECTED to channel: {channel_name}")
+                print(f"🔔 VK LIVE BOT: Successfully connected to {channel_name} and listening for chat messages")
                 return True
             else:
-                logger.error(f"Failed to connect to channel: {channel_name}")
-                return False
+                # Fallback на ОПТИМИЗИРОВАННЫЙ REST-ридер
+                if not self.chat_reader:
+                    logger.info("🚀 Initializing OPTIMIZED VK Live REST API client...")
+                    self.chat_reader = OptimizedVKLiveChatReader(self.user_access_token, self.connection_manager)
+                    # Если ридер ещё не запущен в start_bot (когда ws ок), запустим его в фоне
+                    asyncio.create_task(self.chat_reader.start_reader())
+
+                if await self.chat_reader.join_channel(channel_name):
+                    self.connected_channels.append(channel_name)
+                    
+                    # Регистрируем обработчик с TTS интеграцией
+                    self.chat_reader.register_message_handler(
+                        channel_name,
+                        lambda msg: self._handle_channel_message_optimized(channel_name, msg)
+                    )
+                    
+                    logger.info(f"✅ VK LIVE BOT CONNECTED (Optimized REST) to channel: {channel_name}")
+                    return True
+                else:
+                    logger.error(f"Failed to connect to channel: {channel_name}")
+                    return False
             
         except Exception as e:
             logger.error(f"Failed to connect VK Live bot to channel {channel_name}: {e}")
@@ -93,9 +134,7 @@ class VKLiveBot:
                 logger.warning(f"VK Live bot not connected to channel: {channel_name}")
                 return True
             
-            # Останавливаем chat_reader для этого канала
-            if self.chat_reader:
-                await self.chat_reader.leave_channel(channel_name)
+            # Для WebSocket отписки по каналу в данной версии SDK нет, достаточно очистить локальные структуры
             
             # Удаляем канал из списка подключенных
             self.connected_channels.remove(channel_name)
@@ -119,14 +158,56 @@ class VKLiveBot:
             
             logger.info(f"📨 VK Live chat [{channel_name}] {author_nick}: {message_text}")
             
+            # Обрабатываем команды (если сообщение начинается с !)
+            if message_text.startswith('!'):
+                await self.command_handler.handle_message(channel_name, message_data)
+            
             # Обрабатываем верификацию
             await self.handle_verification_message(channel_name, message_text, str(author_id))
             
-            # Обрабатываем TTS
-            await self.handle_tts_message(channel_name, message_text, author_nick)
+            # Обрабатываем TTS (только для не-команд)
+            if not message_text.startswith('!'):
+                await self.handle_tts_message(channel_name, message_text, author_nick)
             
         except Exception as e:
             logger.error(f"Error handling channel message: {e}")
+    
+    async def _handle_channel_message_optimized(self, channel_name: str, message_data: dict):
+        """Оптимизированный обработчик сообщений для максимальной производительности"""
+        try:
+            # Быстрая экстракция данных (оптимизированная версия передает готовые данные)
+            author_nick = message_data.get('author_nick', 'Unknown')
+            message_text = message_data.get('message', '')
+            author_id = message_data.get('author_id')
+            
+            # Быстрая проверка валидности
+            if not message_text.strip():
+                return
+            
+            # Логирование уже происходит в оптимизированном reader'е
+            
+            # Обработка команд (высокий приоритет)
+            if message_text.startswith('!'):
+                command_task = asyncio.create_task(
+                    self.command_handler.handle_message(channel_name, message_data)
+                )
+            
+            # Асинхронная обработка верификации и TTS без блокировки
+            verification_task = asyncio.create_task(
+                self.handle_verification_message(channel_name, message_text, str(author_id))
+            )
+            
+            # TTS только для не-команд
+            if not message_text.startswith('!'):
+                tts_task = asyncio.create_task(
+                    self.handle_tts_message(channel_name, message_text, author_nick)
+                )
+            
+            # Можно ждать завершения или пустить в фон для максимальной производительности
+            # await asyncio.gather(verification_task, tts_task, return_exceptions=True)
+            
+        except Exception as e:
+            logger.error(f"Error in optimized channel message handler: {e}")
     
     async def handle_verification_message(self, channel_name: str, message: str, user_id: str):
         """Обработка сообщения верификации"""

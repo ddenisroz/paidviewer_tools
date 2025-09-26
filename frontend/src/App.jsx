@@ -14,6 +14,7 @@ import VoiceManagementPage from './pages/tts/VoiceManagementPage';
 import MediaMainPage from './pages/media/MediaMainPage';
 import ChannelPointsPage from './pages/media/ChannelPointsPage';
 import YoutubeIntegrationPage from './pages/media/YoutubeIntegrationPage';
+import GamblingPage from './pages/GamblingPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import CommandsPage from './pages/CommandsPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
@@ -45,6 +46,7 @@ function App() {
                         <Route path="dashboard/media" element={<MediaMainPage />} />
                         <Route path="dashboard/media/channel-points" element={<ChannelPointsPage />} />
                         <Route path="dashboard/media/youtube" element={<YoutubeIntegrationPage />} />
+                        <Route path="dashboard/media/gambling" element={<GamblingPage />} />
                         <Route path="dashboard/chat-analysis" element={<AnalyticsPage />} />
                         <Route path="dashboard/commands" element={<CommandsPage />} />
                         <Route path="dashboard/admin" element={<AdminPage />} />

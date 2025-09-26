@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Mic, Clapperboard, AreaChart, Terminal, ChevronDown, ChevronRight, Youtube, Coins, Headphones, Settings, Shield, MessageSquare, Command } from 'lucide-react';
+import { Home, Mic, Clapperboard, AreaChart, Terminal, Youtube, Coins, Headphones, Settings, Shield, MessageSquare, Command, Dice6 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getAdminList } from '../../services/microservices';
 
@@ -20,8 +20,9 @@ const getNavItems = (isYourchy) => {
             label: 'Медиа интерактивность', 
             icon: Clapperboard,
             submenu: [
-                { to: '/dashboard/media/youtube', label: 'Youtube интеграция', icon: Youtube },
+                { to: '/dashboard/media/youtube', label: 'YouTube заказы', icon: Youtube },
                 { to: '/dashboard/media/channel-points', label: 'Баллы канала', icon: Coins },
+                { to: '/dashboard/media/gambling', label: 'Гэмблинг', icon: Dice6 },
             ]
         },
         { to: '/dashboard/chat-analysis', label: 'Анализ и модерация чата', icon: MessageSquare },
@@ -37,7 +38,7 @@ const getNavItems = (isYourchy) => {
     return baseItems;
 };
 
-const SidebarNavItem = ({ item, openSection, onToggleSection }) => {
+const SidebarNavItem = ({ item, openSection, setOpenSection }) => {
     const location = useLocation();
     const hasSubmenu = item.submenu && item.submenu.length > 0;
 
@@ -47,39 +48,30 @@ const SidebarNavItem = ({ item, openSection, onToggleSection }) => {
 
     const isOpen = openSection === item.to;
 
+    // Автоматически открываем меню при переходе на активную страницу
     useEffect(() => {
         if (isParentActive && !isOpen) {
-            onToggleSection(item.to);
+            setOpenSection(item.to);
         }
-    }, [isParentActive, item.to, onToggleSection, isOpen]);
+    }, [isParentActive, item.to, setOpenSection, isOpen]);
 
     if (hasSubmenu) {
         return (
             <div>
-                <div className='flex items-center justify-between rounded-lg px-4 py-2.5 text-lg font-semibold'>
+                <div className='rounded-lg px-4 py-2.5 text-lg font-semibold'>
                     <NavLink 
                         to={item.to} 
                         end 
-                        className={({isActive}) => `flex items-center gap-4 flex-1 transition-colors ${isActive || isParentActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                        className={({isActive}) => `flex items-center gap-4 transition-colors ${isActive || isParentActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                         <item.icon className="h-6 w-6" />
                         {item.label}
                     </NavLink>
-                    <button 
-                        onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onToggleSection(item.to);
-                        }} 
-                        className="p-1 -mr-1 rounded-full hover:bg-accent text-muted-foreground"
-                    >
-                        {isOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
-                    </button>
                 </div>
                 {isOpen && (
                     <div className="pl-8 pt-2 flex flex-col gap-1">
                         {item.submenu.map((subItem) => (
-                             <NavLink
+                            <NavLink
                                 key={subItem.to}
                                 to={subItem.to}
                                 className={({ isActive }) =>
@@ -140,9 +132,17 @@ const Sidebar = () => {
     
     // Проверяем, является ли пользователь админом
     useEffect(() => {
-        if (isAuthenticated && user && adminUsers.length > 0) {
-            const userIsAdmin = adminUsers.includes(user.username) || adminUsers.includes(user.login);
+        if (isAuthenticated && user) {
+            // Проверяем напрямую поле is_admin от сервера
+            const userIsAdmin = user.is_admin === true;
             setIsAdmin(userIsAdmin);
+            console.log('Admin check:', { 
+                user_display_name: user.display_name, 
+                user_username: user.username,
+                is_admin: user.is_admin, 
+                adminUsers, 
+                result: userIsAdmin 
+            });
         } else {
             setIsAdmin(false);
         }
@@ -152,16 +152,11 @@ const Sidebar = () => {
     
     // Состояние для управления открытыми разделами
     const [openSection, setOpenSection] = useState(null);
-    
-    // Функция для переключения разделов
-    const handleToggleSection = useCallback((sectionTo) => {
-        setOpenSection(prev => prev === sectionTo ? null : sectionTo);
-    }, []);
 
     return (
-        <div className="hidden border-r bg-background md:block">
+        <div className="hidden bg-background md:block">
             <div className="flex h-full max-h-screen flex-col gap-2">
-                <div className="flex h-16 items-center border-b px-4 lg:h-[70px] lg:px-6">
+                <div className="flex h-16 items-center px-4 lg:h-[70px] lg:px-6">
                     <NavLink to="/dashboard" className="flex items-center gap-2 font-semibold">
                         <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                             Payedviewer tools
@@ -175,7 +170,7 @@ const Sidebar = () => {
                                 key={item.to} 
                                 item={item} 
                                 openSection={openSection}
-                                onToggleSection={handleToggleSection}
+                                setOpenSection={setOpenSection}
                             />
                         ))}
                     </nav>

@@ -19,24 +19,154 @@ class SessionManager:
 
     def create_or_get_user_by_platform(self, platform: str, platform_user_id: str, platform_display_name: str, avatar_url: str, db: Session) -> User:
         """Находит пользователя по ID платформы или создает нового, если он не найден."""
+        logger.info(f"🔍 Looking for existing user with {platform} ID: {platform_user_id}")
+        
+        # СНАЧАЛА ищем по токенам (если есть активные токены)
         token = db.query(UserToken).filter(
             UserToken.platform == platform,
             UserToken.platform_user_id == platform_user_id
         ).first()
 
         if token:
+            logger.info(f"✅ Found existing token for {platform} user {platform_user_id}")
             # Получаем пользователя по user_id
             user = db.query(User).filter(User.id == token.user_id).first()
             if user:
-                logger.info(f"Found existing user (ID: {user.id}) for {platform} user {platform_display_name}")
+                logger.info(f"✅ Found existing user (ID: {user.id}) for {platform} user {platform_display_name}")
                 return user
+            else:
+                logger.warning(f"⚠️ Token found but user ID {token.user_id} doesn't exist - will search by platform_user_id")
+        else:
+            logger.info(f"❌ No existing token found for {platform} user {platform_user_id}")
         
-        logger.info(f"Creating a new unified user for {platform} user {platform_display_name}")
-        new_user = User(display_name=platform_display_name)
+        # ЕСЛИ токенов нет, ищем пользователя по всем историческим токенам
+        # Это позволяет найти пользователя даже после логаута (когда токены удалены)
+        logger.info(f"🔍 Searching for user by {platform} platform_user_id in token history...")
+        
+        # Ищем любые записи токенов с таким platform_user_id (даже удаленные)
+        # На самом деле, токены удаляются полностью, поэтому нужна другая стратегия
+        
+        # УЛУЧШЕННЫЙ ПОИСК: Ищем пользователя, который мог входить через другие платформы
+        logger.info(f"🔍 Advanced search for user {platform_display_name}")
+        
+        # Стратегия 1: Ищем по известным маппингам display_name
+        # Например, если Twitch = "yourchy", то VK может быть "Денис Р#1209004"
+        known_mappings = {
+            "yourchy": ["yourchy", "denisR", "денис р", "zavtra_zavod"],  # Различные варианты имени
+            "ttsbottester": ["ttsbottester", "tts bot tester"],
+            "payedviewer": ["payedviewer", "payed viewer"]
+        }
+        
+        current_name_lower = platform_display_name.lower().strip()
+        for main_name, variants in known_mappings.items():
+            if current_name_lower in [v.lower() for v in variants] or main_name.lower() == current_name_lower:
+                # Ищем пользователя с любым из этих имен
+                for variant in variants:
+                    existing_user = db.query(User).filter(User.display_name.ilike(f"%{variant}%")).first()
+                    if existing_user:
+                        logger.info(f"✅ Found existing user (ID: {existing_user.id}) by name mapping: {existing_user.display_name} -> {platform_display_name}")
+                        return existing_user
+        
+        # Стратегия 2: Ищем пользователей, которые имеют токены с админскими именами
+        if current_name_lower in ["yourchy", "payedviewer"]:
+            admin_user = db.query(User).filter(User.is_admin == True).first()
+            if admin_user:
+                logger.info(f"✅ Found existing admin user (ID: {admin_user.id}) for admin name: {platform_display_name}")
+                return admin_user
+        
+        # Если не найден, ищем по точному display_name (старая логика)
+        existing_user = db.query(User).filter(User.display_name == platform_display_name).first()
+        
+        if existing_user:
+            logger.info(f"✅ Found existing user (ID: {existing_user.id}) by display_name: {platform_display_name}")
+            return existing_user
+        
+        # Создаем нового пользователя
+        logger.info(f"🆕 Creating a new unified user for {platform} user {platform_display_name}")
+        
+        # Проверяем, должен ли пользователь быть админом
+        import os
+        admin_users = os.getenv("ADMIN_USERS", "").lower().split(",")
+        
+        # Очищаем список админов от пробелов
+        admin_users = [admin.strip() for admin in admin_users if admin.strip()]
+        
+        # Гибкая проверка админских прав
+        current_name = platform_display_name.lower().strip()
+        is_admin = False
+        
+        for admin_name in admin_users:
+            # Точное совпадение
+            if current_name == admin_name:
+                is_admin = True
+                break
+            # Частичное совпадение (если display_name содержит admin имя)
+            if admin_name in current_name or current_name in admin_name:
+                is_admin = True
+                break
+        
+        logger.info(f"Admin check: platform_display_name='{platform_display_name}', platform='{platform}', admin_users={admin_users}, is_admin={is_admin}")
+        
+        new_user = User(display_name=platform_display_name, is_admin=is_admin)
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
+        
+        if is_admin:
+            logger.info(f"✅ Created new admin user with ID: {new_user.id}")
+        else:
+            logger.info(f"✅ Created new user with ID: {new_user.id}")
         return new_user
+
+    def save_user_tokens(self, user_id: int, platform: str, platform_user_id: str, 
+                        platform_display_name: str, avatar_url: str, access_token: str, 
+                        refresh_token: str = None, expires_at: datetime = None, scopes: list = None):
+        """Сохраняет или обновляет токены пользователя для платформы"""
+        db = next(get_db())
+        try:
+            logger.info(f"💾 Saving tokens for user {user_id}, platform {platform}, platform_user_id {platform_user_id}")
+            
+            # Ищем существующий токен для этой платформы и пользователя
+            existing_token = db.query(UserToken).filter(
+                UserToken.user_id == user_id,
+                UserToken.platform == platform
+            ).first()
+            
+            if existing_token:
+                logger.info(f"🔄 Updating existing token for user {user_id}, platform {platform}")
+                # Обновляем существующий токен
+                existing_token.platform_user_id = platform_user_id
+                existing_token.platform_display_name = platform_display_name
+                existing_token.avatar_url = avatar_url
+                existing_token.access_token = access_token
+                existing_token.refresh_token = refresh_token
+                existing_token.expires_at = expires_at
+                existing_token.scopes = scopes
+            else:
+                logger.info(f"🆕 Creating new token for user {user_id}, platform {platform}")
+                # Создаем новый токен
+                new_token = UserToken(
+                    user_id=user_id,
+                    platform=platform,
+                    platform_user_id=platform_user_id,
+                    platform_display_name=platform_display_name,
+                    avatar_url=avatar_url,
+                    access_token=access_token,
+                    refresh_token=refresh_token,
+                    expires_at=expires_at,
+                    scopes=scopes
+                )
+                db.add(new_token)
+            
+            db.commit()
+            logger.info(f"✅ Successfully saved tokens for user {user_id}, platform {platform}")
+            
+        except Exception as e:
+            logger.error(f"❌ Error saving tokens for user {user_id}: {e}")
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
     def create_session(self, user_id: int, device_info: Optional[Dict] = None) -> str:
         """Создает новую сессию для пользователя, завершая все его предыдущие сессии."""
@@ -361,6 +491,38 @@ class SessionManager:
         except Exception as e:
             logger.error(f"Error validating session {session_id}: {e}")
             return None
+        finally:
+            db.close()
+
+    def clear_all_user_tokens(self, user_id: int) -> bool:
+        """Удалить ВСЕ токены пользователя при логауте"""
+        db = next(get_db())
+        try:
+            from core.database import UserToken
+            
+            # Получаем все токены пользователя перед удалением для логирования
+            tokens = db.query(UserToken).filter_by(user_id=user_id).all()
+            
+            if not tokens:
+                logger.info(f"No tokens found for user {user_id} to clear")
+                return True
+            
+            logger.info(f"🗑️ Clearing ALL {len(tokens)} tokens for user {user_id} on logout:")
+            
+            for token in tokens:
+                logger.info(f"🗑️ Removing {token.platform} token for {token.platform_display_name}")
+            
+            # Удаляем ВСЕ токены пользователя
+            deleted_count = db.query(UserToken).filter_by(user_id=user_id).delete()
+            db.commit()
+            
+            logger.info(f"✅ Successfully cleared ALL {deleted_count} tokens for user {user_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error clearing all tokens for user {user_id}: {e}")
+            db.rollback()
+            return False
         finally:
             db.close()
 

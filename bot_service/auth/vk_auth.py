@@ -206,68 +206,14 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
                 auto_connect_bot=False  # Отключаем автоподключение, сделаем это вручную ниже
             )
             
-            # --- 4. Ручное подключение VK Live бота (специфическая логика для VK) ---
+            # --- 4. Автоматическое подключение VK Live бота ---
             if not current_user and oauth_result.session_id:
-                # Автоматически подключаем VK Live бота к каналу пользователя
+                # Используем новую функцию auto_connect_vk_live_bot
                 try:
-                    from bots.vk_live_bot import VKLiveBot
-                    from core.connection_manager import get_connection_manager
-                    import asyncio
-                    
-                    # Получаем глобальный экземпляр connection_manager
-                    connection_manager = get_connection_manager()
-                    
-                    # Получаем канал пользователя из VK Live API
-                    logger.info(f"User info for auto-connect: {user_info}")
-                    # Пробуем разные варианты получения channel_url
-                    channel_url = user_info.get("channel_url") or user_info.get("channel", {}).get("url")
-                    logger.info(f"Channel URL extracted: {channel_url}")
-                    
-                    if channel_url:
-                        logger.info(f"Auto-connecting VK Live bot to channel: {channel_url}")
-                        
-                        # Сначала удаляем старый гостевой бот, если он есть
-                        if channel_url in connection_manager.active_vk_bots:
-                            logger.info(f"Removing old VK Live bot for channel: {channel_url}")
-                            old_bot_data = connection_manager.active_vk_bots[channel_url]
-                            try:
-                                await old_bot_data["bot"].stop_bot()
-                                old_bot_data["task"].cancel()
-                            except Exception as e:
-                                logger.error(f"Error stopping old VK Live bot: {e}")
-                            del connection_manager.active_vk_bots[channel_url]
-                        
-                        # Создаем экземпляр VK Live бота
-                        vk_user_token = os.getenv("VK_LIVE_USER_TOKEN")
-                        if vk_user_token:
-                            logger.info(f"🔧 Creating VK Live bot instance for channel: {channel_url}")
-                            vk_live_bot = VKLiveBot(vk_user_token, connection_manager)
-                            
-                            # Запускаем бота в фоне и сохраняем задачу
-                            logger.info(f"🚀 Starting VK Live bot in background...")
-                            bot_task = asyncio.create_task(vk_live_bot.start_bot())
-                            await asyncio.sleep(1)  # Даем время на запуск
-                            
-                            # Подключаемся к каналу
-                            logger.info(f"🔗 Attempting to join channel: {channel_url}")
-                            success = await vk_live_bot.join_channel(channel_url)
-                            if success:
-                                # Регистрируем бота в глобальном реестре
-                                if hasattr(connection_manager, 'active_vk_bots'):
-                                    connection_manager.active_vk_bots[channel_url] = {
-                                        "bot": vk_live_bot,
-                                        "task": bot_task
-                                    }
-                                    logger.info(f"✅ VK Live bot successfully connected to {channel_url}")
-                                else:
-                                    logger.error("❌ Connection manager does not have active_vk_bots registry!")
-                            else:
-                                logger.warning(f"❌ Failed to auto-connect VK Live bot to {channel_url}")
-                        else:
-                            logger.warning("VK_LIVE_USER_TOKEN not configured, skipping auto-connect")
-                    else:
-                        logger.warning("No channel URL found in user info, skipping auto-connect")
-                        
+                    from main import auto_connect_vk_live_bot
+                    user_id = oauth_result.user.id
+                    logger.info(f"🎯 VK OAuth successful, auto-connecting VK Live bot for user {user_id}")
+                    await auto_connect_vk_live_bot(user_id)
                 except Exception as e:
                     logger.error(f"Error auto-connecting VK Live bot: {e}")
                     # Не прерываем авторизацию из-за ошибки бота

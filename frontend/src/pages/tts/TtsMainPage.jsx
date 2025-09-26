@@ -13,6 +13,7 @@ import { generateObsUrl } from '../../services/microservices';
 import { PageLoader } from '@/components/ui/loader';
 import { useLoadingState } from '../../hooks/useLoadingState';
 import TtsErrorCard from '../../components/TtsErrorCard';
+import TtsPlatformSelector from '../../components/TtsPlatformSelector';
 
 const TtsMainPageContent = () => {
     const { ttsEnabled, toggleTts, isWhitelisted, engineStatus, isToggling, initializeTts, setNotificationHandler, syncWithHealthContext } = useTts();
@@ -329,6 +330,11 @@ const TtsMainPageContent = () => {
                     </div>
                 </CardContent>
             </Card>
+            
+            {/* TTS Platform Selector - только для авторизованных пользователей */}
+            {isAuthenticated && (
+                <TtsPlatformSelector />
+            )}
         </div>
     );
 };

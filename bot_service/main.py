@@ -23,11 +23,12 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 from logging_config import setup_logging, log_system_info, log_service_start, log_service_stop, log_error, log_api_call, log_websocket_event, log_bot_event
 
-from core.database import get_db, init_db, User, GuestVerification, StreamData, UserSession, UserToken
+from core.database import get_db, init_db, User, GuestVerification, StreamData, UserSession, UserToken, BotCommand
 from core.session_manager import session_manager
 from models.pydantic_models import *
 from core.connection_manager import get_connection_manager
 from auth.auth import get_current_user, get_current_user_optional, get_admin_user, create_jwt_token
+from bots.twitch_bot import Bot
 from auth.oauth_handler import oauth_handler, OAuthUserData
 from api.twitch_api import TwitchAPI
 from api.vk_api import vk_api
@@ -62,6 +63,8 @@ bot_instance = None
 bot_task = None
 vk_live_bot_instance = None
 vk_live_bot_task = None
+
+
 
 # --- Helper Functions ---
 def get_platform_username(user: dict, platform: str) -> str:
@@ -184,6 +187,10 @@ async def collect_stream_stats():
                 UserToken.access_token.isnot(None)
             ).all()
             
+            # Импортируем analytics service
+            from services.analytics_service import AnalyticsService
+            analytics_service = AnalyticsService()
+            
             # Собираем статистику Twitch
             for token in twitch_tokens:
                 try:
@@ -200,22 +207,29 @@ async def collect_stream_stats():
                     
                     # Если стрим онлайн, сохраняем данные
                     if stream_info and stream_info.get('type') == 'live':
-                        new_data = StreamData(
+                        # Используем новый analytics service для записи с пиками
+                        analytics_service.record_stream_data(
                             user_id=token.user_id,
                             platform='twitch',
-                            stream_id=stream_info.get('id'),
                             viewer_count=stream_info.get('viewer_count', 0),
+                            stream_id=stream_info.get('id'),
                             category_name=stream_info.get('game_name', ''),
-                            timestamp=datetime.utcnow()
+                            title=stream_info.get('title', ''),
+                            is_live=True,
+                            db=db
                         )
-                        db.add(new_data)
                     else:
-                        # Можно добавить логику для оффлайн статуса, если нужно
-                        pass
+                        # Записываем оффлайн статус
+                        analytics_service.record_stream_data(
+                            user_id=token.user_id,
+                            platform='twitch',
+                            viewer_count=0,
+                            is_live=False,
+                            db=db
+                        )
                 except Exception as e:
-                    logger.error(f"Error processing VK token {token.user_id}: {e}")
+                    logger.error(f"Error processing Twitch token {token.user_id}: {e}")
 
-            
             # Собираем статистику VK Live
             for token in vk_tokens:
                 try:
@@ -223,23 +237,27 @@ async def collect_stream_stats():
                     
                     # Если стрим онлайн, сохраняем данные
                     if stream_info and stream_info.get('online'):
-                        new_data = StreamData(
+                        analytics_service.record_stream_data(
                             user_id=token.user_id,
                             platform='vk',
-                            stream_id=stream_info.get('stream_key', ''),
                             viewer_count=stream_info.get('viewer_count', 0),
+                            stream_id=stream_info.get('stream_key', ''),
                             category_name=stream_info.get('category', ''),
-                            timestamp=datetime.utcnow()
+                            title=stream_info.get('title', ''),
+                            is_live=True,
+                            db=db
                         )
-                        db.add(new_data)
                     else:
-                        # Можно добавить логику для оффлайн статуса, если нужно
-                        pass
+                        # Записываем оффлайн статус
+                        analytics_service.record_stream_data(
+                            user_id=token.user_id,
+                            platform='vk',
+                            viewer_count=0,
+                            is_live=False,
+                            db=db
+                        )
                 except Exception as e:
                     logger.error(f"Error processing VK token {token.user_id}: {e}")
-
-            
-            db.commit()
 
         finally:
             if db:
@@ -272,18 +290,27 @@ async def lifespan(app: FastAPI):
     db = next(get_db())
     try:
         connection_manager.restore_active_sessions_from_db(db)
+        
+        # Получаем каналы для подключения
+        active_channels = connection_manager.get_active_channels()
+        twitch_channels = connection_manager.get_active_twitch_channels(db)
     finally:
         db.close()
 
-    # Запускаем Twitch бота и подключаем к восстановленным каналам
-    active_channels = connection_manager.get_active_channels()
+    # Запускаем Twitch бота и подключаем только к Twitch каналам
     if active_channels:
-        logger.info(f"🚀 Found active channels: {active_channels}. Starting Twitch bot...")
+        logger.info(f"🚀 Found active channels: {active_channels}")
+        logger.info(f"🎮 Twitch channels to connect: {twitch_channels}")
+        
         bot_token = os.getenv("TWITCH_BOT_TOKEN")
-        if bot_token:
-            bot_instance = Bot(bot_token, active_channels, connection_manager)
+        if bot_token and twitch_channels:
+            bot_instance = Bot(bot_token, twitch_channels, connection_manager)
             bot_task = asyncio.create_task(bot_instance.start_bot())
-            logger.info("✅ Twitch bot started and connecting to channels.")
+            logger.info("✅ Twitch bot started and connecting to Twitch channels.")
+        elif bot_token:
+            logger.info("📺 No Twitch channels found, but bot token available. Creating bot instance ready for connections.")
+            bot_instance = Bot(bot_token, [], connection_manager)
+            bot_task = asyncio.create_task(bot_instance.start_bot())
         else:
             logger.warning("⚠️ TWITCH_BOT_TOKEN not found. Twitch bot not started.")
     else:
@@ -417,6 +444,180 @@ async def api_login_twitch():
     auth_url = f"https://id.twitch.tv/oauth2/authorize?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope={scope}"
     return {"auth_url": auth_url}
 
+async def auto_connect_twitch_bot(user_id: int):
+    """Автоматически подключает Twitch бота к каналу пользователя после OAuth"""
+    global bot_instance, bot_task
+    
+    try:
+        logger.info(f"🤖 Auto-connecting Twitch bot for user {user_id}")
+        
+        # Получаем данные пользователя из базы
+        db = next(get_db())
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                logger.error(f"User {user_id} not found for auto-connect")
+                return
+            
+            # Получаем Twitch токен пользователя
+            twitch_token = db.query(UserToken).filter(
+                UserToken.user_id == user_id,
+                UserToken.platform == "twitch"
+            ).first()
+            
+            if not twitch_token:
+                logger.error(f"No Twitch token found for user {user_id}")
+                return
+            
+            # Получаем имя канала из токена
+            channel_name = twitch_token.platform_display_name
+            if not channel_name:
+                logger.error(f"No channel name found for user {user_id}")
+                return
+            
+            channel_name = channel_name.lower()
+            logger.info(f"🎯 Auto-connecting Twitch bot to channel: {channel_name}")
+            
+            # ВСЕГДА пересоздаем бота с нужными каналами для надежности
+            # TwitchIO лучше работает, когда каналы указаны при создании
+            bot_token = os.getenv("TWITCH_BOT_TOKEN")
+            if not bot_token:
+                logger.error("⚠️ TWITCH_BOT_TOKEN not found for auto-connect")
+                return
+            
+            # Останавливаем старый бот если он есть
+            if bot_instance and bot_task:
+                logger.info("🛑 Stopping existing bot to recreate with correct channels")
+                try:
+                    await bot_instance.close()
+                    bot_task.cancel()
+                except Exception as e:
+                    logger.warning(f"Error stopping old bot: {e}")
+            
+            # Создаем новый бот с правильными каналами
+            logger.info(f"🤖 Creating new Twitch bot instance for channel: {channel_name}")
+            logger.info(f"🔧 Bot token: {bot_token[:10]}...")
+            logger.info(f"🔧 Channels: {[channel_name]}")
+            
+            try:
+                bot_instance = Bot(bot_token, [channel_name], connection_manager)
+                logger.info(f"✅ Bot instance created successfully")
+                
+                logger.info(f"🚀 Starting bot task...")
+                bot_task = asyncio.create_task(bot_instance.start_bot())
+                logger.info(f"✅ Bot task created and started")
+                
+                # Ждем немного, чтобы бот успел подключиться
+                logger.info(f"⏳ Waiting 3 seconds for bot to connect...")
+                await asyncio.sleep(3)
+                
+                # Проверяем статус бота после подключения
+                logger.info(f"🔍 Checking bot status after connection attempt...")
+                logger.info(f"🔍 Bot instance exists: {bot_instance is not None}")
+                logger.info(f"🔍 Bot task exists: {bot_task is not None}")
+                logger.info(f"🔍 Bot task done: {bot_task.done() if bot_task else 'N/A'}")
+                
+                if bot_instance:
+                    logger.info(f"🔍 Bot nick: {getattr(bot_instance, 'nick', 'Not set')}")
+                    logger.info(f"🔍 Bot user_id: {getattr(bot_instance, 'user_id', 'Not set')}")
+                    logger.info(f"🔍 Bot connected_channels: {getattr(bot_instance, 'connected_channels', 'Not set')}")
+                
+                logger.info(f"✅ Twitch bot should be connected to {channel_name}")
+                
+                # Попробуем отправить тестовое сообщение в лог
+                logger.info(f"🧪 TEST: If you see this, logging from main.py works!")
+                
+            except Exception as bot_error:
+                logger.error(f"❌ CRITICAL ERROR creating/starting bot: {bot_error}")
+                logger.error(f"❌ Bot creation failed for channel: {channel_name}")
+                import traceback
+                logger.error(f"❌ Traceback: {traceback.format_exc()}")
+                raise
+                
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error in auto_connect_twitch_bot: {e}")
+
+async def auto_connect_vk_live_bot(user_id: int):
+    """Автоматически подключает VK Live бота к каналу пользователя после OAuth"""
+    global vk_live_bot_instance, vk_live_bot_task
+    
+    try:
+        logger.info(f"🤖 Auto-connecting VK Live bot for user {user_id}")
+        
+        # Получаем данные пользователя из базы
+        db = next(get_db())
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                logger.error(f"User {user_id} not found for auto-connect")
+                return
+            
+            # Получаем VK токен пользователя
+            vk_token = db.query(UserToken).filter(
+                UserToken.user_id == user_id,
+                UserToken.platform == "vk"
+            ).first()
+            
+            if not vk_token:
+                logger.error(f"No VK token found for user {user_id}")
+                return
+            
+            # Определяем корректный канал VK Live: предпочтительно используем channel_url из VK API
+            channel_name = (vk_token.platform_display_name or "").strip()
+            vk_access_token = vk_token.access_token
+            channel_url = None
+            try:
+                if vk_access_token:
+                    user_info = await vk_api._get_current_user_info(vk_access_token)
+                    if user_info and user_info.get("channel") and user_info["channel"].get("url"):
+                        channel_url = user_info["channel"]["url"]
+            except Exception as e:
+                logger.error(f"Failed to fetch VK channel_url via API for user {user_id}: {e}")
+
+            # Выбираем то, что удалось получить: сначала channel_url, иначе display_name
+            target_channel = (channel_url or channel_name).lower()
+            if not target_channel:
+                logger.error(f"No VK Live channel identifier (channel_url/display_name) found for user {user_id}")
+                return
+
+            logger.info(f"🎯 Auto-connecting VK Live bot to channel: {target_channel}")
+            
+            # Если бот уже существует, подключаем к новому каналу
+            if vk_live_bot_instance:
+                success = await vk_live_bot_instance.join_channel(target_channel)
+                if success:
+                    logger.info(f"✅ VK Live bot auto-connected to channel: {target_channel}")
+                else:
+                    logger.error(f"❌ Failed to auto-connect VK Live bot to channel: {target_channel}")
+            else:
+                # Если бот еще не создан, создаем его
+                if not vk_access_token:
+                    logger.error("⚠️ VK access token not found for auto-connect")
+                    return
+                    
+                logger.info(f"🤖 Creating new VK Live bot instance for channel: {target_channel}")
+                from bots.vk_live_bot import VKLiveBot
+                vk_live_bot_instance = VKLiveBot(vk_access_token, connection_manager)
+                vk_live_bot_task = asyncio.create_task(vk_live_bot_instance.start_bot())
+                # Даем время инициализироваться chat_reader внутри бота
+                await asyncio.sleep(2)
+                
+                # Подключаем к каналу
+                success = await vk_live_bot_instance.join_channel(target_channel)
+                if success:
+                    logger.info(f"✅ VK Live bot started and connected to {target_channel}")
+                else:
+                    logger.error(f"❌ Failed to connect VK Live bot to {target_channel}")
+                
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error in auto_connect_vk_live_bot: {e}")
+
 @app.get("/auth/twitch/callback")
 async def auth_twitch_callback(request: Request, code: str = None, error: str = None, state: str = None, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user_optional)):
     """Callback для OAuth авторизации Twitch."""
@@ -462,8 +663,57 @@ async def auth_twitch_callback(request: Request, code: str = None, error: str = 
         auto_connect_bot=True
     )
     
+    # Автоматически подключаем Twitch бота к чату пользователя
+    if oauth_result.user and oauth_result.user.id:
+        logger.info(f"🎯 Twitch OAuth successful, auto-connecting bot for user {oauth_result.user.id}")
+        await auto_connect_twitch_bot(oauth_result.user.id)
+    
     # Создаем ответ с редиректом
     return oauth_handler.create_oauth_response(oauth_result)
+
+@app.post("/api/clear-verifications")
+async def clear_verifications():
+    """Очистить все pending verifications из памяти"""
+    try:
+        connection_manager.pending_verifications.clear()
+        logger.info("🗑️ Cleared all pending verifications from memory")
+        return {"success": True, "message": "Pending verifications cleared"}
+    except Exception as e:
+        logger.error(f"Error clearing verifications: {e}")
+        return {"success": False, "message": str(e)}
+
+@app.get("/api/bot/status")
+async def get_bot_status():
+    """Получить статус Twitch бота"""
+    global bot_instance, bot_task
+    
+    try:
+        status = {
+            "bot_instance_exists": bot_instance is not None,
+            "bot_task_exists": bot_task is not None,
+            "bot_task_done": bot_task.done() if bot_task else None,
+            "bot_connected_channels": [],
+            "bot_nick": None,
+            "bot_user_id": None
+        }
+        
+        if bot_instance:
+            status["bot_nick"] = getattr(bot_instance, 'nick', None)
+            status["bot_user_id"] = getattr(bot_instance, 'user_id', None)
+            status["bot_connected_channels"] = [ch.name for ch in getattr(bot_instance, 'connected_channels', [])]
+            
+        if bot_task and bot_task.done():
+            try:
+                exception = bot_task.exception()
+                if exception:
+                    status["bot_task_exception"] = str(exception)
+            except:
+                pass
+        
+        return status
+    except Exception as e:
+        logger.error(f"Error getting bot status: {e}")
+        return {"error": str(e)}
 
 @app.post("/auth/logout")
 async def logout(request: Request, response: Response):
@@ -484,10 +734,11 @@ async def logout(request: Request, response: Response):
             await _disconnect_user_bots(user_data)
             logger.info(f"Disconnected bots for user {user_id} on logout")
             
-            # Удаляем все токены интеграций пользователя
+            # УДАЛЯЕМ ВСЕ токены интеграций при logout для безопасности
+            # Пользователь должен заново авторизоваться во всех сервисах после logout
             if user_id and user_id != -1:  # Не гостевой пользователь
-                session_manager.clear_user_tokens(user_id)
-                logger.info(f"🗑️ Cleared all integration tokens for user {user_id}")
+                logger.info(f"🗑️ Clearing ALL integration tokens for user {user_id} on logout")
+                session_manager.clear_all_user_tokens(user_id)
         else:
             logger.warning(f"Could not get user data for session {session_id} during logout")
         
@@ -521,10 +772,11 @@ async def api_logout(request: Request, response: Response):
             await _disconnect_user_bots(user_data)
             logger.info(f"Disconnected bots for user {user_id} on logout")
             
-            # Удаляем все токены интеграций пользователя
+            # УДАЛЯЕМ ВСЕ токены интеграций при logout для безопасности
+            # Пользователь должен заново авторизоваться во всех сервисах после logout
             if user_id and user_id != -1:  # Не гостевой пользователь
-                session_manager.clear_user_tokens(user_id)
-                logger.info(f"🗑️ Cleared all integration tokens for user {user_id}")
+                logger.info(f"🗑️ Clearing ALL integration tokens for user {user_id} on logout")
+                session_manager.clear_all_user_tokens(user_id)
         else:
             logger.warning(f"Could not get user data for session {session_id} during logout")
         
@@ -814,7 +1066,16 @@ async def connect_bot_guest(request: Request, db: Session = Depends(get_db)):
         # Отправляем сообщение в чат после небольшой задержки
         async def send_verification_message():
             await asyncio.sleep(2)
-            await bot_instance.send_message(channel_name, f"Код верификации для TTS.TTB: {verification_code}")
+            try:
+                # Получаем канал и отправляем сообщение
+                channel = bot_instance.get_channel(channel_name)
+                if channel:
+                    await channel.send(f"Код верификации для TTS.TTB: {verification_code}")
+                    logger.info(f"✅ Sent verification code to channel {channel_name}")
+                else:
+                    logger.error(f"❌ Channel {channel_name} not found for sending message")
+            except Exception as e:
+                logger.error(f"❌ Error sending verification message: {e}")
         asyncio.create_task(send_verification_message())
     
     logger.info(f"Generated verification code for {channel_name}: {verification_code}")
@@ -1171,77 +1432,63 @@ async def update_stream_category(request: UpdateCategoryRequest, user: dict = De
     return {"success": True, "message": "Category updated successfully"}
 
 @app.get("/api/stream/history")
-async def get_stream_history(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Получить историю стрима"""
-    from core.database import StreamData
+async def get_stream_history(
+    hours_back: int = 24,
+    user: dict = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    """Получить историю стрима с аналитикой"""
+    from services.analytics_service import AnalyticsService
     
-    # Получаем последние записи для всех платформ пользователя
-    last_entries = db.query(StreamData).filter(
-        StreamData.user_id == user["id"]
-    ).order_by(StreamData.timestamp.desc()).all()
+    analytics_service = AnalyticsService()
     
-    if not last_entries:
-        return {
-            "history": [], 
-            "current_viewers": 0, 
-            "status": "offline",
-            "twitch_history": [],
-            "vk_history": []
-        }
+    # Получаем полную аналитику стрима
+    analytics = analytics_service.get_stream_analytics(user["id"], hours_back, db)
     
-    # Разделяем историю по платформам
-    twitch_history = []
-    vk_history = []
-    all_history = []
+    # Получаем информацию о пиках
+    peak_info = analytics_service.get_analytics_message(user["id"], db=db)
     
-    for entry in last_entries[:100]:  # Последние 100 записей
-        history_item = {
-            "timestamp": entry.timestamp.isoformat(),
-            "viewers": entry.viewer_count,
-            "category": entry.category_name,
-            "title": entry.title or "",
-            "platform": entry.platform
-        }
-        all_history.append(history_item)
-        
-        if entry.platform == 'twitch':
-            twitch_history.append(history_item)
-        elif entry.platform == 'vk':
-            vk_history.append(history_item)
+    # Получаем статистику по категориям
+    category_analytics = analytics_service.get_category_analytics(user["id"], db=db)
     
-    # Получаем текущих зрителей
-    current_twitch_viewers = 0
-    current_vk_viewers = 0
-    
-    # Находим последние записи для каждой платформы
-    last_twitch = next((entry for entry in last_entries if entry.platform == 'twitch'), None)
-    last_vk = next((entry for entry in last_entries if entry.platform == 'vk'), None)
-    
-    if last_twitch:
-        current_twitch_viewers = last_twitch.viewer_count
-    if last_vk:
-        current_vk_viewers = last_vk.viewer_count
-    
-    total_viewers = current_twitch_viewers + current_vk_viewers
-
     return {
-        "history": all_history,
-        "current_viewers": total_viewers,
-        "status": "online" if total_viewers > 0 else "offline",
-        "twitch_history": twitch_history,
-        "vk_history": vk_history,
-        "current_twitch_viewers": current_twitch_viewers,
-        "current_vk_viewers": current_vk_viewers
+        "history": analytics.get('all_data', []),
+        "data": analytics.get('data', []),
+        "twitch_history": analytics.get('twitch_data', []),
+        "vk_history": analytics.get('vk_data', []),
+        "current_viewers": 0,  # Будет обновлено в real-time
+        "peak_viewers": analytics.get('peak_viewers', 0),
+        "avg_viewers": analytics.get('avg_viewers', 0),
+        "categories": analytics.get('categories', []),
+        "peak_info": peak_info,
+        "category_analytics": category_analytics,
+        "status": "offline"  # Будет обновлено в real-time
     }
 
 # --- VK Live API Endpoints ---
 @app.get("/api/vk/stream-info")
-async def get_vk_stream_info(user: dict = Depends(get_current_user)):
+async def get_vk_stream_info(user: dict = Depends(get_current_user), force: bool = False):
     """Получить информацию о стриме VK Live"""
-    stream_info = await vk_api.get_stream_info(user["id"])
-    if not stream_info:
-        return {"online": False, "viewer_count": 0}
-    return stream_info
+    try:
+        user_id = user["id"]
+        logger.info(f"VK stream info request for user {user_id}, force={force}")
+        
+        logger.info(f"Getting VK stream info for user {user_id}")
+        
+        stream_info = await vk_api.get_stream_info(user_id)
+        if not stream_info:
+            logger.info(f"No VK stream info found for user {user_id}, returning default")
+            stream_info = {"online": False, "viewer_count": 0}
+        
+        logger.info(f"Returning VK stream info for user {user_id}: {stream_info}")
+        return stream_info
+        
+    except Exception as e:
+        logger.error(f"Error in get_vk_stream_info for user {user.get('id', 'unknown')}: {e}")
+        logger.error(f"Exception details: {type(e).__name__}: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error getting VK stream info: {str(e)}")
 
 @app.get("/api/vk/viewers")
 async def get_vk_viewers(user: dict = Depends(get_current_user)):
@@ -1491,15 +1738,54 @@ async def generate_obs_url(user: dict = Depends(get_current_user)):
 
 # --- YouTube Endpoints ---
 @app.get("/api/youtube/queue")
-async def get_youtube_queue(user: dict = Depends(get_current_user)):
-    queue = connection_manager.get_youtube_queue(user["id"])
-    current_video = connection_manager.get_current_video(user["id"])
-    
-    return QueueResponse(
-        current_video=current_video,
-        queue=queue,
-        is_playing=bool(current_video)
-    )
+async def get_youtube_queue(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        from services.queue_service import QueueService
+        queue_service = QueueService()
+        
+        # Получаем очередь из базы данных
+        queue_items_raw = queue_service.get_queue(user["id"], db)
+        
+        # Преобразуем данные в формат, совместимый с YouTubeVideoPublic
+        def format_queue_item(item):
+            from datetime import datetime
+            return {
+                'id': item['id'],
+                'video_id': item['video_id'],  # YouTube video ID для плеера
+                'title': item['title'],
+                'url': item['url'],
+                'duration': 0,  # Временно 0, если duration строка
+                'thumbnail_url': item['thumbnail_url'] or '',
+                'added_at': datetime.fromisoformat(item['added_at']) if item['added_at'] else datetime.now(),
+                'user_id': str(user["id"])
+            }
+        
+        queue_items = [format_queue_item(item) for item in queue_items_raw]
+        
+        # Первое видео в очереди становится текущим
+        current_video = queue_items[0] if queue_items else None
+        
+        # Остальные видео остаются в очереди
+        pending_queue = queue_items[1:] if len(queue_items) > 1 else []
+        
+        return QueueResponse(
+            current_video=current_video,
+            queue=pending_queue,
+            is_playing=bool(current_video)
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting YouTube queue: {e}")
+        # Fallback к старому способу
+        queue = connection_manager.get_youtube_queue(user["id"])
+        current_video_data = connection_manager.get_current_video(user["id"])
+        current_video = current_video_data if current_video_data else None
+        
+        return QueueResponse(
+            current_video=current_video,
+            queue=queue,
+            is_playing=bool(current_video)
+        )
 
 @app.post("/api/youtube/queue")
 async def add_to_youtube_queue(request: dict, user: dict = Depends(get_current_user)):
@@ -1523,8 +1809,15 @@ async def youtube_player_next(user: dict = Depends(get_current_user)):
         return {"message": "No videos in queue"}
 
 @app.post("/api/youtube/clear")
-async def youtube_queue_clear(user: dict = Depends(get_current_user)):
+async def youtube_queue_clear(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Очищаем ConnectionManager (in-memory)
     connection_manager.clear_youtube_queue(user["id"])
+    
+    # Очищаем базу данных
+    from services.queue_service import QueueService
+    queue_service = QueueService(db)
+    queue_service.clear_queue(user["id"])
+    
     return {"message": "Queue cleared"}
 
 # --- Admin Endpoints ---
@@ -1847,15 +2140,236 @@ async def get_active_channels(request: Request, db: Session = Depends(get_db)):
                     "avatar": None
                 })
         
-        return {"channels": channels}
+        return channels
     except Exception as e:
         logger.error(f"Error getting active channels: {e}")
-        return {"channels": []}
+        return []
 
 # --- Health Check ---
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+# --- Bot Commands API ---
+@app.get("/api/commands")
+async def get_bot_commands(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить все команды бота для текущего пользователя"""
+    user_id = current_user["id"]
+    
+    # Базовые команды (одинаковые для всех)
+    basic_commands = [
+        {
+            "command_name": "sr",
+            "command_type": "basic",
+            "description": "Заказать YouTube видео",
+            "usage": "!sr <URL>",
+            "is_enabled": True,
+            "platforms": "twitch,vk",
+            "allowed_roles": "all",
+            "cooldown_seconds": 10,
+            "editable": True
+        },
+        {
+            "command_name": "queue",
+            "command_type": "basic", 
+            "description": "Показать очередь видео",
+            "usage": "!queue",
+            "is_enabled": True,
+            "platforms": "twitch,vk",
+            "allowed_roles": "all",
+            "cooldown_seconds": 5,
+            "editable": True
+        },
+        {
+            "command_name": "next",
+            "command_type": "basic",
+            "description": "Переключить на следующее видео",
+            "usage": "!next",
+            "is_enabled": True,
+            "platforms": "twitch,vk", 
+            "allowed_roles": "mods",
+            "cooldown_seconds": 0,
+            "editable": True
+        },
+        {
+            "command_name": "clear",
+            "command_type": "basic",
+            "description": "Очистить очередь видео",
+            "usage": "!clear",
+            "is_enabled": True,
+            "platforms": "twitch,vk",
+            "allowed_roles": "mods",
+            "cooldown_seconds": 0,
+            "editable": True
+        },
+        {
+            "command_name": "tts",
+            "command_type": "basic",
+            "description": "Включить/выключить озвучку",
+            "usage": "!tts",
+            "is_enabled": True,
+            "platforms": "twitch,vk",
+            "allowed_roles": "mods",
+            "cooldown_seconds": 5,
+            "editable": True
+        }
+    ]
+    
+    # Получаем пользовательские настройки базовых команд
+    user_commands = db.query(BotCommand).filter(BotCommand.user_id == user_id).all()
+    
+    # Создаем словарь для быстрого поиска
+    user_command_dict = {cmd.command_name: cmd for cmd in user_commands}
+    
+    # Применяем пользовательские настройки к базовым командам
+    for cmd in basic_commands:
+        if cmd["command_name"] in user_command_dict:
+            user_cmd = user_command_dict[cmd["command_name"]]
+            cmd.update({
+                "is_enabled": user_cmd.is_enabled,
+                "platforms": user_cmd.platforms,
+                "allowed_roles": user_cmd.allowed_roles,
+                "cooldown_seconds": user_cmd.cooldown_seconds,
+                "usage_count": user_cmd.usage_count
+            })
+    
+    # Получаем кастомные команды
+    custom_commands = [
+        {
+            "id": cmd.id,
+            "command_name": cmd.command_name,
+            "command_type": "custom",
+            "response_text": cmd.response_text,
+            "description": f"Кастомная команда: {cmd.response_text[:50]}...",
+            "usage": f"!{cmd.command_name}",
+            "is_enabled": cmd.is_enabled,
+            "platforms": cmd.platforms,
+            "allowed_roles": cmd.allowed_roles,
+            "cooldown_seconds": cmd.cooldown_seconds,
+            "usage_count": cmd.usage_count,
+            "created_at": cmd.created_at.isoformat(),
+            "editable": True
+        }
+        for cmd in user_commands if cmd.command_type == 'custom'
+    ]
+    
+    return {
+        "basic_commands": basic_commands,
+        "custom_commands": custom_commands
+    }
+
+@app.post("/api/commands")
+async def create_custom_command(
+    command_data: dict,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Создать новую кастомную команду"""
+    user_id = current_user["id"]
+    
+    # Валидация данных
+    command_name = command_data.get("command_name", "").strip().lower()
+    response_text = command_data.get("response_text", "").strip()
+    
+    if not command_name or not response_text:
+        raise HTTPException(status_code=400, detail="Command name and response text are required")
+    
+    # Убираем ! если есть
+    if command_name.startswith("!"):
+        command_name = command_name[1:]
+    
+    # Проверяем, что команда не существует
+    existing = db.query(BotCommand).filter(
+        BotCommand.user_id == user_id,
+        BotCommand.command_name == command_name
+    ).first()
+    
+    if existing:
+        raise HTTPException(status_code=400, detail="Command already exists")
+    
+    # Создаем команду
+    new_command = BotCommand(
+        user_id=user_id,
+        channel_name=current_user.get("username", ""),
+        command_name=command_name,
+        command_type="custom",
+        response_text=response_text,
+        is_enabled=command_data.get("is_enabled", True),
+        platforms=command_data.get("platforms", "twitch,vk"),
+        allowed_roles=command_data.get("allowed_roles", "all"),
+        cooldown_seconds=command_data.get("cooldown_seconds", 0)
+    )
+    
+    db.add(new_command)
+    db.commit()
+    db.refresh(new_command)
+    
+    return {"message": "Custom command created successfully", "command_id": new_command.id}
+
+@app.put("/api/commands/{command_name}")
+async def update_command(
+    command_name: str,
+    command_data: dict,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Обновить настройки команды"""
+    user_id = current_user["id"]
+    
+    # Ищем команду
+    command = db.query(BotCommand).filter(
+        BotCommand.user_id == user_id,
+        BotCommand.command_name == command_name
+    ).first()
+    
+    if not command:
+        # Создаем новую запись для базовой команды
+        command = BotCommand(
+            user_id=user_id,
+            channel_name=current_user.get("username", ""),
+            command_name=command_name,
+            command_type="basic"
+        )
+        db.add(command)
+    
+    # Обновляем настройки
+    command.is_enabled = command_data.get("is_enabled", command.is_enabled)
+    command.platforms = command_data.get("platforms", command.platforms)
+    command.allowed_roles = command_data.get("allowed_roles", command.allowed_roles)
+    command.cooldown_seconds = command_data.get("cooldown_seconds", command.cooldown_seconds)
+    
+    if command.command_type == "custom":
+        command.response_text = command_data.get("response_text", command.response_text)
+    
+    db.commit()
+    
+    return {"message": "Command updated successfully"}
+
+@app.delete("/api/commands/{command_id}")
+async def delete_custom_command(
+    command_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Удалить кастомную команду"""
+    user_id = current_user["id"]
+    
+    command = db.query(BotCommand).filter(
+        BotCommand.id == command_id,
+        BotCommand.user_id == user_id,
+        BotCommand.command_type == "custom"
+    ).first()
+    
+    if not command:
+        raise HTTPException(status_code=404, detail="Custom command not found")
+    
+    db.delete(command)
+    db.commit()
+    
+    return {"message": "Custom command deleted successfully"}
 
 # --- Background Tasks ---
 async def cleanup_task():

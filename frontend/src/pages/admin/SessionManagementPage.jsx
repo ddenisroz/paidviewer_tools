@@ -1,190 +1,271 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Trash2, RefreshCw, Users, Clock, Shield } from 'lucide-react';
-import api from '@/services/api';
+import { Users, Monitor, Clock, Trash2, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { botService } from '../../services/microservices';
 
 const SessionManagementPage = () => {
-    const [sessions, setSessions] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [clearing, setClearing] = useState(false);
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-    const fetchSessions = async () => {
-        try {
-            setLoading(true);
-            const response = await api.get('/api/admin/sessions');
-            setSessions(response.data.sessions || []);
-        } catch (error) {
-            console.error('Failed to fetch sessions:', error);
-            toast.error('Не удалось загрузить список сессий');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const clearSession = async (channel) => {
-        try {
-            setClearing(true);
-            await api.delete(`/api/admin/sessions/${channel}`);
-            toast.success(`Сессия для канала ${channel} очищена`);
-            await fetchSessions();
-        } catch (error) {
-            console.error('Failed to clear session:', error);
-            toast.error('Не удалось очистить сессию');
-        } finally {
-            setClearing(false);
-        }
-    };
-
-    const clearAllSessions = async () => {
-        if (!window.confirm('Вы уверены, что хотите очистить все активные сессии?')) {
-            return;
-        }
-
-        try {
-            setClearing(true);
-            const response = await api.delete('/api/admin/sessions');
-            toast.success(`Очищено ${response.data.cleared_count} сессий`);
-            await fetchSessions();
-        } catch (error) {
-            console.error('Failed to clear all sessions:', error);
-            toast.error('Не удалось очистить все сессии');
-        } finally {
-            setClearing(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchSessions();
-        
-        // Обновляем каждые 30 секунд
-        const interval = setInterval(fetchSessions, 30000);
-        return () => clearInterval(interval);
-    }, []);
-
-    const formatTimestamp = (timestamp) => {
-        if (!timestamp) return 'Неизвестно';
-        const date = new Date(timestamp * 1000);
-        return date.toLocaleString('ru-RU');
-    };
-
-    const getStatusBadge = (isVerified) => {
-        return isVerified ? (
-            <Badge variant="default" className="bg-green-500">
-                <Shield className="h-3 w-3 mr-1" />
-                Верифицирована
-            </Badge>
-        ) : (
-            <Badge variant="secondary">
-                <Clock className="h-3 w-3 mr-1" />
-                Ожидает верификации
-            </Badge>
-        );
-    };
-
-    if (loading) {
-        return (
-            <div className="container mx-auto p-4">
-                <div className="flex items-center justify-center h-64">
-                    <RefreshCw className="h-8 w-8 animate-spin" />
-                    <span className="ml-2">Загрузка сессий...</span>
-                </div>
-            </div>
-        );
+  const loadSessions = async () => {
+    try {
+      setLoading(true);
+      const response = await botService.get('/api/admin/sessions');
+      setSessions(response.data.sessions || []);
+    } catch (error) {
+      console.error('Error loading sessions:', error);
+      toast.error('Ошибка загрузки сессий');
+    } finally {
+      setLoading(false);
     }
+  };
 
+  const refreshSessions = async () => {
+    try {
+      setRefreshing(true);
+      await loadSessions();
+      toast.success('Список сессий обновлен');
+    } catch (error) {
+      console.error('Error refreshing sessions:', error);
+      toast.error('Ошибка обновления сессий');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const terminateSession = async (sessionId) => {
+    try {
+      await botService.delete(`/api/admin/sessions/${sessionId}`);
+      toast.success('Сессия завершена');
+      await loadSessions();
+    } catch (error) {
+      console.error('Error terminating session:', error);
+      toast.error('Ошибка завершения сессии');
+    }
+  };
+
+  const formatLastActivity = (timestamp) => {
+    if (!timestamp) return 'Неизвестно';
+    
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Только что';
+    if (diffMins < 60) return `${diffMins} мин. назад`;
+    if (diffHours < 24) return `${diffHours} ч. назад`;
+    return `${diffDays} дн. назад`;
+  };
+
+  const getSessionTypeIcon = (session) => {
+    if (session.device_info?.guest_channel) {
+      return <Users className="w-4 h-4 text-blue-500" />;
+    }
+    return <Monitor className="w-4 h-4 text-green-500" />;
+  };
+
+  const getSessionTypeBadge = (session) => {
+    if (session.device_info?.guest_channel) {
+      return <Badge variant="outline" className="text-blue-600 border-blue-200">Гость</Badge>;
+    }
+    return <Badge variant="outline" className="text-green-600 border-green-200">Авторизован</Badge>;
+  };
+
+  useEffect(() => {
+    loadSessions();
+    
+    // Автообновление каждые 30 секунд
+    const interval = setInterval(loadSessions, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading) {
     return (
-        <div className="container mx-auto p-4 space-y-6">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-semibold text-white">Управление сессиями</h1>
-                    <p className="text-slate-400 mt-1">Мониторинг и управление активными гостевыми сессиями</p>
-                </div>
-                <div className="flex gap-2">
-                    <Button
-                        onClick={fetchSessions}
-                        variant="outline"
-                        disabled={loading}
-                    >
-                        <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                        Обновить
-                    </Button>
-                    <Button
-                        onClick={clearAllSessions}
-                        variant="destructive"
-                        disabled={clearing || sessions.length === 0}
-                    >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Очистить все
-                    </Button>
-                </div>
-            </div>
-
-            {sessions.length === 0 ? (
-                <Alert>
-                    <Users className="h-4 w-4" />
-                    <AlertDescription>
-                        Активных сессий не найдено
-                    </AlertDescription>
-                </Alert>
-            ) : (
-                <div className="grid gap-4">
-                    {sessions.map((session, index) => (
-                        <Card key={index} className="bg-slate-800/50 border-slate-700">
-                            <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <CardTitle className="text-lg text-white">
-                                            {session.channel}
-                                        </CardTitle>
-                                        {getStatusBadge(session.is_verified)}
-                                    </div>
-                                    <Button
-                                        onClick={() => clearSession(session.channel)}
-                                        variant="destructive"
-                                        size="sm"
-                                        disabled={clearing}
-                                    >
-                                        <Trash2 className="h-4 w-4 mr-1" />
-                                        Очистить
-                                    </Button>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="pt-0">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                                    <div>
-                                        <span className="text-slate-400">Код верификации:</span>
-                                        <div className="font-mono text-white bg-slate-700 px-2 py-1 rounded mt-1">
-                                            {session.code}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <span className="text-slate-400">Создана:</span>
-                                        <div className="text-white mt-1">
-                                            {formatTimestamp(session.timestamp)}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <span className="text-slate-400">Статус:</span>
-                                        <div className="text-white mt-1">
-                                            {session.is_verified ? 'Активна' : 'Ожидает'}
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
-            )}
-
-            <div className="text-sm text-slate-400">
-                Всего активных сессий: {sessions.length}
-            </div>
+      <div className="container mx-auto p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+          <div className="space-y-3">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-20 bg-gray-200 rounded"></div>
+            ))}
+          </div>
         </div>
+      </div>
     );
+  }
+
+  const activeSessions = sessions.filter(s => s.is_active);
+  const inactiveSessions = sessions.filter(s => !s.is_active);
+
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center">
+            <Monitor className="w-8 h-8 mr-3 text-blue-500" />
+            Управление сессиями
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Просмотр и управление активными пользовательскими сессиями
+          </p>
+        </div>
+        
+        <div className="flex items-center space-x-4">
+          <Badge variant="secondary" className="text-lg px-4 py-2">
+            {activeSessions.length} активных
+          </Badge>
+          <Button onClick={refreshSessions} disabled={refreshing} variant="outline">
+            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Обновить
+          </Button>
+        </div>
+      </div>
+
+      {/* Статистика */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="p-3 bg-green-100 rounded-lg">
+                <Users className="w-6 h-6 text-green-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm text-gray-600">Активные сессии</p>
+                <p className="text-2xl font-bold text-gray-900">{activeSessions.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <Monitor className="w-6 h-6 text-blue-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm text-gray-600">Всего сессий</p>
+                <p className="text-2xl font-bold text-gray-900">{sessions.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="p-3 bg-purple-100 rounded-lg">
+                <Clock className="w-6 h-6 text-purple-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm text-gray-600">Неактивные</p>
+                <p className="text-2xl font-bold text-gray-900">{inactiveSessions.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Активные сессии */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-green-600">Активные сессии ({activeSessions.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {activeSessions.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <p className="text-lg font-medium mb-2">Нет активных сессий</p>
+              <p className="text-sm">Активные сессии будут отображаться здесь</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {activeSessions.map((session) => (
+                <div key={session.session_id} className="flex items-center justify-between p-4 border rounded-lg bg-green-50">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3">
+                      {getSessionTypeIcon(session)}
+                      <span className="font-medium">
+                        {session.device_info?.guest_channel || `User ${session.user_id}`}
+                      </span>
+                      {getSessionTypeBadge(session)}
+                      <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                        Активна
+                      </Badge>
+                    </div>
+                    <div className="flex items-center space-x-4 mt-2 text-xs text-muted-foreground">
+                      <span>ID: {session.session_id.substring(0, 8)}...</span>
+                      <span>Создана: {new Date(session.created_at).toLocaleString('ru-RU')}</span>
+                      <span>Активность: {formatLastActivity(session.last_activity)}</span>
+                      {session.device_info?.ip && (
+                        <span>IP: {session.device_info.ip}</span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => terminateSession(session.session_id)}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" />
+                    Завершить
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Неактивные сессии */}
+      {inactiveSessions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-gray-600">Неактивные сессии ({inactiveSessions.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {inactiveSessions.slice(0, 10).map((session) => (
+                <div key={session.session_id} className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3">
+                      {getSessionTypeIcon(session)}
+                      <span className="font-medium text-gray-600">
+                        {session.device_info?.guest_channel || `User ${session.user_id}`}
+                      </span>
+                      {getSessionTypeBadge(session)}
+                      <Badge variant="outline" className="text-xs text-gray-500 border-gray-300">
+                        Неактивна
+                      </Badge>
+                    </div>
+                    <div className="flex items-center space-x-4 mt-2 text-xs text-muted-foreground">
+                      <span>ID: {session.session_id.substring(0, 8)}...</span>
+                      <span>Создана: {new Date(session.created_at).toLocaleString('ru-RU')}</span>
+                      <span>Последняя активность: {formatLastActivity(session.last_activity)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {inactiveSessions.length > 10 && (
+                <p className="text-center text-sm text-muted-foreground">
+                  ... и еще {inactiveSessions.length - 10} неактивных сессий
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
 };
 
 export default SessionManagementPage;

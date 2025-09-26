@@ -32,7 +32,7 @@ export const DataProvider = ({ children }) => {
     });
 
     const [loading, setLoading] = useState({
-        streamData: true,
+        streamData: false,
         history: true,
         categories: false,
     });
@@ -44,7 +44,9 @@ export const DataProvider = ({ children }) => {
 
     // --- DATA LOADING ---
     const loadStreamData = useCallback(async (force = false) => {
-        if (!isAuthenticated) return;
+        if (!isAuthenticated) {
+            return;
+        }
         setLoading(prev => ({ ...prev, streamData: true }));
 
         try {
@@ -53,20 +55,45 @@ export const DataProvider = ({ children }) => {
                 vk: { title: '', category: null },
             };
 
+            // Создаем промисы для параллельной загрузки
+            const promises = [];
+
             if (integrations.twitch.enabled) {
-                const twitchData = await botService.get('/api/twitch/stream-info', { params: { force } });
-                if (twitchData.data) {
-                    data.twitch.title = twitchData.data.title || '';
-                    data.twitch.category = { id: twitchData.data.game_id, name: twitchData.data.game };
-                }
+                promises.push(
+                    botService.get('/api/twitch/stream-info', { params: { force } })
+                        .then(twitchData => ({ platform: 'twitch', data: twitchData.data }))
+                        .catch(error => {
+                            console.error('Error loading Twitch data:', error);
+                            return { platform: 'twitch', data: null };
+                        })
+                );
             }
 
             if (integrations.vk.enabled) {
-                const vkData = await botService.get('/api/vk/stream-info');
-                if (vkData.data) {
-                    data.vk.title = vkData.data.title || '';
-                    data.vk.category = { id: vkData.data.category_id, name: vkData.data.category };
-                }
+                promises.push(
+                    botService.get('/api/vk/stream-info', { params: { force } })
+                        .then(vkData => ({ platform: 'vk', data: vkData.data }))
+                        .catch(error => {
+                            console.error('Error loading VK data:', error);
+                            return { platform: 'vk', data: null };
+                        })
+                );
+            }
+
+            // Ждем все промисы и обрабатываем результаты
+            if (promises.length > 0) {
+                const results = await Promise.all(promises);
+                results.forEach(result => {
+                    if (result.data) {
+                        if (result.platform === 'twitch') {
+                            data.twitch.title = result.data.title || '';
+                            data.twitch.category = { id: result.data.game_id, name: result.data.game };
+                        } else if (result.platform === 'vk') {
+                            data.vk.title = result.data.title || '';
+                            data.vk.category = { id: result.data.category_id, name: result.data.category };
+                        }
+                    }
+                });
             }
             
             setInitialData(data);
@@ -172,10 +199,10 @@ export const DataProvider = ({ children }) => {
     
     
     useEffect(() => {
-        if (isAuthenticated && user) {
+        if (isAuthenticated && !loading.streamData && (integrations.twitch.enabled || integrations.vk.enabled)) {
             loadStreamData();
         }
-    }, [isAuthenticated, user, integrations, loadStreamData]);
+    }, [isAuthenticated, integrations.twitch.enabled, integrations.vk.enabled, loadStreamData]);
     
 
     const value = useMemo(() => ({

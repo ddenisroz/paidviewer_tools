@@ -5,7 +5,7 @@ import aiohttp
 from typing import Dict, List, Optional, Callable
 import time
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('bot_service')
 
 class VKLiveChatReader:
     """
@@ -27,7 +27,8 @@ class VKLiveChatReader:
             return
             
         self.is_running = True
-        logger.info("🚀 VK Live chat reader started")
+        logger.info("🚀 VK LIVE CHAT READER STARTED - Listening for messages")
+        print("🔔 VK LIVE CHAT READER: Started and ready to receive messages")
         
         try:
             # Запускаем цикл чтения сообщений
@@ -69,15 +70,15 @@ class VKLiveChatReader:
                         logger.debug(f"VK Live chat API response for {channel_name}: {data}")
                         messages = data.get("data", {}).get("chat_messages", [])
                         
-                        # Логируем только если есть новые сообщения или это первая проверка
-                        if len(messages) > 0:
-                            logger.debug(f"📥 Retrieved {len(messages)} messages from {channel_name}")
+                        # Логируем КАЖДУЮ попытку получения сообщений
+                        logger.info(f"🔍 VK LIVE: Checked {channel_name}, got {len(messages)} messages")
                         
                         # Обрабатываем только новые сообщения
                         await self._process_messages(channel_name, messages)
                     else:
                         response_text = await response.text()
-                        logger.warning(f"Failed to get messages for {channel_name}: {response.status} - {response_text}")
+                        logger.error(f"❌ VK LIVE API ERROR for {channel_name}: {response.status} - {response_text}")
+                        logger.error(f"🔍 URL: {url}, Headers: {headers}, Params: {params}")
                         
         except Exception as e:
             logger.error(f"Error getting messages for {channel_name}: {e}")
@@ -131,8 +132,9 @@ class VKLiveChatReader:
             is_moderator = author.get("is_moderator", False)
             is_owner = author.get("is_owner", False)
             
-            # Логируем сообщение
-            logger.info(f"📨 VK Live chat [{channel_name}] {author_nick}: {message_text}")
+            # Логируем сообщение с более заметным форматом
+            logger.info(f"📨 VK LIVE CHAT [{channel_name}] {author_nick}: {message_text}")
+            print(f"🔔 VK LIVE CHAT MESSAGE: [{channel_name}] {author_nick}: {message_text}")  # Дополнительно в консоль
             
             # Вызываем обработчик сообщения, если он зарегистрирован
             if channel_name in self.message_handlers:

@@ -10,6 +10,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { TwitchIcon, VKIcon } from './PlatformIcons';
 import { useData } from '../context/DataContext';
 import { useIntegrations } from '../context/IntegrationsContext';
+import { findMappedCategory } from '../constants/categoryMapping';
 
 const CategoryDropdown = ({ platform, search, onSelect, results }) => {
     if (!search || !Array.isArray(results) || results.length === 0) return null;
@@ -102,11 +103,28 @@ const StreamCategoryCard = () => {
 
     const handleCategorySelect = (platform, category) => {
         if (isLinked && bothEnabled) {
-            setCurrentData(prev => ({
-                ...prev,
-                twitch: { ...prev.twitch, category },
-                vk: { ...prev.vk, category },
-            }));
+            // В объединенном режиме ищем соответствующую категорию для другой платформы
+            const otherPlatform = platform === 'twitch' ? 'vk' : 'twitch';
+            const otherCategories = categories[otherPlatform] || [];
+            
+            // Ищем соответствующую категорию на другой платформе
+            const mappedCategory = findMappedCategory(category.name, platform, otherCategories);
+            
+            if (mappedCategory) {
+                // Нашли соответствующую категорию - устанавливаем разные категории для разных платформ
+                setCurrentData(prev => ({
+                    ...prev,
+                    [platform]: { ...prev[platform], category },
+                    [otherPlatform]: { ...prev[otherPlatform], category: mappedCategory },
+                }));
+            } else {
+                // Не нашли соответствующую категорию - устанавливаем одинаковую (как было раньше)
+                setCurrentData(prev => ({
+                    ...prev,
+                    twitch: { ...prev.twitch, category },
+                    vk: { ...prev.vk, category },
+                }));
+            }
         } else {
             setCurrentData(prev => ({
                 ...prev,
@@ -117,19 +135,22 @@ const StreamCategoryCard = () => {
         setShowDropdown({ twitch: false, vk: false });
     };
 
+    const handleKeyPress = (e) => {
+        if (e.key === 'Enter' && isChanged && status.saveCategory !== 'loading') {
+            handleSave(isLinked && bothEnabled ? 'both' : 'individual');
+        }
+    };
+
     const handleSave = (mode) => {
         const payload = {};
         
         if (mode === 'both') {
-            // Объединенный режим - сохраняем одну и ту же категорию для обеих платформ
-            const category = currentData.twitch.category || currentData.vk.category;
-            if (category) {
-                if (twitchEnabled && category.id !== initialData.twitch.category?.id) {
-                    payload.twitch = { category_id: category.id };
-                }
-                if (vkEnabled && category.id !== initialData.vk.category?.id) {
-                    payload.vk = { category_id: category.id };
-                }
+            // Объединенный режим - сохраняем соответствующие категории для каждой платформы
+            if (twitchEnabled && currentData.twitch.category?.id !== initialData.twitch.category?.id) {
+                payload.twitch = { category_id: currentData.twitch.category.id };
+            }
+            if (vkEnabled && currentData.vk.category?.id !== initialData.vk.category?.id) {
+                payload.vk = { category_id: currentData.vk.category.id };
             }
         } else {
             // Индивидуальный режим - сохраняем только измененные категории
@@ -147,24 +168,35 @@ const StreamCategoryCard = () => {
     };
 
     const isChanged = useMemo(() => {
-        return JSON.stringify(initialData) !== JSON.stringify(currentData);
-    }, [initialData, currentData]);
+        // Проверяем изменения только в категориях
+        const categoryChanged = 
+            (twitchEnabled && initialData.twitch.category?.id !== currentData.twitch.category?.id) ||
+            (vkEnabled && initialData.vk.category?.id !== currentData.vk.category?.id);
+        return categoryChanged;
+    }, [initialData.twitch.category?.id, initialData.vk.category?.id, currentData.twitch.category?.id, currentData.vk.category?.id, twitchEnabled, vkEnabled]);
 
     if (!hasAnyIntegration) {
         return (
             <Card className="h-full border-red-500/50 bg-red-500/5 opacity-60">
                  <CardHeader><CardTitle className="flex items-center gap-2 text-red-500"><Tag /> Смена категории</CardTitle></CardHeader>
-                 <CardContent className="flex items-center justify-center h-full text-center text-muted-foreground">
-                    <div><p>Интеграции не подключены</p></div>
+                 <CardContent className="flex items-center justify-center h-full min-h-[300px]">
+                    <div className="text-center space-y-4">
+                        <div className="w-16 h-16 mx-auto flex items-center justify-center">
+                            <svg className="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </div>
+                        <p className="text-sm text-muted-foreground px-4">Авторизуйтесь для полного функционала</p>
+                    </div>
                 </CardContent>
             </Card>
         );
     }
 
     return (
-        <Card className="h-full">
-            <CardHeader><CardTitle className="flex items-center gap-2"><Tag className="text-green-500"/> Смена категории</CardTitle></CardHeader>
-            <CardContent ref={dropdownRef} className="p-6 space-y-4">
+        <Card className="h-full flex flex-col min-h-[400px]">
+            <CardHeader className="flex-shrink-0"><CardTitle className="flex items-center gap-2"><Tag className="text-green-500"/> Смена категории</CardTitle></CardHeader>
+            <CardContent ref={dropdownRef} className="p-6 flex-1 flex flex-col justify-between min-h-0">
                 {/* Toggle объединения полей */}
                 {bothEnabled && (
                     <div className="flex items-center justify-between p-3 bg-background/10 rounded-lg">
@@ -181,7 +213,8 @@ const StreamCategoryCard = () => {
                     </div>
                 )}
                 {/* Поля ввода */}
-                <div className="space-y-4">
+                <div className="flex-1 flex items-center justify-center">
+                    <div className="w-full space-y-4">
                     {isLinked && bothEnabled ? (
                         <div className="space-y-3 relative">
                             <Label className="flex items-center gap-2 font-medium">
@@ -200,6 +233,7 @@ const StreamCategoryCard = () => {
                                             value={searchTerms.twitch} 
                                             onChange={(e) => handleSearchChange('twitch', e.target.value)}
                                             onFocus={() => setShowDropdown({ twitch: true, vk: true })}
+                                            onKeyPress={handleKeyPress}
                                             placeholder="Найти общую категорию..."
                                             className="h-12 text-lg w-full"
                                         />
@@ -235,6 +269,7 @@ const StreamCategoryCard = () => {
                                             value={searchTerms.twitch} 
                                             onChange={(e) => handleSearchChange('twitch', e.target.value)}
                                             onFocus={() => twitchEnabled && setShowDropdown({ twitch: true, vk: false })}
+                                            onKeyPress={handleKeyPress}
                                             placeholder={twitchEnabled ? "Найти категорию на Twitch..." : "Интеграция отключена"}
                                             className={`h-12 text-lg w-full ${!twitchEnabled ? 'bg-muted cursor-not-allowed blur-sm' : ''}`}
                                             disabled={!twitchEnabled}
@@ -270,6 +305,7 @@ const StreamCategoryCard = () => {
                                             value={searchTerms.vk} 
                                             onChange={(e) => handleSearchChange('vk', e.target.value)} 
                                             onFocus={() => vkEnabled && setShowDropdown({ twitch: false, vk: true })}
+                                            onKeyPress={handleKeyPress}
                                             placeholder={vkEnabled ? "Найти категорию на VK Live..." : "Интеграция отключена"}
                                             className={`h-12 text-lg w-full ${!vkEnabled ? 'bg-muted cursor-not-allowed blur-sm' : ''}`}
                                             disabled={!vkEnabled}
@@ -287,11 +323,12 @@ const StreamCategoryCard = () => {
                             </div>
                         </>
                     )}
+                    </div>
                 </div>
 
                 {/* Кнопка сохранения */}
                 {hasAnyIntegration && (
-                    <div className="pt-2 flex justify-center">
+                    <div className="pt-4 flex justify-center flex-shrink-0">
                         <Button 
                             onClick={() => handleSave(isLinked && bothEnabled ? 'both' : 'individual')}
                             disabled={status.saveCategory === 'loading' || !isChanged}

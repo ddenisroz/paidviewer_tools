@@ -120,6 +120,12 @@ def get_user_voices(user_id: str, db: Session = Depends(get_db)):
 def get_global_voices(db: Session = Depends(get_db)):
     return tts_api.get_global_voices(db)
 
+# --- Admin Voices ---
+@app.get("/api/admin/voices", response_model=List[VoiceSchema])
+def get_admin_voices(db: Session = Depends(get_db)):
+    """Получить все голоса для админки"""
+    return tts_api.get_all_voices(db)
+
 # --- Voice Upload for Users ---
 @app.post("/api/user/voices/upload", response_model=VoiceUploadResponse)
 async def upload_user_voice(

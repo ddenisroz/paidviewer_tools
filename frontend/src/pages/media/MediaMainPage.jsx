@@ -3,7 +3,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Youtube, Coins, Settings } from 'lucide-react';
+import { Youtube, Coins, Settings, Dice6 } from 'lucide-react';
 import { useIntegrations } from '../../context/IntegrationsContext';
 
 const MediaFeatureCard = ({ title, icon, path, enabled, description }) => {
@@ -50,6 +50,13 @@ const MediaMainPage = () => {
                     path="/dashboard/media/channel-points"
                     enabled={isTwitchEnabled} // Только для Twitch
                     description="Настройка звуков для наград"
+                />
+                <MediaFeatureCard 
+                    title="Гэмблинг"
+                    icon={<Dice6 className="h-16 w-16 text-purple-500" />}
+                    path="/dashboard/media/gambling"
+                    enabled={isTwitchEnabled} // Только для Twitch/VK
+                    description="Аукционы и азартные игры"
                 />
             </div>
         </div>

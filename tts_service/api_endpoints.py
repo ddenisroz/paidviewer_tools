@@ -205,6 +205,11 @@ class TTSAPIEndpoints:
             VoiceModel.owner_id.is_(None)
         ).all()
         return [VoiceSchema.from_orm(voice) for voice in voices]
+    
+    def get_all_voices(self, db: Session = Depends(get_db)):
+        """Получить все голоса (для админки)"""
+        voices = db.query(VoiceModel).all()
+        return [VoiceSchema.from_orm(voice) for voice in voices]
 
     async def _transcribe_voice_background(self, voice_id: int, file_path: str, db: Session):
         """Фоновая транскрипция голоса"""

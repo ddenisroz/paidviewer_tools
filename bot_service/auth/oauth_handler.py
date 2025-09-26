@@ -294,5 +294,20 @@ class OAuthHandler:
         except Exception as e:
             logger.error(f"Error connecting VK Live bot: {e}")
 
+    async def _auto_connect_bot(self, platform: str, channel_name: str) -> None:
+        """Автоматическое подключение бота к каналу после OAuth"""
+        logger.info(f"🤖 Auto-connecting {platform} bot to channel: {channel_name}")
+        
+        try:
+            if platform == "twitch":
+                await self._connect_twitch_bot(channel_name)
+            elif platform == "vk":
+                await self._connect_vk_bot(channel_name)
+            else:
+                logger.warning(f"Unknown platform for auto-connect: {platform}")
+                
+        except Exception as e:
+            logger.error(f"Error in auto-connect for {platform}: {e}")
+
 # Глобальный экземпляр OAuth handler
 oauth_handler = OAuthHandler()

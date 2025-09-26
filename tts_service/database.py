@@ -5,8 +5,12 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.ext.declarative import declarative_base
 
 # Определяем путь к базе данных в bot_service
-# BASE_DIR -> tts_service -> parent -> bot_service -> data -> app_data.db
-DATABASE_DIR = Path(__file__).resolve().parent.parent / "bot_service" / "data"
+# BASE_DIR -> tts_service -> parent -> bot_service -> core -> data -> app_data.db
+DATABASE_DIR = Path(__file__).resolve().parent.parent / "bot_service" / "core" / "data"
+
+# Создаем папку если её нет
+DATABASE_DIR.mkdir(parents=True, exist_ok=True)
+
 DATABASE_URL = f"sqlite:///{DATABASE_DIR / 'app_data.db'}"
 
 engine = create_engine(

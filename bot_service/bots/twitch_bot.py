@@ -8,25 +8,42 @@ from core.connection_manager import ConnectionManager
 from api.tts_api import TTSAPI
 from api.youtube_api import YouTubeAPI
 
-logger = logging.getLogger(__name__)
+# Включаем детальное логирование для TwitchIO
+logging.getLogger('twitchio').setLevel(logging.DEBUG)
+logging.getLogger('twitchio.websocket').setLevel(logging.DEBUG)
+logging.getLogger('twitchio.client').setLevel(logging.DEBUG)
+
+logger = logging.getLogger('bot_service')
 
 class Bot(commands.Bot):
     def __init__(self, token: str, initial_channels: List[str], connection_manager: ConnectionManager):
+        logger.info(f"🤖 CREATING TWITCH BOT")
+        logger.info(f"📋 Token: {token[:10]}...")
+        logger.info(f"🔗 Initial channels: {initial_channels}")
+        
         self.connection_manager = connection_manager
         self.tts_api = TTSAPI()
         self.youtube_api = YouTubeAPI()
         
+        logger.info(f"🔧 Initializing TwitchIO Bot...")
         super().__init__(
             token=token,
             prefix='!',
             initial_channels=initial_channels
         )
+        logger.info(f"✅ TwitchIO Bot initialized")
 
     async def event_ready(self):
         """Вызывается когда бот готов к работе"""
-        logger.info(f'Bot logged in as {self.nick}')
-        logger.info(f'Bot user id: {self.user_id}')
-        logger.info(f'Connected to channels: {self.connected_channels}')
+        logger.info(f'🤖 TWITCH BOT READY!')
+        logger.info(f'📋 Bot logged in as: {self.nick}')
+        logger.info(f'🆔 Bot user id: {self.user_id}')
+        logger.info(f'🔗 Connected to channels: {self.connected_channels}')
+        logger.info(f'🎯 BOT IS NOW LISTENING FOR MESSAGES IN ALL CHANNELS!')
+        logger.info(f'🎯 BOT IS NOW LISTENING FOR MESSAGES IN THESE CHANNELS')
+        
+        for channel in self.connected_channels:
+            logger.info(f'✅ MONITORING CHAT: {channel.name}')
 
     async def event_raw_data(self, data: str):
         """Логирует все сырые данные, приходящие от Twitch IRC"""
@@ -34,16 +51,32 @@ class Bot(commands.Bot):
 
     async def event_message(self, message):
         """Обрабатывает входящие сообщения"""
+        # АГРЕССИВНОЕ ЛОГИРОВАНИЕ - логируем ВСЕ входящие сообщения
+        logger.info(f"🔔 MESSAGE RECEIVED! Type: {type(message)}")
+        
         # Логируем сам факт получения сообщения до всех проверок
         if message and hasattr(message, 'raw_data'):
-            logger.info(f"Received message object, raw data: {message.raw_data.strip()}")
+            logger.info(f"📨 RAW MESSAGE DATA: {message.raw_data.strip()}")
         else:
-            logger.info("Received a message object, but it lacks raw_data.")
+            logger.info("⚠️ Message object lacks raw_data")
+            
+        # Логируем основные атрибуты сообщения
+        logger.info(f"📋 Message attributes: channel={getattr(message, 'channel', None)}, author={getattr(message, 'author', None)}, content={getattr(message, 'content', None)}")
 
         try:
             # Проверяем, что все необходимые атрибуты существуют
-            if not message or not message.channel or not message.author:
-                logger.warning("Received message with missing attributes, skipping")
+            if not message:
+                logger.debug("Received empty message, skipping")
+                return
+                
+            # Проверяем наличие канала
+            if not hasattr(message, 'channel') or not message.channel:
+                logger.debug("Received message without channel, skipping")
+                return
+                
+            # Проверяем наличие автора
+            if not hasattr(message, 'author') or not message.author:
+                logger.debug("Received message without author, skipping")
                 return
             
             channel_name = getattr(message.channel, 'name', None)
@@ -51,11 +84,13 @@ class Bot(commands.Bot):
             content = getattr(message, 'content', '')
             
             if not channel_name or not author_name:
-                logger.warning(f"Message missing channel name or author name: channel={channel_name}, author={author_name}")
+                logger.debug(f"Message missing channel name or author name: channel={channel_name}, author={author_name}")
                 return
             
             # Логируем все входящие сообщения для отладки
-            logger.info(f"📨 Twitch chat [{channel_name}] {author_name}: {content}")
+            logger.info(f"📨 TWITCH CHAT [{channel_name}] {author_name}: {content}")
+            logger.info(f"🎯 BOT IS LISTENING TO TWITCH CHAT - CHANNEL: {channel_name}")
+            
             
             # Игнорируем сообщения от самого бота
             if message.echo:
@@ -71,28 +106,31 @@ class Bot(commands.Bot):
 
         # Проверяем верификацию для гостевых подключений
         channel_name = channel_name.lower()
-        
-        # Если канал в процессе верификации, проверяем код
-        # Проверяем как основной ключ, так и новый ключ для дополнительной верификации
-        verification_keys = [channel_name, f"{channel_name}_new"]
         verification_found = False
         
-        for key in verification_keys:
-            if key in self.connection_manager.pending_verifications:
-                verification = self.connection_manager.pending_verifications[key]
-                if not verification.get("verified", False):
-                    # Проверяем, содержит ли сообщение код верификации
-                    if self.connection_manager.check_verification(key, content, author_name):
-                        logger.info(f"Channel {channel_name} verified by {author_name} using key {key}")
-                        
-                        # Если это новая верификация, отключаем предыдущую сессию
-                        if key == f"{channel_name}_new":
-                            # Очищаем старую верификацию
-                            if channel_name in self.connection_manager.pending_verifications:
-                                del self.connection_manager.pending_verifications[channel_name]
-                            # Переименовываем новую верификацию в основную
-                            self.connection_manager.pending_verifications[channel_name] = verification
-                            del self.connection_manager.pending_verifications[key]
+        # Верификация нужна только если есть активные pending_verifications
+        # И только если это не владелец канала
+        if channel_name in self.connection_manager.pending_verifications and author_name.lower() != channel_name:
+            # Если канал в процессе верификации, проверяем код
+            # Проверяем как основной ключ, так и новый ключ для дополнительной верификации
+            verification_keys = [channel_name, f"{channel_name}_new"]
+            
+            for key in verification_keys:
+                if key in self.connection_manager.pending_verifications:
+                    verification = self.connection_manager.pending_verifications[key]
+                    if not verification.get("verified", False):
+                        # Проверяем, содержит ли сообщение код верификации
+                        if self.connection_manager.check_verification(key, content, author_name):
+                            logger.info(f"Channel {channel_name} verified by {author_name} using key {key}")
+                            
+                            # Если это новая верификация, отключаем предыдущую сессию
+                            if key == f"{channel_name}_new":
+                                # Очищаем старую верификацию
+                                if channel_name in self.connection_manager.pending_verifications:
+                                    del self.connection_manager.pending_verifications[channel_name]
+                                # Переименовываем новую верификацию в основную
+                                self.connection_manager.pending_verifications[channel_name] = verification
+                                del self.connection_manager.pending_verifications[key]
                         
                         # Отправляем подтверждение в чат
                         await message.channel.send(f"✅ Верификация успешна! Добро пожаловать, {author_name}!")
@@ -245,25 +283,54 @@ class Bot(commands.Bot):
 
     @commands.command(name='add')
     async def add_video(self, ctx, url: str = None):
-        """Добавить видео в очередь"""
+        """Добавить видео в очередь (устаревшая команда, используйте !sr)"""
+        await ctx.send("⚠️ Команда !add устарела. Используйте !sr <URL>")
+
+    @commands.command(name='sr')
+    async def song_request(self, ctx, url: str = None):
+        """Заказать YouTube видео"""
         if not url:
-            await ctx.send("❌ Укажите URL видео: !add <url>")
+            await ctx.send("❌ Укажите URL видео: !sr <url>")
             return
         
-        # Валидируем URL
-        if not self.youtube_api.validate_url(url):
-            await ctx.send("❌ Неверный YouTube URL")
-            return
-        
-        # Получаем информацию о видео
-        video_info = self.youtube_api.get_video_info(url)
-        if not video_info:
-            await ctx.send("❌ Не удалось получить информацию о видео")
-            return
-        
-        # Добавляем в очередь
-        self.connection_manager.add_to_youtube_queue(ctx.channel.name.lower(), video_info)
-        await ctx.send(f"✅ Добавлено в очередь: {video_info['title']}")
+        try:
+            from services.queue_service import QueueService
+            from core.database import get_db
+            
+            queue_service = QueueService()
+            
+            # Получаем user_id владельца канала
+            # TODO: получить реальный ID через session_manager
+            channel_owner_id = 1  # Заглушка
+            
+            db = next(get_db())
+            try:
+                result = await queue_service.add_video_to_queue(
+                    user_id=channel_owner_id,
+                    video_url=url,
+                    channel_name=ctx.channel.name,
+                    platform='twitch',
+                    requester_name=ctx.author.name,
+                    requester_id=str(ctx.author.id),
+                    is_paid=False,
+                    db=db
+                )
+                
+                if result['success']:
+                    queue_item = result['queue_item']
+                    await ctx.send(
+                        f"✅ Добавлено в очередь: {queue_item['title']} "
+                        f"(позиция {queue_item['position']}, {queue_item.get('duration', 'Unknown')})"
+                    )
+                else:
+                    await ctx.send(f"❌ {result['error']}")
+                    
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"Error in Twitch song request: {e}")
+            await ctx.send("❌ Ошибка добавления видео в очередь")
 
     @commands.command(name='help')
     async def help_command(self, ctx):
@@ -281,16 +348,19 @@ class Bot(commands.Bot):
 
     async def event_channel_joined(self, channel):
         """Вызывается когда бот присоединяется к каналу"""
-        logger.info(f'Joined channel: {channel.name}')
+        logger.info(f'✅ SUCCESSFULLY JOINED CHANNEL: {channel.name}')
+        logger.info(f'🎯 BOT IS NOW LISTENING TO CHAT IN: {channel.name}')
         await channel.send(f"/me подключился к чату!")
 
     async def event_channel_left(self, channel):
         """Вызывается когда бот покидает канал"""
-        logger.info(f'Left channel: {channel.name}')
+        logger.info(f'❌ LEFT CHANNEL: {channel.name}')
+        logger.info(f'🔇 NO LONGER LISTENING TO: {channel.name}')
 
     async def event_join_failure(self, channel: str, error: str):
         """Вызывается при ошибке подключения к каналу."""
-        logger.error(f"Failed to join channel {channel}. Reason: {error}")
+        logger.error(f"❌ FAILED TO JOIN CHANNEL {channel}. Reason: {error}")
+        logger.error(f"🔇 BOT CANNOT LISTEN TO CHAT IN: {channel}")
 
     async def event_command_error(self, ctx, error):
         """Обработка ошибок команд"""
@@ -303,10 +373,16 @@ class Bot(commands.Bot):
 
     async def start_bot(self):
         """Запустить бота"""
+        logger.info(f"🚀 STARTING TWITCH BOT...")
+        logger.info(f"🔗 Bot will connect to IRC and join channels")
+        
         try:
+            logger.info(f"📡 Calling TwitchIO start()...")
             await self.start()
+            logger.info(f"✅ TwitchIO start() completed")
         except Exception as e:
-            logger.error(f"Error starting bot: {e}")
+            logger.error(f"❌ ERROR STARTING BOT: {e}")
+            logger.error(f"🔍 This might be a token or connection issue")
             raise
 
     async def stop_bot(self):

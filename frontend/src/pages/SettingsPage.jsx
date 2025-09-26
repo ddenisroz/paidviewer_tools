@@ -91,6 +91,10 @@ const SettingsPage = () => {
                 <CardContent>
                     <div className="space-y-2">
                         <div className="flex justify-between">
+                            <span className="text-sm text-muted-foreground">ID личного кабинета:</span>
+                            <span className="text-sm font-medium">{user?.id}</span>
+                        </div>
+                        <div className="flex justify-between">
                             <span className="text-sm text-muted-foreground">Имя пользователя:</span>
                             <span className="text-sm font-medium">{user?.username || user?.display_name}</span>
                         </div>

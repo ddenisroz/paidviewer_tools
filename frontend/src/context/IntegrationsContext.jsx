@@ -7,7 +7,7 @@ const IntegrationsContext = createContext();
 export const useIntegrations = () => useContext(IntegrationsContext);
 
 export const IntegrationsProvider = ({ children }) => {
-    const { isAuthenticated, integrationsNeedRefresh, markIntegrationsRefreshed, loginWithTwitch, loginWithVk } = useAuth();
+    const { isAuthenticated, integrationsNeedRefresh, markIntegrationsRefreshed, loginWithTwitch, loginWithVk, checkAuthStatus } = useAuth();
     const [isLoading, setIsLoading] = useState(true);
     const [integrations, setIntegrations] = useState({
         twitch: { enabled: false },
@@ -60,8 +60,13 @@ export const IntegrationsProvider = ({ children }) => {
             // Отключить Twitch интеграцию
             try {
                 setIsLoading(true);
-                await botService.post('/api/integrations/twitch/disconnect');
-                await fetchIntegrations(); // Обновить состояние
+                console.log('Disconnecting Twitch integration...');
+                const disconnectResponse = await botService.post('/api/integrations/twitch/disconnect');
+                console.log('Twitch disconnection response:', disconnectResponse.data);
+                console.log('Twitch disconnection successful, fetching integrations...');
+                // Обновляем только интеграции, не трогаем auth status
+                await fetchIntegrations(); 
+                console.log('Integrations updated, new state:', integrations);
             } catch (error) {
                 console.error('Error disconnecting Twitch:', error);
             } finally {
@@ -78,8 +83,13 @@ export const IntegrationsProvider = ({ children }) => {
             // Отключить VK интеграцию
             try {
                 setIsLoading(true);
-                await botService.post('/api/integrations/vk/disconnect');
-                await fetchIntegrations(); // Обновить состояние
+                console.log('Disconnecting VK integration...');
+                const disconnectResponse = await botService.post('/api/integrations/vk/disconnect');
+                console.log('VK disconnection response:', disconnectResponse.data);
+                console.log('VK disconnection successful, fetching integrations...');
+                // Обновляем только интеграции, не трогаем auth status
+                await fetchIntegrations(); 
+                console.log('Integrations updated, new state:', integrations);
             } catch (error) {
                 console.error('Error disconnecting VK:', error);
             } finally {

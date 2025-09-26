@@ -1,247 +1,180 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Trash2, RefreshCw, Ban, Shield, Plus, AlertTriangle } from 'lucide-react';
-import api from '@/services/api';
+import { Trash2, Plus, AlertCircle, Shield } from 'lucide-react';
 import { toast } from 'sonner';
+import { botService } from '../../services/microservices';
 
 const BlockedChannelsPage = () => {
-    const [blockedChannels, setBlockedChannels] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [unblocking, setUnblocking] = useState(false);
-    const [showBlockDialog, setShowBlockDialog] = useState(false);
-    const [newChannel, setNewChannel] = useState('');
-    const [blockReason, setBlockReason] = useState('');
-    const [blocking, setBlocking] = useState(false);
+  const [blockedChannels, setBlockedChannels] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [newChannel, setNewChannel] = useState('');
+  const [addingChannel, setAddingChannel] = useState(false);
 
-    const fetchBlockedChannels = async () => {
-        try {
-            setLoading(true);
-            const response = await api.get('/api/admin/blocked-channels');
-            setBlockedChannels(response.data.blocked_channels || []);
-        } catch (error) {
-            console.error('Failed to fetch blocked channels:', error);
-            toast.error('Не удалось загрузить список заблокированных каналов');
-        } finally {
-            setLoading(false);
-        }
-    };
+  const loadBlockedChannels = async () => {
+    try {
+      setLoading(true);
+      const response = await botService.get('/api/admin/blocked-channels');
+      setBlockedChannels(response.data.blocked_channels || []);
+    } catch (error) {
+      console.error('Error loading blocked channels:', error);
+      toast.error('Ошибка загрузки заблокированных каналов');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const blockChannel = async () => {
-        if (!newChannel.trim()) {
-            toast.error('Введите название канала');
-            return;
-        }
-
-        try {
-            setBlocking(true);
-            await api.post('/api/admin/blocked-channels', {
-                channel_name: newChannel.trim(),
-                reason: blockReason.trim() || 'Заблокировано администратором',
-                blocked_by: 'admin'
-            });
-            
-            toast.success(`Канал ${newChannel} заблокирован`);
-            setNewChannel('');
-            setBlockReason('');
-            setShowBlockDialog(false);
-            await fetchBlockedChannels();
-        } catch (error) {
-            console.error('Failed to block channel:', error);
-            if (error.response?.status === 400) {
-                toast.error('Канал уже заблокирован');
-            } else {
-                toast.error('Не удалось заблокировать канал');
-            }
-        } finally {
-            setBlocking(false);
-        }
-    };
-
-    const unblockChannel = async (channelName) => {
-        if (!window.confirm(`Вы уверены, что хотите разблокировать канал ${channelName}?`)) {
-            return;
-        }
-
-        try {
-            setUnblocking(true);
-            await api.delete(`/api/admin/blocked-channels/${channelName}`);
-            toast.success(`Канал ${channelName} разблокирован`);
-            await fetchBlockedChannels();
-        } catch (error) {
-            console.error('Failed to unblock channel:', error);
-            toast.error('Не удалось разблокировать канал');
-        } finally {
-            setUnblocking(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchBlockedChannels();
-        
-        // Обновляем каждые 60 секунд
-        const interval = setInterval(fetchBlockedChannels, 60000);
-        return () => clearInterval(interval);
-    }, []);
-
-    const formatDate = (dateString) => {
-        if (!dateString) return 'Неизвестно';
-        const date = new Date(dateString);
-        return date.toLocaleString('ru-RU');
-    };
-
-    if (loading) {
-        return (
-            <div className="container mx-auto p-4">
-                <div className="flex items-center justify-center h-64">
-                    <RefreshCw className="h-8 w-8 animate-spin" />
-                    <span className="ml-2">Загрузка заблокированных каналов...</span>
-                </div>
-            </div>
-        );
+  const addBlockedChannel = async () => {
+    if (!newChannel.trim()) {
+      toast.error('Введите название канала');
+      return;
     }
 
+    try {
+      setAddingChannel(true);
+      await botService.post('/api/admin/blocked-channels', {
+        channel_name: newChannel.trim(),
+        reason: 'Заблокировано администратором'
+      });
+      
+      toast.success('Канал заблокирован');
+      setNewChannel('');
+      await loadBlockedChannels();
+    } catch (error) {
+      console.error('Error adding blocked channel:', error);
+      toast.error('Ошибка блокировки канала');
+    } finally {
+      setAddingChannel(false);
+    }
+  };
+
+  const removeBlockedChannel = async (channelId) => {
+    try {
+      await botService.delete(`/api/admin/blocked-channels/${channelId}`);
+      toast.success('Канал разблокирован');
+      await loadBlockedChannels();
+    } catch (error) {
+      console.error('Error removing blocked channel:', error);
+      toast.error('Ошибка разблокировки канала');
+    }
+  };
+
+  useEffect(() => {
+    loadBlockedChannels();
+  }, []);
+
+  if (loading) {
     return (
-        <div className="container mx-auto p-4 space-y-6">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-semibold text-white">Заблокированные каналы</h1>
-                    <p className="text-slate-400 mt-1">Управление каналами, к которым бот не может подключаться</p>
-                </div>
-                <div className="flex gap-2">
-                    <Button
-                        onClick={fetchBlockedChannels}
-                        variant="outline"
-                        disabled={loading}
-                    >
-                        <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                        Обновить
-                    </Button>
-                    <Dialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>
-                        <DialogTrigger asChild>
-                            <Button>
-                                <Plus className="h-4 w-4 mr-2" />
-                                Заблокировать канал
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-md">
-                            <DialogHeader>
-                                <DialogTitle>Заблокировать канал</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                                <div>
-                                    <Label htmlFor="channel">Название канала</Label>
-                                    <Input
-                                        id="channel"
-                                        value={newChannel}
-                                        onChange={(e) => setNewChannel(e.target.value)}
-                                        placeholder="Введите название канала"
-                                        className="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="reason">Причина блокировки (необязательно)</Label>
-                                    <Textarea
-                                        id="reason"
-                                        value={blockReason}
-                                        onChange={(e) => setBlockReason(e.target.value)}
-                                        placeholder="Укажите причину блокировки"
-                                        className="mt-1"
-                                        rows={3}
-                                    />
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setShowBlockDialog(false)}
-                                    disabled={blocking}
-                                >
-                                    Отмена
-                                </Button>
-                                <Button
-                                    onClick={blockChannel}
-                                    disabled={blocking || !newChannel.trim()}
-                                >
-                                    {blocking ? 'Блокировка...' : 'Заблокировать'}
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-                </div>
-            </div>
-
-            {blockedChannels.length === 0 ? (
-                <Alert>
-                    <Shield className="h-4 w-4" />
-                    <AlertDescription>
-                        Заблокированных каналов не найдено
-                    </AlertDescription>
-                </Alert>
-            ) : (
-                <div className="grid gap-4">
-                    {blockedChannels.map((channel) => (
-                        <Card key={channel.id} className="bg-slate-800/50 border-slate-700">
-                            <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <CardTitle className="text-lg text-white">
-                                            {channel.channel_name}
-                                        </CardTitle>
-                                        <Badge variant="destructive">
-                                            <Ban className="h-3 w-3 mr-1" />
-                                            Заблокирован
-                                        </Badge>
-                                    </div>
-                                    <Button
-                                        onClick={() => unblockChannel(channel.channel_name)}
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={unblocking}
-                                    >
-                                        <Trash2 className="h-4 w-4 mr-1" />
-                                        Разблокировать
-                                    </Button>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="pt-0">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                                    <div>
-                                        <span className="text-slate-400">Причина:</span>
-                                        <div className="text-white mt-1">
-                                            {channel.reason || 'Не указана'}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <span className="text-slate-400">Заблокировал:</span>
-                                        <div className="text-white mt-1">
-                                            {channel.blocked_by || 'Неизвестно'}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <span className="text-slate-400">Дата блокировки:</span>
-                                        <div className="text-white mt-1">
-                                            {formatDate(channel.created_at)}
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
-            )}
-
-            <div className="text-sm text-slate-400">
-                Всего заблокированных каналов: {blockedChannels.length}
-            </div>
+      <div className="container mx-auto p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+          <div className="space-y-3">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-16 bg-gray-200 rounded"></div>
+            ))}
+          </div>
         </div>
+      </div>
     );
+  }
+
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center">
+            <Shield className="w-8 h-8 mr-3 text-red-500" />
+            Заблокированные каналы
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Управление списком заблокированных каналов
+          </p>
+        </div>
+        
+        <Badge variant="secondary" className="text-lg px-4 py-2">
+          {blockedChannels.length} заблокировано
+        </Badge>
+      </div>
+
+      {/* Форма добавления */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Plus className="w-5 h-5 mr-2" />
+            Заблокировать канал
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex space-x-2">
+            <Input
+              placeholder="Введите название канала"
+              value={newChannel}
+              onChange={(e) => setNewChannel(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && addBlockedChannel()}
+              className="flex-1"
+            />
+            <Button 
+              onClick={addBlockedChannel}
+              disabled={addingChannel || !newChannel.trim()}
+            >
+              {addingChannel ? 'Блокируем...' : 'Заблокировать'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Список заблокированных каналов */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Заблокированные каналы ({blockedChannels.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {blockedChannels.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <p className="text-lg font-medium mb-2">Нет заблокированных каналов</p>
+              <p className="text-sm">Заблокированные каналы будут отображаться здесь</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {blockedChannels.map((channel) => (
+                <div key={channel.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                      <span className="font-medium">{channel.channel_name}</span>
+                      {channel.reason && (
+                        <Badge variant="outline" className="text-xs">
+                          {channel.reason}
+                        </Badge>
+                      )}
+                    </div>
+                    {channel.created_at && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Заблокировано: {new Date(channel.created_at).toLocaleString('ru-RU')}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => removeBlockedChannel(channel.id)}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" />
+                    Разблокировать
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 };
 
 export default BlockedChannelsPage;

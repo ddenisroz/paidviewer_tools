@@ -12,6 +12,7 @@ import StreamStatsCard from '../components/StreamStatsCard';
 import StreamTitleCard from '../components/StreamTitleCard';
 import StreamCategoryCard from '../components/StreamCategoryCard';
 import GuestStubs from '../components/GuestStubs';
+import IntegrationsDisabledPlaceholder from '../components/IntegrationsDisabledPlaceholder';
 
 
 
@@ -101,6 +102,8 @@ const HomePage = () => {
             <div className="grid gap-6 lg:grid-cols-3">
                 {!isAuthenticated ? (
                     <GuestStubs />
+                ) : !integrations.twitch.enabled && !integrations.vk.enabled ? (
+                    <IntegrationsDisabledPlaceholder />
                 ) : (
                     <>
                         <StreamStatsCard 
@@ -112,6 +115,10 @@ const HomePage = () => {
                             vkViewers={streamHistory?.current_vk_viewers || 0}
                             vkStreamHistory={streamHistory?.vk_history || []}
                             preparedVkStreamHistory={preparedVkStreamHistory}
+                            peakInfo={streamHistory?.peak_info}
+                            peakViewers={streamHistory?.peak_viewers || 0}
+                            avgViewers={streamHistory?.avg_viewers || 0}
+                            categories={streamHistory?.categories || []}
                         />
                         
                         <StreamTitleCard />
@@ -120,6 +127,7 @@ const HomePage = () => {
                     </>
                 )}
             </div>
+            
         </div>
     );
 };

@@ -8,21 +8,14 @@ import { useAuth } from '../context/AuthContext';
 import { TwitchIcon, VKIcon } from './PlatformIcons';
 
 const IntegrationsDialog = ({ open, onOpenChange }) => {
-    const { integrations, loading } = useIntegrations();
-    const { loginWithTwitch, loginWithVk, logout } = useAuth();
+    const { integrations, loading, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
+    const { loginWithTwitch, loginWithVk } = useAuth();
 
     const handleToggle = (platform, isEnabled) => {
-        if (isEnabled) {
-            // Here you would call a disconnect function
-            // For now, we call the general logout as a placeholder
-            // A specific disconnect endpoint would be better
-            logout();
-        } else {
-            if (platform === 'twitch') {
-                loginWithTwitch();
-            } else if (platform === 'vk') {
-                loginWithVk();
-            }
+        if (platform === 'twitch') {
+            updateTwitchIntegration(!isEnabled);
+        } else if (platform === 'vk') {
+            updateVkIntegration(!isEnabled);
         }
     };
 
@@ -37,10 +30,7 @@ const IntegrationsDialog = ({ open, onOpenChange }) => {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                             <TwitchIcon />
-                            <div>
-                                <p className="font-semibold">Twitch</p>
-                                <p className="text-sm text-muted-foreground">Управление стримом и чатом</p>
-                            </div>
+                            <p className="font-semibold">Twitch</p>
                         </div>
                         <Switch
                             checked={integrations.twitch?.enabled || false}
@@ -52,10 +42,7 @@ const IntegrationsDialog = ({ open, onOpenChange }) => {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                             <VKIcon />
-                            <div>
-                                <p className="font-semibold">VK Live</p>
-                                <p className="text-sm text-muted-foreground">Интеграция с VK Live</p>
-                            </div>
+                            <p className="font-semibold">VK Live</p>
                         </div>
                         <Switch
                             checked={integrations.vk?.enabled || false}

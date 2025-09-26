@@ -523,6 +523,33 @@ class ConnectionManager:
         """Получить список каналов с активными сессиями"""
         return list(self.active_sessions.keys())
     
+    def get_active_twitch_channels(self, db: "Session") -> List[str]:
+        """Получить список только Twitch каналов с активными сессиями"""
+        try:
+            from core.database import UserToken
+            active_channels = list(self.active_sessions.keys())
+            twitch_channels = []
+            
+            for channel_name in active_channels:
+                # Проверяем, есть ли этот канал в базе как Twitch канал
+                user_token = db.query(UserToken).filter(
+                    UserToken.platform_display_name.ilike(channel_name),
+                    UserToken.platform == 'twitch'
+                ).first()
+                
+                if user_token:
+                    twitch_channels.append(channel_name)
+                    logger.info(f"✅ Found Twitch channel: {channel_name}")
+                else:
+                    logger.info(f"⏭️ Skipping non-Twitch channel: {channel_name}")
+            
+            return twitch_channels
+            
+        except Exception as e:
+            logger.error(f"Error filtering Twitch channels: {e}")
+            # В случае ошибки возвращаем пустой список, чтобы не подключаться к неизвестным каналам
+            return []
+    
     async def cleanup_inactive_channels(self):
         """Очистка каналов без активных сессий"""
         try:
@@ -563,4 +590,27 @@ class ConnectionManager:
                             
         except Exception as e:
             logger.error(f"Error in cleanup_inactive_channels: {e}")
+
+    def get_active_twitch_channels(self, db):
+        """Получить список активных Twitch каналов для подключения бота"""
+        try:
+            from core.database import UserToken
+            
+            # Получаем все активные Twitch токены
+            twitch_tokens = db.query(UserToken).filter(
+                UserToken.platform == "twitch"
+            ).all()
+            
+            # Извлекаем имена каналов
+            channels = []
+            for token in twitch_tokens:
+                if token.platform_display_name:
+                    channels.append(token.platform_display_name.lower())
+            
+            logger.info(f"Found {len(channels)} Twitch channels: {channels}")
+            return channels
+            
+        except Exception as e:
+            logger.error(f"Error getting active Twitch channels: {e}")
+            return []
 

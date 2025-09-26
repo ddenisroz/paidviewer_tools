@@ -36,6 +36,12 @@ const StreamTitleCard = () => {
         }
     };
 
+    const handleKeyPress = (e) => {
+        if (e.key === 'Enter' && isChanged && status.saveTitle !== 'loading') {
+            handleSave(isLinked && bothEnabled ? 'both' : 'individual');
+        }
+    };
+
     const handleSave = (mode) => {
         const payload = {};
         
@@ -62,8 +68,12 @@ const StreamTitleCard = () => {
     };
     
     const isChanged = useMemo(() => {
-        return JSON.stringify(initialData) !== JSON.stringify(currentData);
-    }, [initialData, currentData]);
+        // Проверяем изменения только в заголовках
+        const titleChanged = 
+            (twitchEnabled && initialData.twitch.title !== currentData.twitch.title) ||
+            (vkEnabled && initialData.vk.title !== currentData.vk.title);
+        return titleChanged;
+    }, [initialData.twitch.title, initialData.vk.title, currentData.twitch.title, currentData.vk.title, twitchEnabled, vkEnabled]);
 
     if (!hasAnyIntegration) {
         return (
@@ -74,10 +84,14 @@ const StreamTitleCard = () => {
                         Смена названия
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="flex items-center justify-center h-full text-center text-muted-foreground">
-                    <div>
-                        <p>Интеграции не подключены</p>
-                        <p className="text-xs">Перейдите в настройки для подключения</p>
+                <CardContent className="flex items-center justify-center h-full min-h-[300px]">
+                    <div className="text-center space-y-4">
+                        <div className="w-16 h-16 mx-auto flex items-center justify-center">
+                            <svg className="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </div>
+                        <p className="text-sm text-muted-foreground px-4">Авторизуйтесь для полного функционала</p>
                     </div>
                 </CardContent>
             </Card>
@@ -85,14 +99,14 @@ const StreamTitleCard = () => {
     }
 
     return (
-        <Card className="h-full">
-            <CardHeader>
+        <Card className="h-full flex flex-col min-h-[400px]">
+            <CardHeader className="flex-shrink-0">
                 <CardTitle className="flex items-center gap-2">
                     <Edit3 className="h-6 w-6 text-green-500" />
                     Смена названия
                 </CardTitle>
             </CardHeader>
-            <CardContent className="p-6 space-y-4">
+            <CardContent className="p-6 flex-1 flex flex-col justify-between min-h-0">
                 {/* Toggle объединения полей */}
                 {bothEnabled && (
                     <div className="flex items-center justify-between p-3 bg-background/10 rounded-lg">
@@ -110,7 +124,8 @@ const StreamTitleCard = () => {
                 )}
 
                 {/* Поля ввода */}
-                <div className="space-y-4">
+                <div className="flex-1 flex items-center justify-center">
+                    <div className="w-full space-y-4">
                     {isLinked && bothEnabled ? (
                         <div className="space-y-3">
                             <Label className="flex items-center gap-2 font-medium">
@@ -119,6 +134,7 @@ const StreamTitleCard = () => {
                             <Input 
                                 value={currentData.twitch.title || ''} 
                                 onChange={(e) => handleTitleChange('twitch', e.target.value)} 
+                                onKeyPress={handleKeyPress}
                                 placeholder="Введите общее название для обеих платформ..."
                                 className="h-12 text-lg"
                             />
@@ -134,6 +150,7 @@ const StreamTitleCard = () => {
                                 <Input 
                                     value={currentData.twitch.title || ''} 
                                     onChange={(e) => handleTitleChange('twitch', e.target.value)} 
+                                    onKeyPress={handleKeyPress}
                                     placeholder={twitchEnabled ? "Название стрима на Twitch..." : "Интеграция отключена"}
                                     className={`h-12 text-lg ${!twitchEnabled ? 'bg-muted cursor-not-allowed blur-sm' : ''}`}
                                     disabled={!twitchEnabled}
@@ -149,6 +166,7 @@ const StreamTitleCard = () => {
                                 <Input 
                                     value={currentData.vk.title || ''} 
                                     onChange={(e) => handleTitleChange('vk', e.target.value)} 
+                                    onKeyPress={handleKeyPress}
                                     placeholder={vkEnabled ? "Название стрима на VK Live..." : "Интеграция отключена"}
                                     className={`h-12 text-lg ${!vkEnabled ? 'bg-muted cursor-not-allowed blur-sm' : ''}`}
                                     disabled={!vkEnabled}
@@ -156,11 +174,12 @@ const StreamTitleCard = () => {
                             </div>
                         </div>
                     )}
+                    </div>
                 </div>
 
                 {/* Кнопка сохранения */}
                 {hasAnyIntegration && (
-                    <div className="pt-2 flex justify-center">
+                    <div className="pt-4 flex justify-center flex-shrink-0">
                         <Button 
                             onClick={() => handleSave(isLinked && bothEnabled ? 'both' : 'individual')}
                             disabled={status.saveTitle === 'loading' || !isChanged}

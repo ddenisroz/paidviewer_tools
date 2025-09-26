@@ -30,7 +30,7 @@ const Header = () => {
     };
 
     return (
-        <header className="flex h-16 items-center justify-end gap-4 border-b bg-background px-6 lg:h-[70px]">
+        <header className="flex h-16 items-center justify-end gap-4 bg-background px-6 lg:h-[70px]">
             {/* Кнопка настроек - доступна всегда */}
             <Button 
                 onClick={handleSettingsClick} 
@@ -59,22 +59,23 @@ const Header = () => {
                         <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                             <Avatar className="h-10 w-10">
                                 <AvatarImage src={user.avatar} alt={`@${user.username}`} />
-                                <AvatarFallback>{user.username?.[0].toUpperCase()}</AvatarFallback>
+                                <AvatarFallback>ID{user.id}</AvatarFallback>
                             </Avatar>
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-56" align="end" forceMount>
                         <DropdownMenuLabel className="font-normal">
                             <div className="flex flex-col space-y-2">
-                                <p className="text-sm font-medium leading-none">{user.display_name || user.username}</p>
+                                <p className="text-sm font-medium leading-none">ID: {user.id}</p>
                                 <div className="flex flex-col space-y-1">
+                                    <p className="text-xs text-muted-foreground">Подключенные каналы:</p>
                                     {user.integrations && Object.entries(user.integrations).map(([platform, data]) => (
-                                        data.platform_username && (
+                                        data.display_name && (
                                             <div key={platform} className="flex items-center">
                                                 {platform === 'twitch' && <TwitchIcon width="14" height="14" className="mr-2" />}
                                                 {platform === 'vk' && <VKIcon width="14" height="14" className="mr-2" />}
                                                 <p className="text-xs leading-none text-muted-foreground">
-                                                    @{data.platform_username}
+                                                    @{data.display_name}
                                                 </p>
                                             </div>
                                         )
