@@ -17,6 +17,7 @@ export const useTtsCard = () => {
 
 export const TtsCardProvider = ({ children }) => {
     const { user } = useAuth();
+    const ttsHealth = useTtsHealth(); // Вызываем хук на верхнем уровне
     
     const [ttsCardStatus, setTtsCardStatus] = useState({
         isHealthy: false,
@@ -49,22 +50,17 @@ export const TtsCardProvider = ({ children }) => {
     };
 
     useEffect(() => {
-        // Используем данные из TtsHealthContext вместо собственных проверок
-        const ttsHealth = useTtsHealth();
-        
         // Обновляем статус на основе данных из TtsHealthContext
         setTtsCardStatus({
             isHealthy: ttsHealth.isHealthy,
             isLoading: ttsHealth.isChecking,
             error: ttsHealth.isHealthy ? null : 'TTS service is not available'
         });
-        
-        // Не делаем собственные health check'и - используем общий контекст
-    }, [isGuest]);
+    }, [ttsHealth.isHealthy, ttsHealth.isChecking, isGuest]);
     
     const value = {
         ttsCardStatus,
-        refreshStatus: checkTtsHealth
+        refreshStatus: ttsHealth.checkTtsHealth || checkTtsHealth // Используем метод из TtsHealthContext если доступен
     };
 
     return (
