@@ -4,7 +4,6 @@ import { connectBot, disconnectBot, getBotStatus } from '../services/microservic
 import { AuthContext, useAuth } from './AuthContext';
 import { useToast } from '../components/ui/toast';
 import { useIntegrations } from './IntegrationsContext';
-import { useTts } from './TtsContext';
 import api from '../services/api';
 
 const ChatContext = createContext();
@@ -21,7 +20,6 @@ export const ChatProvider = ({ children }) => {
     const { user, isAuthenticated, isLoading } = useAuth();
     const { integrations, loading: integrationsLoading } = useIntegrations();
     const { addToast } = useToast();
-    const { speak } = useTts();
     const [messages, setMessages] = useState([]);
     const [lastJsonMessage, setLastJsonMessage] = useState(null); // <-- Добавлено
     const [isConnected, setIsConnected] = useState(false);
@@ -87,11 +85,6 @@ export const ChatProvider = ({ children }) => {
                  // Добавляем уникальный ID на фронтенде для React key
                 messageData.id = Date.now() + Math.random(); 
                 setMessages(prev => [messageData, ...prev.slice(0, 199)]); // Храним до 200 сообщений
-                
-                // Воспроизводим TTS для сообщения
-                if (messageData.message && messageData.message.trim()) {
-                    speak(messageData.message);
-                }
             }
         };
 

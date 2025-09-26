@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Volume2, VolumeX, SkipForward, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Play, Pause, Volume2, VolumeX, SkipForward, X, Music } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import api from '@/lib/api';
+import api from '../services/api';
 import { useToast } from '@/hooks/use-toast';
 
 const GlobalPlayer = () => {
@@ -11,7 +11,6 @@ const GlobalPlayer = () => {
     const [volume, setVolume] = useState(50);
     const [isMuted, setIsMuted] = useState(false);
     const [isVisible, setIsVisible] = useState(false);
-    const audioRef = useRef(null);
     const { toast } = useToast();
 
     // Загружаем текущее видео из очереди
@@ -39,37 +38,25 @@ const GlobalPlayer = () => {
         return () => clearInterval(interval);
     }, []);
 
-    // Обработка воспроизведения/паузы
+    // Обработка воспроизведения/паузы (заглушка для UI)
     const togglePlayPause = () => {
-        if (audioRef.current) {
-            if (isPlaying) {
-                audioRef.current.pause();
-            } else {
-                audioRef.current.play();
-            }
-            setIsPlaying(!isPlaying);
-        }
+        setIsPlaying(!isPlaying);
+        toast({
+            title: isPlaying ? "Пауза" : "Воспроизведение",
+            description: isPlaying ? "Видео поставлено на паузу" : "Видео воспроизводится"
+        });
     };
 
-    // Обработка громкости
+    // Обработка громкости (заглушка для UI)
     const handleVolumeChange = (value) => {
         const newVolume = value[0];
         setVolume(newVolume);
-        if (audioRef.current) {
-            audioRef.current.volume = newVolume / 100;
-        }
+        setIsMuted(false);
     };
 
-    // Обработка отключения звука
+    // Обработка отключения звука (заглушка для UI)
     const toggleMute = () => {
-        if (audioRef.current) {
-            if (isMuted) {
-                audioRef.current.volume = volume / 100;
-            } else {
-                audioRef.current.volume = 0;
-            }
-            setIsMuted(!isMuted);
-        }
+        setIsMuted(!isMuted);
     };
 
     // Переход к следующему видео
@@ -96,14 +83,25 @@ const GlobalPlayer = () => {
     const closePlayer = () => {
         setIsVisible(false);
         setCurrentVideo(null);
-        if (audioRef.current) {
-            audioRef.current.pause();
-            setIsPlaying(false);
-        }
+        setIsPlaying(false);
     };
 
-    // Если нет видео или плеер скрыт, не отображаем
-    if (!isVisible || !currentVideo) {
+    // Если нет видео, показываем заглушку
+    if (!currentVideo) {
+        return (
+            <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-purple-900/95 to-blue-900/95 backdrop-blur-sm border-t border-purple-500/20 z-50">
+                <div className="container mx-auto px-4 py-3">
+                    <div className="flex items-center justify-center gap-3">
+                        <Music className="w-5 h-5 text-gray-400" />
+                        <span className="text-gray-300 text-sm">Нет очереди заказов YouTube</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Если плеер скрыт, не отображаем
+    if (!isVisible) {
         return null;
     }
 
@@ -187,25 +185,6 @@ const GlobalPlayer = () => {
                     </div>
                 </div>
             </div>
-
-            {/* Скрытый audio элемент для воспроизведения */}
-            <audio
-                ref={audioRef}
-                src={currentVideo.audio_url || `https://www.youtube.com/watch?v=${currentVideo.video_id}`}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                onEnded={() => {
-                    setIsPlaying(false);
-                    // Автоматически переходим к следующему видео
-                    nextVideo();
-                }}
-                onVolumeChange={(e) => {
-                    const newVolume = Math.round(e.target.volume * 100);
-                    setVolume(newVolume);
-                    setIsMuted(newVolume === 0);
-                }}
-                className="hidden"
-            />
         </div>
     );
 };

@@ -12,7 +12,6 @@ import { TtsHealthProvider } from './context/TtsHealthContext.jsx'
 import { TtsCardProvider } from './context/TtsCardContext.jsx'
 import { ActiveChannelsProvider } from './context/ActiveChannelsContext.jsx'
 import { ChatProvider } from './context/ChatContext.jsx'
-import { GlobalAudioProvider } from './context/GlobalAudioContext.jsx'
 
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -27,9 +26,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                   <DataProvider>
                     <TtsProvider>
                       <ActiveChannelsProvider>
-                        <GlobalAudioProvider>
-                          <App />
-                        </GlobalAudioProvider>
+                        <App />
                       </ActiveChannelsProvider>
                     </TtsProvider>
                   </DataProvider>

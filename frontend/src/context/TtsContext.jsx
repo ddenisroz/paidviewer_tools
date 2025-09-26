@@ -4,7 +4,6 @@ import { getTtsHealth, getGlobalVoices, enableTts, disableTts, getTtsStatus } fr
 import { AuthContext } from './AuthContext';
 import { useToast } from '../components/ui/toast';
 import { useButtonPosition } from '../hooks/useButtonPosition';
-import { useGlobalAudio } from './GlobalAudioContext';
 
 const TtsContext = createContext();
 
@@ -14,7 +13,6 @@ export const TtsProvider = ({ children }) => {
     const { user } = useContext(AuthContext);
     const { addToast } = useToast();
     const { getButtonPosition } = useButtonPosition();
-    const { playTTS } = useGlobalAudio();
     const [ttsEnabled, setTtsEnabled] = useState(false);
     const [isWhitelisted, setIsWhitelisted] = useState(null); // null = не проверено, true/false = результат проверки
     const [voices, setVoices] = useState([]);
@@ -238,20 +236,6 @@ export const TtsProvider = ({ children }) => {
         }
     }, [engineStatus.loaded, isWhitelisted, ttsEnabled, notificationCallback, getButtonPosition, isToggling]);
 
-    // Функция для воспроизведения TTS через глобальный аудио
-    const speak = useCallback(async (text, voice = null) => {
-        if (!ttsEnabled) {
-            console.log('TTS is disabled, skipping speech');
-            return;
-        }
-        
-        try {
-            await playTTS(text, voice);
-        } catch (error) {
-            console.error('Error playing TTS:', error);
-        }
-    }, [ttsEnabled, playTTS]);
-
     // Функция для инициализации TTS (вызывается только при переходе на TTS страницы)
     const initializeTts = useCallback(async () => {
         console.log('TtsContext: initializeTts called, isInitialized:', isInitialized, 'engine status:', engineStatus);
@@ -305,7 +289,6 @@ export const TtsProvider = ({ children }) => {
         initializeTts,
         setNotificationHandler,
         syncWithHealthContext,
-        speak,
     };
 
     return (
