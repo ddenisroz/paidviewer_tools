@@ -391,6 +391,36 @@ app.add_middleware(
     secret_key=os.getenv("SECRET_KEY", "your-secret-key")
 )
 
+# --- CORS Middleware (должен быть перед rate limiting) ---
+allowed_origins = [origin.strip() for origin in CORS_ORIGINS.split(',')]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# --- CORS Debug Middleware ---
+@app.middleware("http")
+async def cors_debug_middleware(request: Request, call_next):
+    # Логируем CORS запросы для отладки
+    origin = request.headers.get("origin")
+    if origin and origin.startswith("http://localhost"):
+        logger.info(f"CORS Request: {request.method} {request.url.path} from {origin}")
+    
+    response = await call_next(request)
+    
+    # Добавляем CORS заголовки если их нет
+    if origin and origin.startswith("http://localhost"):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+    
+    return response
+
 # --- Rate Limiting Middleware ---
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
@@ -408,17 +438,6 @@ async def rate_limit_middleware(request: Request, call_next):
     
     response = await call_next(request)
     return response
-
-# --- CORS Middleware ---
-allowed_origins = [origin.strip() for origin in CORS_ORIGINS.split(',')]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # --- Include Routers ---
 app.include_router(vk_auth_router)
@@ -1830,15 +1849,19 @@ async def youtube_player_next(user: dict = Depends(get_current_user)):
 
 @app.post("/api/youtube/clear")
 async def youtube_queue_clear(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Очищаем ConnectionManager (in-memory)
-    connection_manager.clear_youtube_queue(user["id"])
-    
-    # Очищаем базу данных
-    from services.queue_service import QueueService
-    queue_service = QueueService(db)
-    queue_service.clear_queue(user["id"])
-    
-    return {"message": "Queue cleared"}
+    try:
+        # Очищаем ConnectionManager (in-memory)
+        connection_manager.clear_youtube_queue(user["id"])
+        
+        # Очищаем базу данных
+        from services.queue_service import QueueService
+        queue_service = QueueService()
+        queue_service.clear_queue(user["id"], db)
+        
+        return {"message": "Queue cleared"}
+    except Exception as e:
+        logger.error(f"Error clearing YouTube queue: {e}")
+        raise HTTPException(status_code=500, detail="Failed to clear queue")
 
 # --- Admin Endpoints ---
 @app.get("/api/admin/whitelist")
