@@ -4,6 +4,7 @@ import { connectBot, disconnectBot, getBotStatus } from '../services/microservic
 import { AuthContext, useAuth } from './AuthContext';
 import { useToast } from '../components/ui/toast';
 import { useIntegrations } from './IntegrationsContext';
+import { useTts } from './TtsContext';
 import api from '../services/api';
 
 const ChatContext = createContext();
@@ -20,6 +21,7 @@ export const ChatProvider = ({ children }) => {
     const { user, isAuthenticated, isLoading } = useAuth();
     const { integrations, loading: integrationsLoading } = useIntegrations();
     const { addToast } = useToast();
+    const { speak } = useTts();
     const [messages, setMessages] = useState([]);
     const [lastJsonMessage, setLastJsonMessage] = useState(null); // <-- Добавлено
     const [isConnected, setIsConnected] = useState(false);
@@ -43,18 +45,24 @@ export const ChatProvider = ({ children }) => {
     // Функция для установки WebSocket соединения
     const setupWebSocket = useCallback(() => {
         // WebSocket только для авторизованных пользователей (не гостей)
-        if (!isAuthenticated || !user?.id || user?.id === 'guest' || websocket.current) return;
+        if (!isAuthenticated || !user?.id || user?.id === 'guest' || websocket.current) {
+            console.log('WebSocket setup skipped:', { isAuthenticated, userId: user?.id, hasWebSocket: !!websocket.current });
+            return;
+        }
 
         const baseWsUrl = import.meta.env.VITE_BOT_WS_URL || 'ws://localhost:8000/ws';
         const wsUrl = `${baseWsUrl}/chat/${user.id}`;
         
         console.log(`Attempting to connect WebSocket to ${wsUrl}`);
+        setIsConnecting(true);
         
         const ws = new WebSocket(wsUrl);
         websocket.current = ws;
 
         ws.onopen = () => {
             console.log("WebSocket connection established");
+            setIsConnected(true);
+            setIsConnecting(false);
             setError(null);
         };
 
@@ -79,18 +87,35 @@ export const ChatProvider = ({ children }) => {
                  // Добавляем уникальный ID на фронтенде для React key
                 messageData.id = Date.now() + Math.random(); 
                 setMessages(prev => [messageData, ...prev.slice(0, 199)]); // Храним до 200 сообщений
+                
+                // Воспроизводим TTS для сообщения
+                if (messageData.message && messageData.message.trim()) {
+                    speak(messageData.message);
+                }
             }
         };
 
         ws.onerror = (err) => {
             console.error("WebSocket error:", err);
+            setIsConnecting(false);
             setError("Ошибка WebSocket соединения. Попробуйте обновить страницу.");
         };
 
-        ws.onclose = () => {
+        ws.onclose = (event) => {
+            console.log("WebSocket closed:", event.code, event.reason);
             websocket.current = null;
-            // Попытка переподключения через 5 секунд
-            setTimeout(setupWebSocket, 5000); 
+            setIsConnected(false);
+            setIsConnecting(false);
+            
+            // Попытка переподключения только если это не было намеренное закрытие
+            if (event.code !== 1000 && isAuthenticated && user?.id && user?.id !== 'guest') {
+                console.log("Attempting to reconnect WebSocket in 5 seconds...");
+                setTimeout(() => {
+                    if (!websocket.current && isAuthenticated) {
+                        setupWebSocket();
+                    }
+                }, 5000);
+            }
         };
 
     }, [isAuthenticated, user?.id, addToast]);

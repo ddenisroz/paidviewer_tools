@@ -13,6 +13,7 @@ import StreamTitleCard from '../components/StreamTitleCard';
 import StreamCategoryCard from '../components/StreamCategoryCard';
 import GuestStubs from '../components/GuestStubs';
 import IntegrationsDisabledPlaceholder from '../components/IntegrationsDisabledPlaceholder';
+import GlobalPlayer from '../components/GlobalPlayer';
 
 
 
@@ -128,6 +129,8 @@ const HomePage = () => {
                 )}
             </div>
             
+            {/* Глобальный плеер */}
+            <GlobalPlayer />
         </div>
     );
 };

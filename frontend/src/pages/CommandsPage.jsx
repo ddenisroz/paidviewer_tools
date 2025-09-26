@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { 
     Terminal, 
@@ -345,6 +345,9 @@ const CommandsPage = () => {
                                 <DialogContent>
                         <DialogHeader>
                             <DialogTitle>Создать кастомную команду</DialogTitle>
+                            <DialogDescription>
+                                Создайте новую кастомную команду для вашего бота
+                            </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
                             <div>
@@ -480,6 +483,9 @@ const CommandsPage = () => {
                         <DialogTitle>
                             Настройка команды !{editingCommand?.command_name}
                         </DialogTitle>
+                        <DialogDescription>
+                            Настройте параметры команды: платформы, роли и кулдаун
+                        </DialogDescription>
                     </DialogHeader>
                     {editingCommand && (
                         <div className="space-y-4">

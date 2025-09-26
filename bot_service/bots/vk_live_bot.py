@@ -617,6 +617,14 @@ class VKLiveBot:
                     'platforms': 'twitch,vk',
                     'allowed_roles': 'all',
                     'cooldown_seconds': 0
+                },
+                'voice': {
+                    'command_type': 'basic',
+                    'response_text': None,
+                    'is_enabled': True,
+                    'platforms': 'twitch,vk',
+                    'allowed_roles': 'all',
+                    'cooldown_seconds': 5
                 }
             }
             
@@ -688,6 +696,8 @@ class VKLiveBot:
                 await self.song_request_vk(channel_name, url, author_nick)
             elif command_name == 'help':
                 await self.help_command_vk(channel_name)
+            elif command_name == 'voice':
+                await self.voice_command_vk(channel_name, message_data)
             # Добавьте другие базовые команды по необходимости
         except Exception as e:
             logger.error(f"Error in handle_basic_command_vk: {e}")
@@ -772,6 +782,7 @@ class VKLiveBot:
         help_text = """
 🤖 Доступные команды:
 !tts - Включить/выключить TTS
+!voice <номер> - Выбрать голос для TTS
 !queue - Показать очередь видео
 !next - Следующее видео
 !clear - Очистить очередь
@@ -779,3 +790,35 @@ class VKLiveBot:
 !help - Показать это сообщение
         """
         await self.send_message(channel_name, help_text)
+
+    async def voice_command_vk(self, channel_name: str, message_data: dict):
+        """Выбор голоса для TTS для VK Live"""
+        try:
+            message_text = message_data.get("message", "")
+            author_nick = message_data.get("author_nick", "Unknown")
+            
+            parts = message_text.split()
+            if len(parts) < 2:
+                await self.send_message(channel_name, "❌ Укажите номер голоса: !voice <номер>")
+                return
+            
+            try:
+                voice_number = int(parts[1])
+            except ValueError:
+                await self.send_message(channel_name, "❌ Номер голоса должен быть числом")
+                return
+            
+            # Отправляем запрос на смену голоса
+            from api.tts_api import TTSAPI
+            tts_api = TTSAPI()
+            
+            result = await tts_api.set_voice(channel_name, voice_number, author_nick)
+            
+            if result.get('success'):
+                await self.send_message(channel_name, f"✅ {author_nick} изменил голос на #{voice_number}")
+            else:
+                await self.send_message(channel_name, f"❌ Ошибка смены голоса: {result.get('error', 'Неизвестная ошибка')}")
+                
+        except Exception as e:
+            logger.error(f"Error in voice_command_vk: {e}")
+            await self.send_message(channel_name, "❌ Произошла ошибка при смене голоса")

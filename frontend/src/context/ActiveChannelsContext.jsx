@@ -29,9 +29,10 @@ export const ActiveChannelsProvider = ({ children }) => {
                     return acc;
                 }, []);
                 
-                // Генерируем аватарки на фронтенде
-                const channelsWithAvatars = uniqueChannels.map(channel => ({
+                // Генерируем аватарки на фронтенде и добавляем уникальный ID
+                const channelsWithAvatars = uniqueChannels.map((channel, index) => ({
                     ...channel,
+                    id: channel.id || `${channel.platform}-${channel.username}-${index}`, // Добавляем уникальный ID
                     avatar: getChannelAvatar(channel.username, channel.platform)
                 }));
                 setActiveChannels(channelsWithAvatars);

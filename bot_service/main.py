@@ -410,6 +410,17 @@ async def cors_debug_middleware(request: Request, call_next):
     if origin and origin.startswith("http://localhost"):
         logger.info(f"CORS Request: {request.method} {request.url.path} from {origin}")
     
+    # Обрабатываем preflight запросы
+    if request.method == "OPTIONS":
+        response = Response()
+        if origin and origin.startswith("http://localhost"):
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept, Origin"
+            response.headers["Access-Control-Max-Age"] = "86400"
+        return response
+    
     response = await call_next(request)
     
     # Добавляем CORS заголовки если их нет
@@ -417,7 +428,7 @@ async def cors_debug_middleware(request: Request, call_next):
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept, Origin"
     
     return response
 
@@ -2256,6 +2267,17 @@ async def get_bot_commands(
             "is_enabled": True,
             "platforms": "twitch,vk",
             "allowed_roles": "mods",
+            "cooldown_seconds": 5,
+            "editable": True
+        },
+        {
+            "command_name": "voice",
+            "command_type": "basic",
+            "description": "Выбрать голос для TTS",
+            "usage": "!voice <номер>",
+            "is_enabled": True,
+            "platforms": "twitch,vk",
+            "allowed_roles": "all",
             "cooldown_seconds": 5,
             "editable": True
         }

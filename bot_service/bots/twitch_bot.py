@@ -236,9 +236,10 @@ class Bot(commands.Bot):
                 
             channel_name = getattr(message.channel, 'name', None)
             author_name = getattr(message.author, 'name', None)
+            user_id = getattr(message.author, 'id', None)
             content = getattr(message, 'content', '')
             
-            if not channel_name or not author_name or not content:
+            if not channel_name or not author_name or not user_id or not content:
                 return
             
             # Проверяем, является ли сообщение командой
@@ -380,6 +381,14 @@ class Bot(commands.Bot):
                     'platforms': 'twitch,vk',
                     'allowed_roles': 'all',
                     'cooldown_seconds': 0
+                },
+                'voice': {
+                    'command_type': 'basic',
+                    'response_text': None,
+                    'is_enabled': True,
+                    'platforms': 'twitch,vk',
+                    'allowed_roles': 'all',
+                    'cooldown_seconds': 5
                 }
             }
             
@@ -434,6 +443,8 @@ class Bot(commands.Bot):
                 await self.song_request_from_message(message, url)
             elif command_name == 'help':
                 await self.help_command_from_message(message)
+            elif command_name == 'voice':
+                await self.voice_command_from_message(message)
             # Добавьте другие базовые команды по необходимости
         except Exception as e:
             logger.error(f"Error in handle_basic_command: {e}")
@@ -648,6 +659,7 @@ class Bot(commands.Bot):
         help_text = """
 🤖 Доступные команды:
 !tts - Включить/выключить TTS
+!voice <номер> - Выбрать голос для TTS
 !queue - Показать очередь видео
 !next - Следующее видео
 !clear - Очистить очередь
@@ -655,6 +667,40 @@ class Bot(commands.Bot):
 !help - Показать это сообщение
         """
         await message.channel.send(help_text)
+
+    async def voice_command_from_message(self, message):
+        """Выбор голоса для TTS (из сообщения)"""
+        try:
+            parts = message.content.split()
+            if len(parts) < 2:
+                await message.channel.send("❌ Укажите номер голоса: !voice <номер>")
+                return
+            
+            try:
+                voice_number = int(parts[1])
+            except ValueError:
+                await message.channel.send("❌ Номер голоса должен быть числом")
+                return
+            
+            # Получаем информацию о пользователе
+            user_id = str(message.author.id)
+            user_name = message.author.name
+            channel_name = message.channel.name.lower()
+            
+            # Отправляем запрос на смену голоса
+            from api.tts_api import TTSAPI
+            tts_api = TTSAPI()
+            
+            result = await tts_api.set_voice(channel_name, voice_number, user_name)
+            
+            if result.get('success'):
+                await message.channel.send(f"✅ {user_name} изменил голос на #{voice_number}")
+            else:
+                await message.channel.send(f"❌ Ошибка смены голоса: {result.get('error', 'Неизвестная ошибка')}")
+                
+        except Exception as e:
+            logger.error(f"Error in voice_command_from_message: {e}")
+            await message.channel.send("❌ Произошла ошибка при смене голоса")
 
     async def event_channel_joined(self, channel):
         """Вызывается когда бот присоединяется к каналу"""
