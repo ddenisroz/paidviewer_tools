@@ -680,7 +680,7 @@ class VKLiveBot:
         """Обработка базовых команд для VK Live"""
         try:
             if command_name == 'tts':
-                await self.toggle_tts_vk(channel_name)
+                await self.toggle_tts_vk(channel_name, message_data)
             elif command_name == 'queue':
                 await self.show_queue_vk(channel_name)
             elif command_name == 'next':
@@ -703,8 +703,40 @@ class VKLiveBot:
             logger.error(f"Error in handle_basic_command_vk: {e}")
 
     # Функции для базовых команд VK Live
-    async def toggle_tts_vk(self, channel_name: str):
+    async def toggle_tts_vk(self, channel_name: str, message_data: dict = None):
         """Команда для переключения TTS для VK Live"""
+        user_name = "Unknown"
+        if message_data:
+            user_name = message_data.get("author_nick", "Unknown")
+            message_text = message_data.get("message", "")
+            parts = message_text.split()
+            
+            # Проверяем, есть ли дополнительные параметры
+            if len(parts) > 1:
+                if parts[1].lower() == 'random':
+                    # Команда !tts random - выбрать случайный голос
+                    from api.tts_api import TTSAPI
+                    tts_api = TTSAPI()
+                    
+                    result = await tts_api.get_random_voice(channel_name)
+                    if result.get('success'):
+                        voice_number = result.get('voice_number')
+                        await self.send_message(channel_name, f"🎲 {user_name} выбрал случайный голос #{voice_number}")
+                    else:
+                        await self.send_message(channel_name, f"❌ Ошибка выбора случайного голоса: {result.get('error', 'Неизвестная ошибка')}")
+                    return
+                elif parts[1].lower() == 'on':
+                    # Принудительно включить TTS
+                    self.connection_manager.enable_tts(channel_name, 'vk')
+                    await self.send_message(channel_name, "🔊 TTS включен для VK Live")
+                    return
+                elif parts[1].lower() == 'off':
+                    # Принудительно выключить TTS
+                    self.connection_manager.disable_tts(channel_name, 'vk')
+                    await self.send_message(channel_name, "🔇 TTS отключен для VK Live")
+                    return
+        
+        # Обычное переключение TTS
         if self.connection_manager.is_tts_enabled(channel_name, 'vk'):
             self.connection_manager.disable_tts(channel_name, 'vk')
             await self.send_message(channel_name, "🔇 TTS отключен для VK Live")
@@ -782,6 +814,8 @@ class VKLiveBot:
         help_text = """
 🤖 Доступные команды:
 !tts - Включить/выключить TTS
+!tts random - Выбрать случайный голос
+!tts on/off - Принудительно включить/выключить TTS
 !voice <номер> - Выбрать голос для TTS
 !queue - Показать очередь видео
 !next - Следующее видео

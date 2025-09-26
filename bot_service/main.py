@@ -230,7 +230,7 @@ async def collect_stream_stats():
                         )
                 except Exception as e:
                     logger.error(f"Error processing Twitch token {token.user_id}: {e}")
-
+            
             # Собираем статистику VK Live
             for token in vk_tokens:
                 try:
@@ -1500,7 +1500,7 @@ async def get_stream_history(
     
     # Получаем статистику по категориям
     category_analytics = analytics_service.get_category_analytics(user["id"], db=db)
-    
+
     return {
         "history": analytics.get('all_data', []),
         "data": analytics.get('data', []),
@@ -1780,9 +1780,68 @@ async def get_tts_guest_status(channel_name: str):
     return {"enabled": is_enabled}
 
 @app.post("/api/tts/generate-obs-url")
-async def generate_obs_url(user: dict = Depends(get_current_user)):
+async def generate_obs_url(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Генерировать URL для OBS WebSocket"""
-    # Create a JWT token for OBS, which now contains the unified user ID
+    try:
+        # Проверяем, есть ли уже сохраненный токен
+        user_record = db.query(User).filter(User.id == user['id']).first()
+        
+        if user_record and user_record.obs_token:
+            # Возвращаем существующий токен
+            return ObsUrlResponse(obs_token=user_record.obs_token)
+        else:
+            # Создаем новый токен и сохраняем в базе данных
+            obs_token = create_jwt_token(user['id'])
+            
+            if user_record:
+                user_record.obs_token = obs_token
+            else:
+                # Создаем новую запись пользователя (на случай, если её нет)
+                user_record = User(
+                    id=user['id'],
+                    display_name=user.get('display_name', 'User'),
+                    obs_token=obs_token
+                )
+                db.add(user_record)
+            
+            db.commit()
+            return ObsUrlResponse(obs_token=obs_token)
+            
+    except Exception as e:
+        logger.error(f"Error generating OBS URL: {e}")
+        db.rollback()
+        # Fallback: создаем временный токен без сохранения
+        obs_token = create_jwt_token(user['id'])
+        return ObsUrlResponse(obs_token=obs_token)
+
+@app.post("/api/tts/regenerate-obs-url")
+async def regenerate_obs_url(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Перегенерировать URL для OBS WebSocket"""
+    try:
+        # Создаем новый токен
+        obs_token = create_jwt_token(user['id'])
+        
+        # Обновляем или создаем запись пользователя
+        user_record = db.query(User).filter(User.id == user['id']).first()
+        
+        if user_record:
+            user_record.obs_token = obs_token
+        else:
+            # Создаем новую запись пользователя
+            user_record = User(
+                id=user['id'],
+                display_name=user.get('display_name', 'User'),
+                obs_token=obs_token
+            )
+            db.add(user_record)
+        
+        db.commit()
+        return ObsUrlResponse(obs_token=obs_token)
+        
+    except Exception as e:
+        logger.error(f"Error regenerating OBS URL: {e}")
+        db.rollback()
+        # Fallback: создаем временный токен без сохранения
     obs_token = create_jwt_token(user['id'])
     return ObsUrlResponse(obs_token=obs_token)
 
@@ -1830,12 +1889,12 @@ async def get_youtube_queue(user: dict = Depends(get_current_user), db: Session 
         queue = connection_manager.get_youtube_queue(user["id"])
         current_video_data = connection_manager.get_current_video(user["id"])
         current_video = current_video_data if current_video_data else None
-        
-        return QueueResponse(
-            current_video=current_video,
-            queue=queue,
-            is_playing=bool(current_video)
-        )
+    
+    return QueueResponse(
+        current_video=current_video,
+        queue=queue,
+        is_playing=bool(current_video)
+    )
 
 @app.post("/api/youtube/queue")
 async def add_to_youtube_queue(request: dict, user: dict = Depends(get_current_user)):
@@ -2244,7 +2303,7 @@ async def get_bot_commands(
             "usage": "!next",
             "is_enabled": True,
             "platforms": "twitch,vk", 
-            "allowed_roles": "mods",
+            "allowed_roles": "broadcaster,moderator,owner,moderator_vk",
             "cooldown_seconds": 0,
             "editable": True
         },
@@ -2255,30 +2314,41 @@ async def get_bot_commands(
             "usage": "!clear",
             "is_enabled": True,
             "platforms": "twitch,vk",
-            "allowed_roles": "mods",
+            "allowed_roles": "broadcaster,moderator,owner,moderator_vk",
             "cooldown_seconds": 0,
             "editable": True
         },
         {
             "command_name": "tts",
             "command_type": "basic",
-            "description": "Включить/выключить озвучку",
-            "usage": "!tts",
+            "description": "Управление TTS: переключение, случайный голос, принудительное включение/выключение",
+            "usage": "!tts [random|on|off]",
             "is_enabled": True,
             "platforms": "twitch,vk",
-            "allowed_roles": "mods",
+            "allowed_roles": "all",
             "cooldown_seconds": 5,
             "editable": True
         },
         {
             "command_name": "voice",
             "command_type": "basic",
-            "description": "Выбрать голос для TTS",
+            "description": "Выбрать конкретный голос для TTS по номеру",
             "usage": "!voice <номер>",
             "is_enabled": True,
             "platforms": "twitch,vk",
             "allowed_roles": "all",
             "cooldown_seconds": 5,
+            "editable": True
+        },
+        {
+            "command_name": "help",
+            "command_type": "basic",
+            "description": "Показать список всех доступных команд",
+            "usage": "!help",
+            "is_enabled": True,
+            "platforms": "twitch,vk",
+            "allowed_roles": "all",
+            "cooldown_seconds": 10,
             "editable": True
         }
     ]

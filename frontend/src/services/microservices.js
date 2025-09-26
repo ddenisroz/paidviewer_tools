@@ -10,6 +10,7 @@ export const botService = axios.create({
 
 export const ttsService = axios.create({
     baseURL: TTS_SERVICE_URL,
+    withCredentials: true,
 });
 
 // --- Authentication ---
@@ -149,7 +150,7 @@ export const getUsers = async () => {
 
 // User
 export const getUserVoices = async (userId) => {
-    return await ttsService.get(`/api/user/voices?user_id=${userId}`);
+    return await ttsService.get(`/api/user/voices/${userId}`);
 };
 
 export const uploadUserVoice = async (userId, formData) => {

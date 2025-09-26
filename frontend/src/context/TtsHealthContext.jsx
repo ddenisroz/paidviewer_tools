@@ -127,7 +127,9 @@ export const TtsHealthProvider = ({ children }) => {
         const maxAge = 10 * 60 * 1000; // 10 минут (увеличили интервал)
         
         if (!isInitialized || dataAge > maxAge) {
-            checkHealth();
+            if (!checkInProgress) {
+                checkHealth();
+            }
             setIsInitialized(true);
         } else {
             // Обновляем состояние из кэша только если значения изменились
@@ -139,7 +141,7 @@ export const TtsHealthProvider = ({ children }) => {
                 setLastCheck(newLastCheck);
             }
         }
-    }, [location.pathname, isInitialized, checkHealth]);
+    }, [location.pathname, isInitialized, cachedData, isHealthy, lastCheck, checkInProgress]);
 
     const value = {
         isHealthy,

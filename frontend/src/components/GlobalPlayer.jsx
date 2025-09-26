@@ -3,7 +3,7 @@ import { Play, Pause, Volume2, VolumeX, SkipForward, X, Music } from 'lucide-rea
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import api from '../services/api';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/toast';
 
 const GlobalPlayer = () => {
     const [currentVideo, setCurrentVideo] = useState(null);

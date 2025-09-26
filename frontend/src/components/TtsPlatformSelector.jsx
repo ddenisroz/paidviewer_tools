@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Mic, MicOff, Volume2, Settings, Monitor } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { TwitchIcon, VKIcon } from './PlatformIcons';
+import { ttsService } from '../services/microservices';
 
 const TtsPlatformSelector = () => {
   const { user } = useAuth();
@@ -15,22 +17,15 @@ const TtsPlatformSelector = () => {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/tts/settings', {
-        credentials: 'include'
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setSettings(data);
-      } else {
-        // Если настроек нет, используем значения по умолчанию
-        setSettings({
-          enabled_platforms: ['twitch', 'vk'],
-          global_enabled: true
-        });
-      }
+      const response = await ttsService.get('/api/tts/settings');
+      setSettings(response.data);
     } catch (err) {
       console.error('Error loading TTS settings:', err);
+      // Если настроек нет, используем значения по умолчанию
+      setSettings({
+        enabled_platforms: ['twitch', 'vk'],
+        global_enabled: true
+      });
     } finally {
       setLoading(false);
     }
@@ -40,23 +35,11 @@ const TtsPlatformSelector = () => {
   const saveSettings = async (newSettings) => {
     try {
       setSaving(true);
-      const response = await fetch('/api/tts/settings', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(newSettings)
-      });
-
-      if (response.ok) {
-        setSettings(newSettings);
-        // Показываем уведомление
-        if (window.toast) {
-          window.toast.success('Настройки TTS сохранены');
-        }
-      } else {
-        throw new Error('Ошибка сохранения настроек');
+      await ttsService.put('/api/tts/settings', newSettings);
+      setSettings(newSettings);
+      // Показываем уведомление
+      if (window.toast) {
+        window.toast.success('Настройки TTS сохранены');
       }
     } catch (err) {
       console.error('Error saving TTS settings:', err);
@@ -117,14 +100,14 @@ const TtsPlatformSelector = () => {
     {
       id: 'twitch',
       name: 'Twitch',
-      icon: '🎮',
+      icon: <TwitchIcon className="w-5 h-5" />,
       color: 'purple',
       description: 'Озвучка сообщений из Twitch чата'
     },
     {
       id: 'vk',
       name: 'VK Live',
-      icon: '📺',
+      icon: <VKIcon className="w-5 h-5" />,
       color: 'blue',
       description: 'Озвучка сообщений из VK Live чата'
     }
@@ -141,7 +124,7 @@ const TtsPlatformSelector = () => {
               Настройки TTS
             </h3>
             <p className="text-sm text-gray-600 mt-1">
-              Управление озвучкой сообщений по платформам
+              Выбор платформ для озвучки
             </p>
           </div>
           
@@ -220,7 +203,9 @@ const TtsPlatformSelector = () => {
                       ? `bg-${platform.color}-100` 
                       : 'bg-gray-100'
                   }`}>
-                    <span className="text-xl">{platform.icon}</span>
+                    <div className={`text-${platform.color}-600`}>
+                      {platform.icon}
+                    </div>
                   </div>
                   
                   <div>
@@ -262,20 +247,6 @@ const TtsPlatformSelector = () => {
         </div>
       </div>
 
-      {/* Дополнительные настройки */}
-      <div className="p-6 border-t bg-gray-50">
-        <div className="flex items-center justify-between">
-          <div>
-            <h5 className="font-medium text-gray-900">Расширенные настройки</h5>
-            <p className="text-sm text-gray-600">Фильтры, голоса и другие параметры</p>
-          </div>
-          
-          <button className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-            <Settings className="w-4 h-4 mr-2" />
-            Настроить
-          </button>
-        </div>
-      </div>
 
       {/* Информация */}
       {settings.global_enabled && settings.enabled_platforms.length === 0 && (

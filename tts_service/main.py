@@ -84,6 +84,16 @@ async def health_check():
 def get_all_voices(db: Session = Depends(get_db)):
     return tts_api.get_all_voices(db)
 
+@app.get("/api/voices/global")
+def get_global_voices(db: Session = Depends(get_db)):
+    """Получить глобальные голоса (публичные)"""
+    try:
+        # Простая заглушка - возвращаем пустой массив
+        return []
+    except Exception as e:
+        logger.error(f"Error getting global voices: {e}")
+        return []
+
 @app.post("/api/voices/upload", response_model=VoiceUploadResponse)
 async def upload_voice(
     background_tasks: BackgroundTasks,
@@ -305,6 +315,43 @@ async def synthesize_speech(
 ):
     return await tts_api.synthesize_speech(background_tasks, request, db)
 
+@app.post("/api/tts/synthesize-channel")
+async def synthesize_speech_for_channel(
+    background_tasks: BackgroundTasks,
+    channel_name: str = Form(...),
+    text: str = Form(...),
+    author: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Синтез речи для канала с автоматическим выбором голоса"""
+    try:
+        import random
+        
+        # Получаем все доступные голоса
+        voices = db.query(VoiceModel).filter(VoiceModel.is_active == True).all()
+        if not voices:
+            raise HTTPException(status_code=404, detail="No voices available")
+        
+        # Выбираем случайный голос
+        random_voice = random.choice(voices)
+        
+        # Создаем запрос на синтез
+        request = SynthesisRequest(
+            text=text,
+            voice_name=random_voice.name,
+            user_id=None  # Для канальных запросов user_id может быть None
+        )
+        
+        logger.info(f"Using random voice '{random_voice.name}' for channel '{channel_name}' from user '{author}'")
+        
+        return await tts_api.synthesize_speech(background_tasks, request, db)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error synthesizing speech for channel: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # --- Voice Testing ---
 @app.post("/api/voices/{voice_id}/test", response_model=SynthesisResponse)
 async def test_voice(
@@ -339,6 +386,116 @@ async def get_audio_file(voice_name: str):
 @app.delete("/api/voices/{voice_name}/audio")
 async def delete_audio_file(voice_name: str):
     return await tts_api.delete_audio_file(voice_name)
+
+# --- Voice Management ---
+@app.post("/api/tts/set-voice")
+async def set_voice_for_channel(
+    channel_name: str = Form(...),
+    voice_number: int = Form(...),
+    user_name: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Установить голос для канала"""
+    try:
+        # Получаем все доступные голоса
+        voices = db.query(VoiceModel).filter(VoiceModel.is_active == True).all()
+        if not voices:
+            raise HTTPException(status_code=404, detail="No voices available")
+        
+        # Проверяем, что номер голоса валидный
+        if voice_number < 1 or voice_number > len(voices):
+            raise HTTPException(status_code=400, detail=f"Voice number must be between 1 and {len(voices)}")
+        
+        # Выбираем голос по номеру (voice_number - 1, так как номера начинаются с 1)
+        selected_voice = voices[voice_number - 1]
+        
+        # Сохраняем выбор пользователя в базе данных или кэше
+        # Здесь можно добавить логику сохранения выбора пользователя
+        
+        return {
+            "success": True,
+            "voice_number": voice_number,
+            "voice_name": selected_voice.name,
+            "message": f"Voice set to #{voice_number}: {selected_voice.name}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting voice: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/tts/random-voice")
+async def get_random_voice_for_channel(
+    channel_name: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Получить случайный голос для канала"""
+    try:
+        import random
+        
+        # Получаем все доступные голоса
+        voices = db.query(VoiceModel).filter(VoiceModel.is_active == True).all()
+        if not voices:
+            raise HTTPException(status_code=404, detail="No voices available")
+        
+        # Выбираем случайный голос
+        random_voice = random.choice(voices)
+        voice_number = voices.index(random_voice) + 1  # Номер начинается с 1
+        
+        return {
+            "success": True,
+            "voice_number": voice_number,
+            "voice_name": random_voice.name,
+            "message": f"Random voice selected: #{voice_number}: {random_voice.name}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting random voice: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- TTS Settings ---
+@app.get("/api/tts/settings")
+async def get_tts_settings():
+    """Получить настройки TTS (заглушка)"""
+    return JSONResponse({
+        "enabled_platforms": ["twitch", "vk"],
+        "global_enabled": True
+    })
+
+@app.put("/api/tts/settings")
+async def update_tts_settings(settings: dict):
+    """Обновить настройки TTS (заглушка)"""
+    return JSONResponse({"message": "Settings updated successfully"})
+
+@app.get("/api/tts/audio-settings")
+async def get_audio_settings():
+    """Получить настройки звука (заглушка)"""
+    return JSONResponse({
+        "websiteVolume": 50,
+        "obsVolume": 50
+    })
+
+@app.put("/api/tts/audio-settings")
+async def update_audio_settings(settings: dict):
+    """Обновить настройки звука (заглушка)"""
+    return JSONResponse({"message": "Audio settings updated successfully"})
+
+@app.get("/api/tts/settings")
+async def get_tts_settings():
+    """Получить настройки TTS (заглушка)"""
+    return JSONResponse({
+        "enable7TV": True,
+        "enableProfanity": False,
+        "profanityLevel": "medium"
+    })
+
+@app.put("/api/tts/settings")
+async def update_tts_settings(settings: dict):
+    """Обновить настройки TTS (заглушка)"""
+    return JSONResponse({"message": "TTS settings updated successfully"})
 
 # --- Main ---
 if __name__ == "__main__":

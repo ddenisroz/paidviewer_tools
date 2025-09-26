@@ -40,6 +40,7 @@ try:
         id = Column(Integer, primary_key=True, index=True)
         display_name = Column(String, nullable=False)
         is_admin = Column(Boolean, default=False)
+        obs_token = Column(String, nullable=True)  # OBS токен для постоянной ссылки
         created_at = Column(DateTime, default=datetime.utcnow)
         
     class WhitelistedChannel(Base):

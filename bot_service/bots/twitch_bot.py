@@ -572,7 +572,35 @@ class Bot(commands.Bot):
     async def toggle_tts_from_message(self, message):
         """Команда для переключения TTS для Twitch (из сообщения)"""
         channel_name = message.channel.name.lower()
+        user_name = message.author.name
         
+        # Проверяем, есть ли дополнительные параметры
+        parts = message.content.split()
+        if len(parts) > 1:
+            if parts[1].lower() == 'random':
+                # Команда !tts random - выбрать случайный голос
+                from api.tts_api import TTSAPI
+                tts_api = TTSAPI()
+                
+                result = await tts_api.get_random_voice(channel_name)
+                if result.get('success'):
+                    voice_number = result.get('voice_number')
+                    await message.channel.send(f"🎲 {user_name} выбрал случайный голос #{voice_number}")
+                else:
+                    await message.channel.send(f"❌ Ошибка выбора случайного голоса: {result.get('error', 'Неизвестная ошибка')}")
+                return
+            elif parts[1].lower() == 'on':
+                # Принудительно включить TTS
+                self.connection_manager.enable_tts(channel_name, 'twitch')
+                await message.channel.send("🔊 TTS включен для Twitch")
+                return
+            elif parts[1].lower() == 'off':
+                # Принудительно выключить TTS
+                self.connection_manager.disable_tts(channel_name, 'twitch')
+                await message.channel.send("🔇 TTS отключен для Twitch")
+                return
+        
+        # Обычное переключение TTS
         if self.connection_manager.is_tts_enabled(channel_name, 'twitch'):
             self.connection_manager.disable_tts(channel_name, 'twitch')
             await message.channel.send("🔇 TTS отключен для Twitch")
@@ -659,6 +687,8 @@ class Bot(commands.Bot):
         help_text = """
 🤖 Доступные команды:
 !tts - Включить/выключить TTS
+!tts random - Выбрать случайный голос
+!tts on/off - Принудительно включить/выключить TTS
 !voice <номер> - Выбрать голос для TTS
 !queue - Показать очередь видео
 !next - Следующее видео
