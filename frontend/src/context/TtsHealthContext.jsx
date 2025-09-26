@@ -21,7 +21,7 @@ export const TtsHealthProvider = ({ children }) => {
         const saved = localStorage.getItem('tts_health_status');
         return saved ? JSON.parse(saved).isHealthy : false;
     });
-    const [isChecking, setIsChecking] = useState(true);
+    const [isChecking, setIsChecking] = useState(false); // Начинаем с false
     const [lastChecked, setLastChecked] = useState(null);
     const [lastCheck, setLastCheck] = useState(() => {
         const saved = localStorage.getItem('tts_health_status');
@@ -31,6 +31,7 @@ export const TtsHealthProvider = ({ children }) => {
         }
         return null;
     });
+    const [checkInProgress, setCheckInProgress] = useState(false); // Предотвращаем множественные запросы
     const location = useLocation();
     
     // Проверяем, является ли пользователь гостем
@@ -65,20 +66,50 @@ export const TtsHealthProvider = ({ children }) => {
             return;
         }
         
+        // Предотвращаем множественные одновременные запросы
+        if (checkInProgress) {
+            return;
+        }
+        
+        setCheckInProgress(true);
         setIsChecking(true);
+        
         try {
             const response = await ttsService.get('/health');
             const data = response.data;
             const isOk = response.status === 200 && data.tts_engine_loaded;
             setIsHealthy(isOk);
+            
+            // Сохраняем успешный результат
+            const status = {
+                isHealthy: isOk,
+                lastCheck: new Date(),
+                isInitialized: true,
+                cachedData: { isHealthy: isOk, timestamp: Date.now() }
+            };
+            saveHealthStatus(status);
+            
         } catch (error) {
-            console.error('TTS Health Check Failed:', error);
+            // Не логируем ошибки в консоль для ERR_CONNECTION_REFUSED
+            if (!error.message?.includes('ERR_CONNECTION_REFUSED') && error.code !== 'ERR_NETWORK') {
+                console.error('TTS Health Check Failed:', error);
+            }
             setIsHealthy(false);
+            
+            // Сохраняем неуспешный результат
+            const status = {
+                isHealthy: false,
+                lastCheck: new Date(),
+                isInitialized: true,
+                cachedData: { isHealthy: false, timestamp: Date.now() }
+            };
+            saveHealthStatus(status);
         } finally {
             setIsChecking(false);
+            setCheckInProgress(false);
             setLastChecked(Date.now());
         }
-    }, [isGuest]);
+    }, [isGuest, saveHealthStatus, checkInProgress]);
 
     // Проверяем health при загрузке страницы и при смене пути
     useEffect(() => {
@@ -93,7 +124,7 @@ export const TtsHealthProvider = ({ children }) => {
         // Проверяем актуальность сохраненных данных
         const now = Date.now();
         const dataAge = cachedData ? (now - cachedData.timestamp) : Infinity;
-        const maxAge = 5 * 60 * 1000; // 5 минут
+        const maxAge = 10 * 60 * 1000; // 10 минут (увеличили интервал)
         
         if (!isInitialized || dataAge > maxAge) {
             checkHealth();

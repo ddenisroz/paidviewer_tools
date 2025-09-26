@@ -1,7 +1,7 @@
 // src/context/TtsCardContext.jsx
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { useLocation } from 'react-router-dom';
-import { TtsHealthContext } from './TtsHealthContext';
+import { TtsHealthContext, useTtsHealth } from './TtsHealthContext';
 import { ttsService } from '../services/microservices';
 import { useAuth } from './AuthContext';
 
@@ -49,12 +49,17 @@ export const TtsCardProvider = ({ children }) => {
     };
 
     useEffect(() => {
-        checkTtsHealth();
-        // Не запускаем интервал для гостевых пользователей
-        if (!isGuest) {
-            const interval = setInterval(checkTtsHealth, 30000); // Check every 30 seconds
-            return () => clearInterval(interval);
-        }
+        // Используем данные из TtsHealthContext вместо собственных проверок
+        const ttsHealth = useTtsHealth();
+        
+        // Обновляем статус на основе данных из TtsHealthContext
+        setTtsCardStatus({
+            isHealthy: ttsHealth.isHealthy,
+            isLoading: ttsHealth.isChecking,
+            error: ttsHealth.isHealthy ? null : 'TTS service is not available'
+        });
+        
+        // Не делаем собственные health check'и - используем общий контекст
     }, [isGuest]);
     
     const value = {
