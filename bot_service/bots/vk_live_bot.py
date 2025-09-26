@@ -643,7 +643,14 @@ class VKLiveBot:
             
             # Добавляем видео в очередь через сервис
             queue_service = QueueService()
-            result = queue_service.add_to_queue("vk_user", author_nick, url, channel_name)
+            result = await queue_service.add_video_to_queue(
+                user_id=1,  # Временный ID для VK пользователей
+                video_url=url, 
+                channel_name=channel_name,
+                platform='vk',
+                requester_name=author_nick,
+                requester_id="vk_user"
+            )
             
             if result['success']:
                 video_info = result['video_info']

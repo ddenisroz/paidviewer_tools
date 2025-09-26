@@ -519,7 +519,14 @@ class Bot(commands.Bot):
             
             # Добавляем видео в очередь через сервис
             queue_service = QueueService()
-            result = queue_service.add_to_queue(user_id, user_name, url, channel_name)
+            result = await queue_service.add_video_to_queue(
+                user_id=int(user_id), 
+                video_url=url, 
+                channel_name=channel_name,
+                platform='twitch',
+                requester_name=user_name,
+                requester_id=user_id
+            )
             
             if result['success']:
                 video_info = result['video_info']
