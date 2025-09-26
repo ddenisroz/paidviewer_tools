@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.responses import RedirectResponse
 import uvicorn
+from utils.rate_limiter import rate_limiter
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from pathlib import Path
@@ -384,6 +385,30 @@ CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost
 # --- FastAPI App ---
 app = FastAPI(lifespan=lifespan)
 
+# --- Session Middleware (должен быть первым) ---
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("SECRET_KEY", "your-secret-key")
+)
+
+# --- Rate Limiting Middleware ---
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    # Получаем IP адрес клиента
+    client_ip = request.client.host
+    
+    # Проверяем rate limit для API endpoints
+    if request.url.path.startswith("/api/"):
+        if not rate_limiter.is_allowed(client_ip, max_requests=30, window_seconds=60):
+            return Response(
+                content="Too Many Requests",
+                status_code=429,
+                headers={"Retry-After": "60"}
+            )
+    
+    response = await call_next(request)
+    return response
+
 # --- CORS Middleware ---
 allowed_origins = [origin.strip() for origin in CORS_ORIGINS.split(',')]
 
@@ -397,11 +422,6 @@ app.add_middleware(
 
 # --- Include Routers ---
 app.include_router(vk_auth_router)
-
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=os.getenv("SECRET_KEY", "your-secret-key")
-)
 
 # --- WebSocket Endpoints ---
 @app.websocket("/ws/chat/{user_id}")

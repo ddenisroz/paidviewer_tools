@@ -29,15 +29,18 @@ const YoutubeIntegrationPage = () => {
             setCurrentVideo(data.current_video || null);
             setIsPlaying(data.is_playing || false);
         } catch (error) {
-            toast.error('Ошибка загрузки очереди видео.');
+            // Не показываем toast для 429 ошибок (rate limiting)
+            if (error.response?.status !== 429) {
+                toast.error('Ошибка загрузки очереди видео.');
+            }
             console.error('Error loading YouTube queue:', error);
         }
     };
 
     useEffect(() => {
         loadQueue();
-        // Обновляем очередь каждые 5 секунд
-        const interval = setInterval(loadQueue, 5000);
+        // Обновляем очередь каждые 15 секунд (увеличили интервал для избежания rate limiting)
+        const interval = setInterval(loadQueue, 15000);
         return () => clearInterval(interval);
     }, []);
 
@@ -101,7 +104,13 @@ const YoutubeIntegrationPage = () => {
             setIsClearDialogOpen(false); // Закрываем диалог
             loadQueue();
         } catch (error) {
-            toast.error("Не удалось очистить очередь.");
+            if (error.response?.status === 429) {
+                toast.error("Слишком много запросов. Попробуйте через несколько секунд.");
+            } else if (error.code === 'ERR_NETWORK' || error.message?.includes('CORS')) {
+                toast.error("Ошибка сети. Проверьте подключение к серверу.");
+            } else {
+                toast.error("Не удалось очистить очередь.");
+            }
             console.error("Error clearing queue:", error);
         }
     };
