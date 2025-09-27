@@ -42,8 +42,7 @@ class AdminAPI:
         
         # Добавляем в whitelist
         whitelist_user = WhitelistedChannel(
-            channel_name=username,
-            platform="twitch"
+            channel_name=username
         )
         db.add(whitelist_user)
         db.commit()
