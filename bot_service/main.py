@@ -408,7 +408,7 @@ async def cors_debug_middleware(request: Request, call_next):
     # Логируем CORS запросы для отладки
     origin = request.headers.get("origin")
     if origin and origin.startswith("http://localhost"):
-        logger.info(f"CORS Request: {request.method} {request.url.path} from {origin}")
+        logger.debug(f"CORS Request: {request.method} {request.url.path} from {origin}")
     
     # Обрабатываем preflight запросы
     if request.method == "OPTIONS":
@@ -416,8 +416,8 @@ async def cors_debug_middleware(request: Request, call_next):
         if origin and origin.startswith("http://localhost"):
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept, Origin"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept, Origin, X-CSRFToken"
             response.headers["Access-Control-Max-Age"] = "86400"
         return response
     
@@ -440,7 +440,13 @@ async def rate_limit_middleware(request: Request, call_next):
     
     # Проверяем rate limit для API endpoints
     if request.url.path.startswith("/api/"):
-        if not rate_limiter.is_allowed(client_ip, max_requests=30, window_seconds=60):
+        # Увеличиваем лимиты для YouTube и TTS endpoints
+        if any(path in request.url.path for path in ["/api/youtube/", "/api/tts/", "/api/voices/"]):
+            max_requests = 100  # Больше запросов для медиа endpoints
+        else:
+            max_requests = 50   # Стандартный лимит для остальных API
+        
+        if not rate_limiter.is_allowed(client_ip, max_requests=max_requests, window_seconds=60):
             return Response(
                 content="Too Many Requests",
                 status_code=429,
@@ -473,6 +479,17 @@ async def websocket_obs_endpoint(websocket: WebSocket, token: str, db: Session =
             # Обработка OBS сообщений
     except WebSocketDisconnect:
         await connection_manager.disconnect_obs(token)
+
+@app.websocket("/ws/youtube-obs/{token}")
+async def websocket_youtube_obs_endpoint(websocket: WebSocket, token: str, db: Session = Depends(get_db)):
+    """WebSocket для YouTube OBS - отдельный от TTS"""
+    await connection_manager.connect_youtube_obs(websocket, token)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            logger.debug(f"YouTube OBS WebSocket received: {data}")
+    except WebSocketDisconnect:
+        await connection_manager.disconnect_youtube_obs(token)
 
 # --- Auth Endpoints ---
 @app.get("/auth/twitch")
@@ -1630,6 +1647,251 @@ async def update_stream(request: StreamUpdateRequest, user: dict = Depends(get_c
         raise HTTPException(status_code=207, detail={"message": "Some updates failed.", "errors": error_messages})
 
 # --- TTS Endpoints ---
+@app.post("/api/tts/youtube-settings")
+async def set_youtube_settings(request: Request, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Установить настройки YouTube (режим воспроизведения: browser/obs)"""
+    data = await request.json()
+    playback_mode = data.get("playback_mode", "browser")  # browser или obs
+    volume_level = data.get("volume_level", 50.0)
+    
+    try:
+        from core.database import TTSSettings
+        
+        twitch_username = get_platform_username(user, "twitch")
+        if not twitch_username:
+            raise HTTPException(status_code=400, detail="No Twitch integration found")
+        
+        # Сохраняем в ConnectionManager для текущей сессии
+        connection_manager.set_youtube_settings(twitch_username, playback_mode, volume_level)
+        
+        # Сохраняем в базу данных
+        tts_settings = db.query(TTSSettings).filter(
+            TTSSettings.user_id == user['id'],
+            TTSSettings.channel_name == twitch_username
+        ).first()
+        
+        if not tts_settings:
+            tts_settings = TTSSettings(
+                user_id=user['id'],
+                channel_name=twitch_username,
+                voice_settings={"youtube_playback_mode": playback_mode, "youtube_volume": volume_level}
+            )
+            db.add(tts_settings)
+        else:
+            voice_settings = tts_settings.voice_settings or {}
+            voice_settings.update({"youtube_playback_mode": playback_mode, "youtube_volume": volume_level})
+            tts_settings.voice_settings = voice_settings
+        
+        db.commit()
+        
+        logger.info(f"YouTube settings saved for {twitch_username}: {playback_mode} mode, volume {volume_level}%")
+        return {"success": True, "playback_mode": playback_mode, "volume_level": volume_level}
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error saving YouTube settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save YouTube settings")
+
+@app.get("/api/tts/youtube-settings")
+async def get_youtube_settings(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Получить настройки YouTube для пользователя"""
+    try:
+        from core.database import TTSSettings
+        
+        twitch_username = get_platform_username(user, "twitch")
+        if not twitch_username:
+            return {"playback_mode": "browser", "volume_level": 50.0}
+        
+        tts_settings = db.query(TTSSettings).filter(
+            TTSSettings.user_id == user['id'],
+            TTSSettings.channel_name == twitch_username
+        ).first()
+        
+        if tts_settings and tts_settings.voice_settings:
+            voice_settings = tts_settings.voice_settings
+            playback_mode = voice_settings.get("youtube_playback_mode", "browser")
+            volume_level = voice_settings.get("youtube_volume", 50.0)
+            
+            # Синхронизируем с ConnectionManager
+            connection_manager.set_youtube_settings(twitch_username, playback_mode, volume_level)
+            
+            return {"playback_mode": playback_mode, "volume_level": volume_level}
+        
+        return {"playback_mode": "browser", "volume_level": 50.0}
+        
+    except Exception as e:
+        logger.error(f"Error loading YouTube settings: {e}")
+        return {"playback_mode": "browser", "volume_level": 50.0}
+
+@app.post("/api/tts/voice-volume")
+async def set_voice_volume(request: Request, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Установить индивидуальную громкость для кастомного голоса (приоритет выше общей)"""
+    data = await request.json()
+    voice_name = data.get("voice_name")
+    volume_level = data.get("volume_level", 50.0)
+    
+    if not voice_name:
+        raise HTTPException(status_code=400, detail="Voice name required")
+    
+    # Ограничиваем значение от 0 до 100
+    volume_level = max(0.0, min(100.0, float(volume_level)))
+    
+    try:
+        from core.database import TTSSettings
+        
+        twitch_username = get_platform_username(user, "twitch")
+        if not twitch_username:
+            raise HTTPException(status_code=400, detail="No Twitch integration found")
+        
+        # Сохраняем в ConnectionManager для текущей сессии
+        connection_manager.set_voice_volume(twitch_username, voice_name, volume_level)
+        
+        # Сохраняем в базу данных
+        tts_settings = db.query(TTSSettings).filter(
+            TTSSettings.user_id == user['id'],
+            TTSSettings.channel_name == twitch_username
+        ).first()
+        
+        if not tts_settings:
+            tts_settings = TTSSettings(
+                user_id=user['id'],
+                channel_name=twitch_username,
+                voice_settings={"custom_voice_volumes": {voice_name: volume_level}}
+            )
+            db.add(tts_settings)
+        else:
+            voice_settings = tts_settings.voice_settings or {}
+            custom_volumes = voice_settings.get("custom_voice_volumes", {})
+            custom_volumes[voice_name] = volume_level
+            voice_settings["custom_voice_volumes"] = custom_volumes
+            tts_settings.voice_settings = voice_settings
+        
+        db.commit()
+        
+        logger.info(f"Custom voice volume saved for {twitch_username}: {voice_name} = {volume_level}%")
+        return {"success": True, "voice_name": voice_name, "volume_level": volume_level}
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error saving voice volume: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save voice volume")
+
+@app.get("/api/tts/voice-volume/{voice_name}")
+async def get_voice_volume(voice_name: str, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Получить индивидуальную громкость для кастомного голоса"""
+    try:
+        from core.database import TTSSettings
+        
+        twitch_username = get_platform_username(user, "twitch")
+        if not twitch_username:
+            return {"volume_level": 50.0}
+        
+        tts_settings = db.query(TTSSettings).filter(
+            TTSSettings.user_id == user['id'],
+            TTSSettings.channel_name == twitch_username
+        ).first()
+        
+        if tts_settings and tts_settings.voice_settings:
+            custom_volumes = tts_settings.voice_settings.get("custom_voice_volumes", {})
+            volume_level = custom_volumes.get(voice_name, 50.0)
+            
+            # Синхронизируем с ConnectionManager
+            connection_manager.set_voice_volume(twitch_username, voice_name, volume_level)
+            
+            return {"volume_level": volume_level}
+        
+        return {"volume_level": 50.0}
+        
+    except Exception as e:
+        logger.error(f"Error loading voice volume: {e}")
+        return {"volume_level": 50.0}
+
+@app.post("/api/tts/volume")
+async def set_tts_volume(request: Request, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Установить общую громкость TTS для пользователя (сохраняется в БД и памяти)"""
+    data = await request.json()
+    volume_level = data.get("volume_level", 50.0)
+    listening_mode = data.get("listening_mode", "website")  # website или obs
+    
+    # Ограничиваем значение от 0 до 100
+    volume_level = max(0.0, min(100.0, float(volume_level)))
+    
+    try:
+        from core.database import TTSSettings
+        import json
+        
+        # Получаем канал пользователя (Twitch или VK)
+        twitch_username = get_platform_username(user, "twitch")
+        if not twitch_username:
+            raise HTTPException(status_code=400, detail="No Twitch integration found")
+        
+        # Сохраняем в ConnectionManager для текущей сессии
+        connection_manager.set_tts_volume(twitch_username, volume_level)
+        
+        # Сохраняем в базу данных для постоянного хранения
+        tts_settings = db.query(TTSSettings).filter(
+            TTSSettings.user_id == user['id'],
+            TTSSettings.channel_name == twitch_username
+        ).first()
+        
+        if not tts_settings:
+            # Создаем новую запись
+            tts_settings = TTSSettings(
+                user_id=user['id'],
+                channel_name=twitch_username,
+                voice_settings={"volume_level": volume_level, "listening_mode": listening_mode}
+            )
+            db.add(tts_settings)
+        else:
+            # Обновляем существующую запись
+            voice_settings = tts_settings.voice_settings or {}
+            voice_settings.update({"volume_level": volume_level, "listening_mode": listening_mode})
+            tts_settings.voice_settings = voice_settings
+        
+        db.commit()
+        
+        logger.info(f"TTS volume saved to DB and memory for {twitch_username}: {volume_level}% ({listening_mode} mode)")
+        return {"success": True, "volume_level": volume_level, "listening_mode": listening_mode}
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error saving TTS volume: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save volume settings")
+
+@app.get("/api/tts/volume")
+async def get_tts_volume(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Получить текущую громкость TTS для пользователя (из БД)"""
+    try:
+        from core.database import TTSSettings
+        
+        twitch_username = get_platform_username(user, "twitch")
+        if not twitch_username:
+            return {"volume_level": 50.0, "listening_mode": "website"}
+        
+        # Сначала проверяем базу данных
+        tts_settings = db.query(TTSSettings).filter(
+            TTSSettings.user_id == user['id'],
+            TTSSettings.channel_name == twitch_username
+        ).first()
+        
+        if tts_settings and tts_settings.voice_settings:
+            voice_settings = tts_settings.voice_settings
+            volume_level = voice_settings.get("volume_level", 50.0)
+            listening_mode = voice_settings.get("listening_mode", "website")
+            
+            # Синхронизируем с ConnectionManager
+            connection_manager.set_tts_volume(twitch_username, volume_level)
+            
+            return {"volume_level": volume_level, "listening_mode": listening_mode}
+        
+        # Fallback: проверяем ConnectionManager
+        volume_level = connection_manager.get_tts_volume(twitch_username)
+        return {"volume_level": volume_level, "listening_mode": "website"}
+        
+    except Exception as e:
+        logger.error(f"Error loading TTS volume: {e}")
+        return {"volume_level": 50.0, "listening_mode": "website"}
+
 @app.post("/api/tts/enable")
 async def enable_tts(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     # Проверяем whitelist для TTS
@@ -1779,6 +2041,18 @@ async def get_tts_guest_status(channel_name: str):
     is_enabled = connection_manager.is_tts_enabled(channel_name.lower())
     return {"enabled": is_enabled}
 
+@app.get("/api/tts/obs-url")
+async def get_obs_url(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Получить существующий OBS URL для пользователя"""
+    try:
+        user_record = db.query(User).filter(User.id == user["id"]).first()
+        if user_record and user_record.obs_token:
+            return {"obs_token": user_record.obs_token}
+        return {"obs_token": None}
+    except Exception as e:
+        logger.error(f"Error getting OBS URL: {e}")
+        return {"obs_token": None}
+
 @app.post("/api/tts/generate-obs-url")
 async def generate_obs_url(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Генерировать URL для OBS WebSocket"""
@@ -1813,6 +2087,68 @@ async def generate_obs_url(user: dict = Depends(get_current_user), db: Session =
         # Fallback: создаем временный токен без сохранения
         obs_token = create_jwt_token(user['id'])
         return ObsUrlResponse(obs_token=obs_token)
+
+@app.post("/api/youtube/obs-action")
+async def youtube_obs_action(request: Request, user: dict = Depends(get_current_user)):
+    """Отправить действие в YouTube OBS (play, pause, next, volume, etc.)"""
+    try:
+        data = await request.json()
+        action = data.get("action")
+        
+        # Получаем канал пользователя
+        twitch_username = get_platform_username(user, "twitch")
+        if not twitch_username:
+            raise HTTPException(status_code=400, detail="No Twitch integration found")
+        
+        # Отправляем команду в OBS
+        await connection_manager.send_youtube_to_obs(
+            channel_name=twitch_username,
+            action=action,
+            data=data
+        )
+        
+        logger.info(f"YouTube OBS action sent for {twitch_username}: {action}")
+        return {"success": True, "action": action}
+        
+    except Exception as e:
+        logger.error(f"Error sending YouTube OBS action: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send YouTube OBS action")
+
+@app.post("/api/youtube/generate-obs-url")
+async def generate_youtube_obs_url(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Генерировать URL для YouTube OBS WebSocket"""
+    try:
+        # Используем тот же токен, что и для TTS
+        user_record = db.query(User).filter(User.id == user['id']).first()
+        
+        if user_record and user_record.obs_token:
+            obs_token = user_record.obs_token
+        else:
+            # Создаем новый токен
+            obs_token = create_jwt_token(user['id'])
+            
+            if user_record:
+                user_record.obs_token = obs_token
+            else:
+                user_record = User(
+                    id=user['id'],
+                    display_name=user.get('display_name', 'User'),
+                    obs_token=obs_token
+                )
+                db.add(user_record)
+            
+            db.commit()
+            
+        # Возвращаем URL для YouTube OBS
+        youtube_obs_url = f"http://localhost:5173/youtube-obs/{obs_token}"
+        return {"youtube_obs_url": youtube_obs_url, "obs_token": obs_token}
+            
+    except Exception as e:
+        logger.error(f"Error generating YouTube OBS URL: {e}")
+        db.rollback()
+        obs_token = create_jwt_token(user['id'])
+        youtube_obs_url = f"http://localhost:5173/youtube-obs/{obs_token}"
+        return {"youtube_obs_url": youtube_obs_url, "obs_token": obs_token}
 
 @app.post("/api/tts/regenerate-obs-url")
 async def regenerate_obs_url(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -1850,7 +2186,7 @@ async def regenerate_obs_url(user: dict = Depends(get_current_user), db: Session
 async def get_youtube_queue(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         from services.queue_service import QueueService
-        queue_service = QueueService()
+        queue_service = QueueService(connection_manager=connection_manager)
         
         # Получаем очередь из базы данных
         queue_items_raw = queue_service.get_queue(user["id"], db)
@@ -1889,33 +2225,103 @@ async def get_youtube_queue(user: dict = Depends(get_current_user), db: Session 
         queue = connection_manager.get_youtube_queue(user["id"])
         current_video_data = connection_manager.get_current_video(user["id"])
         current_video = current_video_data if current_video_data else None
+        
+        # Преобразуем в правильный формат для fallback
+        formatted_queue = []
+        if queue:
+            for item in queue:
+                formatted_queue.append({
+                    'id': item.get('id', 0),
+                    'video_id': item.get('video_id', ''),
+                    'title': item.get('title', 'Unknown'),
+                    'url': item.get('url', ''),
+                    'duration': item.get('duration', 0),
+                    'thumbnail_url': item.get('thumbnail_url', ''),
+                    'added_at': item.get('added_at', datetime.now()),
+                    'user_id': str(user["id"])
+                })
     
     return QueueResponse(
         current_video=current_video,
-        queue=queue,
+            queue=formatted_queue,
         is_playing=bool(current_video)
     )
 
 @app.post("/api/youtube/queue")
-async def add_to_youtube_queue(request: dict, user: dict = Depends(get_current_user)):
+async def add_to_youtube_queue(request: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     url = request.get("url")
     if not url:
         raise HTTPException(status_code=400, detail="URL required")
     
-    video_info = youtube_api.get_video_info(url)
-    if not video_info:
-        raise HTTPException(status_code=400, detail="Invalid YouTube URL")
-    
-    connection_manager.add_to_youtube_queue(user["id"], video_info)
-    return {"message": "Video added to queue"}
+    try:
+        from services.queue_service import QueueService
+        queue_service = QueueService(connection_manager=connection_manager)
+        
+        # Получаем информацию о видео
+        video_info = youtube_api.get_video_info(url)
+        if not video_info:
+            raise HTTPException(status_code=400, detail="Invalid YouTube URL")
+        
+        # Добавляем в базу данных через QueueService
+        result = queue_service.add_video_to_queue(
+            user_id=user["id"],
+            video_url=url,
+            video_id=video_info.get("video_id", ""),
+            title=video_info.get("title", "Unknown"),
+            duration=video_info.get("duration", "0"),
+            thumbnail_url=video_info.get("thumbnail_url", ""),
+            channel_name="web",  # Заказ через веб-интерфейс
+            platform="web",
+            requester_name=user.get("display_name", "Unknown"),
+            requester_id=str(user["id"]),
+            db=db
+        )
+        
+        # Отправляем событие обновления очереди
+        await connection_manager.send_youtube_event_to_user(
+            user_id=str(user["id"]),
+            event_type="queue_updated",
+            data={"action": "video_added", "video": result}
+        )
+        
+        return {"message": "Video added to queue", "video": result}
+        
+    except Exception as e:
+        logger.error(f"Error adding video to queue: {e}")
+        # Fallback к старому способу
+        video_info = youtube_api.get_video_info(url)
+        if not video_info:
+            raise HTTPException(status_code=400, detail="Invalid YouTube URL")
+        
+        connection_manager.add_to_youtube_queue(user["id"], video_info)
+        return {"message": "Video added to queue (fallback)"}
 
 @app.post("/api/youtube/next")
 async def youtube_player_next(user: dict = Depends(get_current_user)):
     next_video = connection_manager.next_youtube_video(user["id"])
+    
+    # Получаем канал пользователя для OBS
+    twitch_username = get_platform_username(user, "twitch")
+    
     if next_video:
-        return {"message": "Switched to next video", "video": next_video}
+        # Отправляем команду в OBS если настроен режим OBS
+        if twitch_username:
+            await connection_manager.send_youtube_to_obs(
+                channel_name=twitch_username,
+                action="play",
+                data={"video": next_video}
+            )
+        
+        return {"success": True, "message": "Switched to next video", "current_video": next_video}
     else:
-        return {"message": "No videos in queue"}
+        # Отправляем команду остановки в OBS
+        if twitch_username:
+            await connection_manager.send_youtube_to_obs(
+                channel_name=twitch_username,
+                action="clear"
+            )
+        
+        return {"success": False, "message": "No videos in queue"}
 
 @app.post("/api/youtube/clear")
 async def youtube_queue_clear(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -1925,10 +2331,26 @@ async def youtube_queue_clear(user: dict = Depends(get_current_user), db: Sessio
         
         # Очищаем базу данных
         from services.queue_service import QueueService
-        queue_service = QueueService()
+        queue_service = QueueService(connection_manager=connection_manager)
         queue_service.clear_queue(user["id"], db)
         
+        # Отправляем событие очистки очереди
+        await connection_manager.send_youtube_event_to_user(
+            user_id=str(user["id"]),
+            event_type="queue_updated",
+            data={"action": "queue_cleared"}
+        )
+        
+        # Отправляем команду очистки в OBS
+        twitch_username = get_platform_username(user, "twitch")
+        if twitch_username:
+            await connection_manager.send_youtube_to_obs(
+                channel_name=twitch_username,
+                action="clear"
+            )
+        
         return {"message": "Queue cleared"}
+        
     except Exception as e:
         logger.error(f"Error clearing YouTube queue: {e}")
         raise HTTPException(status_code=500, detail="Failed to clear queue")
@@ -1970,6 +2392,76 @@ async def remove_blocked_bot(bot_name: str, user: dict = Depends(get_admin_user)
 async def get_users(user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
     return await admin_api.get_users(db)
 
+# --- User Management Endpoints ---
+@app.put("/api/admin/users/{user_id}")
+async def update_user(user_id: int, request: dict, user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
+    """Обновить пользователя"""
+    return await admin_api.update_user(user_id, request, db)
+
+@app.delete("/api/admin/users/{user_id}")
+async def delete_user(user_id: int, user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
+    """Удалить пользователя"""
+    # Нельзя удалить самого себя
+    if user_id == user["id"]:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    return await admin_api.delete_user(user_id, db)
+
+@app.post("/api/admin/users/{user_id}/block")
+async def block_user(user_id: int, request: dict, user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
+    """Заблокировать пользователя"""
+    return await admin_api.block_user(user_id, request, db)
+
+@app.post("/api/admin/users/{user_id}/unblock")
+async def unblock_user(user_id: int, user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
+    """Разблокировать пользователя"""
+    return await admin_api.unblock_user(user_id, db)
+
+# --- Bot Control Endpoints ---
+@app.get("/api/admin/bots/status")
+async def get_bots_status(user: dict = Depends(get_admin_user)):
+    """Получить статус всех ботов"""
+    return await admin_api.get_bots_status()
+
+@app.post("/api/admin/bots/{bot_name}/restart")
+async def restart_bot(bot_name: str, user: dict = Depends(get_admin_user)):
+    """Перезапустить бота"""
+    return await admin_api.restart_bot(bot_name)
+
+@app.get("/api/admin/bots/logs")
+async def get_bots_logs(user: dict = Depends(get_admin_user)):
+    """Получить логи ботов"""
+    return await admin_api.get_bots_logs()
+
+@app.post("/api/admin/tts/restart")
+async def restart_tts_engine(user: dict = Depends(get_admin_user)):
+    """Перезагрузить TTS движок"""
+    return await admin_api.restart_tts_engine()
+
+@app.post("/api/admin/bot-service/restart")
+async def restart_bot_service(user: dict = Depends(get_admin_user)):
+    """Перезагрузить весь Bot Service"""
+    return await admin_api.restart_bot_service()
+
+# --- System Logs Endpoints ---
+@app.get("/api/admin/logs")
+async def get_system_logs(
+    level: str = None,
+    search: str = None,
+    limit: int = 100,
+    user: dict = Depends(get_admin_user)
+):
+    """Получить системные логи с фильтрацией"""
+    return await admin_api.get_system_logs(level, search, limit)
+
+@app.get("/api/admin/logs/export")
+async def export_system_logs(
+    level: str = None,
+    search: str = None,
+    user: dict = Depends(get_admin_user)
+):
+    """Экспортировать системные логи"""
+    return await admin_api.export_system_logs(level, search)
+
 @app.get("/api/admin/list")
 async def get_admin_list():
     """Получить список админов из переменной окружения"""
@@ -1983,22 +2475,63 @@ async def get_admin_list():
 
 # --- Session Management Endpoints ---
 @app.get("/api/admin/sessions")
-async def get_active_sessions():
+async def get_active_sessions(db: Session = Depends(get_db)):
     """Получить список активных сессий"""
     sessions = []
     
-    # Получаем все pending verifications
-    for channel, verification in connection_manager.pending_verifications.items():
-        is_verified = channel in connection_manager.verified_sessions
-        sessions.append({
-            "channel": channel,
-            "is_verified": is_verified,
-            "code": verification.get("code", ""),
-            "timestamp": verification.get("timestamp", 0),
-            "created_at": datetime.fromtimestamp(verification.get("timestamp", 0)).isoformat() if verification.get("timestamp") else None
-        })
+    try:
+        # Получаем активные сессии из базы данных
+        from core.database import User
+        from datetime import datetime, timedelta
+        
+        # Получаем всех пользователей
+        all_users = db.query(User).all()
+        logger.info(f"Total users in database: {len(all_users)}")
+        
+        # Показываем всех пользователей как активные сессии
+        active_users = all_users
+        
+        for user in active_users:
+            # Пока что у нас нет информации о платформах в модели User
+            # В будущем можно будет добавить отдельные таблицы для связей пользователей с платформами
+            platforms = []
+            
+            sessions.append({
+                "user_id": user.id,
+                "display_name": user.display_name,
+                "platforms": platforms,
+                "is_admin": user.is_admin,
+                "last_activity": datetime.utcnow().isoformat(),  # Используем текущее время как активность
+                "created_at": user.created_at.isoformat() if user.created_at else None,
+                "session_type": "active_user"
+            })
+        
+        # Также добавляем pending verifications
+        for channel, verification in connection_manager.pending_verifications.items():
+            is_verified = channel in connection_manager.verified_sessions
+            sessions.append({
+                "channel": channel,
+                "is_verified": is_verified,
+                "code": verification.get("code", ""),
+                "timestamp": verification.get("timestamp", 0),
+                "created_at": datetime.fromtimestamp(verification.get("timestamp", 0)).isoformat() if verification.get("timestamp") else None,
+                "session_type": "pending_verification"
+            })
+        
+        # Сортируем по последней активности
+        sessions.sort(key=lambda x: x.get('last_activity', x.get('created_at', '')), reverse=True)
+        
+    except Exception as e:
+        logger.error(f"Error getting active sessions: {e}")
+        # В случае ошибки возвращаем пустой список
+        sessions = []
     
-    return {"sessions": sessions}
+    return {
+        "sessions": sessions,
+        "total": len(sessions),
+        "active_users": len([s for s in sessions if s.get('session_type') == 'active_user']),
+        "pending_verifications": len([s for s in sessions if s.get('session_type') == 'pending_verification'])
+    }
 
 @app.delete("/api/admin/sessions/{channel}")
 async def clear_session(channel: str):
@@ -2035,6 +2568,28 @@ async def clear_session(channel: str):
         logger.info(f"Bot disconnected from channel: {channel}")
     
     return {"message": f"Session cleared for channel: {channel}"}
+
+@app.delete("/api/admin/sessions/user/{user_id}")
+async def clear_user_session(user_id: int, db: Session = Depends(get_db)):
+    """Очистить сессию для конкретного пользователя"""
+    try:
+        from core.database import User
+        
+        # Находим пользователя
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return {"error": "User not found"}
+        
+        # Удаляем пользователя из базы данных
+        db.delete(user)
+        db.commit()
+        
+        logger.info(f"User session terminated and user deleted: {user_id}")
+        return {"message": f"User session terminated: {user_id}"}
+        
+    except Exception as e:
+        logger.error(f"Error terminating user session {user_id}: {e}")
+        return {"error": f"Failed to terminate user session: {str(e)}"}
 
 @app.delete("/api/admin/sessions")
 async def clear_all_sessions():

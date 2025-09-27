@@ -41,6 +41,9 @@ try:
         display_name = Column(String, nullable=False)
         is_admin = Column(Boolean, default=False)
         obs_token = Column(String, nullable=True)  # OBS токен для постоянной ссылки
+        is_blocked = Column(Boolean, default=False)  # Заблокирован ли пользователь
+        blocked_reason = Column(String, nullable=True)  # Причина блокировки
+        blocked_at = Column(DateTime, nullable=True)  # Дата блокировки
         created_at = Column(DateTime, default=datetime.utcnow)
         
     class WhitelistedChannel(Base):
@@ -105,8 +108,27 @@ try:
         __table_args__ = {'extend_existing': True}
         id = Column(Integer, primary_key=True, index=True)
         name = Column(String, unique=True, index=True, nullable=False)
+        voice_type = Column(String, default='global')  # 'global' or 'user'
         file_path = Column(String, nullable=False)
         reference_text = Column(String, nullable=True)
+        owner_id = Column(Integer, ForeignKey('users.id'), nullable=True)  # Integer, не String!
+        is_public = Column(Boolean, default=False)
+        is_active = Column(Boolean, default=True)
+        created_at = Column(DateTime, default=datetime.utcnow)
+        
+        # Настройки генерации TTS
+        cfg_strength = Column(Float, default=2.5)
+        speed_preset = Column(String, default='normal')
+        cross_fade_duration = Column(Float, default=0.15)
+        silence_duration = Column(Float, default=0.0)
+        silence_duration_ms = Column(Integer, default=100)  # Добавляем поле из TTS сервиса
+        sway_sampling_coef = Column(Float, default=-1.0)  # Добавляем поле из TTS сервиса
+        temperature = Column(Float, default=1.0)
+        top_p = Column(Float, default=0.9)
+        top_k = Column(Integer, default=50)
+        repetition_penalty = Column(Float, default=1.0)
+        length_penalty = Column(Float, default=1.0)
+        early_stopping = Column(Boolean, default=False)
 
     class GuestVerification(Base):
         """

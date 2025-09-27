@@ -14,13 +14,14 @@ import VoiceManagementPage from './pages/tts/VoiceManagementPage';
 import MediaMainPage from './pages/media/MediaMainPage';
 import ChannelPointsPage from './pages/media/ChannelPointsPage';
 import YoutubeIntegrationPage from './pages/media/YoutubeIntegrationPage';
+import YoutubeSettingsPage from './pages/media/YoutubeSettingsPage';
 import GamblingPage from './pages/GamblingPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import CommandsPage from './pages/CommandsPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 import ObsTtsPage from './pages/tts/ObsTtsPage';
+import ObsYoutubePage from './pages/tts/ObsYoutubePage';
 import SessionManagementPage from './pages/admin/SessionManagementPage';
-import BlockedChannelsPage from './pages/admin/BlockedChannelsPage';
 
 
 function App() {
@@ -34,6 +35,7 @@ function App() {
                 <Route path="/auth/callback" element={<AuthCallbackPage />} />
                 <Route path="/auth/vk/callback" element={<AuthCallbackPage />} />
                 <Route path="/tts-obs/:token" element={<ObsTtsPage />} />
+                <Route path="/youtube-obs/:token" element={<ObsYoutubePage />} />
 
                 {/* Protected Routes with Layout */}
                 <Route path="/" element={<AuthGuard />}>
@@ -46,12 +48,12 @@ function App() {
                         <Route path="dashboard/media" element={<MediaMainPage />} />
                         <Route path="dashboard/media/channel-points" element={<ChannelPointsPage />} />
                         <Route path="dashboard/media/youtube" element={<YoutubeIntegrationPage />} />
+                        <Route path="youtube-settings" element={<YoutubeSettingsPage />} />
                         <Route path="dashboard/media/gambling" element={<GamblingPage />} />
                         <Route path="dashboard/chat-analysis" element={<AnalyticsPage />} />
                         <Route path="dashboard/commands" element={<CommandsPage />} />
-                        <Route path="dashboard/admin" element={<AdminPage />} />
-                        <Route path="dashboard/admin/sessions" element={<SessionManagementPage />} />
-                        <Route path="dashboard/admin/blocked-channels" element={<BlockedChannelsPage />} />
+                        <Route path="dashboard/dolbaebadmintts" element={<AdminPage />} />
+                        <Route path="dashboard/dolbaebadmintts/sessions" element={<SessionManagementPage />} />
                     </Route>
                 </Route>
             </Routes>

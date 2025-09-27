@@ -52,13 +52,13 @@ class AddBlockedBotRequest(BaseModel):
 
 # User models
 class UserPublic(BaseModel):
-    id: str
-    username: str
+    id: int
     display_name: str
-    platform: str
     is_admin: bool
+    is_blocked: bool = False
+    blocked_reason: Optional[str] = None
+    blocked_at: Optional[datetime] = None
     created_at: datetime
-    last_login: Optional[datetime] = None
 
     class Config:
         from_attributes = True

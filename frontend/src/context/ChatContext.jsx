@@ -62,11 +62,33 @@ export const ChatProvider = ({ children }) => {
             setIsConnected(true);
             setIsConnecting(false);
             setError(null);
+            
+            // Отправляем ping каждые 30 секунд для поддержания соединения
+            const pingInterval = setInterval(() => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'ping' }));
+                } else {
+                    clearInterval(pingInterval);
+                }
+            }, 30000);
+            
+            // Сохраняем интервал для очистки
+            ws.pingInterval = pingInterval;
         };
 
         ws.onmessage = (event) => {
             const messageData = JSON.parse(event.data);
             setLastJsonMessage(messageData); // <-- Добавлено: сохраняем все сообщение
+            
+            // Обрабатываем YouTube события
+            if (messageData.type === 'youtube_event') {
+                console.log('YouTube event received:', messageData);
+                // Создаем кастомное событие для YouTube компонентов
+                window.dispatchEvent(new CustomEvent('youtubeEvent', {
+                    detail: messageData
+                }));
+                return;
+            }
             
             // Обрабатываем TTS ошибки
             if (messageData.type === 'tts_error') {
@@ -96,22 +118,69 @@ export const ChatProvider = ({ children }) => {
 
         ws.onclose = (event) => {
             console.log("WebSocket closed:", event.code, event.reason);
+            
+            // Очищаем ping интервал
+            if (ws.pingInterval) {
+                clearInterval(ws.pingInterval);
+            }
+            
             websocket.current = null;
             setIsConnected(false);
             setIsConnecting(false);
             
             // Попытка переподключения только если это не было намеренное закрытие
+            // и пользователь все еще аутентифицирован
             if (event.code !== 1000 && isAuthenticated && user?.id && user?.id !== 'guest') {
-                console.log("Attempting to reconnect WebSocket in 5 seconds...");
+                console.log("Attempting to reconnect WebSocket in 3 seconds...");
                 setTimeout(() => {
-                    if (!websocket.current && isAuthenticated) {
+                    if (!websocket.current && isAuthenticated && user?.id && user?.id !== 'guest') {
                         setupWebSocket();
                     }
-                }, 5000);
+                }, 3000);
+            } else if (event.code === 1000) {
+                console.log("WebSocket closed normally (code 1000)");
             }
         };
 
     }, [isAuthenticated, user?.id, addToast]);
+
+    // Обработка сворачивания/разворачивания браузера
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                // Браузер стал активным - проверяем соединение
+                if (!websocket.current && isAuthenticated && user?.id && user?.id !== 'guest') {
+                    console.log("Browser became visible, reconnecting WebSocket...");
+                    setupWebSocket();
+                }
+            }
+            // НЕ закрываем WebSocket при сворачивании - озвучка должна работать в фоне
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [isAuthenticated, user?.id, setupWebSocket]);
+
+    // Обработка фокуса/потери фокуса окна
+    useEffect(() => {
+        const handleFocus = () => {
+            // Окно получило фокус - проверяем соединение
+            if (!websocket.current && isAuthenticated && user?.id && user?.id !== 'guest') {
+                console.log("Window focused, reconnecting WebSocket...");
+                setupWebSocket();
+            }
+        };
+
+        // НЕ закрываем WebSocket при потере фокуса - озвучка должна работать в фоне
+        window.addEventListener('focus', handleFocus);
+        
+        return () => {
+            window.removeEventListener('focus', handleFocus);
+        };
+    }, [isAuthenticated, user?.id, setupWebSocket]);
 
     // Функция для закрытия WebSocket соединения
     const closeWebSocket = () => {

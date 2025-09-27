@@ -16,6 +16,11 @@ class SessionManager:
     
     def __init__(self):
         self.session_timeout = timedelta(days=30)  # 30 дней бездействия
+        # НЕ разлогиниваем пользователей при:
+        # - сворачивании браузера
+        # - смене вкладки  
+        # - закрытии браузера
+        # - потере фокуса окна
 
     def create_or_get_user_by_platform(self, platform: str, platform_user_id: str, platform_display_name: str, avatar_url: str, db: Session) -> User:
         """Находит пользователя по ID платформы или создает нового, если он не найден."""
@@ -461,12 +466,21 @@ class SessionManager:
             if not session:
                 return None
             
-            if datetime.utcnow() - session.last_activity > self.session_timeout:
+            # Проверяем таймаут только для очень старых сессий (30 дней)
+            # НЕ разлогиниваем пользователей при сворачивании браузера, смене вкладки или закрытии браузера
+            time_since_activity = datetime.utcnow() - session.last_activity
+            if time_since_activity > self.session_timeout:
+                logger.info(f"Session {session_id} expired after {time_since_activity.days} days of inactivity")
                 self.terminate_session(session_id, "timeout")
                 return None
             
-            session.last_activity = datetime.utcnow()
-            db.commit()
+            # Обновляем last_activity только если прошло больше 1 часа
+            # Это предотвращает постоянные обновления базы данных
+            # Сессия остается активной даже после закрытия браузера
+            if time_since_activity > timedelta(hours=1):
+                session.last_activity = datetime.utcnow()
+                db.commit()
+                logger.debug(f"Updated last_activity for session {session_id}")
             
             user = db.query(User).filter_by(id=session.user_id).first()
             if not user:
@@ -480,6 +494,9 @@ class SessionManager:
                 "username": user.display_name,  # Добавляем username
                 "display_name": user.display_name,
                 "is_admin": user.is_admin,
+                "is_blocked": user.is_blocked,
+                "blocked_reason": user.blocked_reason,
+                "blocked_at": user.blocked_at,
                 "integrations": {
                     token.platform: {
                         "platform_user_id": token.platform_user_id,

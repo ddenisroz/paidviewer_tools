@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Trash2, Settings, TestTube2, Globe, User, Link, Copy } from 'lucide-react';
+import { Upload, Trash2, Settings, TestTube2, Globe, User, Edit } from 'lucide-react';
 import { Slider } from "@/components/ui/slider";
 import { useToast } from '../../components/ui/toast';
 import { useButtonPosition } from '../../hooks/useButtonPosition';
@@ -23,7 +23,6 @@ import {
     renameUserVoice,
     getGlobalVoices
 } from '../../services/unified-api';
-import { generateObsUrl } from '../../services/microservices'; // Import directly
 import { Badge } from '@/components/ui/badge';
 import { PageLoader } from '@/components/ui/loader';
 import { useLoadingState } from '../../hooks/useLoadingState';
@@ -42,8 +41,8 @@ const VoiceManagementPageContent = () => {
     const [voiceName, setVoiceName] = useState('');
     const [testText, setTestText] = useState("Ну так я гетеро, че мне пидоров бояться!");
     const [isUploading, setIsUploading] = useState(false);
-    const [obsUrl, setObsUrl] = useState('');
     const [isTranscribing, setIsTranscribing] = useState(false);
+    const [voiceVolumes, setVoiceVolumes] = useState({}); // {voice_name: volume_level}
     
     const { user } = useAuth();
     const { initializeTts, engineStatus } = useTts();
@@ -53,6 +52,59 @@ const VoiceManagementPageContent = () => {
     
     // Используем хук для управления состоянием загрузки
     const showLoader = useLoadingState(isChecking);
+
+    // Загрузка индивидуальной громкости для голоса
+    const loadVoiceVolume = async (voiceName) => {
+        try {
+            const response = await fetch(`/api/tts/voice-volume/${encodeURIComponent(voiceName)}`, {
+                credentials: 'include'
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setVoiceVolumes(prev => ({
+                    ...prev,
+                    [voiceName]: data.volume_level
+                }));
+                return data.volume_level;
+            }
+        } catch (error) {
+            console.error('Error loading voice volume:', error);
+        }
+        return 50.0; // Значение по умолчанию
+    };
+
+    // Сохранение индивидуальной громкости для голоса
+    const saveVoiceVolume = async (voiceName, volumeLevel) => {
+        try {
+            const response = await fetch('/api/tts/voice-volume', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    voice_name: voiceName,
+                    volume_level: volumeLevel
+                }),
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    setVoiceVolumes(prev => ({
+                        ...prev,
+                        [voiceName]: volumeLevel
+                    }));
+                    addToast(`Громкость голоса "${voiceName}" установлена: ${volumeLevel}%`, 'success');
+                    return true;
+                }
+            }
+        } catch (error) {
+            console.error('Error saving voice volume:', error);
+        }
+        addToast('Ошибка сохранения громкости голоса', 'error');
+        return false;
+    };
 
     // Инициализируем TTS только при загрузке этой страницы
     useEffect(() => {
@@ -74,7 +126,17 @@ const VoiceManagementPageContent = () => {
             console.log('Voices response:', response);
             // Проверяем, что response.data существует и является массивом
             const voicesData = response?.data || response || [];
-            setVoices(Array.isArray(voicesData) ? voicesData : []);
+            const voicesArray = Array.isArray(voicesData) ? voicesData : [];
+            setVoices(voicesArray);
+            
+            // Загружаем индивидуальные громкости для всех голосов
+            if (!user.isGuest && voicesArray.length > 0) {
+                for (const voice of voicesArray) {
+                    if (voice.name) {
+                        await loadVoiceVolume(voice.name);
+                    }
+                }
+            }
         } catch (error) {
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось загрузить голоса.' });
             console.error('Error loading voices:', error);
@@ -313,22 +375,6 @@ const VoiceManagementPageContent = () => {
         }
     };
 
-    const handleGenerateObsUrl = async () => {
-        try {
-            const response = await generateObsUrl();
-            const fullUrl = `${window.location.origin}/tts-obs/${response.data.obs_token}`;
-            setObsUrl(fullUrl);
-            addToast({ type: 'success', title: 'Успех', message: 'Ссылка для OBS успешно создана!' });
-        } catch (error) {
-            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось создать ссылку для OBS.' });
-            console.error('Failed to generate OBS URL:', error);
-        }
-    };
-
-    const copyToClipboard = () => {
-        navigator.clipboard.writeText(obsUrl);
-        addToast({ type: 'success', title: 'Успех', message: 'Ссылка скопирована в буфер обмена!' });
-    };
 
     // Показываем прелоадер пока проверяется health или загружаются голоса
     if (showLoader) {
@@ -412,37 +458,17 @@ const VoiceManagementPageContent = () => {
                 </Dialog>
             </div>
 
-            {/* OBS Integration Card */}
-            <Card className="bg-slate-800 border-slate-700">
-                <CardHeader>
-                    <CardTitle className="text-white flex items-center gap-2">
-                        <Link className="h-5 w-5 text-purple-400" />
-                        Интеграция с OBS
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-slate-400 mb-4">
-                        Используйте эту ссылку как источник браузера в OBS для вывода звука TTS в прямой эфир.
-                        Ссылка уникальна для вашего аккаунта, не делитесь ей ни с кем.
-                    </p>
-                    {obsUrl ? (
-                        <div className="flex items-center gap-2">
-                            <Input type="text" value={obsUrl} readOnly className="bg-slate-900" />
-                            <Button onClick={copyToClipboard} variant="outline" size="icon">
-                                <Copy className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    ) : (
-                        <Button onClick={handleGenerateObsUrl} className="bg-purple-600 hover:bg-purple-700">
-                            Сгенерировать ссылку
-                        </Button>
-                    )}
-                </CardContent>
-            </Card>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                  {loading ? (
                      <p className="text-slate-400 col-span-full">Загрузка голосов...</p>
+                 ) : voices.length === 0 ? (
+                     <div className="col-span-full text-center py-12">
+                         <div className="text-slate-400 text-lg mb-4">
+                             <User className="h-12 w-12 mx-auto mb-4 text-slate-500" />
+                             <p>Загрузите свой первый голос</p>
+                         </div>
+                     </div>
                  ) : voices.map((voice) => (
                      <Card key={voice.id} className="bg-slate-800 border-slate-700 flex flex-col">
                          <CardHeader>
@@ -502,6 +528,38 @@ const VoiceManagementPageContent = () => {
                                 <p className="text-sm text-muted-foreground mt-1">
                                     Редактируйте текст или используйте автоматическую транскрипцию аудиофайла.
                                 </p>
+                            </div>
+                            
+                            {/* Индивидуальная громкость голоса */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="voice-volume">Индивидуальная громкость</Label>
+                                    <span className="text-sm text-purple-400 font-medium">
+                                        {voiceVolumes[currentVoice.name] || 50}%
+                                    </span>
+                                </div>
+                                <div className="space-y-2">
+                                    <Slider
+                                        id="voice-volume"
+                                        min={0}
+                                        max={100}
+                                        step={1}
+                                        value={[voiceVolumes[currentVoice.name] || 50]}
+                                        onValueChange={async (value) => {
+                                            const newVolume = value[0];
+                                            await saveVoiceVolume(currentVoice.name, newVolume);
+                                        }}
+                                        className="w-full"
+                                    />
+                                    <div className="flex justify-between text-xs text-gray-400">
+                                        <span>Тихо (0%)</span>
+                                        <span>Громко (100%)</span>
+                                    </div>
+                                </div>
+                                <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded">
+                                    💡 <strong>Приоритет:</strong> Эта настройка имеет приоритет над общей громкостью TTS. 
+                                    Если не установлена, используется общая громкость (50% по умолчанию).
+                                </div>
                             </div>
                             
                             <div>
@@ -573,7 +631,7 @@ const VoiceManagementPageContent = () => {
                     <DialogFooter>
                         <Button onClick={handleTestVoice} variant="outline"><TestTube2 className="h-4 w-4 mr-2"/>Тест</Button>
                         <Button onClick={handleRenameVoice} variant="outline" className="text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white">
-                            <Link className="h-4 w-4 mr-2"/>Переименовать
+                            <Edit className="h-4 w-4 mr-2"/>Переименовать
                         </Button>
                         <Button onClick={handleSaveSettings} className="bg-blue-600 hover:bg-blue-700">
                             <Settings className="h-4 w-4 mr-2"/>Сохранить

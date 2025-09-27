@@ -23,6 +23,13 @@ async def get_current_user(request: Request) -> Dict[str, Any]:
     """
     session_data = get_session_data(request)
     if session_data:
+        # Проверяем, не заблокирован ли пользователь
+        if session_data.get('is_blocked', False):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Account blocked: {session_data.get('blocked_reason', 'No reason provided')}",
+            )
+        
         logger.info(f"User authenticated via session: ID {session_data.get('id')}, Name: {session_data.get('display_name')}")
         return session_data
     

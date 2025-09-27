@@ -1,6 +1,7 @@
 # bot_service/connection_manager.py
 import logging
 import time
+import json
 from typing import Dict, Set, List, TYPE_CHECKING
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
@@ -26,6 +27,7 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
         self.obs_connections: Dict[str, WebSocket] = {}
+        self.youtube_obs_connections: Dict[str, WebSocket] = {}  # YouTube OBS connections
         self.tts_enabled_channels: Set[str] = set()  # Глобальные каналы с TTS
         self.tts_enabled_twitch: Set[str] = set()    # Twitch каналы с TTS
         self.tts_enabled_vk: Set[str] = set()        # VK Live каналы с TTS
@@ -36,6 +38,9 @@ class ConnectionManager:
         self.verified_sessions: Set[str] = set()  # Отслеживаем верифицированные сессии
         self.active_vk_bots: Dict[str, dict] = {}  # Реестр активных VK ботов
         self.active_sessions: Dict[str, set] = {}  # Активные сессии по каналам {channel: {session_ids}}
+        self.tts_volume_settings: Dict[str, float] = {}  # {channel_name: volume_level}
+        self.voice_volume_settings: Dict[str, Dict[str, float]] = {}  # {channel_name: {voice_name: volume_level}}
+        self.youtube_settings: Dict[str, dict] = {}  # {channel_name: {playback_mode, volume_level}}
         
         # Кэш для Twitch API
         self.twitch_cache = {
@@ -92,6 +97,27 @@ class ConnectionManager:
             except Exception as e:
                 logger.error(f"Error broadcasting message to user {user_id}: {e}")
 
+    # YouTube events
+    async def broadcast_youtube_event(self, event_type: str, data: dict = None):
+        """Отправляет событие YouTube всем подключенным пользователям"""
+        message = {
+            "type": "youtube_event",
+            "event": event_type,
+            "data": data or {}
+        }
+        await self.broadcast(json.dumps(message))
+        logger.info(f"YouTube event broadcasted: {event_type}")
+
+    async def send_youtube_event_to_user(self, user_id: str, event_type: str, data: dict = None):
+        """Отправляет событие YouTube конкретному пользователю"""
+        message = {
+            "type": "youtube_event",
+            "event": event_type,
+            "data": data or {}
+        }
+        await self.send_personal_message(json.dumps(message), user_id)
+        logger.info(f"YouTube event sent to user {user_id}: {event_type}")
+
     # OBS connections
     async def connect_obs(self, websocket: WebSocket, token: str):
         await websocket.accept()
@@ -120,6 +146,71 @@ class ConnectionManager:
                 await self.disconnect_obs(token)
             except Exception as e:
                 logger.error(f"Error sending OBS message to token {token}: {e}")
+
+    # YouTube OBS management
+    async def connect_youtube_obs(self, websocket: WebSocket, token: str):
+        await websocket.accept()
+        self.youtube_obs_connections[token] = websocket
+        logger.info(f"YouTube OBS WebSocket connection established for token {token}")
+
+    async def disconnect_youtube_obs(self, token: str):
+        if token in self.youtube_obs_connections:
+            try:
+                websocket = self.youtube_obs_connections[token]
+                if hasattr(websocket, 'client_state') and websocket.client_state.name == 'CONNECTED':
+                    await websocket.close()
+            except Exception as e:
+                logger.debug(f"YouTube OBS WebSocket already closed for token {token}: {e}")
+            finally:
+                del self.youtube_obs_connections[token]
+                logger.info(f"YouTube OBS WebSocket connection closed for token {token}")
+
+    async def send_youtube_obs_message(self, message: str, token: str):
+        """Отправить сообщение в YouTube OBS WebSocket"""
+        if token in self.youtube_obs_connections:
+            try:
+                await self.youtube_obs_connections[token].send_text(message)
+            except WebSocketDisconnect:
+                await self.disconnect_youtube_obs(token)
+            except Exception as e:
+                logger.error(f"Error sending YouTube OBS message to token {token}: {e}")
+
+    async def send_youtube_to_obs(self, channel_name: str, action: str, data: dict = None):
+        """Отправить YouTube команду в OBS для канала"""
+        try:
+            # Получаем настройки YouTube для канала
+            youtube_settings = self.get_youtube_settings(channel_name)
+            
+            if youtube_settings.get("playback_mode") != "obs":
+                logger.debug(f"YouTube playback mode is not OBS for channel {channel_name}, skipping OBS send")
+                return
+            
+            # Формируем сообщение
+            message_data = {
+                "type": f"youtube_{action}",
+                "channel": channel_name,
+                "volume": youtube_settings.get("volume_level", 50.0),
+                **(data if data else {})
+            }
+            
+            # Отправляем всем YouTube OBS подключениям
+            message = json.dumps(message_data)
+            disconnected_tokens = []
+            
+            for token, websocket in self.youtube_obs_connections.items():
+                try:
+                    await websocket.send_text(message)
+                    logger.debug(f"YouTube OBS message sent to {token}: {action}")
+                except Exception as e:
+                    logger.error(f"Error sending YouTube OBS message to {token}: {e}")
+                    disconnected_tokens.append(token)
+            
+            # Удаляем отключенные соединения
+            for token in disconnected_tokens:
+                await self.disconnect_youtube_obs(token)
+                
+        except Exception as e:
+            logger.error(f"Error sending YouTube to OBS for channel {channel_name}: {e}")
 
     # TTS management
     def enable_tts(self, channel_name: str, platform: str = None):
@@ -189,6 +280,118 @@ class ConnectionManager:
 
     def is_bot_blocked(self, bot_name: str) -> bool:
         return bot_name.lower() in self.blocked_bots
+
+    # TTS Volume management
+    def set_tts_volume(self, channel_name: str, volume_level: float):
+        """Установить громкость TTS для канала"""
+        channel_lower = channel_name.lower()
+        self.tts_volume_settings[channel_lower] = max(0.0, min(100.0, volume_level))  # Ограничиваем 0-100%
+        logger.info(f"TTS volume set for channel {channel_name}: {volume_level}%")
+
+    def get_tts_volume(self, channel_name: str, voice_name: str = None) -> float:
+        """Получить громкость TTS для канала (с учетом приоритета кастомных голосов)"""
+        channel_lower = channel_name.lower()
+        
+        # Если указан голос, проверяем индивидуальную настройку (приоритет)
+        if voice_name and channel_lower in self.voice_volume_settings:
+            voice_volume = self.voice_volume_settings[channel_lower].get(voice_name)
+            if voice_volume is not None:
+                logger.debug(f"Using custom voice volume for {channel_name}.{voice_name}: {voice_volume}%")
+                return voice_volume
+        
+        # Иначе используем общую громкость канала
+        general_volume = self.tts_volume_settings.get(channel_lower, 50.0)
+        logger.debug(f"Using general volume for {channel_name}: {general_volume}%")
+        return general_volume
+
+    def set_voice_volume(self, channel_name: str, voice_name: str, volume_level: float):
+        """Установить индивидуальную громкость для кастомного голоса (приоритет выше общей)"""
+        channel_lower = channel_name.lower()
+        
+        if channel_lower not in self.voice_volume_settings:
+            self.voice_volume_settings[channel_lower] = {}
+        
+        self.voice_volume_settings[channel_lower][voice_name] = max(0.0, min(100.0, volume_level))
+        logger.info(f"Custom voice volume set for {channel_name}.{voice_name}: {volume_level}%")
+
+    def get_voice_volume(self, channel_name: str, voice_name: str) -> float:
+        """Получить индивидуальную громкость для кастомного голоса"""
+        channel_lower = channel_name.lower()
+        
+        if channel_lower in self.voice_volume_settings:
+            return self.voice_volume_settings[channel_lower].get(voice_name, 50.0)
+        
+        return 50.0
+
+    def load_tts_volume_from_db(self, db: 'Session'):
+        """Загрузить настройки громкости TTS из базы данных"""
+        try:
+            from core.database import TTSSettings
+            
+            # Загружаем все настройки TTS из базы данных
+            tts_settings_list = db.query(TTSSettings).all()
+            
+            for tts_settings in tts_settings_list:
+                if tts_settings.voice_settings:
+                    volume_level = tts_settings.voice_settings.get("volume_level", 50.0)
+                    channel_name = tts_settings.channel_name
+                    
+                    # Загружаем общую громкость
+                    self.set_tts_volume(channel_name, volume_level)
+                    
+                    # Загружаем индивидуальные громкости кастомных голосов
+                    custom_volumes = tts_settings.voice_settings.get("custom_voice_volumes", {})
+                    for voice_name, voice_volume in custom_volumes.items():
+                        self.set_voice_volume(channel_name, voice_name, voice_volume)
+            
+            logger.info(f"TTS volume settings loaded from database: {len(tts_settings_list)} channels")
+        except Exception as e:
+            logger.error(f"Error loading TTS volume settings from database: {e}")
+
+    def set_youtube_settings(self, channel_name: str, playback_mode: str, volume_level: float):
+        """Установить настройки YouTube для канала"""
+        channel_lower = channel_name.lower()
+        self.youtube_settings[channel_lower] = {
+            "playback_mode": playback_mode,  # browser или obs
+            "volume_level": max(0.0, min(100.0, volume_level))
+        }
+        logger.info(f"YouTube settings set for channel {channel_name}: {playback_mode} mode, volume {volume_level}%")
+
+    def get_youtube_settings(self, channel_name: str) -> dict:
+        """Получить настройки YouTube для канала"""
+        channel_lower = channel_name.lower()
+        return self.youtube_settings.get(channel_lower, {
+            "playback_mode": "browser",
+            "volume_level": 50.0
+        })
+
+    def load_youtube_settings_from_db(self, db: 'Session'):
+        """Загрузить настройки YouTube из базы данных"""
+        try:
+            from core.database import TTSSettings
+            
+            tts_settings_list = db.query(TTSSettings).all()
+            
+            for tts_settings in tts_settings_list:
+                if tts_settings.voice_settings:
+                    playback_mode = tts_settings.voice_settings.get("youtube_playback_mode", "browser")
+                    volume_level = tts_settings.voice_settings.get("youtube_volume", 50.0)
+                    channel_name = tts_settings.channel_name
+                    
+                    self.set_youtube_settings(channel_name, playback_mode, volume_level)
+            
+            logger.info(f"YouTube settings loaded from database: {len(tts_settings_list)} channels")
+        except Exception as e:
+            logger.error(f"Error loading YouTube settings from database: {e}")
+
+    def initialize_from_db(self, db: 'Session'):
+        """Инициализировать ConnectionManager из базы данных при запуске"""
+        try:
+            self.load_tts_volume_from_db(db)
+            self.load_youtube_settings_from_db(db)
+            logger.info("ConnectionManager initialized from database")
+        except Exception as e:
+            logger.error(f"Error initializing ConnectionManager from database: {e}")
 
     # YouTube queue management
     def add_to_youtube_queue(self, user_id: str, video_data: dict):

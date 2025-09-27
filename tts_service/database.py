@@ -32,7 +32,7 @@ from sqlalchemy.sql import func
 
 class User(Base):
     __tablename__ = 'users'
-    id = Column(String, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
     display_name = Column(String)
     avatar = Column(String, nullable=True)
@@ -50,7 +50,7 @@ class Voice(Base):
     voice_type = Column(String, default='global') # 'global' or 'user'
     file_path = Column(String, nullable=False)
     reference_text = Column(String, nullable=True)  # Исправлено: было ref_text_path
-    owner_id = Column(String, ForeignKey('users.id'), nullable=True)
+    owner_id = Column(Integer, ForeignKey('users.id'), nullable=True)
     is_public = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), default=func.now())

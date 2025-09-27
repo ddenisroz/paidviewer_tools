@@ -307,7 +307,7 @@ async def verify_vk_guest(
         path="/",  # Явно указываем путь
         secure=True,
         samesite="lax",
-        max_age=86400  # 24 часа
+        max_age=86400 * 30  # 30 дней (как в oauth_handler)
     )
     
     logger.info(f"VK guest verification successful for channel {channel_name}")

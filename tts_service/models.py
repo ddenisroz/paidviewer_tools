@@ -9,7 +9,7 @@ class VoiceSchema(BaseModel):
     file_path: str
     reference_text: Optional[str] = None
     voice_type: str
-    owner_id: Optional[str] = None
+    owner_id: Optional[int] = None
     is_public: bool
     is_active: bool
     created_at: Optional[dt.datetime] = None
@@ -51,7 +51,8 @@ class TtsConfigResponse(BaseModel):
 class SynthesisRequest(BaseModel):
     text: str
     voice_name: str
-    user_id: Optional[str] = None
+    user_id: Optional[int] = None
+    volume_level: Optional[float] = Field(50.0, ge=0.0, le=100.0, description="Volume level (0-100%)")
 
 class SynthesisResponse(BaseModel):
     success: bool

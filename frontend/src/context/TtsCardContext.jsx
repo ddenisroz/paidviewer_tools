@@ -1,8 +1,6 @@
 // src/context/TtsCardContext.jsx
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import { useLocation } from 'react-router-dom';
-import { TtsHealthContext, useTtsHealth } from './TtsHealthContext';
-import { ttsService } from '../services/microservices';
+import React, { createContext, useContext, useMemo } from 'react';
+import { useTtsHealth } from './TtsHealthContext';
 import { useAuth } from './AuthContext';
 
 const TtsCardContext = createContext();
@@ -17,50 +15,31 @@ export const useTtsCard = () => {
 
 export const TtsCardProvider = ({ children }) => {
     const { user } = useAuth();
-    const ttsHealth = useTtsHealth(); // Вызываем хук на верхнем уровне
+    const ttsHealth = useTtsHealth();
     
-    const [ttsCardStatus, setTtsCardStatus] = useState({
-        isHealthy: false,
-        isLoading: true,
-        error: null
-    });
-
     // Проверяем, является ли пользователь гостем
     const isGuest = user?.is_guest || user?.id === -1;
 
-    const checkTtsHealth = async () => {
-        // Не проверяем TTS для гостевых пользователей
+    // Мемоизируем статус карточки на основе данных из TtsHealthContext
+    const ttsCardStatus = useMemo(() => {
         if (isGuest) {
-            setTtsCardStatus({ isHealthy: false, isLoading: false, error: 'Guest mode - TTS not available' });
-            return;
+            return {
+                isHealthy: false,
+                isLoading: false,
+                error: 'Guest mode - TTS not available'
+            };
         }
         
-        setTtsCardStatus(prev => ({ ...prev, isLoading: true }));
-        try {
-            const response = await ttsService.get('/health');
-            if (response.status === 200 && response.data.tts_engine_loaded) {
-                setTtsCardStatus({ isHealthy: true, isLoading: false, error: null });
-            } else {
-                setTtsCardStatus({ isHealthy: false, isLoading: false, error: 'TTS service is not responding correctly.' });
-            }
-        } catch (error) {
-            setTtsCardStatus({ isHealthy: false, isLoading: false, error: 'Failed to connect to TTS service.' });
-            console.error("TTS Health Check Error:", error);
-        }
-    };
-
-    useEffect(() => {
-        // Обновляем статус на основе данных из TtsHealthContext
-        setTtsCardStatus({
+        return {
             isHealthy: ttsHealth.isHealthy,
             isLoading: ttsHealth.isChecking,
             error: ttsHealth.isHealthy ? null : 'TTS service is not available'
-        });
+        };
     }, [ttsHealth.isHealthy, ttsHealth.isChecking, isGuest]);
     
     const value = {
         ttsCardStatus,
-        refreshStatus: ttsHealth.checkTtsHealth || checkTtsHealth // Используем метод из TtsHealthContext если доступен
+        refreshStatus: ttsHealth.checkTtsHealth
     };
 
     return (

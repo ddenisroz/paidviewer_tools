@@ -387,38 +387,39 @@ const VoiceManagement = () => {
                                              </span>
                                          </div>
                                          {expandedSections.global && (
-                                             <div className="space-y-3">
+                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                                  {voices.filter(voice => voice.voice_type === 'global').map((voice) => (
-                                                     <Card key={voice.id} className="bg-slate-800 border-slate-700">
-                                                         <CardHeader>
+                                                     <Card key={voice.id} className="bg-slate-800 border-slate-700 h-full">
+                                                         <CardHeader className="pb-2">
                                                              <div className="flex items-center justify-between">
-                                                                 <CardTitle className="text-base font-medium text-white flex items-center gap-2">
-                                                                     <Globe className="h-4 w-4 text-blue-400"/>
-                                                                     {voice.name}
+                                                                 <CardTitle className="text-sm font-medium text-white flex items-center gap-2 truncate">
+                                                                     <Globe className="h-3 w-3 text-blue-400 flex-shrink-0"/>
+                                                                     <span className="truncate">{voice.name}</span>
                                                                  </CardTitle>
-                                                                 <Badge variant="default">global</Badge>
+                                                                 <Badge variant="default" className="text-xs">global</Badge>
                                                              </div>
                                                          </CardHeader>
-                                                         <CardContent>
-                                                             <p className="text-xs text-slate-400 italic break-words h-12 overflow-y-auto">
+                                                         <CardContent className="pt-0">
+                                                             <p className="text-xs text-slate-400 italic break-words h-8 overflow-y-auto mb-3">
                                                                  {voice.reference_text || 'Нет референсного текста'}
                                                              </p>
-                                                             <div className="flex gap-2 mt-3">
+                                                             <div className="flex gap-1">
                                                                  <Button 
                                                                      onClick={() => handleEdit(voice)} 
                                                                      size="sm" 
                                                                      variant="outline"
-                                                                     className="flex-1"
+                                                                     className="flex-1 text-xs px-2"
                                                                  >
-                                                                     <Settings className="h-4 w-4 mr-2"/>
+                                                                     <Settings className="h-3 w-3 mr-1"/>
                                                                      Настройки
                                                                  </Button>
                                                                  <Button 
                                                                      onClick={(e) => handleDelete(voice.id, voice.name)} 
                                                                      size="sm" 
                                                                      variant="destructive"
+                                                                     className="px-2"
                                                                  >
-                                                                     <Trash2 className="h-4 w-4"/>
+                                                                     <Trash2 className="h-3 w-3"/>
                                                                  </Button>
                                                              </div>
                                                          </CardContent>
@@ -450,25 +451,25 @@ const VoiceManagement = () => {
                                              </span>
                                          </div>
                                          {expandedSections.user && (
-                                             <div className="space-y-3">
+                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                                  {voices.filter(voice => voice.voice_type === 'user').map((voice) => (
-                                                     <Card key={voice.id} className="bg-slate-800 border-slate-700">
-                                                         <CardHeader>
+                                                     <Card key={voice.id} className="bg-slate-800 border-slate-700 h-full">
+                                                         <CardHeader className="pb-2">
                                                              <div className="flex items-center justify-between">
-                                                                 <CardTitle className="text-base font-medium text-white flex items-center gap-2">
-                                                                     <Users className="h-4 w-4 text-green-400"/>
-                                                                     {voice.name}
+                                                                 <CardTitle className="text-sm font-medium text-white flex items-center gap-2 truncate">
+                                                                     <Users className="h-3 w-3 text-green-400 flex-shrink-0"/>
+                                                                     <span className="truncate">{voice.name}</span>
                                                                  </CardTitle>
-                                                                 <Badge variant="secondary">user</Badge>
+                                                                 <Badge variant="secondary" className="text-xs">user</Badge>
                                                              </div>
-                                                             <div className="text-xs text-slate-400">
+                                                             <div className="text-xs text-slate-400 truncate">
                                                                  {(() => {
                                                                      const owner = users.find(u => u.id === voice.owner_id);
                                                                      return owner ? (
                                                                          <div className="flex items-center gap-1">
-                                                                             <Users className="h-3 w-3" />
-                                                                             <span>{owner.display_name || owner.username}</span>
-                                                                             {owner.is_online && <Badge variant="outline" className="text-xs">Онлайн</Badge>}
+                                                                             <Users className="h-3 w-3 flex-shrink-0" />
+                                                                             <span className="truncate">{owner.display_name || owner.username}</span>
+                                                                             {owner.is_online && <Badge variant="outline" className="text-xs ml-1">Онлайн</Badge>}
                                                                          </div>
                                                                      ) : (
                                                                          <span>Owner ID: {voice.owner_id}</span>
@@ -476,26 +477,27 @@ const VoiceManagement = () => {
                                                                  })()}
                                                              </div>
                                                          </CardHeader>
-                                                         <CardContent>
-                                                             <p className="text-xs text-slate-400 italic break-words h-12 overflow-y-auto">
+                                                         <CardContent className="pt-0">
+                                                             <p className="text-xs text-slate-400 italic break-words h-8 overflow-y-auto mb-3">
                                                                  {voice.reference_text || 'Нет референсного текста'}
                                                              </p>
-                                                             <div className="flex gap-2 mt-3">
+                                                             <div className="flex gap-1">
                                                                  <Button 
                                                                      onClick={() => handleEdit(voice)} 
                                                                      size="sm" 
                                                                      variant="outline"
-                                                                     className="flex-1"
+                                                                     className="flex-1 text-xs px-2"
                                                                  >
-                                                                     <Settings className="h-4 w-4 mr-2"/>
+                                                                     <Settings className="h-3 w-3 mr-1"/>
                                                                      Настройки
                                                                  </Button>
                                                                  <Button 
                                                                      onClick={(e) => handleDelete(voice.id, voice.name)} 
                                                                      size="sm" 
                                                                      variant="destructive"
+                                                                     className="px-2"
                                                                  >
-                                                                     <Trash2 className="h-4 w-4"/>
+                                                                     <Trash2 className="h-3 w-3"/>
                                                                  </Button>
                                                              </div>
                                                          </CardContent>

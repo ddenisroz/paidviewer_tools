@@ -123,7 +123,7 @@ def update_tts_config(settings: TtsConfigSchema):
 
 # --- User Voices ---
 @app.get("/api/user/voices/{user_id}", response_model=List[VoiceSchema])
-def get_user_voices(user_id: str, db: Session = Depends(get_db)):
+def get_user_voices(user_id: int, db: Session = Depends(get_db)):
     return tts_api.get_user_voices(user_id, db)
 
 @app.get("/api/voices/global", response_model=List[VoiceSchema])
@@ -136,13 +136,18 @@ def get_admin_voices(db: Session = Depends(get_db)):
     """Получить все голоса для админки"""
     return tts_api.get_all_voices(db)
 
+@app.delete("/api/admin/voices/{voice_id}")
+def delete_admin_voice(voice_id: int, db: Session = Depends(get_db)):
+    """Удалить голос из админки"""
+    return tts_api.delete_voice(voice_id, db)
+
 # --- Voice Upload for Users ---
 @app.post("/api/user/voices/upload", response_model=VoiceUploadResponse)
 async def upload_user_voice(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     voice_name: str = Form(...),
-    user_id: str = Form(...),
+    user_id: int = Form(...),
     db: Session = Depends(get_db)
 ):
     return await tts_api.upload_voice(
@@ -150,7 +155,7 @@ async def upload_user_voice(
     )
 
 @app.delete("/api/user/voices/{voice_id}")
-def delete_user_voice(voice_id: int, user_id: str, db: Session = Depends(get_db)):
+def delete_user_voice(voice_id: int, user_id: int, db: Session = Depends(get_db)):
     voice = db.query(VoiceModel).filter(
         VoiceModel.id == voice_id, 
         VoiceModel.owner_id == user_id
@@ -189,7 +194,7 @@ def update_voice_settings(
 @app.put("/api/user/voices/{voice_id}/settings")
 def update_user_voice_settings(
     voice_id: int,
-    user_id: str,
+    user_id: int,
     settings: VoiceSettingsSchema,
     db: Session = Depends(get_db)
 ):
@@ -237,7 +242,7 @@ def transcribe_voice_audio(voice_id: int, db: Session = Depends(get_db)):
         )
 
 @app.post("/api/user/voices/{voice_id}/transcribe", response_model=TranscriptionResponse)
-def transcribe_user_voice_audio(voice_id: int, user_id: str, db: Session = Depends(get_db)):
+def transcribe_user_voice_audio(voice_id: int, user_id: int, db: Session = Depends(get_db)):
     voice = db.query(VoiceModel).filter(
         VoiceModel.id == voice_id,
         VoiceModel.owner_id == user_id
@@ -286,7 +291,7 @@ def rename_voice(voice_id: int, new_name: str = Form(...), db: Session = Depends
     return {"message": f"Voice renamed from {old_name} to {new_name}"}
 
 @app.put("/api/user/voices/{voice_id}/rename")
-def rename_user_voice(voice_id: int, user_id: str, new_name: str = Form(...), db: Session = Depends(get_db)):
+def rename_user_voice(voice_id: int, user_id: int, new_name: str = Form(...), db: Session = Depends(get_db)):
     voice = db.query(VoiceModel).filter(
         VoiceModel.id == voice_id,
         VoiceModel.owner_id == user_id
@@ -321,9 +326,10 @@ async def synthesize_speech_for_channel(
     channel_name: str = Form(...),
     text: str = Form(...),
     author: str = Form(...),
+    volume_level: float = Form(50.0),
     db: Session = Depends(get_db)
 ):
-    """Синтез речи для канала с автоматическим выбором голоса"""
+    """Синтез речи для канала с автоматическим выбором голоса и настраиваемой громкостью"""
     try:
         import random
         
@@ -335,16 +341,26 @@ async def synthesize_speech_for_channel(
         # Выбираем случайный голос
         random_voice = random.choice(voices)
         
-        # Создаем запрос на синтез
+        # Создаем запрос на синтез с громкостью
         request = SynthesisRequest(
             text=text,
             voice_name=random_voice.name,
-            user_id=None  # Для канальных запросов user_id может быть None
+            user_id=None,  # Для канальных запросов user_id может быть None
+            volume_level=volume_level
         )
         
-        logger.info(f"Using random voice '{random_voice.name}' for channel '{channel_name}' from user '{author}'")
+        logger.info(f"Using random voice '{random_voice.name}' for channel '{channel_name}' from user '{author}' with volume {volume_level}%")
         
-        return await tts_api.synthesize_speech(background_tasks, request, db)
+        result = await tts_api.synthesize_speech(background_tasks, request, db)
+        
+        # Добавляем информацию о выбранном голосе в ответ
+        if hasattr(result, '__dict__'):
+            result.selected_voice = random_voice.name
+        else:
+            # Если result это dict
+            result['selected_voice'] = random_voice.name
+        
+        return result
         
     except HTTPException:
         raise
@@ -358,7 +374,7 @@ async def test_voice(
     background_tasks: BackgroundTasks,
     voice_id: int,
     text: str = Form(...),
-    user_id: str = Form(None),
+    user_id: int = Form(None),
     db: Session = Depends(get_db)
 ):
     voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
@@ -496,6 +512,11 @@ async def get_tts_settings():
 async def update_tts_settings(settings: dict):
     """Обновить настройки TTS (заглушка)"""
     return JSONResponse({"message": "TTS settings updated successfully"})
+
+@app.post("/api/tts/restart")
+async def restart_tts_engine():
+    """Перезагрузить TTS движок"""
+    return await tts_api.restart_engine()
 
 # --- Main ---
 if __name__ == "__main__":

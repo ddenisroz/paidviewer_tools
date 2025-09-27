@@ -6,23 +6,38 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Plus, Shield, Users, Settings, Mic } from 'lucide-react';
+import { Trash2, Plus, Shield, Users, Settings, Mic, FileText, Activity, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import api, { adminApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import VoiceManagement from '../components/admin/VoiceManagement';
+import UserManagementPage from './admin/UserManagementPage';
+import BotManagementPage from './admin/BotManagementPage';
+import SystemLogsPage from './admin/SystemLogsPage';
+import SessionManagementPage from './admin/SessionManagementPage';
 
 const AdminPage = () => {
     const navigate = useNavigate();
     const { user, isAuthenticated: isTwitchAuthenticated } = useAuth();
+    
+    console.log('AdminPage загружается');
+    console.log('user:', user);
+    console.log('isTwitchAuthenticated:', isTwitchAuthenticated);
     const [channels, setChannels] = useState({ twitch: [], vk: [] });
     const [newChannel, setNewChannel] = useState('');
     const [newPlatform, setNewPlatform] = useState('twitch');
     const [activeTab, setActiveTab] = useState('channels'); // 'channels' или 'voices'
+    const [blockedChannels, setBlockedChannels] = useState([]);
+    const [newBlockedChannel, setNewBlockedChannel] = useState('');
+    const [addingBlockedChannel, setAddingBlockedChannel] = useState(false);
 
     useEffect(() => {
+        console.log('AdminPage useEffect - проверяем права администратора');
+        console.log('user.is_admin:', user?.is_admin);
+        
         // Загружаем данные при монтировании
         loadChannels();
+        loadBlockedChannels();
     }, []);
 
     const loadChannels = async () => {
@@ -71,10 +86,73 @@ const AdminPage = () => {
         }
     };
 
+    const loadBlockedChannels = async () => {
+        try {
+            const response = await api.get('/api/admin/blocked-channels');
+            setBlockedChannels(response.data.blocked_channels || []);
+        } catch (error) {
+            console.error('Ошибка загрузки заблокированных каналов:', error);
+            toast.error('Не удалось загрузить список заблокированных каналов');
+        }
+    };
+
+    const addBlockedChannel = async () => {
+        if (!newBlockedChannel.trim()) {
+            toast.error('Введите название канала');
+            return;
+        }
+
+        try {
+            setAddingBlockedChannel(true);
+            await api.post('/api/admin/blocked-channels', {
+                channel_name: newBlockedChannel.trim(),
+                reason: 'Заблокировано администратором'
+            });
+            
+            toast.success('Канал заблокирован');
+            setNewBlockedChannel('');
+            await loadBlockedChannels();
+        } catch (error) {
+            console.error('Error adding blocked channel:', error);
+            toast.error('Ошибка блокировки канала');
+        } finally {
+            setAddingBlockedChannel(false);
+        }
+    };
+
+    const removeBlockedChannel = async (channelId) => {
+        try {
+            await api.delete(`/api/admin/blocked-channels/${channelId}`);
+            toast.success('Канал разблокирован');
+            await loadBlockedChannels();
+        } catch (error) {
+            console.error('Error removing blocked channel:', error);
+            toast.error('Ошибка разблокировки канала');
+        }
+    };
+
     const logout = () => {
         navigate('/login');
     };
 
+    // Проверяем права администратора
+    if (!user?.is_admin) {
+        console.log('Пользователь не является администратором, перенаправляем');
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 flex items-center justify-center">
+                <div className="text-center">
+                    <h1 className="text-2xl font-bold text-white mb-4">Доступ запрещен</h1>
+                    <p className="text-gray-300 mb-4">У вас нет прав для доступа к админ панели</p>
+                    <Button onClick={() => navigate('/dashboard')} variant="outline" className="text-white border-slate-600">
+                        Вернуться на главную
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
+    console.log('Рендерим админ панель для администратора');
+    
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
             <div className="max-w-6xl mx-auto space-y-6">
@@ -85,7 +163,6 @@ const AdminPage = () => {
                                    <Shield className="h-8 w-8 text-purple-400" />
                                    Админ панель
                                </h1>
-                               <p className="text-slate-300 mt-1">Управление системой TTS</p>
                            </div>
                            <Button onClick={logout} variant="outline" className="text-white border-slate-600">
                                Выйти
@@ -100,7 +177,7 @@ const AdminPage = () => {
                                className={`flex-1 ${activeTab === 'channels' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
                            >
                                <Users className="h-4 w-4 mr-2" />
-                               Каналы
+                               TTS whitelist
                            </Button>
                            <Button
                                variant={activeTab === 'voices' ? 'default' : 'ghost'}
@@ -110,95 +187,86 @@ const AdminPage = () => {
                                <Mic className="h-4 w-4 mr-2" />
                                Голоса
                            </Button>
+                           <Button
+                               variant={activeTab === 'users' ? 'default' : 'ghost'}
+                               onClick={() => setActiveTab('users')}
+                               className={`flex-1 ${activeTab === 'users' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
+                           >
+                               <Users className="h-4 w-4 mr-2" />
+                               Пользователи
+                           </Button>
+                           <Button
+                               variant={activeTab === 'bots' ? 'default' : 'ghost'}
+                               onClick={() => setActiveTab('bots')}
+                               className={`flex-1 ${activeTab === 'bots' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
+                           >
+                               <Settings className="h-4 w-4 mr-2" />
+                               Боты
+                           </Button>
+                           <Button
+                               variant={activeTab === 'sessions' ? 'default' : 'ghost'}
+                               onClick={() => setActiveTab('sessions')}
+                               className={`flex-1 ${activeTab === 'sessions' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
+                           >
+                               <Activity className="h-4 w-4 mr-2" />
+                               Сессии
+                           </Button>
+                           <Button
+                               variant={activeTab === 'logs' ? 'default' : 'ghost'}
+                               onClick={() => {
+                                   console.log('Кнопка Логи нажата, переключаем на logs');
+                                   setActiveTab('logs');
+                               }}
+                               className={`flex-1 ${activeTab === 'logs' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
+                           >
+                               <FileText className="h-4 w-4 mr-2" />
+                               Логи
+                           </Button>
                        </div>
 
                 {/* Контент по табам */}
                 {activeTab === 'channels' ? (
                     <>
                         {/* Статистика */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="bg-slate-800/50 border-slate-700">
-                        <CardContent className="p-4">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-purple-600/20 rounded-lg">
-                                    <Users className="h-5 w-5 text-purple-400" />
+                        <Card className="bg-slate-800/50 border-slate-700">
+                            <CardContent className="p-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-6">
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-1.5 bg-purple-600/20 rounded">
+                                                <Users className="h-4 w-4 text-purple-400" />
+                                            </div>
+                                            <span className="text-sm text-slate-400">Twitch:</span>
+                                            <span className="text-lg font-bold text-white">{channels.twitch.length}</span>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-1.5 bg-blue-600/20 rounded">
+                                                <Users className="h-4 w-4 text-blue-400" />
+                                            </div>
+                                            <span className="text-sm text-slate-400">VK:</span>
+                                            <span className="text-lg font-bold text-white">{channels.vk.length}</span>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-1.5 bg-red-600/20 rounded">
+                                                <Shield className="h-4 w-4 text-red-400" />
+                                            </div>
+                                            <span className="text-sm text-slate-400">Заблокированы:</span>
+                                            <span className="text-lg font-bold text-white">{blockedChannels.length}</span>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-1.5 bg-green-600/20 rounded">
+                                                <Settings className="h-4 w-4 text-green-400" />
+                                            </div>
+                                            <span className="text-sm text-slate-400">Всего:</span>
+                                            <span className="text-lg font-bold text-white">{channels.twitch.length + channels.vk.length}</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="text-sm text-slate-400">Twitch каналы</p>
-                                    <p className="text-2xl font-bold text-white">{channels.twitch.length}</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    
-                    <Card className="bg-slate-800/50 border-slate-700">
-                        <CardContent className="p-4">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-blue-600/20 rounded-lg">
-                                    <Users className="h-5 w-5 text-blue-400" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-slate-400">VK каналы</p>
-                                    <p className="text-2xl font-bold text-white">{channels.vk.length}</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    
-                    <Card className="bg-slate-800/50 border-slate-700">
-                        <CardContent className="p-4">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-green-600/20 rounded-lg">
-                                    <Shield className="h-5 w-5 text-green-400" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-slate-400">Активные сессии</p>
-                                    <Button
-                                        variant="link"
-                                        onClick={() => navigate('/dolbaeb-admin-secure-panel/sessions')}
-                                        className="p-0 h-auto text-white hover:text-green-400"
-                                    >
-                                        Управление
-                                    </Button>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    
-                    <Card className="bg-slate-800/50 border-slate-700">
-                        <CardContent className="p-4">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-red-600/20 rounded-lg">
-                                    <Shield className="h-5 w-5 text-red-400" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-slate-400">Заблокированные каналы</p>
-                                    <Button
-                                        variant="link"
-                                        onClick={() => navigate('/dolbaeb-admin-secure-panel/blocked-channels')}
-                                        className="p-0 h-auto text-white hover:text-red-400"
-                                    >
-                                        Управление
-                                    </Button>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    
-                    <Card className="bg-slate-800/50 border-slate-700">
-                        <CardContent className="p-4">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-green-600/20 rounded-lg">
-                                    <Settings className="h-5 w-5 text-green-400" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-slate-400">Всего каналов</p>
-                                    <p className="text-2xl font-bold text-white">{channels.twitch.length + channels.vk.length}</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                            </CardContent>
+                        </Card>
 
                 {/* Добавление нового канала */}
                 <Card className="bg-slate-800/50 border-slate-700">
@@ -314,9 +382,97 @@ const AdminPage = () => {
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Управление заблокированными каналами */}
+                <Card className="bg-slate-800/50 border-slate-700">
+                    <CardHeader>
+                        <CardTitle className="text-white flex items-center gap-2">
+                            <Shield className="h-5 w-5 text-red-400" />
+                            Заблокированные каналы ({blockedChannels.length})
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {/* Форма добавления заблокированного канала */}
+                        <div className="mb-6">
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="Введите название канала для блокировки"
+                                    value={newBlockedChannel}
+                                    onChange={(e) => setNewBlockedChannel(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && addBlockedChannel()}
+                                    className="flex-1"
+                                />
+                                <Button 
+                                    onClick={addBlockedChannel}
+                                    disabled={addingBlockedChannel || !newBlockedChannel.trim()}
+                                    variant="destructive"
+                                >
+                                    {addingBlockedChannel ? 'Блокируем...' : 'Заблокировать'}
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Список заблокированных каналов */}
+                        {blockedChannels.length === 0 ? (
+                            <div className="text-center py-8 text-slate-400">
+                                <AlertCircle className="w-12 h-12 mx-auto mb-4 text-slate-500" />
+                                <p className="text-lg font-medium mb-2">Нет заблокированных каналов</p>
+                                <p className="text-sm">Заблокированные каналы будут отображаться здесь</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {blockedChannels.map((channel) => (
+                                    <div key={channel.id} className="flex items-center justify-between p-4 border border-red-600/20 rounded-lg bg-red-900/10">
+                                        <div className="flex-1">
+                                            <div className="flex items-center space-x-3">
+                                                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                                                <span className="font-medium text-white">{channel.channel_name}</span>
+                                                {channel.reason && (
+                                                    <Badge variant="outline" className="text-xs border-red-600 text-red-400">
+                                                        {channel.reason}
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                            {channel.created_at && (
+                                                <p className="text-xs text-slate-400 mt-1">
+                                                    Заблокировано: {new Date(channel.created_at).toLocaleString('ru-RU')}
+                                                </p>
+                                            )}
+                                        </div>
+                                        
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => removeBlockedChannel(channel.id)}
+                                            className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white"
+                                        >
+                                            <Trash2 className="w-4 h-4 mr-1" />
+                                            Разблокировать
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
                     </>
-                ) : (
+                ) : activeTab === 'voices' ? (
                     <VoiceManagement />
+                ) : activeTab === 'users' ? (
+                    <UserManagementPage />
+                ) : activeTab === 'bots' ? (
+                    <BotManagementPage />
+                ) : activeTab === 'sessions' ? (
+                    <SessionManagementPage />
+                ) : activeTab === 'logs' ? (
+                    (() => {
+                        console.log('Отображаем SystemLogsPage, activeTab:', activeTab);
+                        return <SystemLogsPage />;
+                    })()
+                ) : (
+                    <div className="text-center py-8">
+                        <p className="text-gray-500">Выберите раздел для управления</p>
+                    </div>
                 )}
             </div>
         </div>

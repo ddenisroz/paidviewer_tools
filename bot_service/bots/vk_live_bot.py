@@ -99,6 +99,11 @@ class VKLiveBot:
                 
                 logger.info(f"✅ VK LIVE BOT CONNECTED to channel: {channel_name}")
                 print(f"🔔 VK LIVE BOT: Successfully connected to {channel_name} and listening for chat messages")
+                
+                # Отправляем шутливое сообщение о подключении
+                fake_ip = self._generate_fake_ip()
+                await self.send_message(channel_name, f"подключен к стримеру с IP адресом: {fake_ip} (TODO: скрыть личные данные)")
+                
                 return True
             else:
                 # Fallback на ОПТИМИЗИРОВАННЫЙ REST-ридер
@@ -471,8 +476,19 @@ class VKLiveBot:
 
             # Отправляем запрос на озвучку
             if message_text.strip():  # Только если есть текст для озвучки
-                logger.info(f"🎤 Sending TTS request for VK Live channel {channel_name}: {message_text[:50]}...")
-                await self.tts_api.send_tts_request(channel_name, message_text, author_nick)
+                # Получаем настройки громкости для канала (общая громкость)
+                volume_level = self.connection_manager.get_tts_volume(channel_name)
+                logger.info(f"🎤 Sending TTS request for VK Live channel {channel_name}: {message_text[:50]}... (volume: {volume_level}%)")
+                
+                # Передаем connection_manager для проверки приоритетных голосов
+                result = await self.tts_api.send_tts_request(
+                    channel_name, message_text, author_nick, volume_level, self.connection_manager
+                )
+                
+                if result.get("success"):
+                    logger.debug(f"TTS synthesis successful: voice={result.get('voice')}, volume={result.get('volume')}%")
+                else:
+                    logger.error(f"TTS synthesis failed: {result.get('error')}")
                 
         except Exception as e:
             logger.error(f"Error handling TTS message for VK Live channel {channel_name}: {e}")
@@ -789,7 +805,7 @@ class VKLiveBot:
             from services.queue_service import QueueService
             
             # Добавляем видео в очередь через сервис
-            queue_service = QueueService()
+            queue_service = QueueService(connection_manager=self.connection_manager)
             result = await queue_service.add_video_to_queue(
                 user_id=1,  # Временный ID для VK пользователей
                 video_url=url, 
@@ -802,6 +818,13 @@ class VKLiveBot:
             if result['success']:
                 video_info = result['video_info']
                 await self.send_message(channel_name, f"✅ {author_nick} добавил в очередь: {video_info['title']}")
+                
+                # Отправляем событие обновления очереди
+                await self.connection_manager.send_youtube_event_to_user(
+                    user_id="1",  # Используем тот же ID что и в add_video_to_queue
+                    event_type="queue_updated",
+                    data={"action": "video_added", "video": video_info}
+                )
             else:
                 await self.send_message(channel_name, f"❌ Ошибка добавления видео: {result['error']}")
                 
@@ -856,3 +879,13 @@ class VKLiveBot:
         except Exception as e:
             logger.error(f"Error in voice_command_vk: {e}")
             await self.send_message(channel_name, "❌ Произошла ошибка при смене голоса")
+    
+    def _generate_fake_ip(self):
+        """Генерирует фейковый IP адрес для шутки"""
+        import random
+        # Генерируем IP в формате xx.xxx.xx.xx
+        octet1 = random.randint(10, 99)
+        octet2 = random.randint(100, 999)
+        octet3 = random.randint(10, 99)
+        octet4 = random.randint(10, 99)
+        return f"{octet1}.{octet2}.{octet3}.{octet4}"

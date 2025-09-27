@@ -28,14 +28,39 @@ const GlobalPlayer = () => {
             }
         } catch (error) {
             console.error('Error loading current video:', error);
+            
+            // Не показываем ошибки для rate limiting и CORS
+            if (error.response?.status === 429 || error.code === 'ERR_NETWORK') {
+                return;
+            }
         }
     };
 
-    // Загружаем видео при монтировании и каждые 5 секунд
+    // Загружаем видео при монтировании и по событиям
     useEffect(() => {
         loadCurrentVideo();
-        const interval = setInterval(loadCurrentVideo, 5000);
-        return () => clearInterval(interval);
+        
+        // Обработчик YouTube событий
+        const handleYoutubeEvent = (event) => {
+            const { event: eventType, data } = event.detail;
+            console.log('GlobalPlayer YouTube event received:', eventType, data);
+            
+            if (eventType === 'queue_updated') {
+                // Обновляем текущее видео при изменении очереди
+                loadCurrentVideo();
+            }
+        };
+        
+        // Подписываемся на YouTube события
+        window.addEventListener('youtubeEvent', handleYoutubeEvent);
+        
+        // Убираем polling - теперь обновляем только по событиям
+        // const interval = setInterval(loadCurrentVideo, 30000);
+        // return () => clearInterval(interval);
+        
+        return () => {
+            window.removeEventListener('youtubeEvent', handleYoutubeEvent);
+        };
     }, []);
 
     // Обработка воспроизведения/паузы (заглушка для UI)
@@ -89,8 +114,8 @@ const GlobalPlayer = () => {
     // Если нет видео, показываем заглушку
     if (!currentVideo) {
         return (
-            <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-purple-900/95 to-blue-900/95 backdrop-blur-sm border-t border-purple-500/20 z-50">
-                <div className="container mx-auto px-4 py-3">
+            <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 z-50">
+                <div className="px-4 py-3">
                     <div className="flex items-center justify-center gap-3">
                         <Music className="w-5 h-5 text-gray-400" />
                         <span className="text-gray-300 text-sm">Нет очереди заказов YouTube</span>
@@ -106,12 +131,12 @@ const GlobalPlayer = () => {
     }
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-purple-900/95 to-blue-900/95 backdrop-blur-sm border-t border-purple-500/20 z-50">
-            <div className="container mx-auto px-4 py-3">
-                <div className="flex items-center justify-between gap-4">
+        <div className="fixed bottom-0 left-0 w-1/2 bg-black/20 backdrop-blur-sm border-t border-r border-white/10 z-50">
+            <div className="px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
                     {/* Информация о видео */}
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-12 h-12 bg-gray-800 rounded-lg overflow-hidden flex-shrink-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="w-10 h-10 bg-gray-800 rounded-md overflow-hidden flex-shrink-0">
                             {currentVideo.thumbnail_url && (
                                 <img 
                                     src={currentVideo.thumbnail_url} 
@@ -120,7 +145,7 @@ const GlobalPlayer = () => {
                                 />
                             )}
                         </div>
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0 flex-1 bg-black/20 rounded-md px-2 py-1">
                             <h3 className="text-white font-medium text-sm truncate">
                                 {currentVideo.title}
                             </h3>
@@ -131,13 +156,13 @@ const GlobalPlayer = () => {
                     </div>
 
                     {/* Элементы управления */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         {/* Кнопка воспроизведения/паузы */}
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={togglePlayPause}
-                            className="text-white hover:bg-white/10"
+                            className="text-white bg-black/30 hover:bg-black/50 border border-white/20"
                         >
                             {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                         </Button>
@@ -148,11 +173,11 @@ const GlobalPlayer = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={toggleMute}
-                                className="text-white hover:bg-white/10 p-1"
+                                className="text-white bg-black/30 hover:bg-black/50 border border-white/20 p-1"
                             >
                                 {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                             </Button>
-                            <div className="w-20">
+                            <div className="w-16">
                                 <Slider
                                     value={[isMuted ? 0 : volume]}
                                     onValueChange={handleVolumeChange}
@@ -168,7 +193,7 @@ const GlobalPlayer = () => {
                             variant="ghost"
                             size="sm"
                             onClick={nextVideo}
-                            className="text-white hover:bg-white/10"
+                            className="text-white bg-black/30 hover:bg-black/50 border border-white/20"
                         >
                             <SkipForward className="w-4 h-4" />
                         </Button>
@@ -178,7 +203,7 @@ const GlobalPlayer = () => {
                             variant="ghost"
                             size="sm"
                             onClick={closePlayer}
-                            className="text-white hover:bg-white/10"
+                            className="text-white bg-black/30 hover:bg-black/50 border border-white/20"
                         >
                             <X className="w-4 h-4" />
                         </Button>

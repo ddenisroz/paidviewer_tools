@@ -32,7 +32,7 @@ const getNavItems = (isYourchy) => {
 
     // Добавляем админ панель только для пользователя yourchy
     if (isYourchy) {
-        baseItems.push({ to: '/dashboard/admin', label: 'Админ панель', icon: Shield });
+        baseItems.push({ to: '/dashboard/dolbaebadmintts', label: 'Админ панель', icon: Shield });
     }
 
     return baseItems;

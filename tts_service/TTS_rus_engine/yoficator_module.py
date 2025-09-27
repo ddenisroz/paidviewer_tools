@@ -8,7 +8,11 @@
 import os
 import re
 import codecs
+import logging
 from pathlib import Path
+
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
 class Yoficator:
     """Ёфикатор для русского текста"""
@@ -29,6 +33,7 @@ class Yoficator:
         self.dictionary = {}
         self.splitter = re.compile(r'(\s+|\w+|\W+|\S+)', re.UNICODE)
         
+        logger.info(f"Загружаем словарь ёфикации из: {self.dictionary_path}")
         # Загружаем словарь
         self._load_dictionary()
     
@@ -56,8 +61,10 @@ class Yoficator:
                             value = bline
                             key = re.sub(r'ё', 'е', value)
                             self.dictionary[key] = value
+            
+            logger.info(f"Словарь ёфикации загружен успешно. Записей: {len(self.dictionary)}")
         except FileNotFoundError:
-            print(f"Предупреждение: Словарь {self.dictionary_path} не найден. Ёфикация отключена.")
+            logger.warning(f"Словарь {self.dictionary_path} не найден. Ёфикация отключена.")
             self.dictionary = {}
     
     def yoficate(self, text):
@@ -162,7 +169,9 @@ class Yoficator:
         return word
 
 # Создаем глобальный экземпляр для удобства использования
+logger.info("Инициализация ёфикатора...")
 yoficator = Yoficator()
+logger.info("Ёфикатор инициализирован успешно")
 
 def yoficate_text(text):
     """

@@ -19,29 +19,164 @@ const YoutubeIntegrationPage = () => {
     const [volume, setVolume] = useState([50]);
     const [isMuted, setIsMuted] = useState(false);
     const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
+    const [playbackMode, setPlaybackMode] = useState('browser'); // browser или obs
+    const [youtubeObsUrl, setYoutubeObsUrl] = useState('');
+    const [isObsUrlVisible, setIsObsUrlVisible] = useState(false);
     const playerRef = useRef(null);
     const { lastJsonMessage } = useChat();
 
     const loadQueue = async () => {
         try {
             const { data } = await api.get('/api/youtube/queue');
+            console.log('YouTube queue data:', data); // Debug log
+            
             setQueue(data.queue || []);
             setCurrentVideo(data.current_video || null);
             setIsPlaying(data.is_playing || false);
         } catch (error) {
-            // Не показываем toast для 429 ошибок (rate limiting)
-            if (error.response?.status !== 429) {
-                toast.error('Ошибка загрузки очереди видео.');
-            }
             console.error('Error loading YouTube queue:', error);
+            
+            // Не показываем toast для 429 ошибок (rate limiting)
+            if (error.response?.status === 429) {
+                console.log('Rate limited, will retry later');
+                return;
+            }
+            
+            // Не показываем toast для CORS ошибок
+            if (error.code === 'ERR_NETWORK' || error.message?.includes('CORS')) {
+                console.log('Network/CORS error, will retry later');
+                return;
+            }
+            
+            toast.error('Ошибка загрузки очереди видео.');
+        }
+    };
+
+    // Загрузка настроек YouTube
+    const loadYoutubeSettings = async () => {
+        try {
+            const response = await api.get('/api/tts/youtube-settings');
+            setPlaybackMode(response.data.playback_mode || 'browser');
+            setVolume([response.data.volume_level || 50]);
+        } catch (error) {
+            console.error('Error loading YouTube settings:', error);
+        }
+    };
+
+    // Сохранение настроек YouTube
+    const saveYoutubeSettings = async (newPlaybackMode, newVolume) => {
+        try {
+            await api.post('/api/tts/youtube-settings', {
+                playback_mode: newPlaybackMode,
+                volume_level: newVolume
+            });
+            toast.success('Настройки YouTube сохранены');
+        } catch (error) {
+            console.error('Error saving YouTube settings:', error);
+            toast.error('Ошибка сохранения настроек YouTube');
+        }
+    };
+
+    // Генерация URL для YouTube OBS
+    const generateYoutubeObsUrl = async () => {
+        try {
+            const response = await api.post('/api/youtube/generate-obs-url');
+            const url = response.data.youtube_obs_url;
+            setYoutubeObsUrl(url);
+            setIsObsUrlVisible(true);
+            
+            // Показываем URL пользователю и предлагаем скопировать
+            toast.success('OBS URL сгенерирован!', {
+                description: 'URL скопирован в буфер обмена',
+                action: {
+                    label: 'Скопировать',
+                    onClick: () => {
+                        navigator.clipboard.writeText(url);
+                        toast.success('URL скопирован!');
+                    }
+                }
+            });
+            
+            // Автоматически копируем в буфер обмена
+            navigator.clipboard.writeText(url);
+            
+            return url;
+        } catch (error) {
+            console.error('Error generating YouTube OBS URL:', error);
+            toast.error('Ошибка создания YouTube OBS URL');
+            return null;
+        }
+    };
+
+    // Перегенерация URL для YouTube OBS
+    const regenerateYoutubeObsUrl = async () => {
+        try {
+            const response = await api.post('/api/youtube/regenerate-obs-url');
+            const url = response.data.youtube_obs_url;
+            setYoutubeObsUrl(url);
+            setIsObsUrlVisible(true);
+            
+            toast.success('OBS URL перегенерирован!', {
+                description: 'Новый URL скопирован в буфер обмена'
+            });
+            
+            // Автоматически копируем в буфер обмена
+            navigator.clipboard.writeText(url);
+            
+            return url;
+        } catch (error) {
+            console.error('Error regenerating YouTube OBS URL:', error);
+            toast.error('Ошибка перегенерации YouTube OBS URL');
+            return null;
+        }
+    };
+
+    // Скрытие URL
+    const hideObsUrl = () => {
+        setIsObsUrlVisible(false);
+        toast.success('OBS URL скрыт');
+    };
+
+    // Загрузка существующего OBS URL
+    const loadExistingObsUrl = async () => {
+        try {
+            const response = await api.get('/api/tts/obs-url');
+            if (response.data.obs_token) {
+                const url = `http://localhost:5173/youtube-obs/${response.data.obs_token}`;
+                setYoutubeObsUrl(url);
+                setIsObsUrlVisible(false); // По умолчанию скрыт
+            }
+        } catch (error) {
+            console.error('Error loading existing OBS URL:', error);
         }
     };
 
     useEffect(() => {
         loadQueue();
-        // Обновляем очередь каждые 15 секунд (увеличили интервал для избежания rate limiting)
-        const interval = setInterval(loadQueue, 15000);
-        return () => clearInterval(interval);
+        loadYoutubeSettings();
+        loadExistingObsUrl();
+        
+        // Обработчик YouTube событий
+        const handleYoutubeEvent = (event) => {
+            const { event: eventType, data } = event.detail;
+            console.log('YouTube event received:', eventType, data);
+            
+            if (eventType === 'queue_updated') {
+                // Обновляем очередь при изменении
+                loadQueue();
+            }
+        };
+        
+        // Подписываемся на YouTube события
+        window.addEventListener('youtubeEvent', handleYoutubeEvent);
+        
+        // Убираем polling - теперь обновляем только по событиям
+        // const interval = setInterval(loadQueue, 30000);
+        // return () => clearInterval(interval);
+        
+        return () => {
+            window.removeEventListener('youtubeEvent', handleYoutubeEvent);
+        };
     }, []);
 
     // Обработчик клавиши Esc для выхода из полноэкранного режима
@@ -159,32 +294,42 @@ const YoutubeIntegrationPage = () => {
                 <Card className={`transition-all duration-300 w-full ${isTheaterMode ? 'bg-black border-none h-full' : ''}`}>
                     <CardContent className={`grid gap-6 p-6 ${isTheaterMode ? 'grid-cols-5 h-full' : 'grid-cols-1 lg:grid-cols-5 min-h-[600px]'}`}>
                         <div className={`space-y-4 ${isTheaterMode ? 'col-span-4' : 'lg:col-span-3'}`}>
-                            {/* Кнопка театрального режима */}
-                            <div className="flex justify-end">
-                                <Button variant="ghost" size="sm" onClick={() => setIsTheaterMode(!isTheaterMode)}>
-                                    {isTheaterMode ? <Minimize className="h-4 w-4 mr-2" /> : <Maximize className="h-4 w-4 mr-2" />}
-                                    {isTheaterMode ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
-                                </Button>
-                            </div>
-                            
-                            {/* Плеер */}
-                            <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-                                {currentVideo ? (
-                                    <YouTube
-                                        videoId={currentVideo.video_id}
-                                        opts={opts}
-                                        onEnd={handleVideoEnd}
-                                        onPlay={() => setIsPlaying(true)}
-                                        onPause={() => setIsPlaying(false)}
-                                        ref={playerRef}
-                                        className="w-full h-full"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-muted">
-                                        <p className="text-muted-foreground">Нет видео для воспроизведения.</p>
+                            {/* Плеер (только для режима сайта) */}
+                            {playbackMode === 'browser' ? (
+                                <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                                    {currentVideo ? (
+                                        <YouTube
+                                            videoId={currentVideo.video_id}
+                                            opts={opts}
+                                            onEnd={handleVideoEnd}
+                                            onPlay={() => setIsPlaying(true)}
+                                            onPause={() => setIsPlaying(false)}
+                                            ref={playerRef}
+                                            className="w-full h-full"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center bg-muted">
+                                            <p className="text-muted-foreground">Нет видео для воспроизведения.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="relative aspect-video bg-gray-800 rounded-lg overflow-hidden border-2 border-purple-500">
+                                    <div className="w-full h-full flex flex-col items-center justify-center text-center p-6">
+                                        <div className="text-6xl mb-4">📹</div>
+                                        <h3 className="text-xl font-medium text-purple-300 mb-2">Режим OBS Studio</h3>
+                                        <p className="text-gray-300 mb-4">
+                                            Видео воспроизводятся в OBS Studio.<br/>
+                                            Управление происходит через кнопки ниже.
+                                        </p>
+                                        {currentVideo && (
+                                            <div className="text-sm text-gray-400 bg-gray-700 p-3 rounded-lg">
+                                                <strong>Сейчас играет:</strong> {currentVideo.title}
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
 
                             {/* Элементы управления */}
                             <div className="flex items-center justify-between bg-muted/30 rounded-lg p-4">
@@ -247,6 +392,82 @@ const YoutubeIntegrationPage = () => {
                                     </DialogContent>
                                 </Dialog>
                             </div>
+                            
+                            {/* Кнопки управления */}
+                            <div className="flex justify-between items-center mt-4">
+                                <div className="flex items-center gap-2">
+                                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                        playbackMode === 'browser' 
+                                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                            : 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                                    }`}>
+                                        {playbackMode === 'browser' ? '🌐 Сайт' : '📹 OBS Studio'}
+                                    </div>
+                                    {!youtubeObsUrl ? (
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            onClick={generateYoutubeObsUrl}
+                                        >
+                                            🔗 OBS URL
+                                        </Button>
+                                    ) : (
+                                        <div className="flex gap-2">
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                onClick={isObsUrlVisible ? hideObsUrl : () => setIsObsUrlVisible(true)}
+                                            >
+                                                {isObsUrlVisible ? '👁️ Скрыть' : '👁️ Показать'}
+                                            </Button>
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                onClick={regenerateYoutubeObsUrl}
+                                            >
+                                                🔄 Перегенерировать
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                                <Button variant="ghost" size="sm" onClick={() => setIsTheaterMode(!isTheaterMode)}>
+                                    {isTheaterMode ? <Minimize className="h-4 w-4 mr-2" /> : <Maximize className="h-4 w-4 mr-2" />}
+                                    {isTheaterMode ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
+                                </Button>
+                            </div>
+                            
+                            {/* OBS URL (если сгенерирован и видим) */}
+                            {youtubeObsUrl && isObsUrlVisible && (
+                                <div className="bg-gray-800 rounded-lg p-3 border border-gray-700 mt-4">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm text-gray-400 mb-1">OBS Browser Source URL:</p>
+                                            <p className="text-xs text-gray-300 font-mono break-all">{youtubeObsUrl}</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(youtubeObsUrl);
+                                                    toast.success('URL скопирован!');
+                                                }}
+                                                className="flex-shrink-0"
+                                            >
+                                                📋 Копировать
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={hideObsUrl}
+                                                className="flex-shrink-0"
+                                            >
+                                                👁️ Скрыть
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className={`flex flex-col h-full ${isTheaterMode ? 'col-span-1' : 'lg:col-span-2'}`}>

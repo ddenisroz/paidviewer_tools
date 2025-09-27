@@ -10,11 +10,11 @@ class TTSAPI:
     def __init__(self):
         self.tts_service_url = os.getenv("TTS_SERVICE_URL", "http://localhost:8001")
 
-    async def send_tts_request(self, channel_name: str, text: str, author: str) -> bool:
-        """Отправить запрос на озвучку в TTS сервис с автоматическим выбором голоса"""
+    async def send_tts_request(self, channel_name: str, text: str, author: str, volume_level: float = 50.0, connection_manager=None) -> dict:
+        """Отправить запрос на озвучку в TTS сервис с автоматическим выбором голоса и приоритетной громкостью"""
         if not self.tts_service_url:
             logger.warning("TTS_SERVICE_URL not configured")
-            return False
+            return {"success": False, "error": "TTS service not configured"}
 
         try:
             async with aiohttp.ClientSession() as session:
@@ -22,21 +22,37 @@ class TTSAPI:
                 data = {
                     "channel_name": channel_name,
                     "text": text,
-                    "author": author
+                    "author": author,
+                    "volume_level": volume_level
                 }
                 
                 async with session.post(url, data=data) as response:
                     if response.status == 200:
                         result = await response.json()
-                        logger.info(f"TTS request sent for channel {channel_name}: {text[:50]}... (using random voice)")
-                        return True
+                        selected_voice = result.get("selected_voice")
+                        
+                        # Если есть connection_manager и выбран голос, проверяем приоритетную громкость
+                        if connection_manager and selected_voice:
+                            priority_volume = connection_manager.get_voice_volume(channel_name, selected_voice)
+                            if priority_volume != 50.0:  # Если есть кастомная громкость
+                                logger.info(f"🔊 Custom voice volume detected for {selected_voice}: {priority_volume}%")
+                                # Пересылаем запрос с приоритетной громкостью
+                                data["volume_level"] = priority_volume
+                                async with session.post(url, data=data) as priority_response:
+                                    if priority_response.status == 200:
+                                        priority_result = await priority_response.json()
+                                        logger.info(f"TTS request sent for channel {channel_name}: {text[:50]}... (voice: {selected_voice}, priority volume: {priority_volume}%)")
+                                        return {"success": True, "voice": selected_voice, "volume": priority_volume}
+                        
+                        logger.info(f"TTS request sent for channel {channel_name}: {text[:50]}... (voice: {selected_voice or 'random'}, volume: {volume_level}%)")
+                        return {"success": True, "voice": selected_voice, "volume": volume_level}
                     else:
                         logger.error(f"TTS request failed: {response.status}")
-                        return False
+                        return {"success": False, "error": f"HTTP {response.status}"}
                         
         except Exception as e:
             logger.error(f"Error sending TTS request: {e}")
-            return False
+            return {"success": False, "error": str(e)}
 
     async def enable_tts(self, channel_name: str) -> bool:
         """Включить TTS для канала"""

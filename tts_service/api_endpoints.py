@@ -46,7 +46,7 @@ class TTSAPIEndpoints:
         request: SynthesisRequest,
         db: Session = Depends(get_db)
     ):
-        """Синтез речи"""
+        """Синтез речи с применением громкости к выходному файлу"""
         if not tts_engine_manager.is_ready():
             raise HTTPException(status_code=503, detail="TTS engine not ready")
         
@@ -74,10 +74,11 @@ class TTSAPIEndpoints:
                 "top_k": voice.top_k,
                 "repetition_penalty": voice.repetition_penalty,
                 "length_penalty": voice.length_penalty,
-                "early_stopping": voice.early_stopping
+                "early_stopping": voice.early_stopping,
+                "volume_level": getattr(request, 'volume_level', 50.0)  # Громкость по умолчанию 50%
             }
             
-            # Выполняем синтез
+            # Выполняем синтез с применением громкости
             success = await tts_engine_manager.synthesize(
                 request.text, 
                 request.voice_name, 
@@ -117,7 +118,7 @@ class TTSAPIEndpoints:
         voice_name: str = Form(...),
         voice_type: str = Form("user"),
         is_public: bool = Form(False),
-        owner_id: str = Form(None),
+        owner_id: int = Form(None),
         db: Session = Depends(get_db)
     ):
         """Загрузить голос"""
@@ -192,7 +193,7 @@ class TTSAPIEndpoints:
         config.cfg_strength = settings.cfg_strength
         return TtsConfigResponse(cfg_strength=config.cfg_strength)
 
-    def get_user_voices(self, user_id: str, db: Session = Depends(get_db)):
+    def get_user_voices(self, user_id: int, db: Session = Depends(get_db)):
         """Получить голоса пользователя"""
         voices = db.query(VoiceModel).filter(
             VoiceModel.owner_id == user_id
@@ -228,6 +229,24 @@ class TTSAPIEndpoints:
                 
         except Exception as e:
             logger.error(f"Error transcribing voice {voice_id}: {e}")
+
+    async def restart_engine(self):
+        """Перезагрузить TTS движок"""
+        try:
+            logger.info("Restarting TTS engine...")
+            
+            # Останавливаем текущий движок
+            await tts_engine_manager.shutdown()
+            
+            # Инициализируем заново
+            await tts_engine_manager.initialize()
+            
+            logger.info("TTS engine restarted successfully")
+            return {"message": "TTS engine restarted successfully", "status": "ready"}
+            
+        except Exception as e:
+            logger.error(f"Error restarting TTS engine: {e}")
+            return {"error": f"Failed to restart TTS engine: {str(e)}", "status": "error"}
 
 # Глобальный экземпляр
 tts_api = TTSAPIEndpoints()

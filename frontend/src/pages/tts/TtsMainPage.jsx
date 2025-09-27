@@ -163,16 +163,30 @@ const TtsMainPageContent = () => {
         }
     };
     
-    // Сохранение настроек звука
+    // Сохранение настроек звука (на сервере для OBS + локально для быстрого UI)
     const saveAudioSettings = async (newSettings) => {
         try {
+            // Определяем активную громкость в зависимости от режима прослушивания
+            const activeVolume = listeningMode === 'website' ? newSettings.websiteVolume : newSettings.obsVolume;
+            
             if (isAuthenticated) {
-                await ttsService.put('/api/tts/audio-settings', newSettings);
-            } else {
+                // Для авторизованных пользователей: сохраняем на сервере
+                await api.post('/api/tts/volume', {
+                    volume_level: activeVolume,
+                    listening_mode: listeningMode  // Передаем режим прослушивания
+                });
+                
+                console.log(`Audio settings saved to server: ${activeVolume}% for ${listeningMode} mode`);
+                
+                // Также сохраняем в localStorage для быстрого доступа UI
                 localStorage.setItem('tts_audio_settings', JSON.stringify(newSettings));
+            } else {
+                // Для гостей: только localStorage (OBS недоступен в гостевом режиме)
+                localStorage.setItem('tts_audio_settings', JSON.stringify(newSettings));
+                console.log('Audio settings saved locally (guest mode):', newSettings);
             }
+            
             setAudioSettings(newSettings);
-            toast.success('Настройки звука сохранены');
         } catch (error) {
             console.error('Failed to save audio settings:', error);
             toast.error('Ошибка сохранения настроек звука');
@@ -195,14 +209,31 @@ const TtsMainPageContent = () => {
         }
     };
     
-    // Обработка изменения громкости
+    // Debounce для автоматического сохранения
+    const [saveTimeout, setSaveTimeout] = useState(null);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    
+    // Обработка изменения громкости с debounce
     const handleVolumeChange = (volumeType, value) => {
         const newSettings = {
             ...audioSettings,
             [volumeType]: value
         };
         setAudioSettings(newSettings);
-        saveAudioSettings(newSettings);
+        setHasUnsavedChanges(true);
+        
+        // Очищаем предыдущий таймер
+        if (saveTimeout) {
+            clearTimeout(saveTimeout);
+        }
+        
+        // Устанавливаем новый таймер для сохранения через 1 секунду
+        const timeout = setTimeout(() => {
+            saveAudioSettings(newSettings);
+            setHasUnsavedChanges(false);
+        }, 1000);
+        
+        setSaveTimeout(timeout);
     };
     
     // Функция для копирования в буфер обмена
@@ -229,18 +260,16 @@ const TtsMainPageContent = () => {
             
             const connected = response.data.connected;
             
-            // Если бот отключился, перенаправляем на страницу логина
+            // НЕ перенаправляем на логин при отключении бота
+            // Пользователь может остаться на странице и попробовать переподключиться
             if (!connected) {
-                toast.error('Бот отключился от канала. Перенаправляем на страницу подключения...');
-                setTimeout(() => {
-                    window.location.href = '/login';
-                }, 2000);
+                console.log('Bot is not connected, but staying on page');
             }
         } catch (error) {
             console.error('Failed to check bot status:', error);
             // Не показываем ошибку для 401 (это нормально для гостей)
             if (error.response?.status !== 401) {
-                toast.error('Ошибка проверки статуса бота');
+                console.log('Bot status check failed, but staying on page');
             }
         }
     }, [isAuthenticated, channelName]);
@@ -264,10 +293,42 @@ const TtsMainPageContent = () => {
         if (isAuthenticated) {
             loadPlatformSettings();
             loadExistingObsUrl();
+            loadVolumeFromBackend(); // Загружаем настройки громкости с backend
         }
-        // Настройки загружаем для всех пользователей
-        loadSettings();
     }, [isAuthenticated]);
+
+    // Загрузка настроек громкости с backend
+    const loadVolumeFromBackend = async () => {
+        try {
+            if (!isAuthenticated) return;
+            
+            const response = await api.get('/api/tts/volume');
+            const backendVolume = response.data.volume_level;
+            const backendListeningMode = response.data.listening_mode || 'website';
+            
+            // Синхронизируем режим прослушивания с backend
+            setListeningMode(backendListeningMode);
+            
+            // Обновляем настройки громкости для соответствующего режима
+            setAudioSettings(prev => ({
+                ...prev,
+                [backendListeningMode === 'website' ? 'websiteVolume' : 'obsVolume']: backendVolume
+            }));
+            
+            console.log(`Settings loaded from backend: ${backendVolume}% for ${backendListeningMode} mode`);
+        } catch (error) {
+            console.error('Failed to load volume from backend:', error);
+        }
+    };
+    
+    // Cleanup таймера при размонтировании компонента
+    useEffect(() => {
+        return () => {
+            if (saveTimeout) {
+                clearTimeout(saveTimeout);
+            }
+        };
+    }, [saveTimeout]);
 
     // Синхронизируем с TtsHealthContext при изменении isHealthy
     useEffect(() => {
@@ -374,32 +435,32 @@ const TtsMainPageContent = () => {
                         {isWhitelisted === null && isAuthenticated && <span className="text-yellow-500">Проверка whitelist...</span>}
                     </CardDescription>
                 </CardHeader>
-                        <CardContent>
+                <CardContent>
                             <div className="space-y-6">
                                 {/* Основное переключение TTS */}
-                                <div className="flex items-center space-x-4">
-                                    <div className="flex items-center space-x-3">
-                                        <Switch
-                                            checked={ttsEnabled}
-                                            onCheckedChange={(checked) => handleToggle()}
-                                            disabled={(!isAuthenticated && !isConnected) || !engineStatus.loaded || isToggling}
-                                        />
-                                        <span className="text-sm font-medium">
-                                            {ttsEnabled ? 'Выключить озвучку чата' : 'Включить озвучку чата'}
-                                        </span>
-                                        {isToggling && (
-                                            <Loader className="h-4 w-4 animate-spin text-primary" />
-                                        )}
-                                    </div>
-                                    
-                                    <div className="flex items-center space-x-2">
-                                        <div 
-                                            className={`w-2 h-2 rounded-full ${ttsEnabled ? 'bg-green-500' : 'bg-red-500'} ${ttsEnabled ? 'shadow-green-500/50 shadow-lg' : 'shadow-red-500/50 shadow-lg'}`}
-                                        />
-                                        <span className={`text-sm ${ttsEnabled ? 'text-green-500' : 'text-red-500'}`}>
-                                            {ttsEnabled ? 'Включено' : 'Выключено'}
-                                        </span>
-                                    </div>
+                    <div className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-3">
+                            <Switch
+                                checked={ttsEnabled}
+                                onCheckedChange={(checked) => handleToggle()}
+                                disabled={(!isAuthenticated && !isConnected) || !engineStatus.loaded || isToggling}
+                            />
+                            <span className="text-sm font-medium">
+                                {ttsEnabled ? 'Выключить озвучку чата' : 'Включить озвучку чата'}
+                            </span>
+                            {isToggling && (
+                                <Loader className="h-4 w-4 animate-spin text-primary" />
+                            )}
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                            <div 
+                                className={`w-2 h-2 rounded-full ${ttsEnabled ? 'bg-green-500' : 'bg-red-500'} ${ttsEnabled ? 'shadow-green-500/50 shadow-lg' : 'shadow-red-500/50 shadow-lg'}`}
+                            />
+                            <span className={`text-sm ${ttsEnabled ? 'text-green-500' : 'text-red-500'}`}>
+                                {ttsEnabled ? 'Включено' : 'Выключено'}
+                            </span>
+                        </div>
                                 </div>
                                 
                                 {/* Выбор платформ - только для авторизованных пользователей */}
@@ -471,17 +532,115 @@ const TtsMainPageContent = () => {
                                         </div>
                                     </div>
                                 )}
-                            </div>
-                        </CardContent>
+                    </div>
+                </CardContent>
             </Card>
             
-            {/* Настройки звука - для всех пользователей */}
+            
+            {/* Способ прослушивания - только для авторизованных пользователей */}
+            {isAuthenticated && (
+                <Card className="mt-6">
+                    <CardHeader>
+                        <CardTitle>Способ прослушивания</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => {
+                                        setListeningMode('website');
+                                        // Синхронизируем с backend
+                                        const newSettings = {
+                                            ...audioSettings,
+                                            websiteVolume: audioSettings.websiteVolume
+                                        };
+                                        saveAudioSettings(newSettings);
+                                    }}
+                                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                        listeningMode === 'website' 
+                                            ? 'bg-purple-600 text-white border border-purple-500' 
+                                            : 'bg-transparent text-gray-300 border border-gray-600 hover:bg-gray-800'
+                                    }`}
+                                >
+                                    Сайт
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        setListeningMode('obs');
+                                        // Синхронизируем с backend
+                                        const newSettings = {
+                                            ...audioSettings,
+                                            obsVolume: audioSettings.obsVolume
+                                        };
+                                        saveAudioSettings(newSettings);
+                                        
+                                        // Генерируем OBS URL если его еще нет
+                                        if (!obsUrl) {
+                                            await handleGenerateObsUrl();
+                                        }
+                                    }}
+                                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                        listeningMode === 'obs' 
+                                            ? 'bg-purple-600 text-white border border-purple-500' 
+                                            : 'bg-transparent text-gray-300 border border-gray-600 hover:bg-gray-800'
+                                    }`}
+                                >
+                                    OBS
+                                </button>
+                            </div>
+                            
+                            {/* URL для OBS - показываем только когда выбран режим OBS */}
+                            {listeningMode === 'obs' && (
+                                <div className="mt-4 p-3 bg-gray-800 rounded-lg">
+                                    <div className="text-sm font-medium mb-2">URL для OBS Browser Source:</div>
+                                    {obsUrl ? (
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="text"
+                                                value={obsUrl}
+                                                readOnly
+                                                className="flex-1 p-2 bg-gray-700 border border-gray-600 rounded text-sm font-mono"
+                                            />
+                                            <Button
+                                                size="sm"
+                                                onClick={copyToClipboard}
+                                                className="bg-green-600 hover:bg-green-700"
+                                            >
+                                                <Copy className="h-4 w-4 mr-1" />
+                                                Копировать
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={handleRegenerateObsUrl}
+                                            >
+                                                Обновить
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <Button
+                                            size="sm"
+                                            onClick={handleGenerateObsUrl}
+                                            className="bg-purple-600 hover:bg-purple-700"
+                                        >
+                                            Сгенерировать URL
+                                        </Button>
+                                    )}
+                                    <div className="text-xs text-gray-400 mt-2">
+                                        💡 <strong>Инструкция:</strong> Добавьте этот URL как "Browser Source" в OBS Studio. 
+                                        Рекомендуемые размеры: 1920x1080.
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+            
+            {/* Настройки звука */}
             <Card className="mt-6">
                 <CardHeader>
                     <CardTitle>Настройки звука</CardTitle>
-                    <CardDescription>
-                        Регулировка громкости воспроизведения TTS
-                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-6">
@@ -524,17 +683,25 @@ const TtsMainPageContent = () => {
                                 Громкость кастомных голосов настраивается индивидуально для каждого голоса
                             </p>
                         </div>
+                        
+                        {/* Индикатор состояния сохранения */}
+                        <div className="flex justify-start pt-2">
+                            <div className="text-sm text-gray-400">
+                                {hasUnsavedChanges ? (
+                                    <span className="text-yellow-400">• Несохраненные изменения</span>
+                                ) : (
+                                    <span className="text-green-400">✓ Настройки сохранены</span>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
             
-            {/* Дополнительные настройки TTS */}
+            {/* Дополнительные настройки */}
             <Card className="mt-6">
                 <CardHeader>
                     <CardTitle>Дополнительные настройки</CardTitle>
-                    <CardDescription>
-                        Настройки фильтрации и обработки сообщений
-                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-6">
@@ -544,9 +711,6 @@ const TtsMainPageContent = () => {
                                 <Label htmlFor="enable7TV" className="text-sm font-medium">
                                     Озвучивать 7TV смайлы
                                 </Label>
-                                <p className="text-xs text-gray-500">
-                                    Включить озвучку смайлов из расширения 7TV
-                                </p>
                             </div>
                             <Switch
                                 id="enable7TV"
@@ -566,9 +730,6 @@ const TtsMainPageContent = () => {
                                     <Label htmlFor="enableProfanity" className="text-sm font-medium">
                                         Озвучивать мат
                                     </Label>
-                                    <p className="text-xs text-gray-500">
-                                        Включить озвучку сообщений с нецензурной лексикой
-                                    </p>
                                 </div>
                                 <Switch
                                     id="enableProfanity"
@@ -600,103 +761,15 @@ const TtsMainPageContent = () => {
                                         <option value="medium">Средний (мат + грубости)</option>
                                         <option value="high">Высокий (все нецензурное)</option>
                                     </select>
-                                </div>
-                            )}
+                            </div>
+                        )}
                         </div>
                     </div>
                 </CardContent>
             </Card>
             
-            {/* Блок выбора способа прослушивания */}
-            <Card className="mt-6">
-                <CardHeader>
-                    <CardTitle>Способ прослушивания</CardTitle>
-                    <CardDescription>
-                        Выберите, как вы хотите слушать озвучку сообщений.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {/* Выбор способа */}
-                        <div className="flex space-x-6">
-                            <div className="flex items-center space-x-2">
-                                <input
-                                    type="radio"
-                                    id="website"
-                                    name="listeningMode"
-                                    value="website"
-                                    checked={listeningMode === 'website'}
-                                    onChange={(e) => setListeningMode(e.target.value)}
-                                    className="w-4 h-4 text-purple-600"
-                                />
-                                <Label htmlFor="website" className="text-sm font-medium">
-                                    Через сайт
-                                </Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <input
-                                    type="radio"
-                                    id="obs"
-                                    name="listeningMode"
-                                    value="obs"
-                                    checked={listeningMode === 'obs'}
-                                    onChange={(e) => setListeningMode(e.target.value)}
-                                    className="w-4 h-4 text-purple-600"
-                                />
-                                <Label htmlFor="obs" className="text-sm font-medium">
-                                    Через OBS
-                                </Label>
-                            </div>
-                        </div>
-                        
-                        {/* OBS интеграция */}
-                        {listeningMode === 'obs' && (
-                            <div className="mt-4 p-4 bg-slate-800 rounded-lg border border-slate-700">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <Link className="h-4 w-4 text-purple-400" />
-                                    <span className="text-sm font-medium text-white">Интеграция с OBS</span>
-                                </div>
-                                <p className="text-slate-400 text-sm mb-4">
-                                    Используйте эту ссылку как источник браузера в OBS для вывода звука TTS в прямой эфир.
-                                    Ссылка уникальна для вашего аккаунта, не делитесь ей ни с кем.
-                                </p>
-                                {obsUrl ? (
-                                    <div className="space-y-3">
-                                        <div className="flex items-center gap-2">
-                                            <Input type="text" value={obsUrl} readOnly className="bg-slate-900" />
-                                            <Button onClick={copyToClipboard} variant="outline" size="icon">
-                                                <Copy className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                        <Button onClick={handleRegenerateObsUrl} variant="outline" size="sm" className="w-full">
-                                            Перегенерировать ссылку
-                                        </Button>
-                                    </div>
-                                ) : (
-                                    <Button onClick={handleGenerateObsUrl} className="bg-purple-600 hover:bg-purple-700">
-                                        Сгенерировать ссылку
-                                    </Button>
-                                )}
-                            </div>
-                        )}
-                        
-                        {/* Информация о выбранном способе */}
-                        {listeningMode === 'website' && (
-                            <div className="mt-4 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                                <p className="text-blue-400 text-sm">
-                                    🔊 Звук будет воспроизводиться через ваш браузер. Убедитесь, что звук включен.
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
         </div>
     );
 };
 
-const TtsMainPage = () => {
-    return <TtsMainPageContent />;
-};
-
-export default TtsMainPage;
+export default TtsMainPageContent;

@@ -14,8 +14,9 @@ class QueueService:
     Сервис для управления очередью YouTube видео
     """
     
-    def __init__(self):
+    def __init__(self, connection_manager=None):
         self.youtube_service = YouTubeService()
+        self.connection_manager = connection_manager
     
     async def add_video_to_queue(
         self, 
@@ -109,8 +110,36 @@ class QueueService:
             
             logger.info(f"Added video to queue: {video_info['title']} by {requester_name}")
             
+            # Отправляем команду в YouTube OBS если настроен и есть connection_manager
+            if self.connection_manager:
+                try:
+                    # Если это первое видео в очереди, начинаем воспроизведение
+                    if queue_item.position == 1:
+                        await self.connection_manager.send_youtube_to_obs(
+                            channel_name=channel_name,
+                            action="play",
+                            data={
+                                "video": {
+                                    "video_id": video_info['video_id'],
+                                    "title": video_info['title'],
+                                    "duration": video_info['duration'],
+                                    "thumbnail_url": video_info['thumbnail_url']
+                                }
+                            }
+                        )
+                    else:
+                        # Если не первое, просто обновляем очередь
+                        await self.connection_manager.send_youtube_to_obs(
+                            channel_name=channel_name,
+                            action="queue_update",
+                            data={"queue_length": max_position + 1}
+                        )
+                except Exception as e:
+                    logger.error(f"Error sending YouTube OBS command: {e}")
+            
             return {
                 'success': True,
+                'video_info': video_info,  # Добавляем video_info для обратной совместимости
                 'queue_item': {
                     'id': queue_item.id,
                     'title': queue_item.title,

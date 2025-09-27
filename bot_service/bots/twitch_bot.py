@@ -223,8 +223,19 @@ class Bot(commands.Bot):
                 text = text.replace(f"{author} говорит:", "").strip()
             
             if text:  # Только если есть текст для озвучки
-                logger.info(f"🎤 Sending TTS request for Twitch channel {channel_name}: {text[:50]}...")
-                await self.tts_api.send_tts_request(channel_name, text, author)
+                # Получаем настройки громкости для канала (общая громкость)
+                volume_level = self.connection_manager.get_tts_volume(channel_name)
+                logger.info(f"🎤 Sending TTS request for Twitch channel {channel_name}: {text[:50]}... (volume: {volume_level}%)")
+                
+                # Передаем connection_manager для проверки приоритетных голосов
+                result = await self.tts_api.send_tts_request(
+                    channel_name, text, author, volume_level, self.connection_manager
+                )
+                
+                if result.get("success"):
+                    logger.debug(f"TTS synthesis successful: voice={result.get('voice')}, volume={result.get('volume')}%")
+                else:
+                    logger.error(f"TTS synthesis failed: {result.get('error')}")
         except Exception as e:
             logger.error(f"Error in handle_tts_message: {e}")
 
@@ -662,7 +673,7 @@ class Bot(commands.Bot):
             channel_name = message.channel.name.lower()
             
             # Добавляем видео в очередь через сервис
-            queue_service = QueueService()
+            queue_service = QueueService(connection_manager=self.connection_manager)
             result = await queue_service.add_video_to_queue(
                 user_id=int(user_id), 
                 video_url=url, 
@@ -675,6 +686,13 @@ class Bot(commands.Bot):
             if result['success']:
                 video_info = result['video_info']
                 await message.channel.send(f"✅ {user_name} добавил в очередь: {video_info['title']}")
+                
+                # Отправляем событие обновления очереди
+                await self.connection_manager.send_youtube_event_to_user(
+                    user_id=user_id,
+                    event_type="queue_updated",
+                    data={"action": "video_added", "video": video_info}
+                )
             else:
                 await message.channel.send(f"❌ Ошибка добавления видео: {result['error']}")
                 
@@ -736,7 +754,20 @@ class Bot(commands.Bot):
         """Вызывается когда бот присоединяется к каналу"""
         logger.info(f'✅ SUCCESSFULLY JOINED CHANNEL: {channel.name}')
         logger.info(f'🎯 BOT IS NOW LISTENING TO CHAT IN: {channel.name}')
-        await channel.send(f"/me подключился к чату!")
+        
+        # Генерируем фейковый IP адрес для шутки
+        fake_ip = self._generate_fake_ip()
+        await channel.send(f"/me подключен к стримеру с IP адресом: {fake_ip} (TODO: скрыть личные данные)")
+    
+    def _generate_fake_ip(self):
+        """Генерирует фейковый IP адрес для шутки"""
+        import random
+        # Генерируем IP в формате xx.xxx.xx.xx
+        octet1 = random.randint(10, 99)
+        octet2 = random.randint(100, 999)
+        octet3 = random.randint(10, 99)
+        octet4 = random.randint(10, 99)
+        return f"{octet1}.{octet2}.{octet3}.{octet4}"
 
     async def event_channel_left(self, channel):
         """Вызывается когда бот покидает канал"""

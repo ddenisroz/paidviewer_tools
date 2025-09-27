@@ -582,6 +582,146 @@ class RussianTTS:
             logger.error(f"Ошибка при синтезе: {e}", exc_info=True)
             return None
 
+    def apply_volume_to_audio(self, audio_path: str, volume_level: float) -> bool:
+        """
+        Применяет громкость к уже сгенерированному аудио файлу.
+        
+        Args:
+            audio_path: Путь к аудио файлу
+            volume_level: Уровень громкости (0.0 - 1.0, где 0.5 = 50%)
+        
+        Returns:
+            bool: True если успешно, False если ошибка
+        """
+        try:
+            if not os.path.exists(audio_path):
+                logger.error(f"Audio file not found: {audio_path}")
+                return False
+            
+            # Читаем аудио файл
+            audio_data, sample_rate = sf.read(audio_path)
+            
+            # Применяем громкость (умножаем на коэффициент)
+            # volume_level от 0 до 100, преобразуем в коэффициент от 0.0 до 2.0
+            volume_multiplier = volume_level / 50.0  # 50% = 1.0x, 100% = 2.0x
+            audio_data_modified = audio_data * volume_multiplier
+            
+            # Предотвращаем клиппинг (ограничиваем значения от -1.0 до 1.0)
+            audio_data_modified = np.clip(audio_data_modified, -1.0, 1.0)
+            
+            # Перезаписываем файл с новой громкостью
+            sf.write(audio_path, audio_data_modified, sample_rate)
+            
+            logger.info(f"Volume applied to audio: {audio_path}, level: {volume_level}%, multiplier: {volume_multiplier:.2f}x")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error applying volume to audio {audio_path}: {e}")
+            return False
+
+    async def synthesize(self, text: str, voice_name: str, output_path: str, volume_level: float = 50.0, **kwargs) -> bool:
+        """
+        Синтез речи с применением громкости к выходному файлу.
+        Этот метод совместим с tts_engine.py.
+        
+        Args:
+            text: Текст для синтеза
+            voice_name: Имя голоса
+            output_path: Путь для сохранения аудио файла
+            volume_level: Уровень громкости (0-100)
+            **kwargs: Дополнительные параметры для synthesize_speech
+        
+        Returns:
+            bool: True если синтез успешен, False если ошибка
+        """
+        try:
+            # Получаем путь к референсному аудио для голоса
+            voice_audio_path = self._get_voice_audio_path(voice_name)
+            if not voice_audio_path:
+                logger.error(f"Voice audio not found for voice: {voice_name}")
+                return False
+            
+            # Выполняем стандартный синтез
+            result_path = self.synthesize_speech(
+                text=text,
+                ref_audio_path=voice_audio_path,
+                ref_text="",  # TODO: получать референсный текст из базы данных
+                **kwargs
+            )
+            
+            if not result_path or not os.path.exists(result_path):
+                logger.error(f"Synthesis failed or output file not created: {result_path}")
+                return False
+            
+            # Если результат не в нужном месте, копируем его
+            if result_path != output_path:
+                import shutil
+                shutil.copy2(result_path, output_path)
+                # Удаляем временный файл
+                try:
+                    os.remove(result_path)
+                except:
+                    pass
+            
+            # Применяем громкость к выходному файлу
+            if volume_level != 50.0:  # 50% = стандартная громкость, не нужно изменять
+                volume_applied = self.apply_volume_to_audio(output_path, volume_level)
+                if not volume_applied:
+                    logger.warning(f"Failed to apply volume to {output_path}, but synthesis succeeded")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error in synthesize method: {e}")
+            return False
+
+    def _get_voice_audio_path(self, voice_name: str) -> str:
+        """
+        Получает путь к референсному аудио файлу для голоса.
+        
+        Args:
+            voice_name: Имя голоса
+            
+        Returns:
+            str: Путь к аудио файлу голоса или None если не найден
+        """
+        try:
+            # Интеграция с базой данных для получения пути к голосу
+            from tts_service.database import get_db, Voice as VoiceModel
+            
+            db = next(get_db())
+            try:
+                voice = db.query(VoiceModel).filter(VoiceModel.name == voice_name).first()
+                if voice and voice.file_path:
+                    voice_path = Path(voice.file_path)
+                    if voice_path.exists():
+                        return str(voice_path)
+                    else:
+                        logger.warning(f"Voice file path exists in DB but file not found: {voice.file_path}")
+                        
+            finally:
+                db.close()
+                
+            # Fallback: поиск в стандартной директории voices
+            voices_dir = Path("voices")
+            voice_file = voices_dir / f"{voice_name}.wav"
+            
+            if voice_file.exists():
+                return str(voice_file)
+            
+            # Попробуем найти любой аудио файл с именем голоса
+            for ext in ['.wav', '.mp3', '.flac']:
+                voice_file = voices_dir / f"{voice_name}{ext}"
+                if voice_file.exists():
+                    return str(voice_file)
+            
+            logger.warning(f"Voice audio file not found for: {voice_name}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting voice audio path for {voice_name}: {e}")
+            return None
+
 
 if __name__ == "__main__":
     # Тестирование

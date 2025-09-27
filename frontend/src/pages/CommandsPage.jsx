@@ -237,7 +237,7 @@ const CommandsPage = () => {
                         <Clock className="h-3 w-3" />
                         <span>{command.cooldown_seconds}с</span>
                     </div>
-                </div>
+            </div>
 
                 <div className="text-xs text-muted-foreground">
                     Платформы: {getPlatformLabel(command.platforms)}
@@ -262,7 +262,7 @@ const CommandsPage = () => {
                             <Trash2 className="h-3 w-3" />
                         </Button>
                     )}
-                </div>
+                                </div>
             </CardContent>
         </Card>
     );
@@ -275,10 +275,10 @@ const CommandsPage = () => {
                         <div className="text-center space-y-4">
                             <Settings className="h-16 w-16 mx-auto text-muted-foreground" />
                             <p className="text-muted-foreground">Войдите в систему для управления командами</p>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                </div>
         );
     }
 
@@ -330,7 +330,7 @@ const CommandsPage = () => {
                                 <CardTitle className="flex items-center gap-2">
                                     <Terminal className="h-5 w-5" />
                                     Кастомные команды
-                                </CardTitle>
+                                    </CardTitle>
                                 <p className="text-sm text-muted-foreground">
                                     Создавайте собственные команды с настраиваемыми ответами.
                                 </p>
@@ -350,7 +350,7 @@ const CommandsPage = () => {
                             </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
-                            <div>
+                                    <div>
                                 <Label htmlFor="command_name">Название команды</Label>
                                 <Input
                                     id="command_name"
@@ -361,8 +361,8 @@ const CommandsPage = () => {
                                         command_name: e.target.value.replace('!', '')
                                     }))}
                                 />
-                            </div>
-                            <div>
+                                    </div>
+                                    <div>
                                 <Label htmlFor="response_text">Ответ команды</Label>
                                 <Textarea
                                     id="response_text"
@@ -414,7 +414,7 @@ const CommandsPage = () => {
                                                     <div className="flex items-center gap-2">
                                                         {option.icon}
                                                         {option.label}
-                                                    </div>
+                                    </div>
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -459,8 +459,8 @@ const CommandsPage = () => {
                                             Создайте первую команду, чтобы начать
                                         </p>
                                     </div>
-                                    </div>
-                            ) : (
+                    </div>
+                ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {customCommands.map(command => (
                                         <CommandCard
@@ -574,7 +574,7 @@ const CommandsPage = () => {
                                         cooldown_seconds: parseInt(e.target.value) || 0
                                     }))}
                                 />
-                            </div>
+            </div>
             </div>
                     )}
                     <DialogFooter>
