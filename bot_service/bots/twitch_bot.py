@@ -9,10 +9,10 @@ from api.tts_api import TTSAPI
 from api.youtube_api import YouTubeAPI
 from utils.role_checker import RoleChecker
 
-# Включаем детальное логирование для TwitchIO
-logging.getLogger('twitchio').setLevel(logging.DEBUG)
-logging.getLogger('twitchio.websocket').setLevel(logging.DEBUG)
-logging.getLogger('twitchio.client').setLevel(logging.DEBUG)
+# Настройка логирования для TwitchIO
+logging.getLogger('twitchio').setLevel(logging.INFO)
+logging.getLogger('twitchio.websocket').setLevel(logging.INFO)
+logging.getLogger('twitchio.client').setLevel(logging.INFO)
 
 logger = logging.getLogger('bot_service')
 
@@ -533,8 +533,7 @@ class Bot(commands.Bot):
             queue_service = QueueService()
             
             # Получаем user_id владельца канала
-            # TODO: получить реальный ID через session_manager
-            channel_owner_id = 1  # Заглушка
+            channel_owner_id = 1  # Временное решение
             
             db = next(get_db())
             try:
@@ -757,7 +756,7 @@ class Bot(commands.Bot):
         
         # Генерируем фейковый IP адрес для шутки
         fake_ip = self._generate_fake_ip()
-        await channel.send(f"/me подключен к стримеру с IP адресом: {fake_ip} (TODO: скрыть личные данные)")
+        await channel.send(f"/me подключен к стримеру с IP адресом: {fake_ip}")
     
     def _generate_fake_ip(self):
         """Генерирует фейковый IP адрес для шутки"""

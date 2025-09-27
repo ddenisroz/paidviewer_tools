@@ -42,7 +42,7 @@ class VKLiveBot:
             
         self.is_running = True
         logger.info("🚀 VK LIVE BOT STARTED - Ready to listen to chat")
-        print("🔔 VK LIVE BOT: Started and ready to connect to channels")
+        logger.info("VK LIVE BOT: Started and ready to connect to channels")
         
         try:
             # ИСПОЛЬЗУЕМ WEBSOCKET КЛИЕНТ ДЛЯ ЧАТА (реальный тайм)
@@ -98,11 +98,11 @@ class VKLiveBot:
                 )
                 
                 logger.info(f"✅ VK LIVE BOT CONNECTED to channel: {channel_name}")
-                print(f"🔔 VK LIVE BOT: Successfully connected to {channel_name} and listening for chat messages")
+                logger.info(f"VK LIVE BOT: Successfully connected to {channel_name} and listening for chat messages")
                 
                 # Отправляем шутливое сообщение о подключении
                 fake_ip = self._generate_fake_ip()
-                await self.send_message(channel_name, f"подключен к стримеру с IP адресом: {fake_ip} (TODO: скрыть личные данные)")
+                await self.send_message(channel_name, f"подключен к стримеру с IP адресом: {fake_ip}")
                 
                 return True
             else:
@@ -684,8 +684,7 @@ class VKLiveBot:
             # Пока возвращаем базовые роли
             roles = []
             
-            # TODO: Реализовать запрос к VK Live API для получения ролей пользователя
-            # Пока используем заглушку
+            # Получение ролей пользователя (заглушка)
             return roles
             
         except Exception as e:

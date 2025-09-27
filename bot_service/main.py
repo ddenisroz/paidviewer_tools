@@ -44,9 +44,8 @@ from bots.vk_live_bot import VKLiveBot
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path=dotenv_path)
-    print(f"✅ Загружен .env из bot_service: {dotenv_path}")
 else:
-    print(f"⚠️  .env не найден в bot_service: {dotenv_path}")
+    logger.warning(f".env не найден в bot_service: {dotenv_path}")
 
 # --- Logging Configuration ---
 log_level = os.getenv("LOG_LEVEL", "DEBUG")

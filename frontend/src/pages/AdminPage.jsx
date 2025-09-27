@@ -20,9 +20,6 @@ const AdminPage = () => {
     const navigate = useNavigate();
     const { user, isAuthenticated: isTwitchAuthenticated } = useAuth();
     
-    console.log('AdminPage загружается');
-    console.log('user:', user);
-    console.log('isTwitchAuthenticated:', isTwitchAuthenticated);
     const [channels, setChannels] = useState({ twitch: [], vk: [] });
     const [newChannel, setNewChannel] = useState('');
     const [newPlatform, setNewPlatform] = useState('twitch');
@@ -32,8 +29,6 @@ const AdminPage = () => {
     const [addingBlockedChannel, setAddingBlockedChannel] = useState(false);
 
     useEffect(() => {
-        console.log('AdminPage useEffect - проверяем права администратора');
-        console.log('user.is_admin:', user?.is_admin);
         
         // Загружаем данные при монтировании
         loadChannels();
@@ -137,7 +132,6 @@ const AdminPage = () => {
 
     // Проверяем права администратора
     if (!user?.is_admin) {
-        console.log('Пользователь не является администратором, перенаправляем');
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 flex items-center justify-center">
                 <div className="text-center">
@@ -151,7 +145,6 @@ const AdminPage = () => {
         );
     }
 
-    console.log('Рендерим админ панель для администратора');
     
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
@@ -213,10 +206,7 @@ const AdminPage = () => {
                            </Button>
                            <Button
                                variant={activeTab === 'logs' ? 'default' : 'ghost'}
-                               onClick={() => {
-                                   console.log('Кнопка Логи нажата, переключаем на logs');
-                                   setActiveTab('logs');
-                               }}
+                               onClick={() => setActiveTab('logs')}
                                className={`flex-1 ${activeTab === 'logs' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
                            >
                                <FileText className="h-4 w-4 mr-2" />
@@ -465,10 +455,7 @@ const AdminPage = () => {
                 ) : activeTab === 'sessions' ? (
                     <SessionManagementPage />
                 ) : activeTab === 'logs' ? (
-                    (() => {
-                        console.log('Отображаем SystemLogsPage, activeTab:', activeTab);
-                        return <SystemLogsPage />;
-                    })()
+                    <SystemLogsPage />
                 ) : (
                     <div className="text-center py-8">
                         <p className="text-gray-500">Выберите раздел для управления</p>
