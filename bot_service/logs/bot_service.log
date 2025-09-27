@@ -18628,3 +18628,330 @@ WHERE youtube_queue.video_id = ? AND youtube_queue.user_id = ? AND youtube_queue
 2025-09-27 14:44:22 - bot_service - INFO - 🧹 Cleaning up 0 active VK bots...
 2025-09-27 14:44:22 - bot_service - INFO - 🧹 All VK bots cleaned up
 2025-09-27 14:44:22 - bot_service - INFO - ✅ TwitchIO start() completed
+2025-09-27 14:55:05 - bot_service - INFO - === BOT SERVICE STARTED ===
+2025-09-27 14:55:07 - bot_service - INFO - === BOT SERVICE STARTED ===
+2025-09-27 14:55:07 - bot_service - INFO - === BOT SERVICE STARTED ===
+2025-09-27 14:55:07 - bot_service - INFO - ==================================================
+2025-09-27 14:55:07 - bot_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-27 14:55:07
+2025-09-27 14:55:07 - bot_service - INFO - ==================================================
+2025-09-27 14:55:07 - bot_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-27 14:55:07 - bot_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-27 14:55:07 - bot_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-27 14:55:07 - bot_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-27 14:55:07 - bot_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service
+2025-09-27 14:55:07 - bot_service - INFO - ==================================================
+2025-09-27 14:55:07 - bot_service - INFO - 🚀 BOT_SERVICE ЗАПУЩЕН
+2025-09-27 14:55:07 - bot_service - INFO - 🌐 Порт: 8000
+2025-09-27 14:55:07 - bot_service - INFO - 📁 Логи: logs/bot_service.log
+2025-09-27 14:55:07 - bot_service - INFO - ⏰ Время: 2025-09-27 14:55:07
+2025-09-27 14:55:07 - bot_service - INFO - 🔄 Restoring active sessions from database...
+2025-09-27 14:55:07 - bot_service - INFO - 🚀 Found active channels: ['yourchy']
+2025-09-27 14:55:07 - bot_service - INFO - 🎮 Twitch channels to connect: ['yourchy']
+2025-09-27 14:55:07 - bot_service - INFO - 🤖 CREATING TWITCH BOT
+2025-09-27 14:55:07 - bot_service - INFO - 📋 Token: oauth:cj4a...
+2025-09-27 14:55:07 - bot_service - INFO - 🔗 Initial channels: ['yourchy']
+2025-09-27 14:55:07 - bot_service - INFO - 🔧 Initializing TwitchIO Bot...
+2025-09-27 14:55:07 - bot_service - INFO - ✅ TwitchIO Bot initialized
+2025-09-27 14:55:07 - bot_service - INFO - ✅ Twitch bot started and connecting to Twitch channels.
+2025-09-27 14:55:07 - bot_service - INFO - Loaded 0 verifications from database
+2025-09-27 14:55:07 - bot_service - INFO - 🚀 STARTING TWITCH BOT...
+2025-09-27 14:55:07 - bot_service - INFO - 🔗 Bot will connect to IRC and join channels
+2025-09-27 14:55:07 - bot_service - INFO - 📡 Calling TwitchIO start()...
+2025-09-27 14:55:09 - bot_service - DEBUG - RAW < :tmi.twitch.tv 001 payedviewer :Welcome, GLHF!
+:tmi.twitch.tv 002 payedviewer :Your host is tmi.twitch.tv
+:tmi.twitch.tv 003 payedviewer :This server is rather new
+:tmi.twitch.tv 004 payedviewer :-
+:tmi.twitch.tv 375 payedviewer :-
+:tmi.twitch.tv 372 payedviewer :You are in a maze of twisty passages, all alike.
+:tmi.twitch.tv 376 payedviewer :>
+:tmi.twitch.tv CAP * ACK :twitch.tv/commands
+:tmi.twitch.tv CAP * ACK :twitch.tv/tags
+:tmi.twitch.tv CAP * ACK :twitch.tv/membership
+2025-09-27 14:55:09 - bot_service - DEBUG - RAW < :payedviewer!payedviewer@payedviewer.tmi.twitch.tv JOIN #yourchy
+:payedviewer.tmi.twitch.tv 353 payedviewer = #yourchy :payedviewer
+:payedviewer.tmi.twitch.tv 366 payedviewer #yourchy :End of /NAMES list
+2025-09-27 14:55:09 - bot_service - INFO - ✅ SUCCESSFULLY JOINED CHANNEL: yourchy
+2025-09-27 14:55:09 - bot_service - INFO - 🎯 BOT IS NOW LISTENING TO CHAT IN: yourchy
+2025-09-27 14:55:09 - bot_service - INFO - 🤖 TWITCH BOT READY!
+2025-09-27 14:55:09 - bot_service - INFO - 📋 Bot logged in as: payedviewer
+2025-09-27 14:55:09 - bot_service - INFO - 🆔 Bot user id: 1317705797
+2025-09-27 14:55:09 - bot_service - INFO - 🔗 Connected to channels: [<Channel name: yourchy>]
+2025-09-27 14:55:09 - bot_service - INFO - 🎯 BOT IS NOW LISTENING FOR MESSAGES IN ALL CHANNELS!
+2025-09-27 14:55:09 - bot_service - INFO - 🎯 BOT IS NOW LISTENING FOR MESSAGES IN THESE CHANNELS
+2025-09-27 14:55:09 - bot_service - INFO - ✅ MONITORING CHAT: yourchy
+2025-09-27 14:55:09 - bot_service - INFO - 🔔 MESSAGE RECEIVED! Type: <class 'twitchio.message.Message'>
+2025-09-27 14:55:09 - bot_service - INFO - 📨 RAW MESSAGE DATA: > :payedviewer!payedviewer@payedviewer.tmi.twitch.tv PRIVMSG(ECHO) #yourchy :/me подключен к стримеру с IP адресом: 24.284.21.56
+2025-09-27 14:55:09 - bot_service - INFO - 📋 Message attributes: channel=<Channel name: yourchy>, author=None, content=/me подключен к стримеру с IP адресом: 24.284.21.56
+2025-09-27 14:55:09 - bot_service - DEBUG - Received message without author, skipping
+2025-09-27 14:55:09 - bot_service - DEBUG - RAW < @badge-info=;badges=moderator/1;color=;display-name=payedviewer;emote-sets=0,300374282;mod=1;subscriber=0;user-type=mod :tmi.twitch.tv USERSTATE #yourchy
+@emote-only=0;followers-only=-1;r9k=0;room-id=75969278;slow=0;subs-only=0 :tmi.twitch.tv ROOMSTATE #yourchy
+2025-09-27 14:55:09 - bot_service - DEBUG - RAW < @badge-info=;badges=moderator/1;color=;display-name=payedviewer;emote-sets=0,300374282;id=55b77fb2-7cc6-42d6-92e0-a3c27d0b9d50;mod=1;subscriber=0;user-type=mod :tmi.twitch.tv USERSTATE #yourchy
+2025-09-27 14:55:12 - bot_service - DEBUG - CORS Request: GET /api/active-channels from http://localhost:5173
+2025-09-27 14:55:12 - bot_service - INFO - Active channels from ConnectionManager: ['yourchy']
+2025-09-27 14:55:46 - bot_service - DEBUG - RAW < :streamelements!streamelements@streamelements.tmi.twitch.tv JOIN #yourchy
+:yourchy!yourchy@yourchy.tmi.twitch.tv JOIN #yourchy
+2025-09-27 14:55:57 - bot_service - DEBUG - CORS Request: GET /api/active-channels from http://localhost:5173
+2025-09-27 14:55:57 - bot_service - INFO - Active channels from ConnectionManager: ['yourchy']
+2025-09-27 14:56:08 - bot_service - DEBUG - Recorded stream data: twitch - 0 viewers
+2025-09-27 14:56:41 - bot_service - DEBUG - CORS Request: GET /api/active-channels from http://localhost:5173
+2025-09-27 14:56:41 - bot_service - INFO - Active channels from ConnectionManager: ['yourchy']
+2025-09-27 14:57:08 - bot_service - DEBUG - Recorded stream data: twitch - 0 viewers
+2025-09-27 14:57:16 - bot_service - DEBUG - CORS Request: GET /api/auth/status from http://localhost:5173
+2025-09-27 14:57:16 - bot_service - DEBUG - CORS Request: GET /api/auth/status from http://localhost:5173
+2025-09-27 14:57:16 - bot_service - DEBUG - CORS Request: GET /api/admin/list from http://localhost:5173
+2025-09-27 14:57:16 - bot_service - DEBUG - CORS Request: GET /api/auth/status from http://localhost:5173
+2025-09-27 14:57:16 - bot_service - DEBUG - CORS Request: GET /api/admin/list from http://localhost:5173
+2025-09-27 14:57:16 - bot_service - DEBUG - CORS Request: GET /api/admin/whitelist from http://localhost:5173
+2025-09-27 14:57:16 - bot_service - DEBUG - CORS Request: GET /api/admin/blocked-channels from http://localhost:5173
+2025-09-27 14:57:16 - bot_service - DEBUG - CORS Request: GET /api/admin/whitelist from http://localhost:5173
+2025-09-27 14:57:16 - bot_service - DEBUG - CORS Request: GET /api/active-channels from http://localhost:5173
+2025-09-27 14:57:16 - bot_service - INFO - Active channels from ConnectionManager: ['yourchy']
+2025-09-27 14:57:16 - bot_service - DEBUG - CORS Request: GET /api/admin/blocked-channels from http://localhost:5173
+2025-09-27 14:57:17 - bot_service - DEBUG - CORS Request: GET /api/twitch/stream-info from http://localhost:5173
+2025-09-27 14:57:18 - bot_service - INFO - Stream info for Yourchy: {'online': False, 'title': 'те131', 'game_id': '18957', 'game': 'Just Cause 2', 'viewer_count': 0, 'started_at': '', 'category_info': {'id': '18957', 'name': 'Just Cause 2', 'box_art_url': 'https://static-cdn.jtvnw.net/ttv-boxart/18957_IGDB-{width}x{height}.jpg', 'igdb_id': '558'}}
+2025-09-27 14:57:19 - bot_service - DEBUG - CORS Request: GET /api/youtube/queue from http://localhost:5173
+2025-09-27 14:57:19 - bot_service - DEBUG - CORS Request: GET /api/youtube/queue from http://localhost:5173
+2025-09-27 14:57:27 - bot_service - DEBUG - CORS Request: POST /api/tts/generate-obs-url from http://localhost:5173
+2025-09-27 14:57:27 - bot_service - DEBUG - CORS Request: POST /api/tts/generate-obs-url from http://localhost:5173
+2025-09-27 14:57:27 - bot_service - DEBUG - CORS Request: GET /api/tts/volume from http://localhost:5173
+2025-09-27 14:57:27 - bot_service - DEBUG - CORS Request: GET /api/tts/volume from http://localhost:5173
+2025-09-27 14:57:27 - bot_service - DEBUG - CORS Request: GET /api/tts/status from http://localhost:5173
+2025-09-27 14:57:31 - bot_service - DEBUG - CORS Request: GET /api/admin/whitelist from http://localhost:5173
+2025-09-27 14:57:31 - bot_service - DEBUG - CORS Request: GET /api/admin/blocked-channels from http://localhost:5173
+2025-09-27 14:57:31 - bot_service - DEBUG - CORS Request: GET /api/admin/blocked-channels from http://localhost:5173
+2025-09-27 14:57:31 - bot_service - DEBUG - CORS Request: GET /api/admin/whitelist from http://localhost:5173
+2025-09-27 14:57:33 - bot_service - DEBUG - CORS Request: GET /api/admin/sessions from http://localhost:5173
+2025-09-27 14:57:33 - bot_service - DEBUG - CORS Request: GET /api/admin/sessions from http://localhost:5173
+2025-09-27 14:57:33 - bot_service - INFO - Total users in database: 1
+2025-09-27 14:57:33 - bot_service - INFO - Total users in database: 1
+2025-09-27 14:57:35 - bot_service - DEBUG - CORS Request: OPTIONS /api/admin/sessions/user/1 from http://localhost:5173
+2025-09-27 14:57:35 - bot_service - DEBUG - CORS Request: DELETE /api/admin/sessions/user/1 from http://localhost:5173
+2025-09-27 14:57:35 - bot_service - INFO - User session terminated and user deleted: 1
+2025-09-27 14:57:35 - bot_service - DEBUG - CORS Request: GET /api/admin/sessions from http://localhost:5173
+2025-09-27 14:57:35 - bot_service - INFO - Total users in database: 0
+2025-09-27 14:57:39 - bot_service - DEBUG - CORS Request: GET /api/auth/status from http://localhost:5173
+2025-09-27 14:57:39 - bot_service - DEBUG - CORS Request: GET /api/auth/status from http://localhost:5173
+2025-09-27 14:57:40 - bot_service - DEBUG - CORS Request: GET /auth/twitch/login from http://localhost:5173
+2025-09-27 14:57:44 - bot_service - INFO - Joined channel: Yourchy
+2025-09-27 14:57:44 - bot_service - INFO - 🎯 Twitch OAuth successful, auto-connecting bot for user 1
+2025-09-27 14:57:44 - bot_service - INFO - 🤖 Auto-connecting Twitch bot for user 1
+2025-09-27 14:57:44 - bot_service - INFO - 🎯 Auto-connecting Twitch bot to channel: yourchy
+2025-09-27 14:57:44 - bot_service - INFO - 🛑 Stopping existing bot to recreate with correct channels
+2025-09-27 14:57:44 - bot_service - INFO - ✅ TwitchIO start() completed
+2025-09-27 14:57:44 - bot_service - INFO - 🤖 Creating new Twitch bot instance for channel: yourchy
+2025-09-27 14:57:44 - bot_service - INFO - 🔧 Bot token: oauth:cj4a...
+2025-09-27 14:57:44 - bot_service - INFO - 🔧 Channels: ['yourchy']
+2025-09-27 14:57:44 - bot_service - INFO - 🤖 CREATING TWITCH BOT
+2025-09-27 14:57:44 - bot_service - INFO - 📋 Token: oauth:cj4a...
+2025-09-27 14:57:44 - bot_service - INFO - 🔗 Initial channels: ['yourchy']
+2025-09-27 14:57:44 - bot_service - INFO - 🔧 Initializing TwitchIO Bot...
+2025-09-27 14:57:44 - bot_service - INFO - ✅ TwitchIO Bot initialized
+2025-09-27 14:57:44 - bot_service - INFO - ✅ Bot instance created successfully
+2025-09-27 14:57:44 - bot_service - INFO - 🚀 Starting bot task...
+2025-09-27 14:57:44 - bot_service - INFO - ✅ Bot task created and started
+2025-09-27 14:57:44 - bot_service - INFO - ⏳ Waiting 3 seconds for bot to connect...
+2025-09-27 14:57:44 - bot_service - INFO - 🚀 STARTING TWITCH BOT...
+2025-09-27 14:57:44 - bot_service - INFO - 🔗 Bot will connect to IRC and join channels
+2025-09-27 14:57:44 - bot_service - INFO - 📡 Calling TwitchIO start()...
+2025-09-27 14:57:46 - bot_service - DEBUG - RAW < :tmi.twitch.tv 001 payedviewer :Welcome, GLHF!
+:tmi.twitch.tv 002 payedviewer :Your host is tmi.twitch.tv
+:tmi.twitch.tv 003 payedviewer :This server is rather new
+:tmi.twitch.tv 004 payedviewer :-
+:tmi.twitch.tv 375 payedviewer :-
+:tmi.twitch.tv 372 payedviewer :You are in a maze of twisty passages, all alike.
+:tmi.twitch.tv 376 payedviewer :>
+:tmi.twitch.tv CAP * ACK :twitch.tv/commands
+:tmi.twitch.tv CAP * ACK :twitch.tv/tags
+:tmi.twitch.tv CAP * ACK :twitch.tv/membership
+2025-09-27 14:57:46 - bot_service - DEBUG - RAW < :payedviewer!payedviewer@payedviewer.tmi.twitch.tv JOIN #yourchy
+:payedviewer.tmi.twitch.tv 353 payedviewer = #yourchy :payedviewer
+:payedviewer.tmi.twitch.tv 366 payedviewer #yourchy :End of /NAMES list
+2025-09-27 14:57:46 - bot_service - DEBUG - RAW < @badge-info=;badges=moderator/1;color=;display-name=payedviewer;emote-sets=0,300374282;mod=1;subscriber=0;user-type=mod :tmi.twitch.tv USERSTATE #yourchy
+@emote-only=0;followers-only=-1;r9k=0;room-id=75969278;slow=0;subs-only=0 :tmi.twitch.tv ROOMSTATE #yourchy
+2025-09-27 14:57:46 - bot_service - INFO - ✅ SUCCESSFULLY JOINED CHANNEL: yourchy
+2025-09-27 14:57:46 - bot_service - INFO - 🎯 BOT IS NOW LISTENING TO CHAT IN: yourchy
+2025-09-27 14:57:46 - bot_service - INFO - 🤖 TWITCH BOT READY!
+2025-09-27 14:57:46 - bot_service - INFO - 📋 Bot logged in as: payedviewer
+2025-09-27 14:57:46 - bot_service - INFO - 🆔 Bot user id: 1317705797
+2025-09-27 14:57:46 - bot_service - INFO - 🔗 Connected to channels: [<Channel name: yourchy>]
+2025-09-27 14:57:46 - bot_service - INFO - 🎯 BOT IS NOW LISTENING FOR MESSAGES IN ALL CHANNELS!
+2025-09-27 14:57:46 - bot_service - INFO - 🎯 BOT IS NOW LISTENING FOR MESSAGES IN THESE CHANNELS
+2025-09-27 14:57:46 - bot_service - INFO - ✅ MONITORING CHAT: yourchy
+2025-09-27 14:57:46 - bot_service - INFO - 🔔 MESSAGE RECEIVED! Type: <class 'twitchio.message.Message'>
+2025-09-27 14:57:46 - bot_service - INFO - 📨 RAW MESSAGE DATA: > :payedviewer!payedviewer@payedviewer.tmi.twitch.tv PRIVMSG(ECHO) #yourchy :/me подключен к стримеру с IP адресом: 12.689.67.51
+2025-09-27 14:57:46 - bot_service - INFO - 📋 Message attributes: channel=<Channel name: yourchy>, author=None, content=/me подключен к стримеру с IP адресом: 12.689.67.51
+2025-09-27 14:57:46 - bot_service - DEBUG - Received message without author, skipping
+2025-09-27 14:57:46 - bot_service - DEBUG - RAW < @badge-info=;badges=moderator/1;color=;display-name=payedviewer;emote-sets=0,300374282;id=fe19379d-1b23-4131-abe6-da1867f6004a;mod=1;subscriber=0;user-type=mod :tmi.twitch.tv USERSTATE #yourchy
+2025-09-27 14:57:47 - bot_service - INFO - 🔍 Checking bot status after connection attempt...
+2025-09-27 14:57:47 - bot_service - INFO - 🔍 Bot instance exists: True
+2025-09-27 14:57:47 - bot_service - INFO - 🔍 Bot task exists: True
+2025-09-27 14:57:47 - bot_service - INFO - 🔍 Bot task done: False
+2025-09-27 14:57:47 - bot_service - INFO - 🔍 Bot nick: payedviewer
+2025-09-27 14:57:47 - bot_service - INFO - 🔍 Bot user_id: 1317705797
+2025-09-27 14:57:47 - bot_service - INFO - 🔍 Bot connected_channels: [<Channel name: yourchy>]
+2025-09-27 14:57:47 - bot_service - INFO - ✅ Twitch bot should be connected to yourchy
+2025-09-27 14:57:47 - bot_service - INFO - 🧪 TEST: If you see this, logging from main.py works!
+2025-09-27 14:57:48 - bot_service - DEBUG - CORS Request: GET /api/auth/status from http://localhost:5173
+2025-09-27 14:57:48 - bot_service - DEBUG - CORS Request: GET /api/auth/status from http://localhost:5173
+2025-09-27 14:57:49 - bot_service - DEBUG - CORS Request: GET /api/admin/list from http://localhost:5173
+2025-09-27 14:57:49 - bot_service - DEBUG - CORS Request: GET /api/auth/status from http://localhost:5173
+2025-09-27 14:57:49 - bot_service - DEBUG - CORS Request: GET /api/admin/list from http://localhost:5173
+2025-09-27 14:57:49 - bot_service - DEBUG - CORS Request: GET /api/youtube/queue from http://localhost:5173
+2025-09-27 14:57:49 - bot_service - DEBUG - CORS Request: GET /api/active-channels from http://localhost:5173
+2025-09-27 14:57:49 - bot_service - INFO - Active channels from ConnectionManager: ['yourchy']
+2025-09-27 14:57:49 - bot_service - DEBUG - CORS Request: GET /api/youtube/queue from http://localhost:5173
+2025-09-27 14:57:49 - bot_service - DEBUG - CORS Request: GET /api/twitch/stream-info from http://localhost:5173
+2025-09-27 14:57:49 - bot_service - INFO - Using cached stream info for Yourchy
+2025-09-27 14:58:09 - bot_service - DEBUG - Recorded stream data: twitch - 0 viewers
+2025-09-27 14:58:32 - bot_service - DEBUG - CORS Request: GET /api/admin/whitelist from http://localhost:5173
+2025-09-27 14:58:32 - bot_service - DEBUG - CORS Request: GET /api/admin/blocked-channels from http://localhost:5173
+2025-09-27 14:58:32 - bot_service - DEBUG - CORS Request: GET /api/admin/whitelist from http://localhost:5173
+2025-09-27 14:58:32 - bot_service - DEBUG - CORS Request: GET /api/admin/blocked-channels from http://localhost:5173
+2025-09-27 14:58:34 - bot_service - DEBUG - CORS Request: GET /api/admin/sessions from http://localhost:5173
+2025-09-27 14:58:34 - bot_service - DEBUG - CORS Request: GET /api/admin/sessions from http://localhost:5173
+2025-09-27 14:58:34 - bot_service - INFO - Total users in database: 1
+2025-09-27 14:58:34 - bot_service - INFO - Total users in database: 1
+2025-09-27 14:58:41 - bot_service - DEBUG - CORS Request: OPTIONS /api/admin/sessions/user/1 from http://localhost:5173
+2025-09-27 14:58:41 - bot_service - DEBUG - CORS Request: DELETE /api/admin/sessions/user/1 from http://localhost:5173
+2025-09-27 14:58:41 - bot_service - INFO - User session terminated and user deleted: 1
+2025-09-27 14:58:41 - bot_service - DEBUG - CORS Request: GET /api/admin/sessions from http://localhost:5173
+2025-09-27 14:58:41 - bot_service - INFO - Total users in database: 0
+2025-09-27 14:58:45 - bot_service - DEBUG - RAW < :streamelements!streamelements@streamelements.tmi.twitch.tv JOIN #yourchy
+:yourchy!yourchy@yourchy.tmi.twitch.tv JOIN #yourchy
+2025-09-27 14:58:49 - bot_service - DEBUG - CORS Request: GET /api/active-channels from http://localhost:5173
+2025-09-27 14:58:49 - bot_service - INFO - Active channels from ConnectionManager: ['yourchy']
+2025-09-27 14:58:58 - bot_service - DEBUG - RAW < @badge-info=;badges=broadcaster/1,share-the-love/1;client-nonce=eda728e208a90741940c54499c70c9f3;color=#DAA520;display-name=Yourchy;emotes=;first-msg=0;flags=;id=84d060a1-0677-444b-8461-f29e3f9912d7;mod=0;returning-chatter=0;room-id=75969278;subscriber=0;tmi-sent-ts=1758967139917;turbo=0;user-id=75969278;user-type= :yourchy!yourchy@yourchy.tmi.twitch.tv PRIVMSG #yourchy :!help
+2025-09-27 14:58:58 - bot_service - INFO - 🔔 MESSAGE RECEIVED! Type: <class 'twitchio.message.Message'>
+2025-09-27 14:58:58 - bot_service - INFO - 📨 RAW MESSAGE DATA: @badge-info=;badges=broadcaster/1,share-the-love/1;client-nonce=eda728e208a90741940c54499c70c9f3;color=#DAA520;display-name=Yourchy;emotes=;first-msg=0;flags=;id=84d060a1-0677-444b-8461-f29e3f9912d7;mod=0;returning-chatter=0;room-id=75969278;subscriber=0;tmi-sent-ts=1758967139917;turbo=0;user-id=75969278;user-type= :yourchy!yourchy@yourchy.tmi.twitch.tv PRIVMSG #yourchy :!help
+2025-09-27 14:58:58 - bot_service - INFO - 📋 Message attributes: channel=<Channel name: yourchy>, author=<Chatter name: yourchy, channel: <Channel name: yourchy>>, content=!help
+2025-09-27 14:58:58 - bot_service - INFO - 📨 TWITCH CHAT [yourchy] yourchy: !help
+2025-09-27 14:58:58 - bot_service - INFO - 🎯 BOT IS LISTENING TO TWITCH CHAT - CHANNEL: yourchy
+2025-09-27 14:58:58 - bot_service - DEBUG - Channel yourchy not in verification process, skipping verification check
+2025-09-27 14:58:58 - bot_service - ERROR - Error creating basic command 'help': name 'BotCommand' is not defined
+2025-09-27 14:58:58 - bot_service - DEBUG - TTS not enabled for Twitch channel yourchy, skipping TTS processing
+2025-09-27 14:59:04 - bot_service - DEBUG - CORS Request: GET /api/admin/sessions from http://localhost:5173
+2025-09-27 14:59:04 - bot_service - INFO - Total users in database: 0
+2025-09-27 14:59:09 - bot_service - DEBUG - RAW < @badge-info=;badges=broadcaster/1,share-the-love/1;client-nonce=dbd7c0e151d360d77dc9c97850a41214;color=#DAA520;display-name=Yourchy;emotes=;first-msg=0;flags=;id=5e155058-b4ee-40d0-9573-1300a4fbcb24;mod=0;returning-chatter=0;room-id=75969278;subscriber=0;tmi-sent-ts=1758967150784;turbo=0;user-id=75969278;user-type= :yourchy!yourchy@yourchy.tmi.twitch.tv PRIVMSG #yourchy :test
+2025-09-27 14:59:09 - bot_service - INFO - 🔔 MESSAGE RECEIVED! Type: <class 'twitchio.message.Message'>
+2025-09-27 14:59:09 - bot_service - INFO - 📨 RAW MESSAGE DATA: @badge-info=;badges=broadcaster/1,share-the-love/1;client-nonce=dbd7c0e151d360d77dc9c97850a41214;color=#DAA520;display-name=Yourchy;emotes=;first-msg=0;flags=;id=5e155058-b4ee-40d0-9573-1300a4fbcb24;mod=0;returning-chatter=0;room-id=75969278;subscriber=0;tmi-sent-ts=1758967150784;turbo=0;user-id=75969278;user-type= :yourchy!yourchy@yourchy.tmi.twitch.tv PRIVMSG #yourchy :test
+2025-09-27 14:59:09 - bot_service - INFO - 📋 Message attributes: channel=<Channel name: yourchy>, author=<Chatter name: yourchy, channel: <Channel name: yourchy>>, content=test
+2025-09-27 14:59:09 - bot_service - INFO - 📨 TWITCH CHAT [yourchy] yourchy: test
+2025-09-27 14:59:09 - bot_service - INFO - 🎯 BOT IS LISTENING TO TWITCH CHAT - CHANNEL: yourchy
+2025-09-27 14:59:09 - bot_service - DEBUG - Channel yourchy not in verification process, skipping verification check
+2025-09-27 14:59:09 - bot_service - DEBUG - TTS not enabled for Twitch channel yourchy, skipping TTS processing
+2025-09-27 14:59:09 - bot_service - DEBUG - Recorded stream data: twitch - 0 viewers
+2025-09-27 14:59:34 - bot_service - DEBUG - CORS Request: GET /api/admin/sessions from http://localhost:5173
+2025-09-27 14:59:34 - bot_service - INFO - Total users in database: 0
+2025-09-27 14:59:49 - bot_service - DEBUG - CORS Request: GET /api/active-channels from http://localhost:5173
+2025-09-27 14:59:49 - bot_service - INFO - Active channels from ConnectionManager: ['yourchy']
+2025-09-27 15:00:04 - bot_service - DEBUG - CORS Request: GET /api/admin/sessions from http://localhost:5173
+2025-09-27 15:00:04 - bot_service - INFO - Total users in database: 0
+2025-09-27 15:00:09 - bot_service - DEBUG - Recorded stream data: twitch - 0 viewers
+2025-09-27 15:00:34 - bot_service - DEBUG - CORS Request: GET /api/admin/sessions from http://localhost:5173
+2025-09-27 15:00:34 - bot_service - INFO - Total users in database: 0
+2025-09-27 15:00:35 - bot_service - INFO - 🛑 BOT_SERVICE ОСТАНОВЛЕН
+2025-09-27 15:00:35 - bot_service - INFO - ⏰ Время: 2025-09-27 15:00:35
+2025-09-27 15:00:35 - bot_service - INFO - 🧹 Cleaning up 0 active VK bots...
+2025-09-27 15:00:35 - bot_service - INFO - 🧹 All VK bots cleaned up
+2025-09-27 15:00:35 - bot_service - INFO - ✅ TwitchIO start() completed
+2025-09-27 15:00:36 - bot_service - INFO - === BOT SERVICE STARTED ===
+2025-09-27 15:00:36 - bot_service - INFO - === BOT SERVICE STARTED ===
+2025-09-27 15:00:36 - bot_service - INFO - ==================================================
+2025-09-27 15:00:36 - bot_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-27 15:00:36
+2025-09-27 15:00:36 - bot_service - INFO - ==================================================
+2025-09-27 15:00:36 - bot_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-27 15:00:36 - bot_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-27 15:00:36 - bot_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-27 15:00:36 - bot_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-27 15:00:36 - bot_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service
+2025-09-27 15:00:36 - bot_service - INFO - ==================================================
+2025-09-27 15:00:36 - bot_service - INFO - 🚀 BOT_SERVICE ЗАПУЩЕН
+2025-09-27 15:00:36 - bot_service - INFO - 🌐 Порт: 8000
+2025-09-27 15:00:36 - bot_service - INFO - 📁 Логи: logs/bot_service.log
+2025-09-27 15:00:36 - bot_service - INFO - ⏰ Время: 2025-09-27 15:00:36
+2025-09-27 15:00:36 - bot_service - INFO - 🔄 Restoring active sessions from database...
+2025-09-27 15:00:36 - bot_service - INFO - 🚀 Found active channels: ['yourchy']
+2025-09-27 15:00:36 - bot_service - INFO - 🎮 Twitch channels to connect: ['yourchy']
+2025-09-27 15:00:36 - bot_service - INFO - 🤖 CREATING TWITCH BOT
+2025-09-27 15:00:36 - bot_service - INFO - 📋 Token: oauth:cj4a...
+2025-09-27 15:00:36 - bot_service - INFO - 🔗 Initial channels: ['yourchy']
+2025-09-27 15:00:36 - bot_service - INFO - 🔧 Initializing TwitchIO Bot...
+2025-09-27 15:00:36 - bot_service - INFO - ✅ TwitchIO Bot initialized
+2025-09-27 15:00:36 - bot_service - INFO - ✅ Twitch bot started and connecting to Twitch channels.
+2025-09-27 15:00:36 - bot_service - INFO - Loaded 0 verifications from database
+2025-09-27 15:00:36 - bot_service - INFO - 🚀 STARTING TWITCH BOT...
+2025-09-27 15:00:36 - bot_service - INFO - 🔗 Bot will connect to IRC and join channels
+2025-09-27 15:00:36 - bot_service - INFO - 📡 Calling TwitchIO start()...
+2025-09-27 15:00:38 - bot_service - DEBUG - RAW < :tmi.twitch.tv 001 payedviewer :Welcome, GLHF!
+:tmi.twitch.tv 002 payedviewer :Your host is tmi.twitch.tv
+:tmi.twitch.tv 003 payedviewer :This server is rather new
+:tmi.twitch.tv 004 payedviewer :-
+:tmi.twitch.tv 375 payedviewer :-
+:tmi.twitch.tv 372 payedviewer :You are in a maze of twisty passages, all alike.
+:tmi.twitch.tv 376 payedviewer :>
+:tmi.twitch.tv CAP * ACK :twitch.tv/commands
+:tmi.twitch.tv CAP * ACK :twitch.tv/tags
+:tmi.twitch.tv CAP * ACK :twitch.tv/membership
+2025-09-27 15:00:38 - bot_service - DEBUG - RAW < :payedviewer!payedviewer@payedviewer.tmi.twitch.tv JOIN #yourchy
+:payedviewer.tmi.twitch.tv 353 payedviewer = #yourchy :payedviewer
+:payedviewer.tmi.twitch.tv 366 payedviewer #yourchy :End of /NAMES list
+2025-09-27 15:00:38 - bot_service - INFO - ✅ SUCCESSFULLY JOINED CHANNEL: yourchy
+2025-09-27 15:00:38 - bot_service - INFO - 🎯 BOT IS NOW LISTENING TO CHAT IN: yourchy
+2025-09-27 15:00:38 - bot_service - INFO - 🤖 TWITCH BOT READY!
+2025-09-27 15:00:38 - bot_service - INFO - 📋 Bot logged in as: payedviewer
+2025-09-27 15:00:38 - bot_service - INFO - 🆔 Bot user id: 1317705797
+2025-09-27 15:00:38 - bot_service - INFO - 🔗 Connected to channels: [<Channel name: yourchy>]
+2025-09-27 15:00:38 - bot_service - INFO - 🎯 BOT IS NOW LISTENING FOR MESSAGES IN ALL CHANNELS!
+2025-09-27 15:00:38 - bot_service - INFO - 🎯 BOT IS NOW LISTENING FOR MESSAGES IN THESE CHANNELS
+2025-09-27 15:00:38 - bot_service - INFO - ✅ MONITORING CHAT: yourchy
+2025-09-27 15:00:38 - bot_service - INFO - 🔔 MESSAGE RECEIVED! Type: <class 'twitchio.message.Message'>
+2025-09-27 15:00:38 - bot_service - INFO - 📨 RAW MESSAGE DATA: > :payedviewer!payedviewer@payedviewer.tmi.twitch.tv PRIVMSG(ECHO) #yourchy :/me подключен к стримеру с IP адресом: 14.959.47.54
+2025-09-27 15:00:38 - bot_service - INFO - 📋 Message attributes: channel=<Channel name: yourchy>, author=None, content=/me подключен к стримеру с IP адресом: 14.959.47.54
+2025-09-27 15:00:38 - bot_service - DEBUG - Received message without author, skipping
+2025-09-27 15:00:38 - bot_service - DEBUG - RAW < @badge-info=;badges=moderator/1;color=;display-name=payedviewer;emote-sets=0,300374282;mod=1;subscriber=0;user-type=mod :tmi.twitch.tv USERSTATE #yourchy
+@emote-only=0;followers-only=-1;r9k=0;room-id=75969278;slow=0;subs-only=0 :tmi.twitch.tv ROOMSTATE #yourchy
+2025-09-27 15:00:38 - bot_service - DEBUG - RAW < @badge-info=;badges=moderator/1;color=;display-name=payedviewer;emote-sets=0,300374282;id=b5904a98-d2cc-4870-947f-d0b927457e09;mod=1;subscriber=0;user-type=mod :tmi.twitch.tv USERSTATE #yourchy
+2025-09-27 15:00:49 - bot_service - DEBUG - CORS Request: GET /api/active-channels from http://localhost:5173
+2025-09-27 15:00:49 - bot_service - INFO - Active channels from ConnectionManager: ['yourchy']
+2025-09-27 15:01:04 - bot_service - DEBUG - CORS Request: GET /api/admin/sessions from http://localhost:5173
+2025-09-27 15:01:04 - bot_service - INFO - Total users in database: 0
+2025-09-27 15:01:21 - bot_service - INFO - 🛑 BOT_SERVICE ОСТАНОВЛЕН
+2025-09-27 15:01:21 - bot_service - INFO - ⏰ Время: 2025-09-27 15:01:21
+2025-09-27 15:01:21 - bot_service - INFO - 🧹 Cleaning up 0 active VK bots...
+2025-09-27 15:01:21 - bot_service - INFO - 🧹 All VK bots cleaned up
+2025-09-27 15:01:21 - bot_service - INFO - ✅ TwitchIO start() completed
+2025-09-27 15:01:23 - bot_service - INFO - === BOT SERVICE STARTED ===
+2025-09-27 15:01:23 - bot_service - INFO - === BOT SERVICE STARTED ===
+2025-09-27 15:01:23 - bot_service - INFO - ==================================================
+2025-09-27 15:01:23 - bot_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-27 15:01:23
+2025-09-27 15:01:23 - bot_service - INFO - ==================================================
+2025-09-27 15:01:23 - bot_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-27 15:01:23 - bot_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-27 15:01:23 - bot_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-27 15:01:23 - bot_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-27 15:01:23 - bot_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service
+2025-09-27 15:01:23 - bot_service - INFO - ==================================================
+2025-09-27 15:01:23 - bot_service - INFO - 🚀 BOT_SERVICE ЗАПУЩЕН
+2025-09-27 15:01:23 - bot_service - INFO - 🌐 Порт: 8000
+2025-09-27 15:01:23 - bot_service - INFO - 📁 Логи: logs/bot_service.log
+2025-09-27 15:01:23 - bot_service - INFO - ⏰ Время: 2025-09-27 15:01:23
+2025-09-27 15:01:23 - bot_service - INFO - 🔄 Restoring active sessions from database...
+2025-09-27 15:01:23 - bot_service - INFO - 🚀 Found active channels: ['yourchy']
+2025-09-27 15:01:23 - bot_service - INFO - 🎮 Twitch channels to connect: ['yourchy']
+2025-09-27 15:01:23 - bot_service - INFO - 🤖 CREATING TWITCH BOT
+2025-09-27 15:01:23 - bot_service - INFO - 📋 Token: oauth:cj4a...
+2025-09-27 15:01:23 - bot_service - INFO - 🔗 Initial channels: ['yourchy']
+2025-09-27 15:01:23 - bot_service - INFO - 🔧 Initializing TwitchIO Bot...
+2025-09-27 15:01:23 - bot_service - INFO - ✅ TwitchIO Bot initialized
+2025-09-27 15:01:23 - bot_service - INFO - ✅ Twitch bot started and connecting to Twitch channels.
+2025-09-27 15:01:23 - bot_service - INFO - Loaded 0 verifications from database
+2025-09-27 15:01:23 - bot_service - INFO - 🚀 STARTING TWITCH BOT...
+2025-09-27 15:01:23 - bot_service - INFO - 🔗 Bot will connect to IRC and join channels
+2025-09-27 15:01:23 - bot_service - INFO - 📡 Calling TwitchIO start()...
+2025-09-27 15:01:24 - bot_service - INFO - 🛑 BOT_SERVICE ОСТАНОВЛЕН
+2025-09-27 15:01:24 - bot_service - INFO - ⏰ Время: 2025-09-27 15:01:24
+2025-09-27 15:01:24 - bot_service - INFO - 🧹 Cleaning up 0 active VK bots...
+2025-09-27 15:01:24 - bot_service - INFO - 🧹 All VK bots cleaned up
+2025-09-27 15:01:24 - bot_service - ERROR - Error stopping bot: 'NoneType' object has no attribute 'cancel'
+2025-09-27 15:01:31 - bot_service - INFO - === BOT SERVICE STARTED ===
+2025-09-27 15:01:32 - bot_service - INFO - === BOT SERVICE STARTED ===

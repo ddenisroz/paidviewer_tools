@@ -2579,6 +2579,30 @@ async def clear_user_session(user_id: int, db: Session = Depends(get_db)):
         if not user:
             return {"error": "User not found"}
         
+        # Получаем активные каналы перед удалением пользователя
+        active_channels = connection_manager.get_active_channels()
+        logger.info(f"Active channels before user deletion: {active_channels}")
+        
+        # Отключаем ботов от всех активных каналов
+        global bot_instance, vk_live_bot_instance
+        for channel in active_channels:
+            # Отключаем Twitch бота
+            if bot_instance and bot_instance.is_connected_to_channel(channel):
+                await bot_instance.leave_channel(channel)
+                logger.info(f"Disconnected Twitch bot from channel: {channel}")
+            
+            # Отключаем VK Live бота
+            if channel in connection_manager.active_vk_bots:
+                vk_bot = connection_manager.active_vk_bots[channel]
+                if vk_bot:
+                    await vk_bot.stop()
+                    del connection_manager.active_vk_bots[channel]
+                    logger.info(f"Disconnected VK Live bot from channel: {channel}")
+        
+        # Очищаем активные каналы из ConnectionManager
+        connection_manager.clear_all_channels()
+        logger.info("Cleared all active channels from ConnectionManager")
+        
         # Удаляем пользователя из базы данных
         db.delete(user)
         db.commit()

@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from core.database import User, get_db
 from core.session_manager import session_manager
 from auth.auth import create_jwt_token, get_current_user_optional
-from bot_disconnect import disconnect_user_bots
+# Импорт функции отключения ботов будет сделан локально
 import base64
 import secrets
 
@@ -342,8 +342,8 @@ async def vk_logout(request: Request, response: Response):
             import sys
             import os
             sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-            from main import bot_instance, vk_live_bot_instance
-            await disconnect_user_bots(user_data, bot_instance, vk_live_bot_instance)
+            from main import bot_instance, vk_live_bot_instance, _disconnect_user_bots
+            await _disconnect_user_bots(user_data)
             logger.info(f"Disconnected bots for user {user_id} on VK logout")
             
             # Удаляем все токены интеграций пользователя

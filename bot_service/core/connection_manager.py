@@ -726,6 +726,17 @@ class ConnectionManager:
         """Получить список каналов с активными сессиями"""
         return list(self.active_sessions.keys())
     
+    def clear_all_channels(self):
+        """Очистить все активные каналы и сессии"""
+        self.active_sessions.clear()
+        self.verified_sessions.clear()
+        self.pending_verifications.clear()
+        self.tts_enabled_channels.clear()
+        self.tts_enabled_twitch.clear()
+        self.tts_enabled_vk.clear()
+        self.active_vk_bots.clear()
+        logger.info("Cleared all channels and sessions from ConnectionManager")
+    
     def get_active_twitch_channels(self, db: "Session") -> List[str]:
         """Получить список только Twitch каналов с активными сессиями"""
         try:
