@@ -37,7 +37,10 @@ const AdminPage = () => {
 
     const loadChannels = async () => {
         try {
-            const response = await api.get('/api/admin/whitelist');
+            const token = localStorage.getItem('token');
+            const response = await api.get('/api/admin/whitelist', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             // Адаптируем под новый формат ответа
             setChannels({ twitch: response.data.whitelist_users || [], vk: [] });
         } catch (error) {
@@ -88,7 +91,10 @@ const AdminPage = () => {
 
     const loadBlockedChannels = async () => {
         try {
-            const response = await api.get('/api/admin/blocked-channels');
+            const token = localStorage.getItem('token');
+            const response = await api.get('/api/admin/blocked-channels', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             setBlockedChannels(response.data.blocked_channels || []);
         } catch (error) {
             console.error('Ошибка загрузки заблокированных каналов:', error);
@@ -104,9 +110,12 @@ const AdminPage = () => {
 
         try {
             setAddingBlockedChannel(true);
+            const token = localStorage.getItem('token');
             await api.post('/api/admin/blocked-channels', {
                 channel_name: newBlockedChannel.trim(),
                 reason: 'Заблокировано администратором'
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
             });
             
             toast.success('Канал заблокирован');

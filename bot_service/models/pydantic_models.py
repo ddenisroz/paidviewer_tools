@@ -7,8 +7,7 @@ from datetime import datetime
 class WhitelistedChannelPublic(BaseModel):
     id: int
     channel_name: str
-    platform: str
-    added_at: datetime
+    created_at: datetime
 
     class Config:
         from_attributes = True
