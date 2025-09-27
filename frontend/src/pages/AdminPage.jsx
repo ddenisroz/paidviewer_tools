@@ -53,8 +53,11 @@ const AdminPage = () => {
         }
 
         try {
+            const token = localStorage.getItem('token');
             await api.post('/api/admin/whitelist/add', {
                 username: newChannel.trim(),
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
             });
             // После успешного добавления перезагружаем актуальный список с бэкенда
             await loadChannels();
@@ -68,9 +71,11 @@ const AdminPage = () => {
 
     const removeChannel = async (channel, platform) => {
         try {
+            const token = localStorage.getItem('token');
             // Внимание: axios.delete передает тело запроса в поле `data`
             await api.delete('/api/admin/whitelist/remove', {
-                data: { username: channel }
+                data: { username: channel },
+                headers: { Authorization: `Bearer ${token}` }
             });
             // После успешного удаления перезагружаем актуальный список с бэкенда
             await loadChannels();
@@ -117,7 +122,10 @@ const AdminPage = () => {
 
     const removeBlockedChannel = async (channelId) => {
         try {
-            await api.delete(`/api/admin/blocked-channels/${channelId}`);
+            const token = localStorage.getItem('token');
+            await api.delete(`/api/admin/blocked-channels/${channelId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             toast.success('Канал разблокирован');
             await loadBlockedChannels();
         } catch (error) {
