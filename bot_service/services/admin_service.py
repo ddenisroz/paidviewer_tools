@@ -38,6 +38,7 @@ class AdminAPI:
         ).first()
         
         if existing:
+            logger.warning(f"⚠️ WHITELIST: Попытка добавить уже существующий канал '{username}'")
             return {"message": f"User {username} is already in whitelist"}
         
         # Добавляем в whitelist
@@ -47,7 +48,7 @@ class AdminAPI:
         db.add(whitelist_user)
         db.commit()
         
-        logger.info(f"User {username} added to whitelist")
+        logger.info(f"✅ WHITELIST: Канал '{username}' добавлен в белый список")
         return {"message": f"User {username} added to whitelist"}
 
     async def remove_from_whitelist(self, request: AddToWhitelistRequest, db: Session) -> dict:
@@ -59,12 +60,13 @@ class AdminAPI:
         ).first()
         
         if not whitelist_user:
+            logger.warning(f"⚠️ WHITELIST: Попытка удалить несуществующий канал '{username}'")
             return {"message": f"User {username} not found in whitelist"}
         
         db.delete(whitelist_user)
         db.commit()
         
-        logger.info(f"User {username} removed from whitelist")
+        logger.info(f"🗑️ WHITELIST: Канал '{username}' удален из белого списка")
         return {"message": f"User {username} removed from whitelist"}
 
     async def get_blocked_bots(self, db: Session) -> List[BlockedBotPublic]:
@@ -210,7 +212,7 @@ class AdminAPI:
             import asyncio
             
             if bot_name == "twitch_bot":
-                logger.info(f"Restarting Twitch bot...")
+                logger.info(f"🔄 BOT RESTART: Перезапускаем Twitch бота...")
                 
                 # Останавливаем текущий бот
                 if bot_instance:

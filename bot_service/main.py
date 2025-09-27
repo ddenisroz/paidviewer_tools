@@ -401,15 +401,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- CORS Debug Middleware ---
+# --- Request Logging Middleware ---
 @app.middleware("http")
-async def cors_debug_middleware(request: Request, call_next):
-    # Логируем CORS запросы для отладки
-    origin = request.headers.get("origin")
-    if origin and origin.startswith("http://localhost"):
-        logger.debug(f"CORS Request: {request.method} {request.url.path} from {origin}")
+async def request_logging_middleware(request: Request, call_next):
+    start_time = time.time()
+    
+    # Получаем информацию о пользователе из токена (если есть)
+    user_info = "Anonymous"
+    auth_header = request.headers.get("authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        try:
+            from auth.auth import decode_jwt_token
+            token = auth_header.split(" ")[1]
+            payload = decode_jwt_token(token)
+            user_info = f"User:{payload.get('display_name', 'Unknown')}"
+        except:
+            user_info = "InvalidToken"
     
     # Обрабатываем preflight запросы
+    origin = request.headers.get("origin")
     if request.method == "OPTIONS":
         response = Response()
         if origin and origin.startswith("http://localhost"):
@@ -429,7 +439,52 @@ async def cors_debug_middleware(request: Request, call_next):
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept, Origin"
     
+    # Логируем только важные запросы
+    process_time = time.time() - start_time
+    if should_log_request(request.url.path, response.status_code):
+        log_level = "ERROR" if response.status_code >= 400 else "INFO"
+        log_message = f"🌐 {request.method} {request.url.path} | {user_info} | {response.status_code} | {process_time:.3f}s"
+        
+        if response.status_code >= 400:
+            logger.error(log_message)
+        else:
+            logger.info(log_message)
+    
     return response
+
+def should_log_request(path: str, status_code: int) -> bool:
+    """Определяет, нужно ли логировать запрос"""
+    # Всегда логируем ошибки
+    if status_code >= 400:
+        return True
+    
+    # Логируем важные операции
+    important_paths = [
+        "/api/admin/",
+        "/api/auth/",
+        "/api/tts/",
+        "/api/chat/",
+        "/auth/twitch/",
+        "/auth/vk/"
+    ]
+    
+    # Не логируем частые статусные запросы
+    skip_paths = [
+        "/api/active-channels",
+        "/api/chat/status",
+        "/api/tts/status",
+        "/api/admin/bots/status"
+    ]
+    
+    for skip_path in skip_paths:
+        if path.startswith(skip_path):
+            return False
+    
+    for important_path in important_paths:
+        if path.startswith(important_path):
+            return True
+    
+    return False
 
 # --- Rate Limiting Middleware ---
 @app.middleware("http")
