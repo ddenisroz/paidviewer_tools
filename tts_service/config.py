@@ -12,10 +12,15 @@ class AppConfig(BaseModel):
     # --- Настройки путей ---
     base_dir: Path = Path(__file__).resolve().parent
     
-    # Голоса
+    # Единая структура аудио файлов (внутри tts_service)
+    @property
+    def audio_path(self) -> Path:
+        return self.base_dir / "audio"
+    
+    # Голоса (референсные файлы)
     @property
     def voices_path(self) -> Path:
-        return self.base_dir / "voices"
+        return self.audio_path / "voices"
         
     @property
     def global_voices_path(self) -> Path:
@@ -25,22 +30,25 @@ class AppConfig(BaseModel):
     def user_voices_path(self) -> Path:
         return self.voices_path / "user"
     
-    # Аудио файлы
+    # Временные файлы (автоудаление через 5 минут)
     @property
-    def audio_path(self) -> Path:
-        return self.base_dir / "audio"
+    def temp_audio_path(self) -> Path:
+        return self.audio_path / "temp"
         
+    # Тестовые аудио файлы
     @property
     def test_audio_path(self) -> Path:
         return self.audio_path / "test"
         
+    # Продакшн аудио файлы
     @property
     def production_audio_path(self) -> Path:
         return self.audio_path / "production"
         
+    # Кеш для F5-TTS
     @property
-    def temp_audio_path(self) -> Path:
-        return self.audio_path / "temp"
+    def cache_audio_path(self) -> Path:
+        return self.audio_path / "cache"
         
     @property
     def user_configs_path(self) -> Path:

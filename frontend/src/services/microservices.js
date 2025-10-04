@@ -108,7 +108,7 @@ export const deleteVoice = async (voiceId) => {
 };
 
 export const updateVoiceSettings = async (voiceId, settings) => {
-    return await ttsService.put(`/api/admin/voices/${voiceId}/settings`, settings);
+    return await botService.put(`/api/voices/${voiceId}/settings`, settings);
 };
 
 export const updateUserVoiceSettings = async (voiceId, userId, settings) => {
@@ -116,11 +116,31 @@ export const updateUserVoiceSettings = async (voiceId, userId, settings) => {
 };
 
 export const transcribeVoice = async (voiceId) => {
-    return await ttsService.post(`/api/admin/voices/${voiceId}/transcribe`);
+    return await botService.post(`/api/admin/voices/${voiceId}/transcribe`);
+};
+
+export const retranscribeVoice = async (voiceId, referenceText) => {
+    const formData = new FormData();
+    formData.append('reference_text', referenceText);
+    return await ttsService.post(`/api/voices/${voiceId}/retranscribe`, formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+    });
+};
+
+export const retranscribeUserVoice = async (voiceId, userId, referenceText) => {
+    const formData = new FormData();
+    formData.append('reference_text', referenceText);
+    return await ttsService.post(`/api/user/voices/${voiceId}/retranscribe?user_id=${userId}`, formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+    });
 };
 
 export const transcribeUserVoice = async (voiceId, userId) => {
-    return await ttsService.post(`/api/user/voices/${voiceId}/transcribe?user_id=${userId}`);
+    return await botService.post(`/api/user/voices/${voiceId}/transcribe?user_id=${userId}`);
 };
 
 // Rename voice functions
@@ -168,18 +188,27 @@ export const deleteUserVoice = async (voiceId, userId) => {
 
 // Common
 export const testVoice = async (voiceName, userId, testText = "Ну так я гетеро, че мне пидоров бояться!", cfgStrength = null, speedPreset = null) => {
+    console.log('📤 testVoice called with:', { voiceName, userId, cfgStrength, speedPreset });
+    
     const formData = new FormData();
     formData.append('voice_name', voiceName);
     formData.append('user_id', userId);
     formData.append('test_text', testText);
     if (cfgStrength !== null) {
         formData.append('cfg_strength', cfgStrength);
+        console.log('  ✅ Added cfg_strength to FormData:', cfgStrength);
     }
     if (speedPreset !== null) {
         formData.append('speed_preset', speedPreset);
+        console.log('  ✅ Added speed_preset to FormData:', speedPreset);
     }
     
-    return await ttsService.post('/api/voices/test', formData, {
+    // Логируем содержимое FormData
+    for (let [key, value] of formData.entries()) {
+        console.log(`  FormData[${key}] =`, value);
+    }
+    
+    return await botService.post('/api/voices/test', formData, {
         headers: {
             'Content-Type': 'multipart/form-data',
         },

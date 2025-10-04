@@ -16,7 +16,7 @@ const ObsTtsPage = () => {
         }
 
         const connect = () => {
-            const wsUrl = `${import.meta.env.VITE_BOT_SERVICE_WS_URL}/ws/chat/obs/${token}`;
+            const wsUrl = `${import.meta.env.VITE_BOT_SERVICE_WS_URL || 'ws://localhost:8000'}/ws/chat/obs/${token}`;
             setStatus(`Connecting to ${wsUrl}...`);
             
             ws.current = new WebSocket(wsUrl);
@@ -30,7 +30,11 @@ const ObsTtsPage = () => {
                 try {
                     const message = JSON.parse(event.data);
                     if (message.type === 'tts_synthesized' && message.audio_url) {
-                        const audioUrl = `${import.meta.env.VITE_TTS_SERVICE_URL}${message.audio_url}`;
+                        // Проверяем, является ли URL уже полным
+                        let audioUrl = message.audio_url;
+                        if (!audioUrl.startsWith('http')) {
+                            audioUrl = `${import.meta.env.VITE_TTS_SERVICE_URL || 'http://localhost:8001'}${message.audio_url}`;
+                        }
                         console.log('Received audio URL:', audioUrl);
                         setAudioQueue(prevQueue => [...prevQueue, audioUrl]);
                     } else if (message.type === 'tts_error') {
@@ -69,24 +73,35 @@ const ObsTtsPage = () => {
     useEffect(() => {
         if (audioQueue.length > 0 && !isPlaying) {
             const nextAudioUrl = audioQueue[0];
+            console.log('Playing audio:', nextAudioUrl);
             setIsPlaying(true);
+            
             const audio = new Audio(nextAudioUrl);
-            audio.play().catch(e => {
-                console.error("Audio play failed:", e);
-                // If play fails, move to the next item
-                setIsPlaying(false);
-                setAudioQueue(prevQueue => prevQueue.slice(1));
-            });
-
+            
+            // Добавляем обработчики событий перед попыткой воспроизведения
+            audio.oncanplaythrough = () => {
+                console.log('Audio ready to play');
+                audio.play().catch(e => {
+                    console.error("Audio play failed:", e);
+                    setIsPlaying(false);
+                    setAudioQueue(prevQueue => prevQueue.slice(1));
+                });
+            };
+            
             audio.onended = () => {
+                console.log('Audio playback ended');
                 setIsPlaying(false);
                 setAudioQueue(prevQueue => prevQueue.slice(1));
             };
-            audio.onerror = () => {
-                console.error("Error loading or playing audio:", nextAudioUrl);
+            
+            audio.onerror = (e) => {
+                console.error("Error loading or playing audio:", nextAudioUrl, e);
                 setIsPlaying(false);
                 setAudioQueue(prevQueue => prevQueue.slice(1));
-            }
+            };
+            
+            // Загружаем аудио
+            audio.load();
         }
     }, [audioQueue, isPlaying]);
 

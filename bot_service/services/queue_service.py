@@ -43,7 +43,7 @@ class QueueService:
             if not self.youtube_service.is_valid_youtube_url(video_url):
                 return {
                     'success': False, 
-                    'error': 'Неверный URL YouTube видео'
+                    'error': 'Неверная ссылка на YouTube. Используйте формат: https://youtube.com/watch?v=...'
                 }
             
             # Получаем информацию о видео
@@ -51,7 +51,7 @@ class QueueService:
             if not video_info:
                 return {
                     'success': False, 
-                    'error': 'Не удалось получить информацию о видео'
+                    'error': 'Видео недоступно или удалено. Проверьте ссылку и попробуйте снова'
                 }
             
             # Проверяем, нет ли уже этого видео в очереди
@@ -66,7 +66,7 @@ class QueueService:
             if existing:
                 return {
                     'success': False, 
-                    'error': 'Это видео уже есть в очереди'
+                    'error': 'Это видео уже есть в очереди! Выберите другое видео'
                 }
             
             # Получаем следующую позицию в очереди

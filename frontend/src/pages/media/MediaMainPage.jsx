@@ -3,7 +3,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Youtube, Coins, Settings, Dice6 } from 'lucide-react';
+import { Youtube, Coins, Settings, Gift, Dice6 } from 'lucide-react';
 import { useIntegrations } from '../../context/IntegrationsContext';
 
 const MediaFeatureCard = ({ title, icon, path, enabled, description }) => {
@@ -21,7 +21,7 @@ const MediaFeatureCard = ({ title, icon, path, enabled, description }) => {
         >
             <div className="flex flex-col items-center justify-center gap-4">
                 {icon}
-                <CardTitle className="text-xl font-bold leading-tight">{title}</CardTitle>
+                <CardTitle className="text-3xl font-bold leading-tight">{title}</CardTitle>
                 <p className="text-base text-muted-foreground">{description}</p>
             </div>
         </Card>
@@ -45,18 +45,18 @@ const MediaMainPage = () => {
                     description="Управление очередью видео"
                 />
                 <MediaFeatureCard 
-                    title="Управление баллами канала"
+                    title="Баллы канала"
                     icon={<Coins className="h-16 w-16 text-yellow-500" />}
-                    path="/dashboard/media/channel-points"
+                    path="/dashboard/points"
                     enabled={isTwitchEnabled} // Только для Twitch
-                    description="Настройка звуков для наград"
+                    description="Управление наградами платформ"
                 />
                 <MediaFeatureCard 
                     title="Гэмблинг"
                     icon={<Dice6 className="h-16 w-16 text-purple-500" />}
-                    path="/dashboard/media/gambling"
+                    path="/dashboard/gambling"
                     enabled={isTwitchEnabled} // Только для Twitch/VK
-                    description="Аукционы и азартные игры"
+                    description="Мини-игры с донатами"
                 />
             </div>
         </div>

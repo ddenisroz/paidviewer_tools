@@ -21,7 +21,12 @@ const YouTubeQueueCarousel = () => {
       
       if (response.ok) {
         const data = await response.json();
-        setQueue(data);
+        // Обрабатываем новый формат ответа
+        if (data.current_video && data.queue) {
+          setQueue([data.current_video, ...data.queue]);
+        } else {
+          setQueue(data);
+        }
       } else {
         throw new Error('Ошибка загрузки очереди');
       }
@@ -36,15 +41,14 @@ const YouTubeQueueCarousel = () => {
   const addVideo = async (url) => {
     try {
       setAddingVideo(true);
-      const response = await fetch('/api/youtube/queue/add', {
+      const response = await fetch('/api/youtube/queue', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
         body: JSON.stringify({
-          video_url: url,
-          is_paid: false
+          url: url
         })
       });
 
@@ -67,15 +71,9 @@ const YouTubeQueueCarousel = () => {
   // Удаление видео
   const removeVideo = async (queueId) => {
     try {
-      const response = await fetch('/api/youtube/queue/remove', {
+      const response = await fetch(`/api/youtube/queue/remove/${queueId}`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          queue_id: queueId
-        })
+        credentials: 'include'
       });
 
       if (response.ok) {
@@ -88,18 +86,38 @@ const YouTubeQueueCarousel = () => {
     }
   };
 
+  // Переключиться на видео
+  const playVideo = async (video) => {
+    try {
+      // Сначала переключаемся на это видео
+      const response = await fetch('/api/youtube/player/next', {
+        method: 'POST',
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        await loadQueue();
+        // Уведомляем другие вкладки
+        window.dispatchEvent(new CustomEvent('youtube_event', {
+          detail: {
+            event: 'video_played',
+            data: { video }
+          }
+        }));
+      } else {
+        throw new Error('Ошибка переключения видео');
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   // Отметить как проигранное
   const markAsPlayed = async (queueId) => {
     try {
-      const response = await fetch('/api/youtube/queue/mark-played', {
+      const response = await fetch(`/api/youtube/queue/mark-played/${queueId}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          queue_id: queueId
-        })
+        credentials: 'include'
       });
 
       if (response.ok) {
@@ -119,8 +137,8 @@ const YouTubeQueueCarousel = () => {
     }
 
     try {
-      const response = await fetch('/api/youtube/queue/clear', {
-        method: 'DELETE',
+      const response = await fetch('/api/youtube/clear', {
+        method: 'POST',
         credentials: 'include'
       });
 
@@ -138,7 +156,8 @@ const YouTubeQueueCarousel = () => {
     loadQueue();
     
     // Автообновление каждые 30 секунд
-    const interval = setInterval(loadQueue, 30000);
+    // Увеличиваем интервал до 60 секунд для снижения нагрузки
+    const interval = setInterval(loadQueue, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -326,6 +345,14 @@ const YouTubeQueueCarousel = () => {
                         <SkipForward className="w-4 h-4" />
                       </button>
                     )}
+                    
+                    <button
+                      onClick={() => playVideo(video)}
+                      className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                      title="Воспроизвести это видео"
+                    >
+                      <Play className="w-4 h-4" />
+                    </button>
                     
                     <button
                       onClick={() => removeVideo(video.id)}

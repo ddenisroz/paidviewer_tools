@@ -148,7 +148,7 @@ const UserManagementPage = () => {
         <div className="container mx-auto p-6 space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold flex items-center">
+                    <h1 className="text-3xl font-bold mb-6 text-foreground flex items-center">
                         <Users className="w-8 h-8 mr-3 text-purple-500" />
                         Управление пользователями
                     </h1>

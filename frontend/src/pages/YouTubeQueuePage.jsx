@@ -11,7 +11,7 @@ const YouTubeQueuePage = () => {
         <div className="bg-gradient-to-r from-red-500 to-pink-500 rounded-lg p-6 text-white">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold flex items-center">
+              <h1 className="text-3xl font-bold mb-6 text-foreground flex items-center">
                 <Play className="w-8 h-8 mr-3" />
                 YouTube Очередь
               </h1>

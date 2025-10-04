@@ -1,6 +1,7 @@
 // src/components/TtsErrorCard.jsx
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
+import { Button } from './ui/button';
 
 const TtsErrorCard = ({ title, description, suggestion }) => {
     return (
@@ -14,9 +15,12 @@ const TtsErrorCard = ({ title, description, suggestion }) => {
                     <p className="text-red-300 mb-3">
                         {description}
                     </p>
-                    <p className="text-slate-400 text-sm">
+                    <p className="text-slate-400 text-sm mb-4">
                         {suggestion}
                     </p>
+                    <div className="text-red-300 text-sm">
+                        Система автоматически обновит статус
+                    </div>
                 </div>
             </div>
         </div>

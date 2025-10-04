@@ -5,14 +5,34 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Twitch, Video } from 'lucide-react';
+import { Twitch, Video, Inbox, Settings, Gift, AlertCircle } from 'lucide-react';
 import { useIntegrations } from '../context/IntegrationsContext';
+import { useDonationAlerts } from '../context/DonationAlertsContext';
 import { useAuth } from '../context/AuthContext';
 import { Loader } from '@/components/ui/loader';
+import InboxPage from './InboxPage';
 
 const SettingsPage = () => {
     const { user } = useAuth();
     const { integrations, isLoading, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
+    const { isConnected: daConnected, isLoading: daLoading, error: daError, connect: daConnect, disconnect: daDisconnect } = useDonationAlerts();
+    const [activeTab, setActiveTab] = React.useState('settings');
+
+    // Проверяем, есть ли хотя бы одна основная интеграция
+    const hasMainIntegration = integrations.twitch?.enabled || integrations.vk?.enabled;
+
+    const handleDonationAlertsConnect = async () => {
+        if (!hasMainIntegration) {
+            alert('Сначала подключите хотя бы одну основную платформу (Twitch или VK Live)');
+            return;
+        }
+        
+        await daConnect();
+    };
+
+    const handleDonationAlertsDisconnect = async () => {
+        await daDisconnect();
+    };
 
     // В гостевом режиме показываем настройки без загрузки
     const isGuestMode = localStorage.getItem('guestModeEnabled') === 'true';
@@ -29,14 +49,43 @@ const SettingsPage = () => {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="container mx-auto p-6 space-y-6">
             <div>
-                <h1 className="text-3xl font-bold">Настройки</h1>
+                <h1 className="text-3xl font-bold mb-6 text-foreground">Настройки</h1>
                 <p className="text-muted-foreground">
                     Управление интеграциями и настройками бота
                 </p>
             </div>
 
+            {/* Табы */}
+            <div className="flex space-x-1 bg-muted p-1 rounded-lg w-fit">
+                <button
+                    onClick={() => setActiveTab('settings')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                        activeTab === 'settings'
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                >
+                    <Settings className="w-4 h-4 mr-2 inline" />
+                    Настройки
+                </button>
+                <button
+                    onClick={() => setActiveTab('tickets')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                        activeTab === 'tickets'
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                >
+                    <Inbox className="w-4 h-4 mr-2 inline" />
+                    Мои тикеты
+                </button>
+            </div>
+
+            {/* Содержимое табов */}
+            {activeTab === 'settings' && (
+            <>
             <Card>
                 <CardContent className="space-y-6 pt-6">
                     {/* Twitch Integration */}
@@ -83,6 +132,57 @@ const SettingsPage = () => {
                 </CardContent>
             </Card>
 
+            {/* DonationAlerts Integration */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Gift className="h-5 w-5 text-purple-600" />
+                        DonationAlerts
+                    </CardTitle>
+                    <CardDescription>
+                        Подключение к системе донатов для получения уведомлений в реальном времени
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                            <p className="text-sm font-medium">
+                                {daConnected ? 'Подключено' : 'Отключено'}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                {daConnected 
+                                    ? 'DonationAlerts подключен и готов к работе'
+                                    : 'Подключите DonationAlerts для получения донатов'
+                                }
+                            </p>
+                        </div>
+                        <Switch
+                            checked={daConnected}
+                            onCheckedChange={daConnected ? handleDonationAlertsDisconnect : handleDonationAlertsConnect}
+                            disabled={daLoading || !hasMainIntegration}
+                        />
+                    </div>
+                    
+                    {!hasMainIntegration && (
+                        <div className="flex items-center space-x-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-md">
+                            <AlertCircle className="w-4 h-4 text-yellow-600" />
+                            <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                                Для подключения DonationAlerts необходимо сначала подключить хотя бы одну основную платформу (Twitch или VK Live)
+                            </p>
+                        </div>
+                    )}
+                    
+                    {daError && (
+                        <div className="flex items-center space-x-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-md">
+                            <AlertCircle className="w-4 h-4 text-red-600" />
+                            <p className="text-sm text-red-700 dark:text-red-300">
+                                {daError}
+                            </p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
             {/* User Info */}
             <Card>
                 <CardHeader>
@@ -101,7 +201,13 @@ const SettingsPage = () => {
                     </div>
                 </CardContent>
             </Card>
+            </>
+            )}
 
+            {/* Таб тикетов */}
+            {activeTab === 'tickets' && (
+                <InboxPage />
+            )}
         </div>
     );
 };

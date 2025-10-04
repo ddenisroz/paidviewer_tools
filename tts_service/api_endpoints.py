@@ -10,6 +10,7 @@ from tts_service.database import get_db, Voice as VoiceModel, User as UserModel
 from tts_service.models import *
 from tts_service.tts_engine import tts_engine_manager
 from tts_service.file_manager import file_manager
+from tts_service.background_tasks import background_task_manager
 
 logger = logging.getLogger(__name__)
 
@@ -61,22 +62,24 @@ class TTSAPIEndpoints:
                 raise HTTPException(status_code=403, detail="Access denied")
             
             # Создаем временный файл для результата
-            temp_file = file_manager.temp_path / f"tts_{request.voice_name}_{int(time.time())}.wav"
+            from tts_service.config import config
+            temp_file = config.temp_audio_path / f"tts_{request.voice_name}_{int(time.time())}.wav"
+            temp_file.parent.mkdir(parents=True, exist_ok=True)
             
-            # Параметры синтеза
+            # Параметры синтеза - используем только поддерживаемые параметры
+            cfg_strength = getattr(request, 'cfg_strength', None)
+            speed_preset = getattr(request, 'speed_preset', None)
+            
+            logger.info(f"📥 Request params: cfg_strength={cfg_strength}, speed_preset={speed_preset}")
+            logger.info(f"📊 Voice defaults: cfg_strength={voice.cfg_strength}, speed_preset={voice.speed_preset}")
+            
             synthesis_params = {
-                "cfg_strength": voice.cfg_strength,
-                "speed_preset": voice.speed_preset,
-                "cross_fade_duration": voice.cross_fade_duration,
-                "silence_duration": voice.silence_duration,
-                "temperature": voice.temperature,
-                "top_p": voice.top_p,
-                "top_k": voice.top_k,
-                "repetition_penalty": voice.repetition_penalty,
-                "length_penalty": voice.length_penalty,
-                "early_stopping": voice.early_stopping,
+                "cfg_strength": cfg_strength if cfg_strength is not None else voice.cfg_strength,
+                "speed_preset": speed_preset if speed_preset is not None else voice.speed_preset,
                 "volume_level": getattr(request, 'volume_level', 50.0)  # Громкость по умолчанию 50%
             }
+            
+            logger.info(f"🎛️ Final synthesis params: {synthesis_params}")
             
             # Выполняем синтез с применением громкости
             success = await tts_engine_manager.synthesize(
@@ -89,16 +92,21 @@ class TTSAPIEndpoints:
             if not success:
                 raise HTTPException(status_code=500, detail="Synthesis failed")
             
-            # Планируем очистку файла
+            # Планируем очистку файла через 5 минут
             background_tasks.add_task(
-                file_manager.cleanup_temp_file, 
-                temp_file
+                background_task_manager.cleanup_temp_file_delayed,
+                temp_file,
+                300  # 5 минут
             )
+            
+            # Создаем URL для доступа к файлу
+            audio_url = f"/api/audio/{temp_file.name}"
             
             return SynthesisResponse(
                 success=True,
                 message="Synthesis completed successfully",
                 audio_file=str(temp_file),
+                audio_url=audio_url,
                 duration=0.0  # TODO: calculate duration
             )
             

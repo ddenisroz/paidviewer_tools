@@ -6,15 +6,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Plus, Shield, Users, Settings, Mic, FileText, Activity, AlertCircle } from 'lucide-react';
+import { Trash2, Plus, Shield, Users, Settings, Mic, Activity, AlertCircle, MessageCircle, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 import api, { adminApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import VoiceManagement from '../components/admin/VoiceManagement';
 import UserManagementPage from './admin/UserManagementPage';
 import BotManagementPage from './admin/BotManagementPage';
-import SystemLogsPage from './admin/SystemLogsPage';
 import SessionManagementPage from './admin/SessionManagementPage';
+import MonitoringPage from './admin/MonitoringPage';
+import SupportTicketsPage from './admin/SupportTicketsPage';
 
 const AdminPage = () => {
     const navigate = useNavigate();
@@ -37,10 +38,7 @@ const AdminPage = () => {
 
     const loadChannels = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const response = await api.get('/api/admin/whitelist', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const response = await api.get('/api/admin/whitelist');
             // Адаптируем под новый формат ответа
             setChannels({ twitch: response.data.whitelist_users || [], vk: [] });
         } catch (error) {
@@ -56,11 +54,8 @@ const AdminPage = () => {
         }
 
         try {
-            const token = localStorage.getItem('token');
             await api.post('/api/admin/whitelist/add', {
                 username: newChannel.trim(),
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
             });
             // После успешного добавления перезагружаем актуальный список с бэкенда
             await loadChannels();
@@ -74,11 +69,9 @@ const AdminPage = () => {
 
     const removeChannel = async (channel, platform) => {
         try {
-            const token = localStorage.getItem('token');
             // Внимание: axios.delete передает тело запроса в поле `data`
             await api.delete('/api/admin/whitelist/remove', {
-                data: { username: channel },
-                headers: { Authorization: `Bearer ${token}` }
+                data: { username: channel }
             });
             // После успешного удаления перезагружаем актуальный список с бэкенда
             await loadChannels();
@@ -91,10 +84,7 @@ const AdminPage = () => {
 
     const loadBlockedChannels = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const response = await api.get('/api/admin/blocked-channels', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const response = await api.get('/api/admin/blocked-channels');
             setBlockedChannels(response.data.blocked_channels || []);
         } catch (error) {
             console.error('Ошибка загрузки заблокированных каналов:', error);
@@ -110,12 +100,9 @@ const AdminPage = () => {
 
         try {
             setAddingBlockedChannel(true);
-            const token = localStorage.getItem('token');
             await api.post('/api/admin/blocked-channels', {
                 channel_name: newBlockedChannel.trim(),
                 reason: 'Заблокировано администратором'
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
             });
             
             toast.success('Канал заблокирован');
@@ -131,10 +118,7 @@ const AdminPage = () => {
 
     const removeBlockedChannel = async (channelId) => {
         try {
-            const token = localStorage.getItem('token');
-            await api.delete(`/api/admin/blocked-channels/${channelId}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.delete(`/api/admin/blocked-channels/${channelId}`);
             toast.success('Канал разблокирован');
             await loadBlockedChannels();
         } catch (error) {
@@ -152,7 +136,7 @@ const AdminPage = () => {
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 flex items-center justify-center">
                 <div className="text-center">
-                    <h1 className="text-2xl font-bold text-white mb-4">Доступ запрещен</h1>
+                    <h1 className="text-3xl font-bold text-white mb-4">Доступ запрещен</h1>
                     <p className="text-gray-300 mb-4">У вас нет прав для доступа к админ панели</p>
                     <Button onClick={() => navigate('/dashboard')} variant="outline" className="text-white border-slate-600">
                         Вернуться на главную
@@ -222,12 +206,20 @@ const AdminPage = () => {
                                Сессии
                            </Button>
                            <Button
-                               variant={activeTab === 'logs' ? 'default' : 'ghost'}
-                               onClick={() => setActiveTab('logs')}
-                               className={`flex-1 ${activeTab === 'logs' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
+                               variant={activeTab === 'tickets' ? 'default' : 'ghost'}
+                               onClick={() => setActiveTab('tickets')}
+                               className={`flex-1 ${activeTab === 'tickets' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
                            >
-                               <FileText className="h-4 w-4 mr-2" />
-                               Логи
+                               <MessageCircle className="h-4 w-4 mr-2" />
+                               Тикеты
+                           </Button>
+                           <Button
+                               variant={activeTab === 'monitoring' ? 'default' : 'ghost'}
+                               onClick={() => setActiveTab('monitoring')}
+                               className={`flex-1 ${activeTab === 'monitoring' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
+                           >
+                               <BarChart3 className="h-4 w-4 mr-2" />
+                               Мониторинг
                            </Button>
                        </div>
 
@@ -471,8 +463,10 @@ const AdminPage = () => {
                     <BotManagementPage />
                 ) : activeTab === 'sessions' ? (
                     <SessionManagementPage />
-                ) : activeTab === 'logs' ? (
-                    <SystemLogsPage />
+                ) : activeTab === 'tickets' ? (
+                    <SupportTicketsPage />
+                ) : activeTab === 'monitoring' ? (
+                    <MonitoringPage />
                 ) : (
                     <div className="text-center py-8">
                         <p className="text-gray-500">Выберите раздел для управления</p>

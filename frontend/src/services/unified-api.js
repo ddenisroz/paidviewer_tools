@@ -10,6 +10,8 @@ import {
     deleteVoice as deleteVoiceApi,
     updateVoiceSettings as updateVoiceSettingsApi,
     transcribeVoice as transcribeVoiceApi,
+    retranscribeVoice as retranscribeVoiceApi,
+    retranscribeUserVoice as retranscribeUserVoiceApi,
     renameVoice as renameVoiceApi,
     renameUserVoice as renameUserVoiceApi,
     getUsers as getUsersApi,
@@ -30,6 +32,7 @@ export const uploadVoice = (formData) => uploadVoiceApi(formData);
 export const deleteVoice = (voiceId) => deleteVoiceApi(voiceId);
 export const updateVoiceSettings = (voiceId, settings) => updateVoiceSettingsApi(voiceId, settings);
 export const transcribeVoice = (voiceId) => transcribeVoiceApi(voiceId);
+export const retranscribeVoice = (voiceId, referenceText) => retranscribeVoiceApi(voiceId, referenceText);
 export const renameVoice = (voiceId, newName) => renameVoiceApi(voiceId, newName);
 export const getUsers = () => getUsersApi();
 
@@ -40,6 +43,7 @@ export const deleteUserVoice = (voiceId, userId) => deleteUserVoiceApi(voiceId, 
 export const updateUserVoiceSettings = (voiceId, userId, settings) => updateUserVoiceSettingsApi(voiceId, userId, settings);
 export const transcribeUserVoice = (voiceId, userId) => transcribeUserVoiceApi(voiceId, userId);
 export const renameUserVoice = (voiceId, userId, newName) => renameUserVoiceApi(voiceId, userId, newName);
+export const retranscribeUserVoice = (voiceId, userId, referenceText) => retranscribeUserVoiceApi(voiceId, userId, referenceText);
 
 // Common
 export const testVoice = (voiceName, userId, testText, cfgStrength, speedPreset) => testVoiceApi(voiceName, userId, testText, cfgStrength, speedPreset);

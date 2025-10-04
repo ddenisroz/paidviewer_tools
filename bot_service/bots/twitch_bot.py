@@ -5,6 +5,7 @@ import asyncio
 from typing import List, Set
 from twitchio.ext import commands
 from core.connection_manager import ConnectionManager
+from core.database import BotCommand
 from api.tts_api import TTSAPI
 from api.youtube_api import YouTubeAPI
 from utils.role_checker import RoleChecker
@@ -79,6 +80,47 @@ class Bot(commands.Bot):
             if not hasattr(message, 'author') or not message.author:
                 logger.debug("Received message without author, skipping")
                 return
+
+            # === ИНТЕГРАЦИЯ С СИСТЕМОЙ ЛУТБОКСОВ ===
+            try:
+                from services.lootbox_service import LootboxService
+                from core.database import get_db
+                
+                # Получаем сессию БД
+                db = next(get_db())
+                lootbox_service = LootboxService(db)
+                
+                # Записываем сообщение для отслеживания активности
+                channel_name = message.channel.name.lower()
+                author_name = message.author.name.lower()
+                
+                # Получаем или создаем пользователя
+                from core.database import User
+                user = db.query(User).filter(User.username == author_name).first()
+                if not user:
+                    # Создаем пользователя если его нет
+                    user = User(
+                        username=author_name,
+                        display_name=message.author.display_name or author_name,
+                        is_active=True
+                    )
+                    db.add(user)
+                    db.commit()
+                    db.refresh(user)
+                
+                # Записываем сообщение в систему лутбоксов
+                lootbox_service.record_chat_message(
+                    user_id=user.id,
+                    channel_name=channel_name,
+                    platform="twitch",
+                    message=message.content
+                )
+                
+                logger.debug(f"📝 Chat message recorded for lootbox system: {author_name} in {channel_name}")
+                
+            except Exception as e:
+                logger.error(f"Error recording chat message for lootbox system: {e}")
+            # === КОНЕЦ ИНТЕГРАЦИИ С ЛУТБОКСАМИ ===
             
             channel_name = getattr(message.channel, 'name', None)
             author_name = getattr(message.author, 'name', None)
@@ -205,13 +247,17 @@ class Bot(commands.Bot):
             channel_name = channel_name.lower()
             
             # Проверяем, включен ли TTS для канала на платформе Twitch
-            if not self.connection_manager.is_tts_enabled(channel_name, 'twitch'):
-                logger.debug(f"TTS not enabled for Twitch channel {channel_name}, skipping TTS processing")
+            tts_enabled = self.connection_manager.is_tts_enabled(channel_name, 'twitch')
+            logger.info(f"🎛️ TTS ENABLED CHECK: Канал '{channel_name}' - {tts_enabled}")
+            if not tts_enabled:
+                logger.warning(f"❌ TTS НЕ ВКЛЮЧЕН для Twitch канала {channel_name}, пропускаем обработку TTS")
                 return
             
             # Проверяем whitelist для канала
-            if not self.connection_manager.is_channel_whitelisted(channel_name):
-                logger.debug(f"Channel {channel_name} not whitelisted, skipping TTS processing")
+            whitelisted = self.connection_manager.is_channel_whitelisted(channel_name)
+            logger.info(f"📝 WHITELIST CHECK: Канал '{channel_name}' - {whitelisted}")
+            if not whitelisted:
+                logger.warning(f"❌ WHITELIST: Канал {channel_name} НЕ в whitelist, пропускаем обработку TTS")
                 return
 
             # Отправляем запрос на озвучку
@@ -243,6 +289,7 @@ class Bot(commands.Bot):
         """Обработка команд из базы данных"""
         try:
             if not message or not message.channel or not message.author:
+                logger.debug("handle_commands: Skipping message without author")
                 return
                 
             channel_name = getattr(message.channel, 'name', None)
@@ -255,13 +302,16 @@ class Bot(commands.Bot):
             
             # Проверяем, является ли сообщение командой
             if not content.startswith('!'):
+                logger.debug(f"handle_commands: Message doesn't start with !: {content}")
                 return
+            
+            logger.info(f"🎯 COMMAND DETECTED: {content} from {author_name} in {channel_name}")
             
             # Извлекаем название команды
             command_name = content.split()[0][1:].lower()  # Убираем ! и приводим к нижнему регистру
             
             # Получаем команды из базы данных
-            from core.database import get_db, BotCommand, UserToken
+            from core.database import get_db, UserToken
             db_gen = get_db()
             db = next(db_gen)
             
@@ -300,7 +350,7 @@ class Bot(commands.Bot):
                 user_roles = RoleChecker.check_twitch_role(
                     user_badges, 
                     str(message.author.id), 
-                    str(message.channel.id)
+                    str(message.channel.name)
                 )
                 
                 # Проверяем права доступа
@@ -456,6 +506,19 @@ class Bot(commands.Bot):
                 await self.help_command_from_message(message)
             elif command_name == 'voice':
                 await self.voice_command_from_message(message)
+            elif command_name == 'lootbox':
+                await self.lootbox_command_from_message(message)
+            elif command_name == 'open':
+                # Обработка команды !open <id>
+                parts = message.content.split()
+                if len(parts) > 1:
+                    try:
+                        lootbox_id = int(parts[1])
+                        await self.open_lootbox_command_from_message(message, lootbox_id)
+                    except ValueError:
+                        await message.channel.send("❌ ID лутбокса должен быть числом")
+                else:
+                    await message.channel.send("❌ Укажите ID лутбокса: !open <id>")
             # Добавьте другие базовые команды по необходимости
         except Exception as e:
             logger.error(f"Error in handle_basic_command: {e}")
@@ -464,6 +527,11 @@ class Bot(commands.Bot):
     async def toggle_tts(self, ctx):
         """Команда для переключения TTS для Twitch"""
         channel_name = ctx.channel.name.lower()
+        
+        # Проверяем whitelist
+        if not self.connection_manager.is_channel_whitelisted(channel_name):
+            await ctx.send("❌ Канал не в белом списке для использования TTS")
+            return
         
         if self.connection_manager.is_tts_enabled(channel_name, 'twitch'):
             self.connection_manager.disable_tts(channel_name, 'twitch')
@@ -533,7 +601,22 @@ class Bot(commands.Bot):
             queue_service = QueueService()
             
             # Получаем user_id владельца канала
-            channel_owner_id = 1  # Временное решение
+            # Попытаемся найти пользователя по имени канала
+            from core.database import User
+            db_temp = next(get_db())
+            try:
+                channel_owner = db_temp.query(User).filter(User.twitch_username == ctx.channel.name.lower()).first()
+                if channel_owner:
+                    channel_owner_id = channel_owner.id
+                else:
+                    # Если пользователь не найден, используем временное решение
+                    channel_owner_id = 1
+                    logger.warning(f"Channel owner not found for {ctx.channel.name}, using default user_id=1")
+            except Exception as e:
+                logger.error(f"Error finding channel owner: {e}")
+                channel_owner_id = 1
+            finally:
+                db_temp.close()
             
             db = next(get_db())
             try:
@@ -570,10 +653,12 @@ class Bot(commands.Bot):
         help_text = """
 🤖 Доступные команды:
 !tts - Включить/выключить TTS
+!voice <номер> - Выбрать голос для TTS
+!voice random - Выбрать случайный голос
 !queue - Показать очередь видео
 !next - Следующее видео
 !clear - Очистить очередь
-!add <url> - Добавить видео в очередь
+!sr <url> - Добавить видео в очередь
 !help - Показать это сообщение
         """
         await ctx.send(help_text)
@@ -584,31 +669,11 @@ class Bot(commands.Bot):
         channel_name = message.channel.name.lower()
         user_name = message.author.name
         
-        # Проверяем, есть ли дополнительные параметры
-        parts = message.content.split()
-        if len(parts) > 1:
-            if parts[1].lower() == 'random':
-                # Команда !tts random - выбрать случайный голос
-                from api.tts_api import TTSAPI
-                tts_api = TTSAPI()
-                
-                result = await tts_api.get_random_voice(channel_name)
-                if result.get('success'):
-                    voice_number = result.get('voice_number')
-                    await message.channel.send(f"🎲 {user_name} выбрал случайный голос #{voice_number}")
-                else:
-                    await message.channel.send(f"❌ Ошибка выбора случайного голоса: {result.get('error', 'Неизвестная ошибка')}")
-                return
-            elif parts[1].lower() == 'on':
-                # Принудительно включить TTS
-                self.connection_manager.enable_tts(channel_name, 'twitch')
-                await message.channel.send("🔊 TTS включен для Twitch")
-                return
-            elif parts[1].lower() == 'off':
-                # Принудительно выключить TTS
-                self.connection_manager.disable_tts(channel_name, 'twitch')
-                await message.channel.send("🔇 TTS отключен для Twitch")
-                return
+        # Проверяем whitelist
+        if not self.connection_manager.is_channel_whitelisted(channel_name):
+            await message.channel.send("❌ Канал не в белом списке для использования TTS")
+            return
+        
         
         # Обычное переключение TTS
         if self.connection_manager.is_tts_enabled(channel_name, 'twitch'):
@@ -664,35 +729,54 @@ class Bot(commands.Bot):
         
         try:
             from services.queue_service import QueueService
-            from core.database import get_db
+            from core.database import get_db, User, UserToken
             
             # Получаем информацию о пользователе
-            user_id = str(message.author.id)
             user_name = message.author.name
             channel_name = message.channel.name.lower()
             
-            # Добавляем видео в очередь через сервис
-            queue_service = QueueService(connection_manager=self.connection_manager)
-            result = await queue_service.add_video_to_queue(
-                user_id=int(user_id), 
-                video_url=url, 
-                channel_name=channel_name,
-                platform='twitch',
-                requester_name=user_name,
-                requester_id=user_id
-            )
+            # Находим владельца канала в базе данных
+            db = next(get_db())
+            result = None
+            try:
+                # Ищем пользователя по Twitch токену, который владеет этим каналом
+                user_token = db.query(UserToken).filter(
+                    UserToken.platform == 'twitch',
+                    UserToken.platform_display_name.in_([channel_name, channel_name.capitalize()])
+                ).first()
+                
+                if not user_token:
+                    await message.channel.send("❌ Канал не найден в системе")
+                    return
+                
+                user_id = user_token.user_id
+                logger.info(f"Found user ID {user_id} for channel {channel_name}")
+                
+                # Добавляем видео в очередь через сервис
+                queue_service = QueueService(connection_manager=self.connection_manager)
+                result = await queue_service.add_video_to_queue(
+                    user_id=user_id, 
+                    video_url=url, 
+                    channel_name=channel_name,
+                    platform='twitch',
+                    requester_name=user_name,
+                    requester_id=str(message.author.id),
+                    db=db
+                )
+            finally:
+                db.close()
             
-            if result['success']:
+            if result and result['success']:
                 video_info = result['video_info']
                 await message.channel.send(f"✅ {user_name} добавил в очередь: {video_info['title']}")
                 
                 # Отправляем событие обновления очереди
                 await self.connection_manager.send_youtube_event_to_user(
-                    user_id=user_id,
+                    user_id=str(user_id),
                     event_type="queue_updated",
                     data={"action": "video_added", "video": video_info}
                 )
-            else:
+            elif result:
                 await message.channel.send(f"❌ Ошибка добавления видео: {result['error']}")
                 
         except Exception as e:
@@ -704,9 +788,8 @@ class Bot(commands.Bot):
         help_text = """
 🤖 Доступные команды:
 !tts - Включить/выключить TTS
-!tts random - Выбрать случайный голос
-!tts on/off - Принудительно включить/выключить TTS
 !voice <номер> - Выбрать голос для TTS
+!voice random - Выбрать случайный голос
 !queue - Показать очередь видео
 !next - Следующее видео
 !clear - Очистить очередь
@@ -720,19 +803,34 @@ class Bot(commands.Bot):
         try:
             parts = message.content.split()
             if len(parts) < 2:
-                await message.channel.send("❌ Укажите номер голоса: !voice <номер>")
+                await message.channel.send("❌ Укажите номер голоса или 'random': !voice <номер> или !voice random")
                 return
             
+            user_name = message.author.name
+            channel_name = message.channel.name.lower()
+            
+            # Проверяем, если это команда !voice random
+            if parts[1].lower() == 'random':
+                from api.tts_api import TTSAPI
+                tts_api = TTSAPI()
+                
+                result = await tts_api.get_random_voice(channel_name)
+                if result.get('success'):
+                    voice_number = result.get('voice_number')
+                    await message.channel.send(f"🎲 {user_name} выбрал случайный голос #{voice_number}")
+                else:
+                    await message.channel.send(f"❌ Ошибка выбора случайного голоса: {result.get('error', 'Неизвестная ошибка')}")
+                return
+            
+            # Обычный выбор голоса по номеру
             try:
                 voice_number = int(parts[1])
             except ValueError:
-                await message.channel.send("❌ Номер голоса должен быть числом")
+                await message.channel.send("❌ Номер голоса должен быть числом или используйте 'random'")
                 return
             
             # Получаем информацию о пользователе
             user_id = str(message.author.id)
-            user_name = message.author.name
-            channel_name = message.channel.name.lower()
             
             # Отправляем запрос на смену голоса
             from api.tts_api import TTSAPI
@@ -756,7 +854,7 @@ class Bot(commands.Bot):
         
         # Генерируем фейковый IP адрес для шутки
         fake_ip = self._generate_fake_ip()
-        await channel.send(f"/me подключен к стримеру с IP адресом: {fake_ip}")
+        await channel.send(f"/me подключен к пользователю с IP адресом: {fake_ip}")
     
     def _generate_fake_ip(self):
         """Генерирует фейковый IP адрес для шутки"""
@@ -767,6 +865,106 @@ class Bot(commands.Bot):
         octet3 = random.randint(10, 99)
         octet4 = random.randint(10, 99)
         return f"{octet1}.{octet2}.{octet3}.{octet4}"
+
+    # === КОМАНДЫ ЛУТБОКСОВ ===
+    
+    async def lootbox_command_from_message(self, message):
+        """Обработка команд лутбоксов из сообщения"""
+        try:
+            parts = message.content.split()
+            if len(parts) < 2:
+                await message.channel.send("🎰 Доступные команды: !lootbox info, !lootbox open <id>, !lootbox list")
+                return
+            
+            action = parts[1].lower()
+            channel_name = message.channel.name.lower()
+            author_name = message.author.name.lower()
+            
+            # Получаем пользователя
+            from core.database import User, get_db
+            db = next(get_db())
+            user = db.query(User).filter(User.username == author_name).first()
+            if not user:
+                await message.channel.send("❌ Пользователь не найден")
+                return
+            
+            from services.lootbox_service import LootboxService
+            lootbox_service = LootboxService(db)
+            
+            if action == "info":
+                # Показываем прогрессию пользователя
+                progression = lootbox_service.get_user_progression(user.id, channel_name)
+                if progression:
+                    await message.channel.send(f"📊 Прогрессия {author_name}: {progression['total_days_active']} дней, серия: {progression['current_streak']}, сообщений: {progression['total_messages']}")
+                else:
+                    await message.channel.send(f"📊 Пользователь {author_name} еще не имеет прогрессии")
+                    
+            elif action == "list":
+                # Показываем доступные лутбоксы
+                lootboxes = lootbox_service.get_channel_lootboxes(channel_name)
+                if lootboxes:
+                    lootbox_list = []
+                    for lb in lootboxes:
+                        price_text = f" ({lb['price']}₽)" if lb['type'] == 'paid' else " (Бесплатный)"
+                        lootbox_list.append(f"{lb['name']}{price_text}")
+                    await message.channel.send(f"🎁 Доступные лутбоксы: {', '.join(lootbox_list)}")
+                else:
+                    await message.channel.send("🎁 Лутбоксы пока не настроены")
+                    
+            elif action == "open":
+                if len(parts) < 3:
+                    await message.channel.send("❌ Укажите ID лутбокса: !lootbox open <id>")
+                    return
+                
+                try:
+                    lootbox_id = int(parts[2])
+                    await self.open_lootbox_command_from_message(message, lootbox_id)
+                except ValueError:
+                    await message.channel.send("❌ ID лутбокса должен быть числом")
+                    
+        except Exception as e:
+            logger.error(f"Error in lootbox command: {e}")
+            await message.channel.send("❌ Ошибка выполнения команды лутбокса")
+    
+    async def open_lootbox_command_from_message(self, message, lootbox_id: int):
+        """Открыть лутбокс по ID"""
+        try:
+            channel_name = message.channel.name.lower()
+            author_name = message.author.name.lower()
+            
+            # Получаем пользователя
+            from core.database import User, get_db
+            db = next(get_db())
+            user = db.query(User).filter(User.username == author_name).first()
+            if not user:
+                await message.channel.send("❌ Пользователь не найден")
+                return
+            
+            from services.lootbox_service import LootboxService
+            lootbox_service = LootboxService(db)
+            
+            # Открываем лутбокс
+            result = lootbox_service.open_lootbox(user.id, channel_name, lootbox_id)
+            if result:
+                reward = result['reward']
+                await message.channel.send(f"🎁 {author_name} открыл лутбокс '{result['lootbox_name']}' и получил: {reward['name']}! 🎉")
+                
+                # Запускаем OBS анимацию
+                try:
+                    from services.obs_animation_service import OBSAnimationService
+                    obs_service = OBSAnimationService(self.connection_manager)
+                    await obs_service.trigger_lootbox_animation(channel_name, {
+                        **result,
+                        'user_name': author_name
+                    })
+                except Exception as e:
+                    logger.error(f"Error triggering OBS animation: {e}")
+            else:
+                await message.channel.send("❌ Не удалось открыть лутбокс. Проверьте ID или попробуйте позже")
+                
+        except Exception as e:
+            logger.error(f"Error in open lootbox command: {e}")
+            await message.channel.send("❌ Ошибка открытия лутбокса")
 
     async def event_channel_left(self, channel):
         """Вызывается когда бот покидает канал"""

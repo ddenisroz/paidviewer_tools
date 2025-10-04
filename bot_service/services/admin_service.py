@@ -180,26 +180,91 @@ class AdminAPI:
         logger.info(f"User {user_id} unblocked")
         return {"message": f"User {user_id} unblocked successfully"}
 
-    async def get_bots_status(self) -> dict:
+    async def get_bots_status(self, connection_manager=None) -> dict:
         """Получить статус всех ботов"""
-        # Здесь можно добавить проверку статуса ботов через connection_manager
-        # Пока возвращаем базовую информацию
-        return {
-            "bots": [
-                {
-                    "name": "twitch_bot",
-                    "status": "running",  # running, stopped, error
-                    "last_activity": datetime.utcnow().isoformat(),
-                    "platform": "twitch"
-                },
-                {
-                    "name": "vk_live_bot", 
-                    "status": "running",
-                    "last_activity": datetime.utcnow().isoformat(),
-                    "platform": "vk_live"
-                }
-            ]
-        }
+        try:
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+            from main import bot_instance, bot_task, vk_live_bot_instance, vk_live_bot_task
+            
+            bots = []
+            
+            # Проверяем статус Twitch бота
+            twitch_status = "stopped"
+            twitch_last_activity = None
+            
+            if bot_instance and bot_task:
+                if not bot_task.done() and bot_instance.nick:
+                    twitch_status = "running"
+                    twitch_last_activity = datetime.utcnow().isoformat()
+                elif bot_task.done():
+                    # Проверяем, завершился ли с ошибкой
+                    try:
+                        bot_task.result()
+                        twitch_status = "stopped"
+                    except Exception:
+                        twitch_status = "error"
+                else:
+                    twitch_status = "error"
+            
+            bots.append({
+                "name": "twitch_bot",
+                "status": twitch_status,
+                "last_activity": twitch_last_activity or datetime.utcnow().isoformat(),
+                "platform": "twitch",
+                "connected_channels": len(bot_instance.connected_channels) if bot_instance and hasattr(bot_instance, 'connected_channels') else 0
+            })
+            
+            # Проверяем статус VK Live бота
+            vk_status = "stopped"
+            vk_last_activity = None
+            
+            if vk_live_bot_instance and vk_live_bot_task:
+                if not vk_live_bot_task.done():
+                    vk_status = "running"
+                    vk_last_activity = datetime.utcnow().isoformat()
+                elif vk_live_bot_task.done():
+                    # Проверяем, завершился ли с ошибкой
+                    try:
+                        vk_live_bot_task.result()
+                        vk_status = "stopped"
+                    except Exception:
+                        vk_status = "error"
+                else:
+                    vk_status = "error"
+            
+            bots.append({
+                "name": "vk_live_bot",
+                "status": vk_status,
+                "last_activity": vk_last_activity or datetime.utcnow().isoformat(),
+                "platform": "vk_live",
+                "connected_channels": len(connection_manager.active_vk_bots) if connection_manager and hasattr(connection_manager, 'active_vk_bots') else 0
+            })
+            
+            return {"bots": bots}
+            
+        except Exception as e:
+            logger.error(f"Error getting bots status: {e}")
+            # Возвращаем базовую информацию в случае ошибки
+            return {
+                "bots": [
+                    {
+                        "name": "twitch_bot",
+                        "status": "error",
+                        "last_activity": datetime.utcnow().isoformat(),
+                        "platform": "twitch",
+                        "connected_channels": 0
+                    },
+                    {
+                        "name": "vk_live_bot", 
+                        "status": "error",
+                        "last_activity": datetime.utcnow().isoformat(),
+                        "platform": "vk_live",
+                        "connected_channels": 0
+                    }
+                ]
+            }
 
     async def restart_bot(self, bot_name: str) -> dict:
         """Перезапустить бота"""

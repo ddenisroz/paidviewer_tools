@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+// Убираем неиспользуемые импорты
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
@@ -28,14 +29,17 @@ import {
     Twitch,
     Volume2,
     Heart,
-    Star
+    Star,
+    // ChevronDown и Check не используются
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useIntegrations } from '../context/IntegrationsContext';
 import api from '../services/api';
 import { toast } from 'sonner';
 
-const CommandsPage = () => {
+    // Компонент множественного выбора ролей удален из-за отсутствующих зависимостей
+
+    const CommandsPage = () => {
     const { isAuthenticated } = useAuth();
     const { integrations } = useIntegrations();
     
@@ -52,7 +56,7 @@ const CommandsPage = () => {
         command_name: '',
         response_text: '',
         platforms: 'twitch,vk',
-        allowed_roles: 'all',
+        allowed_roles: 'all', // Пока оставляем строкой
         cooldown_seconds: 0,
         is_enabled: true
     });
@@ -60,7 +64,7 @@ const CommandsPage = () => {
     const [editForm, setEditForm] = useState({
         is_enabled: true,
         platforms: 'twitch,vk',
-        allowed_roles: 'all',
+        allowed_roles: 'all', // Пока оставляем строкой
         cooldown_seconds: 0,
         response_text: ''
     });
@@ -78,11 +82,26 @@ const CommandsPage = () => {
         { value: 'moderator_vk', label: 'Moderator (VK Live)', icon: <ShieldCheck className="h-3 w-3" /> }
     ];
 
+    // Расширенные варианты для множественного выбора
+    const extendedRoleOptions = [
+        ...roleOptions,
+        // Комбинированные варианты
+        { value: 'broadcaster,moderator', label: 'Стримеры и Модераторы', icon: <ShieldCheck className="h-3 w-3" /> },
+        { value: 'moderator,vip', label: 'Модераторы и VIP', icon: <Shield className="h-3 w-3" /> },
+        { value: 'subscriber,vip,founder', label: 'Подписчики, VIP, Основатели', icon: <Star className="h-3 w-3" /> }
+    ];
+
     const platformOptions = [
         { value: 'twitch,vk', label: 'Все платформы', enabled: integrations.twitch?.enabled && integrations.vk?.enabled },
         { value: 'twitch', label: 'Только Twitch', enabled: integrations.twitch?.enabled },
         { value: 'vk', label: 'Только VK Live', enabled: integrations.vk?.enabled }
     ];
+
+    // Получаем доступные платформы
+    const availablePlatforms = platformOptions.filter(opt => opt.enabled);
+    
+    // Если ни одна платформа не подключена, показываем все
+    const platformsToShow = availablePlatforms.length > 0 ? availablePlatforms : platformOptions;
 
     useEffect(() => {
         if (isAuthenticated) {
@@ -174,12 +193,12 @@ const CommandsPage = () => {
     };
 
     const getRoleLabel = (role) => {
-        const option = roleOptions.find(opt => opt.value === role);
+        const option = extendedRoleOptions.find(opt => opt.value === role);
         return option ? option.label : role;
     };
 
     const getRoleIcon = (role) => {
-        const option = roleOptions.find(opt => opt.value === role);
+        const option = extendedRoleOptions.find(opt => opt.value === role);
         return option ? option.icon : <Users className="h-3 w-3" />;
     };
 
@@ -285,7 +304,7 @@ const CommandsPage = () => {
     return (
         <div className="container mx-auto p-6 space-y-6">
             <div>
-                <h1 className="text-3xl font-bold">Команды чата</h1>
+                <h1 className="text-3xl font-bold mb-6 text-foreground">Команды чата</h1>
             </div>
 
             <Tabs defaultValue="basic" className="space-y-6">
@@ -385,10 +404,10 @@ const CommandsPage = () => {
                                         }))}
                                     >
                                         <SelectTrigger>
-                                            <SelectValue />
+                                            <SelectValue placeholder="Выберите платформы" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {platformOptions.filter(opt => opt.enabled).map(option => (
+                                            {platformsToShow.map(option => (
                                                 <SelectItem key={option.value} value={option.value}>
                                                     {option.label}
                                                 </SelectItem>
@@ -406,10 +425,10 @@ const CommandsPage = () => {
                                         }))}
                                     >
                                         <SelectTrigger>
-                                            <SelectValue />
+                                            <SelectValue placeholder="Выберите доступ" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {roleOptions.map(option => (
+                                            {extendedRoleOptions.map(option => (
                                                 <SelectItem key={option.value} value={option.value}>
                                                     <div className="flex items-center gap-2">
                                                         {option.icon}
@@ -525,10 +544,10 @@ const CommandsPage = () => {
                                         }))}
                                     >
                                         <SelectTrigger>
-                                            <SelectValue />
+                                            <SelectValue placeholder="Выберите платформы" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {platformOptions.filter(opt => opt.enabled).map(option => (
+                                            {platformsToShow.map(option => (
                                                 <SelectItem key={option.value} value={option.value}>
                                                     {option.label}
                                                 </SelectItem>
@@ -546,10 +565,10 @@ const CommandsPage = () => {
                                         }))}
                                     >
                                         <SelectTrigger>
-                                            <SelectValue />
+                                            <SelectValue placeholder="Выберите доступ" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {roleOptions.map(option => (
+                                            {extendedRoleOptions.map(option => (
                                                 <SelectItem key={option.value} value={option.value}>
                                                     <div className="flex items-center gap-2">
                                                         {option.icon}

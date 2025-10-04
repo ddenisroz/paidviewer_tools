@@ -4,7 +4,8 @@ import logging
 import time
 from typing import List, Dict, Any, Optional
 from core.connection_manager import ConnectionManager
-from bots.vk_live_chat_reader import VKLiveChatReader
+from core.database import BotCommand
+# vk_live_chat_reader удален - используем только оптимизированную версию
 from bots.vk_live_chat_reader_optimized import OptimizedVKLiveChatReader
 from utils.vk_live_websocket import VKLiveWebSocketClient
 
@@ -22,7 +23,7 @@ class VKLiveBot:
         self.connected_channels: List[str] = []
         self.is_running = False
         
-        self.chat_reader: Optional[VKLiveChatReader] = None
+        self.chat_reader: Optional[OptimizedVKLiveChatReader] = None
         self.ws_client: Optional[VKLiveWebSocketClient] = None
         self.ws_task: Optional[asyncio.Task] = None
         
@@ -102,7 +103,7 @@ class VKLiveBot:
                 
                 # Отправляем шутливое сообщение о подключении
                 fake_ip = self._generate_fake_ip()
-                await self.send_message(channel_name, f"подключен к стримеру с IP адресом: {fake_ip}")
+                await self.send_message(channel_name, f"подключен к пользователю с IP адресом: {fake_ip}")
                 
                 return True
             else:
@@ -507,7 +508,7 @@ class VKLiveBot:
             command_name = message_text.split()[0][1:].lower()  # Убираем ! и приводим к нижнему регистру
             
             # Получаем команды из базы данных
-            from core.database import get_db, BotCommand, UserToken
+            from core.database import get_db, UserToken
             db_gen = get_db()
             db = next(db_gen)
             
@@ -720,36 +721,10 @@ class VKLiveBot:
     # Функции для базовых команд VK Live
     async def toggle_tts_vk(self, channel_name: str, message_data: dict = None):
         """Команда для переключения TTS для VK Live"""
-        user_name = "Unknown"
-        if message_data:
-            user_name = message_data.get("author_nick", "Unknown")
-            message_text = message_data.get("message", "")
-            parts = message_text.split()
-            
-            # Проверяем, есть ли дополнительные параметры
-            if len(parts) > 1:
-                if parts[1].lower() == 'random':
-                    # Команда !tts random - выбрать случайный голос
-                    from api.tts_api import TTSAPI
-                    tts_api = TTSAPI()
-                    
-                    result = await tts_api.get_random_voice(channel_name)
-                    if result.get('success'):
-                        voice_number = result.get('voice_number')
-                        await self.send_message(channel_name, f"🎲 {user_name} выбрал случайный голос #{voice_number}")
-                    else:
-                        await self.send_message(channel_name, f"❌ Ошибка выбора случайного голоса: {result.get('error', 'Неизвестная ошибка')}")
-                    return
-                elif parts[1].lower() == 'on':
-                    # Принудительно включить TTS
-                    self.connection_manager.enable_tts(channel_name, 'vk')
-                    await self.send_message(channel_name, "🔊 TTS включен для VK Live")
-                    return
-                elif parts[1].lower() == 'off':
-                    # Принудительно выключить TTS
-                    self.connection_manager.disable_tts(channel_name, 'vk')
-                    await self.send_message(channel_name, "🔇 TTS отключен для VK Live")
-                    return
+        # Проверяем whitelist
+        if not self.connection_manager.is_channel_whitelisted(channel_name):
+            await self.send_message(channel_name, "❌ Канал не в белом списке для использования TTS")
+            return
         
         # Обычное переключение TTS
         if self.connection_manager.is_tts_enabled(channel_name, 'vk'):
@@ -803,10 +778,40 @@ class VKLiveBot:
         try:
             from services.queue_service import QueueService
             
+            # Получаем user_id владельца канала
+            from core.database import User, UserToken, get_db
+            db_temp = next(get_db())
+            try:
+                # Ищем пользователя по VK токену, который владеет этим каналом
+                # Ищем как с маленькой, так и с большой буквы
+                user_token = db_temp.query(UserToken).filter(
+                    UserToken.platform == 'vk_live',
+                    UserToken.platform_display_name.in_([channel_name.lower(), channel_name.capitalize()])
+                ).first()
+                
+                if user_token:
+                    channel_owner_id = user_token.user_id
+                    logger.info(f"Found user ID {channel_owner_id} for VK channel {channel_name}")
+                else:
+                    # Fallback: ищем по vk_username
+                    channel_owner = db_temp.query(User).filter(User.vk_username == channel_name.lower()).first()
+                    if channel_owner:
+                        channel_owner_id = channel_owner.id
+                        logger.info(f"Found user ID {channel_owner_id} for VK channel {channel_name} (fallback)")
+                    else:
+                        await self.send_message(channel_name, "❌ Канал не найден в системе")
+                        return
+            except Exception as e:
+                logger.error(f"Error finding VK channel owner: {e}")
+                await self.send_message(channel_name, "❌ Ошибка поиска канала")
+                return
+            finally:
+                db_temp.close()
+            
             # Добавляем видео в очередь через сервис
             queue_service = QueueService(connection_manager=self.connection_manager)
             result = await queue_service.add_video_to_queue(
-                user_id=1,  # Временный ID для VK пользователей
+                user_id=channel_owner_id,
                 video_url=url, 
                 channel_name=channel_name,
                 platform='vk',
@@ -820,7 +825,7 @@ class VKLiveBot:
                 
                 # Отправляем событие обновления очереди
                 await self.connection_manager.send_youtube_event_to_user(
-                    user_id="1",  # Используем тот же ID что и в add_video_to_queue
+                    user_id=str(channel_owner_id),  # Используем тот же ID что и в add_video_to_queue
                     event_type="queue_updated",
                     data={"action": "video_added", "video": video_info}
                 )
@@ -836,9 +841,8 @@ class VKLiveBot:
         help_text = """
 🤖 Доступные команды:
 !tts - Включить/выключить TTS
-!tts random - Выбрать случайный голос
-!tts on/off - Принудительно включить/выключить TTS
 !voice <номер> - Выбрать голос для TTS
+!voice random - Выбрать случайный голос
 !queue - Показать очередь видео
 !next - Следующее видео
 !clear - Очистить очередь
@@ -855,13 +859,27 @@ class VKLiveBot:
             
             parts = message_text.split()
             if len(parts) < 2:
-                await self.send_message(channel_name, "❌ Укажите номер голоса: !voice <номер>")
+                await self.send_message(channel_name, "❌ Укажите номер голоса или 'random': !voice <номер> или !voice random")
                 return
             
+            # Проверяем, если это команда !voice random
+            if parts[1].lower() == 'random':
+                from api.tts_api import TTSAPI
+                tts_api = TTSAPI()
+                
+                result = await tts_api.get_random_voice(channel_name)
+                if result.get('success'):
+                    voice_number = result.get('voice_number')
+                    await self.send_message(channel_name, f"🎲 {author_nick} выбрал случайный голос #{voice_number}")
+                else:
+                    await self.send_message(channel_name, f"❌ Ошибка выбора случайного голоса: {result.get('error', 'Неизвестная ошибка')}")
+                return
+            
+            # Обычный выбор голоса по номеру
             try:
                 voice_number = int(parts[1])
             except ValueError:
-                await self.send_message(channel_name, "❌ Номер голоса должен быть числом")
+                await self.send_message(channel_name, "❌ Номер голоса должен быть числом или используйте 'random'")
                 return
             
             # Отправляем запрос на смену голоса

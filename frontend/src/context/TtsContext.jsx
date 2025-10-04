@@ -32,7 +32,6 @@ export const TtsProvider = ({ children }) => {
     // Инициализация при первом запуске - теперь полагаемся на TtsHealthContext
     useEffect(() => {
         if (!isInitialized) {
-            console.log('TtsContext: First time initialization...');
             // Просто отмечаем как инициализированный, health проверка в TtsHealthContext
             setIsInitialized(true);
         }

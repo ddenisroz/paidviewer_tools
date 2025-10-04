@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Upload, Trash2, Settings, TestTube2, Globe, User, Edit } from 'lucide-react';
 import { Slider } from "@/components/ui/slider";
 import { useToast } from '../../components/ui/toast';
@@ -19,6 +19,7 @@ import {
     deleteUserVoice, 
     updateUserVoiceSettings, 
     transcribeUserVoice,
+    retranscribeUserVoice,
     testVoice,
     renameUserVoice,
     getGlobalVoices
@@ -36,74 +37,62 @@ const VoiceManagementPageContent = () => {
     const [loading, setLoading] = useState(true);
     const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
     const [editDialogOpen, setEditDialogOpen] = useState(false);
+    const [renameDialogOpen, setRenameDialogOpen] = useState(false);
     const [currentVoice, setCurrentVoice] = useState(null);
+    const [newVoiceName, setNewVoiceName] = useState('');
     const [uploadFile, setUploadFile] = useState(null);
     const [voiceName, setVoiceName] = useState('');
-    const [testText, setTestText] = useState("Ну так я гетеро, че мне пидоров бояться!");
+    const [testText, setTestText] = useState("Привет, я бы хотел с тобой постримить, если честно, для меня бы это было честью. Постримить с таким великим стримером было бы реально круто.");
     const [isUploading, setIsUploading] = useState(false);
     const [isTranscribing, setIsTranscribing] = useState(false);
+    const [isTestingVoice, setIsTestingVoice] = useState(false);
     const [voiceVolumes, setVoiceVolumes] = useState({}); // {voice_name: volume_level}
+    const fileInputRef = React.useRef(null);
     
     const { user } = useAuth();
     const { initializeTts, engineStatus } = useTts();
-    const { isHealthy, isChecking } = useTtsHealth();
+    const { isHealthy, isChecking, checkTtsHealth } = useTtsHealth();
     let audioContext = null;
     let audioSource = null;
     
     // Используем хук для управления состоянием загрузки
     const showLoader = useLoadingState(isChecking);
 
-    // Загрузка индивидуальной громкости для голоса
-    const loadVoiceVolume = async (voiceName) => {
+    // Загрузка индивидуальной громкости для голоса из localStorage
+    const loadVoiceVolume = (voiceName) => {
         try {
-            const response = await fetch(`/api/tts/voice-volume/${encodeURIComponent(voiceName)}`, {
-                credentials: 'include'
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setVoiceVolumes(prev => ({
-                    ...prev,
-                    [voiceName]: data.volume_level
-                }));
-                return data.volume_level;
+            const savedVolumes = localStorage.getItem('voiceVolumes');
+            if (savedVolumes) {
+                const volumes = JSON.parse(savedVolumes);
+                if (volumes[voiceName]) {
+                    setVoiceVolumes(prev => ({
+                        ...prev,
+                        [voiceName]: volumes[voiceName]
+                    }));
+                    return volumes[voiceName];
+                }
             }
         } catch (error) {
-            console.error('Error loading voice volume:', error);
+            // Молча игнорируем ошибки загрузки громкости
         }
         return 50.0; // Значение по умолчанию
     };
 
-    // Сохранение индивидуальной громкости для голоса
-    const saveVoiceVolume = async (voiceName, volumeLevel) => {
+    // Сохранение индивидуальной громкости для голоса в localStorage
+    const saveVoiceVolume = (voiceName, volumeLevel) => {
         try {
-            const response = await fetch('/api/tts/voice-volume', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    voice_name: voiceName,
-                    volume_level: volumeLevel
-                }),
-                credentials: 'include'
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success) {
-                    setVoiceVolumes(prev => ({
-                        ...prev,
-                        [voiceName]: volumeLevel
-                    }));
-                    addToast(`Громкость голоса "${voiceName}" установлена: ${volumeLevel}%`, 'success');
-                    return true;
-                }
-            }
+            const savedVolumes = localStorage.getItem('voiceVolumes');
+            const volumes = savedVolumes ? JSON.parse(savedVolumes) : {};
+            volumes[voiceName] = volumeLevel;
+            localStorage.setItem('voiceVolumes', JSON.stringify(volumes));
+            
+            setVoiceVolumes(prev => ({
+                ...prev,
+                [voiceName]: volumeLevel
+            }));
         } catch (error) {
             console.error('Error saving voice volume:', error);
         }
-        addToast('Ошибка сохранения громкости голоса', 'error');
-        return false;
     };
 
     // Инициализируем TTS только при загрузке этой страницы
@@ -133,7 +122,7 @@ const VoiceManagementPageContent = () => {
             if (!user.isGuest && voicesArray.length > 0) {
                 for (const voice of voicesArray) {
                     if (voice.name) {
-                        await loadVoiceVolume(voice.name);
+                        loadVoiceVolume(voice.name);
                     }
                 }
             }
@@ -150,43 +139,75 @@ const VoiceManagementPageContent = () => {
         if (isHealthy) {
             loadVoices();
         }
+        
+        // Обработчик для сворачивания/разворачивания вкладки
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                // При сворачивании вкладки закрываем все диалоги
+                setEditDialogOpen(false);
+                setUploadDialogOpen(false);
+                setRenameDialogOpen(false);
+            }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [isHealthy, loadVoices]);
 
     const handleFileUpload = (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            setUploadFile(file);
-            const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
-            setVoiceName(nameWithoutExt);
+        event.stopPropagation();
+        
+        const file = event.target.files?.[0];
+        
+        if (!file) {
+            return;
         }
+        
+        // Проверяем формат файла (поддерживаем все форматы, которые может конвертировать pydub)
+        const supportedFormats = ['.wav', '.mp3', '.flac', '.ogg', '.m4a', '.aac', '.wma', '.aiff', '.au'];
+        const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+        
+        if (!supportedFormats.includes(fileExtension)) {
+            addToast({ 
+                type: 'error', 
+                title: 'Ошибка', 
+                message: `Неподдерживаемый формат файла. Поддерживаемые форматы: ${supportedFormats.join(', ')}` 
+            });
+            event.target.value = ''; // Сбрасываем input
+            return;
+        }
+        
+        setUploadFile(file);
+        const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
+        setVoiceName(nameWithoutExt);
     };
 
-    const handleUpload = async () => {
+    const handleUpload = async (event) => {
         if (!uploadFile || !voiceName.trim() || !user) {
             addToast({ type: 'error', title: 'Ошибка', message: 'Выберите файл и введите имя голоса.' });
             return;
         }
         
-        const userVoiceCount = voices.filter(v => v.voice_type === 'user').length;
-        if (userVoiceCount >= 5) {
-            addToast({ type: 'error', title: 'Лимит достигнут', message: 'Вы достигли лимита в 5 пользовательских голосов.' });
-            return;
-        }
-
         setIsUploading(true);
         try {
             const formData = new FormData();
             formData.append('file', uploadFile);
-            formData.append('name', voiceName.trim());
-            formData.append('user_id', user.id);
+            formData.append('voice_name', voiceName.trim());
+            formData.append('user_id', user.id); // Загружаем в личную папку пользователя
             
             await uploadUserVoice(user.id, formData);
-            addToast({ type: 'success', title: 'Успех', message: `Голос "${voiceName.trim()}" успешно загружен.` });
+            
+            const position = getButtonPosition(event);
+            addToast({ type: 'success', title: 'Успех', message: `Голос "${voiceName.trim()}" успешно загружен в вашу папку.` });
             setUploadDialogOpen(false);
             setUploadFile(null);
             setVoiceName('');
             loadVoices();
         } catch (error) {
+            console.error('Error uploading voice:', error);
             addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось загрузить голос.' });
         } finally {
             setIsUploading(false);
@@ -219,10 +240,11 @@ const VoiceManagementPageContent = () => {
     };
 
     const handleTranscribe = async () => {
-        if (!currentVoice) return;
+        if (!currentVoice || !user) return;
         
         setIsTranscribing(true);
         try {
+            // Запускаем транскрипцию аудиофайла голоса
             const response = await transcribeUserVoice(currentVoice.id, user.id);
             const newReferenceText = response.data.reference_text;
             
@@ -236,10 +258,10 @@ const VoiceManagementPageContent = () => {
                     : voice
             ));
             
-            addToast({ type: 'success', title: 'Успех', message: 'Транскрипция завершена успешно!' });
+            addToast({ type: 'success', title: 'Успех', message: 'Транскрипция аудиофайла завершена успешно!' });
         } catch (error) {
             console.error('Error transcribing voice:', error);
-            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось выполнить транскрипцию аудио.' });
+            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось выполнить транскрипцию аудиофайла.' });
         } finally {
             setIsTranscribing(false);
         }
@@ -249,25 +271,34 @@ const VoiceManagementPageContent = () => {
         setCurrentVoice(prev => ({...prev, reference_text: value}));
     };
 
-    const handleRenameVoice = async () => {
-        if (!currentVoice || !user) return;
+    const handleRenameVoice = () => {
+        if (!currentVoice) return;
+        setNewVoiceName(currentVoice.name);
+        setRenameDialogOpen(true);
+    };
+
+    const handleConfirmRename = async () => {
+        if (!currentVoice || !user || !newVoiceName.trim()) return;
         
-        const newName = prompt('Введите новое имя голоса:', currentVoice.name);
-        if (!newName || newName.trim() === '' || newName === currentVoice.name) return;
+        if (newVoiceName.trim() === currentVoice.name) {
+            setRenameDialogOpen(false);
+            return;
+        }
         
         try {
-            await renameUserVoice(currentVoice.id, user.id, newName.trim());
+            await renameUserVoice(currentVoice.id, user.id, newVoiceName.trim());
             
             // Обновляем в списке голосов
             setVoices(prev => prev.map(voice => 
                 voice.id === currentVoice.id 
-                    ? {...voice, name: newName.trim()}
+                    ? {...voice, name: newVoiceName.trim()}
                     : voice
             ));
             
             // Обновляем currentVoice
-            setCurrentVoice(prev => ({...prev, name: newName.trim()}));
+            setCurrentVoice(prev => ({...prev, name: newVoiceName.trim()}));
             
+            setRenameDialogOpen(false);
             addToast({ type: 'success', title: 'Успех', message: 'Голос переименован успешно!' });
         } catch (error) {
             console.error('Error renaming voice:', error);
@@ -322,35 +353,73 @@ const VoiceManagementPageContent = () => {
     
     const handleTestVoice = async () => {
         if (!currentVoice || !user) return;
+        
+        setIsTestingVoice(true);
         try {
+            console.log('Testing voice with parameters:', {
+                name: currentVoice.name,
+                cfg_strength: currentVoice.cfg_strength,
+                speed_preset: currentVoice.speed_preset,
+                volume: voiceVolumes[currentVoice.name] || 50
+            });
+            
+            // Используем текущие значения ползунков и тестовый текст для тестирования (БЕЗ сохранения в БД)
             const response = await testVoice(
                 currentVoice.name,
                 user.id,
-                testText,
-                currentVoice.cfg_strength,  // Передаем текущее значение ползунка
-                currentVoice.speed_preset   // Передаем текущий пресет скорости
+                testText,                     // Используем текст из тестового окна
+                currentVoice.cfg_strength,    // Передаем текущее значение ползунка
+                currentVoice.speed_preset     // Передаем текущий пресет скорости
             );
             
             // Получаем URL аудио из ответа
             const audioUrl = response.data.audio_url;
             if (audioUrl) {
                 try {
-                    // Убираем кэш-бастинг, т.к. аудио уже проигрывается
-                    const audio = new Audio(`${TTS_SERVICE_URL}${audioUrl}`);
-                    audio.play();
-                    // Освобождаем ресурсы после проигрывания
-                    audio.onended = () => {
-                        URL.revokeObjectURL(audio.src);
+                    // Проверяем, является ли URL уже полным
+                    let fullAudioUrl = audioUrl;
+                    if (!audioUrl.startsWith('http')) {
+                        fullAudioUrl = `${TTS_SERVICE_URL}${audioUrl}`;
+                    }
+                    
+                    console.log('Playing test audio:', fullAudioUrl);
+                    const audio = new Audio(fullAudioUrl);
+                    
+                    // Применяем индивидуальную громкость для этого голоса
+                    const volumeLevel = voiceVolumes[currentVoice.name] || 50;
+                    audio.volume = volumeLevel / 100; // Конвертируем 0-100 в 0-1
+                    
+                    // Добавляем обработчики событий
+                    audio.oncanplaythrough = () => {
+                        console.log('Test audio ready to play with volume:', audio.volume);
+                        audio.play().catch(e => {
+                            console.error("Test audio play failed:", e);
+                            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось воспроизвести аудио.' });
+                        });
                     };
+                    
+                    audio.onended = () => {
+                        console.log('Test audio playback ended');
+                    };
+                    
+                    audio.onerror = (e) => {
+                        console.error("Error loading test audio:", fullAudioUrl, e);
+                        addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось загрузить аудио файл.' });
+                    };
+                    
+                    // Загружаем аудио
+                    audio.load();
                 } catch (error) {
-                    console.error("Error playing audio:", error);
-                    addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось воспроизвести аудио.' });
+                    console.error("Error creating audio:", error);
+                    addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось создать аудио объект.' });
                 }
             } else {
                 addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось получить аудио для воспроизведения.' });
             }
         } catch (error) {
             addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось протестировать голос.' });
+        } finally {
+            setIsTestingVoice(false);
         }
     };
 
@@ -382,7 +451,7 @@ const VoiceManagementPageContent = () => {
             <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-white">Управление голосами</h1>
+                        <h1 className="text-3xl font-bold mb-6 text-foreground">Управление голосами</h1>
                         <p className="text-slate-400 mt-1">Загружайте и настраивайте свои уникальные голоса для TTS.</p>
                     </div>
                 </div>
@@ -397,7 +466,7 @@ const VoiceManagementPageContent = () => {
             <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-white">Управление голосами</h1>
+                        <h1 className="text-3xl font-bold mb-6 text-foreground">Управление голосами</h1>
                         <p className="text-slate-400 mt-1">Загружайте и настраивайте свои уникальные голоса для TTS.</p>
                     </div>
                 </div>
@@ -415,7 +484,7 @@ const VoiceManagementPageContent = () => {
         <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-white">Управление голосами</h1>
+                    <h1 className="text-3xl font-bold mb-6 text-foreground">Управление голосами</h1>
                     {user?.isGuest ? (
                         <div className="mt-1">
                             <p className="text-slate-400">Гостевой режим: используйте только глобальные голоса.</p>
@@ -425,7 +494,33 @@ const VoiceManagementPageContent = () => {
                         <p className="text-slate-400 mt-1">Загружайте и настраивайте свои уникальные голоса для TTS.</p>
                     )}
                 </div>
-                <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+                {/* Скрытый input для загрузки файлов - вынесен наружу чтобы не терялся при перерисовке диалога */}
+                <input 
+                    ref={(el) => {
+                        fileInputRef.current = el;
+                        if (el) {
+                            // Добавляем слушатель напрямую к элементу
+                            el.onchange = (e) => {
+                                handleFileUpload(e);
+                            };
+                        }
+                    }}
+                    type="file" 
+                    accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,.wma,.aiff,.au"
+                    style={{ display: 'none', pointerEvents: 'auto' }}
+                />
+                
+                <Dialog open={uploadDialogOpen} onOpenChange={(open) => {
+                    setUploadDialogOpen(open);
+                    if (!open) {
+                        // Сбрасываем состояние только при закрытии диалога
+                        setUploadFile(null);
+                        setVoiceName('');
+                        if (fileInputRef.current) {
+                            fileInputRef.current.value = '';
+                        }
+                    }
+                }}>
                     {!user?.isGuest && (
                         <DialogTrigger asChild>
                             <Button className="bg-purple-600 hover:bg-purple-700 w-full md:w-auto">
@@ -434,24 +529,77 @@ const VoiceManagementPageContent = () => {
                             </Button>
                         </DialogTrigger>
                     )}
-                    <DialogContent className="max-w-md">
+                    <DialogContent 
+                        key="upload-dialog"
+                        className="max-w-md" 
+                        onOpenAutoFocus={(e) => e.preventDefault()}
+                        onCloseAutoFocus={(e) => e.preventDefault()}
+                    >
                         <DialogHeader>
                             <DialogTitle>Загрузка нового голоса</DialogTitle>
+                            <DialogDescription>
+                                Загрузите аудио файл для создания вашего голоса
+                            </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
                              <div>
-                                 <Label htmlFor="file">Аудио файл (.wav, до 10MB)</Label>
-                                 <Input id="file" type="file" accept=".wav" onChange={handleFileUpload} className="mt-1" />
+                                 <Label>Аудио файл (WAV, MP3, FLAC, OGG, M4A, AAC, WMA, AIFF, AU)</Label>
+                                 <div className="mt-1">
+                                     <Button
+                                         type="button"
+                                         variant="outline"
+                                         onClick={(e) => {
+                                             e.preventDefault();
+                                             e.stopPropagation();
+                                             if (fileInputRef.current) {
+                                                 fileInputRef.current.click();
+                                             }
+                                         }}
+                                         className="w-full"
+                                     >
+                                         <Upload className="h-4 w-4 mr-2" />
+                                         {uploadFile ? uploadFile.name : 'Выбрать файл'}
+                                     </Button>
+                                 </div>
+                                 {uploadFile && (
+                                     <p className="text-xs text-green-400 mt-1">
+                                         ✓ Файл выбран: {uploadFile.name}
+                                     </p>
+                                 )}
                              </div>
                              <div>
                                  <Label htmlFor="voiceName">Имя голоса</Label>
-                                 <Input id="voiceName" value={voiceName} onChange={(e) => setVoiceName(e.target.value)} placeholder="e.g., my_voice" className="mt-1" />
+                                 <Input 
+                                     id="voiceName" 
+                                     value={voiceName} 
+                                     onChange={(e) => setVoiceName(e.target.value)} 
+                                     placeholder="e.g., speaker1" 
+                                     className="mt-1" 
+                                 />
                              </div>
-                        </div>
-                         <DialogFooter>
-                             <Button onClick={() => setUploadDialogOpen(false)} variant="outline">Отмена</Button>
-                             <Button onClick={handleUpload} disabled={isUploading || !uploadFile || !voiceName.trim()}>
-                                 {isUploading ? 'Загрузка...' : 'Загрузить и транскрибировать'}
+                             <div>
+                                 <Label>Информация</Label>
+                                 <div className="mt-1 p-3 bg-slate-800 rounded-md">
+                                     <p className="text-sm text-slate-300">
+                                         Голос будет доступен только вам и загружен в вашу личную папку голосов.
+                                     </p>
+                                 </div>
+                             </div>
+                         </div>
+                         <DialogFooter className="flex justify-center gap-4">
+                             <Button 
+                                 onClick={() => setUploadDialogOpen(false)} 
+                                 variant="outline"
+                                 className="w-28"
+                             >
+                                 Отмена
+                             </Button>
+                             <Button 
+                                 onClick={(e) => handleUpload(e)} 
+                                 disabled={isUploading || !uploadFile || !voiceName.trim()}
+                                 className="w-36 bg-green-600 hover:bg-green-700"
+                             >
+                                 {isUploading ? 'Загрузка...' : 'Загрузить'}
                              </Button>
                          </DialogFooter>
                     </DialogContent>
@@ -477,16 +625,11 @@ const VoiceManagementPageContent = () => {
                                      {voice.voice_type === 'global' ? <Globe className="h-4 w-4 text-blue-400"/> : <User className="h-4 w-4 text-green-400"/>}
                                      {voice.name}
                                  </CardTitle>
-                                 <Badge variant={voice.voice_type === 'global' ? 'default' : 'secondary'}>{voice.voice_type}</Badge>
                              </div>
                          </CardHeader>
                           <CardContent className="flex-grow flex flex-col justify-between">
-                              <p className="text-xs text-slate-400 italic break-words h-16 overflow-y-auto mb-4 p-2 bg-slate-900 rounded">
-                                  "{voice.reference_text || "Нет референсного текста."}"
-                              </p>
                              <div className="flex space-x-2">
                                  <Button className="flex-1" variant="outline" size="sm" onClick={() => handleEdit(voice)}><Settings className="h-4 w-4 mr-1"/>Настроить</Button>
-                                 <Button className="flex-1" variant="outline" size="sm" onClick={() => { setCurrentVoice(voice); handleTestVoice(); }}><TestTube2 className="h-4 w-4 mr-1"/>Тест</Button>
                                  {voice.voice_type === 'user' && (
                                     <Button variant="destructive" size="icon" onClick={() => handleDelete(voice.id)}><Trash2 className="h-4 w-4"/></Button>
                                  )}
@@ -498,9 +641,17 @@ const VoiceManagementPageContent = () => {
 
              {/* Диалог редактирования голоса */}
             <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-                <DialogContent className="max-w-lg">
+                <DialogContent 
+                    key={`edit-dialog-${currentVoice?.id || 'new'}`}
+                    className="max-w-lg" 
+                    onOpenAutoFocus={(e) => e.preventDefault()}
+                    onCloseAutoFocus={(e) => e.preventDefault()}
+                >
                     <DialogHeader>
                         <DialogTitle>Настройки голоса "{currentVoice?.name}"</DialogTitle>
+                        <DialogDescription>
+                            Настройте параметры синтеза и протестируйте голос
+                        </DialogDescription>
                     </DialogHeader>
                     {currentVoice && (
                         <div className="space-y-4 py-4">
@@ -514,15 +665,16 @@ const VoiceManagementPageContent = () => {
                                   rows={3}
                                   placeholder="Введите референсный текст для синтеза..."
                                 />
-                                <div className="flex gap-2 mt-2">
+                                <div className="flex gap-2 mt-2 justify-end">
                                     <Button
                                         type="button"
                                         variant="outline"
                                         size="sm"
                                         onClick={handleTranscribe}
                                         disabled={isTranscribing}
+                                        className="text-xs px-3"
                                     >
-                                        {isTranscribing ? 'Транскрибирую...' : 'Авто-транскрипция'}
+                                        {isTranscribing ? 'Транскрибирую...' : 'Перетранскрибировать'}
                                     </Button>
                                 </div>
                                 <p className="text-sm text-muted-foreground mt-1">
@@ -545,9 +697,9 @@ const VoiceManagementPageContent = () => {
                                         max={100}
                                         step={1}
                                         value={[voiceVolumes[currentVoice.name] || 50]}
-                                        onValueChange={async (value) => {
+                                        onValueChange={(value) => {
                                             const newVolume = value[0];
-                                            await saveVoiceVolume(currentVoice.name, newVolume);
+                                            saveVoiceVolume(currentVoice.name, newVolume);
                                         }}
                                         className="w-full"
                                     />
@@ -570,7 +722,6 @@ const VoiceManagementPageContent = () => {
                                   onChange={(e) => setTestText(e.target.value)}
                                   className="mt-1"
                                   rows={3}
-                                  placeholder="Введите текст для тестирования голоса..."
                                 />
                             </div>
                             
@@ -580,7 +731,7 @@ const VoiceManagementPageContent = () => {
                                 
                                 {/* Единственный настраиваемый параметр */}
                                 <div>
-                                    <Label htmlFor="cfg-strength">Качество синтеза: {currentVoice.cfg_strength}</Label>
+                                    <Label htmlFor="cfg-strength">Стабильность синтеза: {currentVoice.cfg_strength}</Label>
                                     <Slider
                                         id="cfg-strength"
                                         min={0.1}
@@ -590,51 +741,113 @@ const VoiceManagementPageContent = () => {
                                         onValueChange={(value) => setCurrentVoice(prev => ({ ...prev, cfg_strength: value[0] }))}
                                         className="mt-2"
                                     />
-                                    <p className="text-xs text-muted-foreground mt-1">Влияет на качество и стабильность речи (0.1-10.0) • Рекомендуемое: 2.0</p>
+                                    <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded mt-1">
+                                        💡 <strong>Стабильность:</strong> Влияет на стабильность и консистентность речи. 
+                                        Рекомендуемое значение 2.5. Слишком высокое значение может сделать речь роботизированной.
+                                    </div>
                                 </div>
                                 
                                 <div>
                                     <Label htmlFor="speed-preset">Скорость речи: {
                                         currentVoice.speed_preset === 'very_slow' ? 'Очень медленный' :
                                         currentVoice.speed_preset === 'slow' ? 'Медленный' :
-                                        currentVoice.speed_preset === 'normal' ? 'Нормальный' : 'Быстрый'
+                                        currentVoice.speed_preset === 'normal' ? 'Нормальный' :
+                                        currentVoice.speed_preset === 'fast' ? 'Быстрый' : 'Очень быстрый'
                                     }</Label>
                                     <Slider
                                         id="speed-preset"
                                         min={0}
-                                        max={3}
+                                        max={4}
                                         step={1}
                                         value={[
                                             currentVoice.speed_preset === 'very_slow' ? 0 :
                                             currentVoice.speed_preset === 'slow' ? 1 :
-                                            currentVoice.speed_preset === 'normal' ? 2 : 3
+                                            currentVoice.speed_preset === 'normal' ? 2 :
+                                            currentVoice.speed_preset === 'fast' ? 3 : 4
                                         ]}
                                         onValueChange={(value) => {
                                             const preset = value[0] === 0 ? 'very_slow' : 
                                                          value[0] === 1 ? 'slow' : 
-                                                         value[0] === 2 ? 'normal' : 'fast';
+                                                         value[0] === 2 ? 'normal' :
+                                                         value[0] === 3 ? 'fast' : 'very_fast';
+                                            console.log('Speed preset changed to:', preset);
                                             setCurrentVoice(prev => ({ ...prev, speed_preset: preset }));
                                         }}
                                         className="mt-2"
                                     />
                                     <div className="flex justify-between text-xs text-muted-foreground mt-1 px-1">
-                                        <span>Очень медл.</span>
-                                        <span>Медленный</span>
-                                        <span>Нормальный</span>
-                                        <span>Быстрый</span>
+                                        <span className="text-center w-1/5">Очень медл.</span>
+                                        <span className="text-center w-1/5">Медленный</span>
+                                        <span className="text-center w-1/5">Нормальный</span>
+                                        <span className="text-center w-1/5">Быстрый</span>
+                                        <span className="text-center w-1/5">Очень быстрый</span>
+                                    </div>
+                                    <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded mt-1">
+                                        💡 <strong>Скорость:</strong> Подберите подходящий пресет. Сильно быстрый может обрывать конец фразы. 
+                                        Слишком медленный может тормозить речь. Начните с "Нормальный" и корректируйте по результату.
                                     </div>
                                 </div>
                                 
                             </div>
                         </div>
                     )}
-                    <DialogFooter>
-                        <Button onClick={handleTestVoice} variant="outline"><TestTube2 className="h-4 w-4 mr-2"/>Тест</Button>
-                        <Button onClick={handleRenameVoice} variant="outline" className="text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white">
+                    <DialogFooter className="flex-wrap gap-2">
+                        <Button onClick={handleTestVoice} variant="outline" disabled={isTestingVoice} className="flex-1 min-w-[100px]">
+                            <TestTube2 className="h-4 w-4 mr-2"/>{isTestingVoice ? 'Генерирую...' : 'Тест'}
+                        </Button>
+                        <Button onClick={handleRenameVoice} variant="outline" className="flex-1 min-w-[140px] text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white">
                             <Edit className="h-4 w-4 mr-2"/>Переименовать
                         </Button>
-                        <Button onClick={handleSaveSettings} className="bg-blue-600 hover:bg-blue-700">
+                        <Button onClick={handleSaveSettings} className="flex-1 min-w-[120px] bg-blue-600 hover:bg-blue-700">
                             <Settings className="h-4 w-4 mr-2"/>Сохранить
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Диалог переименования голоса */}
+            <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+                <DialogContent 
+                    key="rename-dialog"
+                    className="max-w-md" 
+                    onOpenAutoFocus={(e) => e.preventDefault()}
+                    onCloseAutoFocus={(e) => e.preventDefault()}
+                >
+                    <DialogHeader>
+                        <DialogTitle>Переименовать голос</DialogTitle>
+                        <DialogDescription>
+                            Введите новое имя для голоса "{currentVoice?.name}"
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div>
+                            <Label htmlFor="new-voice-name">Новое имя</Label>
+                            <Input
+                                id="new-voice-name"
+                                value={newVoiceName}
+                                onChange={(e) => setNewVoiceName(e.target.value)}
+                                placeholder="Введите новое имя голоса..."
+                                className="mt-1"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        handleConfirmRename();
+                                    }
+                                }}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button 
+                            variant="outline" 
+                            onClick={() => setRenameDialogOpen(false)}
+                        >
+                            Отмена
+                        </Button>
+                        <Button 
+                            onClick={handleConfirmRename}
+                            disabled={!newVoiceName.trim() || newVoiceName.trim() === currentVoice?.name}
+                        >
+                            Переименовать
                         </Button>
                     </DialogFooter>
                 </DialogContent>

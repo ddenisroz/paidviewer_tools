@@ -126,15 +126,15 @@ async def get_next_video(
         logger.error(f"Error getting next video via API: {e}")
         raise HTTPException(status_code=500, detail="Ошибка получения следующего видео")
 
-@youtube_router.delete("/queue/remove")
+@youtube_router.delete("/queue/remove/{queue_id}")
 async def remove_from_queue(
-    request: QueueManagementRequest,
+    queue_id: int,
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Удаление видео из очереди"""
     try:
-        success = queue_service.remove_from_queue(user["id"], request.queue_id, db)
+        success = queue_service.remove_from_queue(user["id"], queue_id, db)
         
         if success:
             return {
@@ -166,15 +166,15 @@ async def clear_queue(
         logger.error(f"Error clearing queue via API: {e}")
         raise HTTPException(status_code=500, detail="Ошибка очистки очереди")
 
-@youtube_router.post("/queue/mark-played")
+@youtube_router.post("/queue/mark-played/{queue_id}")
 async def mark_as_played(
-    request: QueueManagementRequest,
+    queue_id: int,
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Отметить видео как проигранное"""
     try:
-        success = queue_service.mark_as_played(user["id"], request.queue_id, db)
+        success = queue_service.mark_as_played(user["id"], queue_id, db)
         
         if success:
             return {

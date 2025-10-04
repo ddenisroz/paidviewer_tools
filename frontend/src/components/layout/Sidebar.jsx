@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Mic, Clapperboard, AreaChart, Terminal, Youtube, Coins, Headphones, Settings, Shield, MessageSquare, Command, Dice6 } from 'lucide-react';
+import { Home, Mic, Clapperboard, AreaChart, Terminal, Youtube, Coins, Headphones, Settings, Shield, MessageSquare, Command, Dice6, Gift } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getAdminList } from '../../services/microservices';
 
@@ -21,8 +21,8 @@ const getNavItems = (isYourchy) => {
             icon: Clapperboard,
             submenu: [
                 { to: '/dashboard/media/youtube', label: 'YouTube заказы', icon: Youtube },
-                { to: '/dashboard/media/channel-points', label: 'Баллы канала', icon: Coins },
-                { to: '/dashboard/media/gambling', label: 'Гэмблинг', icon: Dice6 },
+                { to: '/dashboard/points', label: 'Баллы канала', icon: Coins },
+                { to: '/dashboard/gambling', label: 'Гэмблинг', icon: Dice6 },
             ]
         },
         { to: '/dashboard/chat-analysis', label: 'Анализ и модерация чата', icon: MessageSquare },
@@ -136,13 +136,6 @@ const Sidebar = () => {
             // Проверяем напрямую поле is_admin от сервера
             const userIsAdmin = user.is_admin === true;
             setIsAdmin(userIsAdmin);
-            console.log('Admin check:', { 
-                user_display_name: user.display_name, 
-                user_username: user.username,
-                is_admin: user.is_admin, 
-                adminUsers, 
-                result: userIsAdmin 
-            });
         } else {
             setIsAdmin(false);
         }

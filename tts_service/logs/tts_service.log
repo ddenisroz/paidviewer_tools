@@ -1495,3 +1495,841 @@
 2025-09-27 14:54:54 - tts_service.tts_engine - INFO - Whisper transcriber loaded successfully
 2025-09-27 14:54:54 - tts_service.tts_engine - INFO - TTS engine initialized successfully
 2025-09-27 14:54:54 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-27 16:02:46 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-27 16:02:46 - tts_service - INFO - ⏰ Время: 2025-09-27 16:02:46
+2025-09-27 16:02:46 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-27 16:02:46 - tts_service.tts_engine - INFO - TTS engine does not have cleanup method, skipping
+2025-09-27 16:02:47 - tts_service.tts_engine - INFO - TTS engine shutdown completed
+2025-09-27 16:03:42 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-27 16:03:42 - tts_service - INFO - ==================================================
+2025-09-27 16:03:42 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-27 16:03:42
+2025-09-27 16:03:42 - tts_service - INFO - ==================================================
+2025-09-27 16:03:42 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-27 16:03:42 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-27 16:03:42 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-27 16:03:42 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-27 16:03:42 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-27 16:03:42 - tts_service - INFO - ==================================================
+2025-09-27 16:03:42 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-27 16:03:42 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-27 16:03:42 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-27 16:03:42 - tts_service - INFO - ⏰ Время: 2025-09-27 16:03:42
+2025-09-27 16:03:42 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-27 16:03:42 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-27 16:03:42 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-27 16:03:42 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-27 16:03:50 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-27 16:03:50 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-27 16:03:50 - tts_service.TTS_rus_engine.russian_tts - INFO - Checkpoint скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base_v2\model_last_inference.safetensors
+2025-09-27 16:03:50 - tts_service.TTS_rus_engine.russian_tts - INFO - Vocab.txt скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base\vocab.txt
+2025-09-27 16:03:54 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS модель загружена успешно.
+2025-09-27 16:03:55 - tts_service.tts_engine - INFO - Whisper transcriber loaded successfully
+2025-09-27 16:03:55 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-27 16:03:55 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-27 16:09:30 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-27 16:09:30 - tts_service - INFO - ⏰ Время: 2025-09-27 16:09:30
+2025-09-27 16:09:30 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-27 16:09:30 - tts_service.tts_engine - INFO - TTS engine does not have cleanup method, skipping
+2025-09-27 16:09:31 - tts_service.tts_engine - INFO - TTS engine shutdown completed
+2025-09-27 16:09:52 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-27 16:09:52 - tts_service - INFO - ==================================================
+2025-09-27 16:09:52 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-27 16:09:52
+2025-09-27 16:09:52 - tts_service - INFO - ==================================================
+2025-09-27 16:09:52 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-27 16:09:52 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-27 16:09:52 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-27 16:09:52 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-27 16:09:52 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-27 16:09:52 - tts_service - INFO - ==================================================
+2025-09-27 16:09:52 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-27 16:09:52 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-27 16:09:52 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-27 16:09:52 - tts_service - INFO - ⏰ Время: 2025-09-27 16:09:52
+2025-09-27 16:09:52 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-27 16:09:52 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-27 16:09:52 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-27 16:09:52 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-27 16:09:59 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-27 16:09:59 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-27 16:10:00 - tts_service.TTS_rus_engine.russian_tts - INFO - Checkpoint скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base_v2\model_last_inference.safetensors
+2025-09-27 16:10:00 - tts_service.TTS_rus_engine.russian_tts - INFO - Vocab.txt скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base\vocab.txt
+2025-09-27 16:10:03 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS модель загружена успешно.
+2025-09-27 16:10:04 - tts_service.tts_engine - INFO - Whisper transcriber loaded successfully
+2025-09-27 16:10:04 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-27 16:10:04 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-27 16:47:40 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-27 16:47:40 - tts_service - INFO - ⏰ Время: 2025-09-27 16:47:40
+2025-09-27 16:47:40 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-27 16:47:40 - tts_service.tts_engine - INFO - TTS engine does not have cleanup method, skipping
+2025-09-27 16:47:41 - tts_service.tts_engine - INFO - TTS engine shutdown completed
+2025-09-27 16:53:48 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-27 16:53:48 - tts_service - INFO - ==================================================
+2025-09-27 16:53:48 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-27 16:53:48
+2025-09-27 16:53:48 - tts_service - INFO - ==================================================
+2025-09-27 16:53:48 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-27 16:53:48 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-27 16:53:48 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-27 16:53:48 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-27 16:53:48 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-27 16:53:48 - tts_service - INFO - ==================================================
+2025-09-27 16:53:48 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-27 16:53:48 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-27 16:53:48 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-27 16:53:48 - tts_service - INFO - ⏰ Время: 2025-09-27 16:53:48
+2025-09-27 16:53:48 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-27 16:53:48 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-27 16:53:48 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-27 16:53:48 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-27 16:53:54 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-27 16:53:54 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-27 16:53:54 - tts_service.TTS_rus_engine.russian_tts - INFO - Checkpoint скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base_v2\model_last_inference.safetensors
+2025-09-27 16:53:54 - tts_service.TTS_rus_engine.russian_tts - INFO - Vocab.txt скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base\vocab.txt
+2025-09-27 16:53:57 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS модель загружена успешно.
+2025-09-27 16:53:58 - tts_service.tts_engine - INFO - Whisper transcriber loaded successfully
+2025-09-27 16:53:58 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-27 16:53:58 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-27 16:55:23 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-27 16:55:23 - tts_service - INFO - ⏰ Время: 2025-09-27 16:55:23
+2025-09-27 16:55:23 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-27 16:55:23 - tts_service.tts_engine - INFO - TTS engine does not have cleanup method, skipping
+2025-09-27 16:55:24 - tts_service.tts_engine - INFO - TTS engine shutdown completed
+2025-09-27 16:55:42 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-27 16:55:42 - tts_service - INFO - ==================================================
+2025-09-27 16:55:42 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-27 16:55:42
+2025-09-27 16:55:42 - tts_service - INFO - ==================================================
+2025-09-27 16:55:42 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-27 16:55:42 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-27 16:55:42 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-27 16:55:42 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-27 16:55:42 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-27 16:55:42 - tts_service - INFO - ==================================================
+2025-09-27 16:55:42 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-27 16:55:42 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-27 16:55:42 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-27 16:55:42 - tts_service - INFO - ⏰ Время: 2025-09-27 16:55:42
+2025-09-27 16:55:42 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-27 16:55:42 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-27 16:55:42 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-27 16:55:42 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-27 16:55:49 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-27 16:55:49 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-27 16:55:49 - tts_service.TTS_rus_engine.russian_tts - INFO - Checkpoint скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base_v2\model_last_inference.safetensors
+2025-09-27 16:55:49 - tts_service.TTS_rus_engine.russian_tts - INFO - Vocab.txt скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base\vocab.txt
+2025-09-27 16:55:52 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS модель загружена успешно.
+2025-09-27 16:55:53 - tts_service.tts_engine - INFO - Whisper transcriber loaded successfully
+2025-09-27 16:55:53 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-27 16:55:53 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-27 16:57:56 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-27 16:57:56 - tts_service - INFO - ⏰ Время: 2025-09-27 16:57:56
+2025-09-27 16:57:56 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-27 16:57:56 - tts_service.tts_engine - INFO - TTS engine does not have cleanup method, skipping
+2025-09-27 16:57:56 - tts_service.tts_engine - INFO - TTS engine shutdown completed
+2025-09-27 16:58:15 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-27 16:58:15 - tts_service - INFO - ==================================================
+2025-09-27 16:58:15 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-27 16:58:15
+2025-09-27 16:58:15 - tts_service - INFO - ==================================================
+2025-09-27 16:58:15 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-27 16:58:15 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-27 16:58:15 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-27 16:58:15 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-27 16:58:15 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-27 16:58:15 - tts_service - INFO - ==================================================
+2025-09-27 16:58:15 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-27 16:58:15 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-27 16:58:15 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-27 16:58:15 - tts_service - INFO - ⏰ Время: 2025-09-27 16:58:15
+2025-09-27 16:58:15 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-27 16:58:15 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-27 16:58:15 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-27 16:58:15 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-27 16:58:21 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-27 16:58:21 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-27 16:58:21 - tts_service.TTS_rus_engine.russian_tts - INFO - Checkpoint скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base_v2\model_last_inference.safetensors
+2025-09-27 16:58:21 - tts_service.TTS_rus_engine.russian_tts - INFO - Vocab.txt скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base\vocab.txt
+2025-09-27 16:58:24 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS модель загружена успешно.
+2025-09-27 16:58:25 - tts_service.tts_engine - INFO - Whisper transcriber loaded successfully
+2025-09-27 16:58:25 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-27 16:58:25 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-27 17:02:05 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-27 17:02:05 - tts_service - INFO - ⏰ Время: 2025-09-27 17:02:05
+2025-09-27 17:02:05 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-27 17:02:05 - tts_service.tts_engine - INFO - TTS engine does not have cleanup method, skipping
+2025-09-27 17:02:05 - tts_service.tts_engine - INFO - TTS engine shutdown completed
+2025-09-27 17:02:26 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-27 17:02:26 - tts_service - INFO - ==================================================
+2025-09-27 17:02:26 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-27 17:02:26
+2025-09-27 17:02:26 - tts_service - INFO - ==================================================
+2025-09-27 17:02:26 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-27 17:02:26 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-27 17:02:26 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-27 17:02:26 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-27 17:02:26 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-27 17:02:26 - tts_service - INFO - ==================================================
+2025-09-27 17:02:26 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-27 17:02:26 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-27 17:02:26 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-27 17:02:26 - tts_service - INFO - ⏰ Время: 2025-09-27 17:02:26
+2025-09-27 17:02:26 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-27 17:02:26 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-27 17:02:26 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-27 17:02:26 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-27 17:02:33 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-27 17:02:33 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-27 17:02:33 - tts_service.TTS_rus_engine.russian_tts - INFO - Checkpoint скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base_v2\model_last_inference.safetensors
+2025-09-27 17:02:33 - tts_service.TTS_rus_engine.russian_tts - INFO - Vocab.txt скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base\vocab.txt
+2025-09-27 17:02:37 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS модель загружена успешно.
+2025-09-27 17:02:37 - tts_service.tts_engine - INFO - Whisper transcriber loaded successfully
+2025-09-27 17:02:37 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-27 17:02:37 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-27 17:06:11 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-27 17:06:11 - tts_service - INFO - ⏰ Время: 2025-09-27 17:06:11
+2025-09-27 17:06:11 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-27 17:06:11 - tts_service.tts_engine - INFO - TTS engine does not have cleanup method, skipping
+2025-09-27 17:06:11 - tts_service.tts_engine - INFO - TTS engine shutdown completed
+2025-09-27 18:16:45 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-27 18:16:45 - tts_service - INFO - ==================================================
+2025-09-27 18:16:45 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-27 18:16:45
+2025-09-27 18:16:45 - tts_service - INFO - ==================================================
+2025-09-27 18:16:45 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-27 18:16:45 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-27 18:16:45 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-27 18:16:45 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-27 18:16:45 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-27 18:16:45 - tts_service - INFO - ==================================================
+2025-09-27 18:16:45 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-27 18:16:45 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-27 18:16:45 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-27 18:16:45 - tts_service - INFO - ⏰ Время: 2025-09-27 18:16:45
+2025-09-27 18:16:45 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-27 18:16:45 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-27 18:16:45 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-27 18:16:45 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-27 18:16:53 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-27 18:16:53 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-27 18:16:53 - tts_service.TTS_rus_engine.russian_tts - INFO - Checkpoint скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base_v2\model_last_inference.safetensors
+2025-09-27 18:16:53 - tts_service.TTS_rus_engine.russian_tts - INFO - Vocab.txt скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base\vocab.txt
+2025-09-27 18:16:56 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS модель загружена успешно.
+2025-09-27 18:16:57 - tts_service.tts_engine - INFO - Whisper transcriber loaded successfully
+2025-09-27 18:16:57 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-27 18:16:57 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-27 18:29:41 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-27 18:29:41 - tts_service - INFO - ⏰ Время: 2025-09-27 18:29:41
+2025-09-27 18:29:41 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-27 18:29:41 - tts_service.tts_engine - INFO - TTS engine does not have cleanup method, skipping
+2025-09-27 18:29:42 - tts_service.tts_engine - INFO - TTS engine shutdown completed
+2025-09-27 18:49:43 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-27 18:49:43 - tts_service - INFO - ==================================================
+2025-09-27 18:49:43 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-27 18:49:43
+2025-09-27 18:49:43 - tts_service - INFO - ==================================================
+2025-09-27 18:49:43 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-27 18:49:43 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-27 18:49:43 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-27 18:49:43 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-27 18:49:43 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-27 18:49:43 - tts_service - INFO - ==================================================
+2025-09-27 18:49:43 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-27 18:49:43 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-27 18:49:43 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-27 18:49:43 - tts_service - INFO - ⏰ Время: 2025-09-27 18:49:43
+2025-09-27 18:49:43 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-27 18:49:43 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-27 18:49:43 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-27 18:49:43 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-27 18:49:51 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-27 18:49:51 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-27 18:49:52 - tts_service.TTS_rus_engine.russian_tts - INFO - Checkpoint скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base_v2\model_last_inference.safetensors
+2025-09-27 18:49:52 - tts_service.TTS_rus_engine.russian_tts - INFO - Vocab.txt скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base\vocab.txt
+2025-09-27 18:49:56 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS модель загружена успешно.
+2025-09-27 18:49:56 - tts_service.tts_engine - INFO - Whisper transcriber loaded successfully
+2025-09-27 18:49:56 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-27 18:49:56 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-27 19:43:20 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-27 19:43:20 - tts_service - INFO - ⏰ Время: 2025-09-27 19:43:20
+2025-09-27 19:43:20 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-27 19:43:20 - tts_service.tts_engine - INFO - TTS engine does not have cleanup method, skipping
+2025-09-27 19:43:21 - tts_service.tts_engine - INFO - TTS engine shutdown completed
+2025-09-27 20:59:41 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-27 20:59:41 - tts_service - INFO - ==================================================
+2025-09-27 20:59:41 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-27 20:59:41
+2025-09-27 20:59:41 - tts_service - INFO - ==================================================
+2025-09-27 20:59:41 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-27 20:59:41 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-27 20:59:41 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-27 20:59:41 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-27 20:59:41 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-27 20:59:41 - tts_service - INFO - ==================================================
+2025-09-27 20:59:41 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-27 20:59:41 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-27 20:59:41 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-27 20:59:41 - tts_service - INFO - ⏰ Время: 2025-09-27 20:59:41
+2025-09-27 20:59:41 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-27 20:59:41 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-27 20:59:41 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-27 20:59:41 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-27 20:59:50 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-27 20:59:50 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-27 20:59:50 - tts_service.TTS_rus_engine.russian_tts - ERROR - Ошибка загрузки модели: (MaxRetryError("HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /Misha24-10/F5-TTS_RUSSIAN/resolve/main/F5TTS_v1_Base_v2/model_last_inference.safetensors (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)'))))"), '(Request ID: 45007a16-c37c-4ed5-9c78-139d2e9eb0d5)')
+urllib3.exceptions.SSLError: EOF occurred in violation of protocol (_ssl.c:997)
+
+The above exception was the direct cause of the following exception:
+
+urllib3.exceptions.ProxyError: ('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)')))
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\urllib3\util\retry.py", line 519, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /Misha24-10/F5-TTS_RUSSIAN/resolve/main/F5TTS_v1_Base_v2/model_last_inference.safetensors (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)'))))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service\TTS_rus_engine\russian_tts.py", line 102, in _load_tts_model
+    ckpt_path = hf_hub_download(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1010, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1073, in _hf_hub_download_to_cache_dir
+    (url_to_download, etag, commit_hash, expected_size, xet_file_data, head_call_error) = _get_metadata_or_catch_error(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1546, in _get_metadata_or_catch_error
+    metadata = get_hf_file_metadata(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1463, in get_hf_file_metadata
+    r = _request_wrapper(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 286, in _request_wrapper
+    response = _request_wrapper(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 309, in _request_wrapper
+    response = http_backoff(method=method, url=url, **params, retry_on_exceptions=(), retry_on_status_codes=(429,))
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_http.py", line 310, in http_backoff
+    response = session.request(method=method, url=url, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_http.py", line 96, in send
+    return super().send(request, *args, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\adapters.py", line 671, in send
+    raise ProxyError(e, request=request)
+requests.exceptions.ProxyError: (MaxRetryError("HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /Misha24-10/F5-TTS_RUSSIAN/resolve/main/F5TTS_v1_Base_v2/model_last_inference.safetensors (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)'))))"), '(Request ID: 45007a16-c37c-4ed5-9c78-139d2e9eb0d5)')
+2025-09-27 20:59:51 - tts_service.tts_engine - INFO - Whisper transcriber loaded successfully
+2025-09-27 20:59:51 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-27 20:59:51 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-27 21:00:34 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-27 21:00:34 - tts_service - INFO - ⏰ Время: 2025-09-27 21:00:34
+2025-09-27 21:00:34 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-27 21:00:34 - tts_service.tts_engine - INFO - TTS engine does not have cleanup method, skipping
+2025-09-27 21:00:34 - tts_service.tts_engine - INFO - TTS engine shutdown completed
+2025-09-27 21:00:44 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-27 21:00:44 - tts_service - INFO - ==================================================
+2025-09-27 21:00:44 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-27 21:00:44
+2025-09-27 21:00:44 - tts_service - INFO - ==================================================
+2025-09-27 21:00:44 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-27 21:00:44 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-27 21:00:44 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-27 21:00:44 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-27 21:00:44 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-27 21:00:44 - tts_service - INFO - ==================================================
+2025-09-27 21:00:44 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-27 21:00:44 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-27 21:00:44 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-27 21:00:44 - tts_service - INFO - ⏰ Время: 2025-09-27 21:00:44
+2025-09-27 21:00:44 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-27 21:00:44 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-27 21:00:44 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-27 21:00:44 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-27 21:00:51 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-27 21:00:51 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-27 21:00:51 - tts_service.TTS_rus_engine.russian_tts - ERROR - Ошибка загрузки модели: (MaxRetryError("HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /Misha24-10/F5-TTS_RUSSIAN/resolve/main/F5TTS_v1_Base_v2/model_last_inference.safetensors (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)'))))"), '(Request ID: fda1cc6d-f884-432f-9cb1-63e3d64145d7)')
+urllib3.exceptions.SSLError: EOF occurred in violation of protocol (_ssl.c:997)
+
+The above exception was the direct cause of the following exception:
+
+urllib3.exceptions.ProxyError: ('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)')))
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\urllib3\util\retry.py", line 519, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /Misha24-10/F5-TTS_RUSSIAN/resolve/main/F5TTS_v1_Base_v2/model_last_inference.safetensors (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)'))))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service\TTS_rus_engine\russian_tts.py", line 102, in _load_tts_model
+    ckpt_path = hf_hub_download(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1010, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1073, in _hf_hub_download_to_cache_dir
+    (url_to_download, etag, commit_hash, expected_size, xet_file_data, head_call_error) = _get_metadata_or_catch_error(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1546, in _get_metadata_or_catch_error
+    metadata = get_hf_file_metadata(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1463, in get_hf_file_metadata
+    r = _request_wrapper(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 286, in _request_wrapper
+    response = _request_wrapper(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 309, in _request_wrapper
+    response = http_backoff(method=method, url=url, **params, retry_on_exceptions=(), retry_on_status_codes=(429,))
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_http.py", line 310, in http_backoff
+    response = session.request(method=method, url=url, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_http.py", line 96, in send
+    return super().send(request, *args, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\adapters.py", line 671, in send
+    raise ProxyError(e, request=request)
+requests.exceptions.ProxyError: (MaxRetryError("HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /Misha24-10/F5-TTS_RUSSIAN/resolve/main/F5TTS_v1_Base_v2/model_last_inference.safetensors (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)'))))"), '(Request ID: fda1cc6d-f884-432f-9cb1-63e3d64145d7)')
+2025-09-27 21:00:52 - tts_service.tts_engine - INFO - Whisper transcriber loaded successfully
+2025-09-27 21:00:52 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-27 21:00:52 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-27 21:06:14 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-27 21:06:14 - tts_service - INFO - ⏰ Время: 2025-09-27 21:06:14
+2025-09-27 21:06:14 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-27 21:06:14 - tts_service.tts_engine - INFO - TTS engine does not have cleanup method, skipping
+2025-09-27 21:06:14 - tts_service.tts_engine - INFO - TTS engine shutdown completed
+2025-09-27 21:06:35 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-27 21:06:35 - tts_service - INFO - ==================================================
+2025-09-27 21:06:35 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-27 21:06:35
+2025-09-27 21:06:35 - tts_service - INFO - ==================================================
+2025-09-27 21:06:35 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-27 21:06:35 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-27 21:06:35 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-27 21:06:35 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-27 21:06:35 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-27 21:06:35 - tts_service - INFO - ==================================================
+2025-09-27 21:06:35 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-27 21:06:35 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-27 21:06:35 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-27 21:06:35 - tts_service - INFO - ⏰ Время: 2025-09-27 21:06:35
+2025-09-27 21:06:35 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-27 21:06:35 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-27 21:06:35 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-27 21:06:35 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-27 21:06:41 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-27 21:06:41 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-27 21:06:41 - tts_service.TTS_rus_engine.russian_tts - INFO - Checkpoint скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base_v2\model_last_inference.safetensors
+2025-09-27 21:06:42 - tts_service.TTS_rus_engine.russian_tts - INFO - Vocab.txt скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base\vocab.txt
+2025-09-27 21:06:44 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS модель загружена успешно.
+2025-09-27 21:06:45 - tts_service.tts_engine - INFO - Whisper transcriber loaded successfully
+2025-09-27 21:06:45 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-27 21:06:45 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-27 21:12:45 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-27 21:12:45 - tts_service - INFO - ⏰ Время: 2025-09-27 21:12:45
+2025-09-27 21:12:45 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-27 21:12:45 - tts_service.tts_engine - INFO - TTS engine does not have cleanup method, skipping
+2025-09-27 21:12:46 - tts_service.tts_engine - INFO - TTS engine shutdown completed
+2025-09-27 21:26:24 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-27 21:26:24 - tts_service - INFO - ==================================================
+2025-09-27 21:26:24 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-27 21:26:24
+2025-09-27 21:26:24 - tts_service - INFO - ==================================================
+2025-09-27 21:26:24 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-27 21:26:24 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-27 21:26:24 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-27 21:26:24 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-27 21:26:24 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-27 21:26:24 - tts_service - INFO - ==================================================
+2025-09-27 21:26:24 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-27 21:26:24 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-27 21:26:24 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-27 21:26:24 - tts_service - INFO - ⏰ Время: 2025-09-27 21:26:24
+2025-09-27 21:26:24 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-27 21:26:24 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-27 21:26:24 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-27 21:26:24 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-27 21:26:30 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-27 21:26:30 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-27 21:26:30 - tts_service.TTS_rus_engine.russian_tts - ERROR - Ошибка загрузки модели: (MaxRetryError("HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /Misha24-10/F5-TTS_RUSSIAN/resolve/main/F5TTS_v1_Base_v2/model_last_inference.safetensors (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)'))))"), '(Request ID: 2bbd8c74-f2f6-45d8-b50b-868c7497e346)')
+urllib3.exceptions.SSLError: EOF occurred in violation of protocol (_ssl.c:997)
+
+The above exception was the direct cause of the following exception:
+
+urllib3.exceptions.ProxyError: ('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)')))
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\urllib3\util\retry.py", line 519, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /Misha24-10/F5-TTS_RUSSIAN/resolve/main/F5TTS_v1_Base_v2/model_last_inference.safetensors (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)'))))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service\TTS_rus_engine\russian_tts.py", line 112, in _load_tts_model
+    ckpt_path = hf_hub_download(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1010, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1073, in _hf_hub_download_to_cache_dir
+    (url_to_download, etag, commit_hash, expected_size, xet_file_data, head_call_error) = _get_metadata_or_catch_error(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1546, in _get_metadata_or_catch_error
+    metadata = get_hf_file_metadata(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1463, in get_hf_file_metadata
+    r = _request_wrapper(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 286, in _request_wrapper
+    response = _request_wrapper(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 309, in _request_wrapper
+    response = http_backoff(method=method, url=url, **params, retry_on_exceptions=(), retry_on_status_codes=(429,))
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_http.py", line 310, in http_backoff
+    response = session.request(method=method, url=url, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_http.py", line 96, in send
+    return super().send(request, *args, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\adapters.py", line 671, in send
+    raise ProxyError(e, request=request)
+requests.exceptions.ProxyError: (MaxRetryError("HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /Misha24-10/F5-TTS_RUSSIAN/resolve/main/F5TTS_v1_Base_v2/model_last_inference.safetensors (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)'))))"), '(Request ID: 2bbd8c74-f2f6-45d8-b50b-868c7497e346)')
+2025-09-27 21:26:30 - tts_service.TTS_rus_engine.russian_tts - ERROR - КРИТИЧЕСКАЯ ОШИБКА: Не удалось загрузить модели. Ошибка: TTS модель не загружена
+Traceback (most recent call last):
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service\TTS_rus_engine\russian_tts.py", line 96, in _load_models
+    raise RuntimeError("TTS модель не загружена")
+RuntimeError: TTS модель не загружена
+2025-09-27 21:26:30 - tts_service.TTS_rus_engine.russian_tts - ERROR - Не удалось инициализировать TTS: TTS модель не загружена
+2025-09-27 21:26:30 - tts_service.tts_engine - INFO - Whisper transcriber loaded successfully
+2025-09-27 21:26:30 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-27 21:26:30 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-27 21:27:04 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-27 21:27:04 - tts_service - INFO - ⏰ Время: 2025-09-27 21:27:04
+2025-09-27 21:27:04 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-27 21:27:04 - tts_service.tts_engine - INFO - TTS engine does not have cleanup method, skipping
+2025-09-27 21:27:04 - tts_service.tts_engine - INFO - TTS engine shutdown completed
+2025-09-27 21:27:30 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-27 21:27:30 - tts_service - INFO - ==================================================
+2025-09-27 21:27:30 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-27 21:27:30
+2025-09-27 21:27:30 - tts_service - INFO - ==================================================
+2025-09-27 21:27:30 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-27 21:27:30 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-27 21:27:30 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-27 21:27:30 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-27 21:27:30 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-27 21:27:30 - tts_service - INFO - ==================================================
+2025-09-27 21:27:30 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-27 21:27:30 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-27 21:27:30 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-27 21:27:30 - tts_service - INFO - ⏰ Время: 2025-09-27 21:27:30
+2025-09-27 21:27:30 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-27 21:27:30 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-27 21:27:30 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-27 21:27:30 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-27 21:27:36 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-27 21:27:36 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-27 21:27:36 - tts_service.TTS_rus_engine.russian_tts - ERROR - Ошибка загрузки модели: (MaxRetryError("HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /Misha24-10/F5-TTS_RUSSIAN/resolve/main/F5TTS_v1_Base_v2/model_last_inference.safetensors (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)'))))"), '(Request ID: aa4d325a-d893-4ae5-ae4d-969b033e9fa7)')
+urllib3.exceptions.SSLError: EOF occurred in violation of protocol (_ssl.c:997)
+
+The above exception was the direct cause of the following exception:
+
+urllib3.exceptions.ProxyError: ('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)')))
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\urllib3\util\retry.py", line 519, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /Misha24-10/F5-TTS_RUSSIAN/resolve/main/F5TTS_v1_Base_v2/model_last_inference.safetensors (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)'))))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service\TTS_rus_engine\russian_tts.py", line 112, in _load_tts_model
+    ckpt_path = hf_hub_download(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1010, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1073, in _hf_hub_download_to_cache_dir
+    (url_to_download, etag, commit_hash, expected_size, xet_file_data, head_call_error) = _get_metadata_or_catch_error(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1546, in _get_metadata_or_catch_error
+    metadata = get_hf_file_metadata(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1463, in get_hf_file_metadata
+    r = _request_wrapper(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 286, in _request_wrapper
+    response = _request_wrapper(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 309, in _request_wrapper
+    response = http_backoff(method=method, url=url, **params, retry_on_exceptions=(), retry_on_status_codes=(429,))
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_http.py", line 310, in http_backoff
+    response = session.request(method=method, url=url, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_http.py", line 96, in send
+    return super().send(request, *args, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\adapters.py", line 671, in send
+    raise ProxyError(e, request=request)
+requests.exceptions.ProxyError: (MaxRetryError("HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /Misha24-10/F5-TTS_RUSSIAN/resolve/main/F5TTS_v1_Base_v2/model_last_inference.safetensors (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)'))))"), '(Request ID: aa4d325a-d893-4ae5-ae4d-969b033e9fa7)')
+2025-09-27 21:27:36 - tts_service.TTS_rus_engine.russian_tts - ERROR - КРИТИЧЕСКАЯ ОШИБКА: Не удалось загрузить модели. Ошибка: TTS модель не загружена
+Traceback (most recent call last):
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service\TTS_rus_engine\russian_tts.py", line 96, in _load_models
+    raise RuntimeError("TTS модель не загружена")
+RuntimeError: TTS модель не загружена
+2025-09-27 21:27:36 - tts_service.TTS_rus_engine.russian_tts - ERROR - Не удалось инициализировать TTS: TTS модель не загружена
+2025-09-27 21:27:37 - tts_service.tts_engine - INFO - Whisper transcriber loaded successfully
+2025-09-27 21:27:37 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-27 21:27:37 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-27 21:31:00 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-27 21:31:00 - tts_service - INFO - ⏰ Время: 2025-09-27 21:31:00
+2025-09-27 21:31:00 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-27 21:31:00 - tts_service.tts_engine - INFO - TTS engine does not have cleanup method, skipping
+2025-09-27 21:31:00 - tts_service.tts_engine - INFO - TTS engine shutdown completed
+2025-09-27 21:31:43 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-27 21:31:43 - tts_service - INFO - ==================================================
+2025-09-27 21:31:43 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-27 21:31:43
+2025-09-27 21:31:43 - tts_service - INFO - ==================================================
+2025-09-27 21:31:43 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-27 21:31:43 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-27 21:31:43 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-27 21:31:43 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-27 21:31:43 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-27 21:31:43 - tts_service - INFO - ==================================================
+2025-09-27 21:31:43 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-27 21:31:43 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-27 21:31:43 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-27 21:31:43 - tts_service - INFO - ⏰ Время: 2025-09-27 21:31:43
+2025-09-27 21:31:43 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-27 21:31:43 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-27 21:31:43 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-27 21:31:43 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-27 21:31:49 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-27 21:31:49 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-27 21:31:49 - tts_service.TTS_rus_engine.russian_tts - ERROR - Ошибка загрузки модели: (MaxRetryError("HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /Misha24-10/F5-TTS_RUSSIAN/resolve/main/F5TTS_v1_Base_v2/model_last_inference.safetensors (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)'))))"), '(Request ID: 3ae53295-3daa-4983-b2bd-d3f9c1a261c6)')
+urllib3.exceptions.SSLError: EOF occurred in violation of protocol (_ssl.c:997)
+
+The above exception was the direct cause of the following exception:
+
+urllib3.exceptions.ProxyError: ('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)')))
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\urllib3\util\retry.py", line 519, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /Misha24-10/F5-TTS_RUSSIAN/resolve/main/F5TTS_v1_Base_v2/model_last_inference.safetensors (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)'))))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service\TTS_rus_engine\russian_tts.py", line 112, in _load_tts_model
+    ckpt_path = hf_hub_download(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1010, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1073, in _hf_hub_download_to_cache_dir
+    (url_to_download, etag, commit_hash, expected_size, xet_file_data, head_call_error) = _get_metadata_or_catch_error(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1546, in _get_metadata_or_catch_error
+    metadata = get_hf_file_metadata(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1463, in get_hf_file_metadata
+    r = _request_wrapper(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 286, in _request_wrapper
+    response = _request_wrapper(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 309, in _request_wrapper
+    response = http_backoff(method=method, url=url, **params, retry_on_exceptions=(), retry_on_status_codes=(429,))
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_http.py", line 310, in http_backoff
+    response = session.request(method=method, url=url, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_http.py", line 96, in send
+    return super().send(request, *args, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\adapters.py", line 671, in send
+    raise ProxyError(e, request=request)
+requests.exceptions.ProxyError: (MaxRetryError("HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /Misha24-10/F5-TTS_RUSSIAN/resolve/main/F5TTS_v1_Base_v2/model_last_inference.safetensors (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)'))))"), '(Request ID: 3ae53295-3daa-4983-b2bd-d3f9c1a261c6)')
+2025-09-27 21:31:49 - tts_service.TTS_rus_engine.russian_tts - ERROR - КРИТИЧЕСКАЯ ОШИБКА: Не удалось загрузить модели. Ошибка: TTS модель не загружена
+Traceback (most recent call last):
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service\TTS_rus_engine\russian_tts.py", line 96, in _load_models
+    raise RuntimeError("TTS модель не загружена")
+RuntimeError: TTS модель не загружена
+2025-09-27 21:31:49 - tts_service.TTS_rus_engine.russian_tts - ERROR - Не удалось инициализировать TTS: TTS модель не загружена
+2025-09-27 21:31:50 - tts_service.tts_engine - INFO - Whisper transcriber loaded successfully
+2025-09-27 21:31:50 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-27 21:31:50 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-27 22:14:18 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-27 22:14:18 - tts_service - INFO - ⏰ Время: 2025-09-27 22:14:18
+2025-09-27 22:14:18 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-27 22:14:18 - tts_service.tts_engine - INFO - TTS engine does not have cleanup method, skipping
+2025-09-27 22:14:19 - tts_service.tts_engine - INFO - TTS engine shutdown completed
+2025-09-27 22:28:37 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-27 22:28:37 - tts_service - INFO - ==================================================
+2025-09-27 22:28:37 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-27 22:28:37
+2025-09-27 22:28:37 - tts_service - INFO - ==================================================
+2025-09-27 22:28:37 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-27 22:28:37 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-27 22:28:37 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-27 22:28:37 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-27 22:28:37 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-27 22:28:37 - tts_service - INFO - ==================================================
+2025-09-27 22:28:37 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-27 22:28:37 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-27 22:28:37 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-27 22:28:37 - tts_service - INFO - ⏰ Время: 2025-09-27 22:28:37
+2025-09-27 22:28:37 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-27 22:28:37 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-27 22:28:37 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-27 22:28:37 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-27 22:28:44 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-27 22:28:44 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-27 22:28:44 - tts_service.TTS_rus_engine.russian_tts - INFO - Checkpoint скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base_v2\model_last_inference.safetensors
+2025-09-27 22:28:45 - tts_service.TTS_rus_engine.russian_tts - INFO - Vocab.txt скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base\vocab.txt
+2025-09-27 22:28:48 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS модель загружена успешно.
+2025-09-27 22:28:49 - tts_service.tts_engine - INFO - Whisper transcriber loaded successfully
+2025-09-27 22:28:49 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-27 22:28:49 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-27 22:34:04 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-27 22:34:04 - tts_service - INFO - ⏰ Время: 2025-09-27 22:34:04
+2025-09-27 22:34:04 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-27 22:34:04 - tts_service.tts_engine - INFO - TTS engine does not have cleanup method, skipping
+2025-09-27 22:34:04 - tts_service.tts_engine - INFO - TTS engine shutdown completed
+2025-09-27 22:39:01 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-27 22:39:01 - tts_service - INFO - ==================================================
+2025-09-27 22:39:01 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-27 22:39:01
+2025-09-27 22:39:01 - tts_service - INFO - ==================================================
+2025-09-27 22:39:01 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-27 22:39:01 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-27 22:39:01 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-27 22:39:01 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-27 22:39:01 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-27 22:39:01 - tts_service - INFO - ==================================================
+2025-09-27 22:39:01 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-27 22:39:01 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-27 22:39:01 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-27 22:39:01 - tts_service - INFO - ⏰ Время: 2025-09-27 22:39:01
+2025-09-27 22:39:01 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-27 22:39:01 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-27 22:39:01 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-27 22:39:01 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-27 22:39:09 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-27 22:39:09 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-27 22:39:09 - tts_service.TTS_rus_engine.russian_tts - INFO - Checkpoint скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base_v2\model_last_inference.safetensors
+2025-09-27 22:39:09 - tts_service.TTS_rus_engine.russian_tts - INFO - Vocab.txt скачан в: f5_tts_cache\models--Misha24-10--F5-TTS_RUSSIAN\snapshots\4f5ee5def0435265fe6ecf2143df2ef26d926b62\F5TTS_v1_Base\vocab.txt
+2025-09-27 22:39:13 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS модель загружена успешно.
+2025-09-27 22:39:14 - tts_service.tts_engine - INFO - Whisper transcriber loaded successfully
+2025-09-27 22:39:14 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-27 22:39:14 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-27 22:58:11 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-27 22:58:11 - tts_service - INFO - ⏰ Время: 2025-09-27 22:58:11
+2025-09-27 22:58:11 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-27 22:58:11 - tts_service.tts_engine - INFO - TTS engine does not have cleanup method, skipping
+2025-09-27 22:58:11 - tts_service.tts_engine - INFO - TTS engine shutdown completed
+2025-09-28 00:32:48 - tts_service - INFO - === TTS SERVICE STARTED ===
+2025-09-28 00:32:48 - tts_service - INFO - ==================================================
+2025-09-28 00:32:48 - tts_service - INFO - СИСТЕМА ЗАПУЩЕНА - 2025-09-28 00:32:48
+2025-09-28 00:32:48 - tts_service - INFO - ==================================================
+2025-09-28 00:32:48 - tts_service - INFO - Python версия: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+2025-09-28 00:32:48 - tts_service - INFO - Платформа: Windows-10-10.0.26100-SP0
+2025-09-28 00:32:48 - tts_service - INFO - Архитектура: ('64bit', 'WindowsPE')
+2025-09-28 00:32:48 - tts_service - INFO - Процессор: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+2025-09-28 00:32:48 - tts_service - INFO - Рабочая директория: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service
+2025-09-28 00:32:48 - tts_service - INFO - ==================================================
+2025-09-28 00:32:48 - tts_service - INFO - 🚀 TTS_SERVICE ЗАПУЩЕН
+2025-09-28 00:32:48 - tts_service - INFO - 🌐 Порт: 8001
+2025-09-28 00:32:48 - tts_service - INFO - 📁 Логи: logs/tts_service.log
+2025-09-28 00:32:48 - tts_service - INFO - ⏰ Время: 2025-09-28 00:32:48
+2025-09-28 00:32:48 - tts_service.tts_engine - INFO - Initializing TTS engine...
+2025-09-28 00:32:48 - tts_service.TTS_rus_engine.russian_tts - INFO - CUDA проверка прошла успешно
+2025-09-28 00:32:48 - tts_service.TTS_rus_engine.russian_tts - INFO - F5-TTS использует устройство: cuda
+2025-09-28 00:32:48 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем RUAccent для расстановки ударений (модель: turbo)...
+2025-09-28 00:32:57 - tts_service.TTS_rus_engine.russian_tts - INFO - RUAccent загружен успешно (модель: turbo)
+2025-09-28 00:32:57 - tts_service.TTS_rus_engine.russian_tts - INFO - Загружаем F5-TTS модель...
+2025-09-28 00:32:57 - tts_service.TTS_rus_engine.russian_tts - ERROR - Ошибка загрузки модели: (MaxRetryError("HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /Misha24-10/F5-TTS_RUSSIAN/resolve/main/F5TTS_v1_Base_v2/model_last_inference.safetensors (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)'))))"), '(Request ID: 06bfcf1e-96de-44e5-b59b-772afa5b9719)')
+urllib3.exceptions.SSLError: EOF occurred in violation of protocol (_ssl.c:997)
+
+The above exception was the direct cause of the following exception:
+
+urllib3.exceptions.ProxyError: ('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)')))
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\urllib3\util\retry.py", line 519, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /Misha24-10/F5-TTS_RUSSIAN/resolve/main/F5TTS_v1_Base_v2/model_last_inference.safetensors (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)'))))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service\TTS_rus_engine\russian_tts.py", line 112, in _load_tts_model
+    ckpt_path = hf_hub_download(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1010, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1073, in _hf_hub_download_to_cache_dir
+    (url_to_download, etag, commit_hash, expected_size, xet_file_data, head_call_error) = _get_metadata_or_catch_error(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1546, in _get_metadata_or_catch_error
+    metadata = get_hf_file_metadata(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 1463, in get_hf_file_metadata
+    r = _request_wrapper(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 286, in _request_wrapper
+    response = _request_wrapper(
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\file_download.py", line 309, in _request_wrapper
+    response = http_backoff(method=method, url=url, **params, retry_on_exceptions=(), retry_on_status_codes=(429,))
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_http.py", line 310, in http_backoff
+    response = session.request(method=method, url=url, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\huggingface_hub\utils\_http.py", line 96, in send
+    return super().send(request, *args, **kwargs)
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\.venv\lib\site-packages\requests\adapters.py", line 671, in send
+    raise ProxyError(e, request=request)
+requests.exceptions.ProxyError: (MaxRetryError("HTTPSConnectionPool(host='huggingface.co', port=443): Max retries exceeded with url: /Misha24-10/F5-TTS_RUSSIAN/resolve/main/F5TTS_v1_Base_v2/model_last_inference.safetensors (Caused by ProxyError('Unable to connect to proxy', SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:997)'))))"), '(Request ID: 06bfcf1e-96de-44e5-b59b-772afa5b9719)')
+2025-09-28 00:32:57 - tts_service.TTS_rus_engine.russian_tts - ERROR - КРИТИЧЕСКАЯ ОШИБКА: Не удалось загрузить модели. Ошибка: TTS модель не загружена
+Traceback (most recent call last):
+  File "H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\tts_service\TTS_rus_engine\russian_tts.py", line 96, in _load_models
+    raise RuntimeError("TTS модель не загружена")
+RuntimeError: TTS модель не загружена
+2025-09-28 00:32:57 - tts_service.TTS_rus_engine.russian_tts - ERROR - Не удалось инициализировать TTS: TTS модель не загружена
+2025-09-28 00:32:58 - tts_service.tts_engine - INFO - Whisper transcriber loaded successfully
+2025-09-28 00:32:58 - tts_service.tts_engine - INFO - TTS engine initialized successfully
+2025-09-28 00:32:58 - tts_service.background_tasks - INFO - Background tasks started
+2025-09-28 00:47:16 - tts_service - INFO - 🛑 TTS_SERVICE ОСТАНОВЛЕН
+2025-09-28 00:47:16 - tts_service - INFO - ⏰ Время: 2025-09-28 00:47:16
+2025-09-28 00:47:16 - tts_service.background_tasks - INFO - Background tasks stopped
+2025-09-28 00:47:16 - tts_service.tts_engine - INFO - TTS engine does not have cleanup method, skipping
+2025-09-28 00:47:17 - tts_service.tts_engine - INFO - TTS engine shutdown completed

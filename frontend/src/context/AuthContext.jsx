@@ -19,30 +19,22 @@ export const AuthProvider = ({ children }) => {
             const response = await botService.get('/api/auth/status');
             const { authenticated, user: userData, integrations } = response.data;
 
-            console.log('Auth status response:', { authenticated, userData, integrations });
             
             if (authenticated) {
-                console.log('Setting authenticated=true, user=', userData);
                 setIsAuthenticated(true);
                 // Добавляем поле integrations в объект user для удобства
                 setUser({ ...userData, integrations }); 
             } else {
-                console.log('Setting authenticated=false - server returned authenticated=false');
                 setIsAuthenticated(false);
                 setUser(null);
             }
         } catch (error) {
             console.error('Authentication check failed:', error);
-            console.log('Error response:', error.response);
-            console.log('Error status:', error.response?.status);
-            
             // Только при HTTP 401/403 считаем, что пользователь не аутентифицирован
             if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-                console.log('Logging out due to 401/403 status');
                 setIsAuthenticated(false);
                 setUser(null);
             } else {
-                console.log('Keeping auth state - non-auth error');
             }
             // При других ошибках (сеть, 500, etc) не меняем состояние аутентификации
         } finally {

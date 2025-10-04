@@ -13,9 +13,10 @@ logger = logging.getLogger(__name__)
 class FileManager:
     def __init__(self):
         self.base_path = Path(__file__).parent
-        self.voices_path = self.base_path / "voices"
-        self.temp_path = self.base_path / "temp"
-        self.test_path = self.base_path / "test_audio"
+        from tts_service.config import config
+        self.voices_path = config.voices_path
+        self.temp_path = config.temp_audio_path
+        self.test_path = config.test_audio_path
         
         # Создаем необходимые директории
         self.voices_path.mkdir(exist_ok=True)
@@ -59,15 +60,16 @@ class FileManager:
         """Сохранить загруженный файл"""
         try:
             # Определяем путь для сохранения
+            from tts_service.config import config
             if user_id:
-                save_dir = self.voices_path / "user" / user_id
+                save_dir = config.user_voices_path / str(user_id)
             else:
-                save_dir = self.voices_path / "global"
+                save_dir = config.global_voices_path
             
             save_dir.mkdir(parents=True, exist_ok=True)
             
             # Сохраняем временный файл
-            temp_path = self.temp_path / f"temp_{voice_name}_{file.filename}"
+            temp_path = config.temp_audio_path / f"temp_{voice_name}_{file.filename}"
             with open(temp_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
             

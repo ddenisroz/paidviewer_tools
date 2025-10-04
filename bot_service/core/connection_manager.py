@@ -28,6 +28,7 @@ class ConnectionManager:
         self.active_connections: Dict[str, WebSocket] = {}
         self.obs_connections: Dict[str, WebSocket] = {}
         self.youtube_obs_connections: Dict[str, WebSocket] = {}  # YouTube OBS connections
+        self.audio_connections: Dict[str, WebSocket] = {}  # Аудио подключения по каналам
         self.tts_enabled_channels: Set[str] = set()  # Глобальные каналы с TTS
         self.tts_enabled_twitch: Set[str] = set()    # Twitch каналы с TTS
         self.tts_enabled_vk: Set[str] = set()        # VK Live каналы с TTS
@@ -138,6 +139,38 @@ class ConnectionManager:
                 del self.obs_connections[token]
                 logger.info(f"OBS WebSocket connection closed for token {token}")
 
+    # Аудио connections
+    async def connect_audio(self, websocket: WebSocket, channel: str):
+        await websocket.accept()
+        self.audio_connections[channel] = websocket
+        logger.info(f"Audio WebSocket connection established for channel {channel}")
+
+    async def disconnect_audio(self, channel: str):
+        if channel in self.audio_connections:
+            try:
+                websocket = self.audio_connections[channel]
+                if hasattr(websocket, 'client_state') and websocket.client_state.name == 'CONNECTED':
+                    await websocket.close()
+            except Exception as e:
+                logger.debug(f"Audio WebSocket already closed for channel {channel}: {e}")
+            finally:
+                del self.audio_connections[channel]
+                logger.info(f"Audio WebSocket connection closed for channel {channel}")
+
+    async def send_audio_to_channel(self, channel: str, audio_data: dict):
+        """Отправка аудио данных в канал"""
+        if channel in self.audio_connections:
+            try:
+                websocket = self.audio_connections[channel]
+                if hasattr(websocket, 'client_state') and websocket.client_state.name == 'CONNECTED':
+                    await websocket.send_json(audio_data)
+                    logger.info(f"Audio sent to channel {channel}")
+            except Exception as e:
+                logger.error(f"Error sending audio to channel {channel}: {e}")
+                # Удаляем неактивное подключение
+                if channel in self.audio_connections:
+                    del self.audio_connections[channel]
+
     async def send_obs_message(self, message: str, token: str):
         if token in self.obs_connections:
             try:
@@ -194,23 +227,37 @@ class ConnectionManager:
             }
             
             # Отправляем всем YouTube OBS подключениям
-            message = json.dumps(message_data)
-            disconnected_tokens = []
-            
             for token, websocket in self.youtube_obs_connections.items():
                 try:
-                    await websocket.send_text(message)
-                    logger.debug(f"YouTube OBS message sent to {token}: {action}")
+                    if hasattr(websocket, 'client_state') and websocket.client_state.name == 'CONNECTED':
+                        await websocket.send_json(message_data)
+                        logger.info(f"YouTube {action} command sent to OBS for channel {channel_name}")
                 except Exception as e:
-                    logger.error(f"Error sending YouTube OBS message to {token}: {e}")
-                    disconnected_tokens.append(token)
-            
-            # Удаляем отключенные соединения
-            for token in disconnected_tokens:
-                await self.disconnect_youtube_obs(token)
-                
+                    logger.error(f"Error sending YouTube command to OBS {token}: {e}")
+                    # Удаляем неактивное подключение
+                    if token in self.youtube_obs_connections:
+                        del self.youtube_obs_connections[token]
         except Exception as e:
-            logger.error(f"Error sending YouTube to OBS for channel {channel_name}: {e}")
+            logger.error(f"Error in send_youtube_to_obs: {e}")
+
+    async def send_youtube_state_to_user(self, user_id: str, action: str, data: dict = None):
+        """Отправить состояние YouTube плеера пользователю через WebSocket"""
+        try:
+            if user_id in self.active_connections:
+                websocket = self.active_connections[user_id]
+                if hasattr(websocket, 'client_state') and websocket.client_state.name == 'CONNECTED':
+                    message = {
+                        "type": "youtube_state",
+                        "action": action,
+                        "data": data or {}
+                    }
+                    await websocket.send_json(message)
+                    logger.info(f"YouTube state sent to user {user_id}: {action}")
+        except Exception as e:
+            logger.error(f"Error sending YouTube state to user {user_id}: {e}")
+            # Удаляем неактивное подключение
+            if user_id in self.active_connections:
+                del self.active_connections[user_id]
 
     # TTS management
     def enable_tts(self, channel_name: str, platform: str = None):
@@ -259,10 +306,19 @@ class ConnectionManager:
             from sqlalchemy import func
             db = next(get_db())
             try:
+                logger.info(f"🔍 WHITELIST CHECK: Проверяем канал '{channel_name}'")
                 whitelisted = db.query(WhitelistedChannel).filter(
                     func.lower(WhitelistedChannel.channel_name) == channel_name.lower()
                 ).first()
-                return whitelisted is not None and whitelisted.is_enabled
+                result = whitelisted is not None
+                if whitelisted:
+                    logger.info(f"✅ WHITELIST: Канал '{channel_name}' найден в whitelist (ID: {whitelisted.id})")
+                else:
+                    logger.warning(f"❌ WHITELIST: Канал '{channel_name}' НЕ найден в whitelist")
+                    # Покажем все каналы в whitelist для отладки
+                    all_channels = db.query(WhitelistedChannel).all()
+                    logger.info(f"📋 WHITELIST: Все каналы в базе: {[ch.channel_name for ch in all_channels]}")
+                return result
             finally:
                 db.close()
         except Exception as e:

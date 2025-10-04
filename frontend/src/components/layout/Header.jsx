@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, LogIn, User, LogOut } from 'lucide-react';
+import { Settings, LogIn, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/button';
 import { 
@@ -40,6 +40,7 @@ const Header = () => {
             >
                 <Settings className="h-8 w-8" strokeWidth={2.5} />
             </Button>
+
             
             {userMode === 'guest' ? (
                 <div className="flex items-center space-x-3">
@@ -102,6 +103,7 @@ const Header = () => {
                 open={integrationsOpen} 
                 onOpenChange={setIntegrationsOpen} 
             />
+
         </header>
     );
 };

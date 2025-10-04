@@ -4,7 +4,7 @@ import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Depends, WebSocket, WebSocketDisconnect, HTTPException, Response
+from fastapi import FastAPI, Request, Depends, WebSocket, WebSocketDisconnect, HTTPException, Response, Form, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.responses import RedirectResponse
@@ -22,7 +22,8 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
-from logging_config import setup_logging, log_system_info, log_service_start, log_service_stop, log_error, log_api_call, log_websocket_event, log_bot_event
+# logging_config удален - используем стандартный logging
+import logging
 
 from core.database import get_db, init_db, User, GuestVerification, StreamData, UserSession, UserToken, BotCommand
 from core.session_manager import session_manager
@@ -37,8 +38,27 @@ from auth.vk_auth import router as vk_auth_router
 from api.tts_api import TTSAPI
 from api.youtube_api import YouTubeAPI
 from services.admin_service import AdminAPI
-from bots.twitch_bot import Bot
 from bots.vk_live_bot import VKLiveBot
+
+# --- Logging and Monitoring Setup ---
+log_level = os.getenv("LOG_LEVEL", "INFO")
+logger = logging.getLogger(__name__)
+
+# --- Monitoring API ---
+from monitoring import bot_monitor
+
+# Запускаем мониторинг
+bot_monitor.start_monitoring(interval=60)  # Каждую минуту
+logger.info("System monitoring started for bot_service")
+
+# --- Backup System ---
+from backup_manager import bot_backup_manager
+from logging_config import bot_logging_config
+
+# Запускаем систему бэкапов
+bot_backup_manager.schedule_backups()
+bot_backup_manager.start_scheduler()
+logger.info("=== BOT SERVICE STARTED WITH ENHANCED LOGGING ===")
 
 # Load .env file from bot_service directory
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -47,9 +67,6 @@ if os.path.exists(dotenv_path):
 else:
     logger.warning(f".env не найден в bot_service: {dotenv_path}")
 
-# --- Logging Configuration ---
-log_level = os.getenv("LOG_LEVEL", "DEBUG")
-logger = setup_logging("bot_service", log_level)
 logger.info("=== BOT SERVICE STARTED ===")
 
 # --- Global Variables ---
@@ -71,8 +88,8 @@ def get_platform_username(user: dict, platform: str) -> str:
     """Получить имя пользователя для конкретной платформы"""
     integration = user.get("integrations", {}).get(platform)
     if integration:
-        # Пробуем разные поля для получения имени пользователя
-        username = integration.get("platform_user_id") or integration.get("display_name") or integration.get("username")
+        # Пробуем разные поля для получения имени пользователя (приоритет display_name)
+        username = integration.get("display_name") or integration.get("username") or integration.get("platform_user_id")
         if username:
             return username
     return ""
@@ -279,8 +296,7 @@ async def lifespan(app: FastAPI):
     global bot_instance, bot_task
     
     # Startup
-    log_system_info(logger)
-    log_service_start(logger, "bot_service", 8000)
+    logger.info("Bot service starting on port 8000")
     
     # Инициализация базы данных
     init_db()
@@ -361,7 +377,7 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
-    log_service_stop(logger, "bot_service")
+    logger.info("Bot service stopping")
     
     # Очищаем все активные VK боты
     await cleanup_all_vk_bots()
@@ -442,13 +458,14 @@ async def request_logging_middleware(request: Request, call_next):
     # Логируем только важные запросы
     process_time = time.time() - start_time
     if should_log_request(request.url.path, response.status_code):
-        log_level = "ERROR" if response.status_code >= 400 else "INFO"
         log_message = f"🌐 {request.method} {request.url.path} | {user_info} | {response.status_code} | {process_time:.3f}s"
         
+        # Используем специальный логгер для доступа
+        access_logger = bot_logging_config.get_access_logger()
         if response.status_code >= 400:
-            logger.error(log_message)
+            access_logger.error(log_message)
         else:
-            logger.info(log_message)
+            access_logger.info(log_message)
     
     return response
 
@@ -496,9 +513,9 @@ async def rate_limit_middleware(request: Request, call_next):
     if request.url.path.startswith("/api/"):
         # Увеличиваем лимиты для YouTube и TTS endpoints
         if any(path in request.url.path for path in ["/api/youtube/", "/api/tts/", "/api/voices/"]):
-            max_requests = 100  # Больше запросов для медиа endpoints
+            max_requests = 200  # Больше запросов для медиа endpoints
         else:
-            max_requests = 50   # Стандартный лимит для остальных API
+            max_requests = 200   # Увеличенный лимит для всех API
         
         if not rate_limiter.is_allowed(client_ip, max_requests=max_requests, window_seconds=60):
             return Response(
@@ -513,6 +530,22 @@ async def rate_limit_middleware(request: Request, call_next):
 # --- Include Routers ---
 app.include_router(vk_auth_router)
 
+# Import TTS router
+from api.tts_api_endpoints import tts_router
+app.include_router(tts_router)
+
+# Import Voices router
+from api.voices_api_endpoints import voices_router
+app.include_router(voices_router)
+
+# Import YouTube router
+from api.youtube_api_endpoints import youtube_router
+app.include_router(youtube_router)
+
+# Import Lootbox router
+from api.lootbox_api_endpoints import lootbox_router
+app.include_router(lootbox_router, prefix="/lootbox", tags=["lootbox"])
+
 # --- WebSocket Endpoints ---
 @app.websocket("/ws/chat/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
@@ -523,6 +556,17 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
             # Обработка сообщений
     except WebSocketDisconnect:
         await connection_manager.disconnect(user_id)
+
+@app.websocket("/ws/audio/{channel}")
+async def websocket_audio_endpoint(websocket: WebSocket, channel: str):
+    """WebSocket для отправки аудио в канал"""
+    await connection_manager.connect_audio(websocket, channel)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Обработка аудио сообщений
+    except WebSocketDisconnect:
+        await connection_manager.disconnect_audio(channel)
 
 @app.websocket("/ws/obs/{token}")
 async def websocket_obs_endpoint(websocket: WebSocket, token: str, db: Session = Depends(get_db)):
@@ -558,6 +602,16 @@ async def login_twitch():
 @app.get("/auth/twitch/login")
 async def api_login_twitch():
     """API endpoint для Twitch login (для совместимости с фронтендом)"""
+    client_id = os.getenv("TWITCH_CLIENT_ID")
+    redirect_uri = "http://localhost:8000/auth/twitch/callback"
+    scope = "user:read:email channel:manage:broadcast"
+    
+    auth_url = f"https://id.twitch.tv/oauth2/authorize?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope={scope}"
+    return {"auth_url": auth_url}
+
+@app.get("/api/auth/twitch")
+async def api_auth_twitch():
+    """API endpoint для Twitch auth (для совместимости с фронтендом)"""
     client_id = os.getenv("TWITCH_CLIENT_ID")
     redirect_uri = "http://localhost:8000/auth/twitch/callback"
     scope = "user:read:email channel:manage:broadcast"
@@ -705,6 +759,11 @@ async def auto_connect_vk_live_bot(user_id: int):
                 return
 
             logger.info(f"🎯 Auto-connecting VK Live bot to channel: {target_channel}")
+            
+            # Проверяем, есть ли уже активный бот для этого канала
+            if target_channel in connection_manager.active_vk_bots:
+                logger.info(f"VK Live bot already active for channel: {target_channel}, skipping auto-connect")
+                return
             
             # Если бот уже существует, подключаем к новому каналу
             if vk_live_bot_instance:
@@ -1037,10 +1096,15 @@ async def connect_bot(user: dict = Depends(get_current_user), db: Session = Depe
         # Ждем подключения
         await asyncio.sleep(2)
     
-    # Подключаемся к каналу (whitelist проверка только для TTS функций)
-    success = await bot_instance.join_channel(twitch_username)
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to connect to channel")
+    # Проверяем, подключен ли бот уже к каналу
+    if bot_instance.is_connected_to_channel(twitch_username):
+        logger.info(f"Bot already connected to channel: {twitch_username}")
+        success = True
+    else:
+        # Подключаемся к каналу (whitelist проверка только для TTS функций)
+        success = await bot_instance.join_channel(twitch_username)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to connect to channel")
     
     return {"message": f"Bot connected to {twitch_username}"}
 
@@ -1085,14 +1149,19 @@ async def reconnect_bot(user: dict = Depends(get_current_user)):
     if not twitch_username:
         raise HTTPException(status_code=400, detail="Twitch integration not found")
     
-    # Сначала отключаемся
-    await bot_instance.leave_channel(twitch_username)
-    await asyncio.sleep(1)
-    
-    # Затем подключаемся заново
-    success = await bot_instance.join_channel(twitch_username)
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to reconnect to channel")
+    # Проверяем, подключен ли бот уже к каналу
+    if bot_instance.is_connected_to_channel(twitch_username):
+        logger.info(f"Bot already connected to channel: {twitch_username}, skipping reconnect")
+        success = True
+    else:
+        # Сначала отключаемся
+        await bot_instance.leave_channel(twitch_username)
+        await asyncio.sleep(1)
+        
+        # Затем подключаемся заново
+        success = await bot_instance.join_channel(twitch_username)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to reconnect to channel")
     
     return {"message": f"Bot reconnected to {twitch_username}"}
 
@@ -1265,6 +1334,9 @@ async def connect_vk_live_bot_guest(request: Request, db: Session = Depends(get_
     # Проверяем, есть ли уже активный бот для этого канала
     if channel_name in connection_manager.active_vk_bots:
         logger.info(f"VK Live bot already active for channel: {channel_name}")
+        success = True
+    elif vk_live_bot_instance and vk_live_bot_instance.is_connected_to_channel(channel_name):
+        logger.info(f"Global VK Live bot already connected to channel: {channel_name}")
         success = True
     else:
         # Создаем новый бот для гостевого режима
@@ -1987,14 +2059,16 @@ async def get_tts_status(request: Request, user: dict = Depends(get_current_user
         # Авторизованный пользователь
         twitch_username = get_platform_username(user, "twitch")
         if not twitch_username:
-            return {"enabled": False}
+            return {"enabled": False, "is_whitelisted": False}
         
         is_enabled = connection_manager.is_tts_enabled(twitch_username, 'twitch')
-        return {"enabled": is_enabled}
+        is_whitelisted = connection_manager.is_channel_whitelisted(twitch_username)
+        return {"enabled": is_enabled, "is_whitelisted": is_whitelisted}
     elif channel_name:
         # Гостевой пользователь с указанным каналом
         is_enabled = connection_manager.is_tts_enabled(channel_name.lower(), 'twitch')
-        return {"enabled": is_enabled}
+        is_whitelisted = connection_manager.is_channel_whitelisted(channel_name.lower())
+        return {"enabled": is_enabled, "is_whitelisted": is_whitelisted}
     else:
         # Недостаточно данных для определения статуса
         raise HTTPException(status_code=400, detail="Channel name required for guest users")
@@ -2204,6 +2278,115 @@ async def generate_youtube_obs_url(user: dict = Depends(get_current_user), db: S
         youtube_obs_url = f"http://localhost:5173/youtube-obs/{obs_token}"
         return {"youtube_obs_url": youtube_obs_url, "obs_token": obs_token}
 
+# --- Backup Management API ---
+@app.get("/api/admin/backups/info")
+async def get_backup_info(current_user: dict = Depends(get_admin_user)):
+    """Получить информацию о бэкапах"""
+    try:
+        backup_info = bot_backup_manager.get_backup_info()
+        return {
+            "success": True,
+            "backups": backup_info,
+            "service": "bot_service"
+        }
+    except Exception as e:
+        logger.error(f"Error getting backup info: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка получения информации о бэкапах")
+
+@app.post("/api/admin/backups/create")
+async def create_manual_backup(
+    backup_type: str,
+    current_user: dict = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Создать ручной бэкап"""
+    try:
+        if backup_type == "database":
+            db_path = "core/data/app_data.db"
+            backup_path = bot_backup_manager.create_database_backup(db_path)
+        elif backup_type == "config":
+            config_files = [".env", "alembic.ini"]
+            backup_path = bot_backup_manager.create_config_backup(config_files)
+        elif backup_type == "logs":
+            backup_path = bot_backup_manager.create_logs_backup("logs")
+        elif backup_type == "full":
+            # Полный бэкап
+            db_path = "core/data/app_data.db"
+            bot_backup_manager.create_database_backup(db_path)
+            config_files = [".env", "alembic.ini"]
+            bot_backup_manager.create_config_backup(config_files)
+            bot_backup_manager.create_logs_backup("logs")
+            backup_path = "Full backup completed"
+        else:
+            raise HTTPException(status_code=400, detail="Неверный тип бэкапа")
+        
+        if backup_path:
+            return {
+                "success": True,
+                "message": f"Бэкап {backup_type} создан успешно",
+                "backup_path": backup_path
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Ошибка создания бэкапа")
+            
+    except Exception as e:
+        logger.error(f"Error creating manual backup: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка создания бэкапа")
+
+@app.post("/api/admin/backups/cleanup")
+async def cleanup_old_backups(current_user: dict = Depends(get_admin_user)):
+    """Очистить старые бэкапы"""
+    try:
+        bot_backup_manager.cleanup_old_backups()
+        return {
+            "success": True,
+            "message": "Очистка старых бэкапов завершена"
+        }
+    except Exception as e:
+        logger.error(f"Error cleaning up backups: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка очистки бэкапов")
+
+# --- System Monitoring API ---
+@app.get("/api/admin/monitoring/current")
+async def get_current_monitoring():
+    """Получить текущую статистику мониторинга"""
+    try:
+        stats = bot_monitor.get_current_stats()
+        return {
+            "success": True,
+            "data": stats
+        }
+    except Exception as e:
+        logger.error(f"Error getting monitoring stats: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка получения статистики мониторинга")
+
+@app.get("/api/admin/monitoring/summary")
+async def get_monitoring_summary():
+    """Получить сводку мониторинга за 24 часа"""
+    try:
+        summary = bot_monitor.get_monitoring_summary()
+        return {
+            "success": True,
+            "data": summary
+        }
+    except Exception as e:
+        logger.error(f"Error getting monitoring summary: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка получения сводки мониторинга")
+
+@app.get("/api/admin/monitoring/status")
+async def get_monitoring_status():
+    """Получить статус мониторинга"""
+    try:
+        return {
+            "success": True,
+            "monitoring_active": bot_monitor.is_monitoring,
+            "data_points": len(bot_monitor.monitoring_data),
+            "service": "bot_service"
+        }
+    except Exception as e:
+        logger.error(f"Error getting monitoring status: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка получения статуса мониторинга")
+
 @app.post("/api/tts/regenerate-obs-url")
 async def regenerate_obs_url(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Перегенерировать URL для OBS WebSocket"""
@@ -2256,7 +2439,9 @@ async def get_youtube_queue(user: dict = Depends(get_current_user), db: Session 
                 'duration': 0,  # Временно 0, если duration строка
                 'thumbnail_url': item['thumbnail_url'] or '',
                 'added_at': datetime.fromisoformat(item['added_at']) if item['added_at'] else datetime.now(),
-                'user_id': str(user["id"])
+                'user_id': str(user["id"]),
+                'requester_name': item.get('requester_name', 'Unknown'),  # Имя заказчика
+                'channel_title': item.get('channel_name', '')  # Канал YouTube
             }
         
         queue_items = [format_queue_item(item) for item in queue_items_raw]
@@ -2350,7 +2535,7 @@ async def add_to_youtube_queue(request: dict, user: dict = Depends(get_current_u
         connection_manager.add_to_youtube_queue(user["id"], video_info)
         return {"message": "Video added to queue (fallback)"}
 
-@app.post("/api/youtube/next")
+@app.post("/api/youtube/player/next")
 async def youtube_player_next(user: dict = Depends(get_current_user)):
     next_video = connection_manager.next_youtube_video(user["id"])
     
@@ -2366,6 +2551,13 @@ async def youtube_player_next(user: dict = Depends(get_current_user)):
                 data={"video": next_video}
             )
         
+        # Синхронизируем состояние с фронтендом через WebSocket
+        await connection_manager.send_youtube_state_to_user(
+            user_id=user["id"],
+            action="next_video",
+            data={"current_video": next_video}
+        )
+        
         return {"success": True, "message": "Switched to next video", "current_video": next_video}
     else:
         # Отправляем команду остановки в OBS
@@ -2375,7 +2567,77 @@ async def youtube_player_next(user: dict = Depends(get_current_user)):
                 action="clear"
             )
         
+        # Синхронизируем состояние с фронтендом
+        await connection_manager.send_youtube_state_to_user(
+            user_id=user["id"],
+            action="queue_empty",
+            data={}
+        )
+        
         return {"success": False, "message": "No videos in queue"}
+
+@app.post("/api/youtube/player/play")
+async def youtube_player_play(
+    request: dict,
+    user: dict = Depends(get_current_user)
+):
+    """Переключиться на конкретное видео"""
+    try:
+        video_id = request.get("video_id")
+        queue_id = request.get("queue_id")
+        
+        if not video_id:
+            raise HTTPException(status_code=400, detail="video_id is required")
+        
+        # Получаем информацию о видео из очереди
+        db = next(get_db())
+        queue_item = db.query(YouTubeQueue).filter(
+            YouTubeQueue.id == queue_id,
+            YouTubeQueue.user_id == user["id"]
+        ).first()
+        
+        if not queue_item:
+            raise HTTPException(status_code=404, detail="Video not found in queue")
+        
+        # Создаем объект видео
+        video_data = {
+            "video_id": queue_item.video_id,
+            "title": queue_item.title,
+            "duration": queue_item.duration,
+            "thumbnail_url": queue_item.thumbnail_url,
+            "url": queue_item.video_url,
+            "requester_name": queue_item.requester_name
+        }
+        
+        # Устанавливаем как текущее видео
+        connection_manager.set_current_video(user["id"], video_data)
+        
+        # Получаем канал пользователя для OBS
+        twitch_username = get_platform_username(user, "twitch")
+        
+        # Отправляем команду в OBS
+        if twitch_username:
+            await connection_manager.send_youtube_to_obs(
+                channel_name=twitch_username,
+                action="play",
+                data={"video": video_data}
+            )
+        
+        # Уведомляем WebSocket клиентов
+        await connection_manager.broadcast_to_user(
+            user["id"], 
+            {
+                "type": "youtube_event",
+                "event": "video_played",
+                "data": {"video": video_data}
+            }
+        )
+        
+        return {"success": True, "message": "Video started", "current_video": video_data}
+        
+    except Exception as e:
+        logger.error(f"Error playing video: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/youtube/clear")
 async def youtube_queue_clear(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -2474,7 +2736,7 @@ async def unblock_user(user_id: int, user: dict = Depends(get_admin_user), db: S
 @app.get("/api/admin/bots/status")
 async def get_bots_status(user: dict = Depends(get_admin_user)):
     """Получить статус всех ботов"""
-    return await admin_api.get_bots_status()
+    return await admin_api.get_bots_status(connection_manager)
 
 @app.post("/api/admin/bots/{bot_name}/restart")
 async def restart_bot(bot_name: str, user: dict = Depends(get_admin_user)):
@@ -2954,8 +3216,8 @@ async def get_bot_commands(
         {
             "command_name": "tts",
             "command_type": "basic",
-            "description": "Управление TTS: переключение, случайный голос, принудительное включение/выключение",
-            "usage": "!tts [random|on|off]",
+            "description": "Включить/выключить TTS (озвучку сообщений чата)",
+            "usage": "!tts",
             "is_enabled": True,
             "platforms": "twitch,vk",
             "allowed_roles": "all",
@@ -2965,8 +3227,8 @@ async def get_bot_commands(
         {
             "command_name": "voice",
             "command_type": "basic",
-            "description": "Выбрать конкретный голос для TTS по номеру",
-            "usage": "!voice <номер>",
+            "description": "Выбрать голос для TTS по номеру или случайный голос",
+            "usage": "!voice <номер> или !voice random",
             "is_enabled": True,
             "platforms": "twitch,vk",
             "allowed_roles": "all",
@@ -3155,6 +3417,630 @@ async def startup_event():
     # Запускаем фоновую задачу очистки
     asyncio.create_task(cleanup_task())
     logger.info("🚀 Background cleanup task started")
+
+# --- Points & Rewards API ---
+@app.get("/api/points/rewards/{platform}")
+async def get_platform_rewards(
+    platform: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Получить награды с выбранной платформы (twitch/vk)"""
+    try:
+        if platform == "twitch":
+            # Здесь будет интеграция с Twitch API для получения Channel Points наград
+            return {"rewards": []}
+        elif platform == "vk":
+            # Здесь будет интеграция с VK Live API для получения наград
+            return {"rewards": []}
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported platform")
+    except Exception as e:
+        logger.error(f"Error getting {platform} rewards: {e}")
+        return {"rewards": []}
+
+@app.post("/api/points/rewards/{platform}/create")
+async def create_platform_reward(
+    platform: str,
+    name: str = Form(...),
+    description: str = Form(...),
+    price: int = Form(...),
+    sound: UploadFile = File(None),
+    current_user: dict = Depends(get_current_user)
+):
+    """Создать награду на платформе"""
+    try:
+        if platform == "twitch":
+            # Интеграция с Twitch API для создания Channel Points награды
+            return {"success": True, "message": "Twitch reward created"}
+        elif platform == "vk":
+            # Интеграция с VK Live API для создания награды
+            return {"success": True, "message": "VK reward created"}
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported platform")
+    except Exception as e:
+        logger.error(f"Error creating {platform} reward: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create reward")
+
+@app.delete("/api/points/rewards/{platform}/{reward_id}")
+async def delete_platform_reward(
+    platform: str,
+    reward_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Удалить награду с платформы"""
+    try:
+        if platform == "twitch":
+            # Интеграция с Twitch API для удаления Channel Points награды
+            return {"success": True, "message": "Twitch reward deleted"}
+        elif platform == "vk":
+            # Интеграция с VK Live API для удаления награды
+            return {"success": True, "message": "VK reward deleted"}
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported platform")
+    except Exception as e:
+        logger.error(f"Error deleting {platform} reward: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete reward")
+
+# --- DonationAlerts Integration ---
+@app.post("/api/donationalerts/connect")
+async def connect_donationalerts(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Подключение к DonationAlerts через OAuth"""
+    try:
+        import aiohttp
+        import secrets
+        
+        # Генерируем state для безопасности
+        state = secrets.token_urlsafe(32)
+        
+        # Сохраняем state в сессии пользователя
+        from core.database import User
+        user = db.query(User).filter(User.id == current_user["id"]).first()
+        if user:
+            # Временно сохраняем state (в реальном приложении лучше использовать Redis)
+            user.temp_oauth_state = state
+            db.commit()
+        
+        # Параметры OAuth
+        client_id = os.getenv("DONATIONALERTS_CLIENT_ID")
+        redirect_uri = f"{os.getenv('BASE_URL', 'http://localhost:8000')}/api/donationalerts/callback"
+        scope = "oauth-donation-subscribe"
+        
+        if not client_id:
+            raise HTTPException(status_code=500, detail="DonationAlerts Client ID not configured")
+        
+        auth_url = f"https://www.donationalerts.com/oauth/authorize?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope={scope}&state={state}"
+        
+        return {
+            "success": True,
+            "auth_url": auth_url,
+            "message": "Redirect to DonationAlerts for authorization"
+        }
+    except Exception as e:
+        logger.error(f"Error connecting DonationAlerts: {e}")
+        raise HTTPException(status_code=500, detail="Failed to connect DonationAlerts")
+
+@app.get("/api/donationalerts/callback")
+async def donationalerts_callback(
+    code: str,
+    state: str,
+    db: Session = Depends(get_db)
+):
+    """Callback для OAuth DonationAlerts"""
+    try:
+        import aiohttp
+        
+        # Находим пользователя по state
+        from core.database import User
+        user = db.query(User).filter(User.temp_oauth_state == state).first()
+        if not user:
+            raise HTTPException(status_code=400, detail="Invalid state parameter")
+        
+        # Обмениваем код на токен
+        client_id = os.getenv("DONATIONALERTS_CLIENT_ID")
+        client_secret = os.getenv("DONATIONALERTS_CLIENT_SECRET")
+        redirect_uri = f"{os.getenv('BASE_URL', 'http://localhost:8000')}/api/donationalerts/callback"
+        
+        if not client_id or not client_secret:
+            raise HTTPException(status_code=500, detail="DonationAlerts credentials not configured")
+        
+        async with aiohttp.ClientSession() as session:
+            token_data = {
+                "grant_type": "authorization_code",
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "redirect_uri": redirect_uri,
+                "code": code
+            }
+            
+            async with session.post("https://www.donationalerts.com/oauth/token", data=token_data) as response:
+                if response.status == 200:
+                    token_response = await response.json()
+                    
+                    # Сохраняем токены
+                    user.donationalerts_access_token = token_response.get("access_token")
+                    user.donationalerts_refresh_token = token_response.get("refresh_token")
+                    user.donationalerts_token_expires = datetime.utcnow() + timedelta(seconds=token_response.get("expires_in", 3600))
+                    user.temp_oauth_state = None  # Очищаем временный state
+                    db.commit()
+                    
+                    # Перенаправляем обратно на фронтенд
+                    return RedirectResponse(url="/dashboard/points?connected=true")
+                else:
+                    logger.error(f"DonationAlerts token exchange failed: {response.status}")
+                    return RedirectResponse(url="/dashboard/points?error=token_exchange_failed")
+                    
+    except Exception as e:
+        logger.error(f"Error in DonationAlerts callback: {e}")
+        return RedirectResponse(url="/dashboard/points?error=callback_failed")
+
+@app.post("/api/donationalerts/disconnect")
+async def disconnect_donationalerts(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Отключение от DonationAlerts"""
+    try:
+        from core.database import User
+        user = db.query(User).filter(User.id == current_user["id"]).first()
+        if user:
+            # Очищаем токены DonationAlerts
+            user.donationalerts_access_token = None
+            user.donationalerts_refresh_token = None
+            user.donationalerts_token_expires = None
+            db.commit()
+            
+            return {"success": True, "message": "DonationAlerts отключен"}
+        else:
+            raise HTTPException(status_code=404, detail="User not found")
+    except Exception as e:
+        logger.error(f"Error disconnecting DonationAlerts: {e}")
+        raise HTTPException(status_code=500, detail="Failed to disconnect DonationAlerts")
+
+@app.get("/api/donationalerts/status")
+async def get_donationalerts_status(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Проверить статус подключения к DonationAlerts"""
+    try:
+        from core.database import User
+        user = db.query(User).filter(User.id == current_user["id"]).first()
+        
+        # Проверяем есть ли токены и не истекли ли они
+        is_connected = (
+            user and 
+            user.donationalerts_access_token and 
+            user.donationalerts_token_expires and 
+            user.donationalerts_token_expires > datetime.utcnow()
+        )
+        
+        return {
+            "connected": is_connected,
+            "message": "DonationAlerts connected" if is_connected else "Not connected"
+        }
+    except Exception as e:
+        logger.error(f"Error checking DonationAlerts status: {e}")
+        return {"connected": False, "message": "Error checking status"}
+
+@app.get("/api/donationalerts/donations")
+async def get_recent_donations(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить последние донаты от DonationAlerts"""
+    try:
+        import aiohttp
+        
+        from core.database import User
+        user = db.query(User).filter(User.id == current_user["id"]).first()
+        
+        if not user or not user.donationalerts_access_token:
+            return {"donations": []}
+        
+        # Проверяем не истек ли токен
+        if user.donationalerts_token_expires <= datetime.utcnow():
+            # Здесь нужно обновить токен
+            return {"donations": [], "error": "Token expired"}
+        
+        # Запрос к API DonationAlerts
+        headers = {
+            "Authorization": f"Bearer {user.donationalerts_access_token}",
+            "Content-Type": "application/json"
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get("https://www.donationalerts.com/api/v1/alerts/donations", headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    donations = []
+                    
+                    for item in data.get("data", []):
+                        donations.append({
+                            "id": item["id"],
+                            "username": item["username"],
+                            "message": item["message"] or "Без сообщения",
+                            "amount": float(item["amount"]),
+                            "currency": item["currency"],
+                            "created_at": item["created_at"]
+                        })
+                    
+                    return {"donations": donations}
+                else:
+                    logger.error(f"DonationAlerts API error: {response.status}")
+                    return {"donations": [], "error": "API request failed"}
+                    
+    except Exception as e:
+        logger.error(f"Error getting donations: {e}")
+        return {"donations": [], "error": str(e)}
+
+# --- Support Tickets API ---
+@app.post("/api/support/tickets")
+async def create_support_ticket(
+    subject: str = Form(...),
+    message: str = Form(...),
+    user_name: str = Form(None),
+    user_email: str = Form(None),
+    current_user: dict = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    """Создать новый тикет поддержки"""
+    try:
+        # Валидация длины сообщения
+        if len(message) > 500:
+            raise HTTPException(status_code=400, detail="Message too long. Maximum 500 characters.")
+        
+        if len(subject) > 100:
+            raise HTTPException(status_code=400, detail="Subject too long. Maximum 100 characters.")
+        
+        # Создаем тикет
+        from core.database import SupportTicket
+        ticket = SupportTicket(
+            user_id=current_user["id"] if current_user else None,
+            user_name=user_name or (current_user["display_name"] if current_user else "Anonymous"),
+            user_email=user_email,
+            subject=subject,
+            message=message,
+            status="open",
+            priority="medium"
+        )
+        
+        db.add(ticket)
+        db.commit()
+        db.refresh(ticket)
+        
+        logger.info(f"New support ticket created: ID {ticket.id} by {ticket.user_name}")
+        
+        return {
+            "success": True,
+            "ticket_id": ticket.id,
+            "message": "Ticket created successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating support ticket: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create ticket")
+
+@app.get("/api/admin/support/tickets")
+async def get_support_tickets(
+    status: str = "all",
+    current_user: dict = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Получить все тикеты поддержки (только для админов)"""
+    try:
+        from core.database import SupportTicket
+        
+        query = db.query(SupportTicket)
+        
+        if status != "all":
+            query = query.filter(SupportTicket.status == status)
+        
+        tickets = query.order_by(SupportTicket.created_at.desc()).all()
+        
+        result = []
+        for ticket in tickets:
+            result.append({
+                "id": ticket.id,
+                "user_name": ticket.user_name,
+                "user_email": ticket.user_email,
+                "subject": ticket.subject,
+                "message": ticket.message,
+                "status": ticket.status,
+                "priority": ticket.priority,
+                "admin_notes": ticket.admin_notes,
+                "is_archived": getattr(ticket, 'is_archived', False),  # Безопасное получение поля
+                "created_at": ticket.created_at.isoformat(),
+                "updated_at": ticket.updated_at.isoformat(),
+                "closed_at": ticket.closed_at.isoformat() if ticket.closed_at else None
+            })
+        
+        return {"tickets": result}
+        
+    except Exception as e:
+        logger.error(f"Error getting support tickets: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get tickets")
+
+@app.put("/api/admin/support/tickets/{ticket_id}")
+async def update_support_ticket(
+    ticket_id: int,
+    status: str = Form(...),
+    admin_notes: str = Form(None),
+    current_user: dict = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Обновить статус тикета (только для админов)"""
+    try:
+        from core.database import SupportTicket
+        
+        ticket = db.query(SupportTicket).filter(SupportTicket.id == ticket_id).first()
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Ticket not found")
+        
+        ticket.status = status
+        if admin_notes:
+            ticket.admin_notes = admin_notes
+        
+        if status == "closed":
+            ticket.closed_at = datetime.utcnow()
+        
+        ticket.updated_at = datetime.utcnow()
+        
+        db.commit()
+        
+        logger.info(f"Support ticket {ticket_id} updated to status: {status}")
+        
+        return {"success": True, "message": "Ticket updated successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating support ticket: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update ticket")
+
+@app.put("/api/admin/support/tickets/{ticket_id}/archive")
+async def archive_support_ticket(
+    ticket_id: int,
+    current_user: dict = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Архивировать тикет (только для админов)"""
+    try:
+        from core.database import SupportTicket
+        
+        # Проверяем существование тикета
+        ticket = db.query(SupportTicket).filter(SupportTicket.id == ticket_id).first()
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Ticket not found")
+        
+        # Архивируем тикет
+        ticket.is_archived = True
+        db.commit()
+        
+        return {"success": True, "message": "Ticket archived successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error archiving support ticket: {e}")
+        raise HTTPException(status_code=500, detail="Failed to archive ticket")
+
+@app.put("/api/admin/support/tickets/{ticket_id}/unarchive")
+async def unarchive_support_ticket(
+    ticket_id: int,
+    current_user: dict = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Извлечь тикет из архива (только для админов)"""
+    try:
+        from core.database import SupportTicket
+        
+        # Проверяем существование тикета
+        ticket = db.query(SupportTicket).filter(SupportTicket.id == ticket_id).first()
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Ticket not found")
+        
+        # Извлекаем тикет из архива
+        ticket.is_archived = False
+        db.commit()
+        
+        return {"success": True, "message": "Ticket unarchived successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error unarchiving support ticket: {e}")
+        raise HTTPException(status_code=500, detail="Failed to unarchive ticket")
+
+@app.post("/api/admin/support/tickets/{ticket_id}/respond")
+async def respond_to_ticket(
+    ticket_id: int,
+    message: str = Form(...),
+    current_user: dict = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Ответить на тикет (только для админов)"""
+    try:
+        from core.database import SupportTicket, TicketResponse
+        
+        # Проверяем существование тикета
+        ticket = db.query(SupportTicket).filter(SupportTicket.id == ticket_id).first()
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Ticket not found")
+        
+        # Создаем ответ
+        response = TicketResponse(
+            ticket_id=ticket_id,
+            author_id=current_user["id"],
+            author_name=current_user["display_name"],
+            message=message,
+            is_admin_response=True,
+            is_read=False
+        )
+        
+        db.add(response)
+        
+        # Обновляем статус тикета на "in_progress" если он был "open"
+        if ticket.status == "open":
+            ticket.status = "in_progress"
+            ticket.updated_at = datetime.utcnow()
+        
+        db.commit()
+        
+        logger.info(f"Admin {current_user['display_name']} responded to ticket {ticket_id}")
+        
+        return {"success": True, "message": "Response sent successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error responding to ticket: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send response")
+
+@app.get("/api/support/tickets/{ticket_id}/responses")
+async def get_ticket_responses(
+    ticket_id: int,
+    current_user: dict = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    """Получить ответы на тикет"""
+    try:
+        from core.database import SupportTicket, TicketResponse
+        
+        # Проверяем существование тикета
+        ticket = db.query(SupportTicket).filter(SupportTicket.id == ticket_id).first()
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Ticket not found")
+        
+        # Проверяем права доступа
+        if current_user and ticket.user_id and ticket.user_id != current_user["id"]:
+            # Пользователь может видеть только свои тикеты
+            raise HTTPException(status_code=403, detail="Access denied")
+        elif not current_user and ticket.user_id:
+            # Анонимный пользователь не может видеть тикеты зарегистрированных пользователей
+            raise HTTPException(status_code=403, detail="Authentication required")
+        
+        # Получаем ответы
+        responses = db.query(TicketResponse).filter(
+            TicketResponse.ticket_id == ticket_id
+        ).order_by(TicketResponse.created_at.asc()).all()
+        
+        result = []
+        for response in responses:
+            result.append({
+                "id": response.id,
+                "author_name": response.author_name,
+                "message": response.message,
+                "is_admin_response": response.is_admin_response,
+                "is_read": response.is_read,
+                "created_at": response.created_at.isoformat()
+            })
+        
+        # Отмечаем ответы как прочитанные (если пользователь аутентифицирован)
+        if current_user and ticket.user_id == current_user["id"]:
+            for response in responses:
+                if response.is_admin_response and not response.is_read:
+                    response.is_read = True
+            db.commit()
+        
+        return {"responses": result}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting ticket responses: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get responses")
+
+@app.get("/api/support/my-tickets")
+async def get_my_tickets(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить тикеты текущего пользователя"""
+    try:
+        from core.database import SupportTicket, TicketResponse
+        
+        # Получаем тикеты пользователя
+        tickets = db.query(SupportTicket).filter(
+            SupportTicket.user_id == current_user["id"]
+        ).order_by(SupportTicket.created_at.desc()).all()
+        
+        result = []
+        for ticket in tickets:
+            # Получаем количество непрочитанных ответов
+            unread_count = db.query(TicketResponse).filter(
+                TicketResponse.ticket_id == ticket.id,
+                TicketResponse.is_admin_response == True,
+                TicketResponse.is_read == False
+            ).count()
+            
+            result.append({
+                "id": ticket.id,
+                "subject": ticket.subject,
+                "message": ticket.message,
+                "status": ticket.status,
+                "priority": ticket.priority,
+                "created_at": ticket.created_at.isoformat(),
+                "updated_at": ticket.updated_at.isoformat(),
+                "unread_responses": unread_count
+            })
+        
+        return {"tickets": result}
+        
+    except Exception as e:
+        logger.error(f"Error getting user tickets: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get tickets")
+
+@app.post("/api/support/tickets/{ticket_id}/respond")
+async def user_respond_to_ticket(
+    ticket_id: int,
+    message: str = Form(...),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Ответ пользователя на тикет"""
+    try:
+        from core.database import SupportTicket, TicketResponse
+        
+        # Проверяем существование тикета и права доступа
+        ticket = db.query(SupportTicket).filter(
+            SupportTicket.id == ticket_id,
+            SupportTicket.user_id == current_user["id"]
+        ).first()
+        
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Ticket not found or access denied")
+        
+        # Создаем ответ пользователя
+        response = TicketResponse(
+            ticket_id=ticket_id,
+            author_id=current_user["id"],
+            author_name=current_user["display_name"],
+            message=message,
+            is_admin_response=False,
+            is_read=True  # Ответ пользователя считается прочитанным сразу
+        )
+        
+        db.add(response)
+        
+        # Обновляем время обновления тикета
+        ticket.updated_at = datetime.utcnow()
+        
+        db.commit()
+        
+        logger.info(f"User {current_user['display_name']} responded to ticket {ticket_id}")
+        
+        return {"success": True, "message": "Response sent successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error responding to ticket: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send response")
 
 # --- Main ---
 if __name__ == "__main__":

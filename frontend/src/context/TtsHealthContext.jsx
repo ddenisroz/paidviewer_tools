@@ -22,30 +22,12 @@ export const TtsHealthProvider = ({ children }) => {
     // Проверяем, является ли пользователь гостем
     const isGuest = user?.is_guest || user?.id === -1;
     
-    // Загружаем сохраненный статус из localStorage при инициализации
-    const [isHealthy, setIsHealthy] = useState(() => {
-        const saved = localStorage.getItem('tts_health_status');
-        return saved ? JSON.parse(saved).isHealthy : false;
-    });
+    // Всегда начинаем с false, проверяем статус при загрузке
+    const [isHealthy, setIsHealthy] = useState(false);
     const [isChecking, setIsChecking] = useState(false);
-    const [lastCheck, setLastCheck] = useState(() => {
-        const saved = localStorage.getItem('tts_health_status');
-        if (saved) {
-            const data = JSON.parse(saved);
-            return data.lastCheck ? new Date(data.lastCheck) : null;
-        }
-        return null;
-    });
+    const [lastCheck, setLastCheck] = useState(null);
 
-    // Функция для сохранения статуса в localStorage
-    const saveHealthStatus = useCallback((status) => {
-        const dataToSave = {
-            isHealthy: status.isHealthy,
-            lastCheck: status.lastCheck,
-            timestamp: Date.now()
-        };
-        localStorage.setItem('tts_health_status', JSON.stringify(dataToSave));
-    }, []);
+    // Убрали кэширование в localStorage
 
     const checkHealth = useCallback(async () => {
         // Не проверяем TTS для гостевых пользователей
@@ -59,13 +41,7 @@ export const TtsHealthProvider = ({ children }) => {
         if (checkInProgressRef.current) {
             return;
         }
-        
-        // Проверяем, не слишком ли часто мы проверяем (минимум 30 секунд между проверками)
         const now = Date.now();
-        if (now - lastCheckTimeRef.current < 30000) {
-            return;
-        }
-        
         checkInProgressRef.current = true;
         lastCheckTimeRef.current = now;
         setIsChecking(true);
@@ -74,6 +50,7 @@ export const TtsHealthProvider = ({ children }) => {
             const response = await ttsService.get('/health');
             const data = response.data;
             const isOk = response.status === 200 && data.tts_engine_loaded;
+            
             setIsHealthy(isOk);
             
             // Сохраняем успешный результат
@@ -81,14 +58,10 @@ export const TtsHealthProvider = ({ children }) => {
                 isHealthy: isOk,
                 lastCheck: new Date()
             };
-            saveHealthStatus(status);
             setLastCheck(new Date());
             
         } catch (error) {
-            // Не логируем ошибки в консоль для ERR_CONNECTION_REFUSED
-            if (!error.message?.includes('ERR_CONNECTION_REFUSED') && error.code !== 'ERR_NETWORK') {
-                console.error('TTS Health Check Failed:', error);
-            }
+            console.error('TTS недоступен:', error.message);
             setIsHealthy(false);
             
             // Сохраняем неуспешный результат
@@ -96,13 +69,12 @@ export const TtsHealthProvider = ({ children }) => {
                 isHealthy: false,
                 lastCheck: new Date()
             };
-            saveHealthStatus(status);
             setLastCheck(new Date());
         } finally {
             setIsChecking(false);
             checkInProgressRef.current = false;
         }
-    }, [isGuest, saveHealthStatus]);
+    }, [isGuest]);
 
     // Проверяем health при загрузке страницы и при смене пути
     useEffect(() => {
@@ -114,27 +86,24 @@ export const TtsHealthProvider = ({ children }) => {
             return;
         }
         
-        // Проверяем актуальность сохраненных данных
-        const saved = localStorage.getItem('tts_health_status');
-        if (saved) {
-            const data = JSON.parse(saved);
-            const now = Date.now();
-            const dataAge = now - data.timestamp;
-            const maxAge = 10 * 60 * 1000; // 10 минут
-            
-            if (dataAge > maxAge) {
-                // Данные устарели, проверяем заново
-                checkHealth();
-            } else {
-                // Используем кэшированные данные
-                setIsHealthy(data.isHealthy);
-                setLastCheck(new Date(data.lastCheck));
-            }
-        } else {
-            // Нет сохраненных данных, проверяем
-            checkHealth();
-        }
+        // Всегда проверяем статус заново
+        checkHealth();
     }, [location.pathname, checkHealth]);
+
+    // Принудительная проверка при фокусе на окне
+    useEffect(() => {
+        const handleFocus = () => {
+            checkHealth();
+        };
+
+        window.addEventListener('focus', handleFocus);
+        return () => window.removeEventListener('focus', handleFocus);
+    }, [checkHealth]);
+
+    // Принудительная проверка при инициализации контекста
+    useEffect(() => {
+        checkHealth();
+    }, []);
 
     const value = {
         isHealthy,
@@ -143,6 +112,7 @@ export const TtsHealthProvider = ({ children }) => {
         checkTtsHealth: checkHealth,
         refreshHealth: checkHealth
     };
+
 
     return (
         <TtsHealthContext.Provider value={value}>

@@ -84,19 +84,39 @@ class YouTubeService:
     async def _get_video_info_fallback(self, video_id: str, video_url: str) -> Dict[str, Any]:
         """Fallback метод получения информации без API"""
         try:
-            # Базовая информация без API
-            return {
-                'video_id': video_id,
-                'title': f"YouTube Video {video_id}",
-                'duration': "Unknown",
-                'thumbnail_url': f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
-                'channel_title': "Unknown Channel",
-                'view_count': 0,
-                'like_count': 0,
-                'description': "",
-                'url': video_url,
-                'is_fallback': True
-            }
+            # Пытаемся получить информацию через pytube
+            try:
+                from pytube import YouTube
+                yt = YouTube(video_url)
+                
+                return {
+                    'video_id': video_id,
+                    'title': yt.title or f"YouTube Video {video_id}",
+                    'duration': yt.length or 0,
+                    'thumbnail_url': yt.thumbnail_url or f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
+                    'channel_title': yt.author or "Unknown Channel",
+                    'view_count': yt.views or 0,
+                    'like_count': 0,
+                    'description': (yt.description or "")[:500],
+                    'url': video_url,
+                    'is_fallback': True
+                }
+            except Exception as pytube_error:
+                logger.warning(f"Pytube fallback failed: {pytube_error}")
+                
+                # Если pytube не работает, используем базовую информацию
+                return {
+                    'video_id': video_id,
+                    'title': f"YouTube Video {video_id}",
+                    'duration': 0,
+                    'thumbnail_url': f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
+                    'channel_title': "Unknown Channel",
+                    'view_count': 0,
+                    'like_count': 0,
+                    'description': "",
+                    'url': video_url,
+                    'is_fallback': True
+                }
             
         except Exception as e:
             logger.error(f"Error in fallback method: {e}")

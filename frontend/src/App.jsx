@@ -4,6 +4,8 @@ import { Toaster } from 'sonner';
 
 import AuthGuard from './components/AuthGuard';
 import Layout from './components/Layout';
+import { PlayerProvider } from './context/PlayerContext';
+import { DonationAlertsProvider } from './context/DonationAlertsContext';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import GuestPage from './pages/GuestPage';
@@ -12,7 +14,7 @@ import SettingsPage from './pages/SettingsPage';
 import TtsMainPage from './pages/tts/TtsMainPage';
 import VoiceManagementPage from './pages/tts/VoiceManagementPage';
 import MediaMainPage from './pages/media/MediaMainPage';
-import ChannelPointsPage from './pages/media/ChannelPointsPage';
+import PointsManagementPage from './pages/PointsManagementPage';
 import YoutubeIntegrationPage from './pages/media/YoutubeIntegrationPage';
 import YoutubeSettingsPage from './pages/media/YoutubeSettingsPage';
 import GamblingPage from './pages/GamblingPage';
@@ -26,9 +28,10 @@ import SessionManagementPage from './pages/admin/SessionManagementPage';
 
 function App() {
     return (
-        <>
-            <Toaster />
-            <Routes>
+        <PlayerProvider>
+            <DonationAlertsProvider>
+                <Toaster />
+                <Routes>
                 {/* Public Routes */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/guest" element={<GuestPage />} />
@@ -46,10 +49,10 @@ function App() {
                         <Route path="dashboard/tts/voices" element={<VoiceManagementPage />} />
                         <Route path="dashboard/settings" element={<SettingsPage />} />
                         <Route path="dashboard/media" element={<MediaMainPage />} />
-                        <Route path="dashboard/media/channel-points" element={<ChannelPointsPage />} />
+                        <Route path="dashboard/points" element={<PointsManagementPage />} />
                         <Route path="dashboard/media/youtube" element={<YoutubeIntegrationPage />} />
                         <Route path="youtube-settings" element={<YoutubeSettingsPage />} />
-                        <Route path="dashboard/media/gambling" element={<GamblingPage />} />
+                        <Route path="dashboard/gambling" element={<GamblingPage />} />
                         <Route path="dashboard/chat-analysis" element={<AnalyticsPage />} />
                         <Route path="dashboard/commands" element={<CommandsPage />} />
                         <Route path="dashboard/dolbaebadmintts" element={<AdminPage />} />
@@ -57,7 +60,8 @@ function App() {
                     </Route>
                 </Route>
             </Routes>
-        </>
+            </DonationAlertsProvider>
+        </PlayerProvider>
     );
 }
 

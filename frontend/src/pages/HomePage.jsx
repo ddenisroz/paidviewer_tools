@@ -5,6 +5,7 @@ import { Mic, Clapperboard, Power, PowerOff, MessageSquare, Loader } from 'lucid
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useTts } from '../context/TtsContext';
 import { useTtsCard } from '../context/TtsCardContext';
+import { useTtsHealth } from '../context/TtsHealthContext';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import FeatureCard from '../components/FeatureCard';
@@ -13,7 +14,6 @@ import StreamTitleCard from '../components/StreamTitleCard';
 import StreamCategoryCard from '../components/StreamCategoryCard';
 import GuestStubs from '../components/GuestStubs';
 import IntegrationsDisabledPlaceholder from '../components/IntegrationsDisabledPlaceholder';
-import GlobalPlayer from '../components/GlobalPlayer';
 
 
 
@@ -23,7 +23,39 @@ const HomePage = () => {
     const { integrations } = useIntegrations();
     const { ttsEnabled, toggleTts: onToggleTts, isToggling } = useTts();
     const { ttsCardStatus } = useTtsCard();
+    const { isHealthy: ttsHealthy, isChecking: ttsChecking } = useTtsHealth();
     const { streamHistory, loading } = useData();
+
+
+    // Определяем, какую кнопку показывать для TTS
+    const getTtsActionButton = () => {
+        if (isToggling) {
+            return {
+                text: 'Обработка...',
+                icon: <Loader className="h-4 w-4 animate-spin" />,
+                variant: "secondary",
+                disabled: true
+            };
+        }
+        
+        if (!ttsHealthy) {
+            // Если TTS недоступен, не показываем кнопку
+            return null;
+        }
+        
+        return {
+            text: ttsEnabled ? 'Выключить озвучку' : 'Включить озвучку',
+            icon: ttsEnabled ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />,
+            variant: ttsEnabled ? "destructive" : "default",
+            disabled: false
+        };
+    };
+
+    // Обработчик клика для TTS кнопки
+    const handleTtsActionClick = () => {
+        // Переключаем состояние TTS
+        onToggleTts();
+    };
 
     const preparedStreamHistory = useMemo(() => {
         if (!streamHistory || !Array.isArray(streamHistory) || streamHistory.length < 1) {
@@ -72,14 +104,9 @@ const HomePage = () => {
                         icon={<Mic />} 
                         path="/dashboard/tts"
                         enabled={true}
-                        ttsStatus={ttsCardStatus}
-                        actionButton={{
-                            text: isToggling ? 'Обработка...' : (ttsEnabled ? 'Выключить озвучку' : 'Включить озвучку'),
-                            icon: isToggling ? <Loader className="h-4 w-4 animate-spin" /> : (ttsEnabled ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />),
-                            variant: ttsEnabled ? "destructive" : "default",
-                            disabled: isToggling
-                        }}
-                        onActionClick={onToggleTts}
+                        ttsStatus={{ isHealthy: ttsHealthy, isChecking: ttsChecking }}
+                        actionButton={getTtsActionButton()}
+                        onActionClick={handleTtsActionClick}
                     />
                     <FeatureCard 
                         title="Медиа интерактивность" 
@@ -128,9 +155,6 @@ const HomePage = () => {
                     </>
                 )}
             </div>
-            
-            {/* Глобальный плеер */}
-            <GlobalPlayer />
         </div>
     );
 };

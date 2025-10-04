@@ -6,6 +6,7 @@ import { Settings, Circle } from 'lucide-react';
 
 const FeatureCard = ({ title, icon, path, enabled = true, actionButton, onActionClick, ttsStatus }) => {
     const navigate = useNavigate();
+    
 
     const handleCardClick = () => {
         if (enabled && path) {
@@ -59,7 +60,7 @@ const FeatureCard = ({ title, icon, path, enabled = true, actionButton, onAction
                 
                 {/* Содержимое карточки (кнопка действия) */}
                 <div className="flex-1 flex flex-col justify-end">
-                    {actionButton && (
+                    {actionButton ? (
                          <Button 
                             onClick={handleActionClick} 
                             disabled={!enabled || actionButton.disabled}
@@ -70,6 +71,10 @@ const FeatureCard = ({ title, icon, path, enabled = true, actionButton, onAction
                             {actionButton.icon && <span className="mr-2">{actionButton.icon}</span>}
                             {actionButton.text}
                         </Button>
+                    ) : (
+                        <div className="text-center text-muted-foreground text-sm py-2">
+                            TTS недоступен
+                        </div>
                     )}
                 </div>
             </div>

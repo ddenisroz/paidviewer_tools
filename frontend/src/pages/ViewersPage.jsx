@@ -106,11 +106,11 @@ const ViewersPage = () => {
     };
 
     return (
-        <div className="space-y-6">
+        <div className="container mx-auto p-6 space-y-6">
             {/* Заголовок */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold">График зрителей</h1>
+                    <h1 className="text-3xl font-bold mb-6 text-foreground">График зрителей</h1>
                     <p className="text-muted-foreground">
                         Мониторинг количества зрителей на Twitch и VK Live
                     </p>

@@ -10,11 +10,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { botService } from '../../services/microservices';
+import { useTtsHealth } from '../../context/TtsHealthContext';
 
 const BotManagementPage = () => {
     const [bots, setBots] = useState([]);
     const [loading, setLoading] = useState(true);
     const [restarting, setRestarting] = useState({});
+    const { isHealthy: ttsIsHealthy, isChecking: ttsIsChecking, lastCheck: ttsLastCheck } = useTtsHealth();
 
     const loadBotsStatus = async () => {
         try {
@@ -88,6 +90,48 @@ const BotManagementPage = () => {
         return new Date(dateString).toLocaleString('ru-RU');
     };
 
+    const getBotServiceStatus = () => {
+        if (!bots || bots.length === 0) return 'stopped';
+        
+        // Если хотя бы один бот работает, считаем сервис работающим
+        const hasRunningBot = bots.some(bot => bot.status === 'running');
+        const hasErrorBot = bots.some(bot => bot.status === 'error');
+        
+        if (hasRunningBot) return 'running';
+        if (hasErrorBot) return 'error';
+        return 'stopped';
+    };
+
+    const getBotServiceStatusBadge = () => {
+        const status = getBotServiceStatus();
+        switch (status) {
+            case 'running':
+                return <Badge variant="outline" className="text-green-600 border-green-600">Работает</Badge>;
+            case 'error':
+                return <Badge variant="outline" className="text-red-600 border-red-600">Ошибка</Badge>;
+            default:
+                return <Badge variant="outline" className="text-gray-600 border-gray-600">Остановлен</Badge>;
+        }
+    };
+
+    const getBotServiceDescription = () => {
+        if (!bots || bots.length === 0) {
+            return 'Загрузка статуса...';
+        }
+        
+        const twitchBot = bots.find(bot => bot.platform === 'twitch');
+        const vkBot = bots.find(bot => bot.platform === 'vk_live');
+        
+        const twitchStatus = twitchBot ? twitchBot.status : 'stopped';
+        const vkStatus = vkBot ? vkBot.status : 'stopped';
+        const twitchChannels = twitchBot ? twitchBot.connected_channels || 0 : 0;
+        const vkChannels = vkBot ? vkBot.connected_channels || 0 : 0;
+        
+        const lastActivity = bots.length > 0 ? new Date(bots[0].last_activity).toLocaleString('ru-RU') : 'Неизвестно';
+        
+        return `Twitch: ${twitchStatus} (${twitchChannels} каналов) • VK: ${vkStatus} (${vkChannels} каналов) • ${lastActivity}`;
+    };
+
 
 
     useEffect(() => {
@@ -109,7 +153,7 @@ const BotManagementPage = () => {
         <div className="container mx-auto p-6 space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold flex items-center">
+                    <h1 className="text-3xl font-bold mb-6 text-foreground flex items-center">
                         <Bot className="w-8 h-8 mr-3 text-purple-500" />
                         Управление ботами
                     </h1>
@@ -135,17 +179,21 @@ const BotManagementPage = () => {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-4">
                                 <div className="flex-shrink-0">
-                                    <CheckCircle className="w-5 h-5 text-green-500" />
+                                    {getBotServiceStatus() === 'running' ? (
+                                        <CheckCircle className="w-5 h-5 text-green-500" />
+                                    ) : getBotServiceStatus() === 'error' ? (
+                                        <Square className="w-5 h-5 text-red-500" />
+                                    ) : (
+                                        <Square className="w-5 h-5 text-gray-500" />
+                                    )}
                                 </div>
                                 <div>
                                     <h3 className="text-lg font-semibold flex items-center space-x-2">
                                         <span>Bot Service</span>
-                                        <Badge variant="outline" className="text-green-600 border-green-600">
-                                            Работает
-                                        </Badge>
+                                        {getBotServiceStatusBadge()}
                                     </h3>
                                     <p className="text-sm text-slate-400">
-                                        Twitch Bot + VK Live Bot • Последняя активность: {new Date().toLocaleString('ru-RU')}
+                                        {getBotServiceDescription()}
                                     </p>
                                 </div>
                             </div>
@@ -156,7 +204,10 @@ const BotManagementPage = () => {
                                     variant="outline"
                                     onClick={restartBotService}
                                     disabled={restarting['bot_service']}
-                                    className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
+                                    className={getBotServiceStatus() === 'running' 
+                                        ? "border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
+                                        : "border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+                                    }
                                 >
                                     {restarting['bot_service'] ? (
                                         <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
@@ -181,31 +232,46 @@ const BotManagementPage = () => {
                                 <div>
                                     <h3 className="text-lg font-semibold flex items-center space-x-2">
                                         <span>TTS Engine</span>
-                                        <Badge variant="outline" className="text-blue-600 border-blue-600">
-                                            Готов
+                                        <Badge 
+                                            variant="outline" 
+                                            className={
+                                                ttsIsHealthy 
+                                                    ? "text-green-600 border-green-600" 
+                                                    : "text-red-600 border-red-600"
+                                            }
+                                        >
+                                            {ttsIsHealthy ? 'Готов' : 'Недоступен'}
                                         </Badge>
                                     </h3>
                                     <p className="text-sm text-slate-400">
-                                        Движок синтеза речи • Последняя активность: {new Date().toLocaleString('ru-RU')}
+                                        Движок синтеза речи • {ttsIsHealthy ? 'Последняя активность' : 'Статус'}: {ttsIsHealthy ? (ttsLastCheck ? ttsLastCheck.toLocaleString('ru-RU') : 'Проверяется...') : 'Недоступен'}
                                     </p>
                                 </div>
                             </div>
                             
                             <div className="flex items-center space-x-2">
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={restartTtsEngine}
-                                    disabled={restarting['tts_engine']}
-                                    className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
-                                >
-                                    {restarting['tts_engine'] ? (
-                                        <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
-                                    ) : (
-                                        <RefreshCw className="w-4 h-4 mr-1" />
-                                    )}
-                                    Перезапустить
-                                </Button>
+                                {!ttsIsHealthy && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={restartTtsEngine}
+                                        disabled={restarting['tts_engine']}
+                                        className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+                                    >
+                                        {restarting['tts_engine'] ? (
+                                            <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                                        ) : (
+                                            <RefreshCw className="w-4 h-4 mr-1" />
+                                        )}
+                                        Перезапустить
+                                    </Button>
+                                )}
+                                {ttsIsHealthy && (
+                                    <div className="flex items-center space-x-2 text-green-600">
+                                        <CheckCircle className="w-4 h-4" />
+                                        <span className="text-sm">Работает</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </CardContent>

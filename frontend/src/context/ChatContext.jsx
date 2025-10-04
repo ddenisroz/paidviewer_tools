@@ -27,6 +27,57 @@ export const ChatProvider = ({ children }) => {
     const [error, setError] = useState(null);
     
     const websocket = useRef(null);
+    
+    // Функция для воспроизведения TTS аудио
+    const playTtsAudio = (audioUrl) => {
+        try {
+            // Проверяем, является ли URL уже полным
+            let fullAudioUrl = audioUrl;
+            if (!audioUrl.startsWith('http')) {
+                const ttsServiceUrl = import.meta.env.VITE_TTS_SERVICE_URL || 'http://localhost:8001';
+                fullAudioUrl = `${ttsServiceUrl}${audioUrl}`;
+            }
+            
+            console.log('Playing TTS audio:', fullAudioUrl);
+            const audio = new Audio(fullAudioUrl);
+            
+            // Добавляем обработчики событий
+            audio.oncanplaythrough = () => {
+                console.log('TTS audio ready to play');
+                audio.play().catch(e => {
+                    console.error("TTS audio play failed:", e);
+                    addToast({
+                        type: 'error',
+                        title: 'Ошибка воспроизведения',
+                        message: 'Не удалось воспроизвести TTS аудио'
+                    });
+                });
+            };
+            
+            audio.onended = () => {
+                console.log('TTS audio playback ended');
+            };
+            
+            audio.onerror = (e) => {
+                console.error("Error loading TTS audio:", fullAudioUrl, e);
+                addToast({
+                    type: 'error',
+                    title: 'Ошибка загрузки',
+                    message: 'Не удалось загрузить TTS аудио файл'
+                });
+            };
+            
+            // Загружаем аудио
+            audio.load();
+        } catch (error) {
+            console.error("Error creating TTS audio:", error);
+            addToast({
+                type: 'error',
+                title: 'Ошибка',
+                message: 'Не удалось создать аудио объект для TTS'
+            });
+        }
+    };
 
     // Функция для проверки статуса подключения бота
     const checkConnectionStatus = useCallback(async () => {
@@ -51,14 +102,12 @@ export const ChatProvider = ({ children }) => {
         const baseWsUrl = import.meta.env.VITE_BOT_WS_URL || 'ws://localhost:8000/ws';
         const wsUrl = `${baseWsUrl}/chat/${user.id}`;
         
-        console.log(`Attempting to connect WebSocket to ${wsUrl}`);
         setIsConnecting(true);
         
         const ws = new WebSocket(wsUrl);
         websocket.current = ws;
 
         ws.onopen = () => {
-            console.log("WebSocket connection established");
             setIsConnected(true);
             setIsConnecting(false);
             setError(null);
@@ -90,6 +139,13 @@ export const ChatProvider = ({ children }) => {
                 return;
             }
             
+            // Обрабатываем TTS аудио
+            if (messageData.type === 'tts_synthesized' && messageData.audio_url) {
+                console.log('TTS Audio received:', messageData.audio_url);
+                playTtsAudio(messageData.audio_url);
+                return;
+            }
+            
             // Обрабатываем TTS ошибки
             if (messageData.type === 'tts_error') {
                 console.error('TTS Error:', messageData.message);
@@ -111,9 +167,10 @@ export const ChatProvider = ({ children }) => {
         };
 
         ws.onerror = (err) => {
-            console.error("WebSocket error:", err);
+            console.log("WebSocket connection error (это нормально, если сервер недоступен):", err.type || 'connection_failed');
             setIsConnecting(false);
-            setError("Ошибка WebSocket соединения. Попробуйте обновить страницу.");
+            // Убираем error toast, чтобы не раздражать пользователя постоянными уведомлениями
+            // setError("Ошибка WebSocket соединения. Попробуйте обновить страницу.");
         };
 
         ws.onclose = (event) => {
@@ -195,17 +252,12 @@ export const ChatProvider = ({ children }) => {
     useEffect(() => {
         // Не делаем ничего, пока идет проверка авторизации
         if (isLoading) {
-            console.log('ChatContext: Waiting for auth check to complete...');
             return;
         }
 
-        console.log(`ChatContext: useEffect triggered - isLoading: ${isLoading}, isAuthenticated: ${isAuthenticated}, user.id: ${user?.id}`);
-        
         if (isAuthenticated && user?.id && user?.id !== 'guest') {
-            console.log("ChatContext: Setting up WebSocket for authenticated user");
             setupWebSocket();
         } else {
-            console.log("ChatContext: Closing WebSocket - not authenticated, no user, or guest mode");
             closeWebSocket();
             setIsConnected(false);
             setMessages([]);

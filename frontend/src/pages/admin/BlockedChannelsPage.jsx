@@ -84,7 +84,7 @@ const BlockedChannelsPage = () => {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center">
+          <h1 className="text-3xl font-bold mb-6 text-foreground flex items-center">
             <Shield className="w-8 h-8 mr-3 text-red-500" />
             Заблокированные каналы
           </h1>

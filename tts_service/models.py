@@ -32,7 +32,7 @@ class VoiceSchema(BaseModel):
 class VoiceSettingsSchema(BaseModel):
     """Схема для обновления настроек голоса"""
     cfg_strength: Optional[float] = Field(None, ge=0.1, le=10.0)
-    speed_preset: Optional[str] = Field(None, pattern='^(slow|normal|fast)$')
+    speed_preset: Optional[str] = Field(None, pattern='^(very_slow|slow|normal|fast|very_fast)$')
     cross_fade_duration: Optional[float] = Field(None, ge=0.0, le=1.0)
     silence_duration: Optional[float] = Field(None, ge=0.0, le=2.0)
     temperature: Optional[float] = Field(None, ge=0.1, le=2.0)
@@ -53,11 +53,14 @@ class SynthesisRequest(BaseModel):
     voice_name: str
     user_id: Optional[int] = None
     volume_level: Optional[float] = Field(50.0, ge=0.0, le=100.0, description="Volume level (0-100%)")
+    cfg_strength: Optional[float] = None
+    speed_preset: Optional[str] = None
 
 class SynthesisResponse(BaseModel):
     success: bool
     message: str
     audio_file: Optional[str] = None
+    audio_url: Optional[str] = None
     duration: Optional[float] = None
 
 class VoiceUploadResponse(BaseModel):

@@ -1,7 +1,7 @@
 # core/database.py
 import os
 import logging
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey, JSON, Float, text
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey, JSON, Text, Float, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime
@@ -45,6 +45,12 @@ try:
         blocked_reason = Column(String, nullable=True)  # Причина блокировки
         blocked_at = Column(DateTime, nullable=True)  # Дата блокировки
         created_at = Column(DateTime, default=datetime.utcnow)
+        
+        # DonationAlerts интеграция
+        donationalerts_access_token = Column(String, nullable=True)
+        donationalerts_refresh_token = Column(String, nullable=True)
+        donationalerts_token_expires = Column(DateTime, nullable=True)
+        temp_oauth_state = Column(String, nullable=True)  # Временное хранение OAuth state
         
     class WhitelistedChannel(Base):
         """Модель для белого списка каналов"""
@@ -400,6 +406,37 @@ try:
         game_data = Column(JSON, nullable=True)  # Данные игры (числа, карты, etc.)
         created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
+    class SupportTicket(Base):
+        """Модель тикетов поддержки"""
+        __tablename__ = "support_tickets"
+        __table_args__ = {'extend_existing': True}
+        id = Column(Integer, primary_key=True, index=True)
+        user_id = Column(Integer, ForeignKey('users.id'), nullable=True)  # Может быть null для анонимных тикетов
+        user_name = Column(String, nullable=True)  # Имя пользователя (если не аутентифицирован)
+        user_email = Column(String, nullable=True)  # Email пользователя (опционально)
+        subject = Column(String, nullable=False)  # Тема тикета
+        message = Column(Text, nullable=False)  # Сообщение (до 500 символов)
+        status = Column(String, default="open")  # open, in_progress, closed
+        priority = Column(String, default="medium")  # low, medium, high, urgent
+        admin_notes = Column(Text, nullable=True)  # Заметки администратора
+        is_archived = Column(Boolean, default=False)  # Флаг архивирования
+        created_at = Column(DateTime, default=datetime.utcnow, index=True)
+        updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+        closed_at = Column(DateTime, nullable=True)
+
+    class TicketResponse(Base):
+        """Модель ответов на тикеты"""
+        __tablename__ = "ticket_responses"
+        __table_args__ = {'extend_existing': True}
+        id = Column(Integer, primary_key=True, index=True)
+        ticket_id = Column(Integer, ForeignKey('support_tickets.id'), nullable=False)
+        author_id = Column(Integer, ForeignKey('users.id'), nullable=True)  # ID администратора (null для системных сообщений)
+        author_name = Column(String, nullable=False)  # Имя автора ответа
+        message = Column(Text, nullable=False)  # Текст ответа
+        is_admin_response = Column(Boolean, default=True)  # True для ответов админов, False для пользователей
+        is_read = Column(Boolean, default=False)  # Прочитан ли ответ пользователем
+        created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
 except Exception as e:
     logger.error(f"❌ Не удалось сконфигурировать базу данных: {e}")
     # Устанавливаем заглушки, чтобы приложение не падало
@@ -411,6 +448,133 @@ except Exception as e:
         raise RuntimeError("База данных не сконфигурирована")
     def init_db():
         raise RuntimeError("База данных не сконфигурирована")
+
+# === СИСТЕМА ЛУТБОКСОВ И ГЕЙМИФИКАЦИИ ===
+
+class ChatMessage(Base):
+    """Сообщения из чата для отслеживания активности"""
+    __tablename__ = "chat_messages"
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    channel_name = Column(String, nullable=False, index=True)
+    platform = Column(String, nullable=False)  # twitch, vk_live
+    message = Column(Text, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    is_deleted = Column(Boolean, default=False)
+
+class UserProgression(Base):
+    """Прогрессия пользователей в системе достижений"""
+    __tablename__ = "user_progression"
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    channel_name = Column(String, nullable=False, index=True)
+    platform = Column(String, nullable=False)  # twitch, vk_live
+    
+    # Статистика активности
+    total_days_active = Column(Integer, default=0)
+    current_streak = Column(Integer, default=0)  # Текущая серия дней
+    longest_streak = Column(Integer, default=0)  # Самая длинная серия
+    last_activity_date = Column(DateTime)
+    total_messages = Column(Integer, default=0)
+    
+    # Донаты
+    total_donated = Column(Float, default=0.0)
+    total_donations_count = Column(Integer, default=0)
+    
+    # Лутбоксы
+    free_lootboxes_opened = Column(Integer, default=0)
+    paid_lootboxes_opened = Column(Integer, default=0)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class Achievement(Base):
+    """Достижения, которые можно получить"""
+    __tablename__ = "achievements"
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    channel_name = Column(String, nullable=False, index=True)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    type = Column(String, nullable=False)  # daily_streak, total_days, total_donated, etc.
+    requirement_value = Column(Integer, nullable=False)  # Значение для получения
+    reward_type = Column(String, nullable=False)  # free_lootbox, paid_lootbox, special
+    reward_value = Column(Integer, default=1)  # Количество наград
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class UserAchievement(Base):
+    """Полученные пользователями достижения"""
+    __tablename__ = "user_achievements"
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    achievement_id = Column(Integer, ForeignKey("achievements.id"), nullable=False, index=True)
+    channel_name = Column(String, nullable=False, index=True)
+    earned_at = Column(DateTime, default=datetime.utcnow)
+    is_claimed = Column(Boolean, default=False)  # Забрана ли награда
+
+class Lootbox(Base):
+    """Лутбоксы"""
+    __tablename__ = "lootboxes"
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    channel_name = Column(String, nullable=False, index=True)
+    name = Column(String, nullable=False)
+    description = Column(Text)
+    type = Column(String, nullable=False)  # free, paid
+    price = Column(Float, default=0.0)  # Цена для paid лутбоксов
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class LootboxReward(Base):
+    """Награды в лутбоксах"""
+    __tablename__ = "lootbox_rewards"
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    lootbox_id = Column(Integer, ForeignKey("lootboxes.id"), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    description = Column(Text)
+    type = Column(String, nullable=False)  # currency, item, special, etc.
+    value = Column(String, nullable=False)  # JSON с данными награды
+    weight = Column(Integer, default=1)  # Вес для вероятности выпадения
+    is_active = Column(Boolean, default=True)
+
+class LootboxOpening(Base):
+    """Открытия лутбоксов"""
+    __tablename__ = "lootbox_openings"
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    lootbox_id = Column(Integer, ForeignKey("lootboxes.id"), nullable=False, index=True)
+    channel_name = Column(String, nullable=False, index=True)
+    reward_id = Column(Integer, ForeignKey("lootbox_rewards.id"), nullable=False)
+    opened_at = Column(DateTime, default=datetime.utcnow)
+    is_obs_animated = Column(Boolean, default=False)  # Была ли показана анимация в OBS
+
+class DonationAlert(Base):
+    """Донаты через DonationAlerts"""
+    __tablename__ = "donation_alerts"
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    channel_name = Column(String, nullable=False, index=True)
+    amount = Column(Float, nullable=False)
+    currency = Column(String, default="RUB")
+    message = Column(Text)
+    alert_id = Column(String, unique=True, index=True)  # ID из DonationAlerts
+    processed_at = Column(DateTime, default=datetime.utcnow)
+    is_processed = Column(Boolean, default=False)
 
 # Функция для получения сессии БД
 def get_db():

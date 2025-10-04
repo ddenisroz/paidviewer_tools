@@ -192,11 +192,11 @@ const StreamCategoryPage = () => {
     };
 
     return (
-        <div className="space-y-6">
+        <div className="container mx-auto p-6 space-y-6">
             {/* Заголовок */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold">Смена категории стрима</h1>
+                    <h1 className="text-3xl font-bold mb-6 text-foreground">Смена категории стрима</h1>
                     <p className="text-muted-foreground">
                         Управление категорией стрима на Twitch и VK Live
                     </p>

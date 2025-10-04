@@ -3,12 +3,24 @@ import sys
 import os
 from pathlib import Path
 import logging
+
+# Настройка для работы с Hugging Face Hub
+# Отключаем прокси, если они мешают
+os.environ.pop('HTTP_PROXY', None)
+os.environ.pop('HTTPS_PROXY', None)
+os.environ.pop('http_proxy', None)
+os.environ.pop('https_proxy', None)
+
+# Настраиваем кеш для Hugging Face
+cache_dir = Path("f5_tts_cache").absolute()
+os.environ['HF_HOME'] = str(cache_dir)
+os.environ['HUGGINGFACE_HUB_CACHE'] = str(cache_dir)
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import uvicorn
 
 # --- Logging Configuration ---
@@ -17,7 +29,8 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
-from logging_config import setup_logging, log_system_info, log_service_start, log_service_stop, log_error, log_api_call, log_tts_event
+# logging_config удален - используем стандартный logging
+import logging
 
 from tts_service.database import get_db, init_db, Voice as VoiceModel
 from tts_service.models import *
@@ -26,16 +39,31 @@ from tts_service.file_manager import file_manager
 from tts_service.api_endpoints import tts_api
 from tts_service.background_tasks import background_task_manager
 
-# --- Logging Configuration ---
-logger = setup_logging("tts_service", "INFO")
-logger.info("=== TTS SERVICE STARTED ===")
+# --- Logging and Monitoring Setup ---
+log_level = os.getenv("TTS_LOG_LEVEL", "INFO")
+logger = logging.getLogger(__name__)
+
+# --- Monitoring API ---
+from monitoring import tts_monitor
+
+# Запускаем мониторинг
+tts_monitor.start_monitoring(interval=60)  # Каждую минуту
+logger.info("System monitoring started for tts_service")
+
+# --- Backup System ---
+from backup_manager import tts_backup_manager
+from logging_config import tts_logging_config
+
+# Запускаем систему бэкапов
+tts_backup_manager.schedule_backups()
+tts_backup_manager.start_scheduler()
+logger.info("=== TTS SERVICE STARTED WITH ENHANCED LOGGING ===")
 
 # --- Lifespan Events ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    log_system_info(logger)
-    log_service_start(logger, "tts_service", 8001)
+    logger.info("TTS service starting on port 8001")
     
     # Инициализация базы данных
     init_db()
@@ -49,7 +77,7 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
-    log_service_stop(logger, "tts_service")
+    logger.info("TTS service stopping")
     
     # Остановка фоновых задач
     await background_task_manager.stop()
@@ -135,6 +163,20 @@ def get_global_voices(db: Session = Depends(get_db)):
 def get_admin_voices(db: Session = Depends(get_db)):
     """Получить все голоса для админки"""
     return tts_api.get_all_voices(db)
+
+@app.post("/api/admin/voices/upload", response_model=VoiceUploadResponse)
+async def upload_admin_voice(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    voice_name: str = Form(...),
+    voice_type: str = Form("global"),
+    is_public: bool = Form(True),
+    db: Session = Depends(get_db)
+):
+    """Загрузить голос через админку"""
+    return await tts_api.upload_voice(
+        background_tasks, file, voice_name, voice_type, is_public, None, db
+    )
 
 @app.delete("/api/admin/voices/{voice_id}")
 def delete_admin_voice(voice_id: int, db: Session = Depends(get_db)):
@@ -285,10 +327,37 @@ def rename_voice(voice_id: int, new_name: str = Form(...), db: Session = Depends
         raise HTTPException(status_code=400, detail="Voice with this name already exists")
     
     old_name = voice.name
-    voice.name = new_name
-    db.commit()
+    old_file_path = voice.file_path
     
-    return {"message": f"Voice renamed from {old_name} to {new_name}"}
+    try:
+        # Переименовываем физический файл
+        import os
+        from pathlib import Path
+        
+        old_path = Path(old_file_path)
+        if old_path.exists():
+            # Определяем новое имя файла с сохранением расширения
+            file_extension = old_path.suffix
+            new_file_name = f"{new_name}{file_extension}"
+            new_path = old_path.parent / new_file_name
+            
+            # Переименовываем файл
+            old_path.rename(new_path)
+            
+            # Обновляем путь в базе данных
+            voice.file_path = str(new_path)
+            logger.info(f"Renamed voice file from {old_path} to {new_path}")
+        else:
+            logger.warning(f"Voice file not found: {old_path}")
+        
+        # Обновляем имя в базе данных
+        voice.name = new_name
+        db.commit()
+        
+        return {"message": f"Voice renamed from {old_name} to {new_name}"}
+    except Exception as e:
+        logger.error(f"Error renaming voice file: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to rename voice file: {str(e)}")
 
 @app.put("/api/user/voices/{voice_id}/rename")
 def rename_user_voice(voice_id: int, user_id: int, new_name: str = Form(...), db: Session = Depends(get_db)):
@@ -306,10 +375,37 @@ def rename_user_voice(voice_id: int, user_id: int, new_name: str = Form(...), db
         raise HTTPException(status_code=400, detail="Voice with this name already exists")
     
     old_name = voice.name
-    voice.name = new_name
-    db.commit()
+    old_file_path = voice.file_path
     
-    return {"message": f"Voice renamed from {old_name} to {new_name}"}
+    try:
+        # Переименовываем физический файл
+        import os
+        from pathlib import Path
+        
+        old_path = Path(old_file_path)
+        if old_path.exists():
+            # Определяем новое имя файла с сохранением расширения
+            file_extension = old_path.suffix
+            new_file_name = f"{new_name}{file_extension}"
+            new_path = old_path.parent / new_file_name
+            
+            # Переименовываем файл
+            old_path.rename(new_path)
+            
+            # Обновляем путь в базе данных
+            voice.file_path = str(new_path)
+            logger.info(f"Renamed user voice file from {old_path} to {new_path}")
+        else:
+            logger.warning(f"User voice file not found: {old_path}")
+        
+        # Обновляем имя в базе данных
+        voice.name = new_name
+        db.commit()
+        
+        return {"message": f"User voice renamed from {old_name} to {new_name}"}
+    except Exception as e:
+        logger.error(f"Error renaming user voice file: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to rename user voice file: {str(e)}")
 
 # --- TTS Synthesis ---
 @app.post("/api/tts/synthesize", response_model=SynthesisResponse)
@@ -392,6 +488,133 @@ async def test_voice(
     )
     
     return await tts_api.synthesize_speech(background_tasks, request, db)
+
+@app.post("/api/voices/test", response_model=SynthesisResponse)
+async def test_voice_by_name(
+    background_tasks: BackgroundTasks,
+    voice_name: str = Form(...),
+    test_text: str = Form(...),
+    user_id: Optional[int] = Form(None),
+    cfg_strength: Optional[float] = Form(None),
+    speed_preset: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    """Тестирование голоса по имени (для совместимости с frontend)"""
+    # ДИАГНОСТИКА
+    logger.info(f"=" * 80)
+    logger.info(f"🎬 TTS TEST ENDPOINT CALLED")
+    logger.info(f"  voice_name: {voice_name}")
+    logger.info(f"  user_id: {user_id} (type: {type(user_id)})")
+    logger.info(f"  cfg_strength: {cfg_strength} (type: {type(cfg_strength)})")
+    logger.info(f"  speed_preset: {speed_preset} (type: {type(speed_preset)})")
+    logger.info(f"=" * 80)
+    voice = db.query(VoiceModel).filter(VoiceModel.name == voice_name).first()
+    if not voice:
+        raise HTTPException(status_code=404, detail="Voice not found")
+    
+    # Проверяем права доступа
+    if voice.owner_id and voice.owner_id != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    request = SynthesisRequest(
+        text=test_text,
+        voice_name=voice.name,
+        user_id=user_id,
+        cfg_strength=cfg_strength,
+        speed_preset=speed_preset
+    )
+    
+    return await tts_api.synthesize_speech(background_tasks, request, db)
+
+@app.post("/api/voices/{voice_id}/transcribe")
+async def transcribe_voice(
+    voice_id: int,
+    db: Session = Depends(get_db)
+):
+    """Транскрипция голоса по ID"""
+    voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
+    if not voice:
+        raise HTTPException(status_code=404, detail="Voice not found")
+    
+    try:
+        # Выполняем транскрипцию
+        transcription = await tts_engine_manager.transcribe(voice.file_path)
+        
+        # Обновляем запись в базе данных
+        voice.transcription = transcription
+        db.commit()
+        
+        return {"success": True, "transcription": transcription}
+    except Exception as e:
+        logger.error(f"Error transcribing voice {voice_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/voices/{voice_id}/retranscribe")
+async def retranscribe_voice(
+    voice_id: int,
+    reference_text: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Перетранскрибация голоса по ID с новым референсным текстом"""
+    voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
+    if not voice:
+        raise HTTPException(status_code=404, detail="Voice not found")
+    
+    try:
+        # Обновляем референсный текст
+        voice.reference_text = reference_text
+        db.commit()
+        
+        return {"success": True, "reference_text": reference_text}
+    except Exception as e:
+        logger.error(f"Error retranscribing voice {voice_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/user/voices/{voice_id}/retranscribe")
+async def retranscribe_user_voice(
+    voice_id: int,
+    user_id: int,
+    reference_text: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Перетранскрибация пользовательского голоса с новым референсным текстом"""
+    voice = db.query(VoiceModel).filter(
+        VoiceModel.id == voice_id,
+        VoiceModel.owner_id == user_id
+    ).first()
+    if not voice:
+        raise HTTPException(status_code=404, detail="Voice not found or access denied")
+    
+    try:
+        # Обновляем референсный текст
+        voice.reference_text = reference_text
+        db.commit()
+        
+        return {"success": True, "reference_text": reference_text}
+    except Exception as e:
+        logger.error(f"Error retranscribing user voice {voice_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/voices/{voice_id}/reference-text")
+async def update_reference_text(
+    voice_id: int,
+    text: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Обновление референсного текста голоса"""
+    voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
+    if not voice:
+        raise HTTPException(status_code=404, detail="Voice not found")
+    
+    try:
+        # Обновляем референсный текст
+        voice.reference_text = text
+        db.commit()
+        
+        return {"success": True, "message": "Reference text updated"}
+    except Exception as e:
+        logger.error(f"Error updating reference text for voice {voice_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- File Operations ---
 @app.get("/api/voices/{voice_name}/audio")
@@ -518,6 +741,132 @@ async def restart_tts_engine():
     """Перезагрузить TTS движок"""
     return await tts_api.restart_engine()
 
+@app.get("/api/audio/{filename}")
+async def get_temp_audio(filename: str):
+    """Получить временный аудио файл"""
+    from tts_service.config import config
+    temp_file = config.temp_audio_path / filename
+    
+    if not temp_file.exists():
+        raise HTTPException(status_code=404, detail="Audio file not found")
+    
+    return FileResponse(
+        path=str(temp_file),
+        media_type="audio/wav",
+        filename=filename
+    )
+
 # --- Main ---
+# --- Backup Management API ---
+@app.get("/api/admin/backups/info")
+async def get_backup_info():
+    """Получить информацию о бэкапах TTS"""
+    try:
+        backup_info = tts_backup_manager.get_backup_info()
+        return {
+            "success": True,
+            "backups": backup_info,
+            "service": "tts_service"
+        }
+    except Exception as e:
+        logger.error(f"Error getting TTS backup info: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка получения информации о бэкапах TTS")
+
+@app.post("/api/admin/backups/create")
+async def create_manual_backup(backup_type: str):
+    """Создать ручной бэкап TTS"""
+    try:
+        if backup_type == "database":
+            db_path = "tts_service.db"
+            backup_path = tts_backup_manager.create_database_backup(db_path)
+        elif backup_type == "config":
+            config_files = ["config.py", "requirements.txt"]
+            backup_path = tts_backup_manager.create_config_backup(config_files)
+        elif backup_type == "logs":
+            backup_path = tts_backup_manager.create_logs_backup("logs")
+        elif backup_type == "audio":
+            backup_path = tts_backup_manager.create_audio_backup("audio/voices")
+        elif backup_type == "models":
+            backup_path = tts_backup_manager.create_models_backup("f5_tts_cache")
+        elif backup_type == "full":
+            # Полный бэкап TTS
+            db_path = "tts_service.db"
+            tts_backup_manager.create_database_backup(db_path)
+            config_files = ["config.py", "requirements.txt"]
+            tts_backup_manager.create_config_backup(config_files)
+            tts_backup_manager.create_logs_backup("logs")
+            tts_backup_manager.create_audio_backup("audio/voices")
+            tts_backup_manager.create_models_backup("f5_tts_cache")
+            backup_path = "Full TTS backup completed"
+        else:
+            raise HTTPException(status_code=400, detail="Неверный тип бэкапа TTS")
+        
+        if backup_path:
+            return {
+                "success": True,
+                "message": f"Бэкап TTS {backup_type} создан успешно",
+                "backup_path": backup_path
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Ошибка создания бэкапа TTS")
+            
+    except Exception as e:
+        logger.error(f"Error creating manual TTS backup: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка создания бэкапа TTS")
+
+@app.post("/api/admin/backups/cleanup")
+async def cleanup_old_backups():
+    """Очистить старые бэкапы TTS"""
+    try:
+        tts_backup_manager.cleanup_old_backups()
+        return {
+            "success": True,
+            "message": "Очистка старых бэкапов TTS завершена"
+        }
+    except Exception as e:
+        logger.error(f"Error cleaning up TTS backups: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка очистки бэкапов TTS")
+
+# --- System Monitoring API ---
+@app.get("/api/admin/monitoring/current")
+async def get_current_monitoring():
+    """Получить текущую статистику мониторинга TTS"""
+    try:
+        stats = tts_monitor.get_current_stats()
+        return {
+            "success": True,
+            "data": stats
+        }
+    except Exception as e:
+        logger.error(f"Error getting TTS monitoring stats: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка получения статистики мониторинга TTS")
+
+@app.get("/api/admin/monitoring/summary")
+async def get_monitoring_summary():
+    """Получить сводку мониторинга TTS за 24 часа"""
+    try:
+        summary = tts_monitor.get_monitoring_summary()
+        return {
+            "success": True,
+            "data": summary
+        }
+    except Exception as e:
+        logger.error(f"Error getting TTS monitoring summary: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка получения сводки мониторинга TTS")
+
+@app.get("/api/admin/monitoring/status")
+async def get_monitoring_status():
+    """Получить статус мониторинга TTS"""
+    try:
+        return {
+            "success": True,
+            "monitoring_active": tts_monitor.is_monitoring,
+            "data_points": len(tts_monitor.monitoring_data),
+            "service": "tts_service"
+        }
+    except Exception as e:
+        logger.error(f"Error getting TTS monitoring status: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка получения статуса мониторинга TTS")
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8001)

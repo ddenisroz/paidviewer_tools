@@ -65,8 +65,16 @@ class RussianTTS:
         self.accentizer = None
         
         # Загружаем модели
-        self._load_models()
+        try:
+            self._load_models()
+        except Exception as e:
+            logger.error(f"Не удалось инициализировать TTS: {e}")
+            # Устанавливаем None, чтобы is_ready() возвращал False
+            self.tts_model = None
 
+    def is_ready(self):
+        """Проверяет, готов ли TTS движок к работе."""
+        return self.tts_model is not None
 
     def _load_models(self):
         """Загружает F5-TTS модели и RUAccent."""
@@ -85,9 +93,14 @@ class RussianTTS:
             
             # Загружаем единую модель F5-TTS
             self._load_tts_model()
+            
+            # Проверяем, что модель загружена
+            if self.tts_model is None:
+                raise RuntimeError("TTS модель не загружена")
 
         except Exception as e:
             logger.error(f"КРИТИЧЕСКАЯ ОШИБКА: Не удалось загрузить модели. Ошибка: {e}", exc_info=True)
+            raise  # Пробрасываем ошибку дальше
 
 
     def _load_tts_model(self):
@@ -98,20 +111,61 @@ class RussianTTS:
             cache_dir = Path("f5_tts_cache")
             cache_dir.mkdir(exist_ok=True)
 
-            # Скачиваем модель checkpoint
-            ckpt_path = hf_hub_download(
-                repo_id=MODEL_ID,
-                filename=CHECKPOINT,
-                cache_dir=cache_dir
-            )
-            logger.info(f"Checkpoint скачан в: {ckpt_path}")
+            # Проверяем, есть ли уже скачанная модель
+            # Ищем в разных возможных путях
+            possible_paths = [
+                cache_dir / "models--Misha24-10--F5-TTS_RUSSIAN" / "snapshots" / "main" / "F5TTS_v1_Base_v2" / "model_last_inference.safetensors",
+                cache_dir / "models--Misha24-10--F5-TTS_RUSSIAN" / "snapshots" / "4f5ee5def0435265fe6ecf2143df2ef26d926b62" / "F5TTS_v1_Base_v2" / "model_last_inference.safetensors"
+            ]
+            
+            local_ckpt_path = None
+            for path in possible_paths:
+                if path.exists():
+                    local_ckpt_path = path
+                    break
+            if local_ckpt_path and local_ckpt_path.exists():
+                logger.info(f"Используем локальную модель: {local_ckpt_path}")
+                ckpt_path = str(local_ckpt_path)
+            else:
+                try:
+                    # Скачиваем модель checkpoint
+                    ckpt_path = hf_hub_download(
+                        repo_id=MODEL_ID,
+                        filename=CHECKPOINT,
+                        cache_dir=cache_dir
+                    )
+                    logger.info(f"Checkpoint скачан в: {ckpt_path}")
+                except Exception as download_error:
+                    logger.error(f"Ошибка загрузки модели: {download_error}")
+                    logger.info("Попробуйте скачать модель вручную или проверьте интернет-соединение")
+                    raise RuntimeError("Не удалось загрузить TTS модель")
 
-            # Скачиваем vocab.txt
-            vocab_path = hf_hub_download(
-                repo_id=MODEL_ID,
-                filename=VOCAB,
-                cache_dir=cache_dir
-            )
+            # Проверяем vocab.txt
+            # Ищем в разных возможных путях
+            vocab_possible_paths = [
+                cache_dir / "models--Misha24-10--F5-TTS_RUSSIAN" / "snapshots" / "main" / "vocab.txt",
+                cache_dir / "models--Misha24-10--F5-TTS_RUSSIAN" / "snapshots" / "4f5ee5def0435265fe6ecf2143df2ef26d926b62" / "F5TTS_v1_Base" / "vocab.txt"
+            ]
+            
+            local_vocab_path = None
+            for path in vocab_possible_paths:
+                if path.exists():
+                    local_vocab_path = path
+                    break
+            if local_vocab_path and local_vocab_path.exists():
+                logger.info(f"Используем локальный vocab: {local_vocab_path}")
+                vocab_path = str(local_vocab_path)
+            else:
+                try:
+                    vocab_path = hf_hub_download(
+                        repo_id=MODEL_ID,
+                        filename=VOCAB,
+                        cache_dir=cache_dir
+                    )
+                except Exception as vocab_error:
+                    logger.error(f"Ошибка загрузки vocab: {vocab_error}")
+                    logger.info("Попробуйте скачать vocab.txt вручную")
+                    raise RuntimeError("Не удалось загрузить vocab файл")
             logger.info(f"Vocab.txt скачан в: {vocab_path}")
 
             # Инициализируем F5TTS с безопасными параметрами для CUDA
@@ -120,6 +174,20 @@ class RussianTTS:
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
                     torch.cuda.synchronize()
+                
+                # Устанавливаем переменные окружения для HuggingFace кеша
+                import os
+                os.environ['HF_HOME'] = str(cache_dir.absolute())
+                os.environ['HUGGINGFACE_HUB_CACHE'] = str(cache_dir.absolute())
+                # Отключаем прокси для HuggingFace
+                os.environ['HF_HUB_DISABLE_PROGRESS_BARS'] = '1'
+                os.environ['HF_HUB_DISABLE_TELEMETRY'] = '1'
+                # Отключаем прокси полностью
+                os.environ['NO_PROXY'] = 'huggingface.co'
+                os.environ['http_proxy'] = ''
+                os.environ['https_proxy'] = ''
+                os.environ['HTTP_PROXY'] = ''
+                os.environ['HTTPS_PROXY'] = ''
                 
                 self.tts_model = F5TTS(
                     model="F5TTS_v1_Base",
@@ -141,7 +209,28 @@ class RussianTTS:
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
                     torch.cuda.reset_peak_memory_stats()
-                raise
+                
+                # Если это ошибка прокси, пробуем загрузить без вокодера
+                if "proxy" in str(e).lower() or "ssl" in str(e).lower():
+                    logger.warning("Проблема с прокси, пробуем загрузить F5-TTS без вокодера...")
+                    try:
+                        # Пробуем загрузить только основную модель без вокодера
+                        self.tts_model = F5TTS(
+                            model="F5TTS_v1_Base",
+                            ckpt_file=ckpt_path,
+                            vocab_file=vocab_path,
+                            ode_method=self.ode_method,
+                            use_ema=self.use_ema,
+                            device=self.device,
+                            hf_cache_dir=str(cache_dir),
+                            vocoder=None  # Отключаем вокодер
+                        )
+                        logger.info("F5-TTS загружен без вокодера (fallback режим)")
+                    except Exception as e2:
+                        logger.error(f"Не удалось загрузить F5-TTS даже без вокодера: {e2}")
+                        raise
+                else:
+                    raise
             
             logger.info("F5-TTS модель загружена успешно.")
 
@@ -327,6 +416,14 @@ class RussianTTS:
                 'russian': [0.8, 1.0, 1.2, 1.3, 1.4, 1.5],
                 'english': [0.7, 1.0, 1.1, 1.2, 1.3, 1.3]
             }
+        },
+        'very_fast': {
+            'name': 'Очень быстрый',
+            'description': 'Максимально ускоренная речь',
+            'settings': {
+                'russian': [0.8, 1.1, 1.4, 1.5, 1.6, 1.8],
+                'english': [0.7, 1.0, 1.3, 1.5, 1.6, 1.7]
+            }
         }
     }
 
@@ -447,7 +544,7 @@ class RussianTTS:
         try:
             # Создаем выходную директорию для временных файлов
             output_dir = config.temp_audio_path
-            output_dir.mkdir(exist_ok=True)
+            output_dir.mkdir(parents=True, exist_ok=True)
             
             # Создаем уникальное имя файла с временной меткой
             import time
@@ -466,7 +563,8 @@ class RussianTTS:
                 "sway_sampling_coef": sway_sampling_coef,
                 "cfg_strength": cfg_strength,
                 "nfe_step": nfe_step,
-                "remove_silence": remove_silence
+                "remove_silence": remove_silence,
+                "seed": int(time.time() * 1000) % 2**32  # Добавляем seed для разнообразия
             }
             
             # Убеждаемся, что скорость передается как float
@@ -641,6 +739,9 @@ class RussianTTS:
                 logger.error(f"Voice audio not found for voice: {voice_name}")
                 return False
             
+            # Логируем параметры для диагностики
+            logger.info(f"🔧 Synthesize called with kwargs: {kwargs}")
+            
             # Выполняем стандартный синтез
             result_path = self.synthesize_speech(
                 text=text,
@@ -703,7 +804,8 @@ class RussianTTS:
                 db.close()
                 
             # Fallback: поиск в стандартной директории voices
-            voices_dir = Path("voices")
+            from tts_service.config import config
+            voices_dir = config.voices_path
             voice_file = voices_dir / f"{voice_name}.wav"
             
             if voice_file.exists():
@@ -751,3 +853,4 @@ if __name__ == "__main__":
             print(f"✅ Результат: {result}")
     else:
         print("❌ Ошибка загрузки моделей!")
+

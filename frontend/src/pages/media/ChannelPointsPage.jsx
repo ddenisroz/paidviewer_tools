@@ -174,7 +174,7 @@ const ChannelPointsPage = () => {
             {/* Заголовок и статистика */}
             <div className="space-y-4">
                 <div>
-                <h1 className="text-3xl font-bold text-foreground mb-2">Управление баллами канала</h1>
+                <h1 className="text-3xl font-bold mb-6 text-foreground">Управление баллами канала</h1>
                 <p className="text-muted-foreground">
                         Создавайте и настраивайте награды за баллы канала для ваших зрителей
                 </p>

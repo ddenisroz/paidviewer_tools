@@ -18,7 +18,7 @@ from pydub import AudioSegment
 logger = logging.getLogger(__name__)
 
 # F5-TTS requirements
-TARGET_SAMPLE_RATE = 16000  # 16kHz
+TARGET_SAMPLE_RATE = 48000  # 48kHz для максимального качества
 TARGET_CHANNELS = 1  # Mono
 TARGET_BIT_DEPTH = 16  # 16-bit
 TARGET_DURATION_MIN = 3.0  # Minimum 3 seconds
@@ -55,9 +55,15 @@ def convert_audio_for_f5tts(input_path: str, output_path: str) -> bool:
             logger.error(f"Input file is empty: {input_path}")
             return False
         
-        # Load audio with librosa (handles various formats)
+        # Load audio with librosa с максимальным сохранением качества
         try:
-            audio_data, original_sr = librosa.load(input_path, sr=None, mono=False)
+            # Используем настройки для минимальной потери качества
+            audio_data, original_sr = librosa.load(
+                input_path, 
+                sr=None, 
+                mono=False,
+                res_type='soxr_vhq'  # Максимальное качество без потерь
+            )
         except Exception as e:
             logger.error(f"Failed to load audio file {input_path}: {e}")
             return False
@@ -67,14 +73,15 @@ def convert_audio_for_f5tts(input_path: str, output_path: str) -> bool:
             audio_data = librosa.to_mono(audio_data)
             logger.info("Converted stereo to mono")
         
-        # Resample to 16kHz
+        # Resample to 16kHz с максимальным сохранением качества
         if original_sr != TARGET_SAMPLE_RATE:
             audio_data = librosa.resample(
                 audio_data, 
                 orig_sr=original_sr, 
-                target_sr=TARGET_SAMPLE_RATE
+                target_sr=TARGET_SAMPLE_RATE,
+                res_type='soxr_vhq'  # Максимальное качество без потерь
             )
-            logger.info(f"Resampled from {original_sr}Hz to {TARGET_SAMPLE_RATE}Hz")
+            logger.info(f"Resampled from {original_sr}Hz to {TARGET_SAMPLE_RATE}Hz with soxr_vhq")
         
         # Check duration
         duration = len(audio_data) / TARGET_SAMPLE_RATE
@@ -93,16 +100,29 @@ def convert_audio_for_f5tts(input_path: str, output_path: str) -> bool:
             audio_data = audio_data[:max_samples]
             logger.info(f"Trimmed to {TARGET_DURATION_MAX}s")
         
-        # Normalize audio (prevent clipping)
+        # Минимальная обработка для сохранения оригинального качества
         max_val = np.max(np.abs(audio_data))
         if max_val > 0:
-            audio_data = audio_data / max_val * 0.95  # Leave some headroom
-            logger.info(f"Normalized audio (max was {max_val:.3f})")
+            current_rms = np.sqrt(np.mean(audio_data**2))
+            
+            # Только если аудио действительно очень тихое - слегка усилим
+            if current_rms < 0.02:  # Только если очень тихое
+                gain_factor = min(0.05 / current_rms, 2.0)  # Ограниченное усиление
+                audio_data = audio_data * gain_factor
+                logger.info(f"Gentle amplification for very quiet audio (RMS: {current_rms:.3f} -> {current_rms * gain_factor:.3f})")
+            else:
+                logger.info(f"Audio level is good, preserving original quality (RMS: {current_rms:.3f})")
+            
+            # Только предотвращаем клиппинг, не меняем общий уровень
+            new_max = np.max(np.abs(audio_data))
+            if new_max > 0.98:
+                audio_data = audio_data * (0.98 / new_max)
+                logger.info(f"Prevented clipping (max was {new_max:.3f})")
         
         # Convert to 16-bit integer
         audio_data = (audio_data * 32767).astype(np.int16)
         
-        # Save as WAV file
+        # Save as WAV file с улучшенными настройками для качества
         sf.write(
             output_path,
             audio_data,
@@ -181,7 +201,6 @@ def get_audio_info(file_path: str) -> dict:
     except Exception as e:
         logger.error(f"Error getting audio info: {e}")
         return {}
-
 if __name__ == "__main__":
     # Test the converter
     import sys
@@ -209,3 +228,4 @@ if __name__ == "__main__":
     else:
         print("❌ Conversion failed")
         sys.exit(1)
+

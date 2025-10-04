@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Play, Pause, SkipForward, Volume2, VolumeX, Plus, X, Maximize, Minimize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,49 +7,40 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Slider } from "@/components/ui/slider";
 import { toast } from 'sonner';
 import YouTube from 'react-youtube';
-import api from '../../services/api';
+import { usePlayer } from '../../context/PlayerContext';
 import { useChat } from '../../context/ChatContext';
+import api from '../../services/api';
+import logger from '../../utils/logger';
 
 const YoutubeIntegrationPage = () => {
-    const [queue, setQueue] = useState([]);
-    const [currentVideo, setCurrentVideo] = useState(null);
+    const {
+        currentVideo,
+        isPlaying,
+        volume,
+        isMuted,
+        isTheaterMode,
+        queue,
+        togglePlayPause,
+        setVolume,
+        toggleMute,
+        nextVideo,
+        handlePlayerReady,
+        handlePlayerStateChange,
+        handlePlayerError,
+        setPlayerRef
+    } = usePlayer();
+    
     const [newVideoUrl, setNewVideoUrl] = useState('');
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [isTheaterMode, setIsTheaterMode] = useState(false);
-    const [volume, setVolume] = useState([50]);
-    const [isMuted, setIsMuted] = useState(false);
     const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
     const [playbackMode, setPlaybackMode] = useState('browser'); // browser или obs
     const [youtubeObsUrl, setYoutubeObsUrl] = useState('');
     const [isObsUrlVisible, setIsObsUrlVisible] = useState(false);
-    const playerRef = useRef(null);
     const { lastJsonMessage } = useChat();
 
-    const loadQueue = async () => {
-        try {
-            const { data } = await api.get('/api/youtube/queue');
-            console.log('YouTube queue data:', data); // Debug log
-            
-            setQueue(data.queue || []);
-            setCurrentVideo(data.current_video || null);
-            setIsPlaying(data.is_playing || false);
-        } catch (error) {
-            console.error('Error loading YouTube queue:', error);
-            
-            // Не показываем toast для 429 ошибок (rate limiting)
-            if (error.response?.status === 429) {
-                console.log('Rate limited, will retry later');
-                return;
-            }
-            
-            // Не показываем toast для CORS ошибок
-            if (error.code === 'ERR_NETWORK' || error.message?.includes('CORS')) {
-                console.log('Network/CORS error, will retry later');
-                return;
-            }
-            
-            toast.error('Ошибка загрузки очереди видео.');
-        }
+    // Обработчик готовности плеера с установкой ссылки
+    const handlePlayerReadyWithRef = (event) => {
+        setPlayerRef(event.target);
+        handlePlayerReady(event);
     };
 
     // Загрузка настроек YouTube
@@ -57,7 +48,7 @@ const YoutubeIntegrationPage = () => {
         try {
             const response = await api.get('/api/tts/youtube-settings');
             setPlaybackMode(response.data.playback_mode || 'browser');
-            setVolume([response.data.volume_level || 50]);
+            setVolume([response.data.volume_level || 100]); // По умолчанию 100% для синхронизации
         } catch (error) {
             console.error('Error loading YouTube settings:', error);
         }
@@ -152,31 +143,8 @@ const YoutubeIntegrationPage = () => {
     };
 
     useEffect(() => {
-        loadQueue();
         loadYoutubeSettings();
         loadExistingObsUrl();
-        
-        // Обработчик YouTube событий
-        const handleYoutubeEvent = (event) => {
-            const { event: eventType, data } = event.detail;
-            console.log('YouTube event received:', eventType, data);
-            
-            if (eventType === 'queue_updated') {
-                // Обновляем очередь при изменении
-                loadQueue();
-            }
-        };
-        
-        // Подписываемся на YouTube события
-        window.addEventListener('youtubeEvent', handleYoutubeEvent);
-        
-        // Убираем polling - теперь обновляем только по событиям
-        // const interval = setInterval(loadQueue, 30000);
-        // return () => clearInterval(interval);
-        
-        return () => {
-            window.removeEventListener('youtubeEvent', handleYoutubeEvent);
-        };
     }, []);
 
     // Обработчик клавиши Esc для выхода из полноэкранного режима
@@ -197,40 +165,9 @@ const YoutubeIntegrationPage = () => {
             if (lastJsonMessage.type === 'youtube_queue_update') {
                 console.log("Received youtube_queue_update from WebSocket, reloading queue...");
                 toast.info("Очередь видео обновлена!");
-                loadQueue();
             }
         }
-    }, [lastJsonMessage, loadQueue]);
-
-    const opts = {
-        height: '100%',
-        width: '100%',
-        playerVars: {
-            autoplay: 1,
-            controls: 1,
-        },
-    };
-
-    const handleVideoEnd = async () => {
-        await handleNextVideo();
-    };
-
-    const handleNextVideo = async () => {
-        try {
-            const { data } = await api.post('/api/youtube/player/next');
-            if (data.success) {
-                toast.success("Следующее видео!");
-                loadQueue();
-            } else {
-                toast.info("Очередь пуста.");
-                setCurrentVideo(null);
-                setQueue([]);
-            }
-        } catch (error) {
-            toast.error("Не удалось переключить видео.");
-            console.error('Error skipping video:', error);
-        }
-    };
+    }, [lastJsonMessage]);
 
     const handleClearQueue = async () => {
         try {
@@ -250,32 +187,8 @@ const YoutubeIntegrationPage = () => {
         }
     };
 
-    const handlePlayPause = () => {
-        if (playerRef.current && playerRef.current.internalPlayer) {
-            if (isPlaying) {
-                playerRef.current.internalPlayer.pauseVideo();
-            } else {
-                playerRef.current.internalPlayer.playVideo();
-            }
-        }
-    };
-
     const handleVolumeChange = (newVolume) => {
         setVolume(newVolume);
-        if (playerRef.current && playerRef.current.internalPlayer) {
-            playerRef.current.internalPlayer.setVolume(newVolume[0]);
-        }
-    };
-
-    const handleMuteToggle = () => {
-        setIsMuted(!isMuted);
-        if (playerRef.current && playerRef.current.internalPlayer) {
-            if (isMuted) {
-                playerRef.current.internalPlayer.unMute();
-            } else {
-                playerRef.current.internalPlayer.mute();
-            }
-        }
     };
     
     // Обработчик клика на пустое место в полноэкранном режиме
@@ -289,24 +202,22 @@ const YoutubeIntegrationPage = () => {
         <div 
             className={`transition-all duration-300 ${isTheaterMode ? 'fixed inset-0 bg-black z-50 p-2' : 'space-y-6'}`}
             onClick={handleBackdropClick}
+            style={isTheaterMode ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999 } : {}}
         >
             <div className={`w-full h-full ${isTheaterMode ? '' : ''}`}>
                 <Card className={`transition-all duration-300 w-full ${isTheaterMode ? 'bg-black border-none h-full' : ''}`}>
                     <CardContent className={`grid gap-6 p-6 ${isTheaterMode ? 'grid-cols-5 h-full' : 'grid-cols-1 lg:grid-cols-5 min-h-[600px]'}`}>
                         <div className={`space-y-4 ${isTheaterMode ? 'col-span-4' : 'lg:col-span-3'}`}>
-                            {/* Плеер (только для режима сайта) */}
+                            {/* Информация о текущем видео */}
                             {playbackMode === 'browser' ? (
                                 <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
                                     {currentVideo ? (
-                                        <YouTube
-                                            videoId={currentVideo.video_id}
-                                            opts={opts}
-                                            onEnd={handleVideoEnd}
-                                            onPlay={() => setIsPlaying(true)}
-                                            onPause={() => setIsPlaying(false)}
-                                            ref={playerRef}
-                                            className="w-full h-full"
-                                        />
+                                        <div className="w-full h-full flex items-center justify-center bg-muted">
+                                            <div className="text-center">
+                                                <p className="text-muted-foreground text-lg mb-2">Видео воспроизводится в глобальном плеере</p>
+                                                <p className="text-sm text-muted-foreground">Управление доступно в мини-плеере внизу страницы</p>
+                                            </div>
+                                        </div>
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center bg-muted">
                                             <p className="text-muted-foreground">Нет видео для воспроизведения.</p>
@@ -337,7 +248,7 @@ const YoutubeIntegrationPage = () => {
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        onClick={handlePlayPause}
+                                        onClick={togglePlayPause}
                                         disabled={!currentVideo}
                                     >
                                         {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
@@ -345,7 +256,7 @@ const YoutubeIntegrationPage = () => {
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        onClick={handleNextVideo}
+                                        onClick={nextVideo}
                                     >
                                         <SkipForward className="h-4 w-4" />
                                     </Button>
@@ -356,18 +267,19 @@ const YoutubeIntegrationPage = () => {
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        onClick={handleMuteToggle}
+                                        onClick={toggleMute}
+                                        title={isMuted ? "Включить звук" : "Отключить звук"}
                                     >
                                         {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                                     </Button>
                                     <Slider
-                                        value={volume}
+                                        value={[volume]}
                                         onValueChange={handleVolumeChange}
                                         max={100}
                                         step={1}
                                         className="w-32"
                                     />
-                                    <span className="text-sm text-muted-foreground w-10 text-right">{volume[0]}%</span>
+                                    <span className="text-sm text-muted-foreground w-10 text-right">{volume}%</span>
                                 </div>
 
                                 {/* Очистить очередь */}
@@ -394,46 +306,60 @@ const YoutubeIntegrationPage = () => {
                             </div>
                             
                             {/* Кнопки управления */}
-                            <div className="flex justify-between items-center mt-4">
-                                <div className="flex items-center gap-2">
-                                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                        playbackMode === 'browser' 
-                                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                            : 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                                    }`}>
-                                        {playbackMode === 'browser' ? '🌐 Сайт' : '📹 OBS Studio'}
-                                    </div>
-                                    {!youtubeObsUrl ? (
-                                        <Button 
-                                            variant="outline" 
-                                            size="sm" 
-                                            onClick={generateYoutubeObsUrl}
-                                        >
-                                            🔗 OBS URL
-                                        </Button>
-                                    ) : (
-                                        <div className="flex gap-2">
-                                            <Button 
-                                                variant="outline" 
-                                                size="sm" 
-                                                onClick={isObsUrlVisible ? hideObsUrl : () => setIsObsUrlVisible(true)}
-                                            >
-                                                {isObsUrlVisible ? '👁️ Скрыть' : '👁️ Показать'}
-                                            </Button>
-                                            <Button 
-                                                variant="outline" 
-                                                size="sm" 
-                                                onClick={regenerateYoutubeObsUrl}
-                                            >
-                                                🔄 Перегенерировать
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
-                                <Button variant="ghost" size="sm" onClick={() => setIsTheaterMode(!isTheaterMode)}>
+                            <div className="flex justify-end items-center mt-4">
+                                <Button variant="ghost" size="sm" onClick={() => {
+                                    const newTheaterMode = !isTheaterMode;
+                                    // Уведомляем GlobalPlayer о изменении театрального режима
+                                    window.dispatchEvent(new CustomEvent('youtube_event', {
+                                        detail: {
+                                            event: 'theater_mode_changed',
+                                            data: { isTheaterMode: newTheaterMode }
+                                        }
+                                    }));
+                                }}>
                                     {isTheaterMode ? <Minimize className="h-4 w-4 mr-2" /> : <Maximize className="h-4 w-4 mr-2" />}
                                     {isTheaterMode ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
                                 </Button>
+                            </div>
+                            
+                            {/* Кнопка OBS */}
+                            <div className="flex gap-2 mt-4">
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => {
+                                        if (!youtubeObsUrl) {
+                                            // Если нет URL, генерируем новый
+                                            generateYoutubeObsUrl();
+                                        } else if (isObsUrlVisible) {
+                                            // Если URL виден, скрываем
+                                            hideObsUrl();
+                                        } else {
+                                            // Если URL скрыт, показываем
+                                            setIsObsUrlVisible(true);
+                                        }
+                                    }}
+                                    title={
+                                        !youtubeObsUrl ? "Сгенерировать OBS URL" :
+                                        isObsUrlVisible ? "Скрыть OBS source" : 
+                                        "Показать OBS source для копирования"
+                                    }
+                                >
+                                    {!youtubeObsUrl ? '📹 Сгенерировать OBS URL' :
+                                     isObsUrlVisible ? '👁️ Скрыть OBS source' : 
+                                     '👁️ Показать OBS source'}
+                                </Button>
+                                
+                                {youtubeObsUrl && (
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        onClick={regenerateYoutubeObsUrl}
+                                        title="Перегенерировать новый OBS URL"
+                                    >
+                                        🔄 Перегенерировать
+                                    </Button>
+                                )}
                             </div>
                             
                             {/* OBS URL (если сгенерирован и видим) */}
@@ -444,27 +370,17 @@ const YoutubeIntegrationPage = () => {
                                             <p className="text-sm text-gray-400 mb-1">OBS Browser Source URL:</p>
                                             <p className="text-xs text-gray-300 font-mono break-all">{youtubeObsUrl}</p>
                                         </div>
-                                        <div className="flex gap-2">
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => {
-                                                    navigator.clipboard.writeText(youtubeObsUrl);
-                                                    toast.success('URL скопирован!');
-                                                }}
-                                                className="flex-shrink-0"
-                                            >
-                                                📋 Копировать
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={hideObsUrl}
-                                                className="flex-shrink-0"
-                                            >
-                                                👁️ Скрыть
-                                            </Button>
-                                        </div>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(youtubeObsUrl);
+                                                toast.success('URL скопирован!');
+                                            }}
+                                            className="flex-shrink-0"
+                                        >
+                                            📋 Копировать
+                                        </Button>
                                     </div>
                                 </div>
                             )}
@@ -483,7 +399,7 @@ const YoutubeIntegrationPage = () => {
                                                 <img src={currentVideo.thumbnail_url} alt={currentVideo.title} className="w-20 h-12 object-cover rounded"/>
                                                 <div className="flex-1 min-w-0">
                                                     <h4 className="font-medium text-sm line-clamp-2">{currentVideo.title}</h4>
-                                                    <p className="text-xs text-muted-foreground">от {currentVideo.user_id}</p>
+                                                    <p className="text-xs text-muted-foreground">от {currentVideo.requester_name || currentVideo.user_id || 'Unknown'}</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -499,15 +415,18 @@ const YoutubeIntegrationPage = () => {
                                                     <img src={video.thumbnail_url} alt={video.title} className="w-20 h-12 object-cover rounded"/>
                                                     <div className="flex-1 min-w-0">
                                                         <h4 className="font-medium text-sm line-clamp-2">{video.title}</h4>
-                                                        <p className="text-xs text-muted-foreground">от {video.user_id}</p>
+                                                        <p className="text-xs text-muted-foreground">заказал: {video.requester_name || video.user_id || 'Unknown'}</p>
                                                     </div>
                                                 </div>
                                             ))}
                                         </div>
                                     ) : (
                                         <div className="text-center py-8 text-muted-foreground p-4">
-                                            <p>Очередь пуста</p>
-                                            <p className="text-xs mt-2">Используйте команду !sr в чате для добавления видео</p>
+                                            <div className="text-4xl mb-4">🎵</div>
+                                            <p className="font-medium text-base mb-2">Очередь пуста</p>
+                                            <p className="text-sm text-muted-foreground">
+                                                Очередь пуста. Зрители могут добавлять видео командой !sr
+                                            </p>
                                         </div>
                                     )}
                                 </CardContent>
@@ -521,3 +440,4 @@ const YoutubeIntegrationPage = () => {
 };
 
 export default YoutubeIntegrationPage;
+

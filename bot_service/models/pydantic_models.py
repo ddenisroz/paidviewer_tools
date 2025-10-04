@@ -28,6 +28,8 @@ class YouTubeVideoPublic(BaseModel):
     thumbnail_url: str
     added_at: datetime
     user_id: str
+    requester_name: Optional[str] = None  # Имя заказчика
+    channel_title: Optional[str] = None  # Название YouTube канала
 
     class Config:
         from_attributes = True

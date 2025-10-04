@@ -1,217 +1,273 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, SkipForward, X, Music } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import api from '../services/api';
-import { useToast } from '@/components/ui/toast';
+import YouTube from 'react-youtube';
+import { usePlayer } from '../context/PlayerContext';
+import logger from '../utils/logger';
+import { clearYouTubeCache } from '../utils/youtubeCacheCleaner';
+import { toast } from 'sonner';
 
 const GlobalPlayer = () => {
-    const [currentVideo, setCurrentVideo] = useState(null);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [volume, setVolume] = useState(50);
-    const [isMuted, setIsMuted] = useState(false);
-    const [isVisible, setIsVisible] = useState(false);
-    const { toast } = useToast();
+    const {
+        currentVideo,
+        isPlaying,
+        volume,
+        isMuted,
+        isVisible,
+        isTheaterMode,
+        currentTime,
+        duration,
+        playerRef,
+        togglePlayPause,
+        setVolume,
+        toggleMute,
+        nextVideo,
+        closePlayer,
+        handlePlayerReady,
+        handlePlayerStateChange,
+        handlePlayerError,
+        setPlayerRef
+    } = usePlayer();
 
-    // Загружаем текущее видео из очереди
-    const loadCurrentVideo = async () => {
-        try {
-            const response = await api.get('/api/youtube/queue');
-            const queueData = response.data;
-            
-            if (queueData.current_video && queueData.current_video.video_id) {
-                setCurrentVideo(queueData.current_video);
-                setIsVisible(true);
-            } else {
-                setCurrentVideo(null);
-                setIsVisible(false);
-            }
-        } catch (error) {
-            console.error('Error loading current video:', error);
-            
-            // Не показываем ошибки для rate limiting и CORS
-            if (error.response?.status === 429 || error.code === 'ERR_NETWORK') {
-                return;
-            }
-        }
+    // Обработчик готовности плеера с установкой ссылки
+    const handlePlayerReadyWithRef = (event) => {
+        setPlayerRef(event.target);
+        handlePlayerReady(event);
     };
 
-    // Загружаем видео при монтировании и по событиям
+    // Глобальный перехват ошибок YouTube API для браузерных расширений
     useEffect(() => {
-        loadCurrentVideo();
+        const originalConsoleError = console.error;
+        window.originalConsoleError = originalConsoleError;
         
-        // Обработчик YouTube событий
-        const handleYoutubeEvent = (event) => {
-            const { event: eventType, data } = event.detail;
-            console.log('GlobalPlayer YouTube event received:', eventType, data);
-            
-            if (eventType === 'queue_updated') {
-                // Обновляем текущее видео при изменении очереди
-                loadCurrentVideo();
-            }
-        };
-        
-        // Подписываемся на YouTube события
-        window.addEventListener('youtubeEvent', handleYoutubeEvent);
-        
-        // Убираем polling - теперь обновляем только по событиям
-        // const interval = setInterval(loadCurrentVideo, 30000);
-        // return () => clearInterval(interval);
-        
+        // Перехватываем console.error только если еще не перехватывали
+        if (!window.youtubeErrorHandlerInstalled) {
+            console.error = (...args) => {
+                const message = args[0]?.toString();
+                if (message?.includes('TIMEOUT waiting for') || 
+                    message?.includes('getYouTubeTitleNode') ||
+                    message?.includes('Cannot read properties of null')) {
+                    return; // Игнорируем эти ошибки от расширений
+                }
+                originalConsoleError.apply(console, args);
+            };
+            window.youtubeErrorHandlerInstalled = true;
+        }
+
         return () => {
-            window.removeEventListener('youtubeEvent', handleYoutubeEvent);
+            // Восстанавливаем оригинальный console.error при размонтировании
+            if (window.originalConsoleError && window.youtubeErrorHandlerInstalled) {
+                console.error = window.originalConsoleError;
+                window.youtubeErrorHandlerInstalled = false;
+            }
         };
     }, []);
 
-    // Обработка воспроизведения/паузы (заглушка для UI)
-    const togglePlayPause = () => {
-        setIsPlaying(!isPlaying);
-        toast({
-            title: isPlaying ? "Пауза" : "Воспроизведение",
-            description: isPlaying ? "Видео поставлено на паузу" : "Видео воспроизводится"
-        });
-    };
-
-    // Обработка громкости (заглушка для UI)
+    // Обработка громкости
     const handleVolumeChange = (value) => {
         const newVolume = value[0];
         setVolume(newVolume);
-        setIsMuted(false);
     };
 
-    // Обработка отключения звука (заглушка для UI)
-    const toggleMute = () => {
-        setIsMuted(!isMuted);
+    // Форматирование времени
+    const formatTime = (seconds) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    // Переход к следующему видео
-    const nextVideo = async () => {
-        try {
-            await api.post('/api/youtube/next');
-            toast({
-                title: "Следующее видео",
-                description: "Переход к следующему видео в очереди"
-            });
-            // Перезагружаем текущее видео
-            setTimeout(loadCurrentVideo, 1000);
-        } catch (error) {
-            console.error('Error skipping to next video:', error);
-            toast({
-                title: "Ошибка",
-                description: "Не удалось перейти к следующему видео",
-                variant: "destructive"
-            });
-        }
-    };
-
-    // Закрытие плеера
-    const closePlayer = () => {
-        setIsVisible(false);
-        setCurrentVideo(null);
-        setIsPlaying(false);
-    };
-
-    // Если нет видео, показываем заглушку
+    // Если нет видео, не показываем плеер
     if (!currentVideo) {
-        return (
-            <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 z-50">
-                <div className="px-4 py-3">
-                    <div className="flex items-center justify-center gap-3">
-                        <Music className="w-5 h-5 text-gray-400" />
-                        <span className="text-gray-300 text-sm">Нет очереди заказов YouTube</span>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    // Если плеер скрыт, не отображаем
-    if (!isVisible) {
         return null;
     }
 
+    // Проверяем текущий путь, чтобы не показывать UI на странице YouTube
+    const currentPath = window.location.pathname;
+    const isOnYoutubePage = currentPath.includes('/dashboard/media/youtube');
+    
+    // Плеер работает всегда, UI показываем на всех страницах
+    // На YouTube странице показываем видео, на других - только управление
+    const showUI = isVisible && !isTheaterMode && !isOnYoutubePage;
+
     return (
-        <div className="fixed bottom-0 left-0 w-1/2 bg-black/20 backdrop-blur-sm border-t border-r border-white/10 z-50">
-            <div className="px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                    {/* Информация о видео */}
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <div className="w-10 h-10 bg-gray-800 rounded-md overflow-hidden flex-shrink-0">
-                            {currentVideo.thumbnail_url && (
-                                <img 
-                                    src={currentVideo.thumbnail_url} 
-                                    alt={currentVideo.title}
-                                    className="w-full h-full object-cover"
-                                />
-                            )}
+        <>
+            {/* Основной YouTube плеер - показываем на YouTube странице */}
+            {currentVideo && isOnYoutubePage && (
+                <div className="w-full flex justify-center mt-4">
+                    <div className="w-full max-w-4xl">
+                        <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                            <YouTube
+                                videoId={currentVideo.video_id}
+                                onReady={handlePlayerReadyWithRef}
+                                onStateChange={handlePlayerStateChange}
+                                onError={handlePlayerError}
+                                opts={{
+                                    width: '100%',
+                                    height: '100%',
+                                    playerVars: {
+                                        autoplay: 0,
+                                        controls: 1,
+                                        disablekb: 0,
+                                        enablejsapi: 1,
+                                        fs: 1,
+                                        iv_load_policy: 3,
+                                        modestbranding: 0,
+                                        playsinline: 1,
+                                        rel: 0,
+                                        showinfo: 1,
+                                        cc_load_policy: 0,
+                                        hl: 'ru',
+                                        origin: window.location.origin,
+                                        widget_referrer: window.location.origin
+                                    }
+                                }}
+                                key={`main-player-${currentVideo.video_id}`}
+                                className="w-full h-full"
+                            />
                         </div>
-                        <div className="min-w-0 flex-1 bg-black/20 rounded-md px-2 py-1">
-                            <h3 className="text-white font-medium text-sm truncate">
-                                {currentVideo.title}
-                            </h3>
-                            <p className="text-gray-300 text-xs truncate">
-                                {currentVideo.channel_title}
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Элементы управления */}
-                    <div className="flex items-center gap-2">
-                        {/* Кнопка воспроизведения/паузы */}
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={togglePlayPause}
-                            className="text-white bg-black/30 hover:bg-black/50 border border-white/20"
-                        >
-                            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                        </Button>
-
-                        {/* Регулятор громкости */}
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={toggleMute}
-                                className="text-white bg-black/30 hover:bg-black/50 border border-white/20 p-1"
-                            >
-                                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                            </Button>
-                            <div className="w-16">
-                                <Slider
-                                    value={[isMuted ? 0 : volume]}
-                                    onValueChange={handleVolumeChange}
-                                    max={100}
-                                    step={1}
-                                    className="w-full"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Кнопка следующего видео */}
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={nextVideo}
-                            className="text-white bg-black/30 hover:bg-black/50 border border-white/20"
-                        >
-                            <SkipForward className="w-4 h-4" />
-                        </Button>
-
-                        {/* Кнопка закрытия */}
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={closePlayer}
-                            className="text-white bg-black/30 hover:bg-black/50 border border-white/20"
-                        >
-                            <X className="w-4 h-4" />
-                        </Button>
                     </div>
                 </div>
-            </div>
-        </div>
+            )}
+            
+            {/* Скрытый плеер для других страниц - воспроизводит только звук */}
+            {currentVideo && !isOnYoutubePage && (
+                <div className="hidden">
+                    <YouTube
+                        videoId={currentVideo.video_id}
+                        onReady={handlePlayerReadyWithRef}
+                        onStateChange={handlePlayerStateChange}
+                        onError={handlePlayerError}
+                        opts={{
+                            width: '1px',
+                            height: '1px',
+                            playerVars: {
+                                autoplay: 0,
+                                controls: 0,
+                                disablekb: 1,
+                                enablejsapi: 1,
+                                fs: 0,
+                                iv_load_policy: 3,
+                                modestbranding: 1,
+                                playsinline: 1,
+                                rel: 0,
+                                showinfo: 0,
+                                cc_load_policy: 0,
+                                hl: 'ru',
+                                origin: window.location.origin,
+                                widget_referrer: window.location.origin
+                            }
+                        }}
+                        key={`hidden-player-${currentVideo.video_id}`}
+                        className="hidden"
+                    />
+                </div>
+            )}
+            
+            {/* UI плеера отцентрирован относительно main контейнера */}
+            {showUI && (
+                <div className="w-full flex justify-center mt-4">
+                    <div className="w-full max-w-4xl">
+                    <div className="bg-gray-900/95 backdrop-blur-md border border-gray-700 rounded-xl">
+                        {/* Убрали тайм-бар для снижения нагрузки */}
+                        
+                        {/* Основные элементы управления */}
+                        <div className="flex items-center justify-between px-4 py-4">
+                            {/* Информация о треке слева */}
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className="w-10 h-10 bg-gray-800 rounded-md overflow-hidden flex-shrink-0">
+                                    {currentVideo.thumbnail_url && (
+                                        <img 
+                                            src={currentVideo.thumbnail_url} 
+                                            alt={currentVideo.title}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h3 className="text-white font-medium text-sm truncate">
+                                        {currentVideo.title}
+                                    </h3>
+                                    <p className="text-gray-400 text-xs truncate">
+                                        от {currentVideo.requester_name || currentVideo.user_id || 'Unknown'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Центральные кнопки управления */}
+                            <div className="flex items-center gap-2">
+                                {/* Кнопка закрытия (вместо предыдущего трека) */}
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={closePlayer}
+                                    className="text-gray-400 hover:text-white hover:bg-gray-800 border-0 p-2 h-8 w-8"
+                                    title="Закрыть и поставить на паузу"
+                                >
+                                    <X className="w-4 h-4" />
+                                </Button>
+
+                                {/* Кнопка воспроизведения/паузы */}
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                        togglePlayPause();
+                                        // Синхронизируем с основным плеером
+                                        if (playerRef) {
+                                            if (isPlaying) {
+                                                playerRef.pauseVideo();
+                                            } else {
+                                                playerRef.playVideo();
+                                            }
+                                        }
+                                    }}
+                                    className="text-white bg-white/10 hover:bg-white/20 border-0 p-2 h-10 w-10"
+                                >
+                                    {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                                </Button>
+
+                                {/* Кнопка следующего видео */}
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={nextVideo}
+                                    className="text-gray-400 hover:text-white hover:bg-gray-800 border-0 p-2 h-8 w-8"
+                                    title="Следующее видео"
+                                >
+                                    <SkipForward className="w-4 h-4" />
+                                </Button>
+                            </div>
+
+                            {/* Регулятор громкости справа */}
+                            <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={toggleMute}
+                                    className="text-gray-400 hover:text-white hover:bg-gray-800 border-0 p-2 h-8 w-8"
+                                    title={isMuted ? "Включить звук" : "Отключить звук"}
+                                >
+                                    {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                                </Button>
+                                <div className="w-20">
+                                    <Slider
+                                        value={[isMuted ? 0 : volume]}
+                                        onValueChange={handleVolumeChange}
+                                        max={100}
+                                        step={1}
+                                        className="w-full"
+                                    />
+                                </div>
+                            </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
     );
 };
 
 export default GlobalPlayer;
+

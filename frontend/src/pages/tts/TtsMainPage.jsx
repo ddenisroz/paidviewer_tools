@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Loader, Link, Copy, Radio } from 'lucide-react';
+import { Loader, Link, Copy, Radio, Plus, Save } from 'lucide-react';
 import { generateObsUrl } from '../../services/microservices';
 import { PageLoader } from '@/components/ui/loader';
 import { useLoadingState } from '../../hooks/useLoadingState';
@@ -21,7 +21,7 @@ import api from '../../services/api';
 
 const TtsMainPageContent = () => {
     const { ttsEnabled, toggleTts, isWhitelisted, engineStatus, isToggling, initializeTts, setNotificationHandler, syncWithHealthContext } = useTts();
-    const { isHealthy, isChecking } = useTtsHealth();
+    const { isHealthy, isChecking, checkTtsHealth } = useTtsHealth();
     const { isAuthenticated, user } = useAuth();
     const { integrations } = useIntegrations();
     const [listeningMode, setListeningMode] = useState('website'); // 'website' или 'obs'
@@ -373,33 +373,27 @@ const TtsMainPageContent = () => {
         }
     }, [engineStatus.error, toggleTts, ttsEnabled]);
 
-    // Показываем прелоадер пока проверяется health
-    if (showLoader) {
-        return (
-            <div className="container mx-auto p-4 md:p-6 lg:p-8">
-                <h1 className="text-3xl font-bold mb-4">Озвучка сообщений</h1>
+    return (
+        <div className="container mx-auto p-4 md:p-6 lg:p-8">
+            <h1 className="text-3xl font-bold mb-6 text-foreground">Озвучка сообщений</h1>
+            
+            {/* Показываем прелоадер пока проверяется health */}
+            {showLoader && (
                 <PageLoader message="Проверка состояния TTS сервиса..." />
-            </div>
-        );
-    }
+            )}
 
-    // Заглушка когда TTS недоступен
-    if (!isHealthy) {
-        return (
-            <div className="container mx-auto p-4 md:p-6 lg:p-8">
-                <h1 className="text-3xl font-bold text-white mb-6">Озвучка сообщений</h1>
-                
+            {/* Заглушка когда TTS недоступен */}
+            {!showLoader && !isHealthy && (
                 <TtsErrorCard
                     title="TTS сервер недоступен"
                     description="В данный момент сервис TTS недоступен. Озвучка сообщений временно отключена."
                     suggestion="Попробуйте обновить страницу через несколько минут."
                 />
-            </div>
-        );
-    }
+            )}
 
-    return (
-        <div className="container mx-auto p-4 relative">
+            {/* Основной контент когда TTS доступен */}
+            {!showLoader && isHealthy && (
+        <div className="relative">
             <style dangerouslySetInnerHTML={{
                 __html: `
                     .slider::-webkit-slider-thumb {
@@ -424,7 +418,6 @@ const TtsMainPageContent = () => {
                     }
                 `
             }} />
-            <h1 className="text-3xl font-bold mb-4">Озвучка сообщений</h1>
             
             
             <Card>
@@ -438,7 +431,7 @@ const TtsMainPageContent = () => {
                 <CardContent>
                             <div className="space-y-6">
                                 {/* Основное переключение TTS */}
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                             <Switch
                                 checked={ttsEnabled}
@@ -451,17 +444,105 @@ const TtsMainPageContent = () => {
                             {isToggling && (
                                 <Loader className="h-4 w-4 animate-spin text-primary" />
                             )}
+                            
+                            {/* Статус */}
+                            <div className="flex items-center space-x-2">
+                                <div 
+                                    className={`w-2 h-2 rounded-full ${
+                                        ttsEnabled ? 'bg-green-500' : 'bg-red-500'
+                                    }`}
+                                />
+                                <span className={`text-sm font-medium ${
+                                    ttsEnabled ? 'text-green-400' : 'text-red-400'
+                                }`}>
+                                    {ttsEnabled ? 'Включено' : 'Выключено'}
+                                </span>
+                            </div>
                         </div>
                         
-                        <div className="flex items-center space-x-2">
-                            <div 
-                                className={`w-2 h-2 rounded-full ${ttsEnabled ? 'bg-green-500' : 'bg-red-500'} ${ttsEnabled ? 'shadow-green-500/50 shadow-lg' : 'shadow-red-500/50 shadow-lg'}`}
-                            />
-                            <span className={`text-sm ${ttsEnabled ? 'text-green-500' : 'text-red-500'}`}>
-                                {ttsEnabled ? 'Включено' : 'Выключено'}
-                            </span>
-                        </div>
+                        
+                        
                                 </div>
+                                
+                                {/* Способ озвучки с URL справа */}
+                                {isAuthenticated && (
+                                    <div className="mt-4 mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm text-gray-400">Способ озвучки:</span>
+                                            <div className="flex gap-1">
+                                                <button
+                                                    onClick={() => {
+                                                        setListeningMode('website');
+                                                        const newSettings = {
+                                                            ...audioSettings,
+                                                            websiteVolume: audioSettings.websiteVolume
+                                                        };
+                                                        saveAudioSettings(newSettings);
+                                                    }}
+                                                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                                                        listeningMode === 'website' 
+                                                            ? 'bg-purple-600 text-white shadow-md' 
+                                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                    }`}
+                                                >
+                                                    Сайт
+                                                </button>
+                                                <button
+                                                    onClick={async () => {
+                                                        setListeningMode('obs');
+                                                        const newSettings = {
+                                                            ...audioSettings,
+                                                            obsVolume: audioSettings.obsVolume
+                                                        };
+                                                        saveAudioSettings(newSettings);
+                                                        
+                                                        if (!obsUrl) {
+                                                            await handleGenerateObsUrl();
+                                                        }
+                                                    }}
+                                                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                                                        listeningMode === 'obs' 
+                                                            ? 'bg-purple-600 text-white shadow-md' 
+                                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                    }`}
+                                                >
+                                                    OBS
+                                                </button>
+                                            </div>
+                                            
+                                            {/* URL для OBS - справа от кнопок */}
+                                            {listeningMode === 'obs' && (
+                                                <div className="ml-4 flex items-center gap-2 text-xs">
+                                                    <span className="text-gray-400">URL:</span>
+                                                    {obsUrl ? (
+                                                        <>
+                                                            <button
+                                                                onClick={copyToClipboard}
+                                                                className="text-blue-400 hover:text-blue-300 underline truncate max-w-48"
+                                                                title={obsUrl}
+                                                            >
+                                                                {obsUrl.length > 25 ? `${obsUrl.substring(0, 25)}...` : obsUrl}
+                                                            </button>
+                                                            <button
+                                                                onClick={handleRegenerateObsUrl}
+                                                                className="bg-orange-600 hover:bg-orange-700 text-white px-1.5 py-0.5 rounded text-xs"
+                                                            >
+                                                                ↻
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <button
+                                                            onClick={handleGenerateObsUrl}
+                                                            className="text-purple-400 hover:text-purple-300"
+                                                        >
+                                                            Сгенерировать
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                                 
                                 {/* Выбор платформ - только для авторизованных пользователей */}
                                 {isAuthenticated && (
@@ -537,105 +618,6 @@ const TtsMainPageContent = () => {
             </Card>
             
             
-            {/* Способ прослушивания - только для авторизованных пользователей */}
-            {isAuthenticated && (
-                <Card className="mt-6">
-                    <CardHeader>
-                        <CardTitle>Способ прослушивания</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => {
-                                        setListeningMode('website');
-                                        // Синхронизируем с backend
-                                        const newSettings = {
-                                            ...audioSettings,
-                                            websiteVolume: audioSettings.websiteVolume
-                                        };
-                                        saveAudioSettings(newSettings);
-                                    }}
-                                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                        listeningMode === 'website' 
-                                            ? 'bg-purple-600 text-white border border-purple-500' 
-                                            : 'bg-transparent text-gray-300 border border-gray-600 hover:bg-gray-800'
-                                    }`}
-                                >
-                                    Сайт
-                                </button>
-                                <button
-                                    onClick={async () => {
-                                        setListeningMode('obs');
-                                        // Синхронизируем с backend
-                                        const newSettings = {
-                                            ...audioSettings,
-                                            obsVolume: audioSettings.obsVolume
-                                        };
-                                        saveAudioSettings(newSettings);
-                                        
-                                        // Генерируем OBS URL если его еще нет
-                                        if (!obsUrl) {
-                                            await handleGenerateObsUrl();
-                                        }
-                                    }}
-                                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                        listeningMode === 'obs' 
-                                            ? 'bg-purple-600 text-white border border-purple-500' 
-                                            : 'bg-transparent text-gray-300 border border-gray-600 hover:bg-gray-800'
-                                    }`}
-                                >
-                                    OBS
-                                </button>
-                            </div>
-                            
-                            {/* URL для OBS - показываем только когда выбран режим OBS */}
-                            {listeningMode === 'obs' && (
-                                <div className="mt-4 p-3 bg-gray-800 rounded-lg">
-                                    <div className="text-sm font-medium mb-2">URL для OBS Browser Source:</div>
-                                    {obsUrl ? (
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                type="text"
-                                                value={obsUrl}
-                                                readOnly
-                                                className="flex-1 p-2 bg-gray-700 border border-gray-600 rounded text-sm font-mono"
-                                            />
-                                            <Button
-                                                size="sm"
-                                                onClick={copyToClipboard}
-                                                className="bg-green-600 hover:bg-green-700"
-                                            >
-                                                <Copy className="h-4 w-4 mr-1" />
-                                                Копировать
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={handleRegenerateObsUrl}
-                                            >
-                                                Обновить
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <Button
-                                            size="sm"
-                                            onClick={handleGenerateObsUrl}
-                                            className="bg-purple-600 hover:bg-purple-700"
-                                        >
-                                            Сгенерировать URL
-                                        </Button>
-                                    )}
-                                    <div className="text-xs text-gray-400 mt-2">
-                                        💡 <strong>Инструкция:</strong> Добавьте этот URL как "Browser Source" в OBS Studio. 
-                                        Рекомендуемые размеры: 1920x1080.
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
             
             {/* Настройки звука */}
             <Card className="mt-6">
@@ -723,51 +705,43 @@ const TtsMainPageContent = () => {
                             />
                         </div>
                         
-                        {/* Мат */}
+                        
+                        {/* Фильтрация слов - компактная версия */}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <div>
-                                    <Label htmlFor="enableProfanity" className="text-sm font-medium">
-                                        Озвучивать мат
-                                    </Label>
-                                </div>
-                                <Switch
-                                    id="enableProfanity"
-                                    checked={ttsSettings.enableProfanity}
-                                    onCheckedChange={(checked) => {
-                                        const newSettings = { ...ttsSettings, enableProfanity: checked };
-                                        setTtsSettings(newSettings);
-                                        saveTtsSettings(newSettings);
-                                    }}
-                                />
+                                <Label htmlFor="word-filter" className="text-sm font-medium">
+                                    Фильтрация слов
+                                </Label>
+                                <span className="text-xs text-gray-400">Слов: 0</span>
                             </div>
                             
-                            {ttsSettings.enableProfanity && (
-                                <div className="ml-4 space-y-2">
-                                    <Label htmlFor="profanityLevel" className="text-xs text-gray-400">
-                                        Уровень фильтрации
-                                    </Label>
-                                    <select
-                                        id="profanityLevel"
-                                        value={ttsSettings.profanityLevel}
-                                        onChange={(e) => {
-                                            const newSettings = { ...ttsSettings, profanityLevel: e.target.value };
-                                            setTtsSettings(newSettings);
-                                            saveTtsSettings(newSettings);
-                                        }}
-                                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                    >
-                                        <option value="low">Низкий (только явный мат)</option>
-                                        <option value="medium">Средний (мат + грубости)</option>
-                                        <option value="high">Высокий (все нецензурное)</option>
+                            {/* Компактная форма */}
+                            <div className="flex gap-3">
+                                <div className="flex-1">
+                                    <Input
+                                        placeholder="Добавить слово"
+                                        className="text-sm h-8"
+                                    />
+                                </div>
+                                <div className="w-32">
+                                    <select className="w-full px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500 h-8">
+                                        <option value="all">Все</option>
+                                        <option value="twitch">Twitch</option>
+                                        <option value="vk">VK</option>
                                     </select>
+                                </div>
+                                <Button size="sm" className="px-3 h-8">
+                                    <Plus className="h-3 w-3" />
+                                </Button>
                             </div>
-                        )}
                         </div>
+                        
                     </div>
                 </CardContent>
             </Card>
             
+        </div>
+            )}
         </div>
     );
 };
