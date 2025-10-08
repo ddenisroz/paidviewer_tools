@@ -100,8 +100,7 @@ class OAuthHandler:
                     platform_user_id=user_data.platform_user_id,
                     avatar_url=user_data.avatar_url,
                     db=db,
-                    current_user_id=current_user_id,
-                    platform_username=user_data.username
+                    current_user_id=current_user_id
                 )
             
             if not unified_user:
