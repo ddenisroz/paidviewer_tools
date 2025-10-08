@@ -155,8 +155,8 @@ const MonitoringPage = () => {
     useEffect(() => {
         if (!hasLoaded) {
             setHasLoaded(true);
-            loadMonitoringData();
-            loadDatabaseStats();
+        loadMonitoringData();
+        loadDatabaseStats();
         }
     }, [hasLoaded]);
 
@@ -351,73 +351,6 @@ const MonitoringPage = () => {
                         stats={ttsStats}
                         color="bg-purple-500"
                     />
-                    
-                    {/* Сравнительная таблица */}
-                    <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
-                        <h3 className="text-sm font-medium text-white mb-3">Сравнение сервисов</h3>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-xs">
-                                <thead>
-                                    <tr className="border-b border-slate-600">
-                                        <th className="text-left py-1 text-slate-300">Метрика</th>
-                                        <th className="text-right py-1 text-slate-300">Bot Service</th>
-                                        <th className="text-right py-1 text-slate-300">TTS Service</th>
-                                        <th className="text-right py-1 text-slate-300">Разница</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr className="border-b border-slate-600">
-                                        <td className="py-1 font-medium text-white">CPU %</td>
-                                        <td className="text-right py-1 text-white">{botStats?.cpu_percent?.toFixed(1) || '0.0'}%</td>
-                                        <td className="text-right py-1 text-white">{ttsStats?.cpu_percent?.toFixed(1) || '0.0'}%</td>
-                                        <td className="text-right py-1">
-                                            {botStats && ttsStats && (
-                                                <span className={ttsStats.cpu_percent > botStats.cpu_percent ? 'text-red-400' : 'text-green-400'}>
-                                                    {(ttsStats.cpu_percent - botStats.cpu_percent).toFixed(1)}%
-                                                </span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                    <tr className="border-b border-slate-600">
-                                        <td className="py-1 font-medium text-white">Память</td>
-                                        <td className="text-right py-1 text-white">{botStats ? formatBytes(botStats.memory_bytes) : '0 B'}</td>
-                                        <td className="text-right py-1 text-white">{ttsStats ? formatBytes(ttsStats.memory_bytes) : '0 B'}</td>
-                                        <td className="text-right py-1">
-                                            {botStats && ttsStats && (
-                                                <span className={ttsStats.memory_bytes > botStats.memory_bytes ? 'text-red-400' : 'text-green-400'}>
-                                                    {formatBytes(ttsStats.memory_bytes - botStats.memory_bytes)}
-                                                </span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                    <tr className="border-b border-slate-600">
-                                        <td className="py-1 font-medium text-white">Потоки</td>
-                                        <td className="text-right py-1 text-white">{botStats?.num_threads || 0}</td>
-                                        <td className="text-right py-1 text-white">{ttsStats?.num_threads || 0}</td>
-                                        <td className="text-right py-1">
-                                            {botStats && ttsStats && (
-                                                <span className={ttsStats.num_threads > botStats.num_threads ? 'text-red-400' : 'text-green-400'}>
-                                                    {ttsStats.num_threads - botStats.num_threads}
-                                                </span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td className="py-1 font-medium text-white">Файлы</td>
-                                        <td className="text-right py-1 text-white">{botStats?.num_fds || 0}</td>
-                                        <td className="text-right py-1 text-white">{ttsStats?.num_fds || 0}</td>
-                                        <td className="text-right py-1">
-                                            {botStats && ttsStats && (
-                                                <span className={ttsStats.num_fds > botStats.num_fds ? 'text-red-400' : 'text-green-400'}>
-                                                    {ttsStats.num_fds - botStats.num_fds}
-                                                </span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
                 </div>
             )}
 
