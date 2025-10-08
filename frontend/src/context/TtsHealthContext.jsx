@@ -13,6 +13,10 @@ export const useTtsHealth = () => {
     return context;
 };
 
+// Глобальный флаг для предотвращения множественных проверок
+let globalHealthCheckInProgress = false;
+let globalLastCheckTime = 0;
+
 export const TtsHealthProvider = ({ children }) => {
     const { user } = useAuth();
     const location = useLocation();
@@ -46,11 +50,21 @@ export const TtsHealthProvider = ({ children }) => {
             return;
         }
         
-        // Предотвращаем множественные одновременные запросы
-        if (checkInProgressRef.current) {
+        // Глобальная проверка - предотвращаем множественные одновременные запросы
+        if (globalHealthCheckInProgress) {
+            console.log('TtsHealthContext: Global health check already in progress, skipping...');
             return;
         }
+        
+        // Дополнительная проверка времени - не проверяем слишком часто
         const now = Date.now();
+        if (now - globalLastCheckTime < 2000) { // Минимум 2 секунды между проверками
+            console.log('TtsHealthContext: Health check too frequent, skipping...');
+            return;
+        }
+        
+        globalHealthCheckInProgress = true;
+        globalLastCheckTime = now;
         checkInProgressRef.current = true;
         lastCheckTimeRef.current = now;
         setIsChecking(true);
@@ -70,6 +84,7 @@ export const TtsHealthProvider = ({ children }) => {
         } finally {
             setIsChecking(false);
             checkInProgressRef.current = false;
+            globalHealthCheckInProgress = false;
         }
     };
     
@@ -88,9 +103,20 @@ export const TtsHealthProvider = ({ children }) => {
         }
         
         // Проверяем только один раз при монтировании компонента
-        if (!hasCheckedRef.current) {
+        // Дополнительная защита от двойных вызовов в React Strict Mode
+        if (!hasCheckedRef.current && !checkInProgressRef.current) {
             hasCheckedRef.current = true;
-            checkHealth();
+            // Добавляем небольшую задержку для предотвращения двойных вызовов
+            const timeoutId = setTimeout(() => {
+                if (mountedRef.current && !checkInProgressRef.current) {
+                    checkHealth();
+                }
+            }, 100);
+            
+            return () => {
+                clearTimeout(timeoutId);
+                mountedRef.current = false;
+            };
         }
         
         // Cleanup при размонтировании

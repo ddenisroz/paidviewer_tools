@@ -79,12 +79,24 @@ export async function getGlobalEmotes() {
 }
 
 /**
+ * Экранирует HTML для предотвращения XSS
+ */
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+/**
  * Обрабатывает сообщение и заменяет смайлы на изображения
  */
 export function processEmotes(message, channelEmotes = new Map(), globalEmotes = new Map()) {
     if (!message || typeof message !== 'string') {
         return message;
     }
+
+    // Сначала экранируем весь HTML для безопасности
+    const escapedMessage = escapeHtml(message);
 
     // Объединяем канальные и глобальные смайлы
     const allEmotes = new Map([...channelEmotes, ...globalEmotes]);
@@ -95,17 +107,20 @@ export function processEmotes(message, channelEmotes = new Map(), globalEmotes =
     ).join('|');
     
     if (emoteNames.length === 0) {
-        return message;
+        return escapedMessage;
     }
 
     const emoteRegex = new RegExp(`\\b(${emoteNames})\\b`, 'gi');
     
-    return message.replace(emoteRegex, (match) => {
+    return escapedMessage.replace(emoteRegex, (match) => {
         const emoteName = match.toLowerCase();
         const emote = allEmotes.get(emoteName) || allEmotes.get(match);
         
         if (emote) {
-            return `<img src="${emote.url}" alt="${emote.name}" class="inline-block w-6 h-6 align-middle" title="${emote.name}" />`;
+            // Дополнительно экранируем атрибуты для безопасности
+            const safeUrl = escapeHtml(emote.url);
+            const safeName = escapeHtml(emote.name);
+            return `<img src="${safeUrl}" alt="${safeName}" class="inline-block w-6 h-6 align-middle" title="${safeName}" />`;
         }
         
         return match;

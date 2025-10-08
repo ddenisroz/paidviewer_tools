@@ -14,6 +14,7 @@ import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Depends, WebSocket, WebSocketDisconnect, HTTPException, Response, Form, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -467,6 +468,13 @@ app.add_middleware(
     secret_key=os.getenv("SECRET_KEY", "your-secret-key")
 )
 
+# --- Security Middleware ---
+# Trusted Host Middleware для защиты от Host Header атак
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=["localhost", "127.0.0.1", "*.yourdomain.com"]  # Замените на ваши домены
+)
+
 # --- CORS Middleware (должен быть перед rate limiting) ---
 allowed_origins = [origin.strip() for origin in CORS_ORIGINS.split(',')]
 
@@ -474,9 +482,37 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Ограничиваем методы
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin", "X-CSRFToken"],
 )
+
+# --- Security Headers Middleware ---
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    
+    # Content Security Policy
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.7tv.app; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data: https://cdn.7tv.app https://static-cdn.jtvnw.net; "
+        "connect-src 'self' https://api.twitch.tv https://api.vk.com https://7tv.io; "
+        "frame-src 'self'; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self';"
+    )
+    
+    # Дополнительные заголовки безопасности
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    
+    return response
 
 # --- Request Logging Middleware ---
 @app.middleware("http")

@@ -1,7 +1,8 @@
 # bot_service/models.py
-from pydantic import BaseModel
+from pydantic import BaseModel, validator, Field
 from typing import Optional, List
 from datetime import datetime
+import re
 
 # Whitelist models
 class WhitelistedChannelPublic(BaseModel):
@@ -13,7 +14,13 @@ class WhitelistedChannelPublic(BaseModel):
         from_attributes = True
 
 class AddToWhitelistRequest(BaseModel):
-    username: str
+    username: str = Field(..., min_length=1, max_length=50, regex=r'^[a-zA-Z0-9_]+$')
+    
+    @validator('username')
+    def validate_username(cls, v):
+        if not re.match(r'^[a-zA-Z0-9_]+$', v):
+            raise ValueError('Username can only contain letters, numbers and underscores')
+        return v.lower().strip()
 
 class WhitelistResponse(BaseModel):
     whitelist_users: List[WhitelistedChannelPublic]

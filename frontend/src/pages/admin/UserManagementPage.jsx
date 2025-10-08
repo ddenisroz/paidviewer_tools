@@ -35,7 +35,11 @@ import {
     Unlock,
     MoreVertical,
     ChevronDown,
-    ChevronRight
+    ChevronRight,
+    Plus,
+    List,
+    CheckCircle2,
+    XCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { botService } from '../../services/microservices';
@@ -52,6 +56,12 @@ const UserManagementPage = () => {
     const [blockDialogOpen, setBlockDialogOpen] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
     const [activeSubTab, setActiveSubTab] = useState('users'); // 'users' или 'sessions'
+    
+    // Whitelist states
+    const [whitelistChannels, setWhitelistChannels] = useState({ twitch: [], vk: [] });
+    const [newChannel, setNewChannel] = useState('');
+    const [newPlatform, setNewPlatform] = useState('twitch');
+    const [whitelistLoading, setWhitelistLoading] = useState(false);
     
     // Фильтры
     const [filters, setFilters] = useState({
@@ -108,6 +118,49 @@ const UserManagementPage = () => {
             toast.error('Ошибка загрузки интеграций');
         } finally {
             setIntegrationsLoading(false);
+        }
+    };
+
+    const loadWhitelist = async () => {
+        try {
+            setWhitelistLoading(true);
+            const response = await botService.get('/api/admin/whitelist');
+            setWhitelistChannels({ twitch: response.data.whitelist_users || [], vk: [] });
+        } catch (error) {
+            console.error('Error loading whitelist:', error);
+            toast.error('Ошибка загрузки белого списка');
+        } finally {
+            setWhitelistLoading(false);
+        }
+    };
+
+    const addToWhitelist = async () => {
+        if (!newChannel.trim()) {
+            toast.error('Введите название канала');
+            return;
+        }
+
+        try {
+            await botService.post('/api/admin/whitelist/add', {
+                username: newChannel.trim(),
+            });
+            await loadWhitelist();
+            setNewChannel('');
+            toast.success(`Канал ${newChannel} добавлен в белый список`);
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Ошибка добавления канала');
+        }
+    };
+
+    const removeFromWhitelist = async (channel) => {
+        try {
+            await botService.delete('/api/admin/whitelist/remove', {
+                data: { username: channel }
+            });
+            await loadWhitelist();
+            toast.success(`Канал ${channel} удален из белого списка`);
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Ошибка удаления канала');
         }
     };
 
@@ -277,6 +330,7 @@ const UserManagementPage = () => {
         loadUsers();
         loadSessions();
         loadIntegrations();
+        loadWhitelist();
     }, []);
 
     if (loading) {
@@ -328,6 +382,14 @@ const UserManagementPage = () => {
                 >
                     <Activity className="h-4 w-4 mr-2" />
                     Сессии
+                </Button>
+                <Button
+                    variant={activeSubTab === 'whitelist' ? 'default' : 'ghost'}
+                    onClick={() => setActiveSubTab('whitelist')}
+                    className={`flex-1 ${activeSubTab === 'whitelist' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
+                >
+                    <List className="h-4 w-4 mr-2" />
+                    TTS Whitelist
                 </Button>
             </div>
 
