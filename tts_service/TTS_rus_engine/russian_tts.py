@@ -18,6 +18,10 @@ from f5_tts.api import F5TTS
 from huggingface_hub import hf_hub_download
 from ruaccent import RUAccent
 from .yoficator_module import yoficate_text
+from .number_converter import convert_numbers_in_text
+from .time_converter import convert_all_time_in_text
+from .date_converter import convert_all_dates_in_text
+from .money_converter import convert_all_money_in_text
 try:
     from ..config import config
 except ImportError:
@@ -355,6 +359,38 @@ class RussianTTS:
                 logger.info(f"После ёфикации: '{processed_text}'")
             except Exception as e:
                 logger.warning(f"Ошибка ёфикации: {e}")
+        
+        # Конвертируем даты в слова для русского текста (ПЕРВЫМ, чтобы избежать конфликтов с временем)
+        if language == "russian":
+            try:
+                processed_text = convert_all_dates_in_text(processed_text)
+                logger.info(f"После конвертации дат: '{processed_text}'")
+            except Exception as e:
+                logger.warning(f"Ошибка конвертации дат: {e}")
+        
+        # Конвертируем время в слова для русского текста
+        if language == "russian":
+            try:
+                processed_text = convert_all_time_in_text(processed_text)
+                logger.info(f"После конвертации времени: '{processed_text}'")
+            except Exception as e:
+                logger.warning(f"Ошибка конвертации времени: {e}")
+        
+        # Конвертируем денежные суммы в слова для русского текста
+        if language == "russian":
+            try:
+                processed_text = convert_all_money_in_text(processed_text)
+                logger.info(f"После конвертации денежных сумм: '{processed_text}'")
+            except Exception as e:
+                logger.warning(f"Ошибка конвертации денежных сумм: {e}")
+        
+        # Конвертируем числа в слова для русского текста (ПОСЛЕДНИМ, чтобы не конфликтовать с датами/временем/деньгами)
+        if language == "russian":
+            try:
+                processed_text = convert_numbers_in_text(processed_text)
+                logger.info(f"После конвертации чисел: '{processed_text}'")
+            except Exception as e:
+                logger.warning(f"Ошибка конвертации чисел: {e}")
         
         # Для русского текста добавляем ударения
         if language == "russian" and self.enable_accent:

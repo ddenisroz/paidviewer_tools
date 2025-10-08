@@ -28,6 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { PageLoader } from '@/components/ui/loader';
 import { useLoadingState } from '../../hooks/useLoadingState';
 import { TTS_SERVICE_URL } from '@/services/microservices';
+import { VoiceCardSkeleton } from '@/components/ui/skeleton';
 
 
 const VoiceManagementPageContent = () => {
@@ -104,23 +105,36 @@ const VoiceManagementPageContent = () => {
         if (!user) return;
         try {
             setLoading(true);
-            let response;
+            let allVoices = [];
+            
             if (user.isGuest) {
                 // Для гостей загружаем только глобальные голоса
-                response = await getGlobalVoices();
+                const response = await getGlobalVoices();
+                const voicesData = response?.data || response || [];
+                allVoices = Array.isArray(voicesData) ? voicesData : [];
             } else {
-                // Для авторизованных пользователей загружаем их голоса
-                response = await getUserVoices(user.id);
+                // Для авторизованных пользователей загружаем И глобальные И пользовательские голоса
+                const [userVoicesResponse, globalVoicesResponse] = await Promise.all([
+                    getUserVoices(user.id),
+                    getGlobalVoices()
+                ]);
+                
+                const userVoicesData = userVoicesResponse?.data || userVoicesResponse || [];
+                const globalVoicesData = globalVoicesResponse?.data || globalVoicesResponse || [];
+                
+                const userVoices = Array.isArray(userVoicesData) ? userVoicesData : [];
+                const globalVoices = Array.isArray(globalVoicesData) ? globalVoicesData : [];
+                
+                // Объединяем: сначала пользовательские, потом глобальные
+                allVoices = [...userVoices, ...globalVoices];
             }
-            console.log('Voices response:', response);
-            // Проверяем, что response.data существует и является массивом
-            const voicesData = response?.data || response || [];
-            const voicesArray = Array.isArray(voicesData) ? voicesData : [];
-            setVoices(voicesArray);
+            
+            console.log('Loaded voices:', allVoices);
+            setVoices(allVoices);
             
             // Загружаем индивидуальные громкости для всех голосов
-            if (!user.isGuest && voicesArray.length > 0) {
-                for (const voice of voicesArray) {
+            if (allVoices.length > 0) {
+                for (const voice of allVoices) {
                     if (voice.name) {
                         loadVoiceVolume(voice.name);
                     }
@@ -448,7 +462,7 @@ const VoiceManagementPageContent = () => {
     // Показываем прелоадер пока проверяется health или загружаются голоса
     if (showLoader) {
         return (
-            <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
+            <div className="container mx-auto p-6 space-y-6">
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-3xl font-bold mb-6 text-foreground">Управление голосами</h1>
@@ -463,7 +477,7 @@ const VoiceManagementPageContent = () => {
     // Заглушка когда TTS недоступен
     if (!isHealthy) {
         return (
-            <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
+            <div className="container mx-auto p-6 space-y-6">
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-3xl font-bold mb-6 text-foreground">Управление голосами</h1>
@@ -481,7 +495,7 @@ const VoiceManagementPageContent = () => {
     }
 
     return (
-        <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
+        <div className="container mx-auto p-6 space-y-6">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold mb-6 text-foreground">Управление голосами</h1>
@@ -607,37 +621,96 @@ const VoiceManagementPageContent = () => {
             </div>
 
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                 {loading ? (
-                     <p className="text-slate-400 col-span-full">Загрузка голосов...</p>
-                 ) : voices.length === 0 ? (
-                     <div className="col-span-full text-center py-12">
-                         <div className="text-slate-400 text-lg mb-4">
-                             <User className="h-12 w-12 mx-auto mb-4 text-slate-500" />
-                             <p>Загрузите свой первый голос</p>
-                         </div>
-                     </div>
-                 ) : voices.map((voice) => (
-                     <Card key={voice.id} className="bg-slate-800 border-slate-700 flex flex-col">
-                         <CardHeader>
-                             <div className="flex items-center justify-between">
-                                 <CardTitle className="text-base font-medium text-white flex items-center gap-2">
-                                     {voice.voice_type === 'global' ? <Globe className="h-4 w-4 text-blue-400"/> : <User className="h-4 w-4 text-green-400"/>}
-                                     {voice.name}
-                                 </CardTitle>
-                             </div>
-                         </CardHeader>
-                          <CardContent className="flex-grow flex flex-col justify-between">
-                             <div className="flex space-x-2">
-                                 <Button className="flex-1" variant="outline" size="sm" onClick={() => handleEdit(voice)}><Settings className="h-4 w-4 mr-1"/>Настроить</Button>
-                                 {voice.voice_type === 'user' && (
-                                    <Button variant="destructive" size="icon" onClick={() => handleDelete(voice.id)}><Trash2 className="h-4 w-4"/></Button>
-                                 )}
-                             </div>
-                          </CardContent>
-                     </Card>
-                 ))}
-             </div>
+            {loading ? (
+                <VoiceCardSkeleton count={8} />
+            ) : voices.length === 0 ? (
+                <div className="text-center py-12">
+                    <div className="text-slate-400 text-lg mb-4">
+                        <User className="h-12 w-12 mx-auto mb-4 text-slate-500" />
+                        <p>Загрузите свой первый голос</p>
+                    </div>
+                </div>
+            ) : (
+                <div className="space-y-8">
+                    {/* Секция пользовательских голосов */}
+                    {!user?.isGuest && voices.filter(v => v.voice_type === 'user').length > 0 && (
+                        <div>
+                            <div className="flex items-center gap-2 mb-4 pb-2 border-b border-green-500/30">
+                                <User className="h-5 w-5 text-green-400" />
+                                <h2 className="text-xl font-semibold text-green-400">Мои голоса</h2>
+                                <Badge variant="outline" className="text-green-400 border-green-400 ml-2">
+                                    {voices.filter(v => v.voice_type === 'user').length}
+                                </Badge>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                {voices.filter(v => v.voice_type === 'user').map((voice) => (
+                                    <Card key={voice.id} className="bg-slate-800 border-slate-700 hover:border-green-500/50 transition-colors flex flex-col">
+                                        <CardHeader>
+                                            <div className="flex items-center justify-between">
+                                                <CardTitle className="text-base font-medium text-white flex items-center gap-2">
+                                                    <User className="h-4 w-4 text-green-400"/>
+                                                    {voice.name}
+                                                </CardTitle>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent className="flex-grow flex flex-col justify-between">
+                                            <div className="flex space-x-2">
+                                                <Button className="flex-1" variant="outline" size="sm" onClick={() => handleEdit(voice)}>
+                                                    <Settings className="h-4 w-4 mr-1"/>Настроить
+                                                </Button>
+                                                <Button variant="destructive" size="icon" onClick={() => handleDelete(voice.id)}>
+                                                    <Trash2 className="h-4 w-4"/>
+                                                </Button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Секция глобальных голосов */}
+                    {voices.filter(v => v.voice_type === 'global').length > 0 && (
+                        <div>
+                            <div className="flex items-center gap-2 mb-4 pb-2 border-b border-blue-500/30">
+                                <Globe className="h-5 w-5 text-blue-400" />
+                                <h2 className="text-xl font-semibold text-blue-400">Глобальные голоса</h2>
+                                <Badge variant="outline" className="text-blue-400 border-blue-400 ml-2">
+                                    {voices.filter(v => v.voice_type === 'global').length}
+                                </Badge>
+                            </div>
+                            <div className="text-sm text-slate-400 mb-3 flex items-center gap-2">
+                                <span>ℹ️</span>
+                                <span>Доступны всем пользователям. Вы можете настроить громкость и протестировать.</span>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                {voices.filter(v => v.voice_type === 'global').map((voice) => (
+                                    <Card key={voice.id} className="bg-slate-800 border-slate-700 hover:border-blue-500/50 transition-colors flex flex-col">
+                                        <CardHeader>
+                                            <div className="flex items-center justify-between">
+                                                <CardTitle className="text-base font-medium text-white flex items-center gap-2">
+                                                    <Globe className="h-4 w-4 text-blue-400"/>
+                                                    {voice.name}
+                                                </CardTitle>
+                                                <Badge variant="outline" className="text-blue-400 border-blue-400 text-xs">
+                                                    Глобальный
+                                                </Badge>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent className="flex-grow flex flex-col justify-between">
+                                            <div className="flex space-x-2">
+                                                <Button className="flex-1" variant="outline" size="sm" onClick={() => handleEdit(voice)}>
+                                                    <Settings className="h-4 w-4 mr-1"/>Настроить
+                                                </Button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
              {/* Диалог редактирования голоса */}
             <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
@@ -648,39 +721,52 @@ const VoiceManagementPageContent = () => {
                     onCloseAutoFocus={(e) => e.preventDefault()}
                 >
                     <DialogHeader>
-                        <DialogTitle>Настройки голоса "{currentVoice?.name}"</DialogTitle>
+                        <DialogTitle className="flex items-center gap-2">
+                            {currentVoice?.voice_type === 'global' ? (
+                                <><Globe className="h-5 w-5 text-blue-400"/> Глобальный голос "{currentVoice?.name}"</>
+                            ) : (
+                                <><User className="h-5 w-5 text-green-400"/> Мой голос "{currentVoice?.name}"</>
+                            )}
+                        </DialogTitle>
                         <DialogDescription>
-                            Настройте параметры синтеза и протестируйте голос
+                            {currentVoice?.voice_type === 'global' ? (
+                                'Настройте громкость и протестируйте глобальный голос'
+                            ) : (
+                                'Настройте параметры синтеза и протестируйте голос'
+                            )}
                         </DialogDescription>
                     </DialogHeader>
                     {currentVoice && (
                         <div className="space-y-4 py-4">
-                            <div>
-                                <Label htmlFor="reference-text">Референсный текст</Label>
-                                <Textarea
-                                  id="reference-text"
-                                  value={currentVoice.reference_text || ''}
-                                  onChange={(e) => handleReferenceTextChange(e.target.value)}
-                                  className="mt-1 bg-slate-800"
-                                  rows={3}
-                                  placeholder="Введите референсный текст для синтеза..."
-                                />
-                                <div className="flex gap-2 mt-2 justify-end">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleTranscribe}
-                                        disabled={isTranscribing}
-                                        className="text-xs px-3"
-                                    >
-                                        {isTranscribing ? 'Транскрибирую...' : 'Перетранскрибировать'}
-                                    </Button>
+                            {/* Референсный текст - только для пользовательских голосов */}
+                            {currentVoice.voice_type === 'user' && (
+                                <div>
+                                    <Label htmlFor="reference-text">Референсный текст</Label>
+                                    <Textarea
+                                      id="reference-text"
+                                      value={currentVoice.reference_text || ''}
+                                      onChange={(e) => handleReferenceTextChange(e.target.value)}
+                                      className="mt-1 bg-slate-800"
+                                      rows={3}
+                                      placeholder="Введите референсный текст для синтеза..."
+                                    />
+                                    <div className="flex gap-2 mt-2 justify-end">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleTranscribe}
+                                            disabled={isTranscribing}
+                                            className="text-xs px-3"
+                                        >
+                                            {isTranscribing ? 'Транскрибирую...' : 'Перетранскрибировать'}
+                                        </Button>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        Редактируйте текст или используйте автоматическую транскрипцию аудиофайла.
+                                    </p>
                                 </div>
-                                <p className="text-sm text-muted-foreground mt-1">
-                                    Редактируйте текст или используйте автоматическую транскрипцию аудиофайла.
-                                </p>
-                            </div>
+                            )}
                             
                             {/* Индивидуальная громкость голоса */}
                             <div className="space-y-3">
@@ -725,82 +811,89 @@ const VoiceManagementPageContent = () => {
                                 />
                             </div>
                             
-                            {/* Настройки генерации TTS */}
-                            <div className="space-y-4">
-                                <h4 className="text-sm font-medium text-white">Настройки генерации</h4>
-                                
-                                {/* Единственный настраиваемый параметр */}
-                                <div>
-                                    <Label htmlFor="cfg-strength">Стабильность синтеза: {currentVoice.cfg_strength}</Label>
-                                    <Slider
-                                        id="cfg-strength"
-                                        min={0.1}
-                                        max={10.0}
-                                        step={0.1}
-                                        value={[currentVoice.cfg_strength]}
-                                        onValueChange={(value) => setCurrentVoice(prev => ({ ...prev, cfg_strength: value[0] }))}
-                                        className="mt-2"
-                                    />
-                                    <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded mt-1">
-                                        💡 <strong>Стабильность:</strong> Влияет на стабильность и консистентность речи. 
-                                        Рекомендуемое значение 2.5. Слишком высокое значение может сделать речь роботизированной.
+                            {/* Настройки генерации TTS - только для пользовательских голосов */}
+                            {currentVoice.voice_type === 'user' && (
+                                <div className="space-y-4">
+                                    <h4 className="text-sm font-medium text-white">Настройки генерации</h4>
+                                    
+                                    {/* Единственный настраиваемый параметр */}
+                                    <div>
+                                        <Label htmlFor="cfg-strength">Стабильность синтеза: {currentVoice.cfg_strength}</Label>
+                                        <Slider
+                                            id="cfg-strength"
+                                            min={0.1}
+                                            max={10.0}
+                                            step={0.1}
+                                            value={[currentVoice.cfg_strength]}
+                                            onValueChange={(value) => setCurrentVoice(prev => ({ ...prev, cfg_strength: value[0] }))}
+                                            className="mt-2"
+                                        />
+                                        <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded mt-1">
+                                            💡 <strong>Стабильность:</strong> Влияет на стабильность и консистентность речи. 
+                                            Рекомендуемое значение 2.5. Слишком высокое значение может сделать речь роботизированной.
+                                        </div>
                                     </div>
+                                    
+                                    <div>
+                                        <Label htmlFor="speed-preset">Скорость речи: {
+                                            currentVoice.speed_preset === 'very_slow' ? 'Очень медленный' :
+                                            currentVoice.speed_preset === 'slow' ? 'Медленный' :
+                                            currentVoice.speed_preset === 'normal' ? 'Нормальный' :
+                                            currentVoice.speed_preset === 'fast' ? 'Быстрый' : 'Очень быстрый'
+                                        }</Label>
+                                        <Slider
+                                            id="speed-preset"
+                                            min={0}
+                                            max={4}
+                                            step={1}
+                                            value={[
+                                                currentVoice.speed_preset === 'very_slow' ? 0 :
+                                                currentVoice.speed_preset === 'slow' ? 1 :
+                                                currentVoice.speed_preset === 'normal' ? 2 :
+                                                currentVoice.speed_preset === 'fast' ? 3 : 4
+                                            ]}
+                                            onValueChange={(value) => {
+                                                const preset = value[0] === 0 ? 'very_slow' : 
+                                                             value[0] === 1 ? 'slow' : 
+                                                             value[0] === 2 ? 'normal' :
+                                                             value[0] === 3 ? 'fast' : 'very_fast';
+                                                console.log('Speed preset changed to:', preset);
+                                                setCurrentVoice(prev => ({ ...prev, speed_preset: preset }));
+                                            }}
+                                            className="mt-2"
+                                        />
+                                        <div className="flex justify-between text-xs text-muted-foreground mt-1 px-1">
+                                            <span className="text-center w-1/5">Очень медл.</span>
+                                            <span className="text-center w-1/5">Медленный</span>
+                                            <span className="text-center w-1/5">Нормальный</span>
+                                            <span className="text-center w-1/5">Быстрый</span>
+                                            <span className="text-center w-1/5">Очень быстрый</span>
+                                        </div>
+                                        <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded mt-1">
+                                            💡 <strong>Скорость:</strong> Подберите подходящий пресет. Сильно быстрый может обрывать конец фразы. 
+                                            Слишком медленный может тормозить речь. Начните с "Нормальный" и корректируйте по результату.
+                                        </div>
+                                    </div>
+                                    
                                 </div>
-                                
-                                <div>
-                                    <Label htmlFor="speed-preset">Скорость речи: {
-                                        currentVoice.speed_preset === 'very_slow' ? 'Очень медленный' :
-                                        currentVoice.speed_preset === 'slow' ? 'Медленный' :
-                                        currentVoice.speed_preset === 'normal' ? 'Нормальный' :
-                                        currentVoice.speed_preset === 'fast' ? 'Быстрый' : 'Очень быстрый'
-                                    }</Label>
-                                    <Slider
-                                        id="speed-preset"
-                                        min={0}
-                                        max={4}
-                                        step={1}
-                                        value={[
-                                            currentVoice.speed_preset === 'very_slow' ? 0 :
-                                            currentVoice.speed_preset === 'slow' ? 1 :
-                                            currentVoice.speed_preset === 'normal' ? 2 :
-                                            currentVoice.speed_preset === 'fast' ? 3 : 4
-                                        ]}
-                                        onValueChange={(value) => {
-                                            const preset = value[0] === 0 ? 'very_slow' : 
-                                                         value[0] === 1 ? 'slow' : 
-                                                         value[0] === 2 ? 'normal' :
-                                                         value[0] === 3 ? 'fast' : 'very_fast';
-                                            console.log('Speed preset changed to:', preset);
-                                            setCurrentVoice(prev => ({ ...prev, speed_preset: preset }));
-                                        }}
-                                        className="mt-2"
-                                    />
-                                    <div className="flex justify-between text-xs text-muted-foreground mt-1 px-1">
-                                        <span className="text-center w-1/5">Очень медл.</span>
-                                        <span className="text-center w-1/5">Медленный</span>
-                                        <span className="text-center w-1/5">Нормальный</span>
-                                        <span className="text-center w-1/5">Быстрый</span>
-                                        <span className="text-center w-1/5">Очень быстрый</span>
-                                    </div>
-                                    <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded mt-1">
-                                        💡 <strong>Скорость:</strong> Подберите подходящий пресет. Сильно быстрый может обрывать конец фразы. 
-                                        Слишком медленный может тормозить речь. Начните с "Нормальный" и корректируйте по результату.
-                                    </div>
-                                </div>
-                                
-                            </div>
+                            )}
                         </div>
                     )}
                     <DialogFooter className="flex-wrap gap-2">
                         <Button onClick={handleTestVoice} variant="outline" disabled={isTestingVoice} className="flex-1 min-w-[100px]">
                             <TestTube2 className="h-4 w-4 mr-2"/>{isTestingVoice ? 'Генерирую...' : 'Тест'}
                         </Button>
-                        <Button onClick={handleRenameVoice} variant="outline" className="flex-1 min-w-[140px] text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white">
-                            <Edit className="h-4 w-4 mr-2"/>Переименовать
-                        </Button>
-                        <Button onClick={handleSaveSettings} className="flex-1 min-w-[120px] bg-blue-600 hover:bg-blue-700">
-                            <Settings className="h-4 w-4 mr-2"/>Сохранить
-                        </Button>
+                        {/* Кнопки редактирования - только для пользовательских голосов */}
+                        {currentVoice?.voice_type === 'user' && (
+                            <>
+                                <Button onClick={handleRenameVoice} variant="outline" className="flex-1 min-w-[140px] text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white">
+                                    <Edit className="h-4 w-4 mr-2"/>Переименовать
+                                </Button>
+                                <Button onClick={handleSaveSettings} className="flex-1 min-w-[120px] bg-blue-600 hover:bg-blue-700">
+                                    <Settings className="h-4 w-4 mr-2"/>Сохранить
+                                </Button>
+                            </>
+                        )}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

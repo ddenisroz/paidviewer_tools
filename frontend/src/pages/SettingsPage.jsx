@@ -135,26 +135,16 @@ const SettingsPage = () => {
             {/* DonationAlerts Integration */}
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Gift className="h-5 w-5 text-purple-600" />
-                        DonationAlerts
-                    </CardTitle>
-                    <CardDescription>
-                        Подключение к системе донатов для получения уведомлений в реальном времени
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                            <p className="text-sm font-medium">
-                                {daConnected ? 'Подключено' : 'Отключено'}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                                {daConnected 
-                                    ? 'DonationAlerts подключен и готов к работе'
-                                    : 'Подключите DonationAlerts для получения донатов'
-                                }
-                            </p>
+                        <div className="flex items-center gap-2">
+                            <img 
+                                src="https://donationalerts.com/favicon.ico" 
+                                alt="DonationAlerts" 
+                                className="h-5 w-5"
+                            />
+                            <CardTitle>
+                                DonationAlerts
+                            </CardTitle>
                         </div>
                         <Switch
                             checked={daConnected}
@@ -162,12 +152,17 @@ const SettingsPage = () => {
                             disabled={daLoading || !hasMainIntegration}
                         />
                     </div>
+                    <CardDescription>
+                        {daConnected ? 'Подключен' : ''}
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
                     
-                    {!hasMainIntegration && (
+                    {daConnected && !hasMainIntegration && (
                         <div className="flex items-center space-x-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-md">
                             <AlertCircle className="w-4 h-4 text-yellow-600" />
                             <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                                Для подключения DonationAlerts необходимо сначала подключить хотя бы одну основную платформу (Twitch или VK Live)
+                                Сначала подключите основную платформу (Twitch или VK Live)
                             </p>
                         </div>
                     )}
@@ -193,10 +188,6 @@ const SettingsPage = () => {
                         <div className="flex justify-between">
                             <span className="text-sm text-muted-foreground">ID личного кабинета:</span>
                             <span className="text-sm font-medium">{user?.id}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Имя пользователя:</span>
-                            <span className="text-sm font-medium">{user?.username || user?.display_name}</span>
                         </div>
                     </div>
                 </CardContent>

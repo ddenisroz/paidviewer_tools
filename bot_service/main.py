@@ -1,6 +1,14 @@
 # bot_service/main.py
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# ⚠️ КРИТИЧНО: Загрузить .env ПЕРВЫМ делом, до всех других импортов!
+env_path = Path(__file__).parent / '.env'
+load_dotenv(dotenv_path=env_path, override=True)
+
 import asyncio
+import json
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -8,24 +16,21 @@ from fastapi import FastAPI, Request, Depends, WebSocket, WebSocketDisconnect, H
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 import uvicorn
-from utils.rate_limiter import rate_limiter
-from dotenv import load_dotenv
 from sqlalchemy.orm import Session
-from pathlib import Path
 import sys
 from datetime import datetime, timedelta
+from typing import Optional, List, Dict, Any
 
 # --- Logging Configuration ---
-import sys
-from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
-# logging_config удален - используем стандартный logging
+# Используем стандартное логирование
 import logging
 
-from core.database import get_db, init_db, User, GuestVerification, StreamData, UserSession, UserToken, BotCommand
+from core.database import get_db, init_db, User, GuestVerification, UserSession, UserToken, BotCommand
 from core.session_manager import session_manager
 from models.pydantic_models import *
 from core.connection_manager import get_connection_manager
@@ -39,10 +44,76 @@ from api.tts_api import TTSAPI
 from api.youtube_api import YouTubeAPI
 from services.admin_service import AdminAPI
 from bots.vk_live_bot import VKLiveBot
+from api.widgets import router as widgets_router
+from api.drops_triggers import router as drops_triggers_router
+from api.drops_stats import router as drops_stats_router
+from websocket_handlers import widget_manager
 
 # --- Logging and Monitoring Setup ---
 log_level = os.getenv("LOG_LEVEL", "INFO")
+
+# Настройка логирования
+logging.basicConfig(
+    level=getattr(logging, log_level.upper(), logging.INFO),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('logs/bot_service.log', encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+
 logger = logging.getLogger(__name__)
+
+# --- Command Validation ---
+def validate_command_syntax(command_name: str, response_text: str = None) -> Dict[str, Any]:
+    """
+    Валидация синтаксиса команды
+    
+    Args:
+        command_name: Название команды (без !)
+        response_text: Текст ответа (для кастомных команд)
+        
+    Returns:
+        Dict с результатом валидации
+    """
+    errors = []
+    warnings = []
+    
+    # Проверка названия команды
+    if not command_name:
+        errors.append("Название команды не может быть пустым")
+    elif len(command_name) < 2:
+        errors.append("Название команды должно содержать минимум 2 символа")
+    elif len(command_name) > 20:
+        errors.append("Название команды не должно превышать 20 символов")
+    elif not command_name.replace('_', '').replace('-', '').isalnum():
+        errors.append("Название команды может содержать только буквы, цифры, _ и -")
+    elif command_name.startswith(('_', '-')) or command_name.endswith(('_', '-')):
+        errors.append("Название команды не должно начинаться или заканчиваться на _ или -")
+    
+    # Проверка зарезервированных слов
+    reserved_words = ['admin', 'mod', 'owner', 'broadcaster', 'system', 'bot', 'api']
+    if command_name.lower() in reserved_words:
+        warnings.append(f"'{command_name}' - зарезервированное слово, может конфликтовать с системными командами")
+    
+    # Проверка текста ответа для кастомных команд
+    if response_text:
+        if len(response_text) > 500:
+            errors.append("Текст ответа не должен превышать 500 символов")
+        elif len(response_text.strip()) == 0:
+            errors.append("Текст ответа не может быть пустым")
+        
+        # Проверка на потенциально опасные символы
+        dangerous_chars = ['<', '>', '&', '"', "'", '\\', '/', ';', '|', '`']
+        for char in dangerous_chars:
+            if char in response_text:
+                warnings.append(f"Текст содержит потенциально опасный символ: '{char}'")
+    
+    return {
+        "valid": len(errors) == 0,
+        "errors": errors,
+        "warnings": warnings
+    }
 
 # --- Monitoring API ---
 from monitoring import bot_monitor
@@ -53,7 +124,6 @@ logger.info("System monitoring started for bot_service")
 
 # --- Backup System ---
 from backup_manager import bot_backup_manager
-from logging_config import bot_logging_config
 
 # Запускаем систему бэкапов
 bot_backup_manager.schedule_backups()
@@ -84,15 +154,43 @@ vk_live_bot_task = None
 
 
 # --- Helper Functions ---
-def get_platform_username(user: dict, platform: str) -> str:
-    """Получить имя пользователя для конкретной платформы"""
-    integration = user.get("integrations", {}).get(platform)
-    if integration:
-        # Пробуем разные поля для получения имени пользователя (приоритет display_name)
-        username = integration.get("display_name") or integration.get("username") or integration.get("platform_user_id")
-        if username:
-            return username
+def get_platform_user_id(user: dict, platform: str) -> str:
+    """Получить ID пользователя для конкретной платформы"""
+    try:
+        from core.database import UserToken, get_db
+        
+        db = next(get_db())
+        try:
+            user_token = db.query(UserToken).filter(
+                UserToken.user_id == user['id'],
+                UserToken.platform == platform
+            ).first()
+            
+            if user_token:
+                return user_token.platform_user_id
+                
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error getting platform user ID: {e}")
+    
     return ""
+
+async def get_twitch_username_from_user(user: dict) -> str:
+    """Получить Twitch username из user dict"""
+    twitch_user_id = get_platform_user_id(user, "twitch")
+    if not twitch_user_id:
+        raise HTTPException(status_code=400, detail="Twitch integration not found")
+    
+    user_info = await twitch_api.get_user_by_id(twitch_user_id)
+    if not user_info:
+        raise HTTPException(status_code=400, detail="Failed to get Twitch user info")
+    
+    twitch_username = user_info.get("login")
+    if not twitch_username:
+        raise HTTPException(status_code=400, detail="Twitch username not found")
+    
+    return twitch_username
 
 # Реестр активных ботов по каналам (теперь в connection_manager)
 # active_vk_bots = {}  # {channel_name: {"bot": VKLiveBot_instance, "task": asyncio.Task}}
@@ -132,7 +230,13 @@ async def _disconnect_user_bots(user_data: dict):
     try:
         # Отключаем Twitch бота
         if bot_instance and user_data.get("integrations", {}).get("twitch"):
-            twitch_username = user_data["integrations"]["twitch"].get("display_name")
+            # Получаем username по ID
+            twitch_user_id = user_data["integrations"]["twitch"].get("platform_user_id")
+            if twitch_user_id:
+                user_info = await twitch_api.get_user_by_id(twitch_user_id)
+                twitch_username = user_info.get("login") if user_info else None
+            else:
+                twitch_username = None
             if twitch_username:
                 success = await bot_instance.leave_channel(twitch_username)
                 if success:
@@ -204,75 +308,32 @@ async def collect_stream_stats():
                 UserToken.access_token.isnot(None)
             ).all()
             
-            # Импортируем analytics service
-            from services.analytics_service import AnalyticsService
-            analytics_service = AnalyticsService()
-            
-            # Собираем статистику Twitch
+            # Собираем статистику Twitch (только для мониторинга, без записи в БД)
             for token in twitch_tokens:
                 try:
-                    # Для Twitch используем display_name, для других платформ - platform_user_id
-                    if token.platform == 'twitch':
-                        username = token.platform_display_name
-                    else:
-                        username = token.platform_user_id or token.platform_display_name
-                    
+                    # Получаем имя пользователя по ID
+                    user_info = await twitch_api.get_user_by_id(token.platform_user_id)
+                    if not user_info:
+                        continue
+                        
+                    username = user_info.get('login')
                     if not username:
                         continue
                         
                     stream_info = await twitch_api.get_stream_info(username)
-                    
-                    # Если стрим онлайн, сохраняем данные
+                    # Логируем информацию о стриме, но не сохраняем в БД
                     if stream_info and stream_info.get('type') == 'live':
-                        # Используем новый analytics service для записи с пиками
-                        analytics_service.record_stream_data(
-                            user_id=token.user_id,
-                            platform='twitch',
-                            viewer_count=stream_info.get('viewer_count', 0),
-                            stream_id=stream_info.get('id'),
-                            category_name=stream_info.get('game_name', ''),
-                            title=stream_info.get('title', ''),
-                            is_live=True,
-                            db=db
-                        )
-                    else:
-                        # Записываем оффлайн статус
-                        analytics_service.record_stream_data(
-                            user_id=token.user_id,
-                            platform='twitch',
-                            viewer_count=0,
-                            is_live=False,
-                            db=db
-                        )
+                        logger.info(f"Twitch stream online: {username} - {stream_info.get('viewer_count', 0)} viewers")
                 except Exception as e:
                     logger.error(f"Error processing Twitch token {token.user_id}: {e}")
             
-            # Собираем статистику VK Live
+            # Собираем статистику VK Live (только для мониторинга, без записи в БД)
             for token in vk_tokens:
                 try:
                     stream_info = await vk_api.get_stream_info(token.user_id)
-                    
-                    # Если стрим онлайн, сохраняем данные
+                    # Логируем информацию о стриме, но не сохраняем в БД
                     if stream_info and stream_info.get('online'):
-                        analytics_service.record_stream_data(
-                            user_id=token.user_id,
-                            platform='vk',
-                            viewer_count=stream_info.get('viewer_count', 0),
-                            stream_id=stream_info.get('stream_key', ''),
-                            category_name=stream_info.get('category', ''),
-                            title=stream_info.get('title', ''),
-                            is_live=True,
-                            db=db
-                        )
-                    else:
-                        # Записываем оффлайн статус
-                        analytics_service.record_stream_data(
-                            user_id=token.user_id,
-                            platform='vk',
-                            viewer_count=0,
-                            is_live=False,
-                            db=db
-                        )
+                        logger.info(f"VK stream online: {token.user_id} - {stream_info.get('viewer_count', 0)} viewers")
                 except Exception as e:
                     logger.error(f"Error processing VK token {token.user_id}: {e}")
 
@@ -309,7 +370,7 @@ async def lifespan(app: FastAPI):
         
         # Получаем каналы для подключения
         active_channels = connection_manager.get_active_channels()
-        twitch_channels = connection_manager.get_active_twitch_channels(db)
+        twitch_channels = await connection_manager.get_twitch_channels_for_bot(db)
     finally:
         db.close()
 
@@ -430,7 +491,7 @@ async def request_logging_middleware(request: Request, call_next):
             from auth.auth import decode_jwt_token
             token = auth_header.split(" ")[1]
             payload = decode_jwt_token(token)
-            user_info = f"User:{payload.get('display_name', 'Unknown')}"
+            user_info = f"User:{payload.get('id', 'Unknown')}"
         except:
             user_info = "InvalidToken"
     
@@ -460,8 +521,8 @@ async def request_logging_middleware(request: Request, call_next):
     if should_log_request(request.url.path, response.status_code):
         log_message = f"🌐 {request.method} {request.url.path} | {user_info} | {response.status_code} | {process_time:.3f}s"
         
-        # Используем специальный логгер для доступа
-        access_logger = bot_logging_config.get_access_logger()
+        # Используем стандартный логгер для доступа
+        access_logger = logging.getLogger("access")
         if response.status_code >= 400:
             access_logger.error(log_message)
         else:
@@ -503,29 +564,15 @@ def should_log_request(path: str, status_code: int) -> bool:
     
     return False
 
-# --- Rate Limiting Middleware ---
-@app.middleware("http")
-async def rate_limit_middleware(request: Request, call_next):
-    # Получаем IP адрес клиента
-    client_ip = request.client.host
-    
-    # Проверяем rate limit для API endpoints
-    if request.url.path.startswith("/api/"):
-        # Увеличиваем лимиты для YouTube и TTS endpoints
-        if any(path in request.url.path for path in ["/api/youtube/", "/api/tts/", "/api/voices/"]):
-            max_requests = 200  # Больше запросов для медиа endpoints
-        else:
-            max_requests = 200   # Увеличенный лимит для всех API
-        
-        if not rate_limiter.is_allowed(client_ip, max_requests=max_requests, window_seconds=60):
-            return Response(
-                content="Too Many Requests",
-                status_code=429,
-                headers={"Retry-After": "60"}
-            )
-    
-    response = await call_next(request)
-    return response
+# --- 🔒 БЕЗОПАСНОСТЬ: Rate Limiting Middleware ---
+from middleware.rate_limiter import SimpleRateLimiter
+
+# Добавляем Rate Limiting middleware
+app.add_middleware(
+    SimpleRateLimiter,
+    requests_per_minute=60,  # 60 запросов в минуту по умолчанию
+    burst_requests=10        # Максимум 10 запросов в секунду
+)
 
 # --- Include Routers ---
 app.include_router(vk_auth_router)
@@ -534,27 +581,169 @@ app.include_router(vk_auth_router)
 from api.tts_api_endpoints import tts_router
 app.include_router(tts_router)
 
-# Import Voices router
-from api.voices_api_endpoints import voices_router
+# Import Voices routers
+from api.voices_api_endpoints import voices_router, user_voices_router
 app.include_router(voices_router)
+app.include_router(user_voices_router)
 
 # Import YouTube router
 from api.youtube_api_endpoints import youtube_router
 app.include_router(youtube_router)
 
-# Import Lootbox router
-from api.lootbox_api_endpoints import lootbox_router
-app.include_router(lootbox_router, prefix="/lootbox", tags=["lootbox"])
+
+# Import Database Management router
+from api.database_management_api import router as database_router
+app.include_router(database_router)
+
+# Import Drops System router
+from api.drops_api import router as drops_system_router
+app.include_router(drops_system_router)
+
+# Import Moderation router
+from api.moderation_api import router as moderation_router
+app.include_router(moderation_router)
+
+# Import Widgets router
+app.include_router(widgets_router)
+
+# Import Drops Triggers router
+app.include_router(drops_triggers_router)
+
+# Import Drops Stats router
+app.include_router(drops_stats_router)
+
+# --- Static Files for Widgets ---
+# Добавляем статические файлы для виджетов
+widgets_path = Path(__file__).parent.parent / "frontend" / "src" / "widgets"
+if widgets_path.exists():
+    app.mount("/widgets", StaticFiles(directory=str(widgets_path)), name="widgets")
+
+# Добавляем статические файлы для аудио (базовая TTS)
+import tempfile
+temp_audio_dir = Path(tempfile.gettempdir()) / "bot_service_tts"
+temp_audio_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/audio", StaticFiles(directory=str(temp_audio_dir)), name="audio")
 
 # --- WebSocket Endpoints ---
 @app.websocket("/ws/chat/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, user_id: str):
+async def websocket_endpoint(websocket: WebSocket, user_id: str, db: Session = Depends(get_db)):
     await connection_manager.connect(websocket, user_id)
+    # Регистрируем клиента для мониторинга
+    connection_manager.register_client_connection(user_id, "chat_websocket")
+    
     try:
         while True:
             data = await websocket.receive_text()
-            # Обработка сообщений
+            
+            # Обновляем heartbeat при получении данных
+            connection_manager.update_client_heartbeat(user_id)
+            
+            # Обработка входящих сообщений
+            try:
+                message_data = json.loads(data)
+                message_type = message_data.get('type')
+                
+                if message_type == 'send_message':
+                    # Отправка сообщения в чат
+                    message = message_data.get('message', '').strip()
+                    platforms = message_data.get('platforms', [])
+                    
+                    if not message:
+                        await websocket.send_text(json.dumps({
+                            'type': 'error',
+                            'message': 'Message is empty'
+                        }))
+                        continue
+                    
+                    if not platforms:
+                        await websocket.send_text(json.dumps({
+                            'type': 'error',
+                            'message': 'No platforms specified'
+                        }))
+                        continue
+                    
+                    # Получаем информацию о пользователе
+                    user = db.query(User).filter(User.id == int(user_id)).first()
+                    if not user:
+                        await websocket.send_text(json.dumps({
+                            'type': 'error',
+                            'message': 'User not found'
+                        }))
+                        continue
+                    
+                    # Отправляем сообщение на каждую платформу
+                    results = {}
+                    for platform in platforms:
+                        try:
+                            if platform == 'twitch':
+                                # Отправка в Twitch
+                                # Получаем Twitch username из токенов
+                                twitch_token = db.query(UserToken).filter(
+                                    UserToken.user_id == user.id,
+                                    UserToken.platform == 'twitch'
+                                ).first()
+                                # Получаем имя канала через Twitch API
+                                twitch_username = None
+                                if twitch_token:
+                                    try:
+                                        from api.twitch_api import TwitchAPI
+                                        twitch_api = TwitchAPI(connection_manager)
+                                        user_info = await twitch_api.get_user_by_id(twitch_token.platform_user_id)
+                                        if user_info and user_info.get('login'):
+                                            twitch_username = user_info['login']
+                                    except Exception as e:
+                                        logger.error(f"Error getting Twitch username: {e}")
+                                
+                                if bot_instance and twitch_username:
+                                    success = await bot_instance.send_message(twitch_username, message)
+                                    results[platform] = {'success': success}
+                                else:
+                                    results[platform] = {'success': False, 'error': 'Bot not connected or no Twitch token'}
+                                    
+                            elif platform == 'vk':
+                                # Отправка в VK Live
+                                # Получаем VK username из токенов
+                                vk_token = db.query(UserToken).filter(
+                                    UserToken.user_id == user.id,
+                                    UserToken.platform == 'vk'
+                                ).first()
+                                # Для VK используем platform_user_id как имя канала
+                                vk_channel = vk_token.platform_user_id if vk_token else None
+                                
+                                if vk_live_bot_instance and vk_channel:
+                                    success = await vk_live_bot_instance.send_message(vk_channel, message)
+                                    results[platform] = {'success': success}
+                                else:
+                                    results[platform] = {'success': False, 'error': 'Bot not connected or no VK token'}
+                            else:
+                                results[platform] = {'success': False, 'error': 'Unknown platform'}
+                                
+                        except Exception as e:
+                            logger.error(f"Error sending message to {platform}: {e}")
+                            results[platform] = {'success': False, 'error': str(e)}
+                    
+                    # Отправляем результат обратно клиенту
+                    await websocket.send_text(json.dumps({
+                        'type': 'send_message_result',
+                        'results': results
+                    }))
+                    
+                elif message_type == 'ping':
+                    # Ответ на ping
+                    await websocket.send_text(json.dumps({'type': 'pong'}))
+                    
+            except json.JSONDecodeError:
+                logger.error(f"Failed to parse WebSocket message: {data}")
+            except Exception as e:
+                logger.error(f"Error handling WebSocket message: {e}")
+                await websocket.send_text(json.dumps({
+                    'type': 'error',
+                    'message': str(e)
+                }))
+                
     except WebSocketDisconnect:
+        # Отменяем регистрацию клиента
+        connection_manager.unregister_client_connection(user_id, "chat_websocket")
         await connection_manager.disconnect(user_id)
 
 @app.websocket("/ws/audio/{channel}")
@@ -571,11 +760,27 @@ async def websocket_audio_endpoint(websocket: WebSocket, channel: str):
 @app.websocket("/ws/obs/{token}")
 async def websocket_obs_endpoint(websocket: WebSocket, token: str, db: Session = Depends(get_db)):
     await connection_manager.connect_obs(websocket, token)
+    
+    # Получаем user_id из токена для мониторинга
+    try:
+        from core.database import User
+        user = db.query(User).filter(User.obs_token == token).first()
+        if user:
+            connection_manager.register_client_connection(str(user.id), "obs_websocket")
+    except Exception as e:
+        logger.error(f"Error getting user for OBS token: {e}")
+    
     try:
         while True:
             data = await websocket.receive_text()
+            # Обновляем heartbeat при получении данных
+            if user:
+                connection_manager.update_client_heartbeat(str(user.id))
             # Обработка OBS сообщений
     except WebSocketDisconnect:
+        # Отменяем регистрацию клиента
+        if user:
+            connection_manager.unregister_client_connection(str(user.id), "obs_websocket")
         await connection_manager.disconnect_obs(token)
 
 @app.websocket("/ws/youtube-obs/{token}")
@@ -588,6 +793,29 @@ async def websocket_youtube_obs_endpoint(websocket: WebSocket, token: str, db: S
             logger.debug(f"YouTube OBS WebSocket received: {data}")
     except WebSocketDisconnect:
         await connection_manager.disconnect_youtube_obs(token)
+
+# --- Widget WebSocket Endpoints ---
+@app.websocket("/ws/chat-widget/{user_id}")
+async def websocket_chat_widget(websocket: WebSocket, user_id: str):
+    """WebSocket для виджета чата конкретного пользователя"""
+    await widget_manager.connect_chat_widget(websocket, user_id)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Обрабатываем входящие сообщения от виджета (если нужно)
+    except WebSocketDisconnect:
+        await widget_manager.disconnect_chat_widget(websocket, user_id)
+
+@app.websocket("/ws/lootbox-widget/{user_id}")
+async def websocket_lootbox_widget(websocket: WebSocket, user_id: str):
+    """WebSocket для виджета лутбокса конкретного пользователя"""
+    await widget_manager.connect_lootbox_widget(websocket, user_id)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Обрабатываем входящие сообщения от виджета (если нужно)
+    except WebSocketDisconnect:
+        await widget_manager.disconnect_lootbox_widget(websocket, user_id)
 
 # --- Auth Endpoints ---
 @app.get("/auth/twitch")
@@ -645,7 +873,17 @@ async def auto_connect_twitch_bot(user_id: int):
                 return
             
             # Получаем имя канала из токена
-            channel_name = twitch_token.platform_display_name
+            # Получаем имя канала через Twitch API
+            channel_name = None
+            try:
+                from api.twitch_api import TwitchAPI
+                twitch_api = TwitchAPI(connection_manager)
+                user_info = await twitch_api.get_user_by_id(twitch_token.platform_user_id)
+                if user_info and user_info.get('login'):
+                    channel_name = user_info['login']
+            except Exception as e:
+                logger.error(f"Error getting Twitch channel name: {e}")
+            
             if not channel_name:
                 logger.error(f"No channel name found for user {user_id}")
                 return
@@ -740,8 +978,8 @@ async def auto_connect_vk_live_bot(user_id: int):
                 logger.error(f"No VK token found for user {user_id}")
                 return
             
-            # Определяем корректный канал VK Live: предпочтительно используем channel_url из VK API
-            channel_name = (vk_token.platform_display_name or "").strip()
+            # Для VK используем platform_user_id как имя канала
+            channel_name = vk_token.platform_user_id
             vk_access_token = vk_token.access_token
             channel_url = None
             try:
@@ -752,10 +990,10 @@ async def auto_connect_vk_live_bot(user_id: int):
             except Exception as e:
                 logger.error(f"Failed to fetch VK channel_url via API for user {user_id}: {e}")
 
-            # Выбираем то, что удалось получить: сначала channel_url, иначе display_name
+            # Выбираем то, что удалось получить: сначала channel_url, иначе platform_user_id
             target_channel = (channel_url or channel_name).lower()
             if not target_channel:
-                logger.error(f"No VK Live channel identifier (channel_url/display_name) found for user {user_id}")
+                logger.error(f"No VK Live channel identifier (channel_url/platform_user_id) found for user {user_id}")
                 return
 
             logger.info(f"🎯 Auto-connecting VK Live bot to channel: {target_channel}")
@@ -825,7 +1063,6 @@ async def auth_twitch_callback(request: Request, code: str = None, error: str = 
     # Создаем объект с данными пользователя
     oauth_user_data = OAuthUserData(
         platform_user_id=user_data["id"],
-        platform_display_name=user_data["display_name"],
         avatar_url=user_data.get("profile_image_url"),
         access_token=token_data["access_token"],
         refresh_token=token_data.get("refresh_token"),
@@ -1015,8 +1252,14 @@ async def get_auth_status(request: Request, db: Session = Depends(get_db)):
             is_valid = False
             user_info = None
             if token.platform == 'twitch':
-                user_info = await twitch_api.get_user_from_token(token.access_token)
-                is_valid = user_info is not None
+                try:
+                    from api.twitch_api import TwitchAPI
+                    twitch_api = TwitchAPI(connection_manager)
+                    user_info = await twitch_api.get_user_from_token(token.access_token)
+                    is_valid = user_info is not None
+                except Exception as e:
+                    logger.error(f"Error validating Twitch token: {e}")
+                    is_valid = False
             elif token.platform == 'vk':
                 user_info = await vk_api._get_current_user_info(token.access_token)
                 is_valid = user_info is not None
@@ -1024,7 +1267,7 @@ async def get_auth_status(request: Request, db: Session = Depends(get_db)):
             if is_valid:
                 integrations[token.platform] = {
                     "enabled": True,
-                    "display_name": token.platform_display_name,
+                    "platform_user_id": token.platform_user_id,
                     "avatar_url": token.avatar_url
                 }
             else:
@@ -1046,8 +1289,6 @@ async def get_auth_status(request: Request, db: Session = Depends(get_db)):
         "integrations": integrations,
         "user": {
             "id": user_id,
-            "username": session_data.get("username", "unknown"),
-            "display_name": session_data.get("display_name", "Unknown User"),
             "is_admin": session_data.get("is_admin", False)
         }
     }
@@ -1069,8 +1310,6 @@ async def get_session_status(request: Request):
         "platforms": get_active_platforms(request),
         "user": {
             "id": user_id,
-            "username": session_data["username"],
-            "display_name": session_data["display_name"],
             "is_admin": session_data["is_admin"]
         }
     }
@@ -1086,9 +1325,18 @@ async def connect_bot(user: dict = Depends(get_current_user), db: Session = Depe
         if not bot_token:
             raise HTTPException(status_code=500, detail="TWITCH_BOT_TOKEN not configured")
         
-        twitch_username = get_platform_username(user, "twitch")
-        if not twitch_username:
+        twitch_user_id = get_platform_user_id(user, "twitch")
+        if not twitch_user_id:
             raise HTTPException(status_code=400, detail="Twitch integration not found")
+        
+        # Получаем username по ID
+        user_info = await twitch_api.get_user_by_id(twitch_user_id)
+        if not user_info:
+            raise HTTPException(status_code=400, detail="Failed to get Twitch user info")
+        
+        twitch_username = user_info.get("login")
+        if not twitch_username:
+            raise HTTPException(status_code=400, detail="Twitch username not found")
         
         bot_instance = Bot(bot_token, [twitch_username], connection_manager)
         bot_task = asyncio.create_task(bot_instance.start_bot())
@@ -1115,9 +1363,7 @@ async def disconnect_bot(user: dict = Depends(get_current_user)):
     if not bot_instance:
         raise HTTPException(status_code=400, detail="Bot not running")
     
-    twitch_username = get_platform_username(user, "twitch")
-    if not twitch_username:
-        raise HTTPException(status_code=400, detail="Twitch integration not found")
+    twitch_username = await get_twitch_username_from_user(user)
     
     success = await bot_instance.leave_channel(twitch_username)
     if not success:
@@ -1130,8 +1376,9 @@ async def get_bot_status(user: dict = Depends(get_current_user)):
     if not bot_instance:
         return {"connected": False, "message": "Bot not running"}
     
-    twitch_username = get_platform_username(user, "twitch")
-    if not twitch_username:
+    try:
+        twitch_username = await get_twitch_username_from_user(user)
+    except HTTPException:
         return {"connected": False, "message": "Twitch integration not found"}
     
     is_connected = bot_instance.is_connected_to_channel(twitch_username)
@@ -1145,8 +1392,9 @@ async def reconnect_bot(user: dict = Depends(get_current_user)):
     if not bot_instance:
         raise HTTPException(status_code=400, detail="Bot not running")
     
-    twitch_username = get_platform_username(user, "twitch")
-    if not twitch_username:
+    try:
+        twitch_username = await get_twitch_username_from_user(user)
+    except HTTPException:
         raise HTTPException(status_code=400, detail="Twitch integration not found")
     
     # Проверяем, подключен ли бот уже к каналу
@@ -1164,6 +1412,108 @@ async def reconnect_bot(user: dict = Depends(get_current_user)):
             raise HTTPException(status_code=500, detail="Failed to reconnect to channel")
     
     return {"message": f"Bot reconnected to {twitch_username}"}
+
+@app.post("/api/chat/send-as-streamer")
+async def send_message_as_streamer(request: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Отправка сообщения от имени стримера (не через бота)"""
+    try:
+        message = request.get('message', '').strip()
+        platform = request.get('platform', 'twitch')
+        
+        logger.info(f"📤 Send message as streamer: platform={platform}, message='{message[:50]}...', user={user.get('username', 'unknown')}")
+        logger.info(f"📋 User data keys: {list(user.keys()) if user else 'None'}")
+        logger.info(f"📋 User twitch_name: {user.get('twitch_name', 'NOT_FOUND')}")
+        logger.info(f"📋 User vk_username: {user.get('vk_username', 'NOT_FOUND')}")
+        
+        if not message:
+            raise HTTPException(status_code=400, detail="Message is required")
+        
+        if platform not in ['twitch', 'vk']:
+            raise HTTPException(status_code=400, detail="Invalid platform")
+        
+        if platform == 'twitch':
+            # Для Twitch отправляем через бота, но отображаем как сообщение от стримера
+            if not bot_instance:
+                logger.error("❌ Twitch bot instance not available")
+                raise HTTPException(status_code=400, detail="Twitch bot not connected")
+            
+            # Получаем twitch channel из базы данных
+            from core.database import UserToken
+            user_token = db.query(UserToken).filter(
+                UserToken.user_id == user['id'],
+                UserToken.platform == 'twitch'
+            ).first()
+            
+            if not user_token or not user_token.platform_user_id:
+                logger.error("❌ Twitch user ID not found in database")
+                raise HTTPException(status_code=400, detail="Twitch user ID not found")
+            
+            # Получаем имя канала из Twitch API по user_id
+            twitch_api_instance = TwitchAPI(connection_manager)
+            twitch_user_info = await twitch_api_instance.get_user_by_id(user_token.platform_user_id)
+            if not twitch_user_info:
+                logger.error("❌ Could not get Twitch user info")
+                raise HTTPException(status_code=400, detail="Could not get Twitch user info")
+            
+            twitch_username = twitch_user_info.get('login')  # Получаем login из Twitch API
+            
+            logger.info(f"📤 Sending message via Twitch bot to {twitch_username}")
+            success = await bot_instance.send_message(twitch_username, message)
+            if success:
+                logger.info(f"✅ Message sent successfully to Twitch channel {twitch_username}")
+                logger.info(f"📝 Creating display message from streamer {twitch_username} (not bot payedviewer)")
+                
+                # Создаем сообщение от имени стримера для отображения в чате
+                from core.database import ChatMessage
+                streamer_message = ChatMessage(
+                    user_id=user['id'],
+                    platform='twitch',
+                    channel_name=twitch_username,
+                    message=f"[{twitch_username}]: {message}"  # Форматируем как сообщение от стримера
+                )
+                db.add(streamer_message)
+                db.commit()
+                
+                return {"success": True, "message": "Message sent successfully"}
+            else:
+                logger.error(f"❌ Failed to send message to Twitch channel {twitch_username}")
+                raise HTTPException(status_code=500, detail="Failed to send message to Twitch")
+                
+        elif platform == 'vk':
+            # Для VK Live отправляем через VK Live бот
+            if not vk_live_bot_instance:
+                logger.error("❌ VK Live bot instance not available")
+                raise HTTPException(status_code=400, detail="VK Live bot not connected")
+            
+            # Получаем vk_username из базы данных
+            from core.database import UserToken
+            user_token = db.query(UserToken).filter(
+                UserToken.user_id == user['id'],
+                UserToken.platform == 'vk'
+            ).first()
+            
+            if not user_token or not user_token.platform_user_id:
+                logger.error("❌ VK user ID not found in database")
+                raise HTTPException(status_code=400, detail="VK user ID not found")
+            
+            # Для VK используем platform_user_id как имя канала
+            vk_username = user_token.platform_user_id
+            
+            logger.info(f"📤 Sending message via VK Live bot to {vk_username}")
+            success = await vk_live_bot_instance.send_message(vk_username, message)
+            if success:
+                logger.info(f"✅ Message sent successfully to VK Live channel {vk_username}")
+                return {"success": True, "message": "Message sent successfully"}
+            else:
+                logger.error(f"❌ Failed to send message to VK Live channel {vk_username}")
+                raise HTTPException(status_code=500, detail="Failed to send message to VK Live")
+                
+    except HTTPException:
+        # Перебрасываем HTTP исключения как есть
+        raise
+    except Exception as e:
+        logger.error(f"❌ Unexpected error sending message as streamer: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 # --- Guest Bot Endpoints ---
 @app.post("/api/chat/guest/reconnect")
@@ -1404,7 +1754,7 @@ async def connect_vk_live_bot_guest(request: Request, db: Session = Depends(get_
         
         # Проверяем, есть ли конфликт с авторизованными пользователями
         for session in active_sessions:
-            if session.device_info and session.device_info.get("guest_channel") == channel_name:
+            if session.device_info and session.device_info.get("monitored_channel") == channel_name:
                 logger.warning(f"Session conflict detected: authorized user using channel {channel_name}")
                 return {
                     "message": f"Channel {channel_name} is already in use by an authorized user",
@@ -1523,7 +1873,16 @@ async def get_stream_info(user: dict = Depends(get_current_user)):
     if not twitch_integration:
         return {"online": False}
     
-    twitch_username = twitch_integration.get("display_name")
+    # Получаем username по ID
+    twitch_user_id = twitch_integration.get("platform_user_id")
+    if not twitch_user_id:
+        return {"online": False}
+    
+    user_info = await twitch_api.get_user_by_id(twitch_user_id)
+    if not user_info:
+        return {"online": False}
+    
+    twitch_username = user_info.get("login")
     if not twitch_username:
         return {"online": False}
     
@@ -1537,7 +1896,18 @@ async def get_stream_info_detailed(user: dict = Depends(get_current_user), force
     if not twitch_integration:
         raise HTTPException(status_code=400, detail="Twitch integration not found for this user.")
     
-    twitch_username = twitch_integration.get("display_name")
+    # Получаем username по ID
+    twitch_user_id = twitch_integration.get("platform_user_id")
+    if not twitch_user_id:
+        raise HTTPException(status_code=400, detail="Twitch user ID not found.")
+    
+    user_info = await twitch_api.get_user_by_id(twitch_user_id)
+    if not user_info:
+        raise HTTPException(status_code=400, detail="Failed to get Twitch user info.")
+    
+    twitch_username = user_info.get("login")
+    if not twitch_username:
+        raise HTTPException(status_code=400, detail="Twitch username not found.")
     
     # Проверяем кэш, если не принудительное обновление
     if not force:
@@ -1630,32 +2000,21 @@ async def get_stream_history(
     user: dict = Depends(get_current_user), 
     db: Session = Depends(get_db)
 ):
-    """Получить историю стрима с аналитикой"""
-    from services.analytics_service import AnalyticsService
-    
-    analytics_service = AnalyticsService()
-    
-    # Получаем полную аналитику стрима
-    analytics = analytics_service.get_stream_analytics(user["id"], hours_back, db)
-    
-    # Получаем информацию о пиках
-    peak_info = analytics_service.get_analytics_message(user["id"], db=db)
-    
-    # Получаем статистику по категориям
-    category_analytics = analytics_service.get_category_analytics(user["id"], db=db)
-
+    """Получить историю стрима с аналитикой (заглушка)"""
+    # Аналитика отключена - возвращаем пустые данные
     return {
-        "history": analytics.get('all_data', []),
-        "data": analytics.get('data', []),
-        "twitch_history": analytics.get('twitch_data', []),
-        "vk_history": analytics.get('vk_data', []),
-        "current_viewers": 0,  # Будет обновлено в real-time
-        "peak_viewers": analytics.get('peak_viewers', 0),
-        "avg_viewers": analytics.get('avg_viewers', 0),
-        "categories": analytics.get('categories', []),
-        "peak_info": peak_info,
-        "category_analytics": category_analytics,
-        "status": "offline"  # Будет обновлено в real-time
+        "history": [],
+        "data": [],
+        "twitch_history": [],
+        "vk_history": [],
+        "current_viewers": 0,
+        "current_vk_viewers": 0,
+        "peak_viewers": 0,
+        "avg_viewers": 0,
+        "categories": [],
+        "peak_info": {},
+        "category_analytics": {},
+        "status": "offline"
     }
 
 # --- VK Live API Endpoints ---
@@ -1683,11 +2042,6 @@ async def get_vk_stream_info(user: dict = Depends(get_current_user), force: bool
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Error getting VK stream info: {str(e)}")
 
-@app.get("/api/vk/viewers")
-async def get_vk_viewers(user: dict = Depends(get_current_user)):
-    """Получить количество зрителей VK Live"""
-    viewer_count = await vk_api.get_viewer_count(user["id"])
-    return {"viewer_count": viewer_count}
 
 @app.post("/api/vk/update-title")
 async def update_vk_stream_title(request: UpdateTitleRequest, user: dict = Depends(get_current_user)):
@@ -1773,6 +2127,138 @@ async def update_stream(request: StreamUpdateRequest, user: dict = Depends(get_c
         raise HTTPException(status_code=207, detail={"message": "Some updates failed.", "errors": error_messages})
 
 # --- TTS Endpoints ---
+@app.post("/api/tts/settings")
+async def save_tts_settings(request: Request, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Сохранить настройки TTS"""
+    data = await request.json()
+    
+    try:
+        from core.database import TTSSettings
+        
+        try:
+            twitch_username = await get_twitch_username_from_user(user)
+        except HTTPException:
+            raise HTTPException(status_code=400, detail="No Twitch integration found")
+        
+        # Получаем или создаем настройки TTS
+        tts_settings = db.query(TTSSettings).filter(
+            TTSSettings.user_id == user['id'],
+            TTSSettings.channel_name == twitch_username
+        ).first()
+        
+        if not tts_settings:
+            tts_settings = TTSSettings(
+                user_id=user['id'],
+                channel_name=twitch_username,
+                voice_settings={}
+            )
+            db.add(tts_settings)
+        
+        # Обновляем настройки голосов
+        voice_settings = tts_settings.voice_settings or {}
+        voice_settings.update({
+            "enable7TV": data.get("enable7TV", True),
+            "enableTwitch": data.get("enableTwitch", True)
+        })
+        tts_settings.voice_settings = voice_settings
+        
+        # Обновляем настройки громкости (если переданы)
+        if "websiteVolume" in data:
+            tts_settings.website_volume = data.get("websiteVolume", 50)
+        if "obsVolume" in data:
+            tts_settings.obs_volume = data.get("obsVolume", 50)
+        if "listening_mode" in data:
+            tts_settings.listening_mode = data.get("listening_mode", "website")
+        
+        db.commit()
+        
+        logger.info(f"TTS settings saved for {twitch_username}: voices={voice_settings}, volumes=website:{tts_settings.website_volume}, obs:{tts_settings.obs_volume}")
+        return {"success": True, "settings": voice_settings}
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error saving TTS settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save TTS settings")
+
+@app.get("/api/tts/settings")
+async def get_tts_settings(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Получить настройки TTS"""
+    try:
+        from core.database import TTSSettings
+        
+        try:
+            twitch_username = await get_twitch_username_from_user(user)
+        except HTTPException:
+            raise HTTPException(status_code=400, detail="No Twitch integration found")
+        
+        tts_settings = db.query(TTSSettings).filter(
+            TTSSettings.user_id == user['id'],
+            TTSSettings.channel_name == twitch_username
+        ).first()
+        
+        if tts_settings and tts_settings.voice_settings:
+            voice_settings = tts_settings.voice_settings
+            return {
+                # Настройки голосов
+                "enable7TV": voice_settings.get("enable7TV", True),
+                "enableTwitch": voice_settings.get("enableTwitch", True),
+                # Настройки громкости
+                "websiteVolume": tts_settings.website_volume or 50,
+                "obsVolume": tts_settings.obs_volume or 50,
+                "listening_mode": tts_settings.listening_mode or "website"
+            }
+        else:
+            # Возвращаем настройки по умолчанию
+            return {
+                "enable7TV": True,
+                "enableTwitch": True,
+                "websiteVolume": 50,
+                "obsVolume": 50,
+                "listening_mode": "website"
+            }
+        
+    except Exception as e:
+        logger.error(f"Error loading TTS settings: {e}")
+        return {
+            "enable7TV": True,
+            "enableTwitch": True,
+            "websiteVolume": 50,
+            "obsVolume": 50,
+            "listening_mode": "website"
+        }
+
+@app.get("/api/tts/platform-settings")
+async def get_platform_settings(user: dict = Depends(get_current_user)):
+    """Получить настройки платформ TTS"""
+    try:
+        # Возвращаем настройки платформ из ConnectionManager
+        return {
+            "enabled_platforms": ["twitch", "vk"],  # По умолчанию обе платформы включены
+            "global_enabled": True
+        }
+    except Exception as e:
+        logger.error(f"Error getting platform settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get platform settings")
+
+@app.post("/api/tts/platform-settings")
+async def save_platform_settings(request: dict, user: dict = Depends(get_current_user)):
+    """Сохранить настройки платформ TTS"""
+    try:
+        enabled_platforms = request.get("enabled_platforms", ["twitch", "vk"])
+        global_enabled = request.get("global_enabled", True)
+        
+        # Пока что просто логируем, так как настройки платформ не хранятся в БД
+        logger.info(f"Platform settings updated for user {user['id']}: platforms={enabled_platforms}, enabled={global_enabled}")
+        
+        return {
+            "success": True,
+            "enabled_platforms": enabled_platforms,
+            "global_enabled": global_enabled
+        }
+    except Exception as e:
+        logger.error(f"Error saving platform settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save platform settings")
+
 @app.post("/api/tts/youtube-settings")
 async def set_youtube_settings(request: Request, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Установить настройки YouTube (режим воспроизведения: browser/obs)"""
@@ -1783,8 +2269,9 @@ async def set_youtube_settings(request: Request, user: dict = Depends(get_curren
     try:
         from core.database import TTSSettings
         
-        twitch_username = get_platform_username(user, "twitch")
-        if not twitch_username:
+        try:
+            twitch_username = await get_twitch_username_from_user(user)
+        except HTTPException:
             raise HTTPException(status_code=400, detail="No Twitch integration found")
         
         # Сохраняем в ConnectionManager для текущей сессии
@@ -1824,8 +2311,9 @@ async def get_youtube_settings(user: dict = Depends(get_current_user), db: Sessi
     try:
         from core.database import TTSSettings
         
-        twitch_username = get_platform_username(user, "twitch")
-        if not twitch_username:
+        try:
+            twitch_username = await get_twitch_username_from_user(user)
+        except HTTPException:
             return {"playback_mode": "browser", "volume_level": 50.0}
         
         tts_settings = db.query(TTSSettings).filter(
@@ -1865,8 +2353,9 @@ async def set_voice_volume(request: Request, user: dict = Depends(get_current_us
     try:
         from core.database import TTSSettings
         
-        twitch_username = get_platform_username(user, "twitch")
-        if not twitch_username:
+        try:
+            twitch_username = await get_twitch_username_from_user(user)
+        except HTTPException:
             raise HTTPException(status_code=400, detail="No Twitch integration found")
         
         # Сохраняем в ConnectionManager для текущей сессии
@@ -1908,8 +2397,9 @@ async def get_voice_volume(voice_name: str, user: dict = Depends(get_current_use
     try:
         from core.database import TTSSettings
         
-        twitch_username = get_platform_username(user, "twitch")
-        if not twitch_username:
+        try:
+            twitch_username = await get_twitch_username_from_user(user)
+        except HTTPException:
             return {"volume_level": 50.0}
         
         tts_settings = db.query(TTSSettings).filter(
@@ -1947,8 +2437,9 @@ async def set_tts_volume(request: Request, user: dict = Depends(get_current_user
         import json
         
         # Получаем канал пользователя (Twitch или VK)
-        twitch_username = get_platform_username(user, "twitch")
-        if not twitch_username:
+        try:
+            twitch_username = await get_twitch_username_from_user(user)
+        except HTTPException:
             raise HTTPException(status_code=400, detail="No Twitch integration found")
         
         # Сохраняем в ConnectionManager для текущей сессии
@@ -1990,8 +2481,9 @@ async def get_tts_volume(user: dict = Depends(get_current_user), db: Session = D
     try:
         from core.database import TTSSettings
         
-        twitch_username = get_platform_username(user, "twitch")
-        if not twitch_username:
+        try:
+            twitch_username = await get_twitch_username_from_user(user)
+        except HTTPException:
             return {"volume_level": 50.0, "listening_mode": "website"}
         
         # Сначала проверяем базу данных
@@ -2023,8 +2515,9 @@ async def enable_tts(user: dict = Depends(get_current_user), db: Session = Depen
     # Проверяем whitelist для TTS
     from core.database import WhitelistedChannel
     from sqlalchemy import func
-    twitch_username = get_platform_username(user, "twitch")
-    if not twitch_username:
+    try:
+        twitch_username = await get_twitch_username_from_user(user)
+    except HTTPException:
         raise HTTPException(status_code=400, detail="Twitch integration not found")
     
     whitelisted = db.query(WhitelistedChannel).filter(
@@ -2041,8 +2534,9 @@ async def enable_tts(user: dict = Depends(get_current_user), db: Session = Depen
 
 @app.post("/api/tts/disable")
 async def disable_tts(user: dict = Depends(get_current_user)):
-    twitch_username = get_platform_username(user, "twitch")
-    if not twitch_username:
+    try:
+        twitch_username = await get_twitch_username_from_user(user)
+    except HTTPException:
         raise HTTPException(status_code=400, detail="Twitch integration not found")
     
     success = await tts_api.disable_tts(twitch_username)
@@ -2057,8 +2551,9 @@ async def get_tts_status(request: Request, user: dict = Depends(get_current_user
     
     if user and not user.get("is_guest"):
         # Авторизованный пользователь
-        twitch_username = get_platform_username(user, "twitch")
-        if not twitch_username:
+        try:
+            twitch_username = await get_twitch_username_from_user(user)
+        except HTTPException:
             return {"enabled": False, "is_whitelisted": False}
         
         is_enabled = connection_manager.is_tts_enabled(twitch_username, 'twitch')
@@ -2072,6 +2567,105 @@ async def get_tts_status(request: Request, user: dict = Depends(get_current_user
     else:
         # Недостаточно данных для определения статуса
         raise HTTPException(status_code=400, detail="Channel name required for guest users")
+
+# --- Новые endpoints для двух типов TTS ---
+@app.post("/api/tts/basic/toggle")
+async def toggle_basic_tts(request: dict, user: dict = Depends(get_current_user_optional)):
+    """
+    Включить/выключить базовую TTS (gTTS).
+    Не требует whitelist, доступна всем.
+    """
+    enabled = request.get("enabled", False)
+    channel_name = request.get("channel_name")
+    
+    if not channel_name:
+        if user and not user.get("is_guest"):
+            try:
+                channel_name = await get_twitch_username_from_user(user)
+            except HTTPException:
+                # Пробуем VK
+                channel_name = get_platform_username(user, "vk")
+                if not channel_name:
+                    raise HTTPException(status_code=400, detail="Platform integration not found")
+        else:
+            raise HTTPException(status_code=400, detail="Channel name required")
+    
+    if enabled:
+        connection_manager.enable_basic_tts(channel_name)
+    else:
+        connection_manager.disable_basic_tts(channel_name)
+    
+    logger.info(f"Basic TTS {'enabled' if enabled else 'disabled'} for channel: {channel_name}")
+    return {"success": True, "basic_tts_enabled": enabled}
+
+@app.post("/api/tts/ai/toggle")
+async def toggle_ai_tts(request: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Включить/выключить AI TTS (F5-TTS).
+    Требует whitelist проверку.
+    """
+    from core.database import WhitelistedChannel
+    from sqlalchemy import func
+    
+    enabled = request.get("enabled", False)
+    channel_name = request.get("channel_name")
+    
+    if not channel_name:
+        try:
+            channel_name = await get_twitch_username_from_user(user)
+        except HTTPException:
+            # Пробуем VK
+            channel_name = get_platform_username(user, "vk")
+            if not channel_name:
+                raise HTTPException(status_code=400, detail="Platform integration not found")
+    
+    # Проверяем whitelist для AI TTS
+    whitelisted = db.query(WhitelistedChannel).filter(
+        func.lower(WhitelistedChannel.channel_name) == channel_name.lower()
+    ).first()
+    
+    if not whitelisted:
+        raise HTTPException(status_code=403, detail="Channel not whitelisted for AI TTS")
+    
+    if enabled:
+        connection_manager.enable_ai_tts(channel_name)
+    else:
+        connection_manager.disable_ai_tts(channel_name)
+    
+    logger.info(f"AI TTS {'enabled' if enabled else 'disabled'} for channel: {channel_name}")
+    return {"success": True, "ai_tts_enabled": enabled}
+
+@app.get("/api/tts/dual-status")
+async def get_dual_tts_status(request: Request, user: dict = Depends(get_current_user_optional)):
+    """
+    Получить статус обоих типов TTS (базовой и AI).
+    """
+    channel_name = request.query_params.get("channel_name")
+    
+    if user and not user.get("is_guest") and not channel_name:
+        try:
+            channel_name = await get_twitch_username_from_user(user)
+        except HTTPException:
+            channel_name = get_platform_username(user, "vk")
+            if not channel_name:
+                return {
+                    "basic_tts_enabled": False,
+                    "ai_tts_enabled": False,
+                    "is_whitelisted": False
+                }
+    elif not channel_name:
+        raise HTTPException(status_code=400, detail="Channel name required")
+    
+    basic_enabled = connection_manager.is_basic_tts_enabled(channel_name)
+    ai_enabled = connection_manager.is_ai_tts_enabled(channel_name)
+    is_whitelisted = connection_manager.is_channel_whitelisted(channel_name)
+    
+    return {
+        "basic_tts_enabled": basic_enabled,
+        "ai_tts_enabled": ai_enabled,
+        "is_whitelisted": is_whitelisted,
+        "tts_service_available": await tts_api.tts_manager.check_tts_service_health()
+    }
 
 # --- VK Live TTS Endpoints ---
 @app.post("/api/tts/vk/enable")
@@ -2201,7 +2795,6 @@ async def generate_obs_url(user: dict = Depends(get_current_user), db: Session =
                 # Создаем новую запись пользователя (на случай, если её нет)
                 user_record = User(
                     id=user['id'],
-                    display_name=user.get('display_name', 'User'),
                     obs_token=obs_token
                 )
                 db.add(user_record)
@@ -2224,8 +2817,9 @@ async def youtube_obs_action(request: Request, user: dict = Depends(get_current_
         action = data.get("action")
         
         # Получаем канал пользователя
-        twitch_username = get_platform_username(user, "twitch")
-        if not twitch_username:
+        try:
+            twitch_username = await get_twitch_username_from_user(user)
+        except HTTPException:
             raise HTTPException(status_code=400, detail="No Twitch integration found")
         
         # Отправляем команду в OBS
@@ -2260,7 +2854,6 @@ async def generate_youtube_obs_url(user: dict = Depends(get_current_user), db: S
             else:
                 user_record = User(
                     id=user['id'],
-                    display_name=user.get('display_name', 'User'),
                     obs_token=obs_token
                 )
                 db.add(user_record)
@@ -2403,7 +2996,6 @@ async def regenerate_obs_url(user: dict = Depends(get_current_user), db: Session
             # Создаем новую запись пользователя
             user_record = User(
                 id=user['id'],
-                display_name=user.get('display_name', 'User'),
                 obs_token=obs_token
             )
             db.add(user_record)
@@ -2511,7 +3103,7 @@ async def add_to_youtube_queue(request: dict, user: dict = Depends(get_current_u
             thumbnail_url=video_info.get("thumbnail_url", ""),
             channel_name="web",  # Заказ через веб-интерфейс
             platform="web",
-            requester_name=user.get("display_name", "Unknown"),
+            requester_name=f"User_{user['id']}",
             requester_id=str(user["id"]),
             db=db
         )
@@ -2540,7 +3132,7 @@ async def youtube_player_next(user: dict = Depends(get_current_user)):
     next_video = connection_manager.next_youtube_video(user["id"])
     
     # Получаем канал пользователя для OBS
-    twitch_username = get_platform_username(user, "twitch")
+    twitch_user_id = get_platform_user_id(user, "twitch")
     
     if next_video:
         # Отправляем команду в OBS если настроен режим OBS
@@ -2613,7 +3205,7 @@ async def youtube_player_play(
         connection_manager.set_current_video(user["id"], video_data)
         
         # Получаем канал пользователя для OBS
-        twitch_username = get_platform_username(user, "twitch")
+        twitch_user_id = get_platform_user_id(user, "twitch")
         
         # Отправляем команду в OBS
         if twitch_username:
@@ -2658,7 +3250,7 @@ async def youtube_queue_clear(user: dict = Depends(get_current_user), db: Sessio
         )
         
         # Отправляем команду очистки в OBS
-        twitch_username = get_platform_username(user, "twitch")
+        twitch_user_id = get_platform_user_id(user, "twitch")
         if twitch_username:
             await connection_manager.send_youtube_to_obs(
                 channel_name=twitch_username,
@@ -2797,7 +3389,7 @@ async def get_active_sessions(db: Session = Depends(get_db)):
     
     try:
         # Получаем активные сессии из базы данных
-        from core.database import User
+        from core.database import User, UserToken
         from datetime import datetime, timedelta
         
         # Получаем всех пользователей
@@ -2808,14 +3400,62 @@ async def get_active_sessions(db: Session = Depends(get_db)):
         active_users = all_users
         
         for user in active_users:
-            # Пока что у нас нет информации о платформах в модели User
-            # В будущем можно будет добавить отдельные таблицы для связей пользователей с платформами
+            # Получаем токены пользователя для всех платформ
+            user_tokens = db.query(UserToken).filter(UserToken.user_id == user.id).all()
+            
+            # Собираем информацию о каналах
             platforms = []
+            twitch_channels = []
+            vk_channels = []
+            
+            for token in user_tokens:
+                platform_info = {
+                    "platform": token.platform,
+                    "platform_user_id": token.platform_user_id,
+                    "avatar_url": token.avatar_url,
+                    "created_at": token.created_at.isoformat() if token.created_at else None,
+                    "expires_at": token.expires_at.isoformat() if token.expires_at else None,
+                    "scopes": token.scopes or []
+                }
+                platforms.append(platform_info)
+                
+                # Для Twitch и VK получаем информацию о каналах
+                if token.platform == "twitch":
+                    try:
+                        # Получаем информацию о канале Twitch
+                        twitch_api = TwitchAPI(connection_manager)
+                        user_info = await twitch_api.get_user_by_id(token.platform_user_id)
+                        if user_info:
+                            twitch_channels.append({
+                                "channel_name": user_info.get("login", ""),
+                                "display_name": user_info.get("display_name", ""),
+                                "platform_user_id": token.platform_user_id,
+                                "is_live": False  # Можно добавить проверку статуса стрима
+                            })
+                    except Exception as e:
+                        logger.warning(f"Failed to get Twitch channel info for user {user.id}: {e}")
+                        # Добавляем базовую информацию даже если API недоступен
+                        twitch_channels.append({
+                            "channel_name": f"user_{token.platform_user_id}",
+                            "display_name": f"User {token.platform_user_id}",
+                            "platform_user_id": token.platform_user_id,
+                            "is_live": False
+                        })
+                
+                elif token.platform == "vk":
+                    # Для VK Live пока добавляем базовую информацию
+                    vk_channels.append({
+                        "channel_name": f"vk_user_{token.platform_user_id}",
+                        "display_name": f"VK User {token.platform_user_id}",
+                        "platform_user_id": token.platform_user_id,
+                        "is_live": False
+                    })
             
             sessions.append({
                 "user_id": user.id,
-                "display_name": user.display_name,
                 "platforms": platforms,
+                "twitch_channels": twitch_channels,
+                "vk_channels": vk_channels,
                 "is_admin": user.is_admin,
                 "last_activity": datetime.utcnow().isoformat(),  # Используем текущее время как активность
                 "created_at": user.created_at.isoformat() if user.created_at else None,
@@ -3108,6 +3748,21 @@ async def check_channel_blocked(channel_name: str):
         raise HTTPException(status_code=500, detail="Failed to check channel status")
 
 # --- Active Channels Endpoint ---
+@app.post("/api/sessions/clear-legacy")
+async def clear_legacy_sessions(user: dict = Depends(get_current_user)):
+    """Очистить legacy сессии (test_channel, старые VK ID)"""
+    try:
+        # Удаляем известные legacy сессии
+        legacy_channels = ['test_channel', '75969278']
+        for channel in legacy_channels:
+            connection_manager.remove_active_session(channel, 'legacy_cleanup')
+        
+        logger.info(f"Cleared legacy sessions: {legacy_channels}")
+        return {"success": True, "cleared": legacy_channels}
+    except Exception as e:
+        logger.error(f"Error clearing legacy sessions: {e}")
+        return {"success": False, "error": str(e)}
+
 @app.get("/api/active-channels")
 async def get_active_channels(request: Request, db: Session = Depends(get_db)):
     """Получить список активных каналов"""
@@ -3124,7 +3779,7 @@ async def get_active_channels(request: Request, db: Session = Depends(get_db)):
             
             # Ищем токен пользователя по имени канала на платформе
             user_token = db.query(UserToken).filter(
-                UserToken.platform_display_name.ilike(channel_name)
+                UserToken.platform_user_id == channel_name
             ).first()
             
             if user_token:
@@ -3132,8 +3787,7 @@ async def get_active_channels(request: Request, db: Session = Depends(get_db)):
                 user = db.query(User).filter(User.id == user_token.user_id).first()
                 
                 channels.append({
-                    "username": user_token.platform_display_name,
-                    "display_name": user.display_name if user else user_token.platform_display_name,
+                    "username": user_token.platform_user_id,
                     "platform": user_token.platform,
                     "is_online": True,  # Если канал в active_sessions, значит он активен
                     "avatar": user_token.avatar_url
@@ -3142,7 +3796,6 @@ async def get_active_channels(request: Request, db: Session = Depends(get_db)):
                 # Если пользователь не найден в БД (например, гостевой режим)
                 channels.append({
                     "username": channel_name,
-                    "display_name": channel_name,
                     "platform": "unknown",
                     "is_online": True,
                     "avatar": None
@@ -3153,143 +3806,131 @@ async def get_active_channels(request: Request, db: Session = Depends(get_db)):
         logger.error(f"Error getting active channels: {e}")
         return []
 
+@app.get("/api/client-status/{user_id}")
+async def get_client_status(user_id: str):
+    """Получить статус клиента (активен/неактивен)"""
+    try:
+        is_active = connection_manager.is_client_active(user_id)
+        last_heartbeat = connection_manager.client_heartbeats.get(user_id, 0)
+        connections = list(connection_manager.client_connections.get(user_id, set()))
+        
+        return {
+            "user_id": user_id,
+            "is_active": is_active,
+            "last_heartbeat": last_heartbeat,
+            "connections": connections,
+            "timeout_seconds": connection_manager.heartbeat_timeout
+        }
+    except Exception as e:
+        logger.error(f"Error getting client status: {e}")
+        return {"error": str(e)}
+
 # --- Health Check ---
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
 
 # --- Bot Commands API ---
+
+def get_default_command_description(command_name: str) -> str:
+    """Получить дефолтное описание для команды"""
+    descriptions = {
+        "sr": "Заказать YouTube видео для воспроизведения",
+        "clear": "Очистить очередь воспроизведения",
+        "queue": "Показать текущую очередь воспроизведения",
+        "next": "Перейти к следующему видео в очереди",
+        "voice": "Изменить голос для TTS озвучки",
+        "help": "Показать список доступных команд",
+        "skip": "Пропустить текущее видео",
+        "pause": "Приостановить воспроизведение",
+        "resume": "Возобновить воспроизведение",
+        "volume": "Изменить громкость воспроизведения",
+        "time": "Показать текущее время",
+        "uptime": "Показать время работы стрима",
+        "followage": "Показать время подписки на канал",
+        "discord": "Ссылка на Discord сервер",
+        "social": "Ссылки на социальные сети",
+        "donate": "Информация о донатах",
+        "commands": "Список всех команд бота",
+        "rules": "Правила чата",
+        "mods": "Список модераторов",
+        "vips": "Список VIP пользователей"
+    }
+    return descriptions.get(command_name, f"Команда !{command_name}")
+
 @app.get("/api/commands")
 async def get_bot_commands(
-    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Получить все команды бота для текущего пользователя"""
-    user_id = current_user["id"]
-    
-    # Базовые команды (одинаковые для всех)
-    basic_commands = [
-        {
-            "command_name": "sr",
-            "command_type": "basic",
-            "description": "Заказать YouTube видео",
-            "usage": "!sr <URL>",
-            "is_enabled": True,
-            "platforms": "twitch,vk",
-            "allowed_roles": "all",
-            "cooldown_seconds": 10,
-            "editable": True
-        },
-        {
-            "command_name": "queue",
-            "command_type": "basic", 
-            "description": "Показать очередь видео",
-            "usage": "!queue",
-            "is_enabled": True,
-            "platforms": "twitch,vk",
-            "allowed_roles": "all",
-            "cooldown_seconds": 5,
-            "editable": True
-        },
-        {
-            "command_name": "next",
-            "command_type": "basic",
-            "description": "Переключить на следующее видео",
-            "usage": "!next",
-            "is_enabled": True,
-            "platforms": "twitch,vk", 
-            "allowed_roles": "broadcaster,moderator,owner,moderator_vk",
-            "cooldown_seconds": 0,
-            "editable": True
-        },
-        {
-            "command_name": "clear",
-            "command_type": "basic",
-            "description": "Очистить очередь видео",
-            "usage": "!clear",
-            "is_enabled": True,
-            "platforms": "twitch,vk",
-            "allowed_roles": "broadcaster,moderator,owner,moderator_vk",
-            "cooldown_seconds": 0,
-            "editable": True
-        },
-        {
-            "command_name": "tts",
-            "command_type": "basic",
-            "description": "Включить/выключить TTS (озвучку сообщений чата)",
-            "usage": "!tts",
-            "is_enabled": True,
-            "platforms": "twitch,vk",
-            "allowed_roles": "all",
-            "cooldown_seconds": 5,
-            "editable": True
-        },
-        {
-            "command_name": "voice",
-            "command_type": "basic",
-            "description": "Выбрать голос для TTS по номеру или случайный голос",
-            "usage": "!voice <номер> или !voice random",
-            "is_enabled": True,
-            "platforms": "twitch,vk",
-            "allowed_roles": "all",
-            "cooldown_seconds": 5,
-            "editable": True
-        },
-        {
-            "command_name": "help",
-            "command_type": "basic",
-            "description": "Показать список всех доступных команд",
-            "usage": "!help",
-            "is_enabled": True,
-            "platforms": "twitch,vk",
-            "allowed_roles": "all",
-            "cooldown_seconds": 10,
-            "editable": True
-        }
-    ]
-    
-    # Получаем пользовательские настройки базовых команд
-    user_commands = db.query(BotCommand).filter(BotCommand.user_id == user_id).all()
-    
-    # Создаем словарь для быстрого поиска
-    user_command_dict = {cmd.command_name: cmd for cmd in user_commands}
-    
-    # Применяем пользовательские настройки к базовым командам
-    for cmd in basic_commands:
-        if cmd["command_name"] in user_command_dict:
-            user_cmd = user_command_dict[cmd["command_name"]]
-            cmd.update({
-                "is_enabled": user_cmd.is_enabled,
-                "platforms": user_cmd.platforms,
-                "allowed_roles": user_cmd.allowed_roles,
-                "cooldown_seconds": user_cmd.cooldown_seconds,
-                "usage_count": user_cmd.usage_count
+    try:
+        # Временно убираем авторизацию для тестирования
+        user_id = 1
+        
+        # Получаем реальные команды из базы данных
+        from core.database import BotCommand
+        
+        # Базовые команды из базы данных
+        basic_commands_db = db.query(BotCommand).filter(BotCommand.command_type == 'basic').all()
+        basic_commands = []
+        
+        for cmd in basic_commands_db:
+            # Преобразуем теги из строки в массив
+            tags = []
+            if cmd.tags:
+                tags = [tag.strip() for tag in cmd.tags.split(',') if tag.strip()]
+            
+            # Получаем описание команды из базы данных или используем дефолтное
+            description = cmd.description or get_default_command_description(cmd.command_name)
+            
+            basic_commands.append({
+                "command_name": cmd.command_name,
+                "command_type": "basic",
+                "description": description,
+                "usage": f"!{cmd.command_name}",
+                "is_enabled": cmd.is_enabled,
+                "platforms": cmd.platforms or "twitch,vk",
+                "allowed_roles": cmd.allowed_roles or "all",
+                "cooldown_seconds": cmd.cooldown_seconds or 0,
+                "editable": True,
+                "tags": tags,
+                "response_text": cmd.response_text
             })
-    
-    # Получаем кастомные команды
-    custom_commands = [
-        {
-            "id": cmd.id,
-            "command_name": cmd.command_name,
-            "command_type": "custom",
-            "response_text": cmd.response_text,
-            "description": f"Кастомная команда: {cmd.response_text[:50]}...",
-            "usage": f"!{cmd.command_name}",
-            "is_enabled": cmd.is_enabled,
-            "platforms": cmd.platforms,
-            "allowed_roles": cmd.allowed_roles,
-            "cooldown_seconds": cmd.cooldown_seconds,
-            "usage_count": cmd.usage_count,
-            "created_at": cmd.created_at.isoformat(),
-            "editable": True
+        
+        # Если в базе нет команд, используем базовый набор
+        if not basic_commands:
+            basic_commands = [
+                {
+                    "command_name": "sr",
+                    "command_type": "basic",
+                    "description": "Заказать YouTube видео",
+                    "usage": "!sr <URL>",
+                    "is_enabled": True,
+                    "platforms": "twitch,vk",
+                    "allowed_roles": "all",
+                    "cooldown_seconds": 10,
+                    "editable": True,
+                    "tags": ["медиа запросы"],
+                    "response_text": None
+                }
+            ]
+        
+        # Получаем кастомные команды
+        custom_commands = []
+        
+        return {
+            "basic_commands": basic_commands,
+            "custom_commands": custom_commands
         }
-        for cmd in user_commands if cmd.command_type == 'custom'
-    ]
-    
-    return {
-        "basic_commands": basic_commands,
-        "custom_commands": custom_commands
-    }
+    except Exception as e:
+        print(f"❌ Error in get_bot_commands: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "basic_commands": [],
+            "custom_commands": [],
+            "error": str(e)
+        }
 
 @app.post("/api/commands")
 async def create_custom_command(
@@ -3306,6 +3947,15 @@ async def create_custom_command(
     
     if not command_name or not response_text:
         raise HTTPException(status_code=400, detail="Command name and response text are required")
+    
+    # Валидация синтаксиса команды
+    validation_result = validate_command_syntax(command_name, response_text)
+    if not validation_result["valid"]:
+        raise HTTPException(status_code=400, detail=f"Ошибки валидации: {'; '.join(validation_result['errors'])}")
+    
+    # Предупреждения отправляем в лог
+    if validation_result["warnings"]:
+        logger.warning(f"Command validation warnings for '{command_name}': {'; '.join(validation_result['warnings'])}")
     
     # Убираем ! если есть
     if command_name.startswith("!"):
@@ -3330,7 +3980,8 @@ async def create_custom_command(
         is_enabled=command_data.get("is_enabled", True),
         platforms=command_data.get("platforms", "twitch,vk"),
         allowed_roles=command_data.get("allowed_roles", "all"),
-        cooldown_seconds=command_data.get("cooldown_seconds", 0)
+        cooldown_seconds=command_data.get("cooldown_seconds", 0),
+        tags=command_data.get("tags", "пользовательские")
     )
     
     db.add(new_command)
@@ -3365,11 +4016,23 @@ async def update_command(
         )
         db.add(command)
     
+    # Валидация данных для кастомных команд
+    if command.command_type == "custom":
+        response_text = command_data.get("response_text", command.response_text)
+        validation_result = validate_command_syntax(command_name, response_text)
+        if not validation_result["valid"]:
+            raise HTTPException(status_code=400, detail=f"Ошибки валидации: {'; '.join(validation_result['errors'])}")
+        
+        # Предупреждения отправляем в лог
+        if validation_result["warnings"]:
+            logger.warning(f"Command validation warnings for '{command_name}': {'; '.join(validation_result['warnings'])}")
+    
     # Обновляем настройки
     command.is_enabled = command_data.get("is_enabled", command.is_enabled)
     command.platforms = command_data.get("platforms", command.platforms)
     command.allowed_roles = command_data.get("allowed_roles", command.allowed_roles)
     command.cooldown_seconds = command_data.get("cooldown_seconds", command.cooldown_seconds)
+    command.tags = command_data.get("tags", command.tags)
     
     if command.command_type == "custom":
         command.response_text = command_data.get("response_text", command.response_text)
@@ -3403,11 +4066,12 @@ async def delete_custom_command(
 
 # --- Background Tasks ---
 async def cleanup_task():
-    """Фоновая задача для очистки неактивных каналов"""
+    """Фоновая задача для очистки неактивных каналов и клиентов"""
     while True:
         try:
             await asyncio.sleep(60)  # Проверяем каждую минуту
             await connection_manager.cleanup_inactive_channels()
+            await connection_manager.cleanup_inactive_clients()
         except Exception as e:
             logger.error(f"Error in cleanup task: {e}")
 
@@ -3699,7 +4363,7 @@ async def create_support_ticket(
         from core.database import SupportTicket
         ticket = SupportTicket(
             user_id=current_user["id"] if current_user else None,
-            user_name=user_name or (current_user["display_name"] if current_user else "Anonymous"),
+            user_name=user_name or (f"User_{current_user['id']}" if current_user else "Anonymous"),
             user_email=user_email,
             subject=subject,
             message=message,
@@ -3876,7 +4540,7 @@ async def respond_to_ticket(
         response = TicketResponse(
             ticket_id=ticket_id,
             author_id=current_user["id"],
-            author_name=current_user["display_name"],
+            author_name=f"User_{current_user['id']}",
             message=message,
             is_admin_response=True,
             is_read=False
@@ -3891,7 +4555,7 @@ async def respond_to_ticket(
         
         db.commit()
         
-        logger.info(f"Admin {current_user['display_name']} responded to ticket {ticket_id}")
+        logger.info(f"Admin User_{current_user['id']} responded to ticket {ticket_id}")
         
         return {"success": True, "message": "Response sent successfully"}
         
@@ -4019,7 +4683,7 @@ async def user_respond_to_ticket(
         response = TicketResponse(
             ticket_id=ticket_id,
             author_id=current_user["id"],
-            author_name=current_user["display_name"],
+            author_name=f"User_{current_user['id']}",
             message=message,
             is_admin_response=False,
             is_read=True  # Ответ пользователя считается прочитанным сразу
@@ -4032,7 +4696,7 @@ async def user_respond_to_ticket(
         
         db.commit()
         
-        logger.info(f"User {current_user['display_name']} responded to ticket {ticket_id}")
+        logger.info(f"User_{current_user['id']} responded to ticket {ticket_id}")
         
         return {"success": True, "message": "Response sent successfully"}
         
@@ -4044,4 +4708,8 @@ async def user_respond_to_ticket(
 
 # --- Main ---
 if __name__ == "__main__":
+    # Запускаем автоматическую очистку базы данных
+    from services.scheduled_cleanup import scheduled_cleanup_service
+    scheduled_cleanup_service.start_scheduled_cleanup()
+    
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

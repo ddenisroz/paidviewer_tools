@@ -48,10 +48,8 @@ class QueueManagementRequest(BaseModel):
 queue_service = QueueService()
 youtube_service = YouTubeService()
 
-def get_current_user(request: Request):
-    """Получение текущего пользователя (заглушка)"""
-    # TODO: Реализовать получение пользователя из сессии
-    return {"id": 1, "is_admin": True, "display_name": "TestUser"}
+# Импортируем правильную аутентификацию
+from auth.auth import get_current_user
 
 @youtube_router.post("/queue/add")
 async def add_video_to_queue(
@@ -68,7 +66,7 @@ async def add_video_to_queue(
             video_url=request.video_url,
             channel_name="web_interface",  # Добавлено через веб-интерфейс
             platform="web",
-            requester_name=user["display_name"],
+            requester_name=f"User_{user['id']}",
             requester_id=str(user["id"]),
             is_paid=request.is_paid,
             points_cost=request.points_cost,

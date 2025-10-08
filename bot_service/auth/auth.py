@@ -1,11 +1,10 @@
 # bot_service/auth.py
 import os
-import jwt
-import time
 import logging
 from typing import Optional, Dict, Any
 from fastapi import Request, HTTPException, Depends, status
 from core.session_manager import session_manager
+from core.security_enhanced import security_manager
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,7 @@ async def get_current_user(request: Request) -> Dict[str, Any]:
                 detail=f"Account blocked: {session_data.get('blocked_reason', 'No reason provided')}",
             )
         
-        logger.info(f"User authenticated via session: ID {session_data.get('id')}, Name: {session_data.get('display_name')}")
+        logger.info(f"User authenticated via session: ID {session_data.get('id')}")
         return session_data
     
     raise HTTPException(
@@ -52,16 +51,29 @@ async def get_admin_user(current_user: Dict[str, Any] = Depends(get_current_user
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return current_user
 
-def create_jwt_token(user_id: int) -> str:
-    """Создать JWT токен для пользователя (используется для OBS)."""
-    SECRET_KEY = os.getenv("SECRET_KEY")
-    if not SECRET_KEY:
-        raise RuntimeError("SECRET_KEY not configured for JWT creation")
+def create_jwt_token(user_id: int, token_type: str = "obs") -> str:
+    """
+    Создать JWT токен для пользователя
     
-    payload = {
-        "sub": str(user_id),  # sub должен быть строкой
-        "iat": int(time.time()),
-        "exp": int(time.time()) + 86400 * 365 # 1 год
-    }
+    Args:
+        user_id: ID пользователя
+        token_type: Тип токена (obs, access, refresh)
+        
+    Returns:
+        str: JWT токен
+    """
+    return security_manager.create_jwt_token(user_id, token_type)
+
+
+def verify_jwt_token(token: str, expected_type: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Проверить и декодировать JWT токен
     
-    return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+    Args:
+        token: JWT токен
+        expected_type: Ожидаемый тип токена
+        
+    Returns:
+        Dict: Декодированные данные токена
+    """
+    return security_manager.verify_jwt_token(token, expected_type)

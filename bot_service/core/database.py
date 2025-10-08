@@ -1,11 +1,14 @@
 # core/database.py
 import os
 import logging
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey, JSON, Text, Float, text
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey, JSON, Text, Float, text, Index, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, relationship
 from datetime import datetime
 from typing import Optional
+
+# Импортируем утилиту для работы с датой/временем
+from core.datetime_utils import utcnow_naive
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
@@ -38,19 +41,12 @@ try:
         __tablename__ = 'users'
         __table_args__ = {'extend_existing': True}
         id = Column(Integer, primary_key=True, index=True)
-        display_name = Column(String, nullable=False)
         is_admin = Column(Boolean, default=False)
         obs_token = Column(String, nullable=True)  # OBS токен для постоянной ссылки
         is_blocked = Column(Boolean, default=False)  # Заблокирован ли пользователь
         blocked_reason = Column(String, nullable=True)  # Причина блокировки
         blocked_at = Column(DateTime, nullable=True)  # Дата блокировки
-        created_at = Column(DateTime, default=datetime.utcnow)
-        
-        # DonationAlerts интеграция
-        donationalerts_access_token = Column(String, nullable=True)
-        donationalerts_refresh_token = Column(String, nullable=True)
-        donationalerts_token_expires = Column(DateTime, nullable=True)
-        temp_oauth_state = Column(String, nullable=True)  # Временное хранение OAuth state
+        created_at = Column(DateTime, default=utcnow_naive)
         
     class WhitelistedChannel(Base):
         """Модель для белого списка каналов"""
@@ -58,7 +54,7 @@ try:
         __table_args__ = {'extend_existing': True}
         id = Column(Integer, primary_key=True, index=True)
         channel_name = Column(String, unique=True, index=True, nullable=False)
-        created_at = Column(DateTime, default=datetime.utcnow)
+        created_at = Column(DateTime, default=utcnow_naive)
 
     class MutedUser(Base):
         """Модель заглушенных пользователей в чате"""
@@ -69,45 +65,13 @@ try:
         username = Column(String, index=True, nullable=False)
 
 
-    class StreamData(Base):
-        """Модель данных о потоке"""
-        __tablename__ = "stream_data"
-        __table_args__ = {'extend_existing': True}
-        id = Column(Integer, primary_key=True, index=True)
-        user_id = Column(String, ForeignKey('users.id'), nullable=False)
-        platform = Column(String, nullable=False)
-        stream_id = Column(String, nullable=True)
-        viewer_count = Column(Integer)
-        category_name = Column(String, nullable=True)
-        title = Column(String, nullable=True)  # Добавляем title
-        is_live = Column(Boolean, default=True)  # Статус стрима
-        timestamp = Column(DateTime, default=datetime.utcnow, index=True)
-
-    class StreamPeak(Base):
-        """Модель пиков онлайна"""
-        __tablename__ = "stream_peaks"
-        __table_args__ = {'extend_existing': True}
-        id = Column(Integer, primary_key=True, index=True)
-        user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-        platform = Column(String, nullable=False)  # twitch или vk
-        channel_name = Column(String, nullable=False, index=True)
-        peak_viewers = Column(Integer, nullable=False)  # Пиковое количество зрителей
-        peak_time = Column(DateTime, nullable=False)  # Время пика
-        stream_session_id = Column(String, nullable=True, index=True)  # ID сессии стрима
-        category_name = Column(String, nullable=True)  # Категория во время пика
-        title = Column(String, nullable=True)  # Название стрима во время пика
-        peak_type = Column(String, nullable=False, default='stream')  # stream, daily, weekly, monthly, all_time
-        created_at = Column(DateTime, default=datetime.utcnow, index=True)
-        
-        # Для быстрого поиска пиков
-        date_key = Column(String, nullable=False, index=True)  # Для группировки по дням/неделям/месяцам
 
     class BlockedBot(Base):
         __tablename__ = 'blocked_bots'
         __table_args__ = {'extend_existing': True}
         id = Column(Integer, primary_key=True, index=True)
         bot_name = Column(String, unique=True, index=True, nullable=False)
-        added_at = Column(DateTime, default=datetime.utcnow)
+        added_at = Column(DateTime, default=utcnow_naive)
 
     class Voice(Base):
         __tablename__ = 'voices'
@@ -120,7 +84,7 @@ try:
         owner_id = Column(Integer, ForeignKey('users.id'), nullable=True)  # Integer, не String!
         is_public = Column(Boolean, default=False)
         is_active = Column(Boolean, default=True)
-        created_at = Column(DateTime, default=datetime.utcnow)
+        created_at = Column(DateTime, default=utcnow_naive)
         
         # Настройки генерации TTS
         cfg_strength = Column(Float, default=2.5)
@@ -147,7 +111,7 @@ try:
         channel_name = Column(String, unique=True, index=True, nullable=False)
         verification_code = Column(String, nullable=False)
         is_verified = Column(Boolean, default=False)
-        created_at = Column(DateTime, default=datetime.utcnow)
+        created_at = Column(DateTime, default=utcnow_naive)
         verified_at = Column(DateTime, nullable=True)
 
     class BlockedChannel(Base):
@@ -159,7 +123,7 @@ try:
         reason = Column(String, nullable=True)
         blocked_by = Column(String, nullable=True)  # Кто заблокировал
         is_active = Column(Boolean, default=True)
-        created_at = Column(DateTime, default=datetime.utcnow)
+        created_at = Column(DateTime, default=utcnow_naive)
 
     class UserToken(Base):
         """Модель для токенов пользователей разных платформ"""
@@ -169,14 +133,13 @@ try:
         user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
         platform = Column(String, nullable=False)  # 'twitch', 'vk', etc.
         platform_user_id = Column(String, nullable=False)  # ID пользователя на платформе
-        platform_display_name = Column(String, nullable=False)  # Отображаемое имя на платформе
         avatar_url = Column(String, nullable=True)  # URL аватарки
         access_token = Column(String, nullable=False)
         refresh_token = Column(String, nullable=True)
         expires_at = Column(DateTime, nullable=True)
         scopes = Column(JSON, nullable=True) # Права доступа (scopes)
-        created_at = Column(DateTime, default=datetime.utcnow)
-        updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+        created_at = Column(DateTime, default=utcnow_naive)
+        updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
     class UserSession(Base):
         """Модель активных сессий, привязанная к единому user_id."""
@@ -186,8 +149,8 @@ try:
         user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
         session_id = Column(String, unique=True, index=True, nullable=False)
         device_info = Column(JSON, nullable=True)
-        created_at = Column(DateTime, default=datetime.utcnow)
-        last_activity = Column(DateTime, default=datetime.utcnow)
+        created_at = Column(DateTime, default=utcnow_naive)
+        last_activity = Column(DateTime, default=utcnow_naive)
         is_active = Column(Boolean, default=True)
 
     class VkGuestVerification(Base):
@@ -198,8 +161,40 @@ try:
         channel_name = Column(String, unique=True, index=True, nullable=False)
         verification_code = Column(String, nullable=False)
         is_verified = Column(Boolean, default=False)
-        created_at = Column(DateTime, default=datetime.utcnow)
+        created_at = Column(DateTime, default=utcnow_naive)
         verified_at = Column(DateTime, nullable=True)
+
+    class PsychologyAnalysis(Base):
+        """Модель результатов психологического анализа"""
+        __tablename__ = 'psychology_analysis'
+        __table_args__ = {'extend_existing': True}
+        id = Column(Integer, primary_key=True, index=True)
+        target_user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+        target_username = Column(String, nullable=False)
+        platform = Column(String, nullable=False)
+        analyzed_by_user_id = Column(Integer, ForeignKey('users.id'), nullable=False)  # Кто запросил анализ
+        analyzed_by_username = Column(String, nullable=False)
+        analysis_text = Column(Text, nullable=False)  # Результат анализа
+        messages_count = Column(Integer, nullable=False)  # Количество проанализированных сообщений
+        analysis_date = Column(DateTime, default=utcnow_naive, index=True)
+        ai_model_used = Column(String, nullable=True)  # Какая модель использовалась
+
+    class FilteredWord(Base):
+        """Модель заблокированных слов для TTS"""
+        __tablename__ = 'filtered_words'
+        __table_args__ = (
+            Index('idx_user_word', 'user_id', 'word'),
+            Index('idx_platform', 'platform'),
+            Index('idx_active', 'is_active'),
+            UniqueConstraint('user_id', 'word', 'platform', name='uq_user_word_platform'),
+            {'extend_existing': True}
+        )
+        id = Column(Integer, primary_key=True, index=True)
+        user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)  # Владелец фильтра
+        word = Column(String, nullable=False, index=True)  # Заблокированное слово
+        platform = Column(String, nullable=False, default='all')  # Платформа: all, twitch, vk
+        created_at = Column(DateTime, default=utcnow_naive, index=True)
+        is_active = Column(Boolean, default=True)  # Активен ли фильтр
 
     class YouTubeQueue(Base):
         """Модель очереди YouTube видео"""
@@ -236,8 +231,8 @@ try:
         points = Column(Integer, nullable=False, default=0)  # Количество баллов
         total_earned = Column(Integer, nullable=False, default=0)  # Всего заработано
         total_spent = Column(Integer, nullable=False, default=0)  # Всего потрачено
-        last_activity = Column(DateTime, default=datetime.utcnow)
-        created_at = Column(DateTime, default=datetime.utcnow)
+        last_activity = Column(DateTime, default=utcnow_naive)
+        created_at = Column(DateTime, default=utcnow_naive)
 
     class ChannelReward(Base):
         """Модель наград канала за баллы"""
@@ -259,8 +254,8 @@ try:
         cooldown_expires_at = Column(DateTime, nullable=True)  # Кулдаун
         prompt = Column(String, nullable=True)  # Подсказка для пользовательского ввода
         reward_type = Column(String, nullable=False, default='custom')  # custom, song_request, etc.
-        created_at = Column(DateTime, default=datetime.utcnow)
-        updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+        created_at = Column(DateTime, default=utcnow_naive)
+        updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
     class PointsTransaction(Base):
         """Модель транзакций баллов"""
@@ -312,8 +307,9 @@ try:
         cooldown_seconds = Column(Integer, default=0)  # Кулдаун в секундах
         last_used = Column(DateTime, nullable=True)  # Последнее использование
         usage_count = Column(Integer, default=0)  # Количество использований
-        created_at = Column(DateTime, default=datetime.utcnow)
-        updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+        tags = Column(String, nullable=True, default='')  # Теги команды через запятую
+        created_at = Column(DateTime, default=utcnow_naive)
+        updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
     class TTSSettings(Base):
         """Модель настроек TTS для каналов"""
@@ -325,8 +321,8 @@ try:
         enabled_platforms = Column(JSON, nullable=False, default=lambda: ['twitch', 'vk'])  # Список платформ
         voice_settings = Column(JSON, nullable=True)  # Настройки голоса
         filters = Column(JSON, nullable=True)  # Фильтры сообщений
-        created_at = Column(DateTime, default=datetime.utcnow)
-        updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+        created_at = Column(DateTime, default=utcnow_naive)
+        updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
     class Auction(Base):
         """Модель аукциона за баллы канала"""
@@ -370,41 +366,6 @@ try:
         is_valid = Column(Boolean, default=True)  # Валидна ли ставка
         created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
-    class GamblingGame(Base):
-        """Модель других азартных игр"""
-        __tablename__ = 'gambling_games'
-        __table_args__ = {'extend_existing': True}
-        id = Column(Integer, primary_key=True, index=True)
-        user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-        game_type = Column(String, nullable=False)  # roulette, dice, slots, etc.
-        game_name = Column(String, nullable=False)
-        description = Column(String, nullable=True)
-        min_bet = Column(Integer, nullable=False, default=10)
-        max_bet = Column(Integer, nullable=False, default=1000)
-        house_edge = Column(Float, nullable=False, default=0.05)  # Преимущество дома (5%)
-        is_enabled = Column(Boolean, default=True)
-        platforms = Column(JSON, nullable=False, default=lambda: ['twitch', 'vk'])
-        settings = Column(JSON, nullable=True)  # Дополнительные настройки игры
-        created_at = Column(DateTime, default=datetime.utcnow)
-        updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    class GamblingResult(Base):
-        """Модель результатов азартных игр"""
-        __tablename__ = 'gambling_results'
-        __table_args__ = {'extend_existing': True}
-        id = Column(Integer, primary_key=True, index=True)
-        user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-        game_id = Column(Integer, ForeignKey('gambling_games.id'), nullable=True)
-        participant_id = Column(String, nullable=False, index=True)
-        participant_name = Column(String, nullable=False)
-        platform = Column(String, nullable=False)
-        channel_name = Column(String, nullable=False)
-        game_type = Column(String, nullable=False)
-        bet_amount = Column(Integer, nullable=False)
-        win_amount = Column(Integer, nullable=False, default=0)  # Может быть 0 при проигрыше
-        is_win = Column(Boolean, default=False)
-        game_data = Column(JSON, nullable=True)  # Данные игры (числа, карты, etc.)
-        created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
     class SupportTicket(Base):
         """Модель тикетов поддержки"""
@@ -421,7 +382,7 @@ try:
         admin_notes = Column(Text, nullable=True)  # Заметки администратора
         is_archived = Column(Boolean, default=False)  # Флаг архивирования
         created_at = Column(DateTime, default=datetime.utcnow, index=True)
-        updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+        updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
         closed_at = Column(DateTime, nullable=True)
 
     class TicketResponse(Base):
@@ -534,32 +495,6 @@ class Lootbox(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-class LootboxReward(Base):
-    """Награды в лутбоксах"""
-    __tablename__ = "lootbox_rewards"
-    __table_args__ = {'extend_existing': True}
-    
-    id = Column(Integer, primary_key=True, index=True)
-    lootbox_id = Column(Integer, ForeignKey("lootboxes.id"), nullable=False, index=True)
-    name = Column(String, nullable=False)
-    description = Column(Text)
-    type = Column(String, nullable=False)  # currency, item, special, etc.
-    value = Column(String, nullable=False)  # JSON с данными награды
-    weight = Column(Integer, default=1)  # Вес для вероятности выпадения
-    is_active = Column(Boolean, default=True)
-
-class LootboxOpening(Base):
-    """Открытия лутбоксов"""
-    __tablename__ = "lootbox_openings"
-    __table_args__ = {'extend_existing': True}
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    lootbox_id = Column(Integer, ForeignKey("lootboxes.id"), nullable=False, index=True)
-    channel_name = Column(String, nullable=False, index=True)
-    reward_id = Column(Integer, ForeignKey("lootbox_rewards.id"), nullable=False)
-    opened_at = Column(DateTime, default=datetime.utcnow)
-    is_obs_animated = Column(Boolean, default=False)  # Была ли показана анимация в OBS
 
 class DonationAlert(Base):
     """Донаты через DonationAlerts"""
@@ -575,6 +510,176 @@ class DonationAlert(Base):
     alert_id = Column(String, unique=True, index=True)  # ID из DonationAlerts
     processed_at = Column(DateTime, default=datetime.utcnow)
     is_processed = Column(Boolean, default=False)
+
+    # === СИСТЕМА DROPS ===
+
+class DropsType(Base):
+    """Типы Drops"""
+    __tablename__ = 'drops_types'
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)  # "Стрик", "Донат", "Мифический"
+    description = Column(Text)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=utcnow_naive)
+
+class DropsQuality(Base):
+    """Качества Drops"""
+    __tablename__ = 'drops_qualities'
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)  # "Common", "Rare", "Epic", "Legendary"
+    color = Column(String, nullable=False)  # Hex цвет
+    weight = Column(Integer, default=100)  # Вес для случайного выбора
+    created_at = Column(DateTime, default=utcnow_naive)
+
+class DropsConfig(Base):
+    """Конфигурация Drops для канала"""
+    __tablename__ = 'drops_configs'
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    channel_name = Column(String, nullable=False, index=True)
+    platform = Column(String, nullable=False)  # twitch, vk
+    
+    # Стрик настройки
+    streak_enabled = Column(Boolean, default=True)
+    streak_days_common = Column(Integer, default=1)
+    streak_days_rare = Column(Integer, default=3)
+    streak_days_epic = Column(Integer, default=7)
+    streak_days_legendary = Column(Integer, default=14)
+    streak_messages_required = Column(Integer, default=5)  # Сообщений в чате за стрим
+    
+    # Донат настройки
+    donation_enabled = Column(Boolean, default=True)
+    donation_amount_common = Column(Float, default=50.0)
+    donation_amount_rare = Column(Float, default=100.0)
+    donation_amount_epic = Column(Float, default=500.0)
+    donation_amount_legendary = Column(Float, default=1000.0)
+    
+    # Мифический лутбокс
+    mythical_enabled = Column(Boolean, default=True)
+    mythical_min_interval_hours = Column(Integer, default=2)  # Минимальный интервал
+    mythical_max_interval_hours = Column(Integer, default=8)  # Максимальный интервал
+    mythical_window_duration_minutes = Column(Integer, default=5)  # Длительность окна
+    mythical_donation_amount = Column(Float, default=2000.0)  # Сумма для получения
+    mythical_last_appeared = Column(DateTime, nullable=True)  # Последнее появление
+    
+    created_at = Column(DateTime, default=utcnow_naive)
+    updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
+
+class DropsReward(Base):
+    """Награды в Drops"""
+    __tablename__ = 'drops_rewards'
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    channel_name = Column(String, nullable=False, index=True)
+    platform = Column(String, nullable=False)
+    
+    name = Column(String, nullable=False)
+    description = Column(Text)
+    quality_id = Column(Integer, ForeignKey('drops_qualities.id'), nullable=False)
+    weight = Column(Integer, default=100)  # Вес для случайного выбора
+    
+    # Тип награды
+    reward_type = Column(String, nullable=False)  # "points", "voice", "command", "custom"
+    reward_value = Column(String, nullable=False)  # Значение награды (JSON)
+    
+    # Звук награды
+    sound_file = Column(String, nullable=True)  # Путь к файлу звука
+    sound_volume = Column(Float, default=1.0)
+    
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=utcnow_naive)
+    updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
+
+class UserStreak(Base):
+    """Стрики пользователей"""
+    __tablename__ = 'user_streaks'
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    channel_name = Column(String, nullable=False, index=True)
+    platform = Column(String, nullable=False)
+    viewer_id = Column(String, nullable=False, index=True)
+    viewer_name = Column(String, nullable=False)
+    
+    current_streak = Column(Integer, default=0)
+    max_streak = Column(Integer, default=0)
+    last_activity = Column(DateTime, default=utcnow_naive)
+    messages_this_stream = Column(Integer, default=0)
+    
+    created_at = Column(DateTime, default=utcnow_naive)
+    updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
+    
+    # Уникальный индекс для предотвращения дублирования
+    __table_args__ = (
+        UniqueConstraint('user_id', 'viewer_id', 'platform', name='uq_user_streak'),
+        {'extend_existing': True}
+    )
+
+class DropsHistory(Base):
+    """История получения Drops"""
+    __tablename__ = 'drops_history'
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    channel_name = Column(String, nullable=False, index=True)
+    platform = Column(String, nullable=False)
+    viewer_id = Column(String, nullable=False, index=True)
+    viewer_name = Column(String, nullable=False)
+    
+    # Тип лутбокса
+    lootbox_type = Column(String, nullable=False)  # "streak", "donation", "mythical"
+    quality_id = Column(Integer, ForeignKey('drops_qualities.id'), nullable=False)
+    
+    # Полученная награда
+    reward_id = Column(Integer, ForeignKey('drops_rewards.id'), nullable=True)
+    reward_name = Column(String, nullable=False)
+    reward_type = Column(String, nullable=False)
+    reward_value = Column(String, nullable=False)  # JSON
+    
+    # Дополнительная информация
+    donation_amount = Column(Float, nullable=True)  # Сумма доната (если донатный)
+    streak_days = Column(Integer, nullable=True)  # Дни стрика (если стрик)
+    messages_count = Column(Integer, nullable=True)  # Количество сообщений
+    
+    # Внешние данные
+    donation_alert_id = Column(String, nullable=True)  # ID из DonationAlerts
+    chat_message_id = Column(Integer, nullable=True)  # ID сообщения в чате
+    
+    created_at = Column(DateTime, default=utcnow_naive, index=True)
+
+class MythicalDropsSession(Base):
+    """Сессии мифических Drops"""
+    __tablename__ = 'mythical_drops_sessions'
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    channel_name = Column(String, nullable=False, index=True)
+    platform = Column(String, nullable=False)
+    
+    # Параметры сессии
+    donation_amount = Column(Float, nullable=False)
+    window_duration_minutes = Column(Integer, nullable=False)
+    
+    # Статус
+    is_active = Column(Boolean, default=True)
+    started_at = Column(DateTime, default=utcnow_naive)
+    expires_at = Column(DateTime, nullable=False)
+    winner_viewer_id = Column(String, nullable=True)
+    winner_viewer_name = Column(String, nullable=True)
+    winner_donation_amount = Column(Float, nullable=True)
+    
+    created_at = Column(DateTime, default=utcnow_naive)
 
 # Функция для получения сессии БД
 def get_db():

@@ -286,3 +286,49 @@ install_*.py
 docker-compose.prod.yml
 env.production.example
 *.prod
+
+# Test and temporary files (добавлено при очистке)
+test_*.py
+*_test.py
+check_*.py
+seed_*.py
+create_*.py
+add_*.py
+demo_*.py
+temp_*.py
+tmp_*.py
+
+# Old backups (keep only recent)
+*/backups/*/*.db
+*/backups/*/*.tar.gz
+*/backups/*/*.zip
+
+# Audio temp files
+*/audio/temp/*
+*/audio/cache/*
+*/audio/test/*
+
+# Python bytecode and cache
+*.pyc
+*.pyo
+__pycache__/
+.Python
+
+# Logs (keep only error logs)
+*/logs/*.log
+*/logs/*/*.log
+!*/logs/errors/*.log
+
+# IDE and editor files
+*.swp
+*.swo
+*~
+.vscode/settings.json
+.vscode/launch.json
+.idea/workspace.xml
+.idea/tasks.xml
+
+# OS specific
+.DS_Store
+Thumbs.db
+desktop.ini

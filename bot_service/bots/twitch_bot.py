@@ -2,7 +2,8 @@
 import os
 import logging
 import asyncio
-from typing import List, Set
+import time
+from typing import List, Set, Optional
 from twitchio.ext import commands
 from core.connection_manager import ConnectionManager
 from core.database import BotCommand
@@ -83,12 +84,12 @@ class Bot(commands.Bot):
 
             # === ИНТЕГРАЦИЯ С СИСТЕМОЙ ЛУТБОКСОВ ===
             try:
-                from services.lootbox_service import LootboxService
+                # from services.lootbox_service import LootboxService  # Временно отключено
                 from core.database import get_db
                 
                 # Получаем сессию БД
                 db = next(get_db())
-                lootbox_service = LootboxService(db)
+                # lootbox_service = LootboxService(db)  # Временно отключено
                 
                 # Записываем сообщение для отслеживания активности
                 channel_name = message.channel.name.lower()
@@ -96,27 +97,21 @@ class Bot(commands.Bot):
                 
                 # Получаем или создаем пользователя
                 from core.database import User
-                user = db.query(User).filter(User.username == author_name).first()
-                if not user:
-                    # Создаем пользователя если его нет
-                    user = User(
-                        username=author_name,
-                        display_name=message.author.display_name or author_name,
-                        is_active=True
-                    )
-                    db.add(user)
-                    db.commit()
-                    db.refresh(user)
+                # Для гостевого режима создаем временного пользователя
+                user = User()
+                db.add(user)
+                db.commit()
+                db.refresh(user)
                 
                 # Записываем сообщение в систему лутбоксов
-                lootbox_service.record_chat_message(
-                    user_id=user.id,
-                    channel_name=channel_name,
-                    platform="twitch",
-                    message=message.content
-                )
+                # lootbox_service.record_chat_message(  # Временно отключено
+                #     user_id=user.id,
+                #     channel_name=channel_name,
+                #     platform="twitch",
+                #     message=message.content
+                # )
                 
-                logger.debug(f"📝 Chat message recorded for lootbox system: {author_name} in {channel_name}")
+                # logger.debug(f"📝 Chat message recorded for lootbox system: {author_name} in {channel_name}")
                 
             except Exception as e:
                 logger.error(f"Error recording chat message for lootbox system: {e}")
@@ -133,10 +128,51 @@ class Bot(commands.Bot):
             # Логируем все входящие сообщения для отладки
             logger.info(f"📨 TWITCH CHAT [{channel_name}] {author_name}: {content}")
             logger.info(f"🎯 BOT IS LISTENING TO TWITCH CHAT - CHANNEL: {channel_name}")
+            logger.info(f"🤖 Bot nick: {getattr(self, 'nick', 'NOT_SET')}, Author: {author_name}, Echo: {getattr(message, 'echo', False)}")
             
             
-            # Игнорируем сообщения от самого бота
+            # Обрабатываем сообщения от бота (ECHO) как сообщения стримера
             if message.echo:
+                # Получаем реальное имя стримера из базы данных
+                streamer_name = await self._get_streamer_name_by_channel(channel_name)
+                
+                # Это сообщение от бота - показываем как сообщение от бота (от имени стримера)
+                await self.connection_manager.broadcast_chat_message({
+                    'type': 'chat_message',
+                    'platform': 'twitch',
+                    'channel': channel_name,
+                    'author_name': streamer_name,  # Отображаем как сообщение от стримера
+                    'author': streamer_name,       # Без пометки "(бот)"
+                    'username': streamer_name,
+                    'message': content,
+                    'content': content,
+                    'timestamp': time.time(),
+                    'role': 'broadcaster',
+                    'author_color': '#DAA520',  # Золотой цвет для стримера
+                    'is_bot_message': True  # Флаг что это сообщение от бота
+                })
+                return
+            
+            # Проверяем, является ли отправитель ботом (по имени бота)
+            if hasattr(self, 'nick') and self.nick and author_name.lower() == self.nick.lower():
+                # Получаем реальное имя стримера из базы данных
+                streamer_name = await self._get_streamer_name_by_channel(channel_name)
+                
+                # Это сообщение от бота - показываем как сообщение от бота (от имени стримера)
+                await self.connection_manager.broadcast_chat_message({
+                    'type': 'chat_message',
+                    'platform': 'twitch',
+                    'channel': channel_name,
+                    'author_name': streamer_name,  # Отображаем как сообщение от стримера
+                    'author': streamer_name,       # Без пометки "(бот)"
+                    'username': streamer_name,
+                    'message': content,
+                    'content': content,
+                    'timestamp': time.time(),
+                    'role': 'broadcaster',
+                    'author_color': '#DAA520',  # Золотой цвет для стримера
+                    'is_bot_message': True  # Флаг что это сообщение от бота
+                })
                 return
 
             # Проверяем, не заблокирован ли бот
@@ -222,6 +258,20 @@ class Bot(commands.Bot):
             # Канал не в процессе верификации, значит он авторизованный или уже верифицирован
             logger.debug(f"Channel {channel_name} not in verification process, skipping verification check")
 
+        # Передаем сообщение в чат через WebSocket
+        await self.connection_manager.broadcast_chat_message({
+            'type': 'chat_message',
+            'platform': 'twitch',
+            'channel': channel_name,
+            'author_name': author_name,
+            'author': author_name,
+            'content': content,
+            'message': content,
+            'timestamp': time.time(),
+            'role': 'normal',
+            'author_color': message.author.color or '#ffffff'
+        })
+        
         # Обрабатываем команды
         await self.handle_commands(message)
         
@@ -253,6 +303,12 @@ class Bot(commands.Bot):
                 logger.warning(f"❌ TTS НЕ ВКЛЮЧЕН для Twitch канала {channel_name}, пропускаем обработку TTS")
                 return
             
+            # Проверяем, активен ли владелец канала
+            channel_owner_id = await self._get_channel_owner_id(channel_name)
+            if channel_owner_id and not self.connection_manager.is_client_active(str(channel_owner_id)):
+                logger.info(f"🔇 TTS skipped for {channel_name} - owner {channel_owner_id} is inactive")
+                return
+            
             # Проверяем whitelist для канала
             whitelisted = self.connection_manager.is_channel_whitelisted(channel_name)
             logger.info(f"📝 WHITELIST CHECK: Канал '{channel_name}' - {whitelisted}")
@@ -260,6 +316,21 @@ class Bot(commands.Bot):
                 logger.warning(f"❌ WHITELIST: Канал {channel_name} НЕ в whitelist, пропускаем обработку TTS")
                 return
 
+            # Проверяем фильтр слов перед озвучкой
+            from services.tts_service import TTSService
+            from core.database import get_db
+            
+            db = next(get_db())
+            tts_service = TTSService(db)
+            
+            # Получаем ID владельца канала для проверки фильтра
+            channel_owner_id = await self._get_channel_owner_id(channel_name)
+            if channel_owner_id:
+                is_filtered = await tts_service.check_text_filter(content, int(channel_owner_id), 'twitch')
+                if is_filtered:
+                    logger.info(f"TTS: Message filtered for channel {channel_name}: '{content}'")
+                    return
+            
             # Отправляем запрос на озвучку
             text = content
             author = author_name
@@ -271,11 +342,26 @@ class Bot(commands.Bot):
             if text:  # Только если есть текст для озвучки
                 # Получаем настройки громкости для канала (общая громкость)
                 volume_level = self.connection_manager.get_tts_volume(channel_name)
-                logger.info(f"🎤 Sending TTS request for Twitch channel {channel_name}: {text[:50]}... (volume: {volume_level}%)")
+                
+                # Получаем настройки типов TTS для канала
+                use_basic_tts = self.connection_manager.is_basic_tts_enabled(channel_name)
+                use_ai_tts = self.connection_manager.is_ai_tts_enabled(channel_name)
+                
+                logger.info(f"🎤 Sending TTS request for Twitch channel {channel_name}: {text[:50]}... (volume: {volume_level}%, basic: {use_basic_tts}, ai: {use_ai_tts})")
+                
+                # Загружаем настройки для передачи в F5-TTS
+                tts_settings = await self._get_tts_settings(channel_name)
+                word_filter = await self._get_word_filter()
+                blocked_users = await self._get_blocked_users()
                 
                 # Передаем connection_manager для проверки приоритетных голосов
                 result = await self.tts_api.send_tts_request(
-                    channel_name, text, author, volume_level, self.connection_manager
+                    channel_name, text, author, volume_level, self.connection_manager,
+                    use_ai_tts=use_ai_tts,
+                    use_basic_tts=use_basic_tts,
+                    tts_settings=tts_settings,
+                    word_filter=word_filter,
+                    blocked_users=blocked_users
                 )
                 
                 if result.get("success"):
@@ -284,6 +370,41 @@ class Bot(commands.Bot):
                     logger.error(f"TTS synthesis failed: {result.get('error')}")
         except Exception as e:
             logger.error(f"Error in handle_tts_message: {e}")
+    
+    async def _get_tts_settings(self, channel_name: str) -> dict:
+        """Загрузить настройки TTS для канала"""
+        try:
+            # Здесь можно добавить загрузку из БД или кэша
+            # Пока возвращаем настройки по умолчанию
+            return {
+                "enable7TV": True,
+                "enableTwitch": True,
+                "enableProfanity": False,
+                "profanityLevel": "medium"
+            }
+        except Exception as e:
+            logger.error(f"Error loading TTS settings: {e}")
+            return {}
+    
+    async def _get_word_filter(self) -> list:
+        """Загрузить фильтр слов"""
+        try:
+            # Здесь можно добавить загрузку из БД
+            # Пока возвращаем пустой список
+            return []
+        except Exception as e:
+            logger.error(f"Error loading word filter: {e}")
+            return []
+    
+    async def _get_blocked_users(self) -> list:
+        """Загрузить список заблокированных пользователей"""
+        try:
+            # Здесь можно добавить загрузку из БД
+            # Пока возвращаем пустой список
+            return []
+        except Exception as e:
+            logger.error(f"Error loading blocked users: {e}")
+            return []
 
     async def handle_commands(self, message):
         """Обработка команд из базы данных"""
@@ -345,12 +466,34 @@ class Bot(commands.Bot):
                 if 'twitch' not in command.platforms.split(','):
                     return  # Команда не для Twitch
                 
+                # Получаем ID владельца канала
+                channel_owner_id = None
+                try:
+                    # Получаем информацию о канале из базы данных
+                    # Ищем пользователя по platform_user_id через Twitch API
+                    channel_user = None
+                    try:
+                        from api.twitch_api import TwitchAPI
+                        twitch_api = TwitchAPI(self.connection_manager)
+                        user_info = await twitch_api.get_user_by_username(channel_name, await twitch_api.get_app_access_token())
+                        if user_info:
+                            channel_user = db.query(UserToken).filter(
+                                UserToken.platform == 'twitch',
+                                UserToken.platform_user_id == user_info.get('id')
+                            ).first()
+                    except Exception as e:
+                        logger.error(f"Error getting user info for {channel_name}: {e}")
+                    if channel_user:
+                        channel_owner_id = str(channel_user.platform_user_id)
+                except Exception as e:
+                    logger.error(f"Error getting channel owner ID: {e}")
+                
                 # Получаем роли пользователя
                 user_badges = getattr(message.author, 'badges', [])
                 user_roles = RoleChecker.check_twitch_role(
                     user_badges, 
                     str(message.author.id), 
-                    str(message.channel.name)
+                    channel_owner_id or str(message.channel.name)
                 )
                 
                 # Проверяем права доступа
@@ -450,6 +593,22 @@ class Bot(commands.Bot):
                     'platforms': 'twitch,vk',
                     'allowed_roles': 'all',
                     'cooldown_seconds': 5
+                },
+                'ttsvolume': {
+                    'command_type': 'basic',
+                    'response_text': None,
+                    'is_enabled': True,
+                    'platforms': 'twitch,vk',
+                    'allowed_roles': 'broadcaster,moderator',
+                    'cooldown_seconds': 5
+                },
+                'youtubevolume': {
+                    'command_type': 'basic',
+                    'response_text': None,
+                    'is_enabled': True,
+                    'platforms': 'twitch,vk',
+                    'allowed_roles': 'broadcaster,moderator',
+                    'cooldown_seconds': 5
                 }
             }
             
@@ -506,6 +665,16 @@ class Bot(commands.Bot):
                 await self.help_command_from_message(message)
             elif command_name == 'voice':
                 await self.voice_command_from_message(message)
+            elif command_name == 'ttsvolume':
+                await self.tts_volume_command_from_message(message)
+            elif command_name == 'youtubevolume':
+                await self.youtube_volume_command_from_message(message)
+            elif command_name == 'category':
+                await self.category_command_from_message(message)
+            elif command_name == 'title':
+                await self.title_command_from_message(message)
+            elif command_name == 'about':
+                await self.about_command_from_message(message)
             elif command_name == 'lootbox':
                 await self.lootbox_command_from_message(message)
             elif command_name == 'open':
@@ -740,10 +909,19 @@ class Bot(commands.Bot):
             result = None
             try:
                 # Ищем пользователя по Twitch токену, который владеет этим каналом
-                user_token = db.query(UserToken).filter(
-                    UserToken.platform == 'twitch',
-                    UserToken.platform_display_name.in_([channel_name, channel_name.capitalize()])
-                ).first()
+                # Ищем пользователя по platform_user_id через Twitch API
+                user_token = None
+                try:
+                    from api.twitch_api import TwitchAPI
+                    twitch_api = TwitchAPI(self.connection_manager)
+                    user_info = await twitch_api.get_user_by_username(channel_name, await twitch_api.get_app_access_token())
+                    if user_info:
+                        user_token = db.query(UserToken).filter(
+                            UserToken.platform == 'twitch',
+                            UserToken.platform_user_id == user_info.get('id')
+                        ).first()
+                except Exception as e:
+                    logger.error(f"Error getting user info for {channel_name}: {e}")
                 
                 if not user_token:
                     await message.channel.send("❌ Канал не найден в системе")
@@ -888,28 +1066,30 @@ class Bot(commands.Bot):
                 await message.channel.send("❌ Пользователь не найден")
                 return
             
-            from services.lootbox_service import LootboxService
-            lootbox_service = LootboxService(db)
+            # from services.lootbox_service import LootboxService  # Временно отключено
+            # lootbox_service = LootboxService(db)  # Временно отключено
             
             if action == "info":
                 # Показываем прогрессию пользователя
-                progression = lootbox_service.get_user_progression(user.id, channel_name)
-                if progression:
-                    await message.channel.send(f"📊 Прогрессия {author_name}: {progression['total_days_active']} дней, серия: {progression['current_streak']}, сообщений: {progression['total_messages']}")
-                else:
-                    await message.channel.send(f"📊 Пользователь {author_name} еще не имеет прогрессии")
+                # progression = lootbox_service.get_user_progression(user.id, channel_name)  # Временно отключено
+                # if progression:
+                #     await message.channel.send(f"📊 Прогрессия {author_name}: {progression['total_days_active']} дней, серия: {progression['current_streak']}, сообщений: {progression['total_messages']}")
+                # else:
+                #     await message.channel.send(f"📊 Пользователь {author_name} еще не имеет прогрессии")
+                await message.channel.send(f"📊 Система лутбоксов временно отключена")
                     
             elif action == "list":
                 # Показываем доступные лутбоксы
-                lootboxes = lootbox_service.get_channel_lootboxes(channel_name)
-                if lootboxes:
-                    lootbox_list = []
-                    for lb in lootboxes:
-                        price_text = f" ({lb['price']}₽)" if lb['type'] == 'paid' else " (Бесплатный)"
-                        lootbox_list.append(f"{lb['name']}{price_text}")
-                    await message.channel.send(f"🎁 Доступные лутбоксы: {', '.join(lootbox_list)}")
-                else:
-                    await message.channel.send("🎁 Лутбоксы пока не настроены")
+                # lootboxes = lootbox_service.get_channel_lootboxes(channel_name)  # Временно отключено
+                # if lootboxes:  # Временно отключено
+                #     lootbox_list = []
+                #     for lb in lootboxes:
+                #         price_text = f" ({lb['price']}₽)" if lb['type'] == 'paid' else " (Бесплатный)"
+                #         lootbox_list.append(f"{lb['name']}{price_text}")
+                #     await message.channel.send(f"🎁 Доступные лутбоксы: {', '.join(lootbox_list)}")
+                # else:
+                #     await message.channel.send("🎁 Лутбоксы пока не настроены")
+                await message.channel.send("🎁 Система лутбоксов временно отключена")
                     
             elif action == "open":
                 if len(parts) < 3:
@@ -940,27 +1120,28 @@ class Bot(commands.Bot):
                 await message.channel.send("❌ Пользователь не найден")
                 return
             
-            from services.lootbox_service import LootboxService
-            lootbox_service = LootboxService(db)
+            # from services.lootbox_service import LootboxService  # Временно отключено
+            # lootbox_service = LootboxService(db)  # Временно отключено
             
             # Открываем лутбокс
-            result = lootbox_service.open_lootbox(user.id, channel_name, lootbox_id)
-            if result:
-                reward = result['reward']
-                await message.channel.send(f"🎁 {author_name} открыл лутбокс '{result['lootbox_name']}' и получил: {reward['name']}! 🎉")
-                
-                # Запускаем OBS анимацию
-                try:
-                    from services.obs_animation_service import OBSAnimationService
-                    obs_service = OBSAnimationService(self.connection_manager)
-                    await obs_service.trigger_lootbox_animation(channel_name, {
-                        **result,
-                        'user_name': author_name
-                    })
-                except Exception as e:
-                    logger.error(f"Error triggering OBS animation: {e}")
-            else:
-                await message.channel.send("❌ Не удалось открыть лутбокс. Проверьте ID или попробуйте позже")
+            # result = lootbox_service.open_lootbox(user.id, channel_name, lootbox_id)  # Временно отключено
+            # if result:  # Временно отключено
+            #     reward = result['reward']
+            #     await message.channel.send(f"🎁 {author_name} открыл лутбокс '{result['lootbox_name']}' и получил: {reward['name']}! 🎉")
+            #     
+            #     # Запускаем OBS анимацию
+            #     try:
+            #         from services.obs_animation_service import OBSAnimationService
+            #         obs_service = OBSAnimationService(self.connection_manager)
+            #         await obs_service.trigger_lootbox_animation(channel_name, {
+            #             **result,
+            #             'user_name': author_name
+            #         })
+            #     except Exception as e:
+            #         logger.error(f"Error triggering OBS animation: {e}")
+            # else:
+            #     await message.channel.send("❌ Не удалось открыть лутбокс. Проверьте ID или попробуйте позже")
+            await message.channel.send("🎁 Система лутбоксов временно отключена")
                 
         except Exception as e:
             logger.error(f"Error in open lootbox command: {e}")
@@ -1002,9 +1183,297 @@ class Bot(commands.Bot):
     async def stop_bot(self):
         """Остановить бота"""
         try:
-            await self.close()
+            if hasattr(self, 'close') and self.close:
+                await self.close()
+            else:
+                logger.info("Bot close method not available or already closed")
         except Exception as e:
             logger.error(f"Error stopping bot: {e}")
+
+    async def tts_volume_command_from_message(self, message):
+        """Обработка команды !ttsvolume для Twitch"""
+        try:
+            parts = message.content.split()
+            if len(parts) < 2:
+                await message.channel.send("❌ Укажите уровень громкости (0-100): !ttsvolume <0-100>")
+                return
+            
+            try:
+                volume = int(parts[1])
+                if volume < 0 or volume > 100:
+                    await message.channel.send("❌ Громкость должна быть от 0 до 100")
+                    return
+            except ValueError:
+                await message.channel.send("❌ Громкость должна быть числом от 0 до 100")
+                return
+            
+            # Отправляем запрос на изменение громкости TTS
+            result = await self.tts_api.set_tts_volume(message.channel.name, volume)
+            
+            if result.get('success'):
+                await message.channel.send(f"🔊 {message.author.name} установил громкость TTS на {volume}%")
+            else:
+                await message.channel.send(f"❌ Ошибка установки громкости TTS: {result.get('error', 'Неизвестная ошибка')}")
+                
+        except Exception as e:
+            logger.error(f"Error in tts_volume_command_from_message: {e}")
+            await message.channel.send("❌ Произошла ошибка при установке громкости TTS")
+
+    async def youtube_volume_command_from_message(self, message):
+        """Обработка команды !youtubevolume для Twitch"""
+        try:
+            parts = message.content.split()
+            if len(parts) < 2:
+                await message.channel.send("❌ Укажите уровень громкости (0-100): !youtubevolume <0-100>")
+                return
+            
+            try:
+                volume = int(parts[1])
+                if volume < 0 or volume > 100:
+                    await message.channel.send("❌ Громкость должна быть от 0 до 100")
+                    return
+            except ValueError:
+                await message.channel.send("❌ Громкость должна быть числом от 0 до 100")
+                return
+            
+            # Отправляем запрос на изменение громкости YouTube
+            result = await self.youtube_api.set_volume(message.channel.name, volume)
+            
+            if result.get('success'):
+                await message.channel.send(f"🎵 {message.author.name} установил громкость YouTube на {volume}%")
+            else:
+                await message.channel.send(f"❌ Ошибка установки громкости YouTube: {result.get('error', 'Неизвестная ошибка')}")
+                
+        except Exception as e:
+            logger.error(f"Error in youtube_volume_command_from_message: {e}")
+            await message.channel.send("❌ Произошла ошибка при установке громкости YouTube")
+
+    async def category_command_from_message(self, message):
+        """Обработка команды !category для Twitch"""
+        try:
+            parts = message.content.split()
+            if len(parts) < 2:
+                await message.channel.send("❌ Использование: !category <название категории>")
+                return
+            
+            # Объединяем все части после команды в название категории
+            category_query = " ".join(parts[1:])
+            
+            # Получаем ID канала владельца
+            channel_owner_id = await self._get_channel_owner_id(message.channel.name)
+            if not channel_owner_id:
+                await message.channel.send("❌ Не удалось определить владельца канала")
+                return
+            
+            # Импортируем TwitchAPI
+            from api.twitch_api import TwitchAPI
+            from core.connection_manager import ConnectionManager
+            
+            # Создаем экземпляр API
+            twitch_api = TwitchAPI(ConnectionManager())
+            
+            # Ищем категории
+            categories = await twitch_api.search_categories(category_query)
+            
+            if not categories:
+                await message.channel.send(f"❌ Категория '{category_query}' не найдена")
+                return
+            
+            # Берем первую найденную категорию (наиболее релевантную)
+            category = categories[0]
+            
+            # Используем унифицированную систему обновления
+            await self._update_stream_unified(str(channel_owner_id), twitch_category_id=category['id'], category_name=category['name'])
+            
+            await message.channel.send(f"✅ Категория изменена на: {category['name']}")
+                
+        except Exception as e:
+            logger.error(f"Error in category_command_from_message: {e}")
+            await message.channel.send("❌ Произошла ошибка при изменении категории")
+
+    async def title_command_from_message(self, message):
+        """Обработка команды !title для Twitch"""
+        try:
+            parts = message.content.split()
+            if len(parts) < 2:
+                await message.channel.send("❌ Использование: !title <новое название>")
+                return
+            
+            # Объединяем все части после команды в название
+            new_title = " ".join(parts[1:])
+            
+            # Получаем ID канала владельца
+            channel_owner_id = await self._get_channel_owner_id(message.channel.name)
+            if not channel_owner_id:
+                await message.channel.send("❌ Не удалось определить владельца канала")
+                return
+            
+            # Используем унифицированную систему обновления
+            await self._update_stream_unified(str(channel_owner_id), title=new_title)
+            
+            await message.channel.send(f"✅ Название стрима изменено на: {new_title}")
+                
+        except Exception as e:
+            logger.error(f"Error in title_command_from_message: {e}")
+            await message.channel.send("❌ Произошла ошибка при изменении названия стрима")
+
+    async def about_command_from_message(self, message):
+        """Обработка команды !about для психологического анализа"""
+        try:
+            parts = message.content.split()
+            if len(parts) < 2:
+                await message.channel.send("❌ Использование: !about <ник пользователя>")
+                return
+            
+            target_username = parts[1].lower().strip('@')
+            
+            # Получаем информацию о пользователе, который запросил анализ
+            requester_id = await self._get_channel_owner_id(message.channel.name)
+            if not requester_id:
+                await message.channel.send("❌ Не удалось определить владельца канала")
+                return
+            
+            # Импортируем сервис психологического анализа
+            from services.psychology_service import PsychologyService
+            from core.database import get_db
+            
+            db = next(get_db())
+            psychology_service = PsychologyService(db)
+            
+            # Анализы больше не кэшируются - каждый раз генерируется новый
+            
+            # Показываем, что анализ начался
+            await message.channel.send(f"🔍 Анализирую личность @{target_username}...")
+            
+            # Выполняем анализ
+            analysis_result = await psychology_service.analyze_user_psychology(
+                target_username=target_username,
+                platform="twitch",
+                analyzed_by_user_id=int(requester_id),
+                analyzed_by_username=message.author.name
+            )
+            
+            if analysis_result:
+                await message.channel.send(f"🧠 @{target_username}: {analysis_result}")
+            else:
+                await message.channel.send(f"❌ Не удалось проанализировать @{target_username}")
+                
+        except Exception as e:
+            logger.error(f"Error in about_command_from_message: {e}")
+            await message.channel.send("❌ Произошла ошибка при анализе")
+
+    async def _update_stream_unified(self, user_id: str, title: str = None, twitch_category_id: str = None, category_name: str = None):
+        """Унифицированное обновление стрима для всех подключенных платформ"""
+        try:
+            import aiohttp
+            
+            # Подготавливаем данные для запроса
+            payload = {}
+            
+            if title is not None:
+                payload["twitch"] = {"title": title}
+                payload["vk"] = {"title": title}
+            
+            if twitch_category_id is not None:
+                if "twitch" not in payload:
+                    payload["twitch"] = {}
+                payload["twitch"]["category_id"] = twitch_category_id
+                
+                # Для VK Live нужно найти соответствующую категорию по названию
+                if category_name:
+                    vk_category_id = await self._find_vk_category_by_name(category_name)
+                    if vk_category_id:
+                        if "vk" not in payload:
+                            payload["vk"] = {}
+                        payload["vk"]["category_id"] = vk_category_id
+            
+            if not payload:
+                logger.warning("No data to update")
+                return
+            
+            # Отправляем запрос к унифицированному API
+            async with aiohttp.ClientSession() as session:
+                url = "http://localhost:8000/api/stream/update"
+                headers = {"Content-Type": "application/json"}
+                
+                # Получаем сессию пользователя для авторизации
+                from core.database import UserSession, get_db
+                db = next(get_db())
+                user_session = db.query(UserSession).filter(UserSession.user_id == int(user_id), UserSession.is_active == True).first()
+                
+                if not user_session:
+                    logger.error(f"No active session found for user {user_id}")
+                    return
+                
+                # Используем cookie-based авторизацию
+                cookies = {"session_id": user_session.session_id}
+                
+                async with session.post(url, json=payload, headers=headers, cookies=cookies) as response:
+                    if response.status == 200:
+                        logger.info(f"Successfully updated stream for user {user_id}")
+                        return True
+                    elif response.status == 207:
+                        # Multi-status - некоторые обновления прошли успешно
+                        logger.warning(f"Partial success updating stream for user {user_id}")
+                        return True
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"Failed to update stream for user {user_id}: {response.status} - {error_text}")
+                        return False
+                        
+        except Exception as e:
+            logger.error(f"Error in _update_stream_unified: {e}")
+            return False
+
+    async def _find_vk_category_by_name(self, category_name: str) -> str:
+        """Найти ID категории VK Live по названию"""
+        try:
+            from api.vk_api import VKLiveAPI
+            vk_api = VKLiveAPI()
+            
+            # Ищем категории в VK Live по названию
+            categories = await vk_api.get_categories(search=category_name)
+            
+            if categories:
+                # Возвращаем ID первой найденной категории
+                return categories[0]['id']
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error finding VK category by name '{category_name}': {e}")
+            return None
+
+    async def _get_channel_owner_id(self, channel_name: str) -> Optional[int]:
+        """Получить ID владельца канала Twitch"""
+        try:
+            from core.database import UserToken, get_db
+            
+            db = next(get_db())
+            
+            # Ищем пользователя по channel_name (username канала)
+            # Ищем пользователя по platform_user_id через Twitch API
+            user_token = None
+            try:
+                from api.twitch_api import TwitchAPI
+                twitch_api = TwitchAPI(self.connection_manager)
+                user_info = await twitch_api.get_user_by_username(channel_name, await twitch_api.get_app_access_token())
+                if user_info:
+                    user_token = db.query(UserToken).filter(
+                        UserToken.platform == "twitch",
+                        UserToken.platform_user_id == user_info.get('id')
+                    ).first()
+            except Exception as e:
+                logger.error(f"Error getting user info for {channel_name}: {e}")
+            
+            if user_token:
+                return user_token.user_id
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting channel owner ID for {channel_name}: {e}")
+            return None
 
     def is_connected_to_channel(self, channel_name: str) -> bool:
         """Проверить, подключен ли бот к каналу"""
@@ -1029,3 +1498,52 @@ class Bot(commands.Bot):
         except Exception as e:
             logger.error(f"Error leaving channel {channel_name}: {e}")
             return False
+
+    async def send_message(self, channel_name: str, message: str) -> bool:
+        """Отправить сообщение в канал от имени стримера"""
+        try:
+            # Проверяем, что бот подключен (проверяем наличие каналов)
+            if not self.connected_channels:
+                logger.error(f"❌ Bot is not connected to any channels, cannot send message to {channel_name}")
+                return False
+                
+            # ВНИМАНИЕ: Twitch API не позволяет отправлять сообщения от имени другого пользователя
+            # Бот может отправлять только от своего имени, но в интерфейсе мы показываем как сообщение от стримера
+            channel = self.get_channel(channel_name)
+            if not channel:
+                logger.error(f"❌ Channel {channel_name} not found in connected channels")
+                return False
+            
+            # Получаем реальное имя стримера из базы данных
+            streamer_name = await self._get_streamer_name_by_channel(channel_name)
+            
+            # Отправляем сообщение (технически от бота, но в IRC это будет от имени бота payedviewer)
+            await channel.send(message)
+            logger.info(f"📤 Message sent to {channel_name} as {self.nick} (displayed as {streamer_name}): {message}")
+            
+            # Передаем через WebSocket для отображения в интерфейсе как сообщение от стримера
+            # ВАЖНО: Это сообщение уже будет поймано в event_message как ECHO-сообщение
+            # и обработано там, поэтому НЕ отправляем его повторно здесь
+            # await self.connection_manager.broadcast_chat_message({...})  # УБРАНО
+            
+            return True
+        except Exception as e:
+            logger.error(f"Error sending message to {channel_name}: {e}")
+            return False
+    
+    async def _get_streamer_name_by_channel(self, channel_name: str) -> str:
+        """Получить имя стримера из Twitch API по имени канала"""
+        try:
+            from api.twitch_api import TwitchAPI
+            twitch_api = TwitchAPI(self.connection_manager)
+            
+            # Получаем информацию о пользователе по имени канала
+            user_info = await twitch_api.get_user_by_username(channel_name, await twitch_api.get_app_access_token())
+            if user_info and user_info.get('login'):
+                return user_info['login']
+            
+            # Если не найдено, возвращаем имя канала
+            return channel_name
+        except Exception as e:
+            logger.error(f"Error getting streamer name for {channel_name}: {e}")
+            return channel_name

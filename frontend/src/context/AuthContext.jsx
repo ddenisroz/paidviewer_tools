@@ -1,6 +1,6 @@
 // src/context/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { botService } from '../services/microservices';
+import { botService, loginVk } from '../services/microservices';
 import { toast } from 'sonner';
 
 export const AuthContext = createContext();
@@ -46,6 +46,20 @@ export const AuthProvider = ({ children }) => {
         checkAuthStatus();
     }, [checkAuthStatus]);
 
+    // Очистка legacy сессий при аутентификации
+    useEffect(() => {
+        if (isAuthenticated && user?.id && user?.id > 0) {
+            // Вызываем endpoint для очистки legacy сессий
+            botService.post('/api/sessions/clear-legacy')
+                .then(() => {
+                    console.log('✅ Legacy sessions cleared');
+                })
+                .catch((error) => {
+                    console.log('Legacy sessions cleanup skipped:', error.message);
+                });
+        }
+    }, [isAuthenticated, user?.id]);
+
     const loginWithTwitch = () => {
         botService.get('/auth/twitch/login')
             .then(response => {
@@ -60,12 +74,12 @@ export const AuthProvider = ({ children }) => {
     };
 
     const loginWithVk = () => {
-        import('../services/microservices').then(({ loginVk }) => {
+        try {
             loginVk();
-        }).catch(error => {
+        } catch (error) {
             console.error("VK login error:", error);
             toast.error('Ошибка при входе через VK Live.');
-        });
+        }
     };
 
     const logout = async () => {
@@ -97,7 +111,6 @@ export const AuthProvider = ({ children }) => {
             setUser({
                 id: -1, // Специальный ID для гостевого пользователя
                 username: guestData.username,
-                display_name: guestData.username,
                 is_admin: false,
                 is_guest: true,
                 platform: guestData.platform,

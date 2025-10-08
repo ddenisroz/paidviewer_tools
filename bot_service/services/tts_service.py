@@ -1,56 +1,121 @@
 # bot_service/services/tts_service.py
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 from typing import List, Optional
 import logging
 from datetime import datetime
 
-logger = logging.getLogger('bot_service')
+from core.database import FilteredWord
+
+logger = logging.getLogger(__name__)
 
 class TTSService:
     def __init__(self, db: Session):
         self.db = db
 
-    async def get_filtered_words(self) -> List[dict]:
-        """Получить список отфильтрованных слов"""
+    async def get_filtered_words(self, user_id: int) -> List[dict]:
+        """Получить список отфильтрованных слов для пользователя"""
         try:
-            # Пока что возвращаем пустой список
-            # В будущем здесь будет работа с базой данных
-            return []
+            words = self.db.query(FilteredWord).filter(
+                and_(
+                    FilteredWord.user_id == user_id,
+                    FilteredWord.is_active == True
+                )
+            ).all()
+            
+            return [
+                {
+                    'id': word.id,
+                    'word': word.word,
+                    'platform': word.platform,
+                    'created_at': word.created_at.isoformat() if word.created_at else None
+                }
+                for word in words
+            ]
         except Exception as e:
             logger.error(f"Error getting filtered words: {e}")
-            raise
+            return []
 
-    async def save_filtered_words(self, words: List[dict]) -> bool:
-        """Сохранить список отфильтрованных слов"""
+    async def add_filtered_word(self, user_id: int, word: str, platform: str = 'all') -> bool:
+        """Добавить слово в фильтр"""
         try:
-            # Пока что просто логируем
-            # В будущем здесь будет сохранение в базу данных
-            logger.info(f"Saving {len(words)} filtered words")
-            for word in words:
-                logger.info(f"Word: {word.get('word')}, Platform: {word.get('platform')}")
+            # Проверяем, не существует ли уже такое слово
+            existing = self.db.query(FilteredWord).filter(
+                and_(
+                    FilteredWord.user_id == user_id,
+                    FilteredWord.word == word.lower(),
+                    FilteredWord.platform == platform
+                )
+            ).first()
+            
+            if existing:
+                logger.warning(f"Word '{word}' already exists in filter for user {user_id}")
+                return False
+            
+            filtered_word = FilteredWord(
+                user_id=user_id,
+                word=word.lower(),
+                platform=platform
+            )
+            
+            self.db.add(filtered_word)
+            self.db.commit()
+            
+            logger.info(f"Added word '{word}' to filter for user {user_id}")
             return True
+            
         except Exception as e:
-            logger.error(f"Error saving filtered words: {e}")
-            raise
+            logger.error(f"Error adding filtered word: {e}")
+            self.db.rollback()
+            return False
 
-    async def delete_filtered_word(self, word_id: int) -> bool:
-        """Удалить слово из списка фильтрации"""
+    async def remove_filtered_word(self, user_id: int, word_id: int) -> bool:
+        """Удалить слово из фильтра"""
         try:
-            # Пока что просто логируем
-            logger.info(f"Deleting filtered word with ID: {word_id}")
+            word = self.db.query(FilteredWord).filter(
+                and_(
+                    FilteredWord.id == word_id,
+                    FilteredWord.user_id == user_id
+                )
+            ).first()
+            
+            if not word:
+                logger.warning(f"Word with ID {word_id} not found for user {user_id}")
+                return False
+            
+            self.db.delete(word)
+            self.db.commit()
+            
+            logger.info(f"Removed word '{word.word}' from filter for user {user_id}")
             return True
+            
         except Exception as e:
-            logger.error(f"Error deleting filtered word: {e}")
-            raise
+            logger.error(f"Error removing filtered word: {e}")
+            self.db.rollback()
+            return False
 
-    async def check_text_filter(self, text: str, platform: str = "all") -> bool:
+    async def check_text_filter(self, text: str, user_id: int, platform: str = "all") -> bool:
         """Проверить, содержит ли текст отфильтрованные слова"""
         try:
-            # Пока что возвращаем False (не фильтруем)
-            # В будущем здесь будет проверка по базе данных
-            logger.debug(f"Checking text filter for: '{text}' on platform: {platform}")
+            text_lower = text.lower()
+            
+            # Получаем все активные фильтры для пользователя
+            filters = self.db.query(FilteredWord).filter(
+                and_(
+                    FilteredWord.user_id == user_id,
+                    FilteredWord.is_active == True,
+                    FilteredWord.platform.in_(['all', platform])
+                )
+            ).all()
+            
+            # Проверяем каждое слово
+            for filter_word in filters:
+                if filter_word.word.lower() in text_lower:
+                    logger.info(f"Text filtered: '{text}' contains blocked word '{filter_word.word}'")
+                    return True
+            
             return False
+            
         except Exception as e:
             logger.error(f"Error checking text filter: {e}")
-            raise
-
+            return False

@@ -75,7 +75,7 @@ async def login_vk():
     return {"auth_url": auth_url}
 
 @router.get("/auth/vk/callback")
-async def vk_callback(request: Request, db: Session = Depends(get_db), code: str = None, error: str = None, error_description: str = None, current_user: User = Depends(get_current_user_optional)):
+async def vk_callback(request: Request, db: Session = Depends(get_db), code: str = None, error: str = None, error_description: str = None, current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional)):
     
     # Логируем все параметры запроса для отладки
     logger.info(f"VK callback received. Query params: {dict(request.query_params)}")
@@ -84,11 +84,6 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
     if error:
         logger.warning(f"VK OAuth cancelled by user or failed: {error} - {error_description}")
         return RedirectResponse(url=f"{FRONTEND_URL}/dashboard?auth_error=cancelled")
-    
-    # Проверяем наличие ошибок от VK
-    if error:
-        logger.error(f"VK authorization error: {error} - {error_description}")
-        raise HTTPException(status_code=400, detail=f"VK authorization failed: {error} - {error_description}")
     
     # Проверяем наличие кода авторизации
     if not code:
@@ -125,7 +120,7 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
             "code": code
         }
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
             logger.info(f"Requesting token with payload: {payload}")
             logger.info(f"Using headers: {headers}")
             
@@ -150,14 +145,15 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
             access_token = token_data["access_token"]
             refresh_token = token_data.get("refresh_token")
             expires_in = token_data.get("expires_in", 3600)
-            expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+            from core.datetime_utils import utcnow_naive
+            expires_at = utcnow_naive() + timedelta(seconds=expires_in)
             scopes = token_data.get("scope", "").split(",")
 
             # --- 2. Получение информации о пользователе ---
             logger.info(f"Attempting to get user info with token...")
             
             user_info = None
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
                 endpoint = "https://apidev.live.vkvideo.ru/v1/current_user"
                 try:
                     user_info_response = await client.get(
@@ -178,7 +174,6 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
                 raise HTTPException(status_code=500, detail="Could not fetch user info from VK Live API.")
             
             platform_user_id = str(user_info.get("id"))
-            platform_display_name = user_info.get("nick", f"vk_user_{platform_user_id}")
             avatar_url = user_info.get("avatar_url")
 
             # --- 3. Используем общий OAuth handler ---
@@ -188,7 +183,6 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
             # Создаем объект с данными пользователя
             oauth_user_data = OAuthUserData(
                 platform_user_id=platform_user_id,
-                platform_display_name=platform_display_name,
                 avatar_url=avatar_url,
                 access_token=access_token,
                 refresh_token=refresh_token,
@@ -247,7 +241,8 @@ async def start_vk_guest_verification(
     if existing:
         existing.verification_code = verification_code
         existing.is_verified = False
-        existing.created_at = datetime.utcnow()
+        from core.datetime_utils import utcnow_naive
+        existing.created_at = utcnow_naive()
         existing.verified_at = None
     else:
         verification = VkGuestVerification(
@@ -289,7 +284,8 @@ async def verify_vk_guest(
     
     # Отмечаем как верифицированный
     verification.is_verified = True
-    verification.verified_at = datetime.utcnow()
+    from core.datetime_utils import utcnow_naive
+    verification.verified_at = utcnow_naive()
     db.commit()
     
     # Создаем гостевую сессию
@@ -323,7 +319,6 @@ async def vk_auth_status(user: dict = Depends(get_current_user_optional)):
     return {
         "authenticated": True,
         "user_id": user.get("id"),
-        "display_name": user.get("display_name"),
         "integrations": user.get("integrations", {})
     }
 

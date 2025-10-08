@@ -34,7 +34,6 @@ class User(Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
-    display_name = Column(String)
     avatar = Column(String, nullable=True)
     platform = Column(String, default='twitch')
     twitch_access_token = Column(String, nullable=True)

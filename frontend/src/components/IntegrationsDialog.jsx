@@ -78,7 +78,11 @@ const IntegrationsDialog = ({ open, onOpenChange }) => {
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-2">
-                                <Gift className="w-5 h-5 text-purple-600" />
+                                <img 
+                                    src="https://donationalerts.com/favicon.ico" 
+                                    alt="DonationAlerts" 
+                                    className="h-5 w-5"
+                                />
                                 <div>
                                     <p className="font-semibold">DonationAlerts</p>
                                     <p className="text-xs text-muted-foreground">

@@ -11,8 +11,9 @@ from core.database import get_db
 
 logger = logging.getLogger('bot_service')
 
-# Создаем роутер для Voices API
+# Создаем роутеры для Voices API
 voices_router = APIRouter(prefix="/api/voices", tags=["voices"])
+user_voices_router = APIRouter(prefix="/api/user/voices", tags=["user_voices"])
 
 # Pydantic модели для API
 class VoiceSchema(BaseModel):
@@ -71,7 +72,7 @@ async def transcribe_voice(
         logger.error(f"Error transcribing voice {voice_id}: {e}")
         raise HTTPException(status_code=500, detail="Ошибка транскрибации")
 
-@voices_router.post("/user/{voice_id}/transcribe", response_model=TranscriptionResponse)
+@user_voices_router.post("/{voice_id}/transcribe", response_model=TranscriptionResponse)
 async def transcribe_user_voice(
     voice_id: int,
     user_id: int,
@@ -134,7 +135,7 @@ async def rename_voice(
         logger.error(f"Error renaming voice {voice_id}: {e}")
         raise HTTPException(status_code=500, detail="Ошибка переименования голоса")
 
-@voices_router.put("/user/{voice_id}/rename")
+@user_voices_router.put("/{voice_id}/rename")
 async def rename_user_voice(
     voice_id: int,
     user_id: int,
@@ -241,3 +242,144 @@ async def update_voice_settings(
     except Exception as e:
         logger.error(f"Error updating voice {voice_id} settings: {e}")
         raise HTTPException(status_code=500, detail="Ошибка обновления настроек голоса")
+
+
+# ============================================================================
+# USER VOICES ENDPOINTS - /api/user/voices
+# ============================================================================
+
+@user_voices_router.get("/{user_id}")
+async def get_user_voices(
+    user_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Получить все голоса пользователя"""
+    try:
+        tts_service_url = os.getenv("TTS_SERVICE_URL", "http://localhost:8001")
+        response = requests.get(f"{tts_service_url}/api/user/voices/{user_id}")
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise HTTPException(status_code=response.status_code, detail="Ошибка получения голосов")
+    except Exception as e:
+        logger.error(f"Error getting user {user_id} voices: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка получения голосов")
+
+
+@user_voices_router.post("/upload")
+async def upload_user_voice(
+    user_id: int,
+    file: UploadFile = File(...),
+    name: str = Form(...),
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """Загрузить пользовательский голос"""
+    try:
+        tts_service_url = os.getenv("TTS_SERVICE_URL", "http://localhost:8001")
+        
+        # Отправляем файл в TTS сервис
+        files = {'file': (file.filename, file.file, file.content_type)}
+        data = {'name': name, 'user_id': user_id}
+        
+        response = requests.post(
+            f"{tts_service_url}/api/user/voices/upload?user_id={user_id}",
+            files=files,
+            data=data
+        )
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise HTTPException(status_code=response.status_code, detail="Ошибка загрузки голоса")
+    except Exception as e:
+        logger.error(f"Error uploading voice for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка загрузки голоса")
+
+
+@user_voices_router.delete("/{voice_id}")
+async def delete_user_voice(
+    voice_id: int,
+    user_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Удалить пользовательский голос"""
+    try:
+        tts_service_url = os.getenv("TTS_SERVICE_URL", "http://localhost:8001")
+        response = requests.delete(f"{tts_service_url}/api/user/voices/{voice_id}?user_id={user_id}")
+        
+        if response.status_code == 200:
+            return {"success": True, "message": "Голос удален"}
+        else:
+            raise HTTPException(status_code=response.status_code, detail="Ошибка удаления голоса")
+    except Exception as e:
+        logger.error(f"Error deleting user voice {voice_id}: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка удаления голоса")
+
+
+@user_voices_router.put("/{voice_id}/settings")
+async def update_user_voice_settings(
+    voice_id: int,
+    user_id: int,
+    settings: dict,
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """Обновить настройки пользовательского голоса"""
+    try:
+        tts_service_url = os.getenv("TTS_SERVICE_URL", "http://localhost:8001")
+        
+        logger.info(f"Updating user voice {voice_id} settings: {settings}")
+        
+        response = requests.put(
+            f"{tts_service_url}/api/user/voices/{voice_id}/settings?user_id={user_id}",
+            json=settings
+        )
+        
+        logger.info(f"TTS service response: {response.status_code}")
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"TTS service error: {response.text}")
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Ошибка обновления настроек голоса: {response.text}"
+            )
+    except Exception as e:
+        logger.error(f"Error updating user voice {voice_id} settings: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка обновления настроек голоса")
+
+
+@user_voices_router.post("/{voice_id}/retranscribe")
+async def retranscribe_user_voice(
+    voice_id: int,
+    user_id: int,
+    reference_text: str = Form(...),
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """Перетранскрибировать пользовательский голос с новым референсным текстом"""
+    try:
+        tts_service_url = os.getenv("TTS_SERVICE_URL", "http://localhost:8001")
+        
+        # Отправляем как form-data
+        data = {'reference_text': reference_text}
+        response = requests.post(
+            f"{tts_service_url}/api/user/voices/{voice_id}/retranscribe?user_id={user_id}",
+            data=data
+        )
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail="Ошибка перетранскрибации голоса"
+            )
+    except Exception as e:
+        logger.error(f"Error retranscribing user voice {voice_id}: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка перетранскрибации голоса")

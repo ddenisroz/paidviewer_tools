@@ -60,10 +60,8 @@ class ProcessRewardRequest(BaseModel):
 # Инициализируем сервис
 points_service = PointsService()
 
-def get_current_user(request: Request):
-    """Получение текущего пользователя (заглушка)"""
-    # TODO: Реализовать получение пользователя из сессии
-    return {"id": 1, "is_admin": True, "display_name": "TestUser"}
+# Импортируем правильную аутентификацию
+from auth.auth import get_current_user
 
 # === УПРАВЛЕНИЕ БАЛЛАМИ ===
 

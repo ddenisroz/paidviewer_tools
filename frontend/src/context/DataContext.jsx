@@ -37,12 +37,37 @@ export const DataProvider = ({ children }) => {
         categories: false,
     });
     
+    // State for stream history data
+    const [streamHistory, setStreamHistory] = useState(null);
+    
     const [status, setStatus] = useState({
         saveTitle: 'idle', // idle, loading, success, error
         saveCategory: 'idle', // idle, loading, success, error
     });
 
     // --- DATA LOADING ---
+    const loadStreamHistory = useCallback(async () => {
+        if (!isAuthenticated) {
+            return;
+        }
+        
+        try {
+            setLoading(prev => ({ ...prev, history: true }));
+            const response = await botService.get('/api/stream/history');
+            console.log('Stream history response:', response.data);
+            setStreamHistory(response.data);
+        } catch (error) {
+            console.error('Error loading stream history:', error);
+            addToast({
+                title: 'Ошибка загрузки истории',
+                description: 'Не удалось загрузить историю стрима',
+                variant: 'destructive'
+            });
+        } finally {
+            setLoading(prev => ({ ...prev, history: false }));
+        }
+    }, [isAuthenticated, addToast]);
+
     const loadStreamData = useCallback(async (force = false) => {
         if (!isAuthenticated) {
             return;
@@ -199,10 +224,24 @@ export const DataProvider = ({ children }) => {
     
     
     useEffect(() => {
-        if (isAuthenticated && !loading.streamData && (integrations.twitch.enabled || integrations.vk.enabled)) {
-            loadStreamData();
+        if (isAuthenticated && (integrations.twitch.enabled || integrations.vk.enabled)) {
+            loadStreamHistory();
+            if (!loading.streamData) {
+                loadStreamData();
+            }
         }
-    }, [isAuthenticated, integrations.twitch.enabled, integrations.vk.enabled, loadStreamData]);
+    }, [isAuthenticated, integrations.twitch.enabled, integrations.vk.enabled, loadStreamData, loadStreamHistory]);
+
+    // Автообновление данных каждые 30 секунд
+    useEffect(() => {
+        if (!isAuthenticated) return;
+        
+        const interval = setInterval(() => {
+            loadStreamHistory();
+        }, 30000); // 30 секунд
+        
+        return () => clearInterval(interval);
+    }, [isAuthenticated, loadStreamHistory]);
     
 
     const value = useMemo(() => ({
@@ -213,9 +252,10 @@ export const DataProvider = ({ children }) => {
         status,
         saveChanges,
         categories,
-        searchCategories
+        searchCategories,
+        streamHistory
     }), [
-        initialData, currentData, loading, status, saveChanges, categories, searchCategories
+        initialData, currentData, loading, status, saveChanges, categories, searchCategories, streamHistory
     ]);
 
     return (

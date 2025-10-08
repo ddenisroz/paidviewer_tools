@@ -6,11 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-// Убираем неиспользуемые импорты
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
     Terminal, 
     Edit2, 
@@ -20,24 +21,24 @@ import {
     Plus,
     Settings,
     Users,
-    Shield,
     ShieldCheck,
     Crown,
     Clock,
     Hash,
     MessageSquare,
+    Search,
     Twitch,
-    Volume2,
-    Heart,
     Star,
-    // ChevronDown и Check не используются
+    Filter,
+    ChevronDown
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useIntegrations } from '../context/IntegrationsContext';
 import api from '../services/api';
 import { toast } from 'sonner';
+import { CardSkeleton } from '@/components/ui/skeleton';
+import { PageLoader } from '@/components/ui/loader';
 
-    // Компонент множественного выбора ролей удален из-за отсутствующих зависимостей
 
     const CommandsPage = () => {
     const { isAuthenticated } = useAuth();
@@ -46,6 +47,13 @@ import { toast } from 'sonner';
     const [basicCommands, setBasicCommands] = useState([]);
     const [customCommands, setCustomCommands] = useState([]);
     const [loading, setLoading] = useState(true);
+    
+    // Состояния для фильтрации базовых команд (как в Excel)
+    const [basicSearchTerm, setBasicSearchTerm] = useState('');
+    const [selectedBasicTags, setSelectedBasicTags] = useState([]);
+    const [basicTags, setBasicTags] = useState([]);
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
+    
     
     // Состояния для создания/редактирования команд
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -71,30 +79,16 @@ import { toast } from 'sonner';
 
     const roleOptions = [
         { value: 'all', label: 'Все', icon: <Users className="h-3 w-3" /> },
-        // Twitch роли
-        { value: 'broadcaster', label: 'Broadcaster (Twitch)', icon: <Crown className="h-3 w-3" /> },
-        { value: 'moderator', label: 'Moderator (Twitch)', icon: <ShieldCheck className="h-3 w-3" /> },
-        { value: 'subscriber', label: 'Subscriber (Twitch)', icon: <Heart className="h-3 w-3" /> },
-        { value: 'vip', label: 'VIP (Twitch)', icon: <Shield className="h-3 w-3" /> },
-        { value: 'founder', label: 'Founder (Twitch)', icon: <Star className="h-3 w-3" /> },
-        // VK Live роли
-        { value: 'owner', label: 'Owner (VK Live)', icon: <Crown className="h-3 w-3" /> },
-        { value: 'moderator_vk', label: 'Moderator (VK Live)', icon: <ShieldCheck className="h-3 w-3" /> }
+        { value: 'broadcaster', label: 'Стример', icon: <Crown className="h-3 w-3" /> },
+        { value: 'moderator', label: 'Модератор', icon: <ShieldCheck className="h-3 w-3" /> },
+        { value: 'vip', label: 'VIP', icon: <Star className="h-3 w-3" /> }
     ];
 
-    // Расширенные варианты для множественного выбора
-    const extendedRoleOptions = [
-        ...roleOptions,
-        // Комбинированные варианты
-        { value: 'broadcaster,moderator', label: 'Стримеры и Модераторы', icon: <ShieldCheck className="h-3 w-3" /> },
-        { value: 'moderator,vip', label: 'Модераторы и VIP', icon: <Shield className="h-3 w-3" /> },
-        { value: 'subscriber,vip,founder', label: 'Подписчики, VIP, Основатели', icon: <Star className="h-3 w-3" /> }
-    ];
 
     const platformOptions = [
-        { value: 'twitch,vk', label: 'Все платформы', enabled: integrations.twitch?.enabled && integrations.vk?.enabled },
-        { value: 'twitch', label: 'Только Twitch', enabled: integrations.twitch?.enabled },
-        { value: 'vk', label: 'Только VK Live', enabled: integrations.vk?.enabled }
+        { value: 'twitch,vk', label: 'Все платформы', enabled: integrations?.twitch?.enabled && integrations?.vk?.enabled },
+        { value: 'twitch', label: 'Только Twitch', enabled: integrations?.twitch?.enabled },
+        { value: 'vk', label: 'Только VK Live', enabled: integrations?.vk?.enabled }
     ];
 
     // Получаем доступные платформы
@@ -113,14 +107,65 @@ import { toast } from 'sonner';
         try {
             setLoading(true);
             const response = await api.get('/api/commands');
-            setBasicCommands(response.data.basic_commands || []);
+            
+            const basicCommandsData = response.data.basic_commands || [];
+            
+            setBasicCommands(basicCommandsData);
             setCustomCommands(response.data.custom_commands || []);
+            
+            // Извлекаем уникальные теги из базовых команд
+            const tags = [...new Set(basicCommandsData.flatMap(cmd => {
+                return Array.isArray(cmd.tags) ? cmd.tags : [];
+            }))];
+            
+            setBasicTags(tags);
+            
         } catch (error) {
             console.error('Error loading commands:', error);
             toast.error('Ошибка загрузки команд');
         } finally {
             setLoading(false);
         }
+    };
+
+    // Функция для фильтрации базовых команд (как в Excel)
+    const getFilteredBasicCommands = () => {
+        return basicCommands.filter(command => {
+            const matchesSearch = command.command_name.toLowerCase().includes(basicSearchTerm.toLowerCase()) ||
+                                command.description?.toLowerCase().includes(basicSearchTerm.toLowerCase());
+            
+            // Если не выбрано ни одного тега - показываем все
+            if (selectedBasicTags.length === 0) {
+                return matchesSearch;
+            }
+            
+            // Проверяем, есть ли хотя бы один выбранный тег в команде
+            const matchesTags = selectedBasicTags.some(selectedTag => 
+                command.tags && Array.isArray(command.tags) && command.tags.includes(selectedTag)
+            );
+            
+            return matchesSearch && matchesTags;
+        });
+    };
+
+    // Проверяем, выбраны ли все теги
+    const areAllTagsSelected = selectedBasicTags.length === basicTags.length && basicTags.length > 0;
+
+    // Функции для работы с фильтрами (как в Excel)
+    const toggleTag = (tag) => {
+        setSelectedBasicTags(prev => 
+            prev.includes(tag) 
+                ? prev.filter(t => t !== tag)
+                : [...prev, tag]
+        );
+    };
+
+    const clearAllFilters = () => {
+        setSelectedBasicTags([]);
+    };
+
+    const selectAllFilters = () => {
+        setSelectedBasicTags([...basicTags]);
     };
 
     const handleCreateCommand = async () => {
@@ -157,13 +202,31 @@ import { toast } from 'sonner';
     };
 
     const handleToggleCommand = async (commandName, data) => {
+        // Оптимистичное обновление - сразу меняем состояние
+        setBasicCommands(prev => 
+            prev.map(cmd => 
+                cmd.command_name === commandName 
+                    ? { ...cmd, ...data }
+                    : cmd
+            )
+        );
+        
+        setCustomCommands(prev => 
+            prev.map(cmd => 
+                cmd.command_name === commandName 
+                    ? { ...cmd, ...data }
+                    : cmd
+            )
+        );
+        
+        // Отправляем запрос в фоне
         try {
             await api.put(`/api/commands/${commandName}`, data);
-            toast.success('Команда обновлена!');
-            loadCommands();
         } catch (error) {
             console.error('Error toggling command:', error);
             toast.error('Ошибка переключения команды');
+            // Откатываем изменения при ошибке
+            loadCommands();
         }
     };
 
@@ -184,21 +247,21 @@ import { toast } from 'sonner';
         setEditingCommand(command);
         setEditForm({
             is_enabled: command.is_enabled,
-            platforms: command.platforms,
-            allowed_roles: command.allowed_roles,
-            cooldown_seconds: command.cooldown_seconds,
+            platforms: command.platforms || 'twitch,vk',
+            allowed_roles: command.allowed_roles || 'all',
+            cooldown_seconds: command.cooldown_seconds || 0,
             response_text: command.response_text || ''
         });
         setIsEditDialogOpen(true);
     };
 
     const getRoleLabel = (role) => {
-        const option = extendedRoleOptions.find(opt => opt.value === role);
+        const option = roleOptions.find(opt => opt.value === role);
         return option ? option.label : role;
     };
 
     const getRoleIcon = (role) => {
-        const option = extendedRoleOptions.find(opt => opt.value === role);
+        const option = roleOptions.find(opt => opt.value === role);
         return option ? option.icon : <Users className="h-3 w-3" />;
     };
 
@@ -209,24 +272,25 @@ import { toast } from 'sonner';
         return platforms;
     };
 
-    const CommandCard = ({ command, type }) => (
-        <Card className="h-full">
-            <CardHeader className="pb-3">
+    const CommandCard = React.memo(({ command, type }) => (
+        <Card className="h-full transition-all duration-300 ease-in-out">
+            <CardHeader className="pb-1">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <Terminal className="h-4 w-4 text-primary" />
-                        <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
+                        <Terminal className="h-3 w-3 text-primary" />
+                        <code className="text-sm font-bold font-mono bg-muted px-2 py-1 rounded text-foreground">
                             !{command.command_name}
                         </code>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-2">
-                            <Badge variant={command.is_enabled ? "default" : "secondary"}>
+                        <div className="flex items-center gap-2 transition-all duration-300 ease-in-out">
+                            <Badge variant={command.is_enabled ? "default" : "secondary"} className="transition-all duration-300 ease-in-out">
                                 {command.is_enabled ? 'Включена' : 'Отключена'}
                             </Badge>
                             <Switch
                                 checked={command.is_enabled}
                                 onCheckedChange={(checked) => handleToggleCommand(command.command_name, { is_enabled: checked })}
+                                className="transition-all duration-300 ease-in-out"
                             />
                         </div>
                         {type === 'custom' && (
@@ -235,39 +299,55 @@ import { toast } from 'sonner';
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                    {command.description}
+            <CardContent className="space-y-3">
+                {/* Описание */}
+                <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+                    {command.description || 'Описание команды не указано'}
                 </p>
                 
+                {/* Ответ команды */}
                 {command.response_text && (
-                    <div className="p-3 bg-muted/50 rounded-lg">
-                        <p className="text-sm font-medium mb-1">Ответ:</p>
-                        <p className="text-xs text-muted-foreground">"{command.response_text}"</p>
+                    <div className="p-2 bg-muted/30 rounded-md border-l-2 border-primary/20">
+                        <p className="text-xs font-medium text-primary mb-1">Ответ:</p>
+                        <p className="text-xs text-muted-foreground line-clamp-2">"{command.response_text}"</p>
                     </div>
                 )}
 
-                <div className="flex flex-wrap gap-2">
-                    <div className="flex items-center gap-1 text-xs">
+                {/* Метаданные в одну строку */}
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1">
                         {getRoleIcon(command.allowed_roles)}
                         <span>{getRoleLabel(command.allowed_roles)}</span>
                     </div>
-                    <div className="flex items-center gap-1 text-xs">
+                        <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         <span>{command.cooldown_seconds}с</span>
                     </div>
             </div>
-
-                <div className="text-xs text-muted-foreground">
-                    Платформы: {getPlatformLabel(command.platforms)}
+                    <div className="text-right">
+                        {getPlatformLabel(command.platforms)}
+                    </div>
                 </div>
 
-                <div className="flex gap-2 pt-2">
+                {/* Теги */}
+                {command.tags && Array.isArray(command.tags) && command.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                        {command.tags.map(tag => (
+                            <Badge key={tag} variant="secondary" className="text-xs">
+                                {tag}
+                            </Badge>
+                        ))}
+                    </div>
+                )}
+
+                {/* Кнопки действий */}
+                <div className="flex gap-2 pt-2 border-t border-border/30">
                     <Button
                         variant="outline"
                         size="sm"
                         onClick={() => openEditDialog(command)}
-                        className="flex-1"
+                        className="flex-1 h-8 text-xs"
                     >
                         <Edit2 className="h-3 w-3 mr-1" />
                         Настроить
@@ -277,6 +357,7 @@ import { toast } from 'sonner';
                             variant="destructive"
                             size="sm"
                             onClick={() => handleDeleteCommand(command.id)}
+                            className="h-8 w-8 p-0"
                         >
                             <Trash2 className="h-3 w-3" />
                         </Button>
@@ -284,7 +365,7 @@ import { toast } from 'sonner';
                                 </div>
             </CardContent>
         </Card>
-    );
+    ));
 
     if (!isAuthenticated) {
         return (
@@ -301,6 +382,18 @@ import { toast } from 'sonner';
         );
     }
 
+    // Ранний return для загрузки - сохраняем структуру контейнера
+    if (loading) {
+        return (
+            <div className="container mx-auto p-6 space-y-6">
+                <div>
+                    <h1 className="text-3xl font-bold mb-6 text-foreground">Команды чата</h1>
+                </div>
+                <PageLoader message="Загрузка команд..." />
+            </div>
+        );
+    }
+
     return (
         <div className="container mx-auto p-6 space-y-6">
             <div>
@@ -314,7 +407,7 @@ import { toast } from 'sonner';
                 </TabsList>
 
                 <TabsContent value="basic" className="space-y-4">
-                    <Card>
+                    <Card className="transition-all duration-200">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <Settings className="h-5 w-5" />
@@ -325,25 +418,107 @@ import { toast } from 'sonner';
                             </p>
                         </CardHeader>
                         <CardContent>
-                            {loading ? (
-                                <div className="text-center py-8">Загрузка команд...</div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {basicCommands.map(command => (
+                            {/* Фильтры для базовых команд */}
+                            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                                
+                                {/* Поиск */}
+                                <div className="flex-1">
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                                        <Input
+                                            placeholder="Поиск команд..."
+                                            value={basicSearchTerm}
+                                            onChange={(e) => setBasicSearchTerm(e.target.value)}
+                                            className="pl-10"
+                                        />
+                                    </div>
+                                </div>
+                                
+                                {/* Фильтр как в Excel */}
+                                <div className="relative">
+                                    <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="outline" size="sm" className="h-9">
+                                                <Filter className="h-4 w-4 mr-2" />
+                                                Фильтр по тегам
+                                                {selectedBasicTags.length > 0 && (
+                                                    <Badge variant="secondary" className="ml-2">
+                                                        {selectedBasicTags.length}
+                                                    </Badge>
+                                                )}
+                                                <ChevronDown className="h-4 w-4 ml-2" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-64 p-0" align="start">
+                                            <div className="p-3 border-b">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <h4 className="font-medium text-sm">Фильтр по тегам</h4>
+                                                    <div className="flex gap-1">
+                                                        <Button
+                                                            variant={areAllTagsSelected ? "default" : "ghost"}
+                                                            size="sm"
+                                                            onClick={selectAllFilters}
+                                                            className="h-6 px-2 text-xs"
+                                                        >
+                                                            {areAllTagsSelected ? "Все ✓" : "Все"}
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={clearAllFilters}
+                                                            className="h-6 px-2 text-xs"
+                                                        >
+                                                            Очистить
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                                <Input
+                                                    placeholder="Поиск тегов..."
+                                                    className="h-8 text-xs"
+                                                />
+                                            </div>
+                                            <div className="max-h-48 overflow-y-auto">
+                                                {basicTags.length > 0 ? (
+                                                    basicTags.map(tag => (
+                                                        <div
+                                                            key={tag}
+                                                            className="flex items-center space-x-2 p-2 hover:bg-muted/50 cursor-pointer"
+                                                            onClick={() => toggleTag(tag)}
+                                                        >
+                                                            <Checkbox
+                                                                checked={selectedBasicTags.includes(tag)}
+                                                                onChange={() => toggleTag(tag)}
+                                                            />
+                                                            <span className="text-sm flex-1">{tag}</span>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="p-3 text-sm text-muted-foreground text-center">
+                                                        Нет тегов
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-all duration-200">
+                                    {getFilteredBasicCommands().map(command => (
+                                        <div key={command.command_name} className="transition-all duration-200">
                                         <CommandCard
-                                            key={command.command_name}
                                             command={command}
                                             type="basic"
                                         />
+                                        </div>
                                     ))}
                 </div>
-                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>
 
                 <TabsContent value="custom" className="space-y-4">
-                    <Card>
+                    <Card className="transition-all duration-200">
                         <CardHeader className="flex flex-row items-center justify-between">
                             <div>
                                 <CardTitle className="flex items-center gap-2">
@@ -397,7 +572,7 @@ import { toast } from 'sonner';
                                 <div>
                                     <Label>Платформы</Label>
                                     <Select
-                                        value={createForm.platforms}
+                                        value={createForm.platforms || 'twitch,vk'}
                                         onValueChange={(value) => setCreateForm(prev => ({
                                             ...prev,
                                             platforms: value
@@ -428,7 +603,7 @@ import { toast } from 'sonner';
                                             <SelectValue placeholder="Выберите доступ" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {extendedRoleOptions.map(option => (
+                                            {roleOptions.map(option => (
                                                 <SelectItem key={option.value} value={option.value}>
                                                     <div className="flex items-center gap-2">
                                                         {option.icon}
@@ -467,9 +642,7 @@ import { toast } from 'sonner';
                 </Dialog>
                                 </CardHeader>
                         <CardContent>
-                            {loading ? (
-                                <div className="text-center py-8">Загрузка команд...</div>
-                            ) : customCommands.length === 0 ? (
+                            {!loading && customCommands.length === 0 ? (
                                 <div className="text-center py-8 space-y-4">
                                     <MessageSquare className="h-16 w-16 mx-auto text-muted-foreground" />
                                     <div>
@@ -480,13 +653,14 @@ import { toast } from 'sonner';
                                     </div>
                     </div>
                 ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-all duration-200">
                                     {customCommands.map(command => (
+                                        <div key={command.id} className="transition-all duration-200">
                                         <CommandCard
-                                            key={command.id}
                                             command={command}
                                             type="custom"
                                         />
+                                        </div>
                         ))}
                     </div>
                             )}
@@ -537,7 +711,7 @@ import { toast } from 'sonner';
                                 <div>
                                     <Label>Платформы</Label>
                                     <Select
-                                        value={editForm.platforms}
+                                        value={editForm.platforms || 'twitch,vk'}
                                         onValueChange={(value) => setEditForm(prev => ({
                                             ...prev,
                                             platforms: value
@@ -568,7 +742,7 @@ import { toast } from 'sonner';
                                             <SelectValue placeholder="Выберите доступ" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {extendedRoleOptions.map(option => (
+                                            {roleOptions.map(option => (
                                                 <SelectItem key={option.value} value={option.value}>
                                                     <div className="flex items-center gap-2">
                                                         {option.icon}

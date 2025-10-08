@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 import api from '../services/api';
 import logger from '../utils/logger';
+import { useAuth } from './AuthContext';
 
 // Контекст для глобального состояния плеера
 const PlayerContext = createContext();
@@ -108,9 +109,15 @@ const playerReducer = (state, action) => {
 export const PlayerProvider = ({ children }) => {
     const [state, dispatch] = useReducer(playerReducer, initialState);
     const lastUpdateTimeRef = useRef(0);
+    const { isAuthenticated } = useAuth();
 
     // Загрузка очереди и текущего видео
     const loadQueue = async () => {
+        // Не загружаем данные если пользователь не авторизован
+        if (!isAuthenticated) {
+            return;
+        }
+        
         try {
             dispatch({ type: playerActions.SET_LOADING, payload: true });
             const response = await api.get('/api/youtube/queue');
@@ -143,6 +150,10 @@ export const PlayerProvider = ({ children }) => {
 
     // Переход к следующему видео
     const nextVideo = async () => {
+        if (!isAuthenticated) {
+            return;
+        }
+        
         try {
             logger.debug('Skipping to next video');
             const response = await api.post('/api/youtube/player/next');
@@ -338,6 +349,10 @@ export const PlayerProvider = ({ children }) => {
 
     // Загрузка данных при монтировании
     useEffect(() => {
+        if (!isAuthenticated) {
+            return;
+        }
+        
         loadQueue();
         
         // Периодическое обновление очереди
@@ -369,7 +384,7 @@ export const PlayerProvider = ({ children }) => {
             clearInterval(timeInterval);
             ws.close();
         };
-    }, []);
+    }, [isAuthenticated]);
 
     // Обработка событий YouTube
     useEffect(() => {

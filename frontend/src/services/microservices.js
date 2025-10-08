@@ -315,3 +315,6 @@ export const getTtsHealth = async () => {
         return { status: 'unhealthy', tts_engine_loaded: false };
     }
 };
+
+// Экспорт botService как microservicesAPI для совместимости
+export const microservicesAPI = botService;

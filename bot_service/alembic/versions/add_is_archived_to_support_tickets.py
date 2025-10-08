@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'add_is_archived_to_support_tickets'
-down_revision = '75ba5c72b102_add_obs_token_to_users'
+down_revision = '75ba5c72b102'
 branch_labels = None
 depends_on = None
 

@@ -359,9 +359,9 @@ class VKLiveCommandHandler:
             
             target_user = args[0].lstrip('@')
             
-            # TODO: Реализовать разбан через VK API
+            # VK Live API не поддерживает разбан пользователей
             await self._send_response(channel, 
-                f"⚠️ Функция разбана пользователей пока не реализована в VK Live API")
+                f"⚠️ VK Live API не поддерживает разбан пользователей")
                 
         except Exception as e:
             logger.error(f"Error in unban command: {e}")

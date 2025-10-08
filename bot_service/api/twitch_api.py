@@ -4,13 +4,30 @@ import time
 import aiohttp
 import logging
 from typing import Optional, Dict, Any, List
+from dotenv import load_dotenv
 from core.connection_manager import ConnectionManager
 from core.session_manager import session_manager
+
+# Загружаем .env файл
+# Получаем путь к директории bot_service
+current_dir = os.path.dirname(os.path.abspath(__file__))
+bot_service_dir = os.path.dirname(current_dir)
+env_path = os.path.join(bot_service_dir, '.env')
+
+# Загружаем .env файл из правильной директории
+load_dotenv(env_path)
 
 logger = logging.getLogger(__name__)
 
 # --- Environment Variables ---
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+
+# Проверяем загрузку переменных окружения
+logger.info(f"🔍 Looking for .env file at: {env_path}")
+logger.info(f"🔍 .env file exists: {os.path.exists(env_path)}")
+logger.info(f"🔍 Environment check - TWITCH_CLIENT_ID loaded: {bool(os.getenv('TWITCH_CLIENT_ID'))}")
+logger.info(f"🔍 Environment check - TWITCH_CLIENT_SECRET loaded: {bool(os.getenv('TWITCH_CLIENT_SECRET'))}")
+logger.info(f"🔍 Environment check - TWITCH_BOT_TOKEN loaded: {bool(os.getenv('TWITCH_BOT_TOKEN'))}")
 
 # --- Twitch API Client ---
 class TwitchAPI:
@@ -27,24 +44,65 @@ class TwitchAPI:
         if self._access_token and time.time() < self._token_expires_at:
             return self._access_token
 
+        # Проверяем наличие обязательных параметров
+        if not self.client_id:
+            logger.error("TWITCH_CLIENT_ID is not set in environment variables")
+            raise Exception("TWITCH_CLIENT_ID is not configured")
+        
+        if not self.client_secret:
+            logger.error("TWITCH_CLIENT_SECRET is not set in environment variables")
+            raise Exception("TWITCH_CLIENT_SECRET is not configured")
+        
+        # Дополнительная проверка secret
+        logger.info(f"🔍 Client Secret length: {len(self.client_secret)}")
+        logger.info(f"🔍 Client Secret contains special chars: {'+' in self.client_secret or '=' in self.client_secret}")
+        logger.info(f"🔍 Client Secret starts with: {self.client_secret[:5]}")
+        logger.info(f"🔍 Client Secret ends with: {self.client_secret[-5:]}")
+
         async with aiohttp.ClientSession() as session:
             url = "https://id.twitch.tv/oauth2/token"
-            data = {
-                "client_id": self.client_id,
-                "client_secret": self.client_secret,
-                "grant_type": "client_credentials"
-            }
             
-            async with session.post(url, data=data) as response:
+            # Используем FormData для правильного кодирования
+            form_data = aiohttp.FormData()
+            form_data.add_field('client_id', self.client_id)
+            form_data.add_field('client_secret', self.client_secret)
+            form_data.add_field('grant_type', 'client_credentials')
+            
+            # Детальное логирование для отладки
+            logger.info(f"🔍 Twitch OAuth2 Request URL: {url}")
+            logger.info(f"🔍 Client ID: {self.client_id}")
+            logger.info(f"🔍 Client Secret: {self.client_secret[:8]}...{self.client_secret[-8:] if len(self.client_secret) > 16 else '***'}")
+            logger.info(f"🔍 Grant Type: client_credentials")
+            
+            async with session.post(url, data=form_data) as response:
+                response_text = await response.text()
+                logger.info(f"🔍 Twitch OAuth2 Response Status: {response.status}")
+                logger.info(f"🔍 Twitch OAuth2 Response Body: {response_text}")
+                
                 if response.status == 200:
-                    result = await response.json()
-                    self._access_token = result["access_token"]
-                    self._token_expires_at = time.time() + result["expires_in"] - 60  # 60 секунд запас
-                    logger.info("Twitch app access token refreshed")
-                    return self._access_token
+                    try:
+                        result = await response.json()
+                        self._access_token = result["access_token"]
+                        self._token_expires_at = time.time() + result["expires_in"] - 60  # 60 секунд запас
+                        logger.info("✅ Twitch app access token refreshed successfully")
+                        return self._access_token
+                    except Exception as e:
+                        logger.error(f"❌ Error parsing Twitch OAuth2 response: {e}")
+                        logger.error(f"❌ Raw response: {response_text}")
+                        raise Exception("Failed to parse Twitch access token response")
                 else:
-                    logger.error(f"Failed to get Twitch app access token: {response.status}")
-                    raise Exception("Failed to get Twitch access token")
+                    logger.error(f"❌ Failed to get Twitch app access token: {response.status}")
+                    logger.error(f"❌ Error response: {response_text}")
+                    
+                    # Попробуем понять причину ошибки
+                    if response.status == 400:
+                        logger.error("❌ Bad Request - возможно неправильные параметры")
+                    elif response.status == 401:
+                        logger.error("❌ Unauthorized - возможно неправильный client_id или client_secret")
+                    elif response.status == 403:
+                        logger.error("❌ Forbidden - возможно приложение не активировано или неправильные права")
+                    
+                    raise Exception(f"Failed to get Twitch access token: {response.status} - {response_text}")
 
     async def get_user_info(self, username: str) -> Optional[Dict[str, Any]]:
         """Получить информацию о пользователе Twitch"""
@@ -266,19 +324,28 @@ class TwitchAPI:
         """Получить access token пользователя по коду авторизации"""
         async with aiohttp.ClientSession() as session:
             url = "https://id.twitch.tv/oauth2/token"
-            data = {
-                "client_id": self.client_id,
-                "client_secret": self.client_secret,
-                "code": code,
-                "grant_type": "authorization_code",
-                "redirect_uri": f"{BACKEND_URL}/auth/twitch/callback"
-            }
             
-            async with session.post(url, data=data) as response:
+            # Используем FormData для правильного кодирования
+            form_data = aiohttp.FormData()
+            form_data.add_field('client_id', self.client_id)
+            form_data.add_field('client_secret', self.client_secret)
+            form_data.add_field('code', code)
+            form_data.add_field('grant_type', 'authorization_code')
+            form_data.add_field('redirect_uri', f"{BACKEND_URL}/auth/twitch/callback")
+            
+            logger.info(f"🔍 Twitch OAuth request: {url}")
+            logger.info(f"🔍 Request data: client_id={self.client_id}, code={code[:10]}..., redirect_uri={BACKEND_URL}/auth/twitch/callback")
+            
+            async with session.post(url, data=form_data) as response:
+                response_text = await response.text()
+                logger.info(f"🔍 Twitch OAuth response: {response.status}")
+                logger.info(f"🔍 Response text: {response_text}")
+                
                 if response.status == 200:
                     return await response.json()
                 else:
                     logger.error(f"Failed to get user access token: {response.status}")
+                    logger.error(f"Error response: {response_text}")
                     return None
 
     async def get_user_from_token(self, access_token: str) -> Optional[Dict[str, Any]]:
@@ -319,3 +386,137 @@ class TwitchAPI:
                 else:
                     logger.error(f"Failed to get category info: {response.status}")
                 return None
+
+    async def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Получить информацию о пользователе по user_id"""
+        async with aiohttp.ClientSession() as session:
+            headers = {
+                "Client-ID": self.client_id,
+                "Authorization": f"Bearer {await self.get_app_access_token()}"
+            }
+            
+            url = f"{self.base_url}/users"
+            params = {"id": user_id}
+            
+            async with session.get(url, headers=headers, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data["data"]:
+                        return data["data"][0]
+                else:
+                    logger.error(f"Failed to get user by ID: {response.status}")
+                return None
+
+    async def get_user_by_username(self, username: str, access_token: str) -> Optional[Dict[str, Any]]:
+        """Получить информацию о пользователе по username"""
+        async with aiohttp.ClientSession() as session:
+            headers = {
+                "Client-ID": self.client_id,
+                "Authorization": f"Bearer {access_token}"
+            }
+            
+            url = f"{self.base_url}/users"
+            params = {"login": username}
+            
+            async with session.get(url, headers=headers, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data["data"]:
+                        return data["data"][0]
+                else:
+                    logger.error(f"Failed to get user by username {username}: {response.status}")
+                return None
+
+    async def add_channel_moderator(self, broadcaster_id: str, user_id: str, access_token: str) -> bool:
+        """Добавить модератора на канал"""
+        async with aiohttp.ClientSession() as session:
+            headers = {
+                "Client-ID": self.client_id,
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
+            
+            url = f"{self.base_url}/moderation/moderators"
+            params = {
+                "broadcaster_id": broadcaster_id,
+                "user_id": user_id
+            }
+            
+            async with session.post(url, headers=headers, params=params) as response:
+                if response.status == 204:
+                    logger.info(f"✅ Added moderator {user_id} to channel {broadcaster_id}")
+                    return True
+                else:
+                    text = await response.text()
+                    logger.error(f"Failed to add moderator: {response.status} - {text}")
+                    return False
+
+    async def remove_channel_moderator(self, broadcaster_id: str, user_id: str, access_token: str) -> bool:
+        """Удалить модератора с канала"""
+        async with aiohttp.ClientSession() as session:
+            headers = {
+                "Client-ID": self.client_id,
+                "Authorization": f"Bearer {access_token}"
+            }
+            
+            url = f"{self.base_url}/moderation/moderators"
+            params = {
+                "broadcaster_id": broadcaster_id,
+                "user_id": user_id
+            }
+            
+            async with session.delete(url, headers=headers, params=params) as response:
+                if response.status == 204:
+                    logger.info(f"✅ Removed moderator {user_id} from channel {broadcaster_id}")
+                    return True
+                else:
+                    text = await response.text()
+                    logger.error(f"Failed to remove moderator: {response.status} - {text}")
+                    return False
+
+    async def add_channel_vip(self, broadcaster_id: str, user_id: str, access_token: str) -> bool:
+        """Добавить VIP на канал"""
+        async with aiohttp.ClientSession() as session:
+            headers = {
+                "Client-ID": self.client_id,
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
+            
+            url = f"{self.base_url}/channels/vips"
+            params = {
+                "broadcaster_id": broadcaster_id,
+                "user_id": user_id
+            }
+            
+            async with session.post(url, headers=headers, params=params) as response:
+                if response.status == 204:
+                    logger.info(f"✅ Added VIP {user_id} to channel {broadcaster_id}")
+                    return True
+                else:
+                    text = await response.text()
+                    logger.error(f"Failed to add VIP: {response.status} - {text}")
+                    return False
+
+    async def remove_channel_vip(self, broadcaster_id: str, user_id: str, access_token: str) -> bool:
+        """Удалить VIP с канала"""
+        async with aiohttp.ClientSession() as session:
+            headers = {
+                "Client-ID": self.client_id,
+                "Authorization": f"Bearer {access_token}"
+            }
+            
+            url = f"{self.base_url}/channels/vips"
+            params = {
+                "broadcaster_id": broadcaster_id,
+                "user_id": user_id
+            }
+            
+            async with session.delete(url, headers=headers, params=params) as response:
+                if response.status == 204:
+                    logger.info(f"✅ Removed VIP {user_id} from channel {broadcaster_id}")
+                    return True
+                else:
+                    text = await response.text()
+                    logger.error(f"Failed to remove VIP: {response.status} - {text}")
+                    return False

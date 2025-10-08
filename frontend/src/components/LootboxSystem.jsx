@@ -7,6 +7,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Gift, Trophy, Star, Coins, Calendar, MessageSquare, TrendingUp, Check, X, Settings, BarChart3, Plus } from 'lucide-react';
 import api from '../services/api';
 import logger from '../utils/logger';
+import { CardSkeleton } from './ui/skeleton';
+import ImageLootbox from './ImageLootbox';
+import { 
+    createLootboxImageConfig, 
+    createMockLootboxes,
+    animateLootboxOpening,
+    createSparkleEffect
+} from '../utils/lootboxImages';
 
 const LootboxSystem = ({ channelName }) => {
     const [progression, setProgression] = useState(null);
@@ -27,6 +35,10 @@ const LootboxSystem = ({ channelName }) => {
         },
         categories: ['coins', 'items', 'special', 'exclusive']
     });
+    
+    // Состояние для анимированных лутбоксов
+    const [imageLootboxes, setImageLootboxes] = useState([]);
+    const [openingLootboxId, setOpeningLootboxId] = useState(null);
     
     // Данные для игрового поля
     const [gameFieldData, setGameFieldData] = useState(() => {
@@ -53,7 +65,14 @@ const LootboxSystem = ({ channelName }) => {
 
     useEffect(() => {
         loadData();
+        initializeImageLootboxes();
     }, [channelName]);
+
+    // Инициализация лутбоксов с картинками
+    const initializeImageLootboxes = () => {
+        const mockLootboxes = createMockLootboxes();
+        setImageLootboxes(mockLootboxes);
+    };
 
     // Функция для обновления данных дня
     const updateDayData = (dayNumber, viewerName, isActive) => {
@@ -122,10 +141,44 @@ const LootboxSystem = ({ channelName }) => {
         // TODO: Показать анимацию результата
     };
 
+    // Функции для управления анимированными лутбоксами
+    const handleLootboxOpen = (lootboxId) => {
+        setOpeningLootboxId(lootboxId);
+        
+        // Создаем эффект блеска
+        const element = document.getElementById(`image-lootbox-${lootboxId}`);
+        if (element) {
+            createSparkleEffect(element);
+        }
+        
+        // Сбрасываем состояние через 3 секунды (время анимации)
+        setTimeout(() => {
+            setOpeningLootboxId(null);
+        }, 3000);
+    };
+
+    const openImageLootbox = (lootboxId) => {
+        const element = document.getElementById(`image-lootbox-${lootboxId}`);
+        if (element) {
+            animateLootboxOpening(element, () => {
+                console.log(`Image lootbox ${lootboxId} opened!`);
+                // Здесь можно добавить логику открытия лутбокса
+            });
+        }
+    };
+
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center p-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="space-y-8 p-6">
+                <div className="space-y-4">
+                    <div className="h-8 w-48 bg-muted animate-pulse rounded"></div>
+                    <div className="h-4 w-96 bg-muted animate-pulse rounded"></div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <CardSkeleton />
+                    <CardSkeleton />
+                    <CardSkeleton />
+                </div>
             </div>
         );
     }
@@ -164,14 +217,103 @@ const LootboxSystem = ({ channelName }) => {
                 </div>
             </div>
 
-            <Tabs defaultValue="calendar" className="w-full">
-                <TabsList className="grid w-full grid-cols-5">
+            <Tabs defaultValue="image-lootboxes" className="w-full">
+                <TabsList className="grid w-full grid-cols-6">
+                    <TabsTrigger value="image-lootboxes">🎨 Анимированные лутбоксы</TabsTrigger>
                     <TabsTrigger value="calendar">📅 Календарь</TabsTrigger>
                     <TabsTrigger value="donation-lootboxes">💰 Донатные лутбоксы</TabsTrigger>
                     <TabsTrigger value="achievement-lootboxes">🏆 Лутбоксы за ачивки</TabsTrigger>
                     <TabsTrigger value="settings">⚙️ Настройки</TabsTrigger>
                     <TabsTrigger value="history">📜 История</TabsTrigger>
                 </TabsList>
+
+                {/* Анимированные лутбоксы с картинками */}
+                <TabsContent value="image-lootboxes" className="space-y-6">
+                    <div className="bg-gray-800 rounded-lg p-6">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-white">Анимированные лутбоксы</h3>
+                            <div className="flex gap-2">
+                                <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => {
+                                        // Открыть все лутбоксы одновременно
+                                        imageLootboxes.forEach(lootbox => {
+                                            handleLootboxOpen(lootbox.id);
+                                        });
+                                    }}
+                                >
+                                    <Gift className="w-4 h-4 mr-2" />
+                                    Открыть все
+                                </Button>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => {
+                                        // Сбросить все анимации
+                                        setOpeningLootboxId(null);
+                                    }}
+                                >
+                                    <X className="w-4 h-4 mr-2" />
+                                    Сбросить
+                                </Button>
+                            </div>
+                        </div>
+                        
+                        <div className="mb-6">
+                            <p className="text-gray-400 text-sm">
+                                Нажмите на лутбокс, чтобы увидеть анимацию открытия. Картинки будут сменяться, создавая эффект открытия.
+                            </p>
+                        </div>
+
+                        {/* Сетка анимированных лутбоксов */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            {imageLootboxes.map((lootbox) => {
+                                const config = createLootboxImageConfig(lootbox, 'grid');
+                                return (
+                                    <div 
+                                        key={lootbox.id}
+                                        id={`image-lootbox-${lootbox.id}`}
+                                        className="animate-lootbox-appear"
+                                    >
+                                        <ImageLootbox
+                                            images={config.images}
+                                            title={config.title}
+                                            rarity={config.rarity}
+                                            size={config.size}
+                                            isOpening={openingLootboxId === lootbox.id}
+                                            onOpen={() => handleLootboxOpen(lootbox.id)}
+                                            className={`${config.effects} cursor-pointer`}
+                                        />
+                                        
+                                        {/* Дополнительная кнопка для анимации открытия */}
+                                        <div className="mt-2 text-center">
+                                            <Button
+                                                onClick={() => openImageLootbox(lootbox.id)}
+                                                className="w-full bg-purple-600 hover:bg-purple-700"
+                                                size="sm"
+                                                variant="outline"
+                                            >
+                                                <Star className="w-4 h-4 mr-2" />
+                                                Анимация открытия
+                                            </Button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Информация о системе */}
+                        <div className="mt-8 p-4 bg-gray-700 rounded-lg">
+                            <h4 className="text-sm font-semibold text-white mb-2">ℹ️ О системе анимации</h4>
+                            <p className="text-sm text-gray-300">
+                                Система использует смену картинок для создания эффекта открытия лутбокса. 
+                                Каждый лутбокс имеет набор картинок: закрытый → этапы открытия → открытый.
+                                Добавьте свои картинки в папку <code className="bg-gray-800 px-1 rounded">/src/images/lootboxes/</code>
+                            </p>
+                        </div>
+                    </div>
+                </TabsContent>
 
                 {/* Календарь */}
                 <TabsContent value="calendar" className="space-y-6">

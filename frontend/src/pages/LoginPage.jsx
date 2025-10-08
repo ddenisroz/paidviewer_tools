@@ -326,17 +326,17 @@ const LoginPage = () => {
         <div className="login-page-bg min-h-screen flex items-center justify-center text-white font-sans p-4 relative">
            {/* Секция активных каналов в правом верхнем углу */}
            {activeChannels.length > 0 && (
-               <div className="absolute top-8 right-8 w-80 z-10">
-                   <div className="text-center mb-4">
-                       <h3 className="text-2xl font-bold text-purple-400 mb-2">Уже подключились</h3>
+               <div className="absolute top-8 right-8 w-64 z-10">
+                   <div className="text-center mb-3">
+                       <h3 className="text-lg font-bold text-purple-400 mb-2">Уже подключились</h3>
                    </div>
-                   <div className="vertical-carousel relative overflow-hidden rounded-xl" style={{height: `${activeChannels.length * 80}px`}}>
-                       <div className="flex flex-col h-full">
+                   <div className="vertical-carousel relative overflow-hidden rounded-xl" style={{height: '320px'}}>
+                       <div className={`flex flex-col h-full ${activeChannels.length > 4 ? 'animate-scroll-smooth' : ''}`}>
                            {/* Показываем только реальные данные без дублирования */}
                            {activeChannels.map((channel, index) => (
                                <div 
                                    key={channel.id}
-                                   className="carousel-item flex items-center justify-center px-4 py-2 cursor-pointer h-[80px] flex-shrink-0 hover:bg-purple-500/10 rounded-lg transition-colors"
+                                   className="carousel-item flex items-center justify-center px-3 py-2 cursor-pointer h-[60px] flex-shrink-0 hover:bg-purple-500/10 rounded-lg transition-colors"
                                    onClick={() => {
                                        const url = channel.platform === 'twitch' 
                                            ? `https://twitch.tv/${channel.username}`
@@ -347,26 +347,26 @@ const LoginPage = () => {
                                    <div className="relative">
                                        <img 
                                            src={channel.avatar}
-                                           alt={channel.display_name || channel.username}
-                                           className={`w-12 h-12 rounded-full object-cover avatar-border ${channel.isOnline ? 'live' : ''}`}
+                                           alt={channel.username}
+                                           className={`w-8 h-8 rounded-full object-cover avatar-border ${channel.isOnline ? 'live' : ''}`}
                                            onError={(e) => {
                                                // Fallback на ui-avatars если аватарка не загрузилась
-                                               e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(channel.display_name || channel.username)}&background=1f2937&color=ffffff&size=48`;
+                                               e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(channel.username)}&background=1f2937&color=ffffff&size=32`;
                                            }}
                                        />
                                        {channel.isOnline && (
                                            <div className="live-badge">LIVE</div>
                                        )}
                                    </div>
-                                   <div className="ml-3 text-center">
-                                       <div className="text-white font-medium text-sm">
-                                           {channel.display_name || channel.username}
+                                   <div className="ml-2 text-center">
+                                       <div className="text-white font-medium text-xs">
+                                           {channel.username}
                                        </div>
-                                       <div className="flex items-center justify-center gap-1 mt-1">
+                                       <div className="flex items-center justify-center gap-1 mt-0.5">
                                            {channel.platform === 'twitch' ? (
-                                               <TwitchIcon className="h-3 w-3 text-purple-400" />
+                                               <TwitchIcon className="h-2.5 w-2.5 text-purple-400" />
                                            ) : (
-                                               <VKIcon className="h-3 w-3 text-blue-400" />
+                                               <VKIcon className="h-2.5 w-2.5 text-blue-400" />
                                            )}
                                            <span className="text-xs text-slate-300 capitalize">
                                                {channel.platform}

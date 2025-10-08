@@ -46,6 +46,8 @@ const VoiceManagement = () => {
     const [isTranscribing, setIsTranscribing] = useState(false);
     const [isTestingVoice, setIsTestingVoice] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [hasLoaded, setHasLoaded] = useState(false);
+    const loadingRef = useRef(false); // Ref to prevent double loading
     
     const { user } = useAuth();
     let audioContext = null;
@@ -66,6 +68,11 @@ const VoiceManagement = () => {
     };
 
     const loadVoices = useCallback(async () => {
+        // Предотвращаем множественные одновременные вызовы
+        if (loading || loadingRef.current) {
+            return;
+        }
+        
         try {
             setLoading(true);
             const data = await getAdminVoices();
@@ -78,10 +85,16 @@ const VoiceManagement = () => {
             setVoices([]); // Устанавливаем пустой массив в случае ошибки
         } finally {
             setLoading(false);
+            loadingRef.current = false;
         }
-    }, [addToast]);
+    }, [addToast, loading]);
 
     const loadUsers = useCallback(async () => {
+        // Предотвращаем множественные одновременные вызовы
+        if (usersLoading || loadingRef.current) {
+            return;
+        }
+        
         try {
             setUsersLoading(true);
             console.log('Loading users...');
@@ -106,13 +119,23 @@ const VoiceManagement = () => {
             setUsers([]);
         } finally {
             setUsersLoading(false);
+            loadingRef.current = false;
         }
-    }, [addToast]);
+    }, [addToast, usersLoading]);
 
     useEffect(() => {
-        loadVoices();
-        loadUsers();
-    }, [loadVoices, loadUsers]);
+        if (!hasLoaded && !loadingRef.current) {
+            loadingRef.current = true;
+            setHasLoaded(true);
+            loadVoices();
+            loadUsers();
+            
+            // Сбрасываем флаг после загрузки
+            setTimeout(() => {
+                loadingRef.current = false;
+            }, 1000);
+        }
+    }, []); // Убираем все зависимости!
 
     const handleFileUpload = (event) => {
         const file = event.target.files[0];
@@ -598,7 +621,7 @@ const VoiceManagement = () => {
                                             ) : (
                                                 users.map(u => (
                                                     <SelectItem key={u.id} value={u.id.toString()}>
-                                                        {u.display_name || u.username || `User ${u.id}`}
+                                                        {u.username || `User_${u.id}`}
                                                     </SelectItem>
                                                 ))
                                             )}
@@ -736,7 +759,7 @@ const VoiceManagement = () => {
                                                                      return owner ? (
                                                                          <div className="flex items-center gap-1">
                                                                              <Users className="h-3 w-3 flex-shrink-0" />
-                                                                             <span className="truncate">{owner.display_name || owner.username}</span>
+                                                                             <span className="truncate">{owner.username || `User_${owner.id}`}</span>
                                                                              {owner.is_online && <Badge variant="outline" className="text-xs ml-1">Онлайн</Badge>}
                                                                          </div>
                                                                      ) : (

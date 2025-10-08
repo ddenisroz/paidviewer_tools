@@ -71,12 +71,12 @@ const Header = () => {
                                 <div className="flex flex-col space-y-1">
                                     <p className="text-xs text-muted-foreground">Подключенные каналы:</p>
                                     {user.integrations && Object.entries(user.integrations).map(([platform, data]) => (
-                                        data.display_name && (
+                                        data.username && (
                                             <div key={platform} className="flex items-center">
                                                 {platform === 'twitch' && <TwitchIcon width="14" height="14" className="mr-2" />}
                                                 {platform === 'vk' && <VKIcon width="14" height="14" className="mr-2" />}
                                                 <p className="text-xs leading-none text-muted-foreground">
-                                                    @{data.display_name}
+                                                    @{data.username}
                                                 </p>
                                             </div>
                                         )

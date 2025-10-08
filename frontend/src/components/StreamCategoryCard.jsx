@@ -49,7 +49,6 @@ const CategoryDropdown = ({ platform, search, onSelect, results }) => {
 const StreamCategoryCard = () => {
     const { integrations } = useIntegrations();
     const { initialData, currentData, setCurrentData, saveChanges, status, categories, searchCategories } = useData();
-
     const [isLinked, setIsLinked] = useState(false);
     const [searchTerms, setSearchTerms] = useState({ twitch: '', vk: '' });
     const [showDropdown, setShowDropdown] = useState({ twitch: false, vk: false });
@@ -62,6 +61,7 @@ const StreamCategoryCard = () => {
     const vkEnabled = integrations.vk?.enabled;
     const bothEnabled = twitchEnabled && vkEnabled;
     const hasAnyIntegration = twitchEnabled || vkEnabled;
+
 
     useEffect(() => {
         setSearchTerms({
@@ -177,9 +177,9 @@ const StreamCategoryCard = () => {
 
     if (!hasAnyIntegration) {
         return (
-            <Card className="h-full border-red-500/50 bg-red-500/5 opacity-60">
+            <Card className="border-red-500/50 bg-red-500/5 opacity-60">
                  <CardHeader><CardTitle className="flex items-center gap-2 text-red-500"><Tag /> Смена категории</CardTitle></CardHeader>
-                 <CardContent className="flex items-center justify-center h-full min-h-[300px]">
+                 <CardContent className="flex items-center justify-center min-h-[300px]">
                     <div className="text-center space-y-4">
                         <div className="w-16 h-16 mx-auto flex items-center justify-center">
                             <svg className="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -194,13 +194,13 @@ const StreamCategoryCard = () => {
     }
 
     return (
-        <Card className="h-full flex flex-col min-h-[400px]">
-            <CardHeader className="flex-shrink-0"><CardTitle className="flex items-center gap-2"><Tag className="text-green-500"/> Смена категории</CardTitle></CardHeader>
-            <CardContent ref={dropdownRef} className="p-6 flex-1 flex flex-col justify-between min-h-0">
+        <Card className="flex flex-col min-h-[300px]">
+            <CardHeader className="flex-shrink-0 pb-3"><CardTitle className="flex items-center gap-2"><Tag className="h-5 w-5 text-green-500"/> Смена категории</CardTitle></CardHeader>
+            <CardContent ref={dropdownRef} className="p-4 flex-1 flex flex-col">
                 {/* Toggle объединения полей */}
                 {bothEnabled && (
-                    <div className="flex items-center justify-between p-3 bg-background/10 rounded-lg">
-                        <Label htmlFor="link-categories" className="flex items-center gap-2 cursor-pointer font-medium">
+                    <div className="flex items-center justify-between p-2 bg-background/10 rounded-lg mb-3">
+                        <Label htmlFor="link-categories" className="flex items-center gap-2 cursor-pointer text-sm">
                             {isLinked ? <Link className="h-4 w-4 text-green-500" /> : <Unlink className="h-4 w-4" />}
                             Объединить поля
                         </Label>
@@ -213,13 +213,13 @@ const StreamCategoryCard = () => {
                     </div>
                 )}
                 {/* Поля ввода */}
-                <div className="flex-1 flex items-center justify-center">
+                <div className="flex-1 flex items-center justify-center py-4 min-h-[120px]">
                     <div className="w-full space-y-4">
-                    {isLinked && bothEnabled ? (
-                        <div className="space-y-3 relative">
-                            <Label className="flex items-center gap-2 font-medium">
-                                <TwitchIcon /><VKIcon /> Общая категория
-                            </Label>
+                        {isLinked && bothEnabled ? (
+                            <div className="space-y-3 relative h-[80px] flex flex-col justify-center">
+                                <Label className="flex items-center gap-2 font-medium">
+                                    <TwitchIcon /><VKIcon /> Общая категория
+                                </Label>
                                 <div className="flex gap-3 items-center relative">
                                     {currentData.twitch.category?.box_art_url && (
                                         <img 
@@ -248,10 +248,10 @@ const StreamCategoryCard = () => {
                                     </div>
                                 </div>
                         </div>
-                    ) : (
-                        <>
-                            {/* Поле Twitch */}
-                            <div className={`space-y-2 relative ${!twitchEnabled ? 'opacity-50' : ''}`}>
+                        ) : (
+                            <div className="h-[160px] flex flex-col justify-center space-y-4">
+                                {/* Поле Twitch */}
+                                <div className={`space-y-3 relative ${!twitchEnabled ? 'opacity-50' : ''}`}>
                                 <Label className="flex items-center gap-2 font-medium">
                                     <TwitchIcon /> Twitch
                                     {!twitchEnabled && <span className="text-xs text-muted-foreground">(отключено)</span>}
@@ -287,7 +287,7 @@ const StreamCategoryCard = () => {
                             </div>
 
                             {/* Поле VK Live */}
-                            <div className={`space-y-2 relative ${!vkEnabled ? 'opacity-50' : ''}`}>
+                            <div className={`space-y-3 relative ${!vkEnabled ? 'opacity-50' : ''}`}>
                                 <Label className="flex items-center gap-2 font-medium">
                                     <VKIcon /> VK Live
                                     {!vkEnabled && <span className="text-xs text-muted-foreground">(отключено)</span>}
@@ -321,17 +321,18 @@ const StreamCategoryCard = () => {
                                     </div>
                                 </div>
                             </div>
-                        </>
-                    )}
+                                </div>
+                            )}
                     </div>
                 </div>
 
                 {/* Кнопка сохранения */}
                 {hasAnyIntegration && (
-                    <div className="pt-4 flex justify-center flex-shrink-0">
+                    <div className="mt-auto pt-4 flex justify-center">
                         <Button 
                             onClick={() => handleSave(isLinked && bothEnabled ? 'both' : 'individual')}
                             disabled={status.saveCategory === 'loading' || !isChanged}
+                            size="sm"
                             className="w-full flex items-center gap-2"
                         >
                             {status.saveCategory === 'loading' ? (

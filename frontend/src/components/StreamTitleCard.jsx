@@ -13,13 +13,13 @@ import { useIntegrations } from '../context/IntegrationsContext';
 const StreamTitleCard = () => {
     const { integrations } = useIntegrations();
     const { initialData, currentData, setCurrentData, saveChanges, status } = useData();
-    
     const [isLinked, setIsLinked] = useState(false);
 
     const twitchEnabled = integrations.twitch?.enabled;
     const vkEnabled = integrations.vk?.enabled;
     const bothEnabled = twitchEnabled && vkEnabled;
     const hasAnyIntegration = twitchEnabled || vkEnabled;
+
 
     const handleTitleChange = (platform, value) => {
         if (isLinked && bothEnabled) {
@@ -77,14 +77,14 @@ const StreamTitleCard = () => {
 
     if (!hasAnyIntegration) {
         return (
-            <Card className="h-full border-red-500/50 bg-red-500/5 opacity-60">
+            <Card className="border-red-500/50 bg-red-500/5 opacity-60">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-red-500">
                         <Edit3 className="h-6 w-6" />
                         Смена названия
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="flex items-center justify-center h-full min-h-[300px]">
+                <CardContent className="flex items-center justify-center min-h-[300px]">
                     <div className="text-center space-y-4">
                         <div className="w-16 h-16 mx-auto flex items-center justify-center">
                             <svg className="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -99,18 +99,18 @@ const StreamTitleCard = () => {
     }
 
     return (
-        <Card className="h-full flex flex-col min-h-[400px]">
-            <CardHeader className="flex-shrink-0">
+        <Card className="flex flex-col min-h-[300px]">
+            <CardHeader className="flex-shrink-0 pb-3">
                 <CardTitle className="flex items-center gap-2">
-                    <Edit3 className="h-6 w-6 text-green-500" />
+                    <Edit3 className="h-5 w-5 text-green-500" />
                     Смена названия
                 </CardTitle>
             </CardHeader>
-            <CardContent className="p-6 flex-1 flex flex-col justify-between min-h-0">
+            <CardContent className="p-4 flex-1 flex flex-col">
                 {/* Toggle объединения полей */}
                 {bothEnabled && (
-                    <div className="flex items-center justify-between p-3 bg-background/10 rounded-lg">
-                        <Label htmlFor="link-titles" className="flex items-center gap-2 cursor-pointer font-medium">
+                    <div className="flex items-center justify-between p-2 bg-background/10 rounded-lg mb-3">
+                        <Label htmlFor="link-titles" className="flex items-center gap-2 cursor-pointer text-sm">
                             {isLinked ? <Link className="h-4 w-4 text-green-500" /> : <Unlink className="h-4 w-4" />}
                             Объединить поля
                         </Label>
@@ -124,65 +124,66 @@ const StreamTitleCard = () => {
                 )}
 
                 {/* Поля ввода */}
-                <div className="flex-1 flex items-center justify-center">
+                <div className="flex-1 flex items-center justify-center py-4 min-h-[120px]">
                     <div className="w-full space-y-4">
-                    {isLinked && bothEnabled ? (
-                        <div className="space-y-3">
-                            <Label className="flex items-center gap-2 font-medium">
-                                <TwitchIcon /><VKIcon /> Общее название
-                            </Label>
-                            <Input 
-                                value={currentData.twitch.title || ''} 
-                                onChange={(e) => handleTitleChange('twitch', e.target.value)} 
-                                onKeyPress={handleKeyPress}
-                                placeholder="Введите общее название для обеих платформ..."
-                                className="h-12 text-lg"
-                            />
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {/* Поле Twitch */}
-                            <div className={`space-y-2 ${!twitchEnabled ? 'opacity-50' : ''}`}>
-                                <Label className="flex items-center gap-2 font-medium">
-                                    <TwitchIcon /> Twitch
-                                    {!twitchEnabled && <span className="text-xs text-muted-foreground">(отключено)</span>}
+                        {isLinked && bothEnabled ? (
+                            <div className="space-y-3 h-[80px] flex flex-col justify-center">
+                                <Label className="flex items-center gap-2 text-sm">
+                                    <TwitchIcon /><VKIcon /> Общее название
                                 </Label>
                                 <Input 
                                     value={currentData.twitch.title || ''} 
                                     onChange={(e) => handleTitleChange('twitch', e.target.value)} 
                                     onKeyPress={handleKeyPress}
-                                    placeholder={twitchEnabled ? "Название стрима на Twitch..." : "Интеграция отключена"}
-                                    className={`h-12 text-lg ${!twitchEnabled ? 'bg-muted cursor-not-allowed blur-sm' : ''}`}
-                                    disabled={!twitchEnabled}
+                                    placeholder="Введите общее название для обеих платформ..."
+                                    className="h-10"
                                 />
                             </div>
+                        ) : (
+                            <div className="space-y-4 h-[160px] flex flex-col justify-center">
+                                {/* Поле Twitch */}
+                                <div className={`space-y-3 ${!twitchEnabled ? 'opacity-50' : ''}`}>
+                                    <Label className="flex items-center gap-2 text-sm">
+                                        <TwitchIcon /> Twitch
+                                        {!twitchEnabled && <span className="text-xs text-muted-foreground">(отключено)</span>}
+                                    </Label>
+                                    <Input 
+                                        value={currentData.twitch.title || ''} 
+                                        onChange={(e) => handleTitleChange('twitch', e.target.value)} 
+                                        onKeyPress={handleKeyPress}
+                                        placeholder={twitchEnabled ? "Название стрима на Twitch..." : "Интеграция отключена"}
+                                        className={`h-10 ${!twitchEnabled ? 'bg-muted cursor-not-allowed blur-sm' : ''}`}
+                                        disabled={!twitchEnabled}
+                                    />
+                                </div>
 
-                            {/* Поле VK Live */}
-                            <div className={`space-y-2 ${!vkEnabled ? 'opacity-50' : ''}`}>
-                                <Label className="flex items-center gap-2 font-medium">
-                                    <VKIcon /> VK Live
-                                    {!vkEnabled && <span className="text-xs text-muted-foreground">(отключено)</span>}
-                                </Label>
-                                <Input 
-                                    value={currentData.vk.title || ''} 
-                                    onChange={(e) => handleTitleChange('vk', e.target.value)} 
-                                    onKeyPress={handleKeyPress}
-                                    placeholder={vkEnabled ? "Название стрима на VK Live..." : "Интеграция отключена"}
-                                    className={`h-12 text-lg ${!vkEnabled ? 'bg-muted cursor-not-allowed blur-sm' : ''}`}
-                                    disabled={!vkEnabled}
-                                />
+                                {/* Поле VK Live */}
+                                <div className={`space-y-3 ${!vkEnabled ? 'opacity-50' : ''}`}>
+                                    <Label className="flex items-center gap-2 text-sm">
+                                        <VKIcon /> VK Live
+                                        {!vkEnabled && <span className="text-xs text-muted-foreground">(отключено)</span>}
+                                    </Label>
+                                    <Input 
+                                        value={currentData.vk.title || ''} 
+                                        onChange={(e) => handleTitleChange('vk', e.target.value)} 
+                                        onKeyPress={handleKeyPress}
+                                        placeholder={vkEnabled ? "Название стрима на VK Live..." : "Интеграция отключена"}
+                                        className={`h-10 ${!twitchEnabled ? 'bg-muted cursor-not-allowed blur-sm' : ''}`}
+                                        disabled={!vkEnabled}
+                                    />
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
                     </div>
                 </div>
 
                 {/* Кнопка сохранения */}
                 {hasAnyIntegration && (
-                    <div className="pt-4 flex justify-center flex-shrink-0">
+                    <div className="mt-auto pt-4 flex justify-center">
                         <Button 
                             onClick={() => handleSave(isLinked && bothEnabled ? 'both' : 'individual')}
                             disabled={status.saveTitle === 'loading' || !isChanged}
+                            size="sm"
                             className="w-full flex items-center gap-2"
                         >
                             {status.saveTitle === 'loading' ? (

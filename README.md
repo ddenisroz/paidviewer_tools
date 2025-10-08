@@ -1,224 +1,328 @@
-# TTS Bot Service
+# TTS_TTV_0.02 - Мультиплатформенная TTS система для стримеров
 
-Многофункциональный сервис для интеграции Text-to-Speech (TTS) с платформами Twitch и VK Live.
+## 🎯 Описание проекта
 
-## 🚀 Возможности
+Комплексная система текстового озвучивания (TTS) для стримеров, поддерживающая Twitch и VK Live. Включает в себя чат-ботов, управление голосами, систему команд, анализ чата и интеграцию с OBS.
 
-### Основные функции
-- **Text-to-Speech**: Преобразование текста в речь с поддержкой множества голосов
-- **Мультиплатформенность**: Интеграция с Twitch и VK Live
-- **Управление голосами**: Загрузка и управление пользовательскими голосами
-- **Админ панель**: Полнофункциональная панель управления
-- **Система ролей**: Контроль доступа и прав пользователей
-- **Очередь сообщений**: Управление очередью TTS запросов
-- **Интеграция с YouTube**: Автоматическое добавление видео в очередь
+## ✨ Основные возможности
 
-### Технические особенности
-- **Микросервисная архитектура**: Разделение на Bot Service и TTS Service
-- **WebSocket соединения**: Реальное время для чата и уведомлений
-- **База данных**: SQLite с миграциями Alembic
-- **REST API**: Полнофункциональное API для всех операций
-- **Логирование**: Детальное логирование всех операций
-- **Docker поддержка**: Готовые конфигурации для развертывания
+### 🎤 TTS (Text-to-Speech)
+- **F5-TTS Engine** - современный движок для генерации речи
+- **Управление голосами** - создание, настройка и тестирование голосов
+- **Глобальные голоса** - общие голоса для всех пользователей
+- **Пользовательские голоса** - индивидуальные настройки
+- **Автотранскрипция** - автоматическое преобразование текста
+- **Упрощенная система пользователей** - только ID, без лишних полей
+
+### 💬 Чат-боты
+- **Twitch Bot** - интеграция с Twitch IRC API
+- **VK Live Bot** - интеграция с VK Live API
+- **Управление командами** - создание и настройка команд
+- **Система ролей** - разграничение доступа к командам
+- **Фильтрация контента** - блокировка нежелательных слов
+
+### 🎮 Чат для OBS
+- **Twitch Chat** - отображение чата Twitch в OBS
+- **VK Live Chat** - отображение чата VK Live в OBS
+- **Объединенный чат** - слияние двух чатов в один
+- **Настройка внешнего вида** - CSS, шрифты, цвета
+- **Экспорт** - URL для Browser Source или HTML файлы
+
+### 🎁 Система Drops
+- **Streak Drops** - награды за ежедневное посещение
+- **Donation Drops** - награды за донаты
+- **Mythical Drops** - редкие случайные награды
+- **Управление наградами** - создание и настройка наград
+- **История Drops** - отслеживание выданных наград
+
+### 🧠 AI Анализ
+- **Психологический анализ** - профили пользователей
+- **Анализ поведения** - паттерны активности
+- **Временные анализы** - не сохраняются в БД
+- **Интеграция с чатом** - анализ сообщений в реальном времени
+
+### 🔧 Администрирование
+- **Управление пользователями** - создание, редактирование, удаление, блокировка
+- **Управление сессиями** - просмотр активных подключений с каналами Twitch/VK
+- **Управление голосами** - создание, настройка и тестирование TTS голосов
+- **Whitelist каналов** - управление разрешенными каналами
+- **Заблокированные каналы** - управление блокировками
+- **Мониторинг системы** - состояние сервисов (заглушки)
+- **Очистка базы данных** - удаление старых данных
 
 ## 🏗️ Архитектура
 
+### Backend (FastAPI)
 ```
-├── bot_service/          # Основной сервис ботов
-│   ├── bots/            # Боты для Twitch и VK Live
-│   ├── api/             # REST API endpoints
-│   ├── auth/            # Система аутентификации
-│   ├── core/            # Основная логика
-│   ├── services/        # Бизнес-логика
-│   └── models/          # Модели данных
-├── tts_service/         # TTS сервис
-│   ├── TTS_rus_engine/  # Русский TTS движок
-│   ├── voices/          # Голосовые модели
-│   └── audio/           # Аудио файлы
-├── frontend/            # React фронтенд
-│   ├── src/
-│   │   ├── components/  # UI компоненты
-│   │   ├── pages/       # Страницы
-│   │   ├── context/     # React контекст
-│   │   └── services/    # API сервисы
-└── VK_live_docs/        # Документация VK Live API
+bot_service/
+├── main.py                 # Точка входа
+├── core/
+│   ├── database.py        # Модели базы данных
+│   └── security.py        # Безопасность
+├── api/                   # API endpoints
+├── services/              # Бизнес-логика
+├── bots/                  # Чат-боты
+└── auth/                  # Аутентификация
 ```
 
-## 🛠️ Установка и запуск
+### Frontend (React + Vite)
+```
+frontend/
+├── src/
+│   ├── pages/             # Страницы приложения
+│   ├── components/        # React компоненты
+│   ├── context/           # React Context
+│   └── services/          # API клиенты
+```
 
-### Предварительные требования
+### TTS Service (Python)
+```
+tts_service/
+├── main.py               # TTS сервис
+├── tts_engine.py         # Движок TTS
+├── TTS_rus_engine/       # Русский TTS
+└── f5_tts_cache/         # Кэш моделей
+```
+
+## 🚀 Установка и запуск
+
+### Требования
 - Python 3.8+
 - Node.js 16+
-- Git
+- SQLite
+- Docker (опционально)
 
-### 1. Клонирование репозитория
-```bash
-git clone https://github.com/ddenisroz/twitch-tts-bot.git
-cd twitch-tts-bot
-```
-
-### 2. Настройка окружения
-
-#### Bot Service
+### Backend
 ```bash
 cd bot_service
-cp env.example .env
-# Отредактируйте .env файл с вашими настройками
 pip install -r requirements.txt
+python main.py
 ```
 
-#### TTS Service
-```bash
-cd tts_service
-pip install -r requirements.txt
-```
-
-#### Frontend
+### Frontend
 ```bash
 cd frontend
 npm install
-```
-
-### 3. Настройка переменных окружения
-
-#### bot_service/.env
-```env
-# Основные настройки
-LOG_LEVEL=INFO
-ADMIN_USERS=your_username,admin_username
-
-# Twitch настройки
-TWITCH_BOT_TOKEN=your_twitch_bot_token
-TWITCH_CLIENT_ID=your_twitch_client_id
-TWITCH_CLIENT_SECRET=your_twitch_client_secret
-
-# VK Live настройки
-VK_ACCESS_TOKEN=your_vk_access_token
-VK_GROUP_ID=your_vk_group_id
-
-# База данных
-DATABASE_URL=sqlite:///./data/app_data.db
-
-# TTS Service
-TTS_SERVICE_URL=http://localhost:8001
-```
-
-#### frontend/.env
-```env
-VITE_API_URL=http://localhost:8000
-VITE_TTS_URL=http://localhost:8001
-```
-
-### 4. Запуск сервисов
-
-#### Автоматический запуск (Windows)
-```bash
-start_microservices.bat
-```
-
-#### Ручной запуск
-```bash
-# Terminal 1 - Bot Service
-cd bot_service
-python main.py
-
-# Terminal 2 - TTS Service
-cd tts_service
-python main.py
-
-# Terminal 3 - Frontend
-cd frontend
 npm run dev
 ```
 
-## 📖 Использование
+### TTS Service
+```bash
+cd tts_service
+pip install -r requirements.txt
+python main.py
+```
 
-### Админ панель
-Доступна по адресу: `http://localhost:5173/dashboard/dolbaebadmintts`
+### Docker
+```bash
+docker-compose up -d
+```
 
-**Возможности:**
-- **TTS whitelist**: Управление разрешенными каналами
-- **Управление голосами**: Загрузка и настройка голосов
-- **Управление пользователями**: Контроль доступа
-- **Управление ботами**: Перезапуск сервисов
-- **Сессии**: Мониторинг активных пользователей
-- **Логи**: Просмотр системных логов
+## 📊 База данных
 
-### API Endpoints
+### Основные таблицы
+- **users** - пользователи системы
+- **bot_commands** - команды ботов
+- **filtered_words** - фильтр слов
+- **user_voices** - пользовательские голоса
+- **global_voices** - глобальные голоса
+- **drops_rewards** - награды Drops
+- **drops_history** - история Drops
+- **psychology_analyses** - психологические анализы
 
-#### Bot Service (порт 8000)
-- `GET /api/auth/status` - Статус аутентификации
-- `POST /api/auth/login` - Вход в систему
-- `GET /api/admin/sessions` - Список активных сессий
-- `POST /api/admin/bot-service/restart` - Перезапуск Bot Service
-- `POST /api/admin/tts/restart` - Перезапуск TTS движка
-
-#### TTS Service (порт 8001)
-- `POST /api/tts/synthesize` - Синтез речи
-- `GET /api/tts/voices` - Список доступных голосов
-- `POST /api/tts/restart` - Перезапуск TTS движка
-
-### Команды ботов
-
-#### Twitch
-- `!tts <текст>` - Синтез речи
-- `!skip` - Пропустить текущее сообщение
-- `!queue` - Показать очередь
-- `!volume <1-100>` - Установить громкость
-
-#### VK Live
-- `!ттс <текст>` - Синтез речи
-- `!пропустить` - Пропустить текущее сообщение
-- `!очередь` - Показать очередь
-- `!громкость <1-100>` - Установить громкость
-
-## 🔧 Разработка
-
-### Структура проекта
-- **Backend**: FastAPI + SQLAlchemy + Alembic
-- **Frontend**: React + Vite + Tailwind CSS
-- **TTS**: F5-TTS + Vocos
-- **Боты**: TwitchIO + VK Live API
-
-### Миграции базы данных
+### Миграции
 ```bash
 cd bot_service
 alembic upgrade head
 ```
 
+## 🔐 Безопасность
+
+- **JWT токены** - аутентификация
+- **OAuth 2.0** - интеграция с платформами
+- **Rate Limiting** - защита от спама
+- **XSS защита** - санитизация входных данных
+- **CORS** - настройка кросс-доменных запросов
+- **Валидация данных** - Pydantic модели
+
+## 🎨 UI/UX
+
+### Дизайн
+- **Темная тема** - современный интерфейс
+- **Адаптивность** - поддержка всех устройств
+- **Компоненты** - переиспользуемые UI элементы
+- **Анимации** - плавные переходы
+- **Иконки** - Lucide React
+
+### Навигация
+- **Sidebar** - основное меню
+- **Dashboard** - главная страница
+- **TTS** - управление голосами
+- **Команды** - настройка команд
+- **Drops** - система наград
+- **Админ** - административные функции
+  - **TTS whitelist** - управление разрешенными каналами
+  - **Голоса** - управление TTS голосами
+  - **Пользователи** - управление пользователями и сессиями
+  - **Боты** - управление ботами
+  - **Тикеты** - система поддержки
+  - **Мониторинг** - состояние системы
+
+## 🔌 Интеграции
+
+### Twitch
+- **IRC API** - подключение к чату
+- **REST API** - управление каналом
+- **OAuth** - авторизация пользователей
+
+### VK Live
+- **REST API** - управление стримом
+- **WebSocket** - реальное время
+- **OAuth** - авторизация пользователей
+
+### OBS
+- **Browser Source** - встраивание TTS
+- **WebSocket** - управление воспроизведением
+- **URL параметры** - настройка отображения
+
+## 📈 Мониторинг
+
 ### Логирование
-Логи сохраняются в:
-- `bot_service/logs/bot_service.log`
-- `tts_service/logs/tts_service.log`
+- **Структурированные логи** - JSON формат
+- **Уровни логирования** - DEBUG, INFO, WARNING, ERROR
+- **Ротация логов** - автоматическая очистка
+- **Контекстные логи** - дополнительная информация
 
-## 📚 Документация
+### Метрики
+- **Состояние сервисов** - здоровье системы
+- **Производительность** - время отклика
+- **Использование ресурсов** - память, CPU
+- **Ошибки** - отслеживание проблем
 
-- [VK Live API](VK_live_docs/) - Полная документация VK Live API
-- [Настройка VK Live](VK_LIVE_BOT_SETUP.md)
-- [Команды VK Live](VK_LIVE_COMMANDS_GUIDE.md)
-- [Исправления VK Live](VK_LIVE_API_FIXES.md)
-- [Руководство по токенам](VK_TOKEN_GUIDE.md)
+## 🧪 Тестирование
 
-## 🤝 Вклад в проект
+### Backend
+```bash
+cd bot_service
+python -m pytest tests/
+```
 
-1. Форкните репозиторий
-2. Создайте ветку для новой функции
+### Frontend
+```bash
+cd frontend
+npm run test
+```
+
+## 📦 Развертывание
+
+### Production
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+### Nginx
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+    
+    location / {
+        proxy_pass http://localhost:3000;
+    }
+    
+    location /api {
+        proxy_pass http://localhost:8000;
+    }
+}
+```
+
+## 🤝 Участие в разработке
+
+1. Fork проекта
+2. Создайте feature branch
 3. Внесите изменения
 4. Создайте Pull Request
 
 ## 📄 Лицензия
 
-Этот проект распространяется под лицензией MIT.
+MIT License - см. файл LICENSE
 
-## 🆘 Поддержка
+## 📚 Документация
 
-При возникновении проблем:
-1. Проверьте логи сервисов
-2. Убедитесь в правильности настроек .env
-3. Проверьте доступность портов 8000 и 8001
-4. Создайте Issue в репозитории
+Вся документация организована в папке [`docs/`](./docs/):
+
+### 🚀 Быстрый старт
+- [**Быстрая настройка**](./docs/setup/QUICK_SETUP_GUIDE.md) - Начните за 5 минут
+- [**Быстрые команды**](./docs/setup/QUICK_COMMANDS.md) - Самые частые команды
+- [**AI Setup**](./docs/setup/AI_SETUP_GUIDE.md) - Настройка TTS и AI
+
+### 📖 Руководства
+- [**Developer Guide**](./docs/guides/DEVELOPER_GUIDE.md) - Для разработчиков
+- [**База данных**](./docs/guides/DATABASE_MANAGEMENT_README.md) - Управление БД
+- [**Cleanup Guide**](./docs/guides/CLEANUP_GUIDE.md) - Очистка проекта
+- [**VK Live Команды**](./docs/guides/VK_LIVE_COMMANDS_GUIDE.md) - Команды для VK
+
+### 🚀 Deployment
+- [**Production Deploy**](./docs/deployment/DEPLOYMENT.md) - Развертывание
+- [**Development Setup**](./docs/deployment/DEVELOPMENT.md) - Настройка dev окружения
+
+### 📊 Отчеты
+- [**Project Summary**](./docs/reports/PROJECT_SUMMARY.md) - Краткое описание
+- [**Optimization Report**](./docs/reports/OPTIMIZATION_REPORT.md) - Оптимизация
+- [**Cleanup Report**](./docs/reports/CLEANUP_REPORT.md) - Отчет по очистке
+- [**Testing Checklist**](./docs/reports/TESTING_CHECKLIST.md) - Чеклист тестирования
+
+**📝 [Полный список документации →](./docs/README.md)**
 
 ---
 
-**Версия**: 0.02  
-**Последнее обновление**: 2025-09-27
+## 🆘 Поддержка
+
+- **Документация** - [`docs/`](./docs/)
+- **Issues** - GitHub Issues
+- **Discord** - [ссылка на сервер]
+
+## 🎉 Благодарности
+
+- **F5-TTS** - за отличный TTS движок
+- **Twitch** - за API и документацию
+- **VK** - за VK Live API
+- **Сообщество** - за обратную связь и предложения
+
+---
+
+**Версия:** 0.02  
+**Последнее обновление:** Октябрь 2025  
+**Статус:** В активной разработке
+
+---
+
+## 🛠️ Утилитные скрипты
+
+### Автоматическая очистка проекта
+```bash
+# Просмотр без удаления
+python docs/scripts/cleanup_project.py --dry-run
+
+# Полная очистка
+python docs/scripts/cleanup_project.py
+```
+
+### Мониторинг
+```bash
+python docs/scripts/monitoring_viewer.py
+```
+
+### Deployment скрипты
+```bash
+# Развертывание
+bash docs/scripts/deploy.sh
+
+# Dev окружение
+bash docs/scripts/dev-setup.sh
+
+# Обновление
+bash docs/scripts/update.sh
+```
+
+📚 **[Все скрипты →](./docs/scripts/)**

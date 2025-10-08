@@ -8,7 +8,7 @@
 }
 
 .animate-scroll-smooth {
-    animation: scroll-smooth 25s linear infinite;
+    animation: scroll-smooth 30s linear infinite;
 }
 
 .animate-scroll-smooth:hover {

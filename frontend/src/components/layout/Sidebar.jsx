@@ -1,20 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Mic, Clapperboard, AreaChart, Terminal, Youtube, Coins, Headphones, Settings, Shield, MessageSquare, Command, Dice6, Gift } from 'lucide-react';
+import { Home, Mic, Clapperboard, AreaChart, Terminal, Youtube, Coins, Headphones, Settings, Shield, MessageSquare, Command, Gift, Sparkles, Monitor } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getAdminList } from '../../services/microservices';
 
 const getNavItems = (isYourchy) => {
     const baseItems = [
         { to: '/dashboard', label: 'Главная', icon: Home },
-        { 
-            to: '/dashboard/tts', 
-            label: 'TTS ИИ озвучка', 
-            icon: Mic,
-            submenu: [
-                { to: '/dashboard/tts/voices', label: 'Управление голосами', icon: Headphones },
-            ]
-        },
+        { to: '/dashboard/tts', label: 'TTS ИИ озвучка', icon: Mic },
         { 
             to: '/dashboard/media', 
             label: 'Медиа интерактивность', 
@@ -22,7 +15,14 @@ const getNavItems = (isYourchy) => {
             submenu: [
                 { to: '/dashboard/media/youtube', label: 'YouTube заказы', icon: Youtube },
                 { to: '/dashboard/points', label: 'Баллы канала', icon: Coins },
-                { to: '/dashboard/gambling', label: 'Гэмблинг', icon: Dice6 },
+            ]
+        },
+        { 
+            to: '/dashboard/drops', 
+            label: 'Drops система', 
+            icon: Sparkles,
+            submenu: [
+                { to: '/dashboard/drops/rewards', label: 'Управление наградами', icon: Gift },
             ]
         },
         { to: '/dashboard/chat-analysis', label: 'Анализ и модерация чата', icon: MessageSquare },

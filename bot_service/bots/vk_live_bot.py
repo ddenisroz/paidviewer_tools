@@ -4,7 +4,7 @@ import logging
 import time
 from typing import List, Dict, Any, Optional
 from core.connection_manager import ConnectionManager
-from core.database import BotCommand
+from core.database import BotCommand, get_db
 # vk_live_chat_reader удален - используем только оптимизированную версию
 from bots.vk_live_chat_reader_optimized import OptimizedVKLiveChatReader
 from utils.vk_live_websocket import VKLiveWebSocketClient
@@ -306,6 +306,27 @@ class VKLiveBot:
                 async with session.post(url, headers=headers, params=params, json=message_data) as response:
                     if response.status == 200:
                         logger.info(f"✅ VK Live bot sent message to {channel_name}: {message}")
+                        
+                        # Получаем имя стримера из базы данных
+                        streamer_name = await self._get_streamer_name(channel_name)
+                        
+                        # Передаем через WebSocket для отображения в интерфейсе как сообщение от стримера
+                        await self.connection_manager.broadcast_chat_message({
+                            'type': 'chat_message',
+                            'platform': 'vk',
+                            'channel': channel_name,
+                            'author_name': streamer_name,  # Показываем как сообщение от стримера
+                            'author': streamer_name,
+                            'username': streamer_name,
+                            'content': message,
+                            'message': message,
+                            'timestamp': time.time(),
+                            'role': 'broadcaster',
+                            'author_color': '#0077FF',  # Синий цвет для VK
+                            'is_bot_message': False,  # Не показываем как сообщение от бота
+                            'is_streamer_message': True  # Флаг что это сообщение от стримера
+                        })
+                        
                         return True
                     else:
                         response_text = await response.text()
@@ -315,6 +336,29 @@ class VKLiveBot:
         except Exception as e:
             logger.error(f"Failed to send message to VK Live channel {channel_name}: {e}")
             return False
+    
+    async def _get_streamer_name(self, channel_name: str) -> str:
+        """Получить отображаемое имя стримера из базы данных"""
+        try:
+            from core.database import UserToken
+            db = next(get_db())
+            try:
+                # Ищем токен пользователя для этого канала
+                token = db.query(UserToken).filter(
+                    UserToken.platform == 'vk',
+                    UserToken.platform_user_id == channel_name
+                ).first()
+                
+                # Для VK Live используем platform_user_id как имя канала
+                if token:
+                    return channel_name  # Fallback на имя канала
+                else:
+                    return channel_name  # Fallback на имя канала
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"Error getting streamer display name for {channel_name}: {e}")
+            return channel_name  # Fallback на имя канала
     
     async def mute_user(self, channel_name: str, user_id: int, duration: int = 300):
         """Мут пользователя в чате VK Live"""
@@ -470,6 +514,12 @@ class VKLiveBot:
                 logger.debug(f"TTS not enabled for VK Live channel {channel_name}, skipping TTS processing")
                 return
             
+            # Проверяем, активен ли владелец канала
+            channel_owner_id = await self._get_channel_owner_id(channel_name)
+            if channel_owner_id and not self.connection_manager.is_client_active(str(channel_owner_id)):
+                logger.info(f"🔇 TTS skipped for VK Live {channel_name} - owner {channel_owner_id} is inactive")
+                return
+            
             # Проверяем whitelist для канала
             if not self.connection_manager.is_channel_whitelisted(channel_name):
                 logger.debug(f"Channel {channel_name} not whitelisted, skipping TTS processing")
@@ -479,20 +529,69 @@ class VKLiveBot:
             if message_text.strip():  # Только если есть текст для озвучки
                 # Получаем настройки громкости для канала (общая громкость)
                 volume_level = self.connection_manager.get_tts_volume(channel_name)
-                logger.info(f"🎤 Sending TTS request for VK Live channel {channel_name}: {message_text[:50]}... (volume: {volume_level}%)")
+                
+                # Получаем настройки типов TTS для канала
+                use_basic_tts = self.connection_manager.is_basic_tts_enabled(channel_name)
+                use_ai_tts = self.connection_manager.is_ai_tts_enabled(channel_name)
+                
+                logger.info(f"🎤 Sending TTS request for VK Live channel {channel_name}: {message_text[:50]}... (volume: {volume_level}%, basic: {use_basic_tts}, ai: {use_ai_tts})")
+                
+                # Загружаем настройки для передачи в F5-TTS
+                tts_settings = await self._get_tts_settings(channel_name)
+                word_filter = await self._get_word_filter()
+                blocked_users = await self._get_blocked_users()
                 
                 # Передаем connection_manager для проверки приоритетных голосов
                 result = await self.tts_api.send_tts_request(
-                    channel_name, message_text, author_nick, volume_level, self.connection_manager
+                    channel_name, message_text, author_nick, volume_level, self.connection_manager,
+                    use_ai_tts=use_ai_tts,
+                    use_basic_tts=use_basic_tts,
+                    tts_settings=tts_settings,
+                    word_filter=word_filter,
+                    blocked_users=blocked_users
                 )
                 
                 if result.get("success"):
                     logger.debug(f"TTS synthesis successful: voice={result.get('voice')}, volume={result.get('volume')}%")
                 else:
                     logger.error(f"TTS synthesis failed: {result.get('error')}")
-                
         except Exception as e:
-            logger.error(f"Error handling TTS message for VK Live channel {channel_name}: {e}")
+            logger.error(f"Error in handle_tts_message: {e}")
+    
+    async def _get_tts_settings(self, channel_name: str) -> dict:
+        """Загрузить настройки TTS для канала"""
+        try:
+            # Здесь можно добавить загрузку из БД или кэша
+            # Пока возвращаем настройки по умолчанию
+            return {
+                "enable7TV": True,
+                "enableTwitch": True,
+                "enableProfanity": False,
+                "profanityLevel": "medium"
+            }
+        except Exception as e:
+            logger.error(f"Error loading TTS settings: {e}")
+            return {}
+    
+    async def _get_word_filter(self) -> list:
+        """Загрузить фильтр слов"""
+        try:
+            # Здесь можно добавить загрузку из БД
+            # Пока возвращаем пустой список
+            return []
+        except Exception as e:
+            logger.error(f"Error loading word filter: {e}")
+            return []
+    
+    async def _get_blocked_users(self) -> list:
+        """Загрузить список заблокированных пользователей"""
+        try:
+            # Здесь можно добавить загрузку из БД
+            # Пока возвращаем пустой список
+            return []
+        except Exception as e:
+            logger.error(f"Error loading blocked users: {e}")
+            return []
 
     async def handle_database_commands(self, channel_name: str, message_data: dict):
         """Обработка команд из базы данных для VK Live"""
@@ -681,11 +780,34 @@ class VKLiveBot:
     async def _get_user_roles(self, channel_name: str, user_id: str) -> List[str]:
         """Получение ролей пользователя в VK Live"""
         try:
-            # Здесь нужно сделать запрос к VK Live API для получения информации о пользователе
-            # Пока возвращаем базовые роли
             roles = []
             
-            # Получение ролей пользователя (заглушка)
+            # Получаем информацию о пользователе из VK Live API
+            # Это заглушка - в реальности нужно делать запрос к VK Live API
+            # для получения информации о ролях пользователя в канале
+            
+            # Проверяем, является ли пользователь владельцем канала
+            # (это нужно получать из базы данных или VK Live API)
+            from core.database import get_db, UserToken
+            db_gen = get_db()
+            db = next(db_gen)
+            
+            try:
+                # Получаем информацию о владельце канала
+                channel_owner = db.query(UserToken).filter(
+                    UserToken.platform == 'vk',
+                    UserToken.platform_username == channel_name.lower()
+                ).first()
+                
+                if channel_owner and str(channel_owner.platform_user_id) == str(user_id):
+                    roles.append('owner')
+                
+                # Здесь можно добавить проверку модераторов через VK Live API
+                # Пока добавляем базовые роли
+                
+            finally:
+                db.close()
+            
             return roles
             
         except Exception as e:
@@ -714,6 +836,16 @@ class VKLiveBot:
                 await self.help_command_vk(channel_name)
             elif command_name == 'voice':
                 await self.voice_command_vk(channel_name, message_data)
+            elif command_name == 'ttsvolume':
+                await self.tts_volume_command_vk(channel_name, message_data)
+            elif command_name == 'youtubevolume':
+                await self.youtube_volume_command_vk(channel_name, message_data)
+            elif command_name == 'category':
+                await self.category_command_vk(channel_name, message_data)
+            elif command_name == 'title':
+                await self.title_command_vk(channel_name, message_data)
+            elif command_name == 'about':
+                await self.about_command_vk(channel_name, message_data)
             # Добавьте другие базовые команды по необходимости
         except Exception as e:
             logger.error(f"Error in handle_basic_command_vk: {e}")
@@ -783,10 +915,10 @@ class VKLiveBot:
             db_temp = next(get_db())
             try:
                 # Ищем пользователя по VK токену, который владеет этим каналом
-                # Ищем как с маленькой, так и с большой буквы
+                # Ищем VK Live токен по platform_user_id
                 user_token = db_temp.query(UserToken).filter(
-                    UserToken.platform == 'vk_live',
-                    UserToken.platform_display_name.in_([channel_name.lower(), channel_name.capitalize()])
+                    UserToken.platform == 'vk',
+                    UserToken.platform_user_id == channel_name
                 ).first()
                 
                 if user_token:
@@ -896,6 +1028,281 @@ class VKLiveBot:
         except Exception as e:
             logger.error(f"Error in voice_command_vk: {e}")
             await self.send_message(channel_name, "❌ Произошла ошибка при смене голоса")
+
+    async def tts_volume_command_vk(self, channel_name: str, message_data: dict):
+        """Установка громкости TTS для VK Live"""
+        try:
+            message_text = message_data.get("message", "")
+            author_nick = message_data.get("author_nick", "Unknown")
+            
+            parts = message_text.split()
+            if len(parts) < 2:
+                await self.send_message(channel_name, "❌ Укажите уровень громкости (0-100): !ttsvolume <0-100>")
+                return
+            
+            try:
+                volume = int(parts[1])
+                if volume < 0 or volume > 100:
+                    await self.send_message(channel_name, "❌ Громкость должна быть от 0 до 100")
+                    return
+            except ValueError:
+                await self.send_message(channel_name, "❌ Громкость должна быть числом от 0 до 100")
+                return
+            
+            # Отправляем запрос на изменение громкости TTS
+            from api.tts_api import TTSAPI
+            tts_api = TTSAPI()
+            
+            result = await tts_api.set_tts_volume(channel_name, volume)
+            
+            if result.get('success'):
+                await self.send_message(channel_name, f"🔊 {author_nick} установил громкость TTS на {volume}%")
+            else:
+                await self.send_message(channel_name, f"❌ Ошибка установки громкости TTS: {result.get('error', 'Неизвестная ошибка')}")
+                
+        except Exception as e:
+            logger.error(f"Error in tts_volume_command_vk: {e}")
+            await self.send_message(channel_name, "❌ Произошла ошибка при установке громкости TTS")
+
+    async def youtube_volume_command_vk(self, channel_name: str, message_data: dict):
+        """Установка громкости YouTube для VK Live"""
+        try:
+            message_text = message_data.get("message", "")
+            author_nick = message_data.get("author_nick", "Unknown")
+            
+            parts = message_text.split()
+            if len(parts) < 2:
+                await self.send_message(channel_name, "❌ Укажите уровень громкости (0-100): !youtubevolume <0-100>")
+                return
+            
+            try:
+                volume = int(parts[1])
+                if volume < 0 or volume > 100:
+                    await self.send_message(channel_name, "❌ Громкость должна быть от 0 до 100")
+                    return
+            except ValueError:
+                await self.send_message(channel_name, "❌ Громкость должна быть числом от 0 до 100")
+                return
+            
+            # Отправляем запрос на изменение громкости YouTube
+            from api.youtube_api import YouTubeAPI
+            youtube_api = YouTubeAPI()
+            
+            result = await youtube_api.set_volume(channel_name, volume)
+            
+            if result.get('success'):
+                await self.send_message(channel_name, f"🎵 {author_nick} установил громкость YouTube на {volume}%")
+            else:
+                await self.send_message(channel_name, f"❌ Ошибка установки громкости YouTube: {result.get('error', 'Неизвестная ошибка')}")
+                
+        except Exception as e:
+            logger.error(f"Error in youtube_volume_command_vk: {e}")
+            await self.send_message(channel_name, "❌ Произошла ошибка при установке громкости YouTube")
+
+    async def category_command_vk(self, channel_name: str, message_data: dict):
+        """Изменение категории стрима для VK Live"""
+        try:
+            message_text = message_data.get("message", "")
+            author_nick = message_data.get("author_nick", "Unknown")
+            
+            parts = message_text.split()
+            if len(parts) < 2:
+                await self.send_message(channel_name, "❌ Использование: !category <название категории>")
+                return
+            
+            # Объединяем все части после команды в название категории
+            category_query = " ".join(parts[1:])
+            
+            # Импортируем VKLiveAPI
+            from api.vk_api import VKLiveAPI
+            vk_api = VKLiveAPI()
+            
+            # Ищем категории
+            categories = await vk_api.get_categories(search=category_query)
+            
+            if not categories:
+                await self.send_message(channel_name, f"❌ Категория '{category_query}' не найдена")
+                return
+            
+            # Берем первую найденную категорию (наиболее релевантную)
+            category = categories[0]
+            
+            # Получаем ID канала владельца
+            channel_owner_id = await self._get_channel_owner_id(channel_name)
+            if not channel_owner_id:
+                await self.send_message(channel_name, "❌ Не удалось определить владельца канала")
+                return
+            
+            # Используем унифицированную систему обновления
+            await self._update_stream_unified(channel_owner_id, vk_category_id=category['id'], category_name=category['title'])
+            
+            await self.send_message(channel_name, f"✅ Категория изменена на: {category['title']}")
+                
+        except Exception as e:
+            logger.error(f"Error in category_command_vk: {e}")
+            await self.send_message(channel_name, "❌ Произошла ошибка при изменении категории")
+
+    async def title_command_vk(self, channel_name: str, message_data: dict):
+        """Изменение названия стрима для VK Live"""
+        try:
+            message_text = message_data.get("message", "")
+            author_nick = message_data.get("author_nick", "Unknown")
+            
+            parts = message_text.split()
+            if len(parts) < 2:
+                await self.send_message(channel_name, "❌ Использование: !title <новое название>")
+                return
+            
+            # Объединяем все части после команды в название
+            new_title = " ".join(parts[1:])
+            
+            # Получаем ID канала владельца
+            channel_owner_id = await self._get_channel_owner_id(channel_name)
+            if not channel_owner_id:
+                await self.send_message(channel_name, "❌ Не удалось определить владельца канала")
+                return
+            
+            # Импортируем VKLiveAPI
+            from api.vk_api import VKLiveAPI
+            vk_api = VKLiveAPI()
+            
+            # Используем унифицированную систему обновления
+            await self._update_stream_unified(channel_owner_id, title=new_title)
+            
+            await self.send_message(channel_name, f"✅ Название стрима изменено на: {new_title}")
+                
+        except Exception as e:
+            logger.error(f"Error in title_command_vk: {e}")
+            await self.send_message(channel_name, "❌ Произошла ошибка при изменении названия стрима")
+
+    async def about_command_vk(self, channel_name: str, message_data: dict):
+        """Обработка команды !about для психологического анализа в VK Live"""
+        try:
+            parts = message_data["message"].split()
+            if len(parts) < 2:
+                await self.send_message(channel_name, "❌ Использование: !about <ник пользователя>")
+                return
+            
+            target_username = parts[1].lower().strip('@')
+            
+            # Получаем информацию о пользователе, который запросил анализ
+            requester_id = await self._get_channel_owner_id(channel_name)
+            if not requester_id:
+                await self.send_message(channel_name, "❌ Не удалось определить владельца канала")
+                return
+            
+            # Импортируем сервис психологического анализа
+            from services.psychology_service import PsychologyService
+            from core.database import get_db
+            
+            db = next(get_db())
+            psychology_service = PsychologyService(db)
+            
+            # Анализы больше не кэшируются - каждый раз генерируется новый
+            
+            # Показываем, что анализ начался
+            await self.send_message(channel_name, f"🔍 Анализирую личность @{target_username}...")
+            
+            # Выполняем анализ
+            analysis_result = await psychology_service.analyze_user_psychology(
+                target_username=target_username,
+                platform="vk",
+                analyzed_by_user_id=int(requester_id),
+                analyzed_by_username=message_data["author_nick"]
+            )
+            
+            if analysis_result:
+                await self.send_message(channel_name, f"🧠 @{target_username}: {analysis_result}")
+            else:
+                await self.send_message(channel_name, f"❌ Не удалось проанализировать @{target_username}")
+                
+        except Exception as e:
+            logger.error(f"Error in about_command_vk: {e}")
+            await self.send_message(channel_name, "❌ Произошла ошибка при анализе")
+
+    async def _update_stream_unified(self, user_id: str, title: str = None, vk_category_id: str = None, category_name: str = None):
+        """Унифицированное обновление стрима для всех подключенных платформ"""
+        try:
+            import aiohttp
+            
+            # Подготавливаем данные для запроса
+            payload = {}
+            
+            if title is not None:
+                payload["twitch"] = {"title": title}
+                payload["vk"] = {"title": title}
+            
+            if vk_category_id is not None:
+                if "vk" not in payload:
+                    payload["vk"] = {}
+                payload["vk"]["category_id"] = vk_category_id
+                
+                # Для Twitch нужно найти соответствующую категорию по названию
+                if category_name:
+                    twitch_category_id = await self._find_twitch_category_by_name(category_name)
+                    if twitch_category_id:
+                        if "twitch" not in payload:
+                            payload["twitch"] = {}
+                        payload["twitch"]["category_id"] = twitch_category_id
+            
+            if not payload:
+                logger.warning("No data to update")
+                return
+            
+            # Отправляем запрос к унифицированному API
+            async with aiohttp.ClientSession() as session:
+                url = "http://localhost:8000/api/stream/update"
+                headers = {"Content-Type": "application/json"}
+                
+                # Получаем сессию пользователя для авторизации
+                from core.database import UserSession, get_db
+                db = next(get_db())
+                user_session = db.query(UserSession).filter(UserSession.user_id == int(user_id), UserSession.is_active == True).first()
+                
+                if not user_session:
+                    logger.error(f"No active session found for user {user_id}")
+                    return
+                
+                # Используем cookie-based авторизацию
+                cookies = {"session_id": user_session.session_id}
+                
+                async with session.post(url, json=payload, headers=headers, cookies=cookies) as response:
+                    if response.status == 200:
+                        logger.info(f"Successfully updated stream for user {user_id}")
+                        return True
+                    elif response.status == 207:
+                        # Multi-status - некоторые обновления прошли успешно
+                        logger.warning(f"Partial success updating stream for user {user_id}")
+                        return True
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"Failed to update stream for user {user_id}: {response.status} - {error_text}")
+                        return False
+                        
+        except Exception as e:
+            logger.error(f"Error in _update_stream_unified: {e}")
+            return False
+
+    async def _find_twitch_category_by_name(self, category_name: str) -> str:
+        """Найти ID категории Twitch по названию"""
+        try:
+            from api.twitch_api import TwitchAPI
+            from core.connection_manager import ConnectionManager
+            
+            twitch_api = TwitchAPI(ConnectionManager())
+            
+            # Ищем категории в Twitch по названию
+            categories = await twitch_api.search_categories(category_name)
+            
+            if categories:
+                # Возвращаем ID первой найденной категории
+                return categories[0]['id']
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error finding Twitch category by name '{category_name}': {e}")
+            return None
     
     def _generate_fake_ip(self):
         """Генерирует фейковый IP адрес для шутки"""
@@ -906,3 +1313,26 @@ class VKLiveBot:
         octet3 = random.randint(10, 99)
         octet4 = random.randint(10, 99)
         return f"{octet1}.{octet2}.{octet3}.{octet4}"
+    
+    async def _get_channel_owner_id(self, channel_name: str) -> Optional[str]:
+        """Получить ID владельца канала VK Live"""
+        try:
+            from core.database import UserToken
+            from core.database import get_db
+            
+            db = next(get_db())
+            
+            # Ищем пользователя по channel_name (URL канала)
+            user_token = db.query(UserToken).filter(
+                UserToken.platform == "vk",
+                UserToken.channel_url == channel_name
+            ).first()
+            
+            if user_token:
+                return str(user_token.user_id)
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting channel owner ID for {channel_name}: {e}")
+            return None

@@ -22,9 +22,16 @@ import {
     Volume2,
     Shield,
     ShieldCheck,
-    Crown
+    Crown,
+    Search,
+    Filter,
+    Tag
 } from 'lucide-react';
 import api from '../../services/api';
+import { CardSkeleton } from '@/components/ui/skeleton';
+import PageLayout from '@/components/ui/PageLayout';
+import { PageLoader } from '@/components/ui/loader';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const CommandsManagementPage = () => {
     const { user } = useAuth();
@@ -32,24 +39,21 @@ const CommandsManagementPage = () => {
 
     const [commands, setCommands] = useState({});
     const [loading, setLoading] = useState(true);
+    const [showSkeleton, setShowSkeleton] = useState(true);
     const [editingCommand, setEditingCommand] = useState(null);
-    const [editForm, setEditForm] = useState({ command: '', description: '', enabled: true, permissions: 'all' });
+    const [editForm, setEditForm] = useState({ command: '', description: '', enabled: true, permissions: 'all', tags: '' });
     const [showCreateForm, setShowCreateForm] = useState(false);
-    const [createForm, setCreateForm] = useState({ command: '', description: '', permissions: 'all', enabled: true });
+    const [createForm, setCreateForm] = useState({ command: '', description: '', permissions: 'all', enabled: true, tags: 'пользовательские' });
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedTag, setSelectedTag] = useState('all');
 
-    const categories = {
-        'Основные': ['help', 'tts', 'volume'],
-        'Управление': ['play', 'pause', 'skip', 'clear'],
-        'Модерация': ['mute', 'unmute'],
-        'Настройки': ['speed', 'voice', 'emotes']
-    };
-
-    const categoryIcons = {
-        'Основные': <Settings className="h-4 w-4" />,
-        'Управление': <Play className="h-4 w-4" />,
-        'Модерация': <Users className="h-4 w-4" />,
-        'Настройки': <Volume2 className="h-4 w-4" />,
-        'Пользовательские': <Terminal className="h-4 w-4" />
+    const tagCategories = {
+        'медиа запросы': { icon: <Play className="h-4 w-4" />, color: 'bg-blue-100 text-blue-800' },
+        'TTS озвучка': { icon: <Volume2 className="h-4 w-4" />, color: 'bg-green-100 text-green-800' },
+        'управление': { icon: <Settings className="h-4 w-4" />, color: 'bg-purple-100 text-purple-800' },
+        'модерация': { icon: <Users className="h-4 w-4" />, color: 'bg-red-100 text-red-800' },
+        'информация': { icon: <Terminal className="h-4 w-4" />, color: 'bg-gray-100 text-gray-800' },
+        'пользовательские': { icon: <Tag className="h-4 w-4" />, color: 'bg-yellow-100 text-yellow-800' }
     };
 
     const getPermissionIcon = (permissions) => {
@@ -74,15 +78,111 @@ const CommandsManagementPage = () => {
         if (channelName) {
             try {
                 setLoading(true);
-                const response = await api.get(`/api/commands/${channelName}`);
-                setCommands(response.data.commands || {});
+                const response = await api.get(`/api/commands`);
+                const data = response.data;
+                
+                // Объединяем базовые и кастомные команды
+                const allCommands = {};
+                
+                // Добавляем базовые команды
+                if (data.basic_commands) {
+                    data.basic_commands.forEach(cmd => {
+                        allCommands[cmd.command_name] = {
+                            ...cmd,
+                            command: `!${cmd.command_name}`,
+                            is_custom: false
+                        };
+                    });
+                }
+                
+                // Добавляем кастомные команды
+                if (data.custom_commands) {
+                    data.custom_commands.forEach(cmd => {
+                        allCommands[cmd.command_name] = {
+                            ...cmd,
+                            command: `!${cmd.command_name}`,
+                            is_custom: true
+                        };
+                    });
+                }
+                
+                setCommands(allCommands);
             } catch (error) {
                 console.error('Failed to fetch commands:', error);
-            } finally {
-                setLoading(false);
-            }
+        } finally {
+            setLoading(false);
+            setShowSkeleton(false);
+        }
         }
     }, [channelName]);
+
+    // Функция для фильтрации команд
+    const getFilteredCommands = () => {
+        let filtered = Object.entries(commands);
+        
+        // Фильтр по поиску
+        if (searchTerm) {
+            filtered = filtered.filter(([key, cmd]) => 
+                cmd.command.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                cmd.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                cmd.command_name.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+        
+        // Фильтр по тегам
+        if (selectedTag !== 'all') {
+            filtered = filtered.filter(([key, cmd]) => 
+                cmd.tags && cmd.tags.includes(selectedTag)
+            );
+        }
+        
+        return Object.fromEntries(filtered);
+    };
+
+    // Функция валидации команды
+    const validateCommand = (commandName, responseText) => {
+        const errors = [];
+        const warnings = [];
+        
+        // Проверка названия команды
+        if (!commandName) {
+            errors.push("Название команды не может быть пустым");
+        } else if (commandName.length < 2) {
+            errors.push("Название команды должно содержать минимум 2 символа");
+        } else if (commandName.length > 20) {
+            errors.push("Название команды не должно превышать 20 символов");
+        } else if (!/^[a-zA-Z0-9_-]+$/.test(commandName)) {
+            errors.push("Название команды может содержать только буквы, цифры, _ и -");
+        } else if (commandName.startsWith('_') || commandName.startsWith('-') || 
+                   commandName.endsWith('_') || commandName.endsWith('-')) {
+            errors.push("Название команды не должно начинаться или заканчиваться на _ или -");
+        }
+        
+        // Проверка зарезервированных слов
+        const reservedWords = ['admin', 'mod', 'owner', 'broadcaster', 'system', 'bot', 'api'];
+        if (reservedWords.includes(commandName.toLowerCase())) {
+            warnings.push(`'${commandName}' - зарезервированное слово, может конфликтовать с системными командами`);
+        }
+        
+        // Проверка текста ответа
+        if (responseText) {
+            if (responseText.length > 500) {
+                errors.push("Текст ответа не должен превышать 500 символов");
+            } else if (responseText.trim().length === 0) {
+                errors.push("Текст ответа не может быть пустым");
+            }
+            
+            // Проверка на потенциально опасные символы
+            const dangerousChars = ['<', '>', '&', '"', "'", '\\', '/', ';', '|', '`'];
+            for (const char of dangerousChars) {
+                if (responseText.includes(char)) {
+                    warnings.push(`Текст содержит потенциально опасный символ: '${char}'`);
+                }
+            }
+        }
+        
+        return { valid: errors.length === 0, errors, warnings };
+    };
 
     useEffect(() => {
         fetchCommands();
@@ -94,18 +194,43 @@ const CommandsManagementPage = () => {
         setEditForm({
             command: command.command,
             description: command.description,
-            enabled: command.enabled,
-            permissions: command.permissions || 'all'
+            enabled: command.is_enabled,
+            permissions: command.allowed_roles || 'all',
+            tags: command.tags || ''
         });
     };
     
     const handleSaveCommand = async () => {
         try {
+            const commandName = editingCommand.replace('!', '');
+            
+            // Валидация команды (только для кастомных команд)
+            if (commands[editingCommand]?.is_custom) {
+                const validation = validateCommand(commandName, editForm.description);
+                if (!validation.valid) {
+                    alert(`Ошибки валидации:\n${validation.errors.join('\n')}`);
+                    return;
+                }
+                
+                // Показываем предупреждения
+                if (validation.warnings.length > 0) {
+                    const proceed = confirm(`Предупреждения:\n${validation.warnings.join('\n')}\n\nПродолжить сохранение команды?`);
+                    if (!proceed) return;
+                }
+            }
+            
             const payload = {
-                command_key: editingCommand,
-                updates: editForm
+                is_enabled: editForm.enabled,
+                allowed_roles: editForm.permissions,
+                tags: editForm.tags
             };
-            await api.post(`/api/commands/${channelName}/update`, payload);
+            
+            // Если это кастомная команда, добавляем response_text
+            if (commands[editingCommand]?.is_custom) {
+                payload.response_text = editForm.description;
+            }
+            
+            await api.put(`/api/commands/${commandName}`, payload);
             await fetchCommands();
             setEditingCommand(null);
         } catch (error) {
@@ -115,10 +240,32 @@ const CommandsManagementPage = () => {
 
     const handleCreateCommand = async () => {
         try {
-            await api.post(`/api/commands/${channelName}/create`, createForm);
+            const commandName = createForm.command.replace('!', '');
+            
+            // Валидация команды
+            const validation = validateCommand(commandName, createForm.description);
+            if (!validation.valid) {
+                alert(`Ошибки валидации:\n${validation.errors.join('\n')}`);
+                return;
+            }
+            
+            // Показываем предупреждения
+            if (validation.warnings.length > 0) {
+                const proceed = confirm(`Предупреждения:\n${validation.warnings.join('\n')}\n\nПродолжить создание команды?`);
+                if (!proceed) return;
+            }
+            
+            const payload = {
+                command_name: commandName,
+                response_text: createForm.description,
+                is_enabled: createForm.enabled,
+                allowed_roles: createForm.permissions,
+                tags: createForm.tags
+            };
+            await api.post(`/api/commands`, payload);
             await fetchCommands();
             setShowCreateForm(false);
-            setCreateForm({ command: '', description: '', permissions: 'all', enabled: true });
+            setCreateForm({ command: '', description: '', permissions: 'all', enabled: true, tags: 'пользовательские' });
         } catch (error) {
             console.error('Failed to create command:', error);
         }
@@ -130,10 +277,8 @@ const CommandsManagementPage = () => {
 
     const handleToggleCommand = async (commandKey, enabled) => {
         try {
-            await api.post(`/api/commands/${channelName}/update`, {
-                command_key: commandKey,
-                updates: { enabled }
-            });
+            const commandName = commandKey.replace('!', '');
+            await api.put(`/api/commands/${commandName}`, { is_enabled: enabled });
             await fetchCommands();
         } catch (error) {
             console.error('Failed to toggle command:', error);
@@ -187,10 +332,19 @@ const CommandsManagementPage = () => {
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="all">Все пользователи</SelectItem>
-                                            <SelectItem value="mods">Только модераторы</SelectItem>
-                                            <SelectItem value="broadcaster">Только стример</SelectItem>
+                                            <SelectItem value="broadcaster,moderator,owner,moderator_vk">Модераторы и стример</SelectItem>
+                                            <SelectItem value="broadcaster,owner">Только стример</SelectItem>
                                         </SelectContent>
                                     </Select>
+                                </div>
+                                <div>
+                                    <Label htmlFor={`tags-${commandKey}`}>Теги</Label>
+                                    <Input
+                                        id={`tags-${commandKey}`}
+                                        value={editForm.tags}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, tags: e.target.value }))}
+                                        placeholder="медиа запросы, управление"
+                                    />
                                 </div>
                                 <div className="flex items-center gap-2 pt-2">
                                     <Switch
@@ -210,18 +364,36 @@ const CommandsManagementPage = () => {
                                 <div className="flex items-center gap-3 mb-2">
                                     <Badge variant="secondary" className="font-mono">{command.command}</Badge>
                                     <Badge variant="outline" className="flex items-center gap-1">
-                                        {getPermissionIcon(command.permissions)}
-                                        {getPermissionLabel(command.permissions)}
+                                        {getPermissionIcon(command.allowed_roles)}
+                                        {getPermissionLabel(command.allowed_roles)}
                                     </Badge>
+                                    {command.tags && (
+                                        <div className="flex gap-1">
+                                            {command.tags.split(',').map((tag, index) => (
+                                                <Badge 
+                                                    key={index} 
+                                                    variant="outline" 
+                                                    className={`${tagCategories[tag.trim()]?.color || 'bg-gray-100 text-gray-800'} text-xs`}
+                                                >
+                                                    {tagCategories[tag.trim()]?.icon}
+                                                    {tag.trim()}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="mb-2">
                                     <span className="text-sm text-muted-foreground">{command.description}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Switch
-                                        checked={command.enabled}
+                                        checked={command.is_enabled}
                                         onCheckedChange={(checked) => handleToggleCommand(commandKey, checked)}
                                     />
                                     <Label className="text-sm">Включена</Label>
-                                    <Button size="sm" variant="ghost" onClick={() => handleEditCommand(commandKey)} className="ml-auto"><Edit2 className="h-4 w-4" /></Button>
+                                    <Button size="sm" variant="ghost" onClick={() => handleEditCommand(commandKey)} className="ml-auto">
+                                        <Edit2 className="h-4 w-4" />
+                                    </Button>
                                 </div>
                             </>
                         )}
@@ -231,17 +403,49 @@ const CommandsManagementPage = () => {
         </Card>
     );
 
-    if (loading) {
-        return <div className="flex items-center justify-center h-64">Загрузка команд...</div>;
-    }
+    const loadingContent = (
+        <div className="space-y-6">
+            {/* Кнопки */}
+            <div className="flex gap-2">
+                <div className="h-10 w-32"></div>
+                <div className="h-10 w-40"></div>
+            </div>
+            
+            {/* Поиск */}
+            <div className="flex gap-4">
+                <div className="flex-1 h-10"></div>
+                <div className="h-10 w-24"></div>
+            </div>
+            
+            {/* Tabs */}
+            <Tabs defaultValue="basic" className="space-y-6">
+                <TabsList>
+                    <div className="h-9 w-32"></div>
+                    <div className="h-9 w-36"></div>
+                </TabsList>
+
+                <TabsContent value="basic" className="space-y-4">
+                    <div className="h-32"></div>
+                    <div className="h-32"></div>
+                </TabsContent>
+
+                <TabsContent value="custom" className="space-y-4">
+                    <div className="h-32"></div>
+                    <div className="h-32"></div>
+                </TabsContent>
+            </Tabs>
+        </div>
+    );
 
     return (
-        <div className="container mx-auto p-6 space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold mb-6 text-foreground">Управление командами</h1>
-                    <p className="text-muted-foreground">Настройте команды бота для вашего канала</p>
-                </div>
+        <PageLayout 
+            title="Управление командами"
+            description="Настройте команды бота для вашего канала"
+            loading={loading || showSkeleton}
+            skeleton={loadingContent}
+        >
+            {!(loading || showSkeleton) && (
+                <>
                 <div className="flex gap-2">
                     <Button onClick={() => setShowCreateForm(!showCreateForm)} className="flex items-center gap-2">
                         <Plus className="h-4 w-4" />Создать команду
@@ -249,6 +453,40 @@ const CommandsManagementPage = () => {
                     <Button onClick={handleResetCommands} variant="outline" className="flex items-center gap-2">
                         <RotateCcw className="h-4 w-4" />Сбросить к умолчанию
                     </Button>
+                </div>
+            </div>
+
+            {/* Поиск и фильтрация */}
+            <div className="flex gap-4 mb-6">
+                <div className="flex-1">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <Input
+                            placeholder="Поиск команд..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-10"
+                        />
+                    </div>
+                </div>
+                <div className="w-64">
+                    <Select value={selectedTag} onValueChange={setSelectedTag}>
+                        <SelectTrigger>
+                            <Filter className="h-4 w-4 mr-2" />
+                            <SelectValue placeholder="Фильтр по тегам" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Все теги</SelectItem>
+                            {getAllTags().map(tag => (
+                                <SelectItem key={tag} value={tag}>
+                                    <div className="flex items-center gap-2">
+                                        {tagCategories[tag]?.icon}
+                                        {tag}
+                                    </div>
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
             </div>
 
@@ -270,10 +508,19 @@ const CommandsManagementPage = () => {
                              <SelectTrigger><SelectValue placeholder="Выберите права" /></SelectTrigger>
                              <SelectContent>
                                  <SelectItem value="all">Все пользователи</SelectItem>
-                                 <SelectItem value="mods">Только модераторы</SelectItem>
-                                 <SelectItem value="broadcaster">Только стример</SelectItem>
+                                 <SelectItem value="broadcaster,moderator,owner,moderator_vk">Модераторы и стример</SelectItem>
+                                 <SelectItem value="broadcaster,owner">Только стример</SelectItem>
                              </SelectContent>
                          </Select>
+                     </div>
+                     <div>
+                         <Label htmlFor="create-tags">Теги</Label>
+                         <Input 
+                             id="create-tags" 
+                             value={createForm.tags} 
+                             onChange={(e) => setCreateForm(prev => ({ ...prev, tags: e.target.value }))} 
+                             placeholder="пользовательские, развлечение"
+                         />
                      </div>
                      <div className="flex items-center gap-2 pt-2">
                          <Switch id="create-enabled" checked={createForm.enabled} onCheckedChange={(checked) => setCreateForm(prev => ({ ...prev, enabled: checked }))}/>
@@ -288,41 +535,36 @@ const CommandsManagementPage = () => {
             )}
 
             <Tabs defaultValue="all" className="w-full">
-                <TabsList className="grid w-full grid-cols-6">
+                <TabsList className="grid w-full grid-cols-7">
                     <TabsTrigger value="all">Все</TabsTrigger>
-                    {Object.keys(categories).map(category => (
-                        <TabsTrigger key={category} value={category} className="gap-2">{categoryIcons[category]}{category}</TabsTrigger>
+                    {Object.keys(tagCategories).map(tag => (
+                        <TabsTrigger key={tag} value={tag} className="gap-2">
+                            {tagCategories[tag].icon}
+                            {tag}
+                        </TabsTrigger>
                     ))}
-                     <TabsTrigger value="Пользовательские" className="gap-2">{categoryIcons['Пользовательские']}Пользовательские</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="all" className="space-y-4 mt-4">
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        {Object.entries(commands).map(([commandKey, command]) => renderCommandCard(commandKey, command))}
+                        {Object.entries(getFilteredCommands()).map(([commandKey, command]) => renderCommandCard(commandKey, command))}
                     </div>
                 </TabsContent>
 
-                {Object.keys(categories).map(category => (
-                    <TabsContent key={category} value={category} className="space-y-4 mt-4">
+                {Object.keys(tagCategories).map(tag => (
+                    <TabsContent key={tag} value={tag} className="space-y-4 mt-4">
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            {categories[category]
-                                .filter(commandKey => commands[commandKey])
-                                .map(commandKey => renderCommandCard(commandKey, commands[commandKey]))
+                            {Object.entries(getFilteredCommands())
+                                .filter(([key, cmd]) => cmd.tags && cmd.tags.includes(tag))
+                                .map(([commandKey, command]) => renderCommandCard(commandKey, command))
                             }
                         </div>
                     </TabsContent>
                 ))}
-                
-                <TabsContent value="Пользовательские" className="space-y-4 mt-4">
-                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        {Object.entries(commands)
-                            .filter(([key, cmd]) => cmd.is_custom)
-                            .map(([commandKey, command]) => renderCommandCard(commandKey, command))
-                        }
-                    </div>
-                </TabsContent>
             </Tabs>
-        </div>
+                </>
+            )}
+        </PageLayout>
     );
 };
 

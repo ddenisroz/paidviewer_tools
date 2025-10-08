@@ -24,8 +24,6 @@ from typing import List, Optional
 import uvicorn
 
 # --- Logging Configuration ---
-import sys
-from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
@@ -112,16 +110,6 @@ async def health_check():
 def get_all_voices(db: Session = Depends(get_db)):
     return tts_api.get_all_voices(db)
 
-@app.get("/api/voices/global")
-def get_global_voices(db: Session = Depends(get_db)):
-    """Получить глобальные голоса (публичные)"""
-    try:
-        # Простая заглушка - возвращаем пустой массив
-        return []
-    except Exception as e:
-        logger.error(f"Error getting global voices: {e}")
-        return []
-
 @app.post("/api/voices/upload", response_model=VoiceUploadResponse)
 async def upload_voice(
     background_tasks: BackgroundTasks,
@@ -204,7 +192,12 @@ def delete_user_voice(voice_id: int, user_id: int, db: Session = Depends(get_db)
     ).first()
     
     if not voice:
-        raise HTTPException(status_code=404, detail="Voice not found")
+        raise HTTPException(status_code=404, detail="Voice not found or access denied")
+    
+    # 🔒 БЕЗОПАСНОСТЬ: Запрет удаления глобальных голосов
+    if voice.voice_type != 'user':
+        logger.warning(f"User {user_id} attempted to delete global voice {voice_id}")
+        raise HTTPException(status_code=403, detail="Cannot delete global voice")
     
     # Удаляем файл
     file_manager.delete_voice_file(voice.name)
@@ -213,6 +206,7 @@ def delete_user_voice(voice_id: int, user_id: int, db: Session = Depends(get_db)
     db.delete(voice)
     db.commit()
 
+    logger.info(f"User {user_id} deleted voice {voice_id}")
     return {"message": f"Voice {voice.name} deleted successfully"}
 
 # --- Voice Settings ---
@@ -246,13 +240,19 @@ def update_user_voice_settings(
     ).first()
     
     if not voice:
-        raise HTTPException(status_code=404, detail="Voice not found")
+        raise HTTPException(status_code=404, detail="Voice not found or access denied")
+    
+    # 🔒 БЕЗОПАСНОСТЬ: Запрет изменения глобальных голосов
+    if voice.voice_type != 'user':
+        logger.warning(f"User {user_id} attempted to modify global voice {voice_id}")
+        raise HTTPException(status_code=403, detail="Cannot modify global voice")
     
     # Обновляем настройки
     for field, value in settings.dict(exclude_unset=True).items():
         setattr(voice, field, value)
     
     db.commit()
+    logger.info(f"User {user_id} updated settings for voice {voice_id}")
     return {"message": "Voice settings updated successfully"}
 
 # --- Transcription ---
@@ -266,6 +266,17 @@ def transcribe_voice_audio(voice_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=503, detail="Transcriber not available")
     
     try:
+        # Проверяем существование файла
+        from pathlib import Path
+        file_path = Path(voice.file_path)
+        if not file_path.exists():
+            logger.error(f"Voice file not found: {voice.file_path}")
+            return TranscriptionResponse(
+                success=False,
+                text=None,
+                message=f"Voice file not found: {voice.file_path}"
+            )
+        
         text = tts_engine_manager.transcribe(voice.file_path)
         voice.reference_text = text
         db.commit()
@@ -291,16 +302,33 @@ def transcribe_user_voice_audio(voice_id: int, user_id: int, db: Session = Depen
     ).first()
     
     if not voice:
-        raise HTTPException(status_code=404, detail="Voice not found")
+        raise HTTPException(status_code=404, detail="Voice not found or access denied")
+    
+    # 🔒 БЕЗОПАСНОСТЬ: Запрет транскрипции глобальных голосов
+    if voice.voice_type != 'user':
+        logger.warning(f"User {user_id} attempted to transcribe global voice {voice_id}")
+        raise HTTPException(status_code=403, detail="Cannot transcribe global voice")
     
     if not tts_engine_manager.transcriber:
         raise HTTPException(status_code=503, detail="Transcriber not available")
     
     try:
+        # Проверяем существование файла
+        from pathlib import Path
+        file_path = Path(voice.file_path)
+        if not file_path.exists():
+            logger.error(f"Voice file not found: {voice.file_path}")
+            return TranscriptionResponse(
+                success=False,
+                text=None,
+                message=f"Voice file not found: {voice.file_path}"
+            )
+        
         text = tts_engine_manager.transcribe(voice.file_path)
         voice.reference_text = text
         db.commit()
         
+        logger.info(f"User {user_id} transcribed voice {voice_id}")
         return TranscriptionResponse(
             success=True,
             text=text,
@@ -335,6 +363,8 @@ def rename_voice(voice_id: int, new_name: str = Form(...), db: Session = Depends
         from pathlib import Path
         
         old_path = Path(old_file_path)
+        logger.info(f"Attempting to rename voice file: {old_path}")
+        
         if old_path.exists():
             # Определяем новое имя файла с сохранением расширения
             file_extension = old_path.suffix
@@ -346,9 +376,39 @@ def rename_voice(voice_id: int, new_name: str = Form(...), db: Session = Depends
             
             # Обновляем путь в базе данных
             voice.file_path = str(new_path)
-            logger.info(f"Renamed voice file from {old_path} to {new_path}")
+            logger.info(f"Successfully renamed voice file from {old_path} to {new_path}")
         else:
-            logger.warning(f"Voice file not found: {old_path}")
+            logger.error(f"Voice file not found: {old_path}")
+            # Попробуем найти файл по имени голоса
+            from tts_service.config import config
+            search_paths = [
+                config.global_voices_path / f"{old_name}.wav",
+                config.global_voices_path / f"{old_name}.mp3",
+                config.user_voices_path / f"{old_name}.wav",
+                config.user_voices_path / f"{old_name}.mp3"
+            ]
+            
+            found_file = None
+            for search_path in search_paths:
+                if search_path.exists():
+                    found_file = search_path
+                    break
+            
+            if found_file:
+                # Определяем новое имя файла с сохранением расширения
+                file_extension = found_file.suffix
+                new_file_name = f"{new_name}{file_extension}"
+                new_path = found_file.parent / new_file_name
+                
+                # Переименовываем найденный файл
+                found_file.rename(new_path)
+                
+                # Обновляем путь в базе данных
+                voice.file_path = str(new_path)
+                logger.info(f"Found and renamed voice file from {found_file} to {new_path}")
+            else:
+                logger.error(f"Could not find voice file for {old_name} in any location")
+                raise HTTPException(status_code=404, detail=f"Voice file not found for {old_name}")
         
         # Обновляем имя в базе данных
         voice.name = new_name
@@ -367,7 +427,22 @@ def rename_user_voice(voice_id: int, user_id: int, new_name: str = Form(...), db
     ).first()
     
     if not voice:
-        raise HTTPException(status_code=404, detail="Voice not found")
+        raise HTTPException(status_code=404, detail="Voice not found or access denied")
+    
+    # 🔒 БЕЗОПАСНОСТЬ: Запрет переименования глобальных голосов
+    if voice.voice_type != 'user':
+        logger.warning(f"User {user_id} attempted to rename global voice {voice_id}")
+        raise HTTPException(status_code=403, detail="Cannot rename global voice")
+    
+    # 🔒 БЕЗОПАСНОСТЬ: Валидация имени (санитизация)
+    import re
+    new_name = new_name.strip()
+    if not new_name or len(new_name) > 100:
+        raise HTTPException(status_code=400, detail="Invalid voice name length")
+    
+    # Разрешаем только буквы, цифры, пробелы, дефисы и подчеркивания
+    if not re.match(r'^[\w\s\-]+$', new_name, re.UNICODE):
+        raise HTTPException(status_code=400, detail="Voice name contains invalid characters")
     
     # Проверяем, что новое имя не занято
     existing_voice = db.query(VoiceModel).filter(VoiceModel.name == new_name).first()
@@ -383,6 +458,8 @@ def rename_user_voice(voice_id: int, user_id: int, new_name: str = Form(...), db
         from pathlib import Path
         
         old_path = Path(old_file_path)
+        logger.info(f"Attempting to rename voice file: {old_path}")
+        
         if old_path.exists():
             # Определяем новое имя файла с сохранением расширения
             file_extension = old_path.suffix
@@ -394,9 +471,39 @@ def rename_user_voice(voice_id: int, user_id: int, new_name: str = Form(...), db
             
             # Обновляем путь в базе данных
             voice.file_path = str(new_path)
-            logger.info(f"Renamed user voice file from {old_path} to {new_path}")
+            logger.info(f"Successfully renamed user voice file from {old_path} to {new_path}")
         else:
-            logger.warning(f"User voice file not found: {old_path}")
+            logger.error(f"User voice file not found: {old_path}")
+            # Попробуем найти файл по имени голоса
+            from tts_service.config import config
+            search_paths = [
+                config.user_voices_path / str(user_id) / f"{old_name}.wav",
+                config.user_voices_path / str(user_id) / f"{old_name}.mp3",
+                config.global_voices_path / f"{old_name}.wav",
+                config.global_voices_path / f"{old_name}.mp3"
+            ]
+            
+            found_file = None
+            for search_path in search_paths:
+                if search_path.exists():
+                    found_file = search_path
+                    break
+            
+            if found_file:
+                # Определяем новое имя файла с сохранением расширения
+                file_extension = found_file.suffix
+                new_file_name = f"{new_name}{file_extension}"
+                new_path = found_file.parent / new_file_name
+                
+                # Переименовываем найденный файл
+                found_file.rename(new_path)
+                
+                # Обновляем путь в базе данных
+                voice.file_path = str(new_path)
+                logger.info(f"Found and renamed user voice file from {found_file} to {new_path}")
+            else:
+                logger.error(f"Could not find voice file for {old_name} in any location")
+                raise HTTPException(status_code=404, detail=f"Voice file not found for {old_name}")
         
         # Обновляем имя в базе данных
         voice.name = new_name
@@ -434,27 +541,50 @@ async def synthesize_speech_for_channel(
         if not voices:
             raise HTTPException(status_code=404, detail="No voices available")
         
-        # Выбираем случайный голос
-        random_voice = random.choice(voices)
+        # Логика выбора голоса:
+        # 1. Ищем персональный голос пользователя
+        # 2. Если нет - случайный из глобальных голосов канала
+        selected_voice = None
+        
+        # 1. Проверяем персональный голос пользователя
+        personal_voice = db.query(VoiceModel).filter(
+            VoiceModel.is_active == True,
+            VoiceModel.voice_type == 'user',
+            VoiceModel.owner_id.isnot(None)  # Есть владелец
+        ).first()
+        
+        if personal_voice:
+            selected_voice = personal_voice
+            logger.info(f"Using personal voice '{personal_voice.name}' for user '{author}'")
+        else:
+            # 2. Случайный голос из глобальных голосов канала
+            global_voices = [v for v in voices if v.voice_type == 'global']
+            if global_voices:
+                selected_voice = random.choice(global_voices)
+                logger.info(f"Using random global voice '{selected_voice.name}' for channel '{channel_name}'")
+            else:
+                # Fallback: любой доступный голос
+                selected_voice = random.choice(voices)
+                logger.info(f"Using fallback voice '{selected_voice.name}' (no global voices available)")
         
         # Создаем запрос на синтез с громкостью
         request = SynthesisRequest(
             text=text,
-            voice_name=random_voice.name,
+            voice_name=selected_voice.name,
             user_id=None,  # Для канальных запросов user_id может быть None
             volume_level=volume_level
         )
         
-        logger.info(f"Using random voice '{random_voice.name}' for channel '{channel_name}' from user '{author}' with volume {volume_level}%")
+        logger.info(f"Using selected voice '{selected_voice.name}' for channel '{channel_name}' from user '{author}' with volume {volume_level}%")
         
         result = await tts_api.synthesize_speech(background_tasks, request, db)
         
         # Добавляем информацию о выбранном голосе в ответ
         if hasattr(result, '__dict__'):
-            result.selected_voice = random_voice.name
+            result.selected_voice = selected_voice.name
         else:
             # Если result это dict
-            result['selected_voice'] = random_voice.name
+            result['selected_voice'] = selected_voice.name
         
         return result
         
@@ -585,11 +715,25 @@ async def retranscribe_user_voice(
     if not voice:
         raise HTTPException(status_code=404, detail="Voice not found or access denied")
     
+    # 🔒 БЕЗОПАСНОСТЬ: Запрет перетранскрибации глобальных голосов
+    if voice.voice_type != 'user':
+        logger.warning(f"User {user_id} attempted to retranscribe global voice {voice_id}")
+        raise HTTPException(status_code=403, detail="Cannot retranscribe global voice")
+    
+    # 🔒 БЕЗОПАСНОСТЬ: Валидация референсного текста
+    reference_text = reference_text.strip()
+    if not reference_text:
+        raise HTTPException(status_code=400, detail="Reference text cannot be empty")
+    
+    if len(reference_text) > 5000:
+        raise HTTPException(status_code=400, detail="Reference text is too long (max 5000 characters)")
+    
     try:
         # Обновляем референсный текст
         voice.reference_text = reference_text
         db.commit()
         
+        logger.info(f"User {user_id} retranscribed voice {voice_id}")
         return {"success": True, "reference_text": reference_text}
     except Exception as e:
         logger.error(f"Error retranscribing user voice {voice_id}: {e}")
@@ -695,51 +839,35 @@ async def get_random_voice_for_channel(
         logger.error(f"Error getting random voice: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- TTS Settings ---
-@app.get("/api/tts/settings")
-async def get_tts_settings():
-    """Получить настройки TTS (заглушка)"""
-    return JSONResponse({
-        "enabled_platforms": ["twitch", "vk"],
-        "global_enabled": True
-    })
+# --- TTS Settings (moved to bot_service) ---
+# Все настройки платформ, громкости и фильтров теперь в bot_service
+# TTS service содержит только настройки синтеза голосов
 
-@app.put("/api/tts/settings")
-async def update_tts_settings(settings: dict):
-    """Обновить настройки TTS (заглушка)"""
-    return JSONResponse({"message": "Settings updated successfully"})
-
-@app.get("/api/tts/audio-settings")
-async def get_audio_settings():
-    """Получить настройки звука (заглушка)"""
-    return JSONResponse({
-        "websiteVolume": 50,
-        "obsVolume": 50
-    })
-
-@app.put("/api/tts/audio-settings")
-async def update_audio_settings(settings: dict):
-    """Обновить настройки звука (заглушка)"""
-    return JSONResponse({"message": "Audio settings updated successfully"})
-
-@app.get("/api/tts/settings")
-async def get_tts_settings():
-    """Получить настройки TTS (заглушка)"""
-    return JSONResponse({
-        "enable7TV": True,
-        "enableProfanity": False,
-        "profanityLevel": "medium"
-    })
-
-@app.put("/api/tts/settings")
-async def update_tts_settings(settings: dict):
-    """Обновить настройки TTS (заглушка)"""
-    return JSONResponse({"message": "TTS settings updated successfully"})
 
 @app.post("/api/tts/restart")
 async def restart_tts_engine():
     """Перезагрузить TTS движок"""
     return await tts_api.restart_engine()
+
+@app.post("/api/upload-audio")
+async def upload_audio(file: UploadFile = File(...)):
+    """Загрузить аудио файл для обслуживания"""
+    from tts_service.config import config
+    
+    # Создаем директорию если не существует
+    config.temp_audio_path.mkdir(parents=True, exist_ok=True)
+    
+    # Сохраняем файл
+    file_path = config.temp_audio_path / file.filename
+    with open(file_path, "wb") as buffer:
+        content = await file.read()
+        buffer.write(content)
+    
+    return JSONResponse({
+        "message": "Audio file uploaded successfully",
+        "filename": file.filename,
+        "url": f"/api/audio/{file.filename}"
+    })
 
 @app.get("/api/audio/{filename}")
 async def get_temp_audio(filename: str):

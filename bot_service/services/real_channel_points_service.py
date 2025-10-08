@@ -16,7 +16,9 @@ class RealChannelPointsService:
     
     def __init__(self):
         self.vk_api = VKLiveAPI()
-        self.twitch_api = TwitchAPI()
+        from core.connection_manager import get_connection_manager
+        connection_manager = get_connection_manager()
+        self.twitch_api = TwitchAPI(connection_manager)
     
     # === VK LIVE CHANNEL POINTS ===
     

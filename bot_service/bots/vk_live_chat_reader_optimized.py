@@ -54,6 +54,35 @@ class OptimizedVKLiveChatReader:
             'start_time': time.time()
         }
         
+    async def _cleanup_old_data(self):
+        """Периодическая очистка старых данных для предотвращения утечек памяти"""
+        while self.is_running:
+            try:
+                await asyncio.sleep(600)  # Каждые 10 минут
+                
+                current_time = time.time()
+                cutoff_time = current_time - 3600  # Данные старше часа
+                
+                # Очищаем старые времена последних сообщений
+                old_channels = [
+                    ch for ch, t in self.last_message_times.items() 
+                    if t < cutoff_time and ch not in self.connected_channels
+                ]
+                for ch in old_channels:
+                    del self.last_message_times[ch]
+                    if ch in self.message_cache:
+                        del self.message_cache[ch]
+                    if ch in self.polling_intervals:
+                        del self.polling_intervals[ch]
+                    if ch in self.channel_activity:
+                        del self.channel_activity[ch]
+                
+                if old_channels:
+                    logger.info(f"🧹 Cleaned up data for {len(old_channels)} old channels")
+                    
+            except Exception as e:
+                logger.error(f"Error in cleanup task: {e}")
+    
     async def start_reader(self):
         """Запуск супер-оптимизированного чтения чата"""
         if self.is_running:
@@ -62,6 +91,9 @@ class OptimizedVKLiveChatReader:
             
         self.is_running = True
         logger.info("🚀 OPTIMIZED VK LIVE CHAT READER STARTED - Maximum performance mode")
+        
+        # Запускаем задачу очистки старых данных
+        asyncio.create_task(self._cleanup_old_data())
         
         # Создаем persistent session для лучшей производительности
         timeout = aiohttp.ClientTimeout(total=self.timeout)
@@ -219,9 +251,14 @@ class OptimizedVKLiveChatReader:
                     )
         
         # Очищаем старые записи из кэша (оставляем только последние 1000)
+        # Улучшенная логика: удаляем только старые записи, а не весь кэш
         if len(cache) > 1000:
-            cache.clear()
-            logger.debug(f"Cleared message cache for {channel_name}")
+            # Конвертируем в список и удаляем самые старые записи
+            cache_list = list(cache)
+            # Удаляем первые 200 записей (самые старые)
+            for old_id in cache_list[:200]:
+                cache.discard(old_id)
+            logger.debug(f"Cleaned up {200} old messages from cache for {channel_name}")
         
         # Обрабатываем новые сообщения batch'ом для лучшей производительности
         if new_messages:

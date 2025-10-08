@@ -18,6 +18,8 @@ export const TtsHealthProvider = ({ children }) => {
     const location = useLocation();
     const checkInProgressRef = useRef(false);
     const lastCheckTimeRef = useRef(0);
+    const hasCheckedRef = useRef(false);
+    const mountedRef = useRef(false);
     
     // Проверяем, является ли пользователь гостем
     const isGuest = user?.is_guest || user?.id === -1;
@@ -29,11 +31,18 @@ export const TtsHealthProvider = ({ children }) => {
 
     // Убрали кэширование в localStorage
 
-    const checkHealth = useCallback(async () => {
+    const checkHealthRef = useRef();
+    
+    checkHealthRef.current = async () => {
         // Не проверяем TTS для гостевых пользователей
         if (isGuest) {
             setIsHealthy(false);
             setIsChecking(false);
+            return;
+        }
+        
+        // Проверяем что компонент всё ещё смонтирован
+        if (!mountedRef.current) {
             return;
         }
         
@@ -52,58 +61,43 @@ export const TtsHealthProvider = ({ children }) => {
             const isOk = response.status === 200 && data.tts_engine_loaded;
             
             setIsHealthy(isOk);
-            
-            // Сохраняем успешный результат
-            const status = {
-                isHealthy: isOk,
-                lastCheck: new Date()
-            };
             setLastCheck(new Date());
             
         } catch (error) {
             console.error('TTS недоступен:', error.message);
             setIsHealthy(false);
-            
-            // Сохраняем неуспешный результат
-            const status = {
-                isHealthy: false,
-                lastCheck: new Date()
-            };
             setLastCheck(new Date());
         } finally {
             setIsChecking(false);
             checkInProgressRef.current = false;
         }
-    }, [isGuest]);
+    };
+    
+    const checkHealth = useCallback(() => {
+        return checkHealthRef.current();
+    }, []);
 
-    // Проверяем health при загрузке страницы и при смене пути
+    // Проверяем health ТОЛЬКО при первой загрузке/обновлении страницы
     useEffect(() => {
-        // Проверяем только на дашборде и TTS страницах
-        const isDashboardPage = location.pathname.startsWith('/dashboard') || location.pathname === '/';
-        const isLoginPage = location.pathname === '/login';
+        // Отмечаем что компонент смонтирован
+        mountedRef.current = true;
         
-        if (!isDashboardPage || isLoginPage) {
+        // Не проверяем для гостей
+        if (isGuest) {
             return;
         }
         
-        // Всегда проверяем статус заново
-        checkHealth();
-    }, [location.pathname, checkHealth]);
-
-    // Принудительная проверка при фокусе на окне
-    useEffect(() => {
-        const handleFocus = () => {
+        // Проверяем только один раз при монтировании компонента
+        if (!hasCheckedRef.current) {
+            hasCheckedRef.current = true;
             checkHealth();
+        }
+        
+        // Cleanup при размонтировании
+        return () => {
+            mountedRef.current = false;
         };
-
-        window.addEventListener('focus', handleFocus);
-        return () => window.removeEventListener('focus', handleFocus);
-    }, [checkHealth]);
-
-    // Принудительная проверка при инициализации контекста
-    useEffect(() => {
-        checkHealth();
-    }, []);
+    }, []); // Убираем все зависимости!
 
     const value = {
         isHealthy,

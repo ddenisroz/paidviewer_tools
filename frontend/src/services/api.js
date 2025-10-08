@@ -101,33 +101,8 @@ api.interceptors.response.use(
 );
 
 
-// TTS API functions (обновленные маршруты для микросервисной архитектуры)
-export const ttsApi = {
-    // УСТАРЕЛО: Используйте microservicesAPI вместо этого
-    // Оставлено только для обратной совместимости
-    
-    // Получить сообщения из чата (Bot сервис)
-    getChatMessages: async () => {
-        const response = await api.get('/api/chat/messages');
-        return response.data;
-    },
-
-    // Устаревшие методы - переводим на использование microservicesAPI
-    getStatus: async () => {
-        console.warn('ttsApi.getStatus() устарел, используйте microservicesAPI.getTtsHealth()');
-        return { ready: false, deprecated: true };
-    },
-
-    loadEngine: async () => {
-        console.warn('ttsApi.loadEngine() устарел в микросервисной архитектуре');
-        return { success: false, deprecated: true };
-    },
-
-    getProgress: async () => {
-        console.warn('ttsApi.getProgress() устарел в микросервисной архитектуре');
-        return { progress: 100, deprecated: true };
-    }
-};
+// ⚠️ УДАЛЕНО: Устаревшие методы ttsApi
+// Используйте microservicesAPI из ./microservices.js вместо этого
 
 export { adminApi };
 export default api;

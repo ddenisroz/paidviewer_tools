@@ -16,7 +16,7 @@ const LootboxPage = () => {
         );
     }
 
-    const channelName = user.display_name || user.username || 'yourchy';
+    const channelName = user.username || 'yourchy';
 
     return (
         <div className="min-h-screen bg-gray-900">

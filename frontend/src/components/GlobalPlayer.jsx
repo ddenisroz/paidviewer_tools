@@ -122,7 +122,7 @@ const GlobalPlayer = () => {
                                         widget_referrer: window.location.origin
                                     }
                                 }}
-                                key={`main-player-${currentVideo.video_id}`}
+                                key={`main-player-${currentVideo.video_id}-${Date.now()}`}
                                 className="w-full h-full"
                             />
                         </div>
@@ -158,7 +158,7 @@ const GlobalPlayer = () => {
                                 widget_referrer: window.location.origin
                             }
                         }}
-                        key={`hidden-player-${currentVideo.video_id}`}
+                        key={`hidden-player-${currentVideo.video_id}-${Date.now()}`}
                         className="hidden"
                     />
                 </div>

@@ -1,0 +1,63 @@
+[33mcommit e72760d6aa232115886cc0af64b7da465cbf7001[m
+Author: Denis R <rozenkod312@gmail.com>
+Date:   Sat Sep 27 14:44:59 2025 +0500
+
+    feat: Major admin panel improvements and bug fixes
+    
+    - Changed admin panel URL from /dashboard/admin to /dashboard/dolbaebadmintts
+    - Renamed 'Каналы' tab to 'TTS whitelist' and added 'Сессии' tab
+    - Integrated blocked channels management into TTS whitelist tab
+    - Removed OBS integration from Voice Management page
+    - Added empty state message for custom voices
+    - Fixed system logs to show real data instead of mock data
+    - Implemented real bot restart functionality (Twitch, VK Live, Bot Service)
+    - Added TTS engine restart functionality
+    - Fixed session management to show real user data
+    - Added fake IP joke for bot connections (xx.xxx.xx.xx format)
+    - Made logs display more compact (single line per log)
+    - Fixed various UI theme inconsistencies
+    - Removed temporary ADMIN_USERS fallbacks
+    - Added proper session termination for users
+    - Fixed activity calculation to use current time for active users
+    - Consolidated statistics cards into compact single row
+    - Removed bot logs section from Bot Management (moved to dedicated Logs tab)
+
+bot_service/api/tts_api.py
+bot_service/auth/auth.py
+bot_service/auth/vk_auth.py
+bot_service/bots/twitch_bot.py
+bot_service/bots/vk_live_bot.py
+bot_service/core/connection_manager.py
+bot_service/core/database.py
+bot_service/core/session_manager.py
+bot_service/logs/bot_service.log
+bot_service/main.py
+bot_service/models/pydantic_models.py
+bot_service/services/admin_service.py
+bot_service/services/queue_service.py
+frontend/src/App.jsx
+frontend/src/components/GlobalPlayer.jsx
+frontend/src/components/admin/VoiceManagement.jsx
+frontend/src/components/layout/Sidebar.jsx
+frontend/src/context/ChatContext.jsx
+frontend/src/context/TtsCardContext.jsx
+frontend/src/context/TtsHealthContext.jsx
+frontend/src/pages/AdminPage.jsx
+frontend/src/pages/CommandsPage.jsx
+frontend/src/pages/HomePage.jsx
+frontend/src/pages/admin/BotManagementPage.jsx
+frontend/src/pages/admin/SessionManagementPage.jsx
+frontend/src/pages/admin/SystemLogsPage.jsx
+frontend/src/pages/admin/UserManagementPage.jsx
+frontend/src/pages/media/YoutubeIntegrationPage.jsx
+frontend/src/pages/media/YoutubeSettingsPage.jsx
+frontend/src/pages/tts/ObsYoutubePage.jsx
+frontend/src/pages/tts/TtsMainPage.jsx
+frontend/src/pages/tts/VoiceManagementPage.jsx
+tts_service/TTS_rus_engine/russian_tts.py
+tts_service/TTS_rus_engine/yoficator_module.py
+tts_service/api_endpoints.py
+tts_service/database.py
+tts_service/logs/tts_service.log
+tts_service/main.py
+tts_service/models.py

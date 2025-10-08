@@ -14,11 +14,11 @@ class TTSEngineManager:
         self.is_initialized = False
 
     async def initialize(self):
-        """Инициализация TTS движка"""
+        """Инициализация TTS движка (только F5-TTS)"""
         try:
-            logger.info("Initializing TTS engine...")
+            logger.info("Initializing AI TTS engine (F5-TTS)...")
             
-            # Инициализация TTS движка
+            # Инициализация AI TTS движка (F5-TTS)
             self.tts_engine = RussianTTS()
             # RussianTTS инициализируется в __init__, поэтому await не нужен
             

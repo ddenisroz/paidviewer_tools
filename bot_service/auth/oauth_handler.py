@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 class OAuthUserData:
     """Структура данных пользователя, полученных от OAuth провайдера"""
     platform_user_id: str
-    platform_display_name: str
     avatar_url: Optional[str]
     access_token: str
     refresh_token: Optional[str]
@@ -92,10 +91,10 @@ class OAuthHandler:
             else:
                 # Сценарий нового входа или существующего пользователя
                 logger.info(f"New login or existing user for {platform} ID {user_data.platform_user_id}.")
+                
                 unified_user = session_manager.create_or_get_user_by_platform(
                     platform=platform,
                     platform_user_id=user_data.platform_user_id,
-                    platform_display_name=user_data.platform_display_name,
                     avatar_url=user_data.avatar_url,
                     db=db
                 )
@@ -111,7 +110,6 @@ class OAuthHandler:
                 user_id=unified_user.id,
                 platform=platform,
                 platform_user_id=user_data.platform_user_id,
-                platform_display_name=user_data.platform_display_name,
                 avatar_url=user_data.avatar_url,
                 access_token=user_data.access_token,
                 refresh_token=user_data.refresh_token,
@@ -129,7 +127,7 @@ class OAuthHandler:
                 
                 # Завершаем предыдущие сессии для этого канала
                 session_manager.terminate_all_sessions_for_channel(
-                    channel_name=user_data.platform_display_name.lower(),
+                    channel_name=user_data.platform_user_id.lower(),
                     reason=f"new_{platform}_login"
                 )
                 
@@ -139,20 +137,20 @@ class OAuthHandler:
                     device_info={
                         "user_agent": request.headers.get("user-agent"), 
                         "ip": getattr(request.client, 'host', 'unknown'),
-                        "guest_channel": user_data.platform_display_name.lower()
+                        "monitored_channel": user_data.platform_user_id.lower()
                     }
                 )
                 
                 # Уведомляем connection_manager о новой активной сессии
                 try:
                     connection_manager = self._get_connection_manager()
-                    connection_manager.add_active_session(user_data.platform_display_name, session_id)
+                    connection_manager.add_active_session(user_data.platform_user_id, session_id)
                 except Exception as e:
                     logger.error(f"Error notifying connection_manager about new session: {e}")
                 
                 # Автоматически подключаем бота если требуется
                 if auto_connect_bot:
-                    await self._auto_connect_bot(platform, user_data.platform_display_name)
+                    await self._auto_connect_bot(platform, user_data.platform_user_id)
             
             # Определяем URL для редиректа
             redirect_url = self._get_redirect_url(platform, is_linking, is_new_session)
@@ -199,6 +197,7 @@ class OAuthHandler:
         
         return response
     
+
     def _get_redirect_url(self, platform: str, is_linking: bool, is_new_session: bool) -> str:
         """
         Определяет URL для редиректа на основе сценария авторизации

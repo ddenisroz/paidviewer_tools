@@ -3,7 +3,10 @@ uvicorn
 python-dotenv
 sqlalchemy
 aiohttp
+aiofiles
 httpx
 twitchio
 pytube
 PyJWT
+gtts
+pydub

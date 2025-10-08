@@ -4,54 +4,72 @@ import aiohttp
 import logging
 from typing import Optional
 
+from bot_service.services.tts_manager import get_tts_manager
+
 logger = logging.getLogger(__name__)
 
 class TTSAPI:
     def __init__(self):
         self.tts_service_url = os.getenv("TTS_SERVICE_URL", "http://localhost:8001")
+        self.tts_manager = get_tts_manager()
 
-    async def send_tts_request(self, channel_name: str, text: str, author: str, volume_level: float = 50.0, connection_manager=None) -> dict:
-        """Отправить запрос на озвучку в TTS сервис с автоматическим выбором голоса и приоритетной громкостью"""
-        if not self.tts_service_url:
-            logger.warning("TTS_SERVICE_URL not configured")
-            return {"success": False, "error": "TTS service not configured"}
-
+    async def send_tts_request(
+        self, 
+        channel_name: str, 
+        text: str, 
+        author: str, 
+        volume_level: float = 50.0, 
+        connection_manager=None,
+        use_ai_tts: bool = False,
+        use_basic_tts: bool = True,
+        tts_settings: dict = None,
+        word_filter: list = None,
+        blocked_users: list = None
+    ) -> dict:
+        """
+        Отправить запрос на озвучку через TTS Manager.
+        Поддерживает как AI TTS (F5-TTS), так и базовую TTS (gTTS).
+        
+        Args:
+            channel_name: Имя канала
+            text: Текст для озвучки
+            author: Автор сообщения
+            volume_level: Уровень громкости (0-100)
+            connection_manager: ConnectionManager для проверки приоритетных голосов
+            use_ai_tts: Использовать AI TTS (F5-TTS) через удаленный сервис
+            use_basic_tts: Использовать базовую TTS (gTTS) локально
+            tts_settings: Настройки TTS (enable7TV, enableTwitch, enableProfanity, profanityLevel)
+            word_filter: Список заблокированных слов
+            blocked_users: Список заблокированных пользователей
+        
+        Returns:
+            Dict с результатом: {"success": bool, "voice": str, "volume": float, "tts_type": str}
+        """
         try:
-            async with aiohttp.ClientSession() as session:
-                url = f"{self.tts_service_url}/api/tts/synthesize-channel"
-                data = {
-                    "channel_name": channel_name,
-                    "text": text,
-                    "author": author,
-                    "volume_level": volume_level
-                }
-                
-                async with session.post(url, data=data) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        selected_voice = result.get("selected_voice")
-                        
-                        # Если есть connection_manager и выбран голос, проверяем приоритетную громкость
-                        if connection_manager and selected_voice:
-                            priority_volume = connection_manager.get_voice_volume(channel_name, selected_voice)
-                            if priority_volume != 50.0:  # Если есть кастомная громкость
-                                logger.info(f"🔊 Custom voice volume detected for {selected_voice}: {priority_volume}%")
-                                # Пересылаем запрос с приоритетной громкостью
-                                data["volume_level"] = priority_volume
-                                async with session.post(url, data=data) as priority_response:
-                                    if priority_response.status == 200:
-                                        priority_result = await priority_response.json()
-                                        logger.info(f"TTS request sent for channel {channel_name}: {text[:50]}... (voice: {selected_voice}, priority volume: {priority_volume}%)")
-                                        return {"success": True, "voice": selected_voice, "volume": priority_volume}
-                        
-                        logger.info(f"TTS request sent for channel {channel_name}: {text[:50]}... (voice: {selected_voice or 'random'}, volume: {volume_level}%)")
-                        return {"success": True, "voice": selected_voice, "volume": volume_level}
-                    else:
-                        logger.error(f"TTS request failed: {response.status}")
-                        return {"success": False, "error": f"HTTP {response.status}"}
-                        
+            result = await self.tts_manager.synthesize_tts(
+                channel_name=channel_name,
+                text=text,
+                author=author,
+                volume_level=volume_level,
+                use_ai_tts=use_ai_tts,
+                use_basic_tts=use_basic_tts,
+                connection_manager=connection_manager,
+                tts_settings=tts_settings,
+                word_filter=word_filter,
+                blocked_users=blocked_users
+            )
+            
+            if result.get("success"):
+                tts_type = result.get("tts_type", "unknown")
+                voice = result.get("voice", "unknown")
+                logger.info(f"✅ TTS синтез успешен: type={tts_type}, voice={voice}, channel={channel_name}")
+            else:
+                logger.error(f"❌ TTS синтез не удался: {result.get('error')}")
+            
+            return result
+            
         except Exception as e:
-            logger.error(f"Error sending TTS request: {e}")
+            logger.error(f"❌ Ошибка при отправке TTS запроса: {e}")
             return {"success": False, "error": str(e)}
 
     async def enable_tts(self, channel_name: str) -> bool:

@@ -381,7 +381,7 @@ const GuestTtsCard = () => {
                                                 .filter(voice => voice.type === 'standard' || !voice.type) // Только стандартные голоса
                                                 .map((voice) => (
                                                     <SelectItem key={voice.name} value={voice.name}>
-                                                        {voice.display_name || voice.name}
+                                                        {voice.name}
                                                     </SelectItem>
                                                 ))}
                                         </SelectContent>

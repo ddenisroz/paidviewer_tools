@@ -45,6 +45,77 @@ class VKLiveAPI:
             logger.error(f"Error getting VK token for user {user_id}: {e}")
             return None
 
+    async def _refresh_user_token(self, user_id: str) -> Optional[str]:
+        """Обновить токен пользователя VK используя refresh_token"""
+        try:
+            tokens = session_manager.get_user_tokens(user_id, "vk")
+            if not tokens or not tokens.get("refresh_token"):
+                logger.warning(f"No refresh token found for user {user_id}")
+                return None
+            
+            refresh_token = tokens["refresh_token"]
+            client_id = os.getenv("VK_CLIENT_ID")
+            client_secret = os.getenv("VK_CLIENT_SECRET")
+            
+            if not all([client_id, client_secret]):
+                logger.error("VK credentials not configured for token refresh")
+                return None
+            
+            # Подготавливаем Basic Auth заголовок
+            credentials = f"{client_id}:{client_secret}"
+            base64_credentials = base64.b64encode(credentials.encode()).decode()
+            
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Authorization": f"Basic {base64_credentials}"
+            }
+            
+            payload = {
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "redirect_uri": f"{os.getenv('BACKEND_URL', 'http://localhost:8000')}/auth/vk/callback"
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    "https://api.live.vkvideo.ru/oauth/server/token",
+                    data=payload,
+                    headers=headers
+                ) as response:
+                    if response.status == 200:
+                        token_data = await response.json()
+                        new_access_token = token_data["access_token"]
+                        new_refresh_token = token_data.get("refresh_token", refresh_token)
+                        expires_in = token_data.get("expires_in", 3600)
+                        
+                        # Обновляем токены в базе данных
+                        from core.datetime_utils import utcnow_naive
+                        from datetime import timedelta
+                        expires_at = utcnow_naive() + timedelta(seconds=expires_in)
+                        
+                        session_manager.save_user_tokens(
+                            user_id=user_id,
+                            platform="vk",
+                            platform_user_id=tokens.get("platform_user_id", ""),
+                            username=tokens.get("username"),
+                            avatar_url=tokens.get("avatar_url"),
+                            access_token=new_access_token,
+                            refresh_token=new_refresh_token,
+                            expires_at=expires_at,
+                            scopes=tokens.get("scopes", [])
+                        )
+                        
+                        logger.info(f"VK token refreshed for user {user_id}")
+                        return new_access_token
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"VK token refresh failed: {response.status} - {error_text}")
+                        return None
+                        
+        except Exception as e:
+            logger.error(f"Error refreshing VK token for user {user_id}: {e}")
+            return None
+
     async def search_categories(self, query: str, user_id: str) -> Optional[List[Dict[str, Any]]]:
         """Поиск категорий VK Live по названию"""
         token = self._get_user_token(user_id)
@@ -404,7 +475,7 @@ class VKLiveAPI:
             }
             params = {"channel_url": channel_url}
             
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
                 response = await client.get(url, headers=headers, params=params, timeout=10)
                 
                 if response.status_code == 200:
@@ -429,7 +500,7 @@ class VKLiveAPI:
             }
             params = {"channel_url": channel_url}
             
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
                 response = await client.get(url, headers=headers, params=params, timeout=10)
                 
                 if response.status_code == 200:
@@ -455,7 +526,7 @@ class VKLiveAPI:
             
             body = {"reward": reward_data}
             
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
                 response = await client.post(url, headers=headers, params=params, json=body, timeout=10)
                 
                 if response.status_code == 200:
@@ -484,7 +555,7 @@ class VKLiveAPI:
                 "offset": offset
             }
             
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
                 response = await client.get(url, headers=headers, params=params, timeout=10)
                 
                 if response.status_code == 200:
@@ -510,7 +581,7 @@ class VKLiveAPI:
             
             body = {"demands": [{"id": demand_id} for demand_id in demand_ids]}
             
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
                 response = await client.post(url, headers=headers, params=params, json=body, timeout=10)
                 
                 if response.status_code == 200:
@@ -536,7 +607,7 @@ class VKLiveAPI:
             
             body = {"demands": [{"id": demand_id} for demand_id in demand_ids]}
             
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
                 response = await client.post(url, headers=headers, params=params, json=body, timeout=10)
                 
                 if response.status_code == 200:

@@ -29,9 +29,14 @@ class ConnectionManager:
         self.obs_connections: Dict[str, WebSocket] = {}
         self.youtube_obs_connections: Dict[str, WebSocket] = {}  # YouTube OBS connections
         self.audio_connections: Dict[str, WebSocket] = {}  # Аудио подключения по каналам
-        self.tts_enabled_channels: Set[str] = set()  # Глобальные каналы с TTS
+        self.tts_enabled_channels: Set[str] = set()  # Глобальные каналы с TTS (для обратной совместимости)
         self.tts_enabled_twitch: Set[str] = set()    # Twitch каналы с TTS
         self.tts_enabled_vk: Set[str] = set()        # VK Live каналы с TTS
+        
+        # Новая система: два типа TTS
+        self.basic_tts_enabled_channels: Set[str] = set()  # Каналы с базовой TTS (gTTS)
+        self.ai_tts_enabled_channels: Set[str] = set()     # Каналы с AI TTS (F5-TTS)
+        
         self.blocked_bots: Set[str] = set()
         self.youtube_queues: Dict[str, list] = {}
         self.current_videos: Dict[str, dict] = {}
@@ -42,6 +47,12 @@ class ConnectionManager:
         self.tts_volume_settings: Dict[str, float] = {}  # {channel_name: volume_level}
         self.voice_volume_settings: Dict[str, Dict[str, float]] = {}  # {channel_name: {voice_name: volume_level}}
         self.youtube_settings: Dict[str, dict] = {}  # {channel_name: {playback_mode, volume_level}}
+        
+        # Система мониторинга активных подключений
+        self.client_heartbeats: Dict[str, float] = {}  # {user_id: last_heartbeat_timestamp}
+        self.client_connections: Dict[str, Set[str]] = {}  # {user_id: {connection_types}}
+        self.connection_timeouts: Dict[str, float] = {}  # {user_id: timeout_timestamp}
+        self.heartbeat_timeout = 30  # 30 секунд без heartbeat = неактивный клиент
         
         # Кэш для Twitch API
         self.twitch_cache = {
@@ -97,6 +108,12 @@ class ConnectionManager:
                 await self.disconnect(user_id)
             except Exception as e:
                 logger.error(f"Error broadcasting message to user {user_id}: {e}")
+
+    async def broadcast_chat_message(self, message_data: dict):
+        """Отправляет сообщение чата всем подключенным пользователям"""
+        message = json.dumps(message_data)
+        logger.info(f"📤 Broadcasting chat message to {len(self.active_connections)} connections: {message_data.get('author', 'unknown')}: {message_data.get('content', '')[:50]}")
+        await self.broadcast(message)
 
     # YouTube events
     async def broadcast_youtube_event(self, event_type: str, data: dict = None):
@@ -289,15 +306,56 @@ class ConnectionManager:
             logger.info(f"TTS disabled for channel: {channel_name}")
 
     def is_tts_enabled(self, channel_name: str, platform: str = None) -> bool:
-        """Проверить, включен ли TTS для канала"""
+        """Проверить, включен ли хотя бы один из типов TTS для канала"""
         channel_lower = channel_name.lower()
         
+        # Проверяем включен ли хотя бы один тип TTS
+        has_basic = channel_lower in self.basic_tts_enabled_channels
+        has_ai = channel_lower in self.ai_tts_enabled_channels
+        
+        # Для обратной совместимости также проверяем старые флаги
         if platform == 'twitch':
-            return channel_lower in self.tts_enabled_twitch
+            return has_basic or has_ai or channel_lower in self.tts_enabled_twitch
         elif platform == 'vk':
-            return channel_lower in self.tts_enabled_vk
+            return has_basic or has_ai or channel_lower in self.tts_enabled_vk
         else:
-            return channel_lower in self.tts_enabled_channels
+            return has_basic or has_ai or channel_lower in self.tts_enabled_channels
+    
+    # Управление базовой TTS (gTTS)
+    def enable_basic_tts(self, channel_name: str):
+        """Включить базовую TTS (gTTS) для канала"""
+        channel_lower = channel_name.lower()
+        self.basic_tts_enabled_channels.add(channel_lower)
+        logger.info(f"✅ Базовая TTS (gTTS) включена для канала: {channel_name}")
+    
+    def disable_basic_tts(self, channel_name: str):
+        """Отключить базовую TTS (gTTS) для канала"""
+        channel_lower = channel_name.lower()
+        self.basic_tts_enabled_channels.discard(channel_lower)
+        logger.info(f"❌ Базовая TTS (gTTS) отключена для канала: {channel_name}")
+    
+    def is_basic_tts_enabled(self, channel_name: str) -> bool:
+        """Проверить, включена ли базовая TTS (gTTS) для канала"""
+        channel_lower = channel_name.lower()
+        return channel_lower in self.basic_tts_enabled_channels
+    
+    # Управление AI TTS (F5-TTS)
+    def enable_ai_tts(self, channel_name: str):
+        """Включить AI TTS (F5-TTS) для канала"""
+        channel_lower = channel_name.lower()
+        self.ai_tts_enabled_channels.add(channel_lower)
+        logger.info(f"✅ AI TTS (F5-TTS) включена для канала: {channel_name}")
+    
+    def disable_ai_tts(self, channel_name: str):
+        """Отключить AI TTS (F5-TTS) для канала"""
+        channel_lower = channel_name.lower()
+        self.ai_tts_enabled_channels.discard(channel_lower)
+        logger.info(f"❌ AI TTS (F5-TTS) отключена для канала: {channel_name}")
+    
+    def is_ai_tts_enabled(self, channel_name: str) -> bool:
+        """Проверить, включена ли AI TTS (F5-TTS) для канала"""
+        channel_lower = channel_name.lower()
+        return channel_lower in self.ai_tts_enabled_channels
     
     def is_channel_whitelisted(self, channel_name: str) -> bool:
         """Проверяет, находится ли канал в whitelist для TTS"""
@@ -517,7 +575,7 @@ class ConnectionManager:
         verification = self.pending_verifications[channel]
         
         # Проверяем, не истек ли код (60 секунд)
-        if time.time() - verification["timestamp"] > 60:
+        if "timestamp" in verification and time.time() - verification["timestamp"] > 60:
             logger.info(f"Verification code expired for channel {channel}")
             del self.pending_verifications[channel]
             return False
@@ -760,14 +818,14 @@ class ConnectionManager:
                 # Извлекаем имя канала из device_info
                 device_info = session.device_info
                 if isinstance(device_info, dict):
-                    channel_name = device_info.get('guest_channel')
+                    channel_name = device_info.get('monitored_channel')
                     logger.info(f"📺 Channel name from device_info: {channel_name}")
                     if channel_name:
                         self.add_active_session(channel_name, session.session_id)
                         restored_count += 1
                         logger.info(f"✅ Restored active session {session.session_id} for channel {channel_name}")
                     else:
-                        logger.warning(f"⚠️ No guest_channel found in device_info: {device_info}")
+                        logger.warning(f"⚠️ No monitored_channel found in device_info: {device_info}")
                 else:
                     logger.warning(f"⚠️ device_info is not a dict: {type(device_info)} - {device_info}")
             
@@ -802,10 +860,19 @@ class ConnectionManager:
             
             for channel_name in active_channels:
                 # Проверяем, есть ли этот канал в базе как Twitch канал
+                # Получаем имя канала через Twitch API по platform_user_id
                 user_token = db.query(UserToken).filter(
-                    UserToken.platform_display_name.ilike(channel_name),
                     UserToken.platform == 'twitch'
                 ).first()
+                
+                if user_token:
+                    # Получаем актуальное имя канала через Twitch API
+                    # Для синхронной функции просто сравниваем platform_user_id
+                    if user_token.platform_user_id.lower() == channel_name.lower():
+                        # Это наш канал
+                        pass
+                    else:
+                        continue
                 
                 if user_token:
                     twitch_channels.append(channel_name)
@@ -861,7 +928,7 @@ class ConnectionManager:
         except Exception as e:
             logger.error(f"Error in cleanup_inactive_channels: {e}")
 
-    def get_active_twitch_channels(self, db):
+    async def get_twitch_channels_for_bot(self, db):
         """Получить список активных Twitch каналов для подключения бота"""
         try:
             from core.database import UserToken
@@ -871,11 +938,21 @@ class ConnectionManager:
                 UserToken.platform == "twitch"
             ).all()
             
-            # Извлекаем имена каналов
+            # Извлекаем имена каналов (получаем username по ID)
             channels = []
             for token in twitch_tokens:
-                if token.platform_display_name:
-                    channels.append(token.platform_display_name.lower())
+                if token.platform_user_id:
+                    try:
+                        # Получаем username по ID через Twitch API
+                        from api.twitch_api import TwitchAPI
+                        twitch_api = TwitchAPI(self)
+                        user_info = await twitch_api.get_user_by_id(token.platform_user_id)
+                        if user_info and user_info.get('login'):
+                            channels.append(user_info['login'].lower())
+                    except Exception as e:
+                        logger.error(f"Error getting username for ID {token.platform_user_id}: {e}")
+                        # Fallback: используем ID как есть
+                        channels.append(token.platform_user_id.lower())
             
             logger.info(f"Found {len(channels)} Twitch channels: {channels}")
             return channels
@@ -883,4 +960,116 @@ class ConnectionManager:
         except Exception as e:
             logger.error(f"Error getting active Twitch channels: {e}")
             return []
+    
+    # === Система мониторинга активных подключений ===
+    
+    def register_client_connection(self, user_id: str, connection_type: str = "websocket"):
+        """Зарегистрировать подключение клиента"""
+        current_time = time.time()
+        self.client_heartbeats[user_id] = current_time
+        
+        if user_id not in self.client_connections:
+            self.client_connections[user_id] = set()
+        self.client_connections[user_id].add(connection_type)
+        
+        # Удаляем из таймаутов если был там
+        self.connection_timeouts.pop(user_id, None)
+        
+        logger.info(f"📱 Client {user_id} connected via {connection_type}")
+    
+    def unregister_client_connection(self, user_id: str, connection_type: str = "websocket"):
+        """Отменить регистрацию подключения клиента"""
+        if user_id in self.client_connections:
+            self.client_connections[user_id].discard(connection_type)
+            
+            # Если нет активных подключений, помечаем для таймаута
+            if not self.client_connections[user_id]:
+                del self.client_connections[user_id]
+                self.connection_timeouts[user_id] = time.time()
+                logger.info(f"📱 Client {user_id} disconnected from {connection_type}, marked for timeout")
+            else:
+                logger.info(f"📱 Client {user_id} disconnected from {connection_type}, still has other connections")
+    
+    def update_client_heartbeat(self, user_id: str):
+        """Обновить heartbeat клиента"""
+        current_time = time.time()
+        self.client_heartbeats[user_id] = current_time
+        
+        # Удаляем из таймаутов если был там
+        self.connection_timeouts.pop(user_id, None)
+    
+    def is_client_active(self, user_id: str) -> bool:
+        """Проверить, активен ли клиент"""
+        if user_id not in self.client_heartbeats:
+            return False
+            
+        current_time = time.time()
+        last_heartbeat = self.client_heartbeats[user_id]
+        
+        # Проверяем, не истек ли heartbeat
+        if current_time - last_heartbeat > self.heartbeat_timeout:
+            return False
+            
+        return True
+    
+    def get_inactive_clients(self) -> List[str]:
+        """Получить список неактивных клиентов"""
+        current_time = time.time()
+        inactive_clients = []
+        
+        for user_id, last_heartbeat in self.client_heartbeats.items():
+            if current_time - last_heartbeat > self.heartbeat_timeout:
+                inactive_clients.append(user_id)
+                
+        return inactive_clients
+    
+    async def cleanup_inactive_clients(self):
+        """Очистить неактивных клиентов и отключить их TTS"""
+        inactive_clients = self.get_inactive_clients()
+        
+        for user_id in inactive_clients:
+            logger.info(f"🧹 Cleaning up inactive client {user_id}")
+            
+            # Отключаем TTS для всех каналов этого пользователя
+            await self._disable_tts_for_user(user_id)
+            
+            # Удаляем из всех отслеживаемых структур
+            self.client_heartbeats.pop(user_id, None)
+            self.client_connections.pop(user_id, None)
+            self.connection_timeouts.pop(user_id, None)
+    
+    async def _disable_tts_for_user(self, user_id: str):
+        """Отключить TTS для всех каналов пользователя"""
+        try:
+            from core.database import UserToken, get_db
+            from api.tts_api import TTSAPI
+            
+            db = next(get_db())
+            try:
+                # Получаем все токены пользователя
+                user_tokens = db.query(UserToken).filter(UserToken.user_id == user_id).all()
+                
+                tts_api = TTSAPI()
+                
+                for token in user_tokens:
+                    channel_name = None
+                    
+                    if token.platform == 'twitch':
+                        # Для синхронной функции используем platform_user_id
+                        channel_name = token.platform_user_id
+                    elif token.platform == 'vk':
+                        # Для VK используем platform_user_id
+                        channel_name = token.platform_user_id
+                    
+                    if channel_name:
+                        # Отключаем TTS для канала
+                        await tts_api.disable_tts(channel_name)
+                        self.disable_tts(channel_name, token.platform)
+                        logger.info(f"🔇 TTS disabled for inactive client {user_id} on {token.platform} channel {channel_name}")
+                        
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"Error disabling TTS for user {user_id}: {e}")
 

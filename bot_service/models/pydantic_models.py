@@ -54,7 +54,6 @@ class AddBlockedBotRequest(BaseModel):
 # User models
 class UserPublic(BaseModel):
     id: int
-    display_name: str
     is_admin: bool
     is_blocked: bool = False
     blocked_reason: Optional[str] = None

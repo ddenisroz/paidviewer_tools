@@ -123,8 +123,7 @@ class AdminAPI:
             return {"error": "User not found"}
         
         # Обновляем поля
-        if 'display_name' in request:
-            user.display_name = request['display_name']
+        # display_name больше не используется
         if 'is_admin' in request:
             user.is_admin = request['is_admin']
         
