@@ -217,22 +217,15 @@ export const ChatProvider = ({ children }) => {
             }
             
             // Фильтруем и добавляем только сообщения чата
-            // 🔍 Checking message type:', messageData.type, 'Condition:', messageData.type === 'chat_message' || !messageData.type);
+            // Checking message type
             if (messageData.type === 'chat_message' || !messageData.type) {
-                 // Добавляем уникальный ID на фронтенде для React key
+                // Добавляем уникальный ID на фронтенде для React key
                 messageData.id = Date.now() + Math.random();
-                // 📩 Chat message received:', {
-                    platform: messageData.platform,
-                    author: messageData.author_name || messageData.author,
-                    content: messageData.content || messageData.message
-                });
-                // 🔄 About to dispatch ADD_MESSAGE...');
-                // 📝 Dispatching ADD_MESSAGE action');
+                
                 dispatchMessages({
                     type: 'ADD_MESSAGE',
                     payload: messageData
                 });
-                // ✅ ADD_MESSAGE dispatched successfully');
                 
                 // useReducer автоматически обновляет состояние
             } else {
