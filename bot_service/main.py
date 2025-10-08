@@ -1135,6 +1135,87 @@ async def clear_verifications():
         logger.error(f"Error clearing verifications: {e}")
         return {"success": False, "message": str(e)}
 
+@app.post("/api/admin/merge-duplicate-accounts")
+async def merge_duplicate_accounts(current_user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
+    """Объединить дублирующиеся аккаунты пользователей"""
+    try:
+        from core.database import User, UserToken, UserSession
+        
+        logger.info("🔍 Starting duplicate accounts merge process...")
+        
+        # Находим дубликаты по platform_user_id
+        duplicate_tokens = db.query(UserToken).filter(
+            UserToken.platform_user_id.in_(
+                db.query(UserToken.platform_user_id)
+                .group_by(UserToken.platform_user_id)
+                .having(db.func.count(UserToken.id) > 1)
+            )
+        ).all()
+        
+        if not duplicate_tokens:
+            logger.info("✅ No duplicate accounts found")
+            return {"success": True, "message": "No duplicate accounts found", "merged": 0}
+        
+        # Группируем по platform_user_id
+        duplicates_by_platform_id = {}
+        for token in duplicate_tokens:
+            if token.platform_user_id not in duplicates_by_platform_id:
+                duplicates_by_platform_id[token.platform_user_id] = []
+            duplicates_by_platform_id[token.platform_user_id].append(token)
+        
+        merged_count = 0
+        
+        for platform_user_id, tokens in duplicates_by_platform_id.items():
+            if len(tokens) <= 1:
+                continue
+                
+            logger.info(f"🔄 Merging {len(tokens)} accounts for platform_user_id: {platform_user_id}")
+            
+            # Сортируем по user_id (берем самый старый аккаунт как основной)
+            tokens.sort(key=lambda t: t.user_id)
+            main_token = tokens[0]
+            main_user_id = main_token.user_id
+            
+            # Объединяем остальные токены с основным пользователем
+            for token in tokens[1:]:
+                logger.info(f"  📝 Moving token {token.id} (platform: {token.platform}) from user {token.user_id} to user {main_user_id}")
+                
+                # Обновляем user_id токена
+                token.user_id = main_user_id
+                
+                # Обновляем сессии
+                sessions = db.query(UserSession).filter(UserSession.user_id == token.user_id).all()
+                for session in sessions:
+                    session.user_id = main_user_id
+                    logger.info(f"    🔄 Updated session {session.id}")
+                
+                merged_count += 1
+            
+            # Удаляем дублирующиеся пользователи (кроме основного)
+            user_ids_to_remove = [t.user_id for t in tokens[1:]]
+            for user_id in user_ids_to_remove:
+                # Удаляем пользователя только если у него нет токенов
+                remaining_tokens = db.query(UserToken).filter(UserToken.user_id == user_id).count()
+                if remaining_tokens == 0:
+                    user_to_remove = db.query(User).filter(User.id == user_id).first()
+                    if user_to_remove:
+                        db.delete(user_to_remove)
+                        logger.info(f"    🗑️ Removed duplicate user {user_id}")
+        
+        db.commit()
+        logger.info(f"✅ Merge completed. Merged {merged_count} accounts")
+        
+        return {
+            "success": True, 
+            "message": f"Successfully merged {merged_count} duplicate accounts",
+            "merged": merged_count
+        }
+        
+    except Exception as e:
+        logger.error(f"Error merging duplicate accounts: {e}")
+        db.rollback()
+        return {"success": False, "message": str(e)}
+
 @app.get("/api/bot/status")
 async def get_bot_status():
     """Получить статус Twitch бота"""

@@ -26,7 +26,7 @@ class SessionManager:
         """Находит пользователя по ID платформы или создает нового, если он не найден."""
         logger.info(f"🔍 Looking for existing user with {platform} ID: {platform_user_id}")
         
-        # СНАЧАЛА ищем по токенам (если есть активные токены)
+        # СНАЧАЛА ищем по токенам текущей платформы
         token = db.query(UserToken).filter(
             UserToken.platform == platform,
             UserToken.platform_user_id == platform_user_id
@@ -43,6 +43,26 @@ class SessionManager:
                 logger.warning(f"⚠️ Token found but user ID {token.user_id} doesn't exist - creating new user")
         else:
             logger.info(f"❌ No existing token found for {platform} user {platform_user_id}")
+            
+            # ВАЖНО: Проверяем, есть ли уже пользователь с таким же platform_user_id на ДРУГИХ платформах
+            # Это нужно для объединения аккаунтов при входе через разные платформы
+            logger.info(f"🔍 Checking if user exists on other platforms with same platform_user_id: {platform_user_id}")
+            
+            # Ищем токены с таким же platform_user_id на всех платформах
+            existing_tokens = db.query(UserToken).filter(
+                UserToken.platform_user_id == platform_user_id
+            ).all()
+            
+            if existing_tokens:
+                logger.info(f"🎯 Found existing user on other platforms! Tokens: {[(t.platform, t.user_id) for t in existing_tokens]}")
+                # Берем первого найденного пользователя (все токены должны принадлежать одному пользователю)
+                existing_user_id = existing_tokens[0].user_id
+                user = db.query(User).filter(User.id == existing_user_id).first()
+                if user:
+                    logger.info(f"✅ Found existing user (ID: {user.id}) from other platform - will link {platform} to this user")
+                    return user
+                else:
+                    logger.warning(f"⚠️ Found tokens but user ID {existing_user_id} doesn't exist - creating new user")
             
             # Логируем все существующие токены для отладки
             all_tokens = db.query(UserToken).filter(UserToken.platform == platform).all()
