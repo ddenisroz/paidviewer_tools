@@ -14,7 +14,7 @@ class WhitelistedChannelPublic(BaseModel):
         from_attributes = True
 
 class AddToWhitelistRequest(BaseModel):
-    username: str = Field(..., min_length=1, max_length=50, regex=r'^[a-zA-Z0-9_]+$')
+    username: str = Field(..., min_length=1, max_length=50, pattern=r'^[a-zA-Z0-9_]+$')
     
     @validator('username')
     def validate_username(cls, v):

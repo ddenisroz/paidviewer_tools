@@ -95,9 +95,6 @@ export function processEmotes(message, channelEmotes = new Map(), globalEmotes =
         return message;
     }
 
-    // Сначала экранируем весь HTML для безопасности
-    const escapedMessage = escapeHtml(message);
-
     // Объединяем канальные и глобальные смайлы
     const allEmotes = new Map([...channelEmotes, ...globalEmotes]);
     
@@ -107,17 +104,17 @@ export function processEmotes(message, channelEmotes = new Map(), globalEmotes =
     ).join('|');
     
     if (emoteNames.length === 0) {
-        return escapedMessage;
+        return message;
     }
 
     const emoteRegex = new RegExp(`\\b(${emoteNames})\\b`, 'gi');
     
-    return escapedMessage.replace(emoteRegex, (match) => {
+    return message.replace(emoteRegex, (match) => {
         const emoteName = match.toLowerCase();
         const emote = allEmotes.get(emoteName) || allEmotes.get(match);
         
         if (emote) {
-            // Дополнительно экранируем атрибуты для безопасности
+            // Создаем безопасный HTML для эмодзи
             const safeUrl = escapeHtml(emote.url);
             const safeName = escapeHtml(emote.name);
             return `<img src="${safeUrl}" alt="${safeName}" class="inline-block w-6 h-6 align-middle" title="${safeName}" />`;
