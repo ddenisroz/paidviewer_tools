@@ -92,11 +92,16 @@ class OAuthHandler:
                 # Сценарий нового входа или существующего пользователя
                 logger.info(f"New login or existing user for {platform} ID {user_data.platform_user_id}.")
                 
+                # Если есть current_user (пользователь подключает интеграцию), передаем его ID
+                current_user_id = current_user.get('id') if current_user else None
+                
                 unified_user = session_manager.create_or_get_user_by_platform(
                     platform=platform,
                     platform_user_id=user_data.platform_user_id,
                     avatar_url=user_data.avatar_url,
-                    db=db
+                    db=db,
+                    current_user_id=current_user_id,
+                    platform_username=user_data.username
                 )
             
             if not unified_user:

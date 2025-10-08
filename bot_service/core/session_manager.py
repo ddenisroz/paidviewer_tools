@@ -22,11 +22,11 @@ class SessionManager:
         # - закрытии браузера
         # - потере фокуса окна
 
-    def create_or_get_user_by_platform(self, platform: str, platform_user_id: str, avatar_url: str, db: Session) -> User:
+    def create_or_get_user_by_platform(self, platform: str, platform_user_id: str, avatar_url: str, db: Session, current_user_id: int = None) -> User:
         """Находит пользователя по ID платформы или создает нового, если он не найден."""
         logger.info(f"🔍 Looking for existing user with {platform} ID: {platform_user_id}")
         
-        # СНАЧАЛА ищем по токенам текущей платформы
+        # Ищем по токенам текущей платформы
         token = db.query(UserToken).filter(
             UserToken.platform == platform,
             UserToken.platform_user_id == platform_user_id
@@ -44,42 +44,29 @@ class SessionManager:
         else:
             logger.info(f"❌ No existing token found for {platform} user {platform_user_id}")
             
-            # ВАЖНО: Проверяем, есть ли уже пользователь с таким же platform_user_id на ДРУГИХ платформах
-            # Это нужно для объединения аккаунтов при входе через разные платформы
-            logger.info(f"🔍 Checking if user exists on other platforms with same platform_user_id: {platform_user_id}")
-            
-            # Ищем токены с таким же platform_user_id на всех платформах
-            existing_tokens = db.query(UserToken).filter(
-                UserToken.platform_user_id == platform_user_id
-            ).all()
-            
-            if existing_tokens:
-                logger.info(f"🎯 Found existing user on other platforms! Tokens: {[(t.platform, t.user_id) for t in existing_tokens]}")
-                # Берем первого найденного пользователя (все токены должны принадлежать одному пользователю)
-                existing_user_id = existing_tokens[0].user_id
-                user = db.query(User).filter(User.id == existing_user_id).first()
+            # Если есть current_user_id (пользователь подключает интеграцию), добавляем токен к текущему пользователю
+            if current_user_id:
+                logger.info(f"🔗 User {current_user_id} is connecting {platform} integration - adding token to existing account")
+                user = db.query(User).filter(User.id == current_user_id).first()
                 if user:
-                    logger.info(f"✅ Found existing user (ID: {user.id}) from other platform - will link {platform} to this user")
+                    logger.info(f"✅ Adding {platform} token to existing user {current_user_id}")
                     return user
                 else:
-                    logger.warning(f"⚠️ Found tokens but user ID {existing_user_id} doesn't exist - creating new user")
-            
-            # Логируем все существующие токены для отладки
-            all_tokens = db.query(UserToken).filter(UserToken.platform == platform).all()
-            logger.info(f"🔍 All existing {platform} tokens: {[(t.user_id, t.platform_user_id) for t in all_tokens]}")
+                    logger.warning(f"⚠️ Current user {current_user_id} not found - creating new user")
         
         # Создаем нового пользователя (если токен не найден или пользователь не найден)
         logger.info(f"🆕 Creating a new user for {platform} user {platform_user_id}")
         
-        # Проверяем, должен ли пользователь быть админом по ID
+        # Проверяем, должен ли пользователь быть админом по platform:user_id
         import os
-        admin_users = os.getenv("ADMIN_USERS", "").lower().split(",")
-        admin_users = [admin.strip() for admin in admin_users if admin.strip()]
+        admin_users_raw = os.getenv("ADMIN_USERS", "")
+        admin_users = [admin.strip() for admin in admin_users_raw.split(",") if admin.strip()]
         
-        # Проверяем админские права по platform_user_id
-        is_admin = platform_user_id in admin_users
+        # Проверяем админские права по platform:user_id
+        admin_key = f"{platform}:{platform_user_id}"
+        is_admin = admin_key in admin_users
         
-        logger.info(f"Admin check: platform_user_id='{platform_user_id}', platform='{platform}', admin_users={admin_users}, is_admin={is_admin}")
+        logger.info(f"Admin check: platform='{platform}', platform_user_id='{platform_user_id}', admin_key='{admin_key}', admin_users={admin_users}, is_admin={is_admin}")
         
         new_user = User(is_admin=is_admin)
         db.add(new_user)
@@ -91,6 +78,44 @@ class SessionManager:
         else:
             logger.info(f"✅ Created new user with ID: {new_user.id}")
         return new_user
+
+    def _merge_user_accounts(self, source_user_id: int, target_user_id: int, db: Session):
+        """Объединяет аккаунты пользователей: переносит все данные с source_user_id на target_user_id"""
+        logger.info(f"🔄 Merging user {source_user_id} into user {target_user_id}")
+        
+        try:
+            # Переносим все токены
+            source_tokens = db.query(UserToken).filter(UserToken.user_id == source_user_id).all()
+            for token in source_tokens:
+                logger.info(f"  📝 Moving token {token.id} (platform: {token.platform}) from user {source_user_id} to user {target_user_id}")
+                token.user_id = target_user_id
+            
+            # Переносим все сессии
+            source_sessions = db.query(UserSession).filter(UserSession.user_id == source_user_id).all()
+            for session in source_sessions:
+                logger.info(f"  🔄 Moving session {session.id} from user {source_user_id} to user {target_user_id}")
+                session.user_id = target_user_id
+            
+            # Переносим голоса (если есть)
+            from core.database import Voice
+            source_voices = db.query(Voice).filter(Voice.owner_id == source_user_id).all()
+            for voice in source_voices:
+                logger.info(f"  🎵 Moving voice {voice.id} from user {source_user_id} to user {target_user_id}")
+                voice.owner_id = target_user_id
+            
+            # Удаляем исходного пользователя
+            source_user = db.query(User).filter(User.id == source_user_id).first()
+            if source_user:
+                db.delete(source_user)
+                logger.info(f"  🗑️ Removed source user {source_user_id}")
+            
+            db.commit()
+            logger.info(f"✅ Successfully merged user {source_user_id} into user {target_user_id}")
+            
+        except Exception as e:
+            logger.error(f"❌ Error merging users: {e}")
+            db.rollback()
+            raise
 
     def save_user_tokens(self, user_id: int, platform: str, platform_user_id: str, 
                         avatar_url: str = None, access_token: str = None, 
