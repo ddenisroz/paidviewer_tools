@@ -32,7 +32,7 @@ class WidgetConfigManager {
                 return config;
             }
         } catch (error) {
-            console.log(`Using default config for ${widgetType}`);
+            // Using default config
         }
         
         // Возвращаем конфигурацию по умолчанию

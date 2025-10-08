@@ -141,7 +141,7 @@ export function useWebSocket(endpoint, options = {}) {
           return;
         }
 
-        console.log(`WebSocket connected: ${endpoint}`);
+        // WebSocket connected
         setIsConnected(true);
         setIsConnecting(false);
         setError(null);
@@ -193,7 +193,7 @@ export function useWebSocket(endpoint, options = {}) {
       ws.onclose = (event) => {
         if (!isMountedRef.current) return;
 
-        console.log(`WebSocket closed: ${endpoint}`, event.code, event.reason);
+        // WebSocket closed
         setIsConnected(false);
         setIsConnecting(false);
 
@@ -209,9 +209,7 @@ export function useWebSocket(endpoint, options = {}) {
           reconnectAttemptsRef.current += 1;
           const delay = reconnectInterval * reconnectAttemptsRef.current;
           
-          console.log(
-            `WebSocket reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`
-          );
+          // WebSocket reconnecting
 
           reconnectTimeoutRef.current = setTimeout(() => {
             if (isMountedRef.current) {

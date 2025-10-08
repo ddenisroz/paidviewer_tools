@@ -215,7 +215,7 @@ const TtsMainPageContent = () => {
             if (cachedSettings) {
                 const parsed = JSON.parse(cachedSettings);
                 setTtsSettings(parsed);
-                console.log('📦 Fallback to cached TTS settings:', parsed);
+                // 📦 Fallback to cached TTS settings:', parsed);
             }
         }
     };
@@ -511,7 +511,7 @@ const TtsMainPageContent = () => {
             if (cachedSettings) {
                 const parsed = JSON.parse(cachedSettings);
                 setAudioSettings(parsed);
-                console.log('📦 Fallback to cached audio settings:', parsed);
+                // 📦 Fallback to cached audio settings:', parsed);
             }
         }
     };
@@ -561,7 +561,7 @@ const TtsMainPageContent = () => {
                 // Кэшируем в localStorage только ПОСЛЕ успешной загрузки с сервера
                 localStorage.setItem('basicTtsEnabled', JSON.stringify(data.basic_tts_enabled || false));
                 localStorage.setItem('aiTtsEnabled', JSON.stringify(data.ai_tts_enabled || false));
-                console.log('Dual TTS status loaded:', data);
+                // Dual TTS status loaded:', data);
             }
         } catch (error) {
             console.error('Error loading dual TTS status:', error);
@@ -574,7 +574,7 @@ const TtsMainPageContent = () => {
             if (cachedAi) {
                 setAiTtsEnabled(JSON.parse(cachedAi));
             }
-            console.log('📦 Fallback to cached TTS status');
+            // 📦 Fallback to cached TTS status');
         }
     };
 

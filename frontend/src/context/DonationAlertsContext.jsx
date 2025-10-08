@@ -98,7 +98,7 @@ export const DonationAlertsProvider = ({ children }) => {
                     }
                     
                     if (event.data.type === 'DONATIONALERTS_AUTH_SUCCESS') {
-                        console.log('✅ DonationAlerts авторизация успешна!');
+                        // DonationAlerts авторизация успешна
                         popup.close();
                         window.removeEventListener('message', handleMessage);
                         // Обновляем статус

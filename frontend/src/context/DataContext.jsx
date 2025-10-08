@@ -54,7 +54,7 @@ export const DataProvider = ({ children }) => {
         try {
             setLoading(prev => ({ ...prev, history: true }));
             const response = await botService.get('/api/stream/history');
-            console.log('Stream history response:', response.data);
+            // Stream history response
             setStreamHistory(response.data);
         } catch (error) {
             console.error('Error loading stream history:', error);

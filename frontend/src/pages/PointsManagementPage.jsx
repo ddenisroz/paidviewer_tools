@@ -24,7 +24,7 @@ const PointsManagementPage = () => {
         }
       });
       
-      console.log('Rewards response status:', response.status);
+      // Rewards response status:', response.status);
       
       if (response.ok) {
         const data = await response.json();
@@ -171,7 +171,7 @@ const RewardsTab = ({ rewards, platform, onRewardCreated, showCreate, setShowCre
         body: formData
       });
 
-      console.log('Create reward response status:', response.status);
+      // Create reward response status:', response.status);
 
       if (response.ok) {
         setNewReward({
@@ -198,7 +198,7 @@ const RewardsTab = ({ rewards, platform, onRewardCreated, showCreate, setShowCre
         credentials: 'include'
       });
 
-      console.log('Delete reward response status:', response.status);
+      // Delete reward response status:', response.status);
 
       if (response.ok) {
         onRewardCreated();

@@ -89,7 +89,7 @@ class WebSocketService {
                 this.emit('session_conflict', messageData);
                 break;
             default:
-                console.log('Unknown WebSocket message type:', type);
+                // Unknown WebSocket message type
         }
     }
 

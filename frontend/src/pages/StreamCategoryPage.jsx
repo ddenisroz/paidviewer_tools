@@ -77,23 +77,23 @@ const StreamCategoryPage = () => {
     };
 
     const updateTwitchCategory = async () => {
-        console.log('🚀 Начинаем обновление категории:', twitchCategory);
+        // 🚀 Начинаем обновление категории:', twitchCategory);
         setIsLoading(true);
         setStatus(prev => ({ ...prev, twitch: 'loading' }));
         
         try {
-            console.log('📡 Отправляем API запрос с category_id:', twitchCategory);
+            // 📡 Отправляем API запрос с category_id:', twitchCategory);
             const response = await api.post('/api/twitch/stream/category', {
                 category_id: twitchCategory
             });
             
-            console.log('✅ Получен ответ от API:', response.data);
+            // ✅ Получен ответ от API:', response.data);
             
             if (response.data.success) {
                 setStatus(prev => ({ ...prev, twitch: 'success' }));
                 setLastUpdate(new Date());
                 toast.success(response.data.message);
-                console.log('🎉 Категория успешно обновлена!');
+                // 🎉 Категория успешно обновлена!');
                 
                 // Обновляем информацию о стриме
                 await loadStreamInfo();

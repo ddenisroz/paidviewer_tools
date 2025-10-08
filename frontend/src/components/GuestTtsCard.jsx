@@ -27,11 +27,11 @@ const GuestTtsCard = () => {
 
     // Отладочные логи для состояния верификации
     useEffect(() => {
-        console.log('GuestTtsCard: verificationRequired changed:', verificationRequired);
+        // GuestTtsCard: verificationRequired changed:', verificationRequired);
     }, [verificationRequired]);
 
     useEffect(() => {
-        console.log('GuestTtsCard: verificationCode changed:', verificationCode);
+        // GuestTtsCard: verificationCode changed:', verificationCode);
     }, [verificationCode]);
 
     // Убираем автоматические запросы - они будут вызываться только при подключении к каналу
@@ -136,10 +136,10 @@ const GuestTtsCard = () => {
                 platform: 'twitch' // По умолчанию Twitch для GuestTtsCard
             });
 
-            console.log('GuestTtsCard: API response:', response.data);
+            // GuestTtsCard: API response:', response.data);
 
             if (response.data.verification_required) {
-                console.log('GuestTtsCard: Verification required, setting up verification UI');
+                // GuestTtsCard: Verification required, setting up verification UI');
                 setIsConnected(true); // Бот подключен, но требует верификации
                 setVerificationRequired(true);
                 setVerificationCode(response.data.verification_code);
@@ -295,7 +295,7 @@ const GuestTtsCard = () => {
                     </div>
 
                     {/* Верификация */}
-                    {console.log('GuestTtsCard: Rendering verificationRequired:', verificationRequired)}
+                    {// GuestTtsCard: Rendering verificationRequired:', verificationRequired)}
                     {verificationRequired && (
                         <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                             <div className="flex items-center gap-2 mb-2">

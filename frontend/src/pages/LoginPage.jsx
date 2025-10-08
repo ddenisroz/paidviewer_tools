@@ -112,7 +112,7 @@ const LoginPage = () => {
     }, [verificationTimers]);
 
     const handleVkLogin = () => {
-        console.log('🖱️ Кнопка VK Live нажата!');
+        // 🖱️ Кнопка VK Live нажата!');
         window.location.href = 'http://localhost:8000/auth/vk';
     };
 
@@ -135,13 +135,13 @@ const LoginPage = () => {
                 channel_name: guestUsername.trim()
             });
             
-            console.log('LoginPage: API response:', response.data);
-            console.log('LoginPage: verification_required:', response.data.verification_required);
-            console.log('LoginPage: verified:', response.data.verified);
+            // LoginPage: API response:', response.data);
+            // LoginPage: verification_required:', response.data.verification_required);
+            // LoginPage: verified:', response.data.verified);
             
             // Проверяем конфликт сессий
             if (response.data.conflict) {
-                console.log('LoginPage: Session conflict detected');
+                // LoginPage: Session conflict detected');
                 toast.error(`Канал ${guestUsername} уже используется авторизованным пользователем. Гостевой доступ заблокирован.`);
                 setGuestModalOpen(false);
                 return;
@@ -149,7 +149,7 @@ const LoginPage = () => {
             
             // Если требуется верификация, показываем попап с кодом
             if (response.data.verification_required) {
-                console.log('LoginPage: Verification required, showing modal');
+                // LoginPage: Verification required, showing modal');
                 setVerificationCode(response.data.verification_code);
                 setVerificationTimeout(response.data.timeout);
                 setGuestModalOpen(false);
@@ -157,7 +157,7 @@ const LoginPage = () => {
                 startVerificationTimer();
             } else if (response.data.verified) {
                 // Если бот уже верифицирован, сразу входим в гостевой режим
-                console.log('LoginPage: Bot already verified, entering guest mode');
+                // LoginPage: Bot already verified, entering guest mode');
                 try {
                     await setGuestMode({
                         username: guestUsername.trim(),
@@ -172,7 +172,7 @@ const LoginPage = () => {
                 }
             } else {
                 // Если верификация не требуется, показываем ошибку
-                console.log('LoginPage: No verification required, showing error');
+                // LoginPage: No verification required, showing error');
                 setChannelError('Верификация обязательна для безопасности');
             }
             
@@ -201,7 +201,7 @@ const LoginPage = () => {
         // Автоматически проверяем верификацию каждые 3 секунды
         const verificationTimer = setInterval(async () => {
             if (isDisconnecting) {
-                console.log('LoginPage: Disconnect in progress, skipping automatic verification check');
+                // LoginPage: Disconnect in progress, skipping automatic verification check');
                 return;
             }
             
@@ -228,7 +228,7 @@ const LoginPage = () => {
                     }
                 } else if (!response.data.connected) {
                     // Бот отключился, закрываем попап и перезагружаем страницу
-                    console.log('LoginPage: Bot disconnected, closing verification modal');
+                    // LoginPage: Bot disconnected, closing verification modal');
                     clearInterval(verificationTimer);
                     clearInterval(timer);
                     setVerificationTimers({ timer: null, verificationTimer: null });
@@ -246,7 +246,7 @@ const LoginPage = () => {
 
     const handleVerificationTimeout = async () => {
         if (isDisconnecting) {
-            console.log('LoginPage: Disconnect already in progress, skipping');
+            // LoginPage: Disconnect already in progress, skipping');
             return;
         }
         
@@ -256,7 +256,7 @@ const LoginPage = () => {
             await api.post('/api/chat/guest/disconnect', {
                 channel_name: guestUsername.trim()
             });
-            console.log('LoginPage: Bot disconnected due to verification timeout');
+            // LoginPage: Bot disconnected due to verification timeout');
         } catch (error) {
             console.error('LoginPage: Failed to disconnect bot:', error);
         } finally {
@@ -269,7 +269,7 @@ const LoginPage = () => {
 
     const checkVerificationStatus = async () => {
         if (isDisconnecting) {
-            console.log('LoginPage: Disconnect in progress, skipping verification check');
+            // LoginPage: Disconnect in progress, skipping verification check');
             return;
         }
         
@@ -292,7 +292,7 @@ const LoginPage = () => {
                 }
             } else if (!response.data.connected) {
                 // Бот отключился, закрываем попап и перезагружаем страницу
-                console.log('LoginPage: Bot disconnected, closing verification modal');
+                // LoginPage: Bot disconnected, closing verification modal');
                 setVerificationModalOpen(false);
                 window.location.reload();
             }
@@ -394,7 +394,7 @@ const LoginPage = () => {
                     <div className="space-y-4">
                         <button
                             onClick={() => {
-                                console.log('🖱️ Кнопка Twitch нажата!');
+                                // 🖱️ Кнопка Twitch нажата!');
                                 loginWithTwitch();
                             }}
                             className="w-full bg-[#9146FF] hover:bg-[#7a3adc] text-white font-semibold py-3 px-5 rounded-lg transition-colors duration-300 flex items-center justify-center text-base"
@@ -405,7 +405,7 @@ const LoginPage = () => {
 
                         <button
                             onClick={() => {
-                                console.log('🖱️ Кнопка VK Live нажата!');
+                                // 🖱️ Кнопка VK Live нажата!');
                                 loginWithVk();
                             }}
                             className="w-full bg-red-800 hover:bg-red-900 text-white font-semibold py-3 px-5 rounded-lg transition-colors duration-300 flex items-center justify-center text-base"

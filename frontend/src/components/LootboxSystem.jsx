@@ -137,7 +137,7 @@ const LootboxSystem = ({ channelName }) => {
 
     const showLootboxResult = (result) => {
         // Здесь можно добавить модальное окно с результатом
-        console.log('Lootbox result:', result);
+        // Lootbox result:', result);
         // TODO: Показать анимацию результата
     };
 
@@ -161,7 +161,7 @@ const LootboxSystem = ({ channelName }) => {
         const element = document.getElementById(`image-lootbox-${lootboxId}`);
         if (element) {
             animateLootboxOpening(element, () => {
-                console.log(`Image lootbox ${lootboxId} opened!`);
+                // Image lootbox opened
                 // Здесь можно добавить логику открытия лутбокса
             });
         }

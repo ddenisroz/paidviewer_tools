@@ -129,7 +129,7 @@ const VoiceManagementPageContent = () => {
                 allVoices = [...userVoices, ...globalVoices];
             }
             
-            console.log('Loaded voices:', allVoices);
+            // Loaded voices:', allVoices);
             setVoices(allVoices);
             
             // Загружаем индивидуальные громкости для всех голосов
@@ -370,7 +370,7 @@ const VoiceManagementPageContent = () => {
         
         setIsTestingVoice(true);
         try {
-            console.log('Testing voice with parameters:', {
+            // Testing voice with parameters:', {
                 name: currentVoice.name,
                 cfg_strength: currentVoice.cfg_strength,
                 speed_preset: currentVoice.speed_preset,
@@ -396,7 +396,7 @@ const VoiceManagementPageContent = () => {
                         fullAudioUrl = `${TTS_SERVICE_URL}${audioUrl}`;
                     }
                     
-                    console.log('Playing test audio:', fullAudioUrl);
+                    // Playing test audio:', fullAudioUrl);
                     const audio = new Audio(fullAudioUrl);
                     
                     // Применяем индивидуальную громкость для этого голоса
@@ -405,7 +405,7 @@ const VoiceManagementPageContent = () => {
                     
                     // Добавляем обработчики событий
                     audio.oncanplaythrough = () => {
-                        console.log('Test audio ready to play with volume:', audio.volume);
+                        // Test audio ready to play with volume:', audio.volume);
                         audio.play().catch(e => {
                             console.error("Test audio play failed:", e);
                             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось воспроизвести аудио.' });
@@ -413,7 +413,7 @@ const VoiceManagementPageContent = () => {
                     };
                     
                     audio.onended = () => {
-                        console.log('Test audio playback ended');
+                        // Test audio playback ended');
                     };
                     
                     audio.onerror = (e) => {
@@ -857,7 +857,7 @@ const VoiceManagementPageContent = () => {
                                                              value[0] === 1 ? 'slow' : 
                                                              value[0] === 2 ? 'normal' :
                                                              value[0] === 3 ? 'fast' : 'very_fast';
-                                                console.log('Speed preset changed to:', preset);
+                                                // Speed preset changed to:', preset);
                                                 setCurrentVoice(prev => ({ ...prev, speed_preset: preset }));
                                             }}
                                             className="mt-2"

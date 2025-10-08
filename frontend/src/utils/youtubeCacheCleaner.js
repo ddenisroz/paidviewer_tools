@@ -15,7 +15,7 @@ export const clearYouTubeCache = () => {
                 key.includes('youtube-') ||
                 key.includes('youtube_')) {
                 localStorage.removeItem(key);
-                console.log('Removed localStorage key:', key);
+                // Removed localStorage key:', key);
             }
         });
         
@@ -30,7 +30,7 @@ export const clearYouTubeCache = () => {
                 key.includes('youtube-') ||
                 key.includes('youtube_')) {
                 sessionStorage.removeItem(key);
-                console.log('Removed sessionStorage key:', key);
+                // Removed sessionStorage key:', key);
             }
         });
         
@@ -60,14 +60,14 @@ export const clearYouTubeCache = () => {
                     document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
                     document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=.youtube.com";
                     document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=.google.com";
-                    console.log('Removed cookie:', name);
+                    // Removed cookie:', name);
                 }
             });
         } catch (error) {
             console.warn('Error clearing cookies:', error);
         }
         
-        console.log('YouTube cache and cookies cleared successfully');
+        // YouTube cache and cookies cleared successfully');
         return true;
     } catch (error) {
         console.error('Error clearing YouTube cache:', error);

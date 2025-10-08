@@ -14,12 +14,12 @@ const AuthCallbackPage = () => {
 
     useEffect(() => {
         const token = searchParams.get('token');
-        console.log('🔑 Токен из URL:', token);
-        console.log('🔗 Платформа:', platform);
+        // 🔑 Токен из URL:', token);
+        // 🔗 Платформа:', platform);
 
         const handleCallback = async () => {
             if (token) {
-                console.log('✅ Токен найден, пытаемся авторизоваться...');
+                // ✅ Токен найден, пытаемся авторизоваться...');
                 await loginAndFetchUser(token);
                 // После успешного получения пользователя, перенаправляем на дашборд.
                 navigate('/dashboard', { replace: true });

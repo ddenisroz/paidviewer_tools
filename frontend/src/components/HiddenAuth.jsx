@@ -35,7 +35,7 @@ const HiddenAuth = () => {
                             
                             // Слушаем сообщения от popup окна
                             const handleMessage = (event) => {
-                                console.log('📨 Получено сообщение:', event.data, 'от origin:', event.origin);
+                                // 📨 Получено сообщение:', event.data, 'от origin:', event.origin);
                                 
                                 // Принимаем сообщения от localhost:8000 (бэкенд) или от текущего origin
                                 const allowedOrigins = [
@@ -45,12 +45,12 @@ const HiddenAuth = () => {
                                 ];
                                 
                                 if (!allowedOrigins.includes(event.origin)) {
-                                    console.log('❌ Сообщение от неразрешенного origin:', event.origin);
+                                    // ❌ Сообщение от неразрешенного origin:', event.origin);
                                     return;
                                 }
                                 
                                 if (event.data.type === 'TWITCH_AUTH_SUCCESS') {
-                                    console.log('✅ Авторизация Twitch успешна!');
+                                    // ✅ Авторизация Twitch успешна!');
                                     popup.close();
                                     window.removeEventListener('message', handleMessage);
                                     // Обновляем статус авторизации

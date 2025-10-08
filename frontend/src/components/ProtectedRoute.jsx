@@ -11,7 +11,7 @@ const ProtectedRoute = () => {
     useEffect(() => {
         const timer = setTimeout(() => {
             if (!hasLogged) {
-                console.log('🔒 ProtectedRoute проверка:', { token, loading, isAuthenticated });
+                // ProtectedRoute проверка
                 setHasLogged(true);
             }
         }, 1000);

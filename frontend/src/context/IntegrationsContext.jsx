@@ -60,13 +60,13 @@ export const IntegrationsProvider = ({ children }) => {
             // Отключить Twitch интеграцию
             try {
                 setIsLoading(true);
-                console.log('Disconnecting Twitch integration...');
+                // Disconnecting Twitch integration...');
                 const disconnectResponse = await botService.post('/api/integrations/twitch/disconnect');
-                console.log('Twitch disconnection response:', disconnectResponse.data);
-                console.log('Twitch disconnection successful, fetching integrations...');
+                // Twitch disconnection response:', disconnectResponse.data);
+                // Twitch disconnection successful, fetching integrations...');
                 // Обновляем только интеграции, не трогаем auth status
                 await fetchIntegrations(); 
-                console.log('Integrations updated, new state:', integrations);
+                // Integrations updated, new state:', integrations);
             } catch (error) {
                 console.error('Error disconnecting Twitch:', error);
             } finally {
@@ -83,13 +83,13 @@ export const IntegrationsProvider = ({ children }) => {
             // Отключить VK интеграцию
             try {
                 setIsLoading(true);
-                console.log('Disconnecting VK integration...');
+                // Disconnecting VK integration...');
                 const disconnectResponse = await botService.post('/api/integrations/vk/disconnect');
-                console.log('VK disconnection response:', disconnectResponse.data);
-                console.log('VK disconnection successful, fetching integrations...');
+                // VK disconnection response:', disconnectResponse.data);
+                // VK disconnection successful, fetching integrations...');
                 // Обновляем только интеграции, не трогаем auth status
                 await fetchIntegrations(); 
-                console.log('Integrations updated, new state:', integrations);
+                // Integrations updated, new state:', integrations);
             } catch (error) {
                 console.error('Error disconnecting VK:', error);
             } finally {

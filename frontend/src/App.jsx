@@ -35,7 +35,6 @@ const ObsTtsPage = lazy(() => import('./pages/tts/ObsTtsPage'));
 const ObsYoutubePage = lazy(() => import('./pages/tts/ObsYoutubePage'));
 const ChatObsPage = lazy(() => import('./pages/ChatObsPage'));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
-const SessionManagementPage = lazy(() => import('./pages/admin/SessionManagementPage'));
 const UserManagementPage = lazy(() => import('./pages/admin/UserManagementPage'));
 const BotManagementPage = lazy(() => import('./pages/admin/BotManagementPage'));
 const MonitoringPage = lazy(() => import('./pages/admin/MonitoringPage'));

@@ -23,7 +23,7 @@ const ObsTtsPage = () => {
 
             ws.current.onopen = () => {
                 setStatus(`Connection established. Waiting for TTS messages...`);
-                console.log('OBS TTS WebSocket Connected');
+                // OBS TTS WebSocket Connected');
             };
 
             ws.current.onmessage = (event) => {
@@ -35,7 +35,7 @@ const ObsTtsPage = () => {
                         if (!audioUrl.startsWith('http')) {
                             audioUrl = `${import.meta.env.VITE_TTS_SERVICE_URL || 'http://localhost:8001'}${message.audio_url}`;
                         }
-                        console.log('Received audio URL:', audioUrl);
+                        // Received audio URL:', audioUrl);
                         setAudioQueue(prevQueue => [...prevQueue, audioUrl]);
                     } else if (message.type === 'tts_error') {
                         console.error('TTS Error:', message.message);
@@ -56,7 +56,7 @@ const ObsTtsPage = () => {
 
             ws.current.onclose = () => {
                 setStatus('WebSocket Disconnected. Reconnecting in 5 seconds...');
-                console.log('WebSocket Disconnected. Reconnecting...');
+                // WebSocket Disconnected. Reconnecting...');
                 setTimeout(connect, 5000); // Attempt to reconnect every 5 seconds
             };
         };
@@ -73,14 +73,14 @@ const ObsTtsPage = () => {
     useEffect(() => {
         if (audioQueue.length > 0 && !isPlaying) {
             const nextAudioUrl = audioQueue[0];
-            console.log('Playing audio:', nextAudioUrl);
+            // Playing audio:', nextAudioUrl);
             setIsPlaying(true);
             
             const audio = new Audio(nextAudioUrl);
             
             // Добавляем обработчики событий перед попыткой воспроизведения
             audio.oncanplaythrough = () => {
-                console.log('Audio ready to play');
+                // Audio ready to play');
                 audio.play().catch(e => {
                     console.error("Audio play failed:", e);
                     setIsPlaying(false);
@@ -89,7 +89,7 @@ const ObsTtsPage = () => {
             };
             
             audio.onended = () => {
-                console.log('Audio playback ended');
+                // Audio playback ended');
                 setIsPlaying(false);
                 setAudioQueue(prevQueue => prevQueue.slice(1));
             };

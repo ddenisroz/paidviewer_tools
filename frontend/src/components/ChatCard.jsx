@@ -116,8 +116,8 @@ const ChatCard = ({ integrations }) => {
 
     // Логирование для отладки
     useEffect(() => {
-        console.log('💬 ChatCard - Total messages:', chatMessages.length, 'Filtered:', filteredMessages.length);
-        console.log('💬 ChatCard - Messages array:', chatMessages.slice(0, 3));
+        // 💬 ChatCard - Total messages:', chatMessages.length, 'Filtered:', filteredMessages.length);
+        // 💬 ChatCard - Messages array:', chatMessages.slice(0, 3));
     }, [chatMessages, filteredMessages]);
 
     // Автоскролл к последнему сообщению (только для отдельного окна)
@@ -141,9 +141,9 @@ const ChatCard = ({ integrations }) => {
 
     const loadEmotes = async () => {
         try {
-            console.log('🎭 Loading 7TV emotes for channel:', user.twitch_name);
+            // 🎭 Loading 7TV emotes for channel:', user.twitch_name);
             const emotesData = await getAllEmotesForChannel(user.twitch_name);
-            console.log('🎭 Loaded emotes:', emotesData);
+            // 🎭 Loaded emotes:', emotesData);
             setEmotes(emotesData);
         } catch (error) {
             console.error('Error loading emotes:', error);
@@ -509,7 +509,7 @@ const ChatCard = ({ integrations }) => {
             channelName = platform === 'twitch' ? user?.twitch_name : user?.vk_username;
         }
         
-        console.log('Context menu action:', { action, username, platform, channelName, msg });
+        // Context menu action:', { action, username, platform, channelName, msg });
         
         if (!channelName) {
             console.error('Channel name not found:', { platform, user });
@@ -715,7 +715,7 @@ const ChatCard = ({ integrations }) => {
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
             // Обработка сообщений
-            console.log(data);
+            // data
         };
     </script>
 </body>

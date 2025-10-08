@@ -52,10 +52,10 @@ export const AuthProvider = ({ children }) => {
             // Вызываем endpoint для очистки legacy сессий
             botService.post('/api/sessions/clear-legacy')
                 .then(() => {
-                    console.log('✅ Legacy sessions cleared');
+                    // Legacy sessions cleared
                 })
                 .catch((error) => {
-                    console.log('Legacy sessions cleanup skipped:', error.message);
+                    // Legacy sessions cleanup skipped
                 });
         }
     }, [isAuthenticated, user?.id]);
@@ -105,7 +105,6 @@ export const AuthProvider = ({ children }) => {
 
     const setGuestMode = async (guestData) => {
         try {
-            console.log('Setting guest mode with data:', guestData);
             // Устанавливаем гостевой режим
             setIsAuthenticated(true);
             setUser({
@@ -118,7 +117,6 @@ export const AuthProvider = ({ children }) => {
             });
             
             // Можно добавить дополнительную логику для гостевого режима
-            console.log('Guest mode set successfully');
         } catch (error) {
             console.error('Failed to set guest mode:', error);
             throw error;

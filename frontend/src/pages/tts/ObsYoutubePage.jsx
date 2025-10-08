@@ -24,14 +24,14 @@ const ObsYoutubePage = () => {
         ws.current = new WebSocket(wsUrl);
 
         ws.current.onopen = () => {
-            console.log('YouTube OBS WebSocket connected');
+            // YouTube OBS WebSocket connected');
             setStatus('Подключено к YouTube OBS');
         };
 
         ws.current.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
-                console.log('YouTube OBS message received:', data);
+                // YouTube OBS message received:', data);
 
                 switch (data.type) {
                     case 'youtube_play':
@@ -62,7 +62,7 @@ const ObsYoutubePage = () => {
                         setIsPlaying(false);
                         break;
                     default:
-                        console.log('Unknown YouTube OBS message type:', data.type);
+                        // Unknown YouTube OBS message type:', data.type);
                 }
             } catch (error) {
                 console.error('Error parsing YouTube OBS WebSocket message:', error);
@@ -70,7 +70,7 @@ const ObsYoutubePage = () => {
         };
 
         ws.current.onclose = () => {
-            console.log('YouTube OBS WebSocket disconnected');
+            // YouTube OBS WebSocket disconnected');
             setStatus('Отключено от YouTube OBS');
         };
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,16 +55,10 @@ const VoiceManagement = () => {
 
     // Функция для переключения раздела
     const toggleSection = (sectionType) => {
-        console.log('toggleSection called with:', sectionType);
-        console.log('Current expandedSections:', expandedSections);
-        setExpandedSections(prev => {
-            const newState = {
-                ...prev,
-                [sectionType]: !prev[sectionType]
-            };
-            console.log('New state will be:', newState);
-            return newState;
-        });
+        setExpandedSections(prev => ({
+            ...prev,
+            [sectionType]: !prev[sectionType]
+        }));
     };
 
     const loadVoices = useCallback(async () => {
@@ -97,9 +91,7 @@ const VoiceManagement = () => {
         
         try {
             setUsersLoading(true);
-            console.log('Loading users...');
             const response = await getUsers();
-            console.log('Users response:', response);
             
             // Проверяем разные форматы ответа
             let usersData = [];
@@ -111,7 +103,6 @@ const VoiceManagement = () => {
                 usersData = response.users;
             }
             
-            console.log('Parsed users data:', usersData);
             setUsers(usersData);
         } catch (error) {
             console.error('Error loading users:', error);
@@ -337,14 +328,6 @@ const VoiceManagement = () => {
 
         setIsTestingVoice(true);
         try {
-            console.log('Testing voice with params:', {
-                voiceName: currentVoice.name,
-                userId: user.id,
-                testText,
-                testCfgStrength,
-                testSpeedPreset
-            });
-
             // Используем текущие значения ползунков для тестирования
             const response = await testVoice(
                 currentVoice.name,
@@ -354,29 +337,24 @@ const VoiceManagement = () => {
                 testSpeedPreset
             );
             
-            console.log('Test voice response:', response);
-            
             // Получаем URL аудио из ответа
             const audioUrl = response.data?.audio_url || response.audio_url;
             if (audioUrl) {
                 // Создаем полный URL
                 const fullAudioUrl = audioUrl.startsWith('http') ? audioUrl : `http://localhost:8001${audioUrl}`;
-                console.log('Playing audio from URL:', fullAudioUrl);
                 
                 const audio = new Audio(fullAudioUrl);
                 
                 // Обработчики событий
                 audio.onloadstart = () => {
-                    console.log('Audio loading started');
+                    // Audio loading started
                 };
                 
                 audio.oncanplay = () => {
-                    console.log('Audio can play - attempting to play');
                     setIsTestingVoice(false);
                     
                     // Автоматически воспроизводим когда аудио готово
                     audio.play().then(() => {
-                        console.log('Audio playing successfully');
                         setIsPlaying(true);
                         addToast({ type: 'success', title: 'Успех', message: 'Аудио воспроизводится!' });
                     }).catch((playError) => {
@@ -387,16 +365,13 @@ const VoiceManagement = () => {
                 };
                 
                 audio.oncanplaythrough = () => {
-                    console.log('Audio can play through');
                     setIsTestingVoice(false);
                 };
                 
                 audio.onloadeddata = () => {
-                    console.log('Audio data loaded - attempting to play');
-                    
                     // Пытаемся воспроизвести когда данные загружены
                     audio.play().then(() => {
-                        console.log('Audio playing successfully (onloadeddata)');
+                        // Audio playing successfully
                     }).catch((playError) => {
                         console.error('Play error (onloadeddata):', playError);
                     });
@@ -409,18 +384,15 @@ const VoiceManagement = () => {
                 };
                 
                 audio.onabort = () => {
-                    console.log('Audio aborted');
                     setIsTestingVoice(false);
                     setIsPlaying(false);
                 };
                 
                 audio.onended = () => {
-                    console.log('Audio ended');
                     setIsPlaying(false);
                 };
                 
                 audio.onpause = () => {
-                    console.log('Audio paused');
                     setIsPlaying(false);
                 };
                 
@@ -428,7 +400,7 @@ const VoiceManagement = () => {
                 setTimeout(() => {
                     if (audio.readyState >= 2) { // HAVE_CURRENT_DATA
                         audio.play().then(() => {
-                            console.log('Audio playing successfully (delayed)');
+                            // Audio playing successfully (delayed)
                         }).catch((playError) => {
                             console.error('Delayed play error:', playError);
                         });

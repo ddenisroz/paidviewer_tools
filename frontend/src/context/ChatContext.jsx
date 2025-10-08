@@ -21,12 +21,12 @@ const messagesReducer = (state, action) => {
             );
             
             if (isDuplicate) {
-                console.log('⚠️ Duplicate message detected, skipping:', action.payload);
+                // ⚠️ Duplicate message detected, skipping:', action.payload);
                 return state;
             }
             
             const newMessages = [action.payload, ...state.slice(0, 199)];
-            console.log('📝 Reducer: New messages array length:', newMessages.length);
+            // 📝 Reducer: New messages array length:', newMessages.length);
             return newMessages;
             
         case 'CLEAR_MESSAGES':
@@ -62,9 +62,9 @@ export const ChatProvider = ({ children }) => {
     
     // Отслеживаем изменения messages для отладки
     useEffect(() => {
-        console.log('🔄 Messages state changed:', messages.length, 'messages');
+        // 🔄 Messages state changed:', messages.length, 'messages');
         if (messages.length > 0) {
-            console.log('📋 Latest message:', messages[0]);
+            // 📋 Latest message:', messages[0]);
         }
     }, [messages]);
     
@@ -80,12 +80,12 @@ export const ChatProvider = ({ children }) => {
                 fullAudioUrl = `${ttsServiceUrl}${audioUrl}`;
             }
             
-            console.log('Playing TTS audio:', fullAudioUrl);
+            // Playing TTS audio:', fullAudioUrl);
             const audio = new Audio(fullAudioUrl);
             
             // Добавляем обработчики событий
             audio.oncanplaythrough = () => {
-                console.log('TTS audio ready to play');
+                // TTS audio ready to play');
                 audio.play().catch(e => {
                     console.error("TTS audio play failed:", e);
                     addToast({
@@ -97,7 +97,7 @@ export const ChatProvider = ({ children }) => {
             };
             
             audio.onended = () => {
-                console.log('TTS audio playback ended');
+                // TTS audio playback ended');
             };
             
             audio.onerror = (e) => {
@@ -137,33 +137,33 @@ export const ChatProvider = ({ children }) => {
     const setupWebSocket = useCallback(() => {
         // WebSocket только для авторизованных пользователей (не гостей)
         if (!isAuthenticated || !user?.id || user?.id === 'guest') {
-            console.log('WebSocket setup skipped:', { isAuthenticated, userId: user?.id });
+            // WebSocket setup skipped:', { isAuthenticated, userId: user?.id });
             return;
         }
 
         // Если уже есть активное соединение, не создаем новое
         if (websocket.current && websocket.current.readyState === WebSocket.OPEN) {
-            console.log('WebSocket already connected, skipping setup');
+            // WebSocket already connected, skipping setup');
             return;
         }
 
         // Если соединение в процессе установки, ждем
         if (websocket.current && websocket.current.readyState === WebSocket.CONNECTING) {
-            console.log('WebSocket is connecting, skipping setup');
+            // WebSocket is connecting, skipping setup');
             return;
         }
 
         const baseWsUrl = import.meta.env.VITE_BOT_WS_URL || 'ws://localhost:8000/ws';
         const wsUrl = `${baseWsUrl}/chat/${user.id}`;
         
-        console.log('🔌 Setting up WebSocket connection to:', wsUrl);
+        // 🔌 Setting up WebSocket connection to:', wsUrl);
         setIsConnecting(true);
         
         const ws = new WebSocket(wsUrl);
         websocket.current = ws;
 
         ws.onopen = () => {
-            console.log('✅ WebSocket connected successfully to:', wsUrl);
+            // ✅ WebSocket connected successfully to:', wsUrl);
             setIsConnected(true);
             setIsConnecting(false);
             setError(null);
@@ -182,14 +182,14 @@ export const ChatProvider = ({ children }) => {
         };
 
         ws.onmessage = (event) => {
-            console.log('🔔 WebSocket message received:', event.data);
+            // 🔔 WebSocket message received:', event.data);
             const messageData = JSON.parse(event.data);
-            console.log('📦 Parsed message data:', messageData);
+            // 📦 Parsed message data:', messageData);
             setLastJsonMessage(messageData); // <-- Добавлено: сохраняем все сообщение
             
             // Обрабатываем YouTube события
             if (messageData.type === 'youtube_event') {
-                console.log('YouTube event received:', messageData);
+                // YouTube event received:', messageData);
                 // Создаем кастомное событие для YouTube компонентов
                 window.dispatchEvent(new CustomEvent('youtubeEvent', {
                     detail: messageData
@@ -199,7 +199,7 @@ export const ChatProvider = ({ children }) => {
             
             // Обрабатываем TTS аудио
             if (messageData.type === 'tts_synthesized' && messageData.audio_url) {
-                console.log('TTS Audio received:', messageData.audio_url);
+                // TTS Audio received:', messageData.audio_url);
                 playTtsAudio(messageData.audio_url);
                 return;
             }
@@ -217,22 +217,22 @@ export const ChatProvider = ({ children }) => {
             }
             
             // Фильтруем и добавляем только сообщения чата
-            console.log('🔍 Checking message type:', messageData.type, 'Condition:', messageData.type === 'chat_message' || !messageData.type);
+            // 🔍 Checking message type:', messageData.type, 'Condition:', messageData.type === 'chat_message' || !messageData.type);
             if (messageData.type === 'chat_message' || !messageData.type) {
                  // Добавляем уникальный ID на фронтенде для React key
                 messageData.id = Date.now() + Math.random();
-                console.log('📩 Chat message received:', {
+                // 📩 Chat message received:', {
                     platform: messageData.platform,
                     author: messageData.author_name || messageData.author,
                     content: messageData.content || messageData.message
                 });
-                console.log('🔄 About to dispatch ADD_MESSAGE...');
-                console.log('📝 Dispatching ADD_MESSAGE action');
+                // 🔄 About to dispatch ADD_MESSAGE...');
+                // 📝 Dispatching ADD_MESSAGE action');
                 dispatchMessages({
                     type: 'ADD_MESSAGE',
                     payload: messageData
                 });
-                console.log('✅ ADD_MESSAGE dispatched successfully');
+                // ✅ ADD_MESSAGE dispatched successfully');
                 
                 // useReducer автоматически обновляет состояние
             } else {
@@ -241,14 +241,14 @@ export const ChatProvider = ({ children }) => {
         };
 
         ws.onerror = (err) => {
-            console.log("WebSocket connection error (это нормально, если сервер недоступен):", err.type || 'connection_failed');
+            // WebSocket connection error
             setIsConnecting(false);
             // Убираем error toast, чтобы не раздражать пользователя постоянными уведомлениями
             // setError("Ошибка WebSocket соединения. Попробуйте обновить страницу.");
         };
 
         ws.onclose = (event) => {
-            console.log("WebSocket closed:", event.code, event.reason);
+            // WebSocket closed
             
             // Очищаем ping интервал
             if (ws.pingInterval) {
@@ -262,14 +262,14 @@ export const ChatProvider = ({ children }) => {
             // Попытка переподключения только если это не было намеренное закрытие
             // и пользователь все еще аутентифицирован
             if (event.code !== 1000 && isAuthenticated && user?.id && user?.id !== 'guest') {
-                console.log("Attempting to reconnect WebSocket in 3 seconds...");
+                // Attempting to reconnect WebSocket
                 setTimeout(() => {
                     if (!websocket.current && isAuthenticated && user?.id && user?.id !== 'guest') {
                         setupWebSocket();
                     }
                 }, 3000);
             } else if (event.code === 1000) {
-                console.log("WebSocket closed normally (code 1000)");
+                // WebSocket closed normally
             }
         };
 
@@ -327,7 +327,7 @@ export const ChatProvider = ({ children }) => {
     // Функция для закрытия WebSocket соединения
     const closeWebSocket = useCallback(() => {
         if (websocket.current) {
-            console.log('🔌 Closing WebSocket connection');
+            // 🔌 Closing WebSocket connection');
             
             // Очищаем ping интервал
             if (websocket.current.pingInterval) {
@@ -353,21 +353,21 @@ export const ChatProvider = ({ children }) => {
     useEffect(() => {
         // Не делаем ничего, пока идет проверка авторизации
         if (isLoading) {
-            console.log('⏳ Waiting for auth to complete...');
+            // ⏳ Waiting for auth to complete...');
             return;
         }
 
         if (isAuthenticated && user?.id && user?.id !== 'guest') {
-            console.log('👤 User authenticated, setting up WebSocket');
+            // 👤 User authenticated, setting up WebSocket');
             setupWebSocket();
         } else {
-            console.log('🚪 User not authenticated or is guest, closing WebSocket');
+            // 🚪 User not authenticated or is guest, closing WebSocket');
             closeWebSocket();
             dispatchMessages({ type: 'CLEAR_MESSAGES' });
         }
 
         return () => {
-            console.log('🧹 Cleaning up WebSocket on unmount');
+            // 🧹 Cleaning up WebSocket on unmount');
             closeWebSocket();
         };
     }, [isAuthenticated, user?.id, isLoading, setupWebSocket, closeWebSocket]);

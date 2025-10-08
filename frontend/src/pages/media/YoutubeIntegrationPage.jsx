@@ -163,7 +163,7 @@ const YoutubeIntegrationPage = () => {
     useEffect(() => {
         if (lastJsonMessage) {
             if (lastJsonMessage.type === 'youtube_queue_update') {
-                console.log("Received youtube_queue_update from WebSocket, reloading queue...");
+                // Received youtube_queue_update from WebSocket, reloading queue
                 toast.info("Очередь видео обновлена!");
             }
         }

@@ -188,7 +188,7 @@ export const deleteUserVoice = async (voiceId, userId) => {
 
 // Common
 export const testVoice = async (voiceName, userId, testText = "Ну так я гетеро, че мне пидоров бояться!", cfgStrength = null, speedPreset = null) => {
-    console.log('📤 testVoice called with:', { voiceName, userId, cfgStrength, speedPreset });
+    // 📤 testVoice called with:', { voiceName, userId, cfgStrength, speedPreset });
     
     const formData = new FormData();
     formData.append('voice_name', voiceName);
@@ -196,16 +196,16 @@ export const testVoice = async (voiceName, userId, testText = "Ну так я г
     formData.append('test_text', testText);
     if (cfgStrength !== null) {
         formData.append('cfg_strength', cfgStrength);
-        console.log('  ✅ Added cfg_strength to FormData:', cfgStrength);
+        //   ✅ Added cfg_strength to FormData:', cfgStrength);
     }
     if (speedPreset !== null) {
         formData.append('speed_preset', speedPreset);
-        console.log('  ✅ Added speed_preset to FormData:', speedPreset);
+        //   ✅ Added speed_preset to FormData:', speedPreset);
     }
     
     // Логируем содержимое FormData
     for (let [key, value] of formData.entries()) {
-        console.log(`  FormData[${key}] =`, value);
+        // FormData entry
     }
     
     return await botService.post('/api/voices/test', formData, {

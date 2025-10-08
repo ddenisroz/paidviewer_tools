@@ -22,7 +22,7 @@ class WidgetWebSocket {
             this.ws = new WebSocket(this.url);
             
             this.ws.onopen = () => {
-                console.log('WebSocket connected');
+                // WebSocket connected');
                 this.isConnected = true;
                 this.reconnectAttempts = 0;
                 this.emit('connected');
@@ -38,7 +38,7 @@ class WidgetWebSocket {
             };
             
             this.ws.onclose = () => {
-                console.log('WebSocket disconnected');
+                // WebSocket disconnected');
                 this.isConnected = false;
                 this.emit('disconnected');
                 this.handleReconnect();
@@ -58,7 +58,7 @@ class WidgetWebSocket {
     handleReconnect() {
         if (this.reconnectAttempts < this.options.maxReconnectAttempts) {
             this.reconnectAttempts++;
-            console.log(`Reconnecting... (attempt ${this.reconnectAttempts})`);
+            // Reconnecting...
             
             setTimeout(() => {
                 this.connect();

@@ -49,7 +49,7 @@ class ChatWidget {
                 return data.config;
             }
         } catch (error) {
-            console.log('Using default config');
+            // Using default config');
         }
         
         return this.getDefaultConfig();
@@ -125,7 +125,7 @@ class ChatWidget {
         this.ws = new WebSocket(wsUrl);
         
         this.ws.onopen = () => {
-            console.log('Chat widget connected');
+            // Chat widget connected');
             this.isConnected = true;
         };
         
@@ -141,7 +141,7 @@ class ChatWidget {
         };
         
         this.ws.onclose = () => {
-            console.log('Chat widget disconnected, reconnecting...');
+            // Chat widget disconnected, reconnecting...');
             this.isConnected = false;
             setTimeout(() => this.connectWebSocket(), 5000);
         };

@@ -52,7 +52,7 @@ class LootboxWidget {
                 return data.config;
             }
         } catch (error) {
-            console.log('Using default config');
+            // Using default config');
         }
         
         return this.getDefaultConfig();
@@ -101,11 +101,11 @@ class LootboxWidget {
         });
         
         this.ws.on('connected', () => {
-            console.log('Lootbox widget connected');
+            // Lootbox widget connected');
         });
         
         this.ws.on('disconnected', () => {
-            console.log('Lootbox widget disconnected');
+            // Lootbox widget disconnected');
         });
     }
     
@@ -275,7 +275,7 @@ class LootboxWidget {
         };
         
         audio.src = soundMap[rarity] || soundMap.common;
-        audio.play().catch(e => console.log('Audio play failed:', e));
+        audio.play().catch(e => // Audio play failed:', e));
     }
     
     hideWidget() {

@@ -23,7 +23,6 @@ export const TtsProvider = ({ children }) => {
 
     // Функция для регистрации callback уведомлений
     const setNotificationHandler = useCallback((callback) => {
-        console.log('TtsContext: setNotificationHandler called with callback:', !!callback);
         if (callback) {
             setNotificationCallback(() => callback);
         }
@@ -40,7 +39,6 @@ export const TtsProvider = ({ children }) => {
     // Дополнительная инициализация при появлении пользователя
     useEffect(() => {
         if (isInitialized && engineStatus.loaded && user) {
-            console.log('TtsContext: User appeared, checking TTS status...');
             // Вызываем функции напрямую, без зависимости
             const initUserTts = async () => {
                 try {
@@ -72,23 +70,18 @@ export const TtsProvider = ({ children }) => {
 
     const checkEngineStatus = useCallback(async () => {
         try {
-            console.log('TtsContext: Checking engine status...');
             const response = await getTtsHealth();
-            console.log('TtsContext: Engine status response:', response);
             
             // Проверяем и статус, и готовность движка
             if (response.status === 'healthy' && response.tts_engine_loaded) {
-                console.log('TtsContext: Engine loaded successfully');
                 setEngineStatus({ loaded: true, error: null });
             } else {
-                console.log('TtsContext: Engine not ready, status:', response.status, 'loaded:', response.tts_engine_loaded);
                 const errorMsg = response.status !== 'healthy' 
                     ? "TTS сервис недоступен" 
                     : "TTS движок не готов";
                 setEngineStatus({ loaded: false, error: errorMsg });
             }
         } catch (error) {
-            console.log('TtsContext: Engine check failed:', error);
             setEngineStatus({ loaded: false, error: "Не удается подключиться к TTS сервису" });
             console.error("TTS Health check failed:", error);
         }
@@ -162,7 +155,6 @@ export const TtsProvider = ({ children }) => {
     const toggleTts = useCallback(async (event = null) => {
         // Предотвращаем множественные вызовы
         if (isToggling) {
-            console.log('TtsContext: Toggle already in progress, ignoring');
             return;
         }
         
@@ -170,8 +162,8 @@ export const TtsProvider = ({ children }) => {
         
         try {
             if (!engineStatus.loaded) {
-                console.log('TtsContext: TTS engine not loaded, notificationCallback:', !!notificationCallback);
-                console.log('TtsContext: Engine status:', engineStatus);
+                // TtsContext: TTS engine not loaded, notificationCallback:', !!notificationCallback);
+                // TtsContext: Engine status:', engineStatus);
                 // Показываем более точное сообщение об ошибке
                 const errorMessage = engineStatus.error || "TTS движок не готов. Попробуйте обновить страницу.";
                 if (notificationCallback) {
@@ -184,13 +176,13 @@ export const TtsProvider = ({ children }) => {
             }
 
             if (!isWhitelisted) {
-                console.log('TtsContext: Channel not whitelisted, notificationCallback:', !!notificationCallback);
+                // TtsContext: Channel not whitelisted, notificationCallback:', !!notificationCallback);
                 const message = "Ваш канал не в белом списке для использования TTS.";
                 if (notificationCallback) {
-                    console.log('TtsContext: Using notification callback for whitelist');
+                    // TtsContext: Using notification callback for whitelist');
                     notificationCallback(message);
                 } else {
-                    console.log('TtsContext: Using fallback notification for whitelist');
+                    // TtsContext: Using fallback notification for whitelist');
                     const position = getButtonPosition(event);
                     // showNotification(message, 'warning', 4000, position); // This line was removed from imports
                 }
@@ -237,17 +229,17 @@ export const TtsProvider = ({ children }) => {
 
     // Функция для инициализации TTS (вызывается только при переходе на TTS страницы)
     const initializeTts = useCallback(async () => {
-        console.log('TtsContext: initializeTts called, isInitialized:', isInitialized, 'engine status:', engineStatus);
+        // TtsContext: initializeTts called, isInitialized:', isInitialized, 'engine status:', engineStatus);
         
         // Если уже инициализирован, не делаем повторную инициализацию
         if (isInitialized) {
-            console.log('TtsContext: Already initialized, skipping...');
+            // TtsContext: Already initialized, skipping...');
             return;
         }
         
         // Проверяем статус TTS только если есть пользователь
         if (engineStatus.loaded && user) {
-            console.log('TtsContext: Engine loaded and user exists, checking TTS status...');
+            // TtsContext: Engine loaded and user exists, checking TTS status...');
             try {
                 // Проверяем статус TTS
                 const channelName = user?.isGuest ? user.username : null;
