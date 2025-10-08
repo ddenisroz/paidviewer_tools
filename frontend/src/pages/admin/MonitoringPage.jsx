@@ -42,28 +42,61 @@ const MonitoringPage = () => {
         try {
             setLoading(true);
             
-            // Заглушки для мониторинга (endpoints не реализованы)
-            const mockData = {
-                uptime: 3600, // 1 час
-                cpu_percent: 15.5,
-                memory_bytes: 256 * 1024 * 1024, // 256 MB
-                num_threads: 8,
-                num_fds: 32,
-                num_connections: 5,
-                system_cpu_percent: 25.3,
-                system_memory_used: 4 * 1024 * 1024 * 1024, // 4 GB
-                system_memory_total: 16 * 1024 * 1024 * 1024, // 16 GB
-                system_memory_percent: 25.0,
-                disk_used: 50 * 1024 * 1024 * 1024, // 50 GB
-                disk_total: 500 * 1024 * 1024 * 1024, // 500 GB
-                disk_percent: 10.0,
-                gpu_percent: 0,
-                gpu_memory_bytes: 0,
-                gpu_temperature: 0,
-            };
-
-            setBotStats(mockData);
-            setTtsStats(mockData);
+            // Загружаем реальные данные мониторинга
+            const [botResponse, ttsResponse] = await Promise.allSettled([
+                botService.get('/api/admin/monitoring/current'),
+                ttsService.get('/api/monitoring/current')
+            ]);
+            
+            if (botResponse.status === 'fulfilled') {
+                setBotStats(botResponse.value.data);
+            } else {
+                console.error('Bot monitoring error:', botResponse.reason);
+                setBotStats({
+                    uptime: 0,
+                    cpu_percent: 0,
+                    memory_bytes: 0,
+                    num_threads: 0,
+                    num_fds: 0,
+                    num_connections: 0,
+                    system_cpu_percent: 0,
+                    system_memory_used: 0,
+                    system_memory_total: 0,
+                    system_memory_percent: 0,
+                    disk_used: 0,
+                    disk_total: 0,
+                    disk_percent: 0,
+                    gpu_percent: 0,
+                    gpu_memory_bytes: 0,
+                    gpu_temperature: 0,
+                    status: 'error'
+                });
+            }
+            
+            if (ttsResponse.status === 'fulfilled') {
+                setTtsStats(ttsResponse.value.data);
+            } else {
+                console.error('TTS monitoring error:', ttsResponse.reason);
+                setTtsStats({
+                    uptime: 0,
+                    cpu_percent: 0,
+                    memory_bytes: 0,
+                    num_threads: 0,
+                    num_fds: 0,
+                    num_connections: 0,
+                    system_cpu_percent: 0,
+                    system_memory_used: 0,
+                    system_memory_total: 0,
+                    system_memory_percent: 0,
+                    disk_used: 0,
+                    disk_total: 0,
+                    disk_percent: 0,
+                    gpu_percent: 0,
+                    gpu_memory_bytes: 0,
+                    gpu_temperature: 0,
+                    status: 'error'
+                });
+            }
             
         } catch (error) {
             console.error('Error loading monitoring data:', error);
@@ -75,19 +108,21 @@ const MonitoringPage = () => {
 
     const loadDatabaseStats = async () => {
         try {
-            // Заглушка для статистики БД (endpoint не реализован)
-            const mockDbStats = {
-                total_users: 42,
-                total_sessions: 15,
-                total_voices: 8,
-                total_channels: 25,
-                database_size_mb: 12.5,
-                last_cleanup: new Date().toISOString(),
-            };
-            setDbStats(mockDbStats);
+            const response = await botService.get('/api/database/stats');
+            setDbStats(response.data);
         } catch (error) {
             console.error('Error loading database stats:', error);
             toast.error('Ошибка загрузки статистики базы данных');
+            // Fallback данные при ошибке
+            setDbStats({
+                total_users: 0,
+                total_sessions: 0,
+                total_voices: 0,
+                total_channels: 0,
+                database_size_mb: 0,
+                last_cleanup: null,
+                status: 'error'
+            });
         }
     };
 
@@ -151,11 +186,11 @@ const MonitoringPage = () => {
     };
 
     const CompactMetricCard = ({ title, value, unit = '', icon: Icon, color }) => (
-        <div className="flex items-center space-x-2 p-2 bg-white dark:bg-gray-800/50 rounded border border-gray-200 dark:border-gray-700">
+        <div className="flex items-center space-x-2 p-2 bg-slate-700/50 rounded border border-slate-600">
             <Icon className={`w-4 h-4 ${color}`} />
             <div className="flex-1 min-w-0">
-                <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{title}</div>
-                <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                <div className="text-xs text-slate-400 truncate">{title}</div>
+                <div className="text-sm font-medium text-white truncate">
                     {value}{unit}
                 </div>
             </div>
@@ -165,8 +200,8 @@ const MonitoringPage = () => {
     const ServiceCard = ({ title, stats, color }) => {
         if (!stats) {
             return (
-                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                    <div className="text-center text-gray-500 dark:text-gray-400 text-sm">
+                <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                    <div className="text-center text-slate-400 text-sm">
                         Нет данных для {title}
                     </div>
                 </div>
@@ -174,13 +209,13 @@ const MonitoringPage = () => {
         }
 
         return (
-            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-2">
                         <div className={`w-2 h-2 rounded-full ${color}`}></div>
-                        <span className="font-medium text-gray-900 dark:text-white text-sm">{title}</span>
+                        <span className="font-medium text-white text-sm">{title}</span>
                     </div>
-                    <Badge variant="outline" className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600">
+                    <Badge variant="outline" className="text-xs bg-slate-700 text-slate-300 border-slate-600">
                         {formatUptime(stats.uptime)}
                     </Badge>
                 </div>
@@ -191,51 +226,51 @@ const MonitoringPage = () => {
                         value={stats.cpu_percent?.toFixed(1)}
                         unit="%"
                         icon={Cpu}
-                        color="text-orange-600"
+                        color="text-orange-400"
                     />
                     <CompactMetricCard
                         title="Память"
                         value={formatBytes(stats.memory_bytes)}
                         icon={MemoryStick}
-                        color="text-blue-600"
+                        color="text-blue-400"
                     />
                     <CompactMetricCard
                         title="Потоки"
                         value={stats.num_threads}
                         icon={Activity}
-                        color="text-green-600"
+                        color="text-green-400"
                     />
                     <CompactMetricCard
                         title="Файлы"
                         value={stats.num_fds}
                         icon={HardDrive}
-                        color="text-purple-600"
+                        color="text-purple-400"
                     />
                 </div>
                 
                 {/* GPU метрики для TTS */}
                 {stats.gpu_percent !== undefined && (
-                    <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <div className="mt-2 pt-2 border-t border-slate-600">
                         <div className="grid grid-cols-3 gap-2">
                             <CompactMetricCard
                                 title="GPU"
                                 value={stats.gpu_percent?.toFixed(1)}
                                 unit="%"
                                 icon={Thermometer}
-                                color="text-red-600"
+                                color="text-red-400"
                             />
                             <CompactMetricCard
                                 title="GPU память"
                                 value={formatBytes(stats.gpu_memory_bytes)}
                                 icon={MemoryStick}
-                                color="text-red-600"
+                                color="text-red-400"
                             />
                             <CompactMetricCard
                                 title="GPU темп."
                                 value={stats.gpu_temperature?.toFixed(0)}
                                 unit="°C"
                                 icon={Thermometer}
-                                color="text-red-600"
+                                color="text-red-400"
                             />
                         </div>
                     </div>
@@ -248,29 +283,29 @@ const MonitoringPage = () => {
         <div className="container mx-auto p-6 space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Мониторинг ресурсов</h1>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Отслеживание использования CPU, памяти и других ресурсов</p>
+                    <h1 className="text-2xl font-bold text-white">Мониторинг ресурсов</h1>
+                    <p className="text-sm text-slate-400">Отслеживание использования CPU, памяти и других ресурсов</p>
                 </div>
                 
                 <div className="flex items-center space-x-3">
                     <div className="flex items-center space-x-2">
-                        <label className="text-xs text-gray-600 dark:text-gray-400">Автообновление:</label>
+                        <label className="text-xs text-slate-400">Автообновление:</label>
                         <Button
                             variant={autoRefresh ? "default" : "outline"}
                             size="sm"
                             onClick={() => setAutoRefresh(!autoRefresh)}
-                            className="text-xs h-7"
+                            className={`text-xs h-7 ${autoRefresh ? 'bg-purple-600 hover:bg-purple-700' : 'border-slate-600 text-slate-300 hover:bg-slate-700'}`}
                         >
                             {autoRefresh ? "Вкл" : "Выкл"}
                         </Button>
                     </div>
                     
                     <div className="flex items-center space-x-2">
-                        <label className="text-xs text-gray-600 dark:text-gray-400">Интервал:</label>
+                        <label className="text-xs text-slate-400">Интервал:</label>
                         <select
                             value={refreshInterval}
                             onChange={(e) => setRefreshInterval(Number(e.target.value))}
-                            className="px-2 py-1 border rounded text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600 h-7"
+                            className="px-2 py-1 border rounded text-xs bg-slate-700 text-white border-slate-600 h-7"
                             disabled={!autoRefresh}
                         >
                             <option value={2}>2 сек</option>
@@ -284,7 +319,7 @@ const MonitoringPage = () => {
                         onClick={loadMonitoringData}
                         disabled={loading}
                         size="sm"
-                        className="h-7 text-xs"
+                        className="h-7 text-xs bg-purple-600 hover:bg-purple-700"
                     >
                         {loading ? (
                             <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
@@ -299,8 +334,8 @@ const MonitoringPage = () => {
             {loading && !botStats && !ttsStats ? (
                 <div className="flex items-center justify-center h-32">
                     <div className="text-center">
-                        <RefreshCw className="w-6 h-6 animate-spin text-blue-500 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Загрузка данных мониторинга...</p>
+                        <RefreshCw className="w-6 h-6 animate-spin text-purple-500 mx-auto mb-2" />
+                        <p className="text-sm text-slate-400">Загрузка данных мониторинга...</p>
                     </div>
                 </div>
             ) : (
@@ -308,72 +343,72 @@ const MonitoringPage = () => {
                     <ServiceCard
                         title="Bot Service"
                         stats={botStats}
-                        color="bg-blue-500"
+                        color="bg-purple-500"
                     />
                     
                     <ServiceCard
                         title="TTS Service"
                         stats={ttsStats}
-                        color="bg-green-500"
+                        color="bg-purple-500"
                     />
                     
                     {/* Сравнительная таблица */}
-                    <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                        <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Сравнение сервисов</h3>
+                    <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                        <h3 className="text-sm font-medium text-white mb-3">Сравнение сервисов</h3>
                         <div className="overflow-x-auto">
                             <table className="w-full text-xs">
                                 <thead>
-                                    <tr className="border-b border-gray-200 dark:border-gray-700">
-                                        <th className="text-left py-1 text-gray-700 dark:text-gray-300">Метрика</th>
-                                        <th className="text-right py-1 text-gray-700 dark:text-gray-300">Bot Service</th>
-                                        <th className="text-right py-1 text-gray-700 dark:text-gray-300">TTS Service</th>
-                                        <th className="text-right py-1 text-gray-700 dark:text-gray-300">Разница</th>
+                                    <tr className="border-b border-slate-600">
+                                        <th className="text-left py-1 text-slate-300">Метрика</th>
+                                        <th className="text-right py-1 text-slate-300">Bot Service</th>
+                                        <th className="text-right py-1 text-slate-300">TTS Service</th>
+                                        <th className="text-right py-1 text-slate-300">Разница</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr className="border-b border-gray-200 dark:border-gray-700">
-                                        <td className="py-1 font-medium text-gray-900 dark:text-white">CPU %</td>
-                                        <td className="text-right py-1 text-gray-900 dark:text-white">{botStats?.cpu_percent?.toFixed(1) || '0.0'}%</td>
-                                        <td className="text-right py-1 text-gray-900 dark:text-white">{ttsStats?.cpu_percent?.toFixed(1) || '0.0'}%</td>
+                                    <tr className="border-b border-slate-600">
+                                        <td className="py-1 font-medium text-white">CPU %</td>
+                                        <td className="text-right py-1 text-white">{botStats?.cpu_percent?.toFixed(1) || '0.0'}%</td>
+                                        <td className="text-right py-1 text-white">{ttsStats?.cpu_percent?.toFixed(1) || '0.0'}%</td>
                                         <td className="text-right py-1">
                                             {botStats && ttsStats && (
-                                                <span className={ttsStats.cpu_percent > botStats.cpu_percent ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}>
+                                                <span className={ttsStats.cpu_percent > botStats.cpu_percent ? 'text-red-400' : 'text-green-400'}>
                                                     {(ttsStats.cpu_percent - botStats.cpu_percent).toFixed(1)}%
                                                 </span>
                                             )}
                                         </td>
                                     </tr>
-                                    <tr className="border-b border-gray-200 dark:border-gray-700">
-                                        <td className="py-1 font-medium text-gray-900 dark:text-white">Память</td>
-                                        <td className="text-right py-1 text-gray-900 dark:text-white">{botStats ? formatBytes(botStats.memory_bytes) : '0 B'}</td>
-                                        <td className="text-right py-1 text-gray-900 dark:text-white">{ttsStats ? formatBytes(ttsStats.memory_bytes) : '0 B'}</td>
+                                    <tr className="border-b border-slate-600">
+                                        <td className="py-1 font-medium text-white">Память</td>
+                                        <td className="text-right py-1 text-white">{botStats ? formatBytes(botStats.memory_bytes) : '0 B'}</td>
+                                        <td className="text-right py-1 text-white">{ttsStats ? formatBytes(ttsStats.memory_bytes) : '0 B'}</td>
                                         <td className="text-right py-1">
                                             {botStats && ttsStats && (
-                                                <span className={ttsStats.memory_bytes > botStats.memory_bytes ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}>
+                                                <span className={ttsStats.memory_bytes > botStats.memory_bytes ? 'text-red-400' : 'text-green-400'}>
                                                     {formatBytes(ttsStats.memory_bytes - botStats.memory_bytes)}
                                                 </span>
                                             )}
                                         </td>
                                     </tr>
-                                    <tr className="border-b border-gray-200 dark:border-gray-700">
-                                        <td className="py-1 font-medium text-gray-900 dark:text-white">Потоки</td>
-                                        <td className="text-right py-1 text-gray-900 dark:text-white">{botStats?.num_threads || 0}</td>
-                                        <td className="text-right py-1 text-gray-900 dark:text-white">{ttsStats?.num_threads || 0}</td>
+                                    <tr className="border-b border-slate-600">
+                                        <td className="py-1 font-medium text-white">Потоки</td>
+                                        <td className="text-right py-1 text-white">{botStats?.num_threads || 0}</td>
+                                        <td className="text-right py-1 text-white">{ttsStats?.num_threads || 0}</td>
                                         <td className="text-right py-1">
                                             {botStats && ttsStats && (
-                                                <span className={ttsStats.num_threads > botStats.num_threads ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}>
+                                                <span className={ttsStats.num_threads > botStats.num_threads ? 'text-red-400' : 'text-green-400'}>
                                                     {ttsStats.num_threads - botStats.num_threads}
                                                 </span>
                                             )}
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td className="py-1 font-medium text-gray-900 dark:text-white">Файлы</td>
-                                        <td className="text-right py-1 text-gray-900 dark:text-white">{botStats?.num_fds || 0}</td>
-                                        <td className="text-right py-1 text-gray-900 dark:text-white">{ttsStats?.num_fds || 0}</td>
+                                        <td className="py-1 font-medium text-white">Файлы</td>
+                                        <td className="text-right py-1 text-white">{botStats?.num_fds || 0}</td>
+                                        <td className="text-right py-1 text-white">{ttsStats?.num_fds || 0}</td>
                                         <td className="text-right py-1">
                                             {botStats && ttsStats && (
-                                                <span className={ttsStats.num_fds > botStats.num_fds ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}>
+                                                <span className={ttsStats.num_fds > botStats.num_fds ? 'text-red-400' : 'text-green-400'}>
                                                     {ttsStats.num_fds - botStats.num_fds}
                                                 </span>
                                             )}
@@ -387,43 +422,43 @@ const MonitoringPage = () => {
             )}
 
             {/* Database Management Section */}
-            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
                 <div className="flex items-center space-x-2 mb-3">
-                    <Database className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">Управление базой данных</h3>
+                    <Database className="w-4 h-4 text-slate-400" />
+                    <h3 className="text-sm font-medium text-white">Управление базой данных</h3>
                 </div>
                 
                 {dbStats ? (
                     <div className="space-y-3">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                            <div className="text-center p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
-                                <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                            <div className="text-center p-2 bg-blue-900/20 rounded border border-blue-800">
+                                <div className="text-lg font-bold text-blue-400">
                                     {dbStats.total_chat_messages?.toLocaleString() || 0}
                                 </div>
-                                <div className="text-xs text-gray-600 dark:text-gray-400">Сообщений</div>
+                                <div className="text-xs text-slate-400">Сообщений</div>
                             </div>
-                            <div className="text-center p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
-                                <div className="text-lg font-bold text-green-600 dark:text-green-400">
+                            <div className="text-center p-2 bg-green-900/20 rounded border border-green-800">
+                                <div className="text-lg font-bold text-green-400">
                                     {dbStats.total_users?.toLocaleString() || 0}
                                 </div>
-                                <div className="text-xs text-gray-600 dark:text-gray-400">Пользователей</div>
+                                <div className="text-xs text-slate-400">Пользователей</div>
                             </div>
-                            <div className="text-center p-2 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-200 dark:border-purple-800">
-                                <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                            <div className="text-center p-2 bg-purple-900/20 rounded border border-purple-800">
+                                <div className="text-lg font-bold text-purple-400">
                                     {dbStats.total_psychology_analyses?.toLocaleString() || 0}
                                 </div>
-                                <div className="text-xs text-gray-600 dark:text-gray-400">Анализов</div>
+                                <div className="text-xs text-slate-400">Анализов</div>
                             </div>
-                            <div className="text-center p-2 bg-orange-50 dark:bg-orange-900/20 rounded border border-orange-200 dark:border-orange-800">
-                                <div className="text-lg font-bold text-orange-600 dark:text-orange-400">
+                            <div className="text-center p-2 bg-orange-900/20 rounded border border-orange-800">
+                                <div className="text-lg font-bold text-orange-400">
                                     {dbStats.estimated_db_size || '0 MB'}
                                 </div>
-                                <div className="text-xs text-gray-600 dark:text-gray-400">Размер БД</div>
+                                <div className="text-xs text-slate-400">Размер БД</div>
                             </div>
                         </div>
                         
-                        <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
-                            <div className="flex items-center space-x-2 text-xs text-gray-600 dark:text-gray-400">
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-600">
+                            <div className="flex items-center space-x-2 text-xs text-slate-400">
                                 <AlertTriangle className="w-3 h-3 text-yellow-500" />
                                 <span>Очистка удалит старые данные навсегда</span>
                             </div>
