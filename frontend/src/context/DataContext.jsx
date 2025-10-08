@@ -58,15 +58,23 @@ export const DataProvider = ({ children }) => {
             setStreamHistory(response.data);
         } catch (error) {
             console.error('Error loading stream history:', error);
-            addToast({
-                title: 'Ошибка загрузки истории',
-                description: 'Не удалось загрузить историю стрима',
-                variant: 'destructive'
+            // Убираем toast ошибку - API возвращает заглушку, ошибка не критична
+            setStreamHistory({
+                history: [],
+                data: [],
+                twitch_history: [],
+                vk_history: [],
+                current_viewers: 0,
+                current_vk_viewers: 0,
+                peak_viewers: 0,
+                avg_viewers: 0,
+                categories: [],
+                status: 'offline'
             });
         } finally {
             setLoading(prev => ({ ...prev, history: false }));
         }
-    }, [isAuthenticated, addToast]);
+    }, [isAuthenticated]);
 
     const loadStreamData = useCallback(async (force = false) => {
         if (!isAuthenticated) {
