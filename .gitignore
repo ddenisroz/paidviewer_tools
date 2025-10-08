@@ -101,7 +101,7 @@ celerybeat.pid
 .env.development
 .env.test
 .env.production
-.venv
+.venv/
 env/
 venv/
 ENV/
@@ -266,6 +266,16 @@ tts_service/audio/
 tts_service/temp/
 tts_service/user_configs/
 bot_service/core/data/
+
+# TTS Models and Cache (большие файлы моделей)
+**/f5_tts_cache/
+**/models--*/
+**/snapshots/
+**/*.bin
+**/*.safetensors
+**/pytorch_model.bin
+**/model.bin
+**/model_last_inference.pt
 *.aac
 *.wav
 *.mp3
