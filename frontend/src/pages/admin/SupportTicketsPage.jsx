@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../../constants';
 import { MessageCircle, Search, Filter, Clock, CheckCircle, XCircle, AlertCircle, Eye, EyeOff, Send, Archive } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -27,7 +28,7 @@ const SupportTicketsPage = () => {
   const loadTickets = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/admin/support/tickets?status=${statusFilter}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/support/tickets?status=${statusFilter}`, {
         credentials: 'include'
       });
 
@@ -51,7 +52,7 @@ const SupportTicketsPage = () => {
 
   const loadTicketResponses = async (ticketId) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/support/tickets/${ticketId}/responses`, {
+      const response = await fetch(`${API_BASE_URL}/api/support/tickets/${ticketId}/responses`, {
         credentials: 'include'
       });
 
@@ -75,7 +76,7 @@ const SupportTicketsPage = () => {
       const formData = new FormData();
       formData.append('message', newResponse);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/admin/support/tickets/${selectedTicket.id}/respond`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/support/tickets/${selectedTicket.id}/respond`, {
         method: 'POST',
         credentials: 'include',
         body: formData
@@ -107,7 +108,7 @@ const SupportTicketsPage = () => {
         formData.append('admin_notes', adminNotes);
       }
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/admin/support/tickets/${selectedTicket.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/support/tickets/${selectedTicket.id}`, {
         method: 'PUT',
         credentials: 'include',
         body: formData
@@ -130,7 +131,7 @@ const SupportTicketsPage = () => {
 
   const handleArchiveTicket = async (ticketId) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/admin/support/tickets/${ticketId}/archive`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/support/tickets/${ticketId}/archive`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -154,7 +155,7 @@ const SupportTicketsPage = () => {
 
   const handleUnarchiveTicket = async (ticketId) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/admin/support/tickets/${ticketId}/unarchive`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/support/tickets/${ticketId}/unarchive`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

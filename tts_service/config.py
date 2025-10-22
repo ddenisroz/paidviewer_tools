@@ -2,6 +2,10 @@ import os
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import Optional
+from dotenv import load_dotenv
+
+# Загружаем переменные окружения из .env файла
+load_dotenv()
 
 class AppConfig(BaseModel):
     # --- Общие настройки ---
@@ -56,7 +60,7 @@ class AppConfig(BaseModel):
 
     # --- Логирование ---
     log_level: str = Field(default="INFO", env="TTS_LOG_LEVEL")
-    cors_origins: str = Field(default="http://localhost:5173,http://localhost:3000", env="CORS_ORIGINS")
+    cors_origins: str = Field(default="http://localhost:5173,http://localhost:3000,http://localhost:8000", env="CORS_ORIGINS")
     log_file: Optional[str] = Field(default=None, env="TTS_LOG_FILE")
     
     # --- F5-TTS настройки ---

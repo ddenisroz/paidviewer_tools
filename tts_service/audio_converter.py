@@ -206,26 +206,26 @@ if __name__ == "__main__":
     import sys
     
     if len(sys.argv) != 3:
-        print("Usage: python audio_converter.py <input_file> <output_file>")
+        logger.info("Usage: python audio_converter.py <input_file> <output_file>")
         sys.exit(1)
     
     input_file = sys.argv[1]
     output_file = sys.argv[2]
     
-    print(f"Converting {input_file} to F5-TTS format...")
+    logger.info(f"Converting {input_file} to F5-TTS format...")
     success = convert_audio_for_f5tts(input_file, output_file)
     
     if success:
-        print(f"✅ Conversion successful: {output_file}")
+        logger.info(f"Conversion successful: {output_file}")
         
         # Validate the result
         is_valid, message = validate_audio_for_f5tts(output_file)
-        print(f"Validation: {message}")
+        logger.info(f"Validation: {message}")
         
         # Show audio info
         info = get_audio_info(output_file)
-        print(f"Audio info: {info}")
+        logger.info(f"Audio info: {info}")
     else:
-        print("❌ Conversion failed")
+        logger.error("Conversion failed")
         sys.exit(1)
 

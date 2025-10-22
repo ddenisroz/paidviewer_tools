@@ -302,6 +302,7 @@ class AdminAPI:
                     return {"error": "TWITCH_BOT_TOKEN not configured"}
                 
                 # Получаем активные каналы
+                from core.connection_manager import get_connection_manager
                 connection_manager = get_connection_manager()
                 active_channels = connection_manager.get_active_channels()
                 # active_channels - это список строк (названий каналов)
@@ -312,7 +313,7 @@ class AdminAPI:
                 new_bot_task = asyncio.create_task(new_bot_instance.start_bot())
                 
                 # Обновляем глобальные переменные
-                import main
+                # Логика из main будет реализована в отдельном модуле
                 main.bot_instance = new_bot_instance
                 main.bot_task = new_bot_task
                 
@@ -346,6 +347,7 @@ class AdminAPI:
                     return {"error": "VK_LIVE_USER_TOKEN not configured"}
                 
                 # Получаем активные каналы
+                from core.connection_manager import get_connection_manager
                 connection_manager = get_connection_manager()
                 active_channels = connection_manager.get_active_channels()
                 # active_channels - это список строк (названий каналов)
@@ -356,7 +358,7 @@ class AdminAPI:
                 new_vk_bot_task = asyncio.create_task(new_vk_bot_instance.start_bot())
                 
                 # Обновляем глобальные переменные
-                import main
+                # Логика из main будет реализована в отдельном модуле
                 main.vk_live_bot_instance = new_vk_bot_instance
                 main.vk_live_bot_task = new_vk_bot_task
                 
@@ -380,7 +382,10 @@ class AdminAPI:
             import httpx
             
             # Получаем URL TTS сервиса
-            tts_service_url = os.getenv("TTS_SERVICE_URL", "http://localhost:8001")
+            from constants import DEFAULT_TTS_SERVICE_URL
+            tts_service_url = os.getenv("TTS_SERVICE_URL")
+            if not tts_service_url:
+                raise ValueError("TTS_SERVICE_URL environment variable is required")
             
             # Отправляем запрос на перезагрузку TTS движка
             async with httpx.AsyncClient() as client:

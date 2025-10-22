@@ -20,7 +20,12 @@ const ObsYoutubePage = () => {
         }
 
         // Подключаемся к WebSocket
-        const wsUrl = `${import.meta.env.VITE_BOT_SERVICE_WS_URL || 'ws://localhost:8000'}/obs/youtube/${token}`;
+        const wsBaseUrl = import.meta.env.VITE_BOT_SERVICE_WS_URL;
+        if (!wsBaseUrl) {
+            console.error('VITE_BOT_SERVICE_WS_URL environment variable is required');
+            return;
+        }
+        const wsUrl = `${wsBaseUrl}/obs/youtube/${token}`;
         ws.current = new WebSocket(wsUrl);
 
         ws.current.onopen = () => {

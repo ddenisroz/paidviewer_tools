@@ -1,5 +1,6 @@
 // src/context/DonationAlertsContext.jsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { API_BASE_URL } from '../constants';
 import { useAuth } from './AuthContext';
 
 const DonationAlertsContext = createContext();
@@ -29,7 +30,7 @@ export const DonationAlertsProvider = ({ children }) => {
             setIsLoading(true);
             setError(null);
             
-            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/donationalerts/status`, {
+            const response = await fetch(`${API_BASE_URL}/api/donationalerts/status`, {
                 credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json'
@@ -49,6 +50,7 @@ export const DonationAlertsProvider = ({ children }) => {
         } finally {
             setIsLoading(false);
         }
+        /* eslint-enable no-unreachable */
     };
 
     // Подключение к DonationAlerts
@@ -62,7 +64,7 @@ export const DonationAlertsProvider = ({ children }) => {
             setIsLoading(true);
             setError(null);
             
-            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/donationalerts/connect`, {
+            const response = await fetch(`${API_BASE_URL}/api/donationalerts/connect`, {
                 method: 'POST',
                 credentials: 'include',
                 headers: {
@@ -78,50 +80,8 @@ export const DonationAlertsProvider = ({ children }) => {
             const data = await response.json();
             
             if (data.auth_url) {
-                // Открываем окно авторизации
-                const popup = window.open(
-                    data.auth_url,
-                    'donationalerts_auth',
-                    'width=600,height=700,scrollbars=yes,resizable=yes'
-                );
-                
-                // Слушаем сообщения от popup окна
-                const handleMessage = (event) => {
-                    const allowedOrigins = [
-                        'http://localhost:8000',
-                        'http://localhost:5173',
-                        window.location.origin
-                    ];
-                    
-                    if (!allowedOrigins.includes(event.origin)) {
-                        return;
-                    }
-                    
-                    if (event.data.type === 'DONATIONALERTS_AUTH_SUCCESS') {
-                        // DonationAlerts авторизация успешна
-                        popup.close();
-                        window.removeEventListener('message', handleMessage);
-                        // Обновляем статус
-                        checkStatus();
-                    } else if (event.data.type === 'DONATIONALERTS_AUTH_ERROR') {
-                        console.error('❌ Ошибка авторизации DonationAlerts:', event.data.error);
-                        popup.close();
-                        window.removeEventListener('message', handleMessage);
-                        setError(event.data.error || 'Ошибка авторизации');
-                    }
-                };
-                
-                window.addEventListener('message', handleMessage);
-                
-                // Проверяем, не закрыли ли окно
-                const checkClosed = setInterval(() => {
-                    if (popup.closed) {
-                        clearInterval(checkClosed);
-                        window.removeEventListener('message', handleMessage);
-                        setIsLoading(false);
-                    }
-                }, 1000);
-                
+                // Прямое перенаправление на страницу авторизации
+                window.location.href = data.auth_url;
                 return true;
             } else {
                 throw new Error('URL авторизации не получен');
@@ -141,7 +101,7 @@ export const DonationAlertsProvider = ({ children }) => {
             setIsLoading(true);
             setError(null);
             
-            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/donationalerts/disconnect`, {
+            const response = await fetch(`${API_BASE_URL}/api/donationalerts/disconnect`, {
                 method: 'POST',
                 credentials: 'include',
                 headers: {
@@ -168,6 +128,23 @@ export const DonationAlertsProvider = ({ children }) => {
     useEffect(() => {
         checkStatus();
     }, [user]);
+
+    // Слушаем событие успешного подключения от callback страницы
+    useEffect(() => {
+        const handleDonationAlertsConnected = (event) => {
+            if (event.detail && event.detail.success) {
+                setIsConnected(true);
+                setError(null);
+                checkStatus(); // Обновляем статус
+            }
+        };
+
+        window.addEventListener('donationalerts_connected', handleDonationAlertsConnected);
+        
+        return () => {
+            window.removeEventListener('donationalerts_connected', handleDonationAlertsConnected);
+        };
+    }, []);
 
     const value = {
         isConnected,

@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Twitch, MessageCircle, Users, Wifi, WifiOff } from 'lucide-react';
 import { VKIcon } from './PlatformIcons';
 
-const StreamStatus = ({ integrations, streamData }) => {
+const StreamStatus = ({ integrations, streamData, isLoading = false }) => {
     const twitchEnabled = integrations?.twitch?.enabled;
     const vkEnabled = integrations?.vk?.enabled;
     
@@ -12,9 +12,51 @@ const StreamStatus = ({ integrations, streamData }) => {
     const twitchStream = streamData?.twitch;
     const vkStream = streamData?.vk;
     
-    
+    // Если загружается, показываем пустые карточки с анимацией
+    if (isLoading) {
+        return (
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto">
+                {/* Пустая Twitch карточка - точно такой же размер как финальная */}
+                <Card className="border-muted-foreground/20 bg-muted/5">
+                    <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-muted-foreground/30 rounded"></div>
+                            <div className="flex-1">
+                                <div className="h-4 bg-muted-foreground/30 rounded w-16 mb-2"></div>
+                                <div className="h-3 bg-muted-foreground/20 rounded w-12"></div>
+                            </div>
+                            <div className="flex space-x-1">
+                                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+                
+                {/* Пустая VK карточка - точно такой же размер как финальная */}
+                <Card className="border-muted-foreground/20 bg-muted/5">
+                    <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-muted-foreground/30 rounded"></div>
+                            <div className="flex-1">
+                                <div className="h-4 bg-muted-foreground/30 rounded w-16 mb-2"></div>
+                                <div className="h-3 bg-muted-foreground/20 rounded w-12"></div>
+                            </div>
+                            <div className="flex space-x-1">
+                                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
     return (
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 max-w-2xl mx-auto">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto">
             {/* Twitch статус */}
             <Card className={`${twitchEnabled ? 'border-purple-500/20 bg-purple-500/5' : 'border-muted-foreground/20 bg-muted/5'}`}>
                 <CardContent className="p-4">

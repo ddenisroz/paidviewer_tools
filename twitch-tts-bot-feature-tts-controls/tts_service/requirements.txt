@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+python-dotenv
+sqlalchemy
+aiohttp
+torch
+torchaudio
+soundfile
+librosa
+pydub
+numpy
+f5-tts
+faster-whisper
+ruaccent

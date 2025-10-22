@@ -4,9 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import YouTube from 'react-youtube';
 import { usePlayer } from '../context/PlayerContext';
-import logger from '../utils/logger';
-import { clearYouTubeCache } from '../utils/youtubeCacheCleaner';
-import { toast } from 'sonner';
 
 const GlobalPlayer = () => {
     const {
@@ -16,8 +13,8 @@ const GlobalPlayer = () => {
         isMuted,
         isVisible,
         isTheaterMode,
-        currentTime,
-        duration,
+        // currentTime,
+        // duration,
         playerRef,
         togglePlayPause,
         setVolume,
@@ -70,18 +67,7 @@ const GlobalPlayer = () => {
         setVolume(newVolume);
     };
 
-    // Форматирование времени
-    const formatTime = (seconds) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-
-    // Если нет видео, не показываем плеер
-    if (!currentVideo) {
-        return null;
-    }
-
+    // ✅ ВАЖНО: Вычисляем все переменные ДО условных return
     // Проверяем текущий путь, чтобы не показывать UI на странице YouTube
     const currentPath = window.location.pathname;
     const isOnYoutubePage = currentPath.includes('/dashboard/media/youtube');
@@ -89,6 +75,11 @@ const GlobalPlayer = () => {
     // Плеер работает всегда, UI показываем на всех страницах
     // На YouTube странице показываем видео, на других - только управление
     const showUI = isVisible && !isTheaterMode && !isOnYoutubePage;
+
+    // ✅ ТЕПЕРЬ проверяем если нет видео, не показываем плеер
+    if (!currentVideo) {
+        return null;
+    }
 
     return (
         <>

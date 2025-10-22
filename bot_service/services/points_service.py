@@ -547,3 +547,147 @@ class PointsService:
         finally:
             if should_close:
                 db.close()
+    
+    # === УПРАВЛЕНИЕ НАГРАДАМИ (НОВЫЕ МЕТОДЫ) ===
+    
+    def update_reward(self, user_id: int, reward_id: int, update_data: Dict[str, Any], db: Session = None) -> Dict[str, Any]:
+        """Обновление награды"""
+        should_close = False
+        if db is None:
+            db = next(get_db())
+            should_close = True
+        
+        try:
+            # Находим награду
+            reward = db.query(ChannelReward).filter(
+                and_(
+                    ChannelReward.id == reward_id,
+                    ChannelReward.user_id == user_id
+                )
+            ).first()
+            
+            if not reward:
+                return {"success": False, "error": "Награда не найдена"}
+            
+            # Обновляем поля
+            for key, value in update_data.items():
+                if hasattr(reward, key) and value is not None:
+                    setattr(reward, key, value)
+            
+            reward.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(reward)
+            
+            logger.info(f"Reward {reward_id} updated successfully")
+            return {
+                "success": True,
+                "message": "Награда обновлена",
+                "reward": {
+                    "id": reward.id,
+                    "title": reward.title,
+                    "cost": reward.cost,
+                    "enabled": reward.enabled
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error updating reward {reward_id}: {e}")
+            db.rollback()
+            return {"success": False, "error": str(e)}
+        finally:
+            if should_close:
+                db.close()
+    
+    def delete_reward(self, user_id: int, reward_id: int, db: Session = None) -> Dict[str, Any]:
+        """Удаление награды"""
+        should_close = False
+        if db is None:
+            db = next(get_db())
+            should_close = True
+        
+        try:
+            # Находим награду
+            reward = db.query(ChannelReward).filter(
+                and_(
+                    ChannelReward.id == reward_id,
+                    ChannelReward.user_id == user_id
+                )
+            ).first()
+            
+            if not reward:
+                return {"success": False, "error": "Награда не найдена"}
+            
+            # Проверяем, нет ли активных запросов на обмен
+            pending_requests = db.query(RewardQueue).filter(
+                and_(
+                    RewardQueue.reward_id == reward_id,
+                    RewardQueue.status == 'pending'
+                )
+            ).count()
+            
+            if pending_requests > 0:
+                return {
+                    "success": False, 
+                    "error": f"Невозможно удалить награду: есть {pending_requests} активных запросов"
+                }
+            
+            # Удаляем награду
+            db.delete(reward)
+            db.commit()
+            
+            logger.info(f"Reward {reward_id} deleted successfully")
+            return {"success": True, "message": "Награда удалена"}
+            
+        except Exception as e:
+            logger.error(f"Error deleting reward {reward_id}: {e}")
+            db.rollback()
+            return {"success": False, "error": str(e)}
+        finally:
+            if should_close:
+                db.close()
+    
+    def toggle_reward(self, user_id: int, reward_id: int, db: Session = None) -> Dict[str, Any]:
+        """Переключение статуса награды (enabled/disabled)"""
+        should_close = False
+        if db is None:
+            db = next(get_db())
+            should_close = True
+        
+        try:
+            # Находим награду
+            reward = db.query(ChannelReward).filter(
+                and_(
+                    ChannelReward.id == reward_id,
+                    ChannelReward.user_id == user_id
+                )
+            ).first()
+            
+            if not reward:
+                return {"success": False, "error": "Награда не найдена"}
+            
+            # Переключаем статус
+            reward.enabled = not reward.enabled
+            reward.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(reward)
+            
+            status = "включена" if reward.enabled else "отключена"
+            logger.info(f"Reward {reward_id} toggled to {reward.enabled}")
+            
+            return {
+                "success": True,
+                "message": f"Награда {status}",
+                "reward": {
+                    "id": reward.id,
+                    "title": reward.title,
+                    "enabled": reward.enabled
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error toggling reward {reward_id}: {e}")
+            db.rollback()
+            return {"success": False, "error": str(e)}
+        finally:
+            if should_close:
+                db.close()

@@ -173,7 +173,7 @@ class PsychologyService:
             analysis_text = messages_text[:500]
             
             headers = {
-                "Authorization": f"Bearer {os.getenv('HUGGINGFACE_API_TOKEN', 'hf_your_token_here')}",
+                "Authorization": f"Bearer {os.getenv('HUGGINGFACE_TOKEN', 'hf_your_token_here')}",
                 "Content-Type": "application/json"
             }
             

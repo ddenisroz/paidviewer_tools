@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Gift, Plus, Edit, Trash2, Trophy, Coins } from 'lucide-react';
 import api from '../../services/api';
-import logger from '../../utils/logger';
+import { dropsLogger as logger } from '../../utils/logger';
 import { toast } from 'sonner';
 
 const LootboxManagement = () => {
@@ -56,11 +56,18 @@ const LootboxManagement = () => {
         try {
             setIsLoading(true);
             // Загружаем лутбоксы и достижения
-            // TODO: Добавить API эндпоинты для получения всех данных
-            setLootboxes([]);
-            setAchievements([]);
+            const [lootboxesResponse, achievementsResponse] = await Promise.all([
+                api.get('/api/lootbox/admin/lootboxes'),
+                api.get('/api/lootbox/admin/achievements')
+            ]);
+            
+            setLootboxes(lootboxesResponse.data || []);
+            setAchievements(achievementsResponse.data || []);
         } catch (error) {
             logger.error('Error loading lootbox management data:', error);
+            // Устанавливаем пустые массивы в случае ошибки
+            setLootboxes([]);
+            setAchievements([]);
         } finally {
             setIsLoading(false);
         }
@@ -502,7 +509,7 @@ const LootboxManagement = () => {
                                 <Label htmlFor="obs_url">WebSocket URL для OBS</Label>
                                 <Input
                                     id="obs_url"
-                                    value="ws://localhost:8000/ws/obs/lootbox_yourchy"
+                                    value={`${import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8000'}/ws/obs/lootbox_yourchy`}
                                     readOnly
                                     className="bg-gray-700"
                                 />
@@ -514,7 +521,7 @@ const LootboxManagement = () => {
                                 <Label>Lua скрипт для OBS</Label>
                                 <Textarea
                                     value={`-- Вставьте этот код в OBS Scripts
-local websocket_url = "ws://localhost:8000/ws/obs/lootbox_yourchy"
+local websocket_url = "${import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8000'}/ws/obs/lootbox_yourchy"
 -- ... остальной код скрипта`}
                                     readOnly
                                     className="bg-gray-700 font-mono text-xs"

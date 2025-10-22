@@ -7,66 +7,74 @@ const IntegrationsContext = createContext();
 export const useIntegrations = () => useContext(IntegrationsContext);
 
 export const IntegrationsProvider = ({ children }) => {
-    const { isAuthenticated, integrationsNeedRefresh, markIntegrationsRefreshed, loginWithTwitch, loginWithVk, checkAuthStatus } = useAuth();
-    const [isLoading, setIsLoading] = useState(true);
+    const { isAuthenticated, user, integrationsNeedRefresh, markIntegrationsRefreshed, loginWithTwitch, loginWithVk, refreshAuthStatus } = useAuth();
     const [integrations, setIntegrations] = useState({
-        twitch: { enabled: false },
-        vk: { enabled: false },
+        twitch: { enabled: null }, // null = загрузка, false = отключено, true = включено
+        vk: { enabled: null },
     });
+    const [isLoading, setIsLoading] = useState(false);
+    const [initialLoad, setInitialLoad] = useState(true);
 
     const fetchIntegrations = useCallback(async () => {
-        if (!isAuthenticated) {
+        if (isAuthenticated === false) {
             setIntegrations({ twitch: { enabled: false }, vk: { enabled: false } });
             setIsLoading(false);
+            setInitialLoad(false);
             return;
         }
 
-        setIsLoading(true);
-        try {
-            // Используем эндпоинт, который обращается к базе данных
-            const response = await botService.get('/api/auth/status');
-            if (response.data && response.data.integrations) {
-                setIntegrations({
-                    twitch: { enabled: !!response.data.integrations.twitch },
-                    vk: { enabled: !!response.data.integrations.vk },
-                });
-            } else {
-                 setIntegrations({ twitch: { enabled: false }, vk: { enabled: false } });
-            }
-        } catch (error) {
-            console.error('Error fetching integrations status:', error);
-            setIntegrations({ twitch: { enabled: false }, vk: { enabled: false } });
-        } finally {
+        // Если пользователь аутентифицирован, используем данные из AuthContext
+        if (isAuthenticated === true && user?.integrations) {
+            const newIntegrations = {
+                twitch: { 
+                    enabled: !!user.integrations.twitch?.connected,  // Проверяем поле connected
+                    username: user.integrations.twitch?.username || null
+                },
+                vk: { 
+                    enabled: !!user.integrations.vk?.connected,  // Проверяем поле connected
+                    username: user.integrations.vk?.username || null
+                },
+            };
+            setIntegrations(newIntegrations);
             setIsLoading(false);
+            setInitialLoad(false);
+            return;
         }
-    }, [isAuthenticated]);
+
+        // Если данные еще не загружены, показываем состояние загрузки
+        if (isAuthenticated === null) {
+            setIntegrations({ twitch: { enabled: null }, vk: { enabled: null } });
+            setIsLoading(true);
+            setInitialLoad(true);
+        }
+    }, [isAuthenticated, user?.integrations]);
 
     useEffect(() => {
         fetchIntegrations();
-    }, [fetchIntegrations, isAuthenticated]);
+    }, [fetchIntegrations]);
 
     useEffect(() => {
         if (integrationsNeedRefresh) {
+            // Принудительно обновляем данные аутентификации
+            refreshAuthStatus(true);
             fetchIntegrations();
             markIntegrationsRefreshed();
         }
-    }, [integrationsNeedRefresh, fetchIntegrations, markIntegrationsRefreshed]);
+    }, [integrationsNeedRefresh, fetchIntegrations, markIntegrationsRefreshed, refreshAuthStatus]);
 
-    const updateTwitchIntegration = async (enabled) => {
+    const updateTwitchIntegration = async (enabled, onClose = null) => {
         if (enabled) {
             // Подключить Twitch интеграцию - перенаправить на OAuth
+            if (onClose) onClose(); // Закрываем попап перед перенаправлением
             loginWithTwitch();
         } else {
             // Отключить Twitch интеграцию
             try {
                 setIsLoading(true);
-                // Disconnecting Twitch integration...');
                 const disconnectResponse = await botService.post('/api/integrations/twitch/disconnect');
-                // Twitch disconnection response:', disconnectResponse.data);
-                // Twitch disconnection successful, fetching integrations...');
-                // Обновляем только интеграции, не трогаем auth status
-                await fetchIntegrations(); 
-                // Integrations updated, new state:', integrations);
+                // Обновляем данные пользователя из AuthContext
+                await refreshAuthStatus(true);
+                await fetchIntegrations();
             } catch (error) {
                 console.error('Error disconnecting Twitch:', error);
             } finally {
@@ -75,21 +83,21 @@ export const IntegrationsProvider = ({ children }) => {
         }
     };
 
-    const updateVkIntegration = async (enabled) => {
+    const updateVkIntegration = async (enabled, onClose = null) => {
         if (enabled) {
             // Подключить VK интеграцию - перенаправить на OAuth
+            console.log('🔵 [INTEGRATIONS] VK integration enable requested');
+            if (onClose) onClose(); // Закрываем попап перед перенаправлением
+            console.log('🔵 [INTEGRATIONS] Calling loginWithVk()');
             loginWithVk();
         } else {
             // Отключить VK интеграцию
             try {
                 setIsLoading(true);
-                // Disconnecting VK integration...');
                 const disconnectResponse = await botService.post('/api/integrations/vk/disconnect');
-                // VK disconnection response:', disconnectResponse.data);
-                // VK disconnection successful, fetching integrations...');
-                // Обновляем только интеграции, не трогаем auth status
-                await fetchIntegrations(); 
-                // Integrations updated, new state:', integrations);
+                // Обновляем данные пользователя из AuthContext
+                await refreshAuthStatus(true);
+                await fetchIntegrations();
             } catch (error) {
                 console.error('Error disconnecting VK:', error);
             } finally {

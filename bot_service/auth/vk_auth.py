@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from core.database import User, get_db
 from core.session_manager import session_manager
 from auth.auth import create_jwt_token, get_current_user_optional
+from constants import DEFAULT_BACKEND_URL, DEFAULT_FRONTEND_URL
 # Импорт функции отключения ботов будет сделан локально
 import base64
 import secrets
@@ -27,11 +28,17 @@ router = APIRouter()
 # VK Live OAuth настройки
 VK_CLIENT_ID = os.getenv("VK_CLIENT_ID")
 VK_CLIENT_SECRET = os.getenv("VK_CLIENT_SECRET")
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+BACKEND_URL = os.getenv("BACKEND_URL")
+if not BACKEND_URL:
+    raise ValueError("BACKEND_URL environment variable is required")
+
+FRONTEND_URL = os.getenv("FRONTEND_URL")
+if not FRONTEND_URL:
+    raise ValueError("FRONTEND_URL environment variable is required")
+
 VK_AUTH_BASE_URL = os.getenv("VK_AUTH_BASE_URL", "https://auth.live.vkvideo.ru/app/oauth2/authorize")
 SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = "HS256"
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
 
 @router.get("/auth/vk")
 async def vk_auth():
@@ -93,7 +100,11 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
     # Загружаем переменные окружения
     VK_CLIENT_ID = os.getenv("VK_CLIENT_ID")
     VK_CLIENT_SECRET = os.getenv("VK_CLIENT_SECRET")
-    VK_REDIRECT_URI = "http://localhost:8000/auth/vk/callback"
+    from constants import DEFAULT_BACKEND_URL
+    backend_url = os.getenv("BACKEND_URL")
+    if not backend_url:
+        raise ValueError("BACKEND_URL environment variable is required")
+    VK_REDIRECT_URI = f"{backend_url}/auth/vk/callback"
 
     if not all([VK_CLIENT_ID, VK_CLIENT_SECRET]):
         logger.error(f"VK credentials not configured. VK_CLIENT_ID: {'✓' if VK_CLIENT_ID else '✗'}, VK_CLIENT_SECRET: {'✓' if VK_CLIENT_SECRET else '✗'}")
@@ -154,24 +165,44 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
             
             user_info = None
             async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
-                endpoint = "https://apidev.live.vkvideo.ru/v1/current_user"
+                # Пробуем основной API endpoint
+                endpoint = "https://api.live.vkvideo.ru/v1/current_user"
                 try:
+                    logger.info(f"Trying production API: {endpoint}")
                     user_info_response = await client.get(
                         endpoint,
                         headers={"Authorization": f"Bearer {access_token}"}
                     )
+                    logger.info(f"User info response status: {user_info_response.status_code}")
+                    logger.info(f"User info response: {user_info_response.text[:500]}")  # Логируем первые 500 символов
+                    
                     if user_info_response.status_code == 200:
                         data = user_info_response.json()
                         if isinstance(data, dict) and "data" in data and "user" in data["data"]:
                             user_info = data["data"]["user"]
                             user_info['channel_url'] = data["data"].get("channel", {}).get("url")
+                            logger.info(f"Successfully got user info: user_id={user_info.get('id')}")
                     else:
                         logger.error(f"Failed to get user info, status: {user_info_response.status_code}")
+                        # Пробуем dev API
+                        dev_endpoint = "https://apidev.live.vkvideo.ru/v1/current_user"
+                        logger.info(f"Trying dev API: {dev_endpoint}")
+                        dev_response = await client.get(
+                            dev_endpoint,
+                            headers={"Authorization": f"Bearer {access_token}"}
+                        )
+                        if dev_response.status_code == 200:
+                            data = dev_response.json()
+                            if isinstance(data, dict) and "data" in data and "user" in data["data"]:
+                                user_info = data["data"]["user"]
+                                user_info['channel_url'] = data["data"].get("channel", {}).get("url")
+                                logger.info(f"Successfully got user info from dev API")
                 except Exception as e:
-                    logger.error(f"Error getting user info: {e}")
+                    logger.error(f"Error getting user info: {e}", exc_info=True)
 
             if not user_info:
-                raise HTTPException(status_code=500, detail="Could not fetch user info from VK Live API.")
+                logger.error("Could not fetch user info from VK Live API")
+                raise HTTPException(status_code=500, detail="Could not fetch user info from VK Live API. Please try again later.")
             
             platform_user_id = str(user_info.get("id"))
             avatar_url = user_info.get("avatar_url")
@@ -181,36 +212,63 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
             from constants import Platform
             
             # Создаем объект с данными пользователя
+            # Извлекаем VK username из channel URL для подключения бота
+            # VK Live API возвращает channel.url: "https://live.vkvideo.ru/yourchy"
+            vk_username = None
+            channel_url = user_info.get('channel_url')
+            
+            if channel_url:
+                # Извлекаем ник канала из URL
+                try:
+                    # URL формат: https://live.vkvideo.ru/yourchy
+                    vk_username = channel_url.rstrip('/').split('/')[-1]
+                    logger.info(f"✅ Extracted channel name from URL: {vk_username} (from {channel_url})")
+                except Exception as e:
+                    logger.error(f"❌ Failed to extract channel name from URL {channel_url}: {e}")
+            
+            # Fallback на user.nick если не удалось извлечь из URL
+            if not vk_username:
+                vk_username = (
+                    user_info.get("nick") or
+                    user_info.get("login") or 
+                    user_info.get("username") or 
+                    user_info.get("screen_name") or
+                    None
+                )
+                if vk_username:
+                    logger.info(f"⚠️ Using user.nick as fallback: {vk_username}")
+            
+            if vk_username:
+                # Проверяем что это не ID (если вдруг API вернет ID)
+                if vk_username.isdigit():
+                    logger.warning(f"⚠️ VK username is numeric ({vk_username}), using fallback")
+                    vk_username = f"vk{platform_user_id}"
+            else:
+                # VK Live API не вернул username, используем ID как fallback
+                vk_username = f"vk{platform_user_id}"
+                logger.warning(f"⚠️ VK API returned user_info without channel URL or nick: {user_info}")
+                logger.warning(f"⚠️ Available keys: {list(user_info.keys())}")
+                logger.info(f"✅ Using fallback VK username: {vk_username}")
+            
             oauth_user_data = OAuthUserData(
                 platform_user_id=platform_user_id,
                 avatar_url=avatar_url,
                 access_token=access_token,
                 refresh_token=refresh_token,
                 expires_at=expires_at,
-                scopes=scopes
+                scopes=scopes,
+                username=vk_username  # Теперь передаем реальный username
             )
             
-            # Используем общий OAuth handler (отключаем автоподключение бота, сделаем это вручную для VK)
+            # Используем общий OAuth handler с автоподключением бота
             oauth_result = await oauth_handler.handle_oauth_callback(
                 request=request,
                 db=db,
                 platform=Platform.VK,
                 user_data=oauth_user_data,
                 current_user=current_user,
-                auto_connect_bot=False  # Отключаем автоподключение, сделаем это вручную ниже
+                auto_connect_bot=True  # Включаем автоподключение бота
             )
-            
-            # --- 4. Автоматическое подключение VK Live бота ---
-            if not current_user and oauth_result.session_id:
-                # Используем новую функцию auto_connect_vk_live_bot
-                try:
-                    from main import auto_connect_vk_live_bot
-                    user_id = oauth_result.user.id
-                    logger.info(f"🎯 VK OAuth successful, auto-connecting VK Live bot for user {user_id}")
-                    await auto_connect_vk_live_bot(user_id)
-                except Exception as e:
-                    logger.error(f"Error auto-connecting VK Live bot: {e}")
-                    # Не прерываем авторизацию из-за ошибки бота
             
             # Создаем ответ с редиректом
             return oauth_handler.create_oauth_response(oauth_result)
@@ -337,7 +395,8 @@ async def vk_logout(request: Request, response: Response):
             import sys
             import os
             sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-            from main import bot_instance, vk_live_bot_instance, _disconnect_user_bots
+            from main import bot_instance, vk_live_bot_instance
+            # Отключение ботов пользователя будет реализовано в отдельном модуле
             await _disconnect_user_bots(user_data)
             logger.info(f"Disconnected bots for user {user_id} on VK logout")
             

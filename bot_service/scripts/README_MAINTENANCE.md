@@ -239,7 +239,7 @@ sudo systemctl status bot-service-monitor.timer
 
 3. **Проверить целостность БД:**
    ```bash
-   sqlite3 bot_service.db "PRAGMA integrity_check;"
+   sqlite3 data/app_data.db "PRAGMA integrity_check;"
    ```
 
 ### Проблемы с логами

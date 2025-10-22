@@ -59,12 +59,18 @@ const DropsDisplay = ({ drops, onPlaySound }) => {
   };
 
   const getQualityColor = (qualityName) => {
+    // Улучшенная цветовая палитра с лучшим контрастом
     switch (qualityName) {
-      case 'Common': return 'border-gray-300 bg-gray-50';
-      case 'Rare': return 'border-blue-300 bg-blue-50';
-      case 'Epic': return 'border-purple-300 bg-purple-50';
-      case 'Legendary': return 'border-yellow-300 bg-yellow-50';
-      default: return 'border-gray-300 bg-gray-50';
+      case 'Common': 
+        return 'border-slate-400 bg-slate-100 text-slate-900 shadow-sm';
+      case 'Rare': 
+        return 'border-blue-500 bg-blue-100 text-blue-900 shadow-md';
+      case 'Epic': 
+        return 'border-purple-500 bg-purple-100 text-purple-900 shadow-lg';
+      case 'Legendary': 
+        return 'border-amber-500 bg-amber-100 text-amber-900 shadow-xl';
+      default: 
+        return 'border-gray-400 bg-gray-100 text-gray-900 shadow-sm';
     }
   };
 

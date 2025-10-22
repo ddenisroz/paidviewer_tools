@@ -1,10 +1,9 @@
 # bot_service/auth.py
-import os
 import logging
 from typing import Optional, Dict, Any
 from fastapi import Request, HTTPException, Depends, status
 from core.session_manager import session_manager
-from core.security_enhanced import security_manager
+from core.security_modern import modern_security_manager as security_manager
 
 logger = logging.getLogger(__name__)
 
@@ -77,3 +76,4 @@ def verify_jwt_token(token: str, expected_type: Optional[str] = None) -> Dict[st
         Dict: Декодированные данные токена
     """
     return security_manager.verify_jwt_token(token, expected_type)
+

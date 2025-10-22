@@ -8,5 +8,20 @@ httpx
 twitchio
 pytube
 PyJWT
+cryptography
 gtts
 pydub
+# redis - removed, using database instead
+# aioredis - removed, using database instead
+prometheus-client
+structlog
+psutil
+
+# Modern security and configuration libraries
+cryptography==41.0.7
+python-jose[cryptography]
+# === RATE LIMITING ===
+slowapi>=0.1.9
+limits>=2.3
+pydantic-settings
+cachetools

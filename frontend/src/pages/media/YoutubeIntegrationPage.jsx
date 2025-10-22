@@ -10,7 +10,7 @@ import YouTube from 'react-youtube';
 import { usePlayer } from '../../context/PlayerContext';
 import { useChat } from '../../context/ChatContext';
 import api from '../../services/api';
-import logger from '../../utils/logger';
+import { youtubeLogger as logger } from '../../utils/logger';
 
 const YoutubeIntegrationPage = () => {
     const {
@@ -133,7 +133,8 @@ const YoutubeIntegrationPage = () => {
         try {
             const response = await api.get('/api/tts/obs-url');
             if (response.data.obs_token) {
-                const url = `http://localhost:5173/youtube-obs/${response.data.obs_token}`;
+                const frontendUrl = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173';
+                const url = `${frontendUrl}/youtube-obs/${response.data.obs_token}`;
                 setYoutubeObsUrl(url);
                 setIsObsUrlVisible(false); // По умолчанию скрыт
             }

@@ -28,9 +28,9 @@ export const TtsHealthProvider = ({ children }) => {
     // Проверяем, является ли пользователь гостем
     const isGuest = user?.is_guest || user?.id === -1;
     
-    // Всегда начинаем с false, проверяем статус при загрузке
+    // Начинаем с проверки для не-гостевых пользователей
     const [isHealthy, setIsHealthy] = useState(false);
-    const [isChecking, setIsChecking] = useState(false);
+    const [isChecking, setIsChecking] = useState(!isGuest); // Начинаем с проверки если не гость
     const [lastCheck, setLastCheck] = useState(null);
 
     // Убрали кэширование в localStorage
@@ -58,7 +58,8 @@ export const TtsHealthProvider = ({ children }) => {
         
         // Дополнительная проверка времени - не проверяем слишком часто
         const now = Date.now();
-        if (now - globalLastCheckTime < 2000) { // Минимум 2 секунды между проверками
+        const minCheckInterval = parseInt(import.meta.env.VITE_TTS_MIN_CHECK_INTERVAL || '2000', 10);
+        if (now - globalLastCheckTime < minCheckInterval) { // Минимум 2 секунды между проверками
             console.log('TtsHealthContext: Health check too frequent, skipping...');
             return;
         }
@@ -69,19 +70,45 @@ export const TtsHealthProvider = ({ children }) => {
         lastCheckTimeRef.current = now;
         setIsChecking(true);
         
+        console.log('TtsHealthContext: Starting health check...');
+        
+        // Дополнительная защита - принудительно завершаем проверку через заданное время
+        const forceCompleteTimeoutMs = parseInt(import.meta.env.VITE_TTS_FORCE_COMPLETE_TIMEOUT || '5000', 10);
+        const forceCompleteTimeout = setTimeout(() => {
+            if (checkInProgressRef.current) {
+                console.log('TtsHealthContext: Force completing health check due to timeout');
+                setIsChecking(false);
+                checkInProgressRef.current = false;
+                globalHealthCheckInProgress = false;
+            }
+        }, forceCompleteTimeoutMs);
+        
         try {
-            const response = await ttsService.get('/health');
+            // Добавляем таймаут для проверки TTS сервера
+            const healthCheckTimeout = parseInt(import.meta.env.VITE_TTS_HEALTH_CHECK_TIMEOUT || '3000', 10);
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('TTS health check timeout')), healthCheckTimeout)
+            );
+            
+            const response = await Promise.race([
+                ttsService.get('/health'),
+                timeoutPromise
+            ]);
+            
             const data = response.data;
             const isOk = response.status === 200 && data.tts_engine_loaded;
             
+            console.log('TtsHealthContext: TTS server response:', { status: response.status, data, isOk });
             setIsHealthy(isOk);
             setLastCheck(new Date());
             
         } catch (error) {
-            console.error('TTS недоступен:', error.message);
+            console.log('TtsHealthContext: TTS server check failed:', error.message);
             setIsHealthy(false);
             setLastCheck(new Date());
         } finally {
+            console.log('TtsHealthContext: Health check completed, setting isChecking to false');
+            clearTimeout(forceCompleteTimeout);
             setIsChecking(false);
             checkInProgressRef.current = false;
             globalHealthCheckInProgress = false;
@@ -99,19 +126,22 @@ export const TtsHealthProvider = ({ children }) => {
         
         // Не проверяем для гостей
         if (isGuest) {
+            console.log('TtsHealthContext: Guest user, skipping health check');
             return;
         }
         
         // Проверяем только один раз при монтировании компонента
         // Дополнительная защита от двойных вызовов в React Strict Mode
         if (!hasCheckedRef.current && !checkInProgressRef.current) {
+            console.log('TtsHealthContext: Starting health check on mount');
             hasCheckedRef.current = true;
             // Добавляем небольшую задержку для предотвращения двойных вызовов
+            const initialDelay = parseInt(import.meta.env.VITE_TTS_INITIAL_CHECK_DELAY || '100', 10);
             const timeoutId = setTimeout(() => {
                 if (mountedRef.current && !checkInProgressRef.current) {
                     checkHealth();
                 }
-            }, 100);
+            }, initialDelay);
             
             return () => {
                 clearTimeout(timeoutId);

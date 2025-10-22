@@ -18,9 +18,6 @@ const TtsErrorCard = ({ title, description, suggestion }) => {
                     <p className="text-slate-400 text-sm mb-4">
                         {suggestion}
                     </p>
-                    <div className="text-red-300 text-sm">
-                        Система автоматически обновит статус
-                    </div>
                 </div>
             </div>
         </div>

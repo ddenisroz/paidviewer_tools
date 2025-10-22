@@ -1,12 +1,27 @@
 import axios from 'axios';
 import { toast } from 'sonner';
 
-export const TTS_SERVICE_URL = import.meta.env.VITE_TTS_SERVICE_URL || 'http://localhost:8001';
+import { TTS_SERVICE_URL, API_BASE_URL } from '../constants';
+
+export { TTS_SERVICE_URL };
 
 export const botService = axios.create({
-    baseURL: import.meta.env.VITE_BOT_SERVICE_URL || 'http://localhost:8000',
+    baseURL: API_BASE_URL,
     withCredentials: true,
 });
+
+// Response interceptor для обработки 401 ошибок
+botService.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            // Перенаправляем на страницу логина при 401
+            window.location.href = '/login';
+        }
+        return Promise.reject(error);
+    }
+);
+
 
 export const ttsService = axios.create({
     baseURL: TTS_SERVICE_URL,
@@ -25,16 +40,25 @@ export const loginTwitch = async () => {
     } catch (error) {
         console.error('❌ Ошибка при получении URL авторизации:', error);
         // Fallback на старый способ
-        window.location.href = `${botService.defaults.baseURL}/auth/twitch`;
+        window.location.href = `${botService.defaults.baseURL}/auth/twitch/login`;
     }
 };
 
 export const loginVk = async () => {
     try {
+        console.log('🔵 [VK AUTH] Requesting auth URL from /auth/vk/login');
         // Получаем URL авторизации от API
         const response = await botService.get('/auth/vk/login');
+        console.log('🔵 [VK AUTH] Response received:', response.data);
         const { auth_url } = response.data;
         
+        if (!auth_url) {
+            console.error('❌ [VK AUTH] No auth_url in response:', response.data);
+            toast.error('Не удалось получить URL авторизации VK');
+            return;
+        }
+        
+        console.log('🔵 [VK AUTH] Redirecting to:', auth_url);
         // Перенаправляем на VK OAuth
         window.location.href = auth_url;
     } catch (error) {

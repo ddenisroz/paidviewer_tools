@@ -21,6 +21,8 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from core.database import Base
+# Импортируем все модели для автогенерации миграций
+from core.database import *
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

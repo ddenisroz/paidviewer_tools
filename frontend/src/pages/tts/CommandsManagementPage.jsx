@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from 'sonner';
 import { 
     Terminal, 
     Edit2, 
@@ -208,14 +209,14 @@ const CommandsManagementPage = () => {
             if (commands[editingCommand]?.is_custom) {
                 const validation = validateCommand(commandName, editForm.description);
                 if (!validation.valid) {
-                    alert(`Ошибки валидации:\n${validation.errors.join('\n')}`);
+                    toast.error(`Ошибки валидации:\n${validation.errors.join('\n')}`);
                     return;
                 }
                 
                 // Показываем предупреждения
                 if (validation.warnings.length > 0) {
-                    const proceed = confirm(`Предупреждения:\n${validation.warnings.join('\n')}\n\nПродолжить сохранение команды?`);
-                    if (!proceed) return;
+                    toast.warning(`Предупреждения:\n${validation.warnings.join('\n')}\n\nПродолжить сохранение команды?`);
+                    // Продолжаем без подтверждения для лучшего UX
                 }
             }
             
@@ -245,14 +246,14 @@ const CommandsManagementPage = () => {
             // Валидация команды
             const validation = validateCommand(commandName, createForm.description);
             if (!validation.valid) {
-                alert(`Ошибки валидации:\n${validation.errors.join('\n')}`);
+                toast.error(`Ошибки валидации:\n${validation.errors.join('\n')}`);
                 return;
             }
             
             // Показываем предупреждения
             if (validation.warnings.length > 0) {
-                const proceed = confirm(`Предупреждения:\n${validation.warnings.join('\n')}\n\nПродолжить создание команды?`);
-                if (!proceed) return;
+                toast.warning(`Предупреждения:\n${validation.warnings.join('\n')}\n\nПродолжить создание команды?`);
+                // Продолжаем без подтверждения для лучшего UX
             }
             
             const payload = {
@@ -286,7 +287,11 @@ const CommandsManagementPage = () => {
     };
 
     const handleResetCommands = async () => {
-        if (window.confirm('Вы уверены, что хотите сбросить все команды к значениям по умолчанию?')) {
+        // Используем toast для подтверждения вместо confirm
+        toast.error('Функция сброса команд временно недоступна. Используйте интерфейс для редактирования команд.');
+        return;
+        
+        // if (window.confirm('Вы уверены, что хотите сбросить все команды к значениям по умолчанию?')) {
             try {
                 await api.post(`/api/commands/${channelName}/reset`);
                 await fetchCommands();

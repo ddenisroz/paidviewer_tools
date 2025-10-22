@@ -163,7 +163,12 @@ const YoutubeSettingsPage = () => {
 
                     {/* Настройки громкости */}
                     <div className="space-y-3">
-                        <h3 className="text-lg font-medium">Громкость ({volume}%)</h3>
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-medium">Громкость</h3>
+                            <span className="text-lg font-bold text-purple-400 bg-purple-400/10 px-3 py-1 rounded">
+                                {volume}%
+                            </span>
+                        </div>
                         <div className="flex items-center gap-4">
                             <input
                                 type="range"
@@ -173,16 +178,38 @@ const YoutubeSettingsPage = () => {
                                 onChange={(e) => {
                                     const newVolume = parseInt(e.target.value);
                                     setVolume(newVolume);
-                                    saveYoutubeSettings(playbackMode, newVolume);
+                                    // Debounce сохранение
+                                    clearTimeout(window.youtubeVolumeSaveTimeout);
+                                    window.youtubeVolumeSaveTimeout = setTimeout(() => {
+                                        saveYoutubeSettings(playbackMode, newVolume);
+                                    }, 1000);
                                 }}
-                                className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                className="flex-1 h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
                                 style={{
                                     background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${volume}%, #374151 ${volume}%, #374151 100%)`
                                 }}
                             />
-                            <div className="text-sm font-mono w-12 text-center">
-                                {volume}%
-                            </div>
+                            <style>{`
+                                input[type="range"]::-webkit-slider-thumb {
+                                    appearance: none;
+                                    width: 24px;
+                                    height: 24px;
+                                    border-radius: 50%;
+                                    background: #8b5cf6;
+                                    cursor: pointer;
+                                    box-shadow: 0 0 8px rgba(139, 92, 246, 0.5);
+                                    border: 2px solid #6b21a8;
+                                }
+                                input[type="range"]::-moz-range-thumb {
+                                    width: 24px;
+                                    height: 24px;
+                                    border-radius: 50%;
+                                    background: #8b5cf6;
+                                    cursor: pointer;
+                                    box-shadow: 0 0 8px rgba(139, 92, 246, 0.5);
+                                    border: 2px solid #6b21a8;
+                                }
+                            `}</style>
                         </div>
                     </div>
                 </CardContent>

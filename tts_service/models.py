@@ -1,6 +1,6 @@
 # tts_service/models.py
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Dict, Any
 import datetime as dt
 
 class VoiceSchema(BaseModel):
@@ -50,12 +50,13 @@ class TtsConfigResponse(BaseModel):
     cfg_strength: float
 
 class SynthesisRequest(BaseModel):
-    text: str = Field(..., min_length=1, max_length=5000, description="Text to synthesize (1-5000 characters)")
+    text: str = Field(..., min_length=1, max_length=1000, description="Text to synthesize (1-1000 characters)")
     voice_name: str = Field(..., min_length=1, max_length=100, description="Voice name")
     user_id: Optional[int] = Field(None, ge=1, description="User ID")
     volume_level: Optional[float] = Field(50.0, ge=0.0, le=100.0, description="Volume level (0-100%)")
     cfg_strength: Optional[float] = Field(None, ge=0.1, le=10.0, description="CFG strength override")
     speed_preset: Optional[str] = Field(None, pattern='^(very_slow|slow|normal|fast|very_fast)$', description="Speed preset override")
+    priority: Optional[int] = Field(2, ge=1, le=4, description="Priority level (1-4)")
 
 class SynthesisResponse(BaseModel):
     success: bool
@@ -74,3 +75,47 @@ class TranscriptionResponse(BaseModel):
     success: bool
     text: Optional[str] = None
     message: str
+
+class UserTTSLimitsSchema(BaseModel):
+    """Схема настроек TTS пользователя"""
+    max_text_length: int = Field(ge=10, le=1000, description="Maximum text length (10-1000 characters)")
+    daily_limit: int = Field(ge=1, le=1000, description="Daily request limit (1-1000)")
+    gpu_time_limit: float = Field(ge=10.0, le=3600.0, description="Daily GPU time limit in seconds (10-3600)")
+    priority_level: int = Field(ge=1, le=4, description="Priority level (1-4)")
+    tts_enabled: bool = Field(description="TTS enabled for user")
+
+class UserTTSLimitsResponse(BaseModel):
+    """Ответ с настройками TTS пользователя"""
+    max_text_length: int
+    daily_limit: int
+    gpu_time_limit: float
+    priority_level: int
+    tts_enabled: bool
+    current_usage: Optional[Dict[str, Any]] = None
+
+class UserTTSUsageSchema(BaseModel):
+    """Схема статистики использования TTS"""
+    period_days: int
+    total_requests: int
+    total_gpu_time: float
+    total_cpu_time: float
+    total_characters: int
+    successful_requests: int
+    failed_requests: int
+    gpu_requests: int
+    cpu_requests: int
+    success_rate: float
+    avg_processing_time: float
+
+class GlobalTTSStatsSchema(BaseModel):
+    """Схема глобальной статистики TTS"""
+    period_days: int
+    unique_users: int
+    total_requests: int
+    total_gpu_time: float
+    total_cpu_time: float
+    total_characters: int
+    successful_requests: int
+    failed_requests: int
+    success_rate: float
+    avg_requests_per_user: float

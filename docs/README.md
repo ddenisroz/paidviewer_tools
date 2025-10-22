@@ -1,6 +1,60 @@
-# 📚 Документация проекта TTS_TTV
+# 📚 Документация TTS_TTV_0.02
 
-Централизованная документация для всех компонентов проекта.
+**Обновлено:** 22 октября 2025
+
+---
+
+## 🚨 НАЧНИ ОТСЮДА!
+
+### Для AI-агентов (Claude, GPT, и т.д.):
+
+1. **ОБЯЗАТЕЛЬНО ЧИТАЙ ПЕРВЫМ:** [CURRENT_STATUS.md](CURRENT_STATUS.md)  
+   ✅ Что работает | ❌ Что сломано | ⛔ Что НЕ ТРОГАТЬ
+
+2. **ОБЯЗАТЕЛЬНО ЧИТАЙ ВТОРЫМ:** [LLM_DEVELOPMENT_RULES.md](LLM_DEVELOPMENT_RULES.md)  
+   🚨 Критические правила чтобы НЕ ЛОМАТЬ рабочие фичи
+
+3. Полный список: [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)
+
+### Для людей-разработчиков:
+
+1. **Быстрый старт:** [QUICK_START.md](QUICK_START.md)
+2. **Архитектура:** [ARCHITECTURE_GUIDE.md](ARCHITECTURE_GUIDE.md)
+3. **Разработка:** [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)
+4. **Текущий статус:** [CURRENT_STATUS.md](CURRENT_STATUS.md)
+
+---
+
+## 📊 Текущий статус проекта
+
+### ✅ Работает:
+- Авторизация (Twitch + VK Live)
+- Смена названия стрима
+- Смена категории стрима (раздельный режим)
+- ChatBox (отображение сообщений)
+- TTS базовая озвучка
+- TTS shortcuts (кнопки на главной)
+
+### ❌ Баги:
+- Смена категории в объединенном режиме
+- Сохранение истории Twitch чата (backend не перезапущен!)
+- Позиционирование контекстного меню
+
+### 🔧 В разработке:
+- Кнопка "Настройка" в ChatBox (редактор стилей + экспорт в OBS)
+
+**Детали:** [CURRENT_STATUS.md](CURRENT_STATUS.md)
+
+---
+
+## ⚠️ ВАЖНО ДЛЯ AI-АГЕНТОВ
+
+**НЕ НАЧИНАЙ РАБОТУ** без прочтения:
+- [CURRENT_STATUS.md](CURRENT_STATUS.md)
+- [LLM_DEVELOPMENT_RULES.md](LLM_DEVELOPMENT_RULES.md)
+
+**НЕ ТРОГАЙ рабочие фичи!**  
+Лучше не исправить баг, чем сломать 5 работающих фич.
 
 ---
 
@@ -8,170 +62,49 @@
 
 ```
 docs/
-├── 📊 reports/          - Отчеты и чеклисты
-├── 📖 guides/           - Руководства и инструкции
-├── 🚀 deployment/       - Документы по развертыванию
-├── ⚙️ setup/            - Гайды по настройке
-└── 🔧 scripts/          - Утилитные скрипты
+├── README.md                          ← ты здесь
+├── DOCUMENTATION_INDEX.md             ← полный индекс
+├── CURRENT_STATUS.md                  ← что работает/не работает
+├── LLM_DEVELOPMENT_RULES.md           ← правила для AI
+├── QUICK_START.md                     ← быстрый старт
+├── ARCHITECTURE_GUIDE.md              ← архитектура
+├── DEVELOPER_GUIDE.md                 ← гайд разработчика
+├── QUICK_FIX_GUIDE.md                 ← частые проблемы
+├── DEPLOYMENT.md                      ← деплой
+├── SECURITY_LOGIC.md                  ← безопасность
+└── vk/                                ← VK Live API docs
+    ├── Методы.Категории.md
+    └── Методы.Канал.md
 ```
 
 ---
 
-## 📊 Отчеты (`reports/`)
+## 🔍 Быстрый поиск
 
-| Файл | Описание |
-|------|----------|
-| [`FINAL_CLEANUP_SUMMARY.md`](./reports/FINAL_CLEANUP_SUMMARY.md) | ⭐ **Финальный отчет по реорганизации** |
-| [`PROJECT_REPORT.md`](./reports/PROJECT_REPORT.md) | Полный отчет о проекте |
-| [`PROJECT_SUMMARY.md`](./reports/PROJECT_SUMMARY.md) | Краткое резюме проекта |
-| [`TECHNICAL_REPORT.md`](./reports/TECHNICAL_REPORT.md) | Технический анализ |
-| [`OPTIMIZATION_REPORT.md`](./reports/OPTIMIZATION_REPORT.md) | Отчет по оптимизации |
-| [`CLEANUP_REPORT.md`](./reports/CLEANUP_REPORT.md) | Отчет по очистке проекта |
-| [`PROJECT_REORGANIZATION_REPORT.md`](./reports/PROJECT_REORGANIZATION_REPORT.md) | Детальный отчет по реорганизации |
-| [`TESTING_CHECKLIST.md`](./reports/TESTING_CHECKLIST.md) | Чеклист тестирования |
-| [`PRODUCTION_CHECKLIST.md`](./reports/PRODUCTION_CHECKLIST.md) | Чеклист для продакшена |
-
----
-
-## 📖 Руководства (`guides/`)
-
-### 🛠️ Разработка
-- [`DEVELOPER_GUIDE.md`](./guides/DEVELOPER_GUIDE.md) - Гайд для разработчиков
-- [`CLEANUP_GUIDE.md`](./guides/CLEANUP_GUIDE.md) - Руководство по очистке проекта
-
-### 🗄️ База данных
-- [`DATABASE_MANAGEMENT_README.md`](./guides/DATABASE_MANAGEMENT_README.md) - Управление базой данных
-
-### 📝 Системы
-- [`LOGGING_AND_BACKUP_SYSTEM.md`](./guides/LOGGING_AND_BACKUP_SYSTEM.md) - Логирование и бэкапы
-- [`WORD_FILTER_SYSTEM.md`](./guides/WORD_FILTER_SYSTEM.md) - Система фильтрации слов
-- [`PSYCHOLOGY_ANALYSIS_README.md`](./guides/PSYCHOLOGY_ANALYSIS_README.md) - Психологический анализ
-
-### 🎮 Платформы
-- [`VK_LIVE_COMMANDS_GUIDE.md`](./guides/VK_LIVE_COMMANDS_GUIDE.md) - Команды для VK Live
-- [`EMOTE_SETTINGS.md`](./guides/EMOTE_SETTINGS.md) - Настройка эмоций
+| Вопрос | Документ |
+|--------|----------|
+| Что работает/не работает? | [CURRENT_STATUS.md](CURRENT_STATUS.md) |
+| Как не сломать код? | [LLM_DEVELOPMENT_RULES.md](LLM_DEVELOPMENT_RULES.md) |
+| Как запустить проект? | [QUICK_START.md](QUICK_START.md) |
+| Как устроен проект? | [ARCHITECTURE_GUIDE.md](ARCHITECTURE_GUIDE.md) |
+| Как разрабатывать? | [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) |
+| Типичные баги? | [QUICK_FIX_GUIDE.md](QUICK_FIX_GUIDE.md) |
+| VK Live API? | [vk/Методы.*.md](vk/) |
+| Полный список? | [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md) |
 
 ---
 
-## 🚀 Развертывание (`deployment/`)
+## 📞 Поддержка
 
-| Файл | Описание |
-|------|----------|
-| [`DEPLOYMENT.md`](./deployment/DEPLOYMENT.md) | Инструкция по развертыванию |
-| [`DEVELOPMENT.md`](./deployment/DEVELOPMENT.md) | Настройка среды разработки |
+**Проблемы?**
 
----
-
-## ⚙️ Настройка (`setup/`)
-
-| Файл | Описание |
-|------|----------|
-| [`QUICK_SETUP_GUIDE.md`](./setup/QUICK_SETUP_GUIDE.md) | Быстрая настройка проекта |
-| [`AI_SETUP_GUIDE.md`](./setup/AI_SETUP_GUIDE.md) | Настройка AI компонентов |
-| [`HUGGINGFACE_TOKEN_GUIDE.md`](./setup/HUGGINGFACE_TOKEN_GUIDE.md) | Получение токена HuggingFace |
-| [`QUICK_COMMANDS.md`](./setup/QUICK_COMMANDS.md) | Список быстрых команд |
+1. Проверь [CURRENT_STATUS.md](CURRENT_STATUS.md)
+2. Проверь [QUICK_FIX_GUIDE.md](QUICK_FIX_GUIDE.md)
+3. Читай логи:
+   - Backend: `bot_service/bot_service.log`
+   - Frontend: F12 → Console
 
 ---
 
-## 🔧 Утилитные скрипты (`scripts/`)
-
-### Python скрипты
-- **`cleanup_project.py`** - Автоматическая очистка проекта
-  ```bash
-  # Просмотр без удаления
-  python docs/scripts/cleanup_project.py --dry-run
-  
-  # Полная очистка
-  python docs/scripts/cleanup_project.py
-  ```
-
-- **`monitoring_viewer.py`** - Просмотр мониторинга
-  ```bash
-  python docs/scripts/monitoring_viewer.py
-  ```
-
-### Bash скрипты
-- **`deploy.sh`** - Развертывание на сервере
-- **`dev-setup.sh`** - Настройка окружения разработки
-- **`update.sh`** - Обновление проекта
-- **`setup-cloudflare-tunnel.sh`** - Настройка Cloudflare Tunnel
-
----
-
-## 🎯 Быстрый старт
-
-### Для начала работы:
-1. **Первая настройка**: [`setup/QUICK_SETUP_GUIDE.md`](./setup/QUICK_SETUP_GUIDE.md)
-2. **Разработка**: [`deployment/DEVELOPMENT.md`](./deployment/DEVELOPMENT.md)
-3. **Команды**: [`setup/QUICK_COMMANDS.md`](./setup/QUICK_COMMANDS.md)
-
-### Для разработчиков:
-1. **Developer Guide**: [`guides/DEVELOPER_GUIDE.md`](./guides/DEVELOPER_GUIDE.md)
-2. **База данных**: [`guides/DATABASE_MANAGEMENT_README.md`](./guides/DATABASE_MANAGEMENT_README.md)
-3. **Оптимизация**: [`reports/OPTIMIZATION_REPORT.md`](./reports/OPTIMIZATION_REPORT.md)
-
-### Для деплоя:
-1. **Deployment**: [`deployment/DEPLOYMENT.md`](./deployment/DEPLOYMENT.md)
-2. **Production Checklist**: [`reports/PRODUCTION_CHECKLIST.md`](./reports/PRODUCTION_CHECKLIST.md)
-
----
-
-## 🔍 Поиск документации
-
-| Если нужно... | Смотри... |
-|---------------|-----------|
-| 🚀 Быстро запустить проект | [`setup/QUICK_SETUP_GUIDE.md`](./setup/QUICK_SETUP_GUIDE.md) |
-| 🛠️ Настроить окружение разработки | [`deployment/DEVELOPMENT.md`](./deployment/DEVELOPMENT.md) |
-| 🗄️ Работать с базой данных | [`guides/DATABASE_MANAGEMENT_README.md`](./guides/DATABASE_MANAGEMENT_README.md) |
-| 🎤 Настроить TTS | [`setup/AI_SETUP_GUIDE.md`](./setup/AI_SETUP_GUIDE.md) |
-| 📺 Настроить VK Live | [`guides/VK_LIVE_COMMANDS_GUIDE.md`](./guides/VK_LIVE_COMMANDS_GUIDE.md) |
-| 🧹 Очистить проект | [`guides/CLEANUP_GUIDE.md`](./guides/CLEANUP_GUIDE.md) |
-| 📊 Узнать о проекте | [`reports/PROJECT_SUMMARY.md`](./reports/PROJECT_SUMMARY.md) |
-| 🐛 Протестировать проект | [`reports/TESTING_CHECKLIST.md`](./reports/TESTING_CHECKLIST.md) |
-| 🚢 Задеплоить на прод | [`deployment/DEPLOYMENT.md`](./deployment/DEPLOYMENT.md) |
-
----
-
-## 📝 Обновление документации
-
-При добавлении новой документации:
-1. Размести файл в соответствующую папку
-2. Обнови этот `README.md`
-3. Добавь ссылку в таблицу поиска
-4. Проверь все внутренние ссылки
-
----
-
-## 💡 Принципы организации
-
-### ✅ Правильно:
-- Отчеты → `reports/`
-- Руководства → `guides/`
-- Deployment → `deployment/`
-- Setup → `setup/`
-- Скрипты → `scripts/`
-
-### ❌ Неправильно:
-- ~~Документы в корне проекта~~
-- ~~Множественные README~~
-- ~~Смешанная структура~~
-
----
-
-## 🔄 История изменений
-
-### v2.0 (Октябрь 2025)
-- ✅ Централизована вся документация в `docs/`
-- ✅ Создана логическая структура папок
-- ✅ Добавлены навигационные ссылки
-- ✅ Перемещены все отчеты и гайды
-- ✅ Организованы утилитные скрипты
-
-### v1.0 (До реорганизации)
-- ❌ Документы в корне проекта
-- ❌ Неструктурированная организация
-
----
-
-**📧 Вопросы?** Загляни в [`guides/DEVELOPER_GUIDE.md`](./guides/DEVELOPER_GUIDE.md) или [`setup/QUICK_SETUP_GUIDE.md`](./setup/QUICK_SETUP_GUIDE.md)
+**Версия:** 2.0 | **Статус:** ✅ Актуально | **Дата:** 22.10.2025
 

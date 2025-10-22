@@ -91,7 +91,8 @@ class LootboxWidget {
     }
     
     connectWebSocket(userId) {
-        const wsUrl = `ws://localhost:8000/ws/lootbox-widget/${userId || 'default'}`;
+        const wsBaseUrl = window.location.protocol === 'https:' ? 'wss://' + window.location.host : 'ws://' + window.location.host;
+        const wsUrl = `${wsBaseUrl}/ws/lootbox-widget/${userId || 'default'}`;
         this.ws = new window.WidgetWebSocket(wsUrl);
         
         this.ws.on('message', (data) => {

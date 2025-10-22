@@ -1,15 +1,20 @@
 // src/context/ChatContext.jsx
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useReducer } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useReducer, useMemo } from 'react';
+import { API_BASE_URL } from '../constants';
 import { connectBot, disconnectBot, getBotStatus } from '../services/microservices';
 import { AuthContext, useAuth } from './AuthContext';
 import { useToast } from '../components/ui/toast';
 import { useIntegrations } from './IntegrationsContext';
+import { useWebSocket } from '../hooks/useWebSocket';
 import api from '../services/api';
+import { chatLogger as logger } from '../utils/logger';
 
 const ChatContext = createContext();
 
 // Reducer для управления сообщениями
 const messagesReducer = (state, action) => {
+    const maxMessages = parseInt(import.meta.env.VITE_CHAT_MAX_MESSAGES || '200', 10);
+    
     switch (action.type) {
         case 'ADD_MESSAGE':
             // Проверяем на дубликаты
@@ -21,19 +26,18 @@ const messagesReducer = (state, action) => {
             );
             
             if (isDuplicate) {
-                // ⚠️ Duplicate message detected, skipping:', action.payload);
                 return state;
             }
             
-            const newMessages = [action.payload, ...state.slice(0, 199)];
-            // 📝 Reducer: New messages array length:', newMessages.length);
+            const newMessages = [action.payload, ...state.slice(0, maxMessages - 1)];
             return newMessages;
             
         case 'CLEAR_MESSAGES':
             return [];
             
         case 'SET_MESSAGES':
-            return action.payload;
+            // Применяем ограничение на количество сообщений
+            return action.payload.slice(0, maxMessages);
             
         default:
             return state;
@@ -49,431 +53,322 @@ export const useChat = () => {
 };
 
 export const ChatProvider = ({ children }) => {
-    const { user, isAuthenticated, isLoading } = useAuth();
+    const { user, isAuthenticated, isGuest, isLoading } = useAuth();
     const { integrations, loading: integrationsLoading } = useIntegrations();
     const { addToast } = useToast();
-    const [messages, dispatchMessages] = useReducer(messagesReducer, []);
-    const [lastJsonMessage, setLastJsonMessage] = useState(null); // <-- Добавлено
-    const [isConnected, setIsConnected] = useState(false);
-    const [isConnecting, setIsConnecting] = useState(false);
-    const [error, setError] = useState(null);
     
-    const websocket = useRef(null);
+    // Инициализируем messages из localStorage
+    const loadMessagesFromStorage = () => {
+        try {
+            const maxMessages = parseInt(import.meta.env.VITE_CHAT_MAX_MESSAGES || '500', 10);
+            const stored = localStorage.getItem('chat_messages');
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                // Ограничиваем количество загруженных сообщений
+                return parsed.slice(0, maxMessages);
+            }
+        } catch (error) {
+            logger.error('Error loading messages from storage:', error);
+        }
+        return [];
+    };
     
-    // Отслеживаем изменения messages для отладки
+    const [messages, dispatchMessages] = useReducer(messagesReducer, [], loadMessagesFromStorage);
+    
+    // Загрузка истории сообщений из API при инициализации
     useEffect(() => {
-        // 🔄 Messages state changed:', messages.length, 'messages');
+        const loadChatHistory = async () => {
+            if (!isAuthenticated && !isGuest) return;
+            
+            try {
+                const response = await api.get('/api/chat/history', {
+                    params: {
+                        limit: parseInt(import.meta.env.VITE_CHAT_MAX_MESSAGES || '200', 10)
+                    }
+                });
+                
+                if (response.data.success && response.data.messages.length > 0) {
+                    logger.info(`📜 Loaded ${response.data.messages.length} messages from history`);
+                    dispatchMessages({ type: 'SET_MESSAGES', payload: response.data.messages });
+                }
+            } catch (error) {
+                logger.error('Failed to load chat history:', error);
+                // Fallback на localStorage если API не доступно
+            }
+        };
+        
+        loadChatHistory();
+    }, [isAuthenticated, isGuest]);
+    const [lastJsonMessage, setLastJsonMessage] = useState(null);
+    const [error, setError] = useState(null);
+    const [botStatus, setBotStatus] = useState('disconnected');
+    
+    // Web Audio API контекст для обхода политики браузера (как в Twitch TTS проектах)
+    const audioContext = useRef(null);
+    const audioUnlocked = useRef(false);
+    const autoplayToastShown = useRef(false);
+    
+    // Разблокировка AudioContext при первом взаимодействии (ЛЕНИВАЯ инициализация)
+    useEffect(() => {
+        const unlockAudioContext = async () => {
+            // Помечаем что пользователь взаимодействовал со страницей
+            if (!audioUnlocked.current) {
+                audioUnlocked.current = true;
+                logger.info('✅ User interaction detected - audio unlocked');
+                
+                // Удаляем обработчики после первого клика
+                document.removeEventListener('click', unlockAudioContext);
+                document.removeEventListener('touchstart', unlockAudioContext);
+                document.removeEventListener('keydown', unlockAudioContext);
+                
+                // Resume контекста если он уже существует и приостановлен
+                if (audioContext.current && audioContext.current.state === 'suspended') {
+                    try {
+                        await audioContext.current.resume();
+                        logger.info('🔊 AudioContext resumed after user gesture');
+                    } catch (err) {
+                        logger.debug('AudioContext resume failed:', err.message);
+                    }
+                }
+            }
+        };
+        
+        // Добавляем обработчики для первого взаимодействия
+        document.addEventListener('click', unlockAudioContext);
+        document.addEventListener('touchstart', unlockAudioContext);
+        document.addEventListener('keydown', unlockAudioContext);
+        
+        return () => {
+            document.removeEventListener('click', unlockAudioContext);
+            document.removeEventListener('touchstart', unlockAudioContext);
+            document.removeEventListener('keydown', unlockAudioContext);
+        };
+    }, []);
+    
+    // Используем новый WebSocket хук если пользователь авторизован (включая гостя)
+    const baseUrl = API_BASE_URL;
+    if (!baseUrl) {
+        logger.error('VITE_BOT_SERVICE_URL environment variable is required');
+        return (
+            <ChatContext.Provider value={{
+                messages: [],
+                sendMessage: () => {},
+                isConnected: false,
+                botStatus: 'disconnected',
+                connectBotToChannels: () => {},
+                disconnectBotFromChannels: () => {},
+                playTTS: () => {},
+                error: 'Ошибка конфигурации: отсутствует URL сервиса'
+            }}>
+                {children}
+            </ChatContext.Provider>
+        );
+    }
+    // Для гостей используем session_id как уникальный идентификатор, для обычных пользователей - реальный ID
+    const userId = isGuest ? user?.session_id : user?.id;
+    const wsUrl = (isAuthenticated === true || isGuest === true) ? `${baseUrl.replace('http', 'ws')}/ws/chat/${userId}` : null;
+    
+    // Логируем WebSocket URL только если есть проблемы
+    if (!wsUrl && (isAuthenticated || isGuest)) {
+        logger.warn(`Failed to construct WebSocket URL - baseUrl: ${baseUrl}, userId: ${userId}, isAuth: ${isAuthenticated}, isGuest: ${isGuest}`);
+    }
+    
+    // Мемоизируем WebSocket URL чтобы избежать пересоздания соединения
+    const memoizedWsUrl = useMemo(() => wsUrl, [wsUrl]);
+    
+    // Мемоизируем опции WebSocket чтобы избежать пересоздания соединения
+    const wsOptions = useMemo(() => ({
+        onMessage: (data) => {
+            setLastJsonMessage(data);
+            
+            if (data.type === 'message') {
+                dispatchMessages({ type: 'ADD_MESSAGE', payload: data });
+            } else if (data.type === 'bot_status') {
+                setBotStatus(data.status);
+            } else if (data.type === 'tts_audio') {
+                // Обработка готового TTS аудио из backend через Web Audio API
+                const audioData = data.data || data;
+                if (audioData.audio_url) {
+                    try {
+                        // Используем Web Audio API для лучшей совместимости с autoplay политикой
+                        const playAudioViaWebAudioAPI = async () => {
+                            try {
+                                // Проверяем что пользователь кликнул на странице
+                                if (!audioUnlocked.current) {
+                                    throw new Error('User interaction required');
+                                }
+                                
+                                // ЛЕНИВОЕ создание AudioContext (ТОЛЬКО после первого клика)
+                                if (!audioContext.current || audioContext.current.state === 'closed') {
+                                    audioContext.current = new (window.AudioContext || window.webkitAudioContext)();
+                                    logger.info('🎵 AudioContext created for TTS playback');
+                                }
+                                
+                                // Resume контекста если он приостановлен
+                                if (audioContext.current.state === 'suspended') {
+                                    await audioContext.current.resume();
+                                    logger.info('🔊 AudioContext resumed');
+                                }
+                                
+                                // Проверяем что контекст работает
+                                if (audioContext.current.state !== 'running') {
+                                    throw new Error('AudioContext not running');
+                                }
+                                
+                                // Загружаем аудио файл
+                                const response = await fetch(audioData.audio_url);
+                                const arrayBuffer = await response.arrayBuffer();
+                                
+                                // Декодируем аудио данные
+                                const audioBuffer = await audioContext.current.decodeAudioData(arrayBuffer);
+                                
+                                // Создаем source и применяем громкость
+                                const source = audioContext.current.createBufferSource();
+                                const gainNode = audioContext.current.createGain();
+                                
+                                source.buffer = audioBuffer;
+                                gainNode.gain.value = (audioData.volume || 50) / 100;
+                                
+                                // Подключаем: source → gain → destination
+                                source.connect(gainNode);
+                                gainNode.connect(audioContext.current.destination);
+                                
+                                // Воспроизводим
+                                source.start(0);
+                                logger.info(`✅ TTS audio playing via Web Audio API: ${audioData.tts_type}`);
+                                
+                            } catch (err) {
+                                // Fallback на обычный Audio если Web Audio API не работает
+                                logger.warn('Web Audio API failed, falling back to Audio element:', err.message);
+                                
+                                const audio = new Audio(audioData.audio_url);
+                                audio.volume = (audioData.volume || 50) / 100;
+                                
+                                const playPromise = audio.play();
+                                if (playPromise !== undefined) {
+                                    playPromise.catch(playErr => {
+                                        if (playErr.name === 'NotAllowedError' && !autoplayToastShown.current) {
+                                            autoplayToastShown.current = true;
+                                            addToast({
+                                                type: 'info',
+                                                title: '🔊 Разрешите озвучку',
+                                                message: 'Кликните в любом месте страницы для активации TTS',
+                                                duration: 5000
+                                            });
+                                        }
+                                    });
+                                }
+                            }
+                        };
+                        
+                        playAudioViaWebAudioAPI();
+                        
+                    } catch (err) {
+                        logger.error('Error creating TTS playback:', err);
+                    }
+                } else {
+                    logger.warn('TTS audio event received but no audio_url provided');
+                }
+            } else if (data.type === 'error') {
+                setError(data.message);
+                addToast({ 
+                    type: 'error', 
+                    title: 'Ошибка чата', 
+                    message: data.message 
+                });
+            } else if (data.type === 'ping' || data.type === 'pong') {
+                // Игнорируем ping/pong сообщения (heartbeat)
+                return;
+            } else {
+                logger.debug('Unknown message type:', data.type);
+            }
+        },
+        onOpen: () => {
+            logger.info('Chat WebSocket connected');
+            setError(null);
+        },
+        onClose: () => {
+            // Логируем только если это не нормальное закрытие
+            logger.debug('Chat WebSocket disconnected');
+        },
+        onError: (error) => {
+            logger.error('Chat WebSocket error:', error);
+            setError('Ошибка соединения с чатом');
+        },
+        autoReconnect: true,
+        reconnectInterval: 5000,  // Увеличиваем интервал переподключения до 5 секунд
+        maxReconnectAttempts: 5,  // Уменьшаем количество попыток
+        heartbeatInterval: 30000  // Heartbeat каждые 30 секунд
+    }), [addToast, audioContext, audioUnlocked, autoplayToastShown]);
+    
+    const { isConnected, sendMessage: wsSendMessage } = useWebSocket(memoizedWsUrl, wsOptions);
+    
+    // Сохраняем messages в localStorage при изменении
+    useEffect(() => {
         if (messages.length > 0) {
-            // 📋 Latest message:', messages[0]);
+            logger.debug('Messages updated:', messages.length, 'total messages');
+            try {
+                localStorage.setItem('chat_messages', JSON.stringify(messages));
+            } catch (error) {
+                logger.error('Error saving messages to storage:', error);
+            }
         }
     }, [messages]);
-    
-    // useReducer автоматически обновляет состояние
 
-    // Функция для воспроизведения TTS аудио
-    const playTtsAudio = (audioUrl) => {
+    // Функция для воспроизведения TTS
+    const playTTS = useCallback((text, voice = 'default') => {
         try {
-            // Проверяем, является ли URL уже полным
-            let fullAudioUrl = audioUrl;
-            if (!audioUrl.startsWith('http')) {
-                const ttsServiceUrl = import.meta.env.VITE_TTS_SERVICE_URL || 'http://localhost:8001';
-                fullAudioUrl = `${ttsServiceUrl}${audioUrl}`;
-            }
+            const audio = new Audio();
+            audio.src = `${API_BASE_URL}/api/tts/speak?text=${encodeURIComponent(text)}&voice=${voice}`;
             
-            // Playing TTS audio:', fullAudioUrl);
-            const audio = new Audio(fullAudioUrl);
-            
-            // Добавляем обработчики событий
-            audio.oncanplaythrough = () => {
-                // TTS audio ready to play');
-                audio.play().catch(e => {
-                    console.error("TTS audio play failed:", e);
-                    addToast({
-                        type: 'error',
-                        title: 'Ошибка воспроизведения',
-                        message: 'Не удалось воспроизвести TTS аудио'
-                    });
+            audio.onloadeddata = () => {
+                logger.debug('TTS audio loaded, playing...');
+                audio.play().catch(err => {
+                    logger.error('Error playing TTS audio:', err);
                 });
             };
             
-            audio.onended = () => {
-                // TTS audio playback ended');
-            };
-            
-            audio.onerror = (e) => {
-                console.error("Error loading TTS audio:", fullAudioUrl, e);
+            audio.onerror = (err) => {
+                logger.error('Error loading TTS audio:', err);
                 addToast({
                     type: 'error',
-                    title: 'Ошибка загрузки',
-                    message: 'Не удалось загрузить TTS аудио файл'
+                    title: 'Ошибка TTS',
+                    message: 'Не удалось загрузить аудио для озвучки'
                 });
             };
             
             // Загружаем аудио
             audio.load();
         } catch (error) {
-            console.error("Error creating TTS audio:", error);
+            logger.error("Error creating TTS audio:", error);
             addToast({
                 type: 'error',
                 title: 'Ошибка',
                 message: 'Не удалось создать аудио объект для TTS'
             });
         }
-    };
+    }, [addToast]);
 
     // Функция для проверки статуса подключения бота
     const checkConnectionStatus = useCallback(async () => {
         if (!isAuthenticated) return;
         try {
             const response = await api.get('/api/chat/status');
-            setIsConnected(response.data.is_connected);
+            setBotStatus(response.data.is_connected ? 'connected' : 'disconnected');
         } catch (err) {
-            console.error("Failed to check chat connection status:", err);
-            setIsConnected(false);
+            logger.error("Failed to check chat connection status:", err);
+            setBotStatus('disconnected');
         }
     }, [isAuthenticated]);
-    
-    // Функция для установки WebSocket соединения
-    const setupWebSocket = useCallback(() => {
-        // WebSocket только для авторизованных пользователей (не гостей)
-        if (!isAuthenticated || !user?.id || user?.id === 'guest') {
-            // WebSocket setup skipped:', { isAuthenticated, userId: user?.id });
-            return;
-        }
-
-        // Если уже есть активное соединение, не создаем новое
-        if (websocket.current && websocket.current.readyState === WebSocket.OPEN) {
-            // WebSocket already connected, skipping setup');
-            return;
-        }
-
-        // Если соединение в процессе установки, ждем
-        if (websocket.current && websocket.current.readyState === WebSocket.CONNECTING) {
-            // WebSocket is connecting, skipping setup');
-            return;
-        }
-
-        const baseWsUrl = import.meta.env.VITE_BOT_WS_URL || 'ws://localhost:8000/ws';
-        const wsUrl = `${baseWsUrl}/chat/${user.id}`;
-        
-        // 🔌 Setting up WebSocket connection to:', wsUrl);
-        setIsConnecting(true);
-        
-        const ws = new WebSocket(wsUrl);
-        websocket.current = ws;
-
-        ws.onopen = () => {
-            // ✅ WebSocket connected successfully to:', wsUrl);
-            setIsConnected(true);
-            setIsConnecting(false);
-            setError(null);
-            
-            // Отправляем ping каждые 30 секунд для поддержания соединения
-            const pingInterval = setInterval(() => {
-                if (ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: 'ping' }));
-                } else {
-                    clearInterval(pingInterval);
-                }
-            }, 30000);
-            
-            // Сохраняем интервал для очистки
-            ws.pingInterval = pingInterval;
-        };
-
-        ws.onmessage = (event) => {
-            // 🔔 WebSocket message received:', event.data);
-            const messageData = JSON.parse(event.data);
-            // 📦 Parsed message data:', messageData);
-            setLastJsonMessage(messageData); // <-- Добавлено: сохраняем все сообщение
-            
-            // Обрабатываем YouTube события
-            if (messageData.type === 'youtube_event') {
-                // YouTube event received:', messageData);
-                // Создаем кастомное событие для YouTube компонентов
-                window.dispatchEvent(new CustomEvent('youtubeEvent', {
-                    detail: messageData
-                }));
-                return;
-            }
-            
-            // Обрабатываем TTS аудио
-            if (messageData.type === 'tts_synthesized' && messageData.audio_url) {
-                // TTS Audio received:', messageData.audio_url);
-                playTtsAudio(messageData.audio_url);
-                return;
-            }
-            
-            // Обрабатываем TTS ошибки
-            if (messageData.type === 'tts_error') {
-                console.error('TTS Error:', messageData.message);
-                // Показываем красивое уведомление об ошибке
-                addToast({
-                    type: 'error',
-                    title: 'Ошибка TTS',
-                    message: messageData.message
-                });
-                return;
-            }
-            
-            // Фильтруем и добавляем только сообщения чата
-            // Checking message type
-            if (messageData.type === 'chat_message' || !messageData.type) {
-                // Добавляем уникальный ID на фронтенде для React key
-                messageData.id = Date.now() + Math.random();
-                
-                dispatchMessages({
-                    type: 'ADD_MESSAGE',
-                    payload: messageData
-                });
-                
-                // useReducer автоматически обновляет состояние
-            } else {
-                console.warn('⚠️ Message type not handled:', messageData.type);
-            }
-        };
-
-        ws.onerror = (err) => {
-            // WebSocket connection error
-            setIsConnecting(false);
-            // Убираем error toast, чтобы не раздражать пользователя постоянными уведомлениями
-            // setError("Ошибка WebSocket соединения. Попробуйте обновить страницу.");
-        };
-
-        ws.onclose = (event) => {
-            // WebSocket closed
-            
-            // Очищаем ping интервал
-            if (ws.pingInterval) {
-                clearInterval(ws.pingInterval);
-            }
-            
-            websocket.current = null;
-            setIsConnected(false);
-            setIsConnecting(false);
-            
-            // Попытка переподключения только если это не было намеренное закрытие
-            // и пользователь все еще аутентифицирован
-            if (event.code !== 1000 && isAuthenticated && user?.id && user?.id !== 'guest') {
-                // Attempting to reconnect WebSocket
-                setTimeout(() => {
-                    if (!websocket.current && isAuthenticated && user?.id && user?.id !== 'guest') {
-                        setupWebSocket();
-                    }
-                }, 3000);
-            } else if (event.code === 1000) {
-                // WebSocket closed normally
-            }
-        };
-
-    }, [isAuthenticated, user?.id, addToast]);
-
-    // ОТКЛЮЧЕНО: автоматическое переподключение при сворачивании/разворачивании браузера
-    // WebSocket остается активным в фоне, переподключение только при явном обновлении страницы
-    // useEffect(() => {
-    //     const handleVisibilityChange = () => {
-    //         if (document.visibilityState === 'visible') {
-    //             // Браузер стал активным - проверяем соединение
-    //             const needsReconnect = (!websocket.current || 
-    //                 websocket.current.readyState === WebSocket.CLOSED || 
-    //                 websocket.current.readyState === WebSocket.CLOSING) &&
-    //                 isAuthenticated && user?.id && user?.id !== 'guest';
-    //                 
-    //             if (needsReconnect) {
-    //                 console.log("🌅 Browser became visible, reconnecting WebSocket...");
-    //                 setupWebSocket();
-    //             }
-    //         }
-    //         // НЕ закрываем WebSocket при сворачивании - озвучка должна работать в фоне
-    //     };
-
-    //     document.addEventListener('visibilitychange', handleVisibilityChange);
-    //     
-    //     return () => {
-    //         document.removeEventListener('visibilitychange', handleVisibilityChange);
-    //     };
-    // }, [isAuthenticated, user?.id, setupWebSocket]);
-
-    // ОТКЛЮЧЕНО: автоматическое переподключение при фокусе окна
-    // useEffect(() => {
-    //     const handleFocus = () => {
-    //         // Окно получило фокус - проверяем соединение
-    //         const needsReconnect = (!websocket.current || 
-    //             websocket.current.readyState === WebSocket.CLOSED || 
-    //             websocket.current.readyState === WebSocket.CLOSING) &&
-    //             isAuthenticated && user?.id && user?.id !== 'guest';
-    //             
-    //         if (needsReconnect) {
-    //             console.log("🎯 Window focused, reconnecting WebSocket...");
-    //             setupWebSocket();
-    //         }
-    //     };
-
-    //     // НЕ закрываем WebSocket при потере фокуса - озвучка должна работать в фоне
-    //     window.addEventListener('focus', handleFocus);
-    //     
-    //     return () => {
-    //         window.removeEventListener('focus', handleFocus);
-    //     };
-    // }, [isAuthenticated, user?.id, setupWebSocket]);
-
-    // Функция для закрытия WebSocket соединения
-    const closeWebSocket = useCallback(() => {
-        if (websocket.current) {
-            // 🔌 Closing WebSocket connection');
-            
-            // Очищаем ping интервал
-            if (websocket.current.pingInterval) {
-                clearInterval(websocket.current.pingInterval);
-            }
-            
-            // Предотвращаем реконнект
-            websocket.current.onclose = null;
-            websocket.current.onerror = null;
-            
-            // Закрываем только если соединение открыто или в процессе открытия
-            if (websocket.current.readyState === WebSocket.OPEN || 
-                websocket.current.readyState === WebSocket.CONNECTING) {
-                websocket.current.close();
-            }
-            
-            websocket.current = null;
-            setIsConnected(false);
-        }
-    }, []);
-
-    // Основной useEffect для управления соединением
-    useEffect(() => {
-        // Не делаем ничего, пока идет проверка авторизации
-        if (isLoading) {
-            // ⏳ Waiting for auth to complete...');
-            return;
-        }
-
-        if (isAuthenticated && user?.id && user?.id !== 'guest') {
-            // 👤 User authenticated, setting up WebSocket');
-            setupWebSocket();
-        } else {
-            // 🚪 User not authenticated or is guest, closing WebSocket');
-            closeWebSocket();
-            dispatchMessages({ type: 'CLEAR_MESSAGES' });
-        }
-
-        return () => {
-            // 🧹 Cleaning up WebSocket on unmount');
-            closeWebSocket();
-        };
-    }, [isAuthenticated, user?.id, isLoading, setupWebSocket, closeWebSocket]);
-
-    // useEffect для автоматического подключения/отключения бота
-    useEffect(() => {
-        const manageBotConnection = async () => {
-            // Ждем загрузки интеграций
-            if (integrationsLoading) {
-                return;
-            }
-
-            const hasTwitch = integrations.twitch?.enabled;
-            
-            // Убираем автоматическое подключение бота
-            // if (isAuthenticated && hasTwitch && !isConnected) {
-            //     console.log("ChatContext: Twitch integration is active, attempting to auto-connect bot.");
-            //     try {
-            //         await api.post('/api/chat/connect');
-            //         setIsConnected(true);
-            //     } catch (err) {
-            //         console.error("ChatContext: Failed to auto-connect bot.", err);
-            //         setIsConnected(false);
-            //     }
-            // } else if ((!isAuthenticated || !hasTwitch) && isConnected) {
-            //     console.log("ChatContext: User logged out or Twitch integration disabled, disconnecting bot.");
-            //     try {
-            //         await api.post('/api/chat/disconnect');
-            //         setIsConnected(false);
-            //     } catch (err) {
-            //         console.error("ChatContext: Failed to auto-disconnect bot.", err);
-            //     }
-            // }
-        };
-
-        manageBotConnection();
-
-    }, [isAuthenticated, integrations, integrationsLoading, isConnected]);
-
-
-    // Функции управления ботом
-    const handleBotAction = useCallback(async (action) => {
-        if (!isAuthenticated) return;
-        setIsConnecting(true);
-        setError(null);
-        try {
-            await api.post(`/api/chat/${action}`);
-            setIsConnected(action === 'connect');
-            if (action === 'connect') {
-                addToast({
-                    type: 'success',
-                    title: 'Бот подключен',
-                    message: 'Вы успешно подключились к каналу.'
-                });
-            } else {
-                addToast({
-                    type: 'success',
-                    title: 'Бот отключен',
-                    message: 'Вы успешно отключились от канала.'
-                });
-                dispatchMessages({ type: 'CLEAR_MESSAGES' }); // Очищаем чат при отключении
-            }
-        } catch (error) {
-            if (error.response) {
-                console.error("Chat API error:", error.response.data);
-                addToast({
-                    type: 'error',
-                    title: 'Ошибка чат-бота',
-                    message: `Не удалось ${action === 'connect' ? 'подключиться к' : 'отключиться от'} канала: ${error.response.data.detail}`
-                });
-            } else {
-                console.error("Chat connection error:", error);
-                addToast({
-                    type: 'error',
-                    title: 'Ошибка сети',
-                    message: 'Проверьте ваше интернет-соединение.'
-                });
-            }
-        } finally {
-            setIsConnecting(false);
-        }
-    }, [user, isAuthenticated, addToast, setIsConnecting, setIsConnected, dispatchMessages]);
-    
-    const connectBot = useCallback(() => handleBotAction('connect'), [handleBotAction]);
-
-    const disconnect = useCallback(async () => {
-        if (!isAuthenticated) return;
-        setIsConnecting(true);
-        setError(null);
-        try {
-            await api.post('/api/chat/disconnect');
-            setIsConnected(false);
-            dispatchMessages({ type: 'CLEAR_MESSAGES' }); // Очищаем чат при отключении
-        } catch (err) {
-            console.error("Failed to disconnect bot:", err);
-            setError(err.response?.data?.detail || "Не удалось отключить бота.");
-        } finally {
-            setIsConnecting(false);
-        }
-    }, [isAuthenticated]);
-    
-    const clearChat = () => {
-        dispatchMessages({ type: 'CLEAR_MESSAGES' });
-    };
 
     // Функция для отправки сообщения в чат
     const sendMessage = useCallback((message, platforms = []) => {
-        if (!websocket.current || websocket.current.readyState !== WebSocket.OPEN) {
+        if (!isConnected) {
             throw new Error('WebSocket not connected');
         }
 
         if (!message || !message.trim()) {
-            throw new Error('Message is empty');
+            throw new Error('Message cannot be empty');
         }
 
         if (!platforms || platforms.length === 0) {
@@ -481,25 +376,113 @@ export const ChatProvider = ({ children }) => {
         }
 
         // Отправляем сообщение через WebSocket
-        websocket.current.send(JSON.stringify({
+        wsSendMessage({
             type: 'send_message',
             message: message.trim(),
             platforms: platforms
-        }));
+        });
+    }, [isConnected, wsSendMessage]);
+
+    // Функция для подключения бота
+    const connectBotToChannels = useCallback(async (platforms = []) => {
+        if (!isAuthenticated) return;
+        
+        try {
+            const response = await connectBot(platforms);
+            if (response.success) {
+                setBotStatus('connected');
+                addToast({
+                    type: 'success',
+                    title: 'Бот подключен',
+                    message: `Бот успешно подключен к ${platforms.join(', ')}`
+                });
+            }
+        } catch (error) {
+            logger.error('Error connecting bot:', error);
+            addToast({
+                type: 'error',
+                title: 'Ошибка подключения',
+                message: 'Не удалось подключить бота к каналам'
+            });
+        }
+    }, [isAuthenticated, addToast]);
+
+    // Функция для отключения бота
+    const disconnectBotFromChannels = useCallback(async () => {
+        if (!isAuthenticated) return;
+        
+        try {
+            const response = await disconnectBot();
+            if (response.success) {
+                setBotStatus('disconnected');
+                addToast({
+                    type: 'success',
+                    title: 'Бот отключен',
+                    message: 'Бот успешно отключен от всех каналов'
+                });
+            }
+        } catch (error) {
+            logger.error('Error disconnecting bot:', error);
+            addToast({
+                type: 'error',
+                title: 'Ошибка отключения',
+                message: 'Не удалось отключить бота от каналов'
+            });
+        }
+    }, [isAuthenticated, addToast]);
+
+    // Функция для получения статуса бота
+    const getBotConnectionStatus = useCallback(async () => {
+        if (!isAuthenticated) return;
+        
+        try {
+            const response = await getBotStatus();
+            setBotStatus(response.status);
+            return response;
+        } catch (error) {
+            logger.error('Error getting bot status:', error);
+            setBotStatus('disconnected');
+            return { status: 'disconnected' };
+        }
+    }, [isAuthenticated]);
+
+    // Функция для очистки сообщений
+    const clearMessages = useCallback(() => {
+        dispatchMessages({ type: 'CLEAR_MESSAGES' });
     }, []);
+
+    // Функция для установки сообщений
+    const setMessages = useCallback((newMessages) => {
+        dispatchMessages({ type: 'SET_MESSAGES', payload: newMessages });
+    }, []);
+
+    // Автоматическая проверка статуса бота при загрузке
+    useEffect(() => {
+        if (isAuthenticated && !isLoading) {
+            getBotConnectionStatus();
+        }
+    }, [isAuthenticated, isLoading, getBotConnectionStatus]);
+
+    // Очистка сообщений при выходе
+    useEffect(() => {
+        if (!isAuthenticated) {
+            dispatchMessages({ type: 'CLEAR_MESSAGES' });
+        }
+    }, [isAuthenticated]);
 
     const value = {
         messages,
-        lastJsonMessage, // <-- Добавлено
+        lastJsonMessage,
         isConnected,
-        isConnecting,
+        botStatus,
         error,
-        connect: connectBot,
-        disconnect,
-        clearChat,
-        checkConnectionStatus,
-        sendMessage, // <-- Добавлено
-        // forceUpdate убран - useReducer автоматически обновляет состояние
+        sendMessage,
+        connectBotToChannels,
+        disconnectBotFromChannels,
+        getBotConnectionStatus,
+        clearMessages,
+        setMessages,
+        playTTS
     };
 
     return (

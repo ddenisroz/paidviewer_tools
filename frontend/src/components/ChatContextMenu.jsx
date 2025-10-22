@@ -19,6 +19,42 @@ const ChatContextMenu = ({
     isTtsBlocked = false
 }) => {
     const menuRef = useRef(null);
+    const [position, setPosition] = React.useState({ x, y });
+
+    // Корректируем позицию меню, чтобы оно не выходило за границы экрана
+    useEffect(() => {
+        if (menuRef.current) {
+            const menuRect = menuRef.current.getBoundingClientRect();
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            
+            let adjustedX = x;
+            let adjustedY = y;
+            
+            // Если меню выходит за правую границу экрана, сдвигаем влево
+            if (x + menuRect.width > windowWidth) {
+                adjustedX = windowWidth - menuRect.width - 10;
+            }
+            
+            // Если меню выходит за нижнюю границу экрана, сдвигаем вверх
+            if (y + menuRect.height > windowHeight) {
+                adjustedY = windowHeight - menuRect.height - 10;
+            }
+            
+            // Не даём меню выйти за левую границу
+            if (adjustedX < 10) {
+                adjustedX = 10;
+            }
+            
+            // Не даём меню выйти за верхнюю границу
+            if (adjustedY < 10) {
+                adjustedY = 10;
+            }
+            
+            console.log(`📐 [CONTEXT MENU] Position adjusted: original(${x}, ${y}) → final(${adjustedX}, ${adjustedY}), size: ${menuRect.width}x${menuRect.height}`);
+            setPosition({ x: adjustedX, y: adjustedY });
+        }
+    }, [x, y]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -52,129 +88,38 @@ const ChatContextMenu = ({
     const isVk = message.platform === 'vk';
     
     // VK Live API ограничения - доступны только базовые функции
-    const vkAvailableActions = ['block_tts', 'unblock_tts'];
-    const twitchAvailableActions = ['block_tts', 'unblock_tts', 'timeout_10m', 'timeout_1h', 'ban', 'add_moderator', 'remove_moderator', 'add_vip', 'remove_vip'];
+    // const vkAvailableActions = ['block_tts', 'unblock_tts'];
+    // const twitchAvailableActions = ['block_tts', 'unblock_tts', 'timeout_10m', 'timeout_1h', 'ban', 'add_moderator', 'remove_moderator', 'add_vip', 'remove_vip'];
 
     return (
         <div
             ref={menuRef}
-            className="fixed bg-popover border border-border rounded-md shadow-lg py-1 z-50 min-w-[200px]"
+            className="fixed bg-popover border border-border rounded-md shadow-2xl py-1 z-[9999] min-w-[180px] animate-in fade-in slide-in-from-top-2 duration-150 backdrop-blur-sm"
             style={{
-                left: `${x}px`,
-                top: `${y}px`,
+                left: `${position.x}px`,
+                top: `${position.y}px`,
+                boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)'
             }}
         >
-            {/* TTS Блокировка */}
+            {/* Заглушить/Разглушить TTS */}
             <button
                 onClick={() => handleAction(isTtsBlocked ? 'unblock_tts' : 'block_tts')}
-                className="w-full px-4 py-2 text-sm text-left hover:bg-accent flex items-center gap-2 transition-colors"
+                className={`w-full px-4 py-2 text-sm text-left hover:bg-accent flex items-center gap-2 transition-colors font-medium ${
+                    isTtsBlocked ? 'text-green-500' : 'text-red-500'
+                }`}
             >
                 {isTtsBlocked ? (
                     <>
-                        <Volume2 className="h-4 w-4 text-green-500" />
-                        <span>Разблокировать TTS</span>
+                        <Volume2 className="h-4 w-4" />
+                        <span>Разглушить</span>
                     </>
                 ) : (
                     <>
-                        <VolumeX className="h-4 w-4 text-red-500" />
-                        <span>Заблокировать TTS</span>
+                        <VolumeX className="h-4 w-4" />
+                        <span>Заглушить</span>
                     </>
                 )}
             </button>
-
-            {/* Модерация - только для Twitch */}
-            {isTwitch && (
-                <>
-                    <div className="h-px bg-border my-1" />
-                    <div className="px-2 py-1 text-xs text-muted-foreground">Модерация (Twitch)</div>
-                    
-                    <button
-                        onClick={() => handleAction('timeout_10m')}
-                        className="w-full px-4 py-2 text-sm text-left hover:bg-accent flex items-center gap-2 transition-colors"
-                    >
-                        <Clock className="h-4 w-4 text-orange-500" />
-                        <span>Таймаут 10 минут</span>
-                    </button>
-
-                    <button
-                        onClick={() => handleAction('timeout_1h')}
-                        className="w-full px-4 py-2 text-sm text-left hover:bg-accent flex items-center gap-2 transition-colors"
-                    >
-                        <Clock className="h-4 w-4 text-orange-500" />
-                        <span>Таймаут 1 час</span>
-                    </button>
-
-                    <button
-                        onClick={() => handleAction('ban')}
-                        className="w-full px-4 py-2 text-sm text-left hover:bg-accent flex items-center gap-2 transition-colors text-red-500"
-                    >
-                        <Ban className="h-4 w-4" />
-                        <span>Забанить</span>
-                    </button>
-                </>
-            )}
-
-            {/* VK Live ограничения */}
-            {isVk && (
-                <>
-                    <div className="h-px bg-border my-1" />
-                    <div className="px-2 py-1 text-xs text-muted-foreground">VK Live API</div>
-                    <div className="px-4 py-2 text-xs text-muted-foreground">
-                        Модерация недоступна в VK Live API
-                    </div>
-                </>
-            )}
-
-            {/* Роли - только для Twitch */}
-            {isTwitch && (
-                <>
-                    <div className="h-px bg-border my-1" />
-                    <div className="px-2 py-1 text-xs text-muted-foreground">Роли (Twitch)</div>
-
-                    <button
-                        onClick={() => handleAction('add_moderator')}
-                        className="w-full px-4 py-2 text-sm text-left hover:bg-accent flex items-center gap-2 transition-colors"
-                    >
-                        <ShieldCheck className="h-4 w-4 text-green-500" />
-                        <span>Сделать модератором</span>
-                    </button>
-
-                    <button
-                        onClick={() => handleAction('remove_moderator')}
-                        className="w-full px-4 py-2 text-sm text-left hover:bg-accent flex items-center gap-2 transition-colors"
-                    >
-                        <ShieldCheck className="h-4 w-4 text-gray-500" />
-                        <span>Снять модератора</span>
-                    </button>
-
-                    <button
-                        onClick={() => handleAction('add_vip')}
-                        className="w-full px-4 py-2 text-sm text-left hover:bg-accent flex items-center gap-2 transition-colors"
-                    >
-                        <Star className="h-4 w-4 text-purple-500" />
-                        <span>Сделать VIP</span>
-                    </button>
-
-                    <button
-                        onClick={() => handleAction('remove_vip')}
-                        className="w-full px-4 py-2 text-sm text-left hover:bg-accent flex items-center gap-2 transition-colors"
-                    >
-                        <Star className="h-4 w-4 text-gray-500" />
-                        <span>Снять VIP</span>
-                    </button>
-                </>
-            )}
-
-            {/* VK Live - роли недоступны */}
-            {isVk && (
-                <>
-                    <div className="h-px bg-border my-1" />
-                    <div className="px-2 py-1 text-xs text-muted-foreground">Роли (VK Live)</div>
-                    <div className="px-4 py-2 text-xs text-muted-foreground">
-                        Управление ролями недоступно в VK Live API
-                    </div>
-                </>
-            )}
         </div>
     );
 };

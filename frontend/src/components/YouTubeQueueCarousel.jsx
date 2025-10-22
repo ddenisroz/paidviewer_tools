@@ -317,8 +317,8 @@ const YouTubeQueueCarousel = () => {
                       )}
                       
                       {video.is_paid && video.points_cost && (
-                        <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded text-xs">
-                          {video.points_cost} баллов
+                        <span className="px-3 py-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded text-xs font-medium shadow-sm">
+                          💚 {video.points_cost} баллов
                         </span>
                       )}
                     </div>

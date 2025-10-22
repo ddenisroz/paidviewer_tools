@@ -13,6 +13,7 @@ import { getAdminVoices, uploadVoice, deleteVoice, updateVoiceSettings, transcri
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../ui/toast';
 import { useButtonPosition } from '../../hooks/useButtonPosition';
+import { TTS_SERVICE_URL } from '../../constants';
 
 const VoiceManagement = () => {
     const { addToast } = useToast();
@@ -341,7 +342,7 @@ const VoiceManagement = () => {
             const audioUrl = response.data?.audio_url || response.audio_url;
             if (audioUrl) {
                 // Создаем полный URL
-                const fullAudioUrl = audioUrl.startsWith('http') ? audioUrl : `http://localhost:8001${audioUrl}`;
+                const fullAudioUrl = audioUrl.startsWith('http') ? audioUrl : `${TTS_SERVICE_URL}${audioUrl}`;
                 
                 const audio = new Audio(fullAudioUrl);
                 
@@ -496,14 +497,14 @@ const VoiceManagement = () => {
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                        <Mic className="h-6 w-6 text-purple-400" />
+                        <Mic className="h-6 w-6 text-gray-400" />
                         Управление голосами
                     </h2>
-                    <p className="text-slate-300 mt-1">Загрузка и управление всеми голосовыми сэмплами</p>
+                    <p className="text-gray-300 mt-1">Загрузка и управление всеми голосовыми сэмплами</p>
                 </div>
                 <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
                     <DialogTrigger asChild>
-                        <Button className="bg-purple-600 hover:bg-purple-700">
+                        <Button className="bg-gray-600 hover:bg-gray-700">
                             <Upload className="h-4 w-4 mr-2" />
                             Загрузить голос
                         </Button>
@@ -524,7 +525,7 @@ const VoiceManagement = () => {
                                         type="file"
                                         accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,.wma,.aiff,.au"
                                         onChange={handleFileUpload}
-                                        className="file:bg-purple-600 file:text-white file:border-0 file:rounded-md file:px-1.5 file:py-0.5 file:mr-1 file:cursor-pointer hover:file:bg-purple-700 file:text-xs cursor-pointer text-xs"
+                                        className="file:bg-gray-600 file:text-white file:border-0 file:rounded-md file:px-1.5 file:py-0.5 file:mr-1 file:cursor-pointer hover:file:bg-gray-700 file:text-xs cursor-pointer text-xs"
                                     />
                                 </div>
                             </div>
@@ -622,7 +623,7 @@ const VoiceManagement = () => {
                 </Dialog>
             </div>
 
-            <Card className="bg-slate-800/50 border-slate-700">
+            <Card className="bg-gray-800/50 border-gray-700">
                  <CardHeader>
                     <CardTitle>Список голосов</CardTitle>
                  </CardHeader>
@@ -636,30 +637,30 @@ const VoiceManagement = () => {
                                  {voices.filter(voice => voice.voice_type === 'global').length > 0 && (
                                      <div className="mb-6">
                                          <div 
-                                             className="flex items-center gap-2 mb-3 cursor-pointer hover:bg-slate-700 p-2 rounded-lg transition-colors"
+                                             className="flex items-center gap-2 mb-3 cursor-pointer hover:bg-gray-700 p-2 rounded-lg transition-colors"
                                              onClick={() => toggleSection('global')}
                                          >
-                                             <Globe className="h-5 w-5 text-blue-400"/>
+                                             <Globe className="h-5 w-5 text-gray-400"/>
                                              <h3 className="text-lg font-semibold text-white">Глобальные голоса</h3>
                                              <Badge variant="outline" className="ml-auto">
                                                  {voices.filter(voice => voice.voice_type === 'global').length}
                                              </Badge>
                                              {expandedSections.global ? 
-                                                 <ChevronDown className="h-4 w-4 text-slate-400"/> : 
-                                                 <ChevronRight className="h-4 w-4 text-slate-400"/>
+                                                 <ChevronDown className="h-4 w-4 text-gray-400"/> : 
+                                                 <ChevronRight className="h-4 w-4 text-gray-400"/>
                                              }
-                                             <span className="text-xs text-slate-500 ml-2">
+                                             <span className="text-xs text-gray-500 ml-2">
                                                  {expandedSections.global ? 'open' : 'closed'}
                                              </span>
                                          </div>
                                          {expandedSections.global && (
                                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                                  {voices.filter(voice => voice.voice_type === 'global').map((voice) => (
-                                                     <Card key={voice.id} className="bg-slate-800 border-slate-700 h-full">
+                                                     <Card key={voice.id} className="bg-gray-800 border-gray-700 h-full">
                                                          <CardHeader className="pb-2">
                                                              <div className="flex items-center justify-between">
                                                                  <CardTitle className="text-sm font-medium text-white flex items-center gap-2 truncate">
-                                                                     <Globe className="h-3 w-3 text-blue-400 flex-shrink-0"/>
+                                                                     <Globe className="h-3 w-3 text-gray-400 flex-shrink-0"/>
                                                                      <span className="truncate">{voice.name}</span>
                                                                  </CardTitle>
                                                                  <Badge variant="default" className="text-xs">global</Badge>
@@ -697,35 +698,35 @@ const VoiceManagement = () => {
                                  {voices.filter(voice => voice.voice_type === 'user').length > 0 && (
                                      <div className="mb-6">
                                          <div 
-                                             className="flex items-center gap-2 mb-3 cursor-pointer hover:bg-slate-700 p-2 rounded-lg transition-colors"
+                                             className="flex items-center gap-2 mb-3 cursor-pointer hover:bg-gray-700 p-2 rounded-lg transition-colors"
                                              onClick={() => toggleSection('user')}
                                          >
-                                             <Users className="h-5 w-5 text-green-400"/>
+                                             <Users className="h-5 w-5 text-gray-400"/>
                                              <h3 className="text-lg font-semibold text-white">Пользовательские голоса</h3>
                                              <Badge variant="outline" className="ml-auto">
                                                  {voices.filter(voice => voice.voice_type === 'user').length}
                                              </Badge>
                                              {expandedSections.user ? 
-                                                 <ChevronDown className="h-4 w-4 text-slate-400"/> : 
-                                                 <ChevronRight className="h-4 w-4 text-slate-400"/>
+                                                 <ChevronDown className="h-4 w-4 text-gray-400"/> : 
+                                                 <ChevronRight className="h-4 w-4 text-gray-400"/>
                                              }
-                                             <span className="text-xs text-slate-500 ml-2">
+                                             <span className="text-xs text-gray-500 ml-2">
                                                  {expandedSections.user ? 'open' : 'closed'}
                                              </span>
                                          </div>
                                          {expandedSections.user && (
                                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                                  {voices.filter(voice => voice.voice_type === 'user').map((voice) => (
-                                                     <Card key={voice.id} className="bg-slate-800 border-slate-700 h-full">
+                                                     <Card key={voice.id} className="bg-gray-800 border-gray-700 h-full">
                                                          <CardHeader className="pb-2">
                                                              <div className="flex items-center justify-between">
                                                                  <CardTitle className="text-sm font-medium text-white flex items-center gap-2 truncate">
-                                                                     <Users className="h-3 w-3 text-green-400 flex-shrink-0"/>
+                                                                     <Users className="h-3 w-3 text-gray-400 flex-shrink-0"/>
                                                                      <span className="truncate">{voice.name}</span>
                                                                  </CardTitle>
                                                                  <Badge variant="secondary" className="text-xs">user</Badge>
                                                              </div>
-                                                             <div className="text-xs text-slate-400 truncate">
+                                                             <div className="text-xs text-gray-400 truncate">
                                                                  {(() => {
                                                                      const owner = users.find(u => u.id === voice.owner_id);
                                                                      return owner ? (
@@ -770,7 +771,7 @@ const VoiceManagement = () => {
                              </>
                          ) : (
                              <div className="col-span-full text-center py-8">
-                                 <p className="text-slate-400">Голосов не найдено</p>
+                                 <p className="text-gray-400">Голосов не найдено</p>
                              </div>
                          )}
                      </div>

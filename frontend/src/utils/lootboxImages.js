@@ -1,4 +1,5 @@
 // Утилиты для работы с лутбоксами на основе картинок
+import { API_BASE_URL } from '../constants';
 
 /**
  * Получает набор картинок для анимации лутбокса по типу
@@ -146,36 +147,26 @@ export const getRandomLootboxImages = (rarity) => {
 };
 
 /**
- * Создает моковые данные для демонстрации
- * @returns {Array} - Массив моковых лутбоксов
+ * Создает данные лутбоксов из API
+ * @returns {Promise<Array>} - Массив лутбоксов из базы данных
  */
-export const createMockLootboxes = () => {
-  return [
-    {
-      id: 1,
-      name: 'Обычный лутбокс',
-      rarity: 'common',
-      description: 'Простой лутбокс с базовыми наградами'
-    },
-    {
-      id: 2,
-      name: 'Редкий лутбокс',
-      rarity: 'rare',
-      description: 'Редкий лутбокс с улучшенными наградами'
-    },
-    {
-      id: 3,
-      name: 'Эпический лутбокс',
-      rarity: 'epic',
-      description: 'Эпический лутбокс с мощными наградами'
-    },
-    {
-      id: 4,
-      name: 'Легендарный лутбокс',
-      rarity: 'legendary',
-      description: 'Легендарный лутбокс с уникальными наградами'
+export const createLootboxesFromAPI = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/drops/lootboxes`, {
+      credentials: 'include'
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      return data.lootboxes || [];
+    } else {
+      // Ошибка загрузки лутбоксов из API
+      return [];
     }
-  ];
+  } catch (error) {
+    // Ошибка загрузки лутбоксов
+    return [];
+  }
 };
 
 /**
@@ -205,7 +196,7 @@ export const createSparkleEffect = (element) => {
   
   const sparkle = document.createElement('div');
   sparkle.className = 'absolute inset-0 pointer-events-none animate-sparkle';
-  sparkle.innerHTML = '✨';
+        sparkle.textContent = '✨';
   sparkle.style.fontSize = '2rem';
   sparkle.style.display = 'flex';
   sparkle.style.alignItems = 'center';

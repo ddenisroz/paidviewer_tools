@@ -3,8 +3,12 @@ uvicorn
 python-dotenv
 sqlalchemy
 aiohttp
+# PyTorch with CUDA support
+# Install with: pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu124
+# Or use: pip install torch==2.4.0+cu124 torchaudio==2.4.0+cu124 torchvision==0.19.0+cu124 --extra-index-url https://download.pytorch.org/whl/cu124
 torch
 torchaudio
+torchvision
 soundfile
 librosa
 pydub
@@ -12,3 +16,5 @@ numpy
 f5-tts
 faster-whisper
 ruaccent
+# redis - removed, using database instead
+# aioredis - removed, using database instead

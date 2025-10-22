@@ -6,18 +6,15 @@ import AuthGuard from './components/AuthGuard';
 import Layout from './components/Layout';
 import { PlayerProvider } from './context/PlayerContext';
 import { DonationAlertsProvider } from './context/DonationAlertsContext';
+import { UserSettingsProvider } from './context/UserSettingsContext';
 
-// Компонент загрузки
-const LoadingFallback = () => (
-    <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
-    </div>
-);
+// Убираем глобальный прелоадер
 
 // Lazy loading для страниц
 // Critical pages - загружаем сразу
 import LoginPage from './pages/LoginPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
+import DonationAlertsCallback from './pages/DonationAlertsCallback';
 import HomePage from './pages/HomePage';
 
 // Non-critical pages - lazy loading
@@ -25,6 +22,7 @@ const GuestPage = lazy(() => import('./pages/GuestPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const TtsMainPage = lazy(() => import('./pages/tts/TtsMainPage'));
 const VoiceManagementPage = lazy(() => import('./pages/tts/VoiceManagementPage'));
+const LocalTTSSettingsPage = lazy(() => import('./pages/tts/LocalTTSSettingsPage'));
 const MediaMainPage = lazy(() => import('./pages/media/MediaMainPage'));
 const PointsManagementPage = lazy(() => import('./pages/PointsManagementPage'));
 const YoutubeIntegrationPage = lazy(() => import('./pages/media/YoutubeIntegrationPage'));
@@ -41,23 +39,27 @@ const MonitoringPage = lazy(() => import('./pages/admin/MonitoringPage'));
 const BlockedChannelsPage = lazy(() => import('./pages/admin/BlockedChannelsPage'));
 const SupportTicketsPage = lazy(() => import('./pages/admin/SupportTicketsPage'));
 const DropsMainPage = lazy(() => import('./pages/drops/DropsMainPage'));
-const DropsRewardsPage = lazy(() => import('./pages/drops/DropsRewardsPage'));
+const DropsWidget = lazy(() => import('./pages/obs/DropsWidget'));
+// Убираем DropsRewardsPage - бесполезная вкладка
 
 
 function App() {
     return (
         <PlayerProvider>
             <DonationAlertsProvider>
-                <Toaster />
-                <Suspense fallback={<LoadingFallback />}>
+                <UserSettingsProvider>
+                    <Toaster />
+                    <Suspense fallback={null}>
                     <Routes>
                         {/* Public Routes */}
                         <Route path="/login" element={<LoginPage />} />
                         <Route path="/guest" element={<GuestPage />} />
                         <Route path="/auth/callback" element={<AuthCallbackPage />} />
                         <Route path="/auth/vk/callback" element={<AuthCallbackPage />} />
+                        <Route path="/donationalerts/callback" element={<DonationAlertsCallback />} />
                         <Route path="/tts-obs/:token" element={<ObsTtsPage />} />
                         <Route path="/youtube-obs/:token" element={<ObsYoutubePage />} />
+                        <Route path="/drops-widget/:token" element={<DropsWidget />} />
                         <Route path="/chat/obs" element={<ChatObsPage />} />
 
                         {/* Protected Routes with Layout */}
@@ -67,11 +69,12 @@ function App() {
                                 <Route path="dashboard" element={<HomePage />} />
                                 <Route path="dashboard/tts" element={<TtsMainPage />} />
                                 <Route path="dashboard/tts/voices" element={<VoiceManagementPage />} />
+                                <Route path="dashboard/tts/local" element={<LocalTTSSettingsPage />} />
                                 <Route path="dashboard/settings" element={<SettingsPage />} />
                                 <Route path="dashboard/media" element={<MediaMainPage />} />
                                 <Route path="dashboard/points" element={<PointsManagementPage />} />
                                 <Route path="dashboard/drops" element={<DropsMainPage />} />
-                                <Route path="dashboard/drops/rewards" element={<DropsRewardsPage />} />
+                                {/* Убираем бесполезную вкладку drops/rewards */}
                                 <Route path="dashboard/media/youtube" element={<YoutubeIntegrationPage />} />
                                 <Route path="youtube-settings" element={<YoutubeSettingsPage />} />
                                 <Route path="dashboard/chat-analysis" element={<AnalyticsPage />} />
@@ -88,7 +91,8 @@ function App() {
                             </Route>
                         </Route>
                     </Routes>
-                </Suspense>
+                    </Suspense>
+                </UserSettingsProvider>
             </DonationAlertsProvider>
         </PlayerProvider>
     );

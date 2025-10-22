@@ -1,13 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Mic, Clapperboard, AreaChart, Terminal, Youtube, Coins, Headphones, Settings, Shield, MessageSquare, Command, Gift, Sparkles, Monitor } from 'lucide-react';
+import { Home, Mic, Clapperboard, AreaChart, Terminal, Youtube, Coins, Headphones, Settings, Shield, MessageSquare, Command, Gift, Sparkles, Monitor, Menu, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { getAdminList } from '../../services/microservices';
+import { getAdminList, botService } from '../../services/microservices';
 
 const getNavItems = (isYourchy) => {
     const baseItems = [
         { to: '/dashboard', label: 'Главная', icon: Home },
-        { to: '/dashboard/tts', label: 'TTS ИИ озвучка', icon: Mic },
+        { 
+            to: '/dashboard/tts', 
+            label: 'TTS ИИ озвучка', 
+            icon: Mic,
+            submenu: [
+                { to: '/dashboard/tts/voices', label: 'Управление голосами', icon: Headphones },
+                { to: '/dashboard/tts/local', label: 'Локальный движок', icon: Monitor },
+            ]
+        },
         { 
             to: '/dashboard/media', 
             label: 'Медиа интерактивность', 
@@ -17,14 +25,7 @@ const getNavItems = (isYourchy) => {
                 { to: '/dashboard/points', label: 'Баллы канала', icon: Coins },
             ]
         },
-        { 
-            to: '/dashboard/drops', 
-            label: 'Drops система', 
-            icon: Sparkles,
-            submenu: [
-                { to: '/dashboard/drops/rewards', label: 'Управление наградами', icon: Gift },
-            ]
-        },
+        { to: '/dashboard/drops', label: 'Drops система', icon: Sparkles },
         { to: '/dashboard/chat-analysis', label: 'Анализ и модерация чата', icon: MessageSquare },
         { to: '/dashboard/commands', label: 'Команды', icon: Command },
         { to: '/dashboard/settings', label: 'Настройки', icon: Settings },
@@ -38,7 +39,7 @@ const getNavItems = (isYourchy) => {
     return baseItems;
 };
 
-const SidebarNavItem = ({ item, openSection, setOpenSection }) => {
+const SidebarNavItem = ({ item, openSection, setOpenSection, onMobileMenuClose }) => {
     const location = useLocation();
     const hasSubmenu = item.submenu && item.submenu.length > 0;
 
@@ -62,6 +63,7 @@ const SidebarNavItem = ({ item, openSection, setOpenSection }) => {
                     <NavLink 
                         to={item.to} 
                         end 
+                        onClick={onMobileMenuClose}
                         className={({isActive}) => `flex items-center gap-4 transition-colors ${isActive || isParentActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                         <item.icon className="h-6 w-6" />
@@ -74,6 +76,7 @@ const SidebarNavItem = ({ item, openSection, setOpenSection }) => {
                             <NavLink
                                 key={subItem.to}
                                 to={subItem.to}
+                                onClick={onMobileMenuClose}
                                 className={({ isActive }) =>
                                     `flex items-center gap-3 rounded-md px-4 py-2 text-base font-medium transition-colors ${
                                         isActive
@@ -96,6 +99,7 @@ const SidebarNavItem = ({ item, openSection, setOpenSection }) => {
         <NavLink
             to={item.to}
             end
+            onClick={onMobileMenuClose}
             className={({ isActive }) =>
                 `flex items-center gap-4 rounded-lg px-4 py-2.5 text-lg font-semibold transition-colors ${
                     isActive
@@ -111,16 +115,22 @@ const SidebarNavItem = ({ item, openSection, setOpenSection }) => {
 };
 
 const Sidebar = () => {
-    const { user, isAuthenticated } = useAuth();
+    const { user, isAuthenticated, isGuest } = useAuth();
     const [adminUsers, setAdminUsers] = useState([]);
     const [isAdmin, setIsAdmin] = useState(false);
     
-    // Загружаем список админов при монтировании компонента
+    // Загружаем список админов только для админов
     useEffect(() => {
         const loadAdminList = async () => {
+            // Проверяем права доступа перед запросом
+            if (!user?.is_admin) {
+                setAdminUsers([]);
+                return;
+            }
+            
             try {
-                const response = await getAdminList();
-                setAdminUsers(response.data.admins || []);
+                const response = await botService.get('/api/admin/list');
+                setAdminUsers(response.data);
             } catch (error) {
                 console.error('Failed to load admin list:', error);
                 setAdminUsers([]);
@@ -128,7 +138,7 @@ const Sidebar = () => {
         };
         
         loadAdminList();
-    }, []); // Keep empty dependency array to load only once
+    }, [user?.is_admin]); // Загружаем только при изменении прав админа
     
     // Проверяем, является ли пользователь админом
     useEffect(() => {
@@ -145,14 +155,49 @@ const Sidebar = () => {
     
     // Состояние для управления открытыми разделами
     const [openSection, setOpenSection] = useState(null);
+    
+    // Состояние для мобильного меню
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     return (
-        <div className="hidden bg-background md:block">
-            <div className="flex h-full max-h-screen flex-col gap-2">
+        <>
+            {/* Мобильная кнопка меню */}
+            <button 
+                className="md:hidden fixed top-4 left-4 z-50 p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                aria-label="Открыть меню"
+            >
+                {isMobileMenuOpen ? (
+                    <X className="h-6 w-6 text-white" />
+                ) : (
+                    <Menu className="h-6 w-6 text-white" />
+                )}
+            </button>
+            
+            {/* Overlay для мобильных */}
+            {isMobileMenuOpen && (
+                <div 
+                    className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                />
+            )}
+            
+            {/* Sidebar */}
+            <div className={`
+                fixed md:relative h-full w-64 bg-background z-50 transform transition-transform duration-300 ease-in-out
+                ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+                md:block
+            `}>
+                <div className="flex h-full max-h-screen flex-col gap-2">
                 <div className="flex h-16 items-center px-4 lg:h-[70px] lg:px-6">
                     <NavLink to="/dashboard" className="flex items-center gap-2 font-semibold">
-                        <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                            Payedviewer tools
+                        <span className="text-xl font-bold text-green-400 font-mono tracking-wider whitespace-nowrap">
+                            Payedviewer_tools
+                            {isGuest && (
+                                <span className="text-sm text-slate-400 ml-2">
+                                    (Guest mode)
+                                </span>
+                            )}
                         </span>
                     </NavLink>
                 </div>
@@ -164,6 +209,7 @@ const Sidebar = () => {
                                 item={item} 
                                 openSection={openSection}
                                 setOpenSection={setOpenSection}
+                                onMobileMenuClose={() => setIsMobileMenuOpen(false)}
                             />
                         ))}
                     </nav>
@@ -185,8 +231,9 @@ const Sidebar = () => {
                         </div>
                     </div>
                 )}
+                </div>
             </div>
-        </div>
+        </>
     );
 }
 

@@ -308,5 +308,5 @@ if __name__ == "__main__":
     # Тестирование
     test_text = "елка, медведь, осел, все, еще, ее"
     result = yoficate_text(test_text)
-    print(f"Исходный текст: {test_text}")
-    print(f"Ёфицированный: {result}")
+    logger.info(f"Test text: {test_text}")
+    logger.info(f"Yoficated result: {result}")

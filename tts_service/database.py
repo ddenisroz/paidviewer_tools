@@ -5,8 +5,8 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.ext.declarative import declarative_base
 
 # Определяем путь к базе данных в bot_service
-# BASE_DIR -> tts_service -> parent -> bot_service -> core -> data -> app_data.db
-DATABASE_DIR = Path(__file__).resolve().parent.parent / "bot_service" / "core" / "data"
+# BASE_DIR -> tts_service -> parent -> bot_service -> data -> app_data.db
+DATABASE_DIR = Path(__file__).resolve().parent.parent / "bot_service" / "data"
 
 # Создаем папку если её нет
 DATABASE_DIR.mkdir(parents=True, exist_ok=True)
@@ -41,6 +41,13 @@ class User(Base):
     is_admin = Column(Boolean, default=False)
     settings = Column(JSON, default={})
     created_at = Column(DateTime(timezone=True), default=func.now())
+    
+    # TTS настройки пользователя
+    tts_max_text_length = Column(Integer, default=200)  # Максимальная длина текста
+    tts_daily_limit = Column(Integer, default=100)  # Дневной лимит запросов
+    tts_gpu_time_limit = Column(Float, default=300.0)  # Лимит GPU времени в секундах в день
+    tts_priority_level = Column(Integer, default=2)  # Уровень приоритета (1-4)
+    tts_enabled = Column(Boolean, default=True)  # Включен ли TTS для пользователя
 
 class Voice(Base):
     __tablename__ = 'voices'
@@ -65,6 +72,35 @@ class Voice(Base):
     cross_fade_duration = Column(Float, default=0.15)
     silence_duration_ms = Column(Integer, default=100)
     sway_sampling_coef = Column(Float, default=-1.0)
+
+class UserTTSUsage(Base):
+    """Логирование использования TTS пользователями для биллинга и throttle"""
+    __tablename__ = 'user_tts_usage'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    date = Column(DateTime(timezone=True), default=func.now(), index=True)
+    
+    # Статистика использования
+    requests_count = Column(Integer, default=0)  # Количество запросов
+    gpu_time_seconds = Column(Float, default=0.0)  # Время GPU в секундах
+    cpu_time_seconds = Column(Float, default=0.0)  # Время CPU в секундах
+    total_characters = Column(Integer, default=0)  # Общее количество символов
+    successful_requests = Column(Integer, default=0)  # Успешные запросы
+    failed_requests = Column(Integer, default=0)  # Неудачные запросы
+    
+    # Детали по типам обработки
+    gpu_requests = Column(Integer, default=0)  # Запросы на GPU
+    cpu_requests = Column(Integer, default=0)  # Запросы на CPU
+    
+    # Приоритеты
+    critical_requests = Column(Integer, default=0)  # Критические запросы
+    high_requests = Column(Integer, default=0)  # Высокий приоритет
+    normal_requests = Column(Integer, default=0)  # Обычные запросы
+    low_requests = Column(Integer, default=0)  # Низкий приоритет
+    
+    created_at = Column(DateTime(timezone=True), default=func.now())
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
 
 
 def get_db():

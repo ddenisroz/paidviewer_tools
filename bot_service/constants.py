@@ -2,11 +2,21 @@
 Константы для bot_service
 Централизованное хранение всех магических чисел, строк и конфигурационных значений
 """
+import os
 
 # === URL и ENDPOINT КОНСТАНТЫ ===
-DEFAULT_FRONTEND_URL = "http://localhost:5173"
-DEFAULT_BACKEND_URL = "http://localhost:8000"
-DEFAULT_TTS_SERVICE_URL = "http://localhost:8001"
+# Требуем обязательную настройку URL через переменные окружения
+DEFAULT_FRONTEND_URL = os.getenv("FRONTEND_URL")
+DEFAULT_BACKEND_URL = os.getenv("BACKEND_URL") 
+DEFAULT_TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL")
+
+# Проверяем наличие обязательных URL
+if not DEFAULT_FRONTEND_URL:
+    raise ValueError("FRONTEND_URL environment variable is required")
+if not DEFAULT_BACKEND_URL:
+    raise ValueError("BACKEND_URL environment variable is required")
+if not DEFAULT_TTS_SERVICE_URL:
+    raise ValueError("TTS_SERVICE_URL environment variable is required")
 
 # OAuth редиректы
 OAUTH_REDIRECT_URLS = {

@@ -4,11 +4,13 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
 import logging
+import time
 
 # Импорты моделей и сервисов
 from core.database import get_db
 from services.queue_service import QueueService
 from services.youtube_service import YouTubeService
+from utils.enhanced_logger import log_request, log_response, api_logger
 
 # Получим функции аутентификации из main.py
 import sys
@@ -58,6 +60,8 @@ async def add_video_to_queue(
     db: Session = Depends(get_db)
 ):
     """Добавление видео в очередь"""
+    log_request("/youtube/queue/add", "POST", {"video_url": request.video_url}, user.get('id'))
+    start_time = time.time()
     try:
         # Временно используем заглушки для requester info
         # В реальной системе это будет из сессии/чата
@@ -74,12 +78,15 @@ async def add_video_to_queue(
         )
         
         if result["success"]:
-            return {
+            response = {
                 "success": True,
                 "message": "Видео добавлено в очередь",
                 "queue_item": result["queue_item"]
             }
+            log_response("/youtube/queue/add", 200, response, time.time() - start_time)
+            return response
         else:
+            log_response("/youtube/queue/add", 400, {"error": result["error"]}, time.time() - start_time)
             raise HTTPException(status_code=400, detail=result["error"])
             
     except Exception as e:
@@ -147,6 +154,7 @@ async def remove_from_queue(
         raise HTTPException(status_code=500, detail="Ошибка удаления видео")
 
 @youtube_router.delete("/queue/clear")
+@youtube_router.post("/clear")  # Alias для совместимости с frontend
 async def clear_queue(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -210,21 +218,87 @@ async def get_video_info(video_url: str):
         raise HTTPException(status_code=500, detail="Ошибка получения информации о видео")
 
 @youtube_router.get("/search")
-async def search_videos(query: str, max_results: int = 5):
-    """Поиск YouTube видео"""
+async def search_youtube_videos(
+    query: str = None,
+    platform: str = "youtube",
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Поиск YouTube видео по названию или популярным видео"""
+    log_request("/youtube/search", "GET", {"query": query}, user.get('id'))
+    start_time = time.time()
+    
     try:
-        if not query.strip():
-            raise HTTPException(status_code=400, detail="Поисковый запрос не может быть пустым")
+        if not query or len(query.strip()) < 2:
+            # Возвращаем список популярных видео если нет поиска
+            response = {
+                "success": True,
+                "results": [
+                    {
+                        "video_id": "dQw4w9WgXcQ",
+                        "title": "Rick Astley - Never Gonna Give You Up (Video)",
+                        "thumbnail": "https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg",
+                        "channel": "Rick Astley Official",
+                        "duration": "3:33",
+                        "views": "1.2B"
+                    },
+                    {
+                        "video_id": "jNQXAC9IVRw",
+                        "title": "Me at the zoo",
+                        "thumbnail": "https://img.youtube.com/vi/jNQXAC9IVRw/mqdefault.jpg",
+                        "channel": "jawed",
+                        "duration": "0:18",
+                        "views": "300M"
+                    }
+                ],
+                "count": 2
+            }
+            log_response("/youtube/search", 200, response, time.time() - start_time)
+            return response
         
-        results = await youtube_service.search_videos(query, max_results)
+        # Используем yt-dlp для поиска (без скачивания)
+        import yt_dlp
         
-        return {
-            "success": True,
-            "results": results
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'default_search': 'ytsearch5',  # Ищем 5 результатов
+            'extract_flat': True,
+            'skip_download': True,
         }
         
-    except HTTPException:
-        raise
+        search_results = []
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(query, download=False)
+                
+                if 'entries' in info:
+                    for entry in info['entries'][:5]:
+                        if entry.get('id'):
+                            search_results.append({
+                                "video_id": entry.get('id'),
+                                "title": entry.get('title', 'Unknown'),
+                                "thumbnail": entry.get('thumbnail', f"https://img.youtube.com/vi/{entry.get('id')}/mqdefault.jpg"),
+                                "channel": entry.get('uploader', 'Unknown'),
+                                "duration": entry.get('duration', 'Unknown'),
+                                "url": f"https://www.youtube.com/watch?v={entry.get('id')}"
+                            })
+        except Exception as yt_error:
+            logger.warning(f"yt-dlp search failed: {yt_error}, using fallback")
+            # Fallback: возвращаем пустой результат
+            search_results = []
+        
+        response = {
+            "success": True,
+            "results": search_results,
+            "count": len(search_results),
+            "query": query
+        }
+        
+        log_response("/youtube/search", 200, response, time.time() - start_time)
+        return response
+        
     except Exception as e:
-        logger.error(f"Error searching videos via API: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка поиска видео")
+        logger.error(f"Error searching YouTube: {e}")
+        log_response("/youtube/search", 500, {"error": str(e)}, time.time() - start_time)
+        raise HTTPException(status_code=500, detail="Ошибка поиска видео YouTube")

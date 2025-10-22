@@ -118,6 +118,17 @@ export const TtsProvider = ({ children }) => {
         }
     }, [user]);
 
+    // Слушаем изменения от TtsQuickSettings (shortcuts на главной странице)
+    useEffect(() => {
+        const handleTtsStatusChange = (event) => {
+            console.log('🔄 TtsContext: Received tts-status-changed event:', event.detail);
+            setTtsEnabled(event.detail.enabled);
+        };
+
+        window.addEventListener('tts-status-changed', handleTtsStatusChange);
+        return () => window.removeEventListener('tts-status-changed', handleTtsStatusChange);
+    }, []);
+
     const loadVoices = useCallback(async () => {
         if (user && engineStatus.loaded) {
              try {
@@ -192,6 +203,12 @@ export const TtsProvider = ({ children }) => {
             if (ttsEnabled) {
                 await disableTts();
                 setTtsEnabled(false);
+                
+                // Уведомляем shortcuts на главной странице
+                window.dispatchEvent(new CustomEvent('tts-status-changed', { 
+                    detail: { enabled: false } 
+                }));
+                
                 const message = "Озвучка сообщений отключена.";
                 if (notificationCallback) {
                     notificationCallback(message, "success");
@@ -202,6 +219,12 @@ export const TtsProvider = ({ children }) => {
             } else {
                 await enableTts();
                 setTtsEnabled(true);
+                
+                // Уведомляем shortcuts на главной странице
+                window.dispatchEvent(new CustomEvent('tts-status-changed', { 
+                    detail: { enabled: true } 
+                }));
+                
                 const message = "Озвучка сообщений включена.";
                 if (notificationCallback) {
                     notificationCallback(message, "success");

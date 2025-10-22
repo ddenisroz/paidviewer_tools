@@ -1,5 +1,6 @@
 // src/pages/HomePage.jsx
 import React, { useMemo, useState, useEffect } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -10,16 +11,26 @@ import StreamTitleCard from '../components/StreamTitleCard';
 import StreamCategoryCard from '../components/StreamCategoryCard';
 import GuestStubs from '../components/GuestStubs';
 import IntegrationsDisabledPlaceholder from '../components/IntegrationsDisabledPlaceholder';
+import TtsQuickSettings from '../components/TtsQuickSettings';
 
 
 
 const HomePage = () => {
-    const { isAuthenticated } = useAuth();
-    const { integrations } = useIntegrations();
+    const { isAuthenticated, isGuest, user } = useAuth();
+    const { integrations, isLoading: integrationsLoading } = useIntegrations();
     const { streamHistory } = useData();
     
     // Дополнительные данные для VK Live
     const [vkStreamInfo, setVkStreamInfo] = useState(null);
+    
+    // Общее состояние загрузки для всех карточек
+    const [contentLoaded, setContentLoaded] = useState(false);
+    
+    // Состояние объединения полей для карточек
+    const [titleLinked, setTitleLinked] = useState(false);
+    const [categoryLinked, setCategoryLinked] = useState(false);
+
+    // Состояние будет загружаться через контекст CombineSettingsContext
 
     // Загружаем данные VK Live отдельно
     useEffect(() => {
@@ -42,45 +53,9 @@ const HomePage = () => {
         return () => clearInterval(interval);
     }, [integrations?.vk?.enabled, isAuthenticated]);
 
-    const preparedStreamHistory = useMemo(() => {
-        // streamHistory - это объект с полями history, data, twitch_history, vk_history
-        const historyData = streamHistory?.history || streamHistory?.data || [];
-        if (!Array.isArray(historyData) || historyData.length < 1) {
-            return [];
-        }
-        const sortedHistory = [...historyData].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-        const startTime = new Date(sortedHistory[0].timestamp).getTime();
-        if (isNaN(startTime)) return [];
-        return sortedHistory
-            .filter(d => d.viewers >= 0)
-            .map(d => {
-                const currentTime = new Date(d.timestamp);
-                if (isNaN(currentTime.getTime())) return null;
-                // Используем нормальное время вместо относительного
-                const hours = currentTime.getHours().toString().padStart(2, '0');
-                const minutes = currentTime.getMinutes().toString().padStart(2, '0');
-                return { ...d, time: `${hours}:${minutes}` };
-            }).filter(Boolean);
-    }, [streamHistory]);
+    // Удален неиспользуемый preparedStreamHistory
 
-    const preparedVkStreamHistory = useMemo(() => {
-        if (!streamHistory?.vk_history || !Array.isArray(streamHistory.vk_history) || streamHistory.vk_history.length < 1) {
-            return [];
-        }
-        const sortedHistory = [...streamHistory.vk_history].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-        const startTime = new Date(sortedHistory[0].timestamp).getTime();
-        if (isNaN(startTime)) return [];
-        return sortedHistory
-            .filter(d => d.viewers >= 0)
-            .map(d => {
-                const currentTime = new Date(d.timestamp);
-                if (isNaN(currentTime.getTime())) return null;
-                // Используем нормальное время вместо относительного
-                const hours = currentTime.getHours().toString().padStart(2, '0');
-                const minutes = currentTime.getMinutes().toString().padStart(2, '0');
-                return { ...d, time: `${hours}:${minutes}` };
-            }).filter(Boolean);
-    }, [streamHistory]);
+    // Удален неиспользуемый preparedVkStreamHistory
     
     // Подготавливаем данные о стримах для компонента StreamStatus
     const streamData = useMemo(() => {
@@ -125,35 +100,144 @@ const HomePage = () => {
         };
     }, [integrations, streamHistory, vkStreamInfo]);
 
+
+    // Показываем пустые карточки если интеграции еще загружаются
+    const isLoading = integrations.twitch.enabled === null || integrations.vk.enabled === null || integrationsLoading;
+    
+    // Управляем состоянием загрузки контента
+    useEffect(() => {
+        if (!isLoading) {
+            // Небольшая задержка для плавного появления всех карточек одновременно
+            const timer = setTimeout(() => {
+                setContentLoaded(true);
+            }, 100);
+            return () => clearTimeout(timer);
+        } else {
+            setContentLoaded(false);
+        }
+    }, [isLoading]);
+
     return (
         <div className="space-y-8 pb-20">
-            {/* Статусы стримов */}
-            <div className="flex justify-center">
-                <StreamStatus 
-                    integrations={integrations}
-                    streamData={streamData}
-                />
-            </div>
+            {/* Статусы стримов - скрываем для гостей */}
+            {!isGuest && (
+                <div className={`flex justify-center transition-all duration-500 ${contentLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                    <StreamStatus 
+                        integrations={integrations}
+                        streamData={streamData}
+                        isLoading={isLoading}
+                    />
+                </div>
+            )}
             
-            <div className="space-y-6 max-w-6xl mx-auto">
+            <div className="space-y-6 max-w-6xl mx-auto overflow-visible">
                 {!isAuthenticated ? (
                     <GuestStubs />
-                ) : !integrations.twitch.enabled && !integrations.vk.enabled ? (
+                ) : isGuest ? (
+                    /* Для гостя показываем только ChatBox */
+                    <div className="w-full">
+                        <ChatCard 
+                            integrations={integrations}
+                            isOnHomePage={true}
+                        />
+                    </div>
+                ) : (integrations.twitch.enabled === false && integrations.vk.enabled === false) ? (
                     <IntegrationsDisabledPlaceholder />
                 ) : (
                     <>
                         {/* Настройки стрима - в две колонки */}
-                        <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-                            <StreamTitleCard />
-                            <StreamCategoryCard />
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Карточка названия */}
+                            <div className={`transition-all duration-500 ${contentLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                                {isLoading ? (
+                                    <Card className="border-muted-foreground/20 bg-muted/5">
+                                        <CardHeader className="pb-3">
+                                            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                                                <div className="w-5 h-5 bg-muted-foreground/30 rounded"></div>
+                                                <div className="h-5 bg-muted-foreground/30 rounded w-24"></div>
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-center h-12">
+                                                    <div className="flex space-x-1">
+                                                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                                                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                                                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ) : (
+                                    <StreamTitleCard onLinkStateChange={setTitleLinked} />
+                                )}
+                            </div>
+                            
+                            {/* Карточка категории */}
+                            <div className={`transition-all duration-500 ${contentLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                                {isLoading ? (
+                                    <Card className="border-muted-foreground/20 bg-muted/5">
+                                        <CardHeader className="pb-3">
+                                            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                                                <div className="w-5 h-5 bg-muted-foreground/30 rounded"></div>
+                                                <div className="h-5 bg-muted-foreground/30 rounded w-32"></div>
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-center h-12">
+                                                    <div className="flex space-x-1">
+                                                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                                                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                                                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ) : (
+                                    <StreamCategoryCard onLinkStateChange={setCategoryLinked} />
+                                )}
+                            </div>
                         </div>
                         
                         {/* Чат - на всю ширину */}
-                        <div className="w-full">
+                        <div className={`w-full transition-all duration-500 delay-200 ${contentLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                            {isLoading ? (
+                                <Card className="border-muted-foreground/20 bg-muted/5">
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                                            <div className="w-5 h-5 bg-muted-foreground/30 rounded"></div>
+                                            <div className="h-5 bg-muted-foreground/30 rounded w-20"></div>
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-center h-32">
+                                                <div className="flex space-x-1">
+                                                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                                                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                                                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ) : (
                             <ChatCard 
                                 integrations={integrations}
+                                isOnHomePage={true}
                             />
+                            )}
                         </div>
+                        
+                        {/* Быстрые настройки TTS - под чатом */}
+                        {!isLoading && (
+                            <div className={`w-full transition-all duration-500 delay-300 ${contentLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                                <TtsQuickSettings />
+                            </div>
+                        )}
                     </>
                 )}
             </div>

@@ -14,7 +14,9 @@ from typing import Optional, Dict, Tuple
 from pathlib import Path
 import time
 
-from bot_service.services.basic_tts import get_basic_tts
+from constants import DEFAULT_TTS_SERVICE_URL, DEFAULT_BACKEND_URL
+
+from services.basic_tts import get_basic_tts
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +36,7 @@ class TTSManager:
     """
     
     def __init__(self):
-        self.tts_service_url = os.getenv("TTS_SERVICE_URL", "http://localhost:8001")
+        self.tts_service_url = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
         self.basic_tts = get_basic_tts()
         
         # Кеш состояния TTS сервиса
@@ -44,15 +46,50 @@ class TTSManager:
         
         logger.info(f"✅ TTS Manager инициализирован. TTS Service URL: {self.tts_service_url}")
     
-    async def check_tts_service_health(self) -> bool:
+    async def get_user_tts_endpoint(self, user_id: int, db_session) -> Optional[str]:
+        """
+        Получить TTS endpoint пользователя (локальный или централизованный).
+        
+        Args:
+            user_id: ID пользователя
+            db_session: Сессия БД
+            
+        Returns:
+            URL endpoint или None (использовать централизованный)
+        """
+        try:
+            from core.database import LocalTTSEndpoint
+            
+            local_config = db_session.query(LocalTTSEndpoint).filter(
+                LocalTTSEndpoint.user_id == user_id,
+                LocalTTSEndpoint.use_local == True,
+                LocalTTSEndpoint.is_active == True
+            ).first()
+            
+            if local_config and local_config.is_healthy:
+                logger.info(f"🏠 Используется локальный TTS endpoint для user_id={user_id}: {local_config.endpoint_url}")
+                return local_config.endpoint_url
+                
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting user TTS endpoint: {e}")
+            return None
+    
+    async def check_tts_service_health(self, force_check: bool = False) -> bool:
         """
         Проверка доступности TTS сервиса (F5-TTS).
-        Кеширует результат на 30 секунд для оптимизации.
+        
+        Args:
+            force_check: Принудительная проверка, игнорируя кеш (для админки)
+        
+        Returns:
+            bool: True если сервис доступен
         """
         current_time = time.time()
         
-        # Проверяем кеш
-        if current_time - self._last_health_check < self._health_check_interval:
+        # Проверяем кеш только если не форсируем проверку
+        if not force_check and current_time - self._last_health_check < self._health_check_interval:
             return self._tts_service_available
         
         try:
@@ -65,7 +102,7 @@ class TTSManager:
                         data = await response.json()
                         is_healthy = data.get("tts_engine_loaded", False)
                         
-                        # Логируем изменение статуса
+                        # Логируем изменение статуса только если он изменился
                         if is_healthy != self._tts_service_available:
                             if is_healthy:
                                 logger.info("✅ TTS Service (F5-TTS) стал доступен")
@@ -81,7 +118,9 @@ class TTSManager:
                         return False
                         
         except Exception as e:
-            logger.error(f"❌ Ошибка проверки TTS Service: {e}")
+            # Не логируем ошибку при принудительной проверке из админки
+            if not force_check:
+                logger.error(f"❌ Ошибка проверки TTS Service: {e}")
             self._tts_service_available = False
             self._last_health_check = current_time
             return False
@@ -91,13 +130,15 @@ class TTSManager:
         channel_name: str,
         text: str,
         author: str,
+        user_id: int = None,
         volume_level: float = 50.0,
         use_ai_tts: bool = False,
         use_basic_tts: bool = True,
         connection_manager=None,
         tts_settings: dict = None,
         word_filter: list = None,
-        blocked_users: list = None
+        blocked_users: list = None,
+        db_session=None
     ) -> Dict:
         """
         Синтезирует речь с автоматическим выбором TTS системы.
@@ -106,6 +147,7 @@ class TTSManager:
             channel_name: Имя канала
             text: Текст для озвучки
             author: Автор сообщения
+            user_id: ID пользователя для изоляции настроек
             volume_level: Уровень громкости (0-100)
             use_ai_tts: Использовать AI TTS (F5-TTS)
             use_basic_tts: Использовать базовую TTS (gTTS)
@@ -113,6 +155,7 @@ class TTSManager:
             tts_settings: Настройки TTS (enable7TV, enableTwitch, enableProfanity, profanityLevel)
             word_filter: Список заблокированных слов
             blocked_users: Список заблокированных пользователей
+            db_session: Сессия БД для проверки локального endpoint
         
         Returns:
             Dict с результатом: {"success": bool, "voice": str, "volume": float, "tts_type": str}
@@ -121,14 +164,22 @@ class TTSManager:
         
         # Приоритет 1: AI TTS (F5-TTS) через HTTP
         if use_ai_tts:
+            logger.info(f"🎙️ [DECISION] Trying AI TTS (F5-TTS) first")
+            # Определяем endpoint: локальный или централизованный
+            tts_endpoint = self.tts_service_url
+            if user_id and db_session:
+                local_endpoint = await self.get_user_tts_endpoint(user_id, db_session)
+                if local_endpoint:
+                    tts_endpoint = local_endpoint
+            
             # Проверяем доступность TTS сервиса
             is_tts_service_healthy = await self.check_tts_service_health()
             
             if is_tts_service_healthy:
                 try:
                     result = await self._synthesize_via_tts_service(
-                        channel_name, text, author, volume_level, connection_manager,
-                        tts_settings, word_filter, blocked_users
+                        channel_name, text, author, user_id, volume_level, connection_manager,
+                        tts_settings, word_filter, blocked_users, tts_endpoint=tts_endpoint
                     )
                     if result["success"]:
                         logger.info(f"✅ AI TTS (F5-TTS) синтез успешен: voice={result.get('voice')}")
@@ -142,6 +193,7 @@ class TTSManager:
         
         # Приоритет 2: Базовая TTS (gTTS) - локальная fallback система
         if use_basic_tts:
+            logger.info(f"🎙️ [DECISION] Using basic TTS (gTTS) - ALWAYS AVAILABLE AS FALLBACK")
             try:
                 result = await self._synthesize_via_basic_tts(
                     text, volume_level
@@ -167,22 +219,31 @@ class TTSManager:
         channel_name: str,
         text: str,
         author: str,
-        volume_level: float,
+        user_id: int = None,
+        volume_level: float = 50.0,
         connection_manager=None,
         tts_settings: dict = None,
         word_filter: list = None,
-        blocked_users: list = None
+        blocked_users: list = None,
+        tts_endpoint: str = None
     ) -> Dict:
         """
         Синтез через удаленный TTS сервис (F5-TTS).
+        
+        Args:
+            tts_endpoint: URL TTS сервиса (локальный или централизованный)
         """
         try:
+            # Используем переданный endpoint или дефолтный
+            endpoint = tts_endpoint or self.tts_service_url
+            
             async with aiohttp.ClientSession() as session:
-                url = f"{self.tts_service_url}/api/tts/synthesize-channel"
+                url = f"{endpoint}/api/tts/synthesize-channel"
                 data = {
                     "channel_name": channel_name,
                     "text": text,
                     "author": author,
+                    "user_id": user_id,
                     "volume_level": volume_level,
                     "tts_settings": tts_settings or {},
                     "word_filter": word_filter or [],
@@ -193,6 +254,9 @@ class TTSManager:
                     if response.status == 200:
                         result = await response.json()
                         selected_voice = result.get("selected_voice")
+                        audio_url = result.get("audio_url")  # Extract audio URL from response
+                        
+                        logger.info(f"🎙️ TTS Service response: {result}")
                         
                         # Если есть connection_manager и выбран голос, проверяем приоритетную громкость
                         if connection_manager and selected_voice:
@@ -208,14 +272,16 @@ class TTSManager:
                                             "success": True,
                                             "voice": selected_voice,
                                             "volume": priority_volume,
-                                            "tts_type": "ai_f5"
+                                            "tts_type": "ai_f5",
+                                            "audio_url": audio_url  # Include audio URL
                                         }
                         
                         return {
                             "success": True,
                             "voice": selected_voice,
                             "volume": volume_level,
-                            "tts_type": "ai_f5"
+                            "tts_type": "ai_f5",
+                            "audio_url": audio_url  # Include audio URL
                         }
                     else:
                         error_text = await response.text()
@@ -232,7 +298,8 @@ class TTSManager:
         volume_level: float
     ) -> Dict:
         """
-        Синтез через локальную базовую TTS (gTTS) с сохранением в TTS сервисе.
+        Синтез через локальную базовую TTS (gTTS).
+        Работает ПОЛНОСТЬЮ локально без зависимости от tts_service.
         """
         try:
             # gTTS синхронный, но быстрый, можно вызвать напрямую
@@ -243,35 +310,29 @@ class TTSManager:
             )
             
             if audio_path:
-                # Отправляем файл в TTS сервис для обслуживания
-                audio_url = await self._upload_to_tts_service(audio_path)
+                # ✅ ИСПОЛЬЗУЕМ ЛОКАЛЬНОЕ ОБСЛУЖИВАНИЕ БЕЗ ЗАГРУЗКИ НА TTS_SERVICE
+                # Базовая TTS работает НЕЗАВИСИМО от tts_service
+                filename = Path(audio_path).name
+                backend_url = os.getenv("BACKEND_URL", DEFAULT_BACKEND_URL)
+                audio_url = f"{backend_url}/api/tts/audio/{filename}"
                 
-                if audio_url:
-                    return {
-                        "success": True,
-                        "voice": "basic_gtts",
-                        "volume": volume_level,
-                        "tts_type": "basic_gtts",
-                        "audio_url": audio_url,
-                        "audio_path": audio_path  # Оставляем для внутреннего использования
-                    }
-                else:
-                    # Fallback на локальное обслуживание
-                    filename = Path(audio_path).name
-                    audio_url = f"http://localhost:8000/audio/{filename}"
-                    return {
-                        "success": True,
-                        "voice": "basic_gtts",
-                        "volume": volume_level,
-                        "tts_type": "basic_gtts",
-                        "audio_url": audio_url,
-                        "audio_path": audio_path
-                    }
+                logger.info(f"✅ [BASIC TTS] Audio synthesized: {filename}")
+                logger.info(f"✅ [BASIC TTS] Audio URL: {audio_url}")
+                
+                return {
+                    "success": True,
+                    "voice": "basic_gtts",
+                    "volume": volume_level,
+                    "tts_type": "basic_gtts",
+                    "audio_url": audio_url,
+                    "audio_path": audio_path  # Оставляем для внутреннего использования
+                }
             else:
-                return {"success": False, "error": "Basic TTS returned no audio"}
+                logger.error("❌ [BASIC TTS] synthesis_speech returned None")
+                return {"success": False, "error": "Basic TTS synthesis failed"}
                 
         except Exception as e:
-            logger.error(f"❌ Ошибка базовой TTS: {e}")
+            logger.error(f"❌ [BASIC TTS] Error: {e}")
             return {"success": False, "error": str(e)}
     
     async def _upload_to_tts_service(self, audio_path: str) -> Optional[str]:

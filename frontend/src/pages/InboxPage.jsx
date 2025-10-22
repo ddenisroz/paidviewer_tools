@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../constants';
 import { MessageCircle, Clock, CheckCircle, AlertCircle, Reply, Send, Eye, EyeOff, Plus } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -29,7 +30,7 @@ const InboxPage = () => {
   const loadTickets = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/support/my-tickets`, {
+      const response = await fetch(`${API_BASE_URL}/api/support/my-tickets`, {
         credentials: 'include'
       });
 
@@ -49,7 +50,7 @@ const InboxPage = () => {
 
   const loadTicketResponses = async (ticketId) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/support/tickets/${ticketId}/responses`, {
+      const response = await fetch(`${API_BASE_URL}/api/support/tickets/${ticketId}/responses`, {
         credentials: 'include'
       });
 
@@ -79,7 +80,7 @@ const InboxPage = () => {
       const formData = new FormData();
       formData.append('message', newResponse);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/support/tickets/${selectedTicket.id}/respond`, {
+      const response = await fetch(`${API_BASE_URL}/api/support/tickets/${selectedTicket.id}/respond`, {
         method: 'POST',
         credentials: 'include',
         body: formData
@@ -116,7 +117,7 @@ const InboxPage = () => {
       formDataToSend.append('subject', createFormData.subject);
       formDataToSend.append('message', createFormData.message);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/support/tickets`, {
+      const response = await fetch(`${API_BASE_URL}/api/support/tickets`, {
         method: 'POST',
         credentials: 'include',
         body: formDataToSend

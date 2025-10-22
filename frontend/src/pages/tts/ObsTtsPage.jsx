@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { TTS_SERVICE_URL, WS_BASE_URL } from '../../constants';
 import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -16,7 +17,7 @@ const ObsTtsPage = () => {
         }
 
         const connect = () => {
-            const wsUrl = `${import.meta.env.VITE_BOT_SERVICE_WS_URL || 'ws://localhost:8000'}/ws/chat/obs/${token}`;
+            const wsUrl = `${WS_BASE_URL}/ws/tts/${token}`;
             setStatus(`Connecting to ${wsUrl}...`);
             
             ws.current = new WebSocket(wsUrl);
@@ -33,24 +34,22 @@ const ObsTtsPage = () => {
                         // Проверяем, является ли URL уже полным
                         let audioUrl = message.audio_url;
                         if (!audioUrl.startsWith('http')) {
-                            audioUrl = `${import.meta.env.VITE_TTS_SERVICE_URL || 'http://localhost:8001'}${message.audio_url}`;
+                            audioUrl = `${TTS_SERVICE_URL}${message.audio_url}`;
                         }
                         // Received audio URL:', audioUrl);
                         setAudioQueue(prevQueue => [...prevQueue, audioUrl]);
                     } else if (message.type === 'tts_error') {
-                        console.error('TTS Error:', message.message);
-                        // Показываем красивое уведомление об ошибке
-                        // Для OBS страницы используем console.error вместо toast
-                        console.error(message.message);
+                        // TTS ошибка - показываем пользователю
+                        setError(message.message);
                     }
                 } catch (error) {
-                    console.error('Error processing WebSocket message:', error);
+                    // Ошибка обработки WebSocket сообщения
                 }
             };
 
             ws.current.onerror = (error) => {
                 setStatus('WebSocket Error. Reconnecting...');
-                console.error('WebSocket Error:', error);
+                // WebSocket ошибка
                 // The 'onclose' event will handle the reconnection logic.
             };
 
@@ -82,7 +81,7 @@ const ObsTtsPage = () => {
             audio.oncanplaythrough = () => {
                 // Audio ready to play');
                 audio.play().catch(e => {
-                    console.error("Audio play failed:", e);
+                    // Ошибка воспроизведения аудио
                     setIsPlaying(false);
                     setAudioQueue(prevQueue => prevQueue.slice(1));
                 });
@@ -95,7 +94,7 @@ const ObsTtsPage = () => {
             };
             
             audio.onerror = (e) => {
-                console.error("Error loading or playing audio:", nextAudioUrl, e);
+                // Ошибка загрузки или воспроизведения аудио
                 setIsPlaying(false);
                 setAudioQueue(prevQueue => prevQueue.slice(1));
             };

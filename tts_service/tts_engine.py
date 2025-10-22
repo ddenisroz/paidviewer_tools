@@ -88,6 +88,135 @@ class TTSEngineManager:
         except Exception as e:
             logger.error(f"Error during synthesis: {e}")
             raise
+    
+    async def synthesize_speech_async(self, text: str, voice: str = "female_1", user_id: int = None) -> str:
+        """
+        Асинхронный синтез речи для worker'ов
+        
+        Args:
+            text: Текст для озвучивания
+            voice: Голос для синтеза
+            user_id: ID пользователя (для логирования)
+            
+        Returns:
+            str: Путь к сгенерированному аудио файлу
+        """
+        if not self.is_ready():
+            raise RuntimeError("TTS engine not initialized")
+        
+        try:
+            logger.info(f"Async synthesizing speech for user {user_id}: '{text[:50]}...' with voice '{voice}'")
+            
+            # Выполняем синтез в executor для неблокирующей работы
+            loop = asyncio.get_event_loop()
+            audio_path = await loop.run_in_executor(
+                None,
+                self.tts_engine.synthesize,
+                text,
+                voice
+            )
+            
+            if audio_path and Path(audio_path).exists():
+                logger.info(f"Async speech synthesized successfully: {audio_path}")
+                return audio_path
+            else:
+                logger.error("Async TTS synthesis failed: no audio file generated")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Async TTS synthesis error: {e}")
+            return None
+    
+    async def synthesize_with_conversion_async(
+        self, 
+        text: str, 
+        voice: str = "female_1", 
+        user_id: int = None,
+        target_format: str = "wav",
+        target_sample_rate: int = 22050
+    ) -> str:
+        """
+        Асинхронный синтез с конвертацией аудио
+        
+        Args:
+            text: Текст для озвучивания
+            voice: Голос для синтеза
+            user_id: ID пользователя
+            target_format: Целевой формат аудио
+            target_sample_rate: Целевая частота дискретизации
+            
+        Returns:
+            str: Путь к сгенерированному и сконвертированному аудио файлу
+        """
+        try:
+            # Импортируем асинхронные компоненты
+            from async_tts_engine import async_tts_engine
+            from async_audio_converter import async_audio_converter
+            
+            # Синтезируем речь
+            synthesis_task_id = await async_tts_engine.synthesize_speech_async(
+                text=text,
+                voice=voice,
+                user_id=user_id
+            )
+            
+            # Ждем завершения синтеза
+            synthesis_result = None
+            max_wait_time = 30  # 30 секунд максимум
+            wait_time = 0
+            
+            while wait_time < max_wait_time:
+                synthesis_result = await async_tts_engine.get_task_result(synthesis_task_id)
+                if synthesis_result:
+                    break
+                await asyncio.sleep(0.5)
+                wait_time += 0.5
+            
+            if not synthesis_result:
+                logger.error("Synthesis task did not complete in time")
+                return None
+            
+            # Определяем путь для конвертированного файла
+            original_path = Path(synthesis_result)
+            converted_path = original_path.parent / f"{original_path.stem}_converted.{target_format}"
+            
+            # Конвертируем аудио
+            conversion_task_id = await async_audio_converter.convert_audio_async(
+                input_path=str(original_path),
+                output_path=str(converted_path),
+                target_format=target_format,
+                target_sample_rate=target_sample_rate
+            )
+            
+            # Ждем завершения конвертации
+            conversion_result = None
+            wait_time = 0
+            
+            while wait_time < max_wait_time:
+                conversion_result = await async_audio_converter.get_conversion_result(conversion_task_id)
+                if conversion_result:
+                    break
+                await asyncio.sleep(0.5)
+                wait_time += 0.5
+            
+            if not conversion_result:
+                logger.error("Audio conversion task did not complete in time")
+                return synthesis_result  # Возвращаем оригинальный файл
+            
+            # Удаляем оригинальный файл после успешной конвертации
+            try:
+                if original_path.exists():
+                    original_path.unlink()
+                    logger.info(f"Removed original file after conversion: {original_path}")
+            except Exception as e:
+                logger.warning(f"Failed to remove original file: {e}")
+            
+            logger.info(f"Speech synthesized and converted successfully: {conversion_result}")
+            return conversion_result
+            
+        except Exception as e:
+            logger.error(f"Async synthesis with conversion error: {e}")
+            return None
 
     def transcribe(self, audio_path: str) -> str:
         """Транскрипция аудио с оптимизацией для русского языка"""

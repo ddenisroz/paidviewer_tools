@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  # Bot Service - основной API
+  bot_service:
+    build:
+      context: ./bot_service
+      dockerfile: Dockerfile.prod
+    container_name: tts_bot_service_dev
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - DATABASE_URL=sqlite:///./core/data/app_data.db
+      - SECRET_KEY=dev_secret_key_change_in_production
+      - ALGORITHM=HS256
+      
+      # URLs для разработки
+      - BACKEND_URL=http://localhost:8000
+      - FRONTEND_URL=http://localhost:3000
+      - TTS_SERVICE_URL=http://localhost:8001
+      
+      # Twitch (замените на свои)
+      - TWITCH_CLIENT_ID=your_twitch_client_id
+      - TWITCH_CLIENT_SECRET=your_twitch_client_secret
+      - TWITCH_BOT_TOKEN=your_twitch_bot_token
+      - TWITCH_REDIRECT_URI=http://localhost:8000/auth/twitch/callback
+      
+      # VK (замените на свои)
+      - VK_CLIENT_ID=your_vk_client_id
+      - VK_CLIENT_SECRET=your_vk_client_secret
+      - VK_REDIRECT_URI=http://localhost:8000/auth/vk/callback
+      - VK_AUTH_BASE_URL=https://auth.live.vkvideo.ru/app/oauth2/authorize
+      - VK_LIVE_USER_TOKEN=your_vk_live_token
+      
+      # YouTube
+      - YOUTUBE_API_KEY=your_youtube_api_key
+      
+      # DonationAlerts
+      - DONATIONALERTS_CLIENT_ID=your_da_client_id
+      - DONATIONALERTS_CLIENT_SECRET=your_da_client_secret
+      
+      # Hugging Face
+      - HUGGINGFACE_TOKEN=your_hf_token
+      
+      # CORS для разработки
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+      
+      # Security для разработки
+      - SESSION_COOKIE_SECURE=false
+      - SESSION_COOKIE_HTTPONLY=false
+      - ENABLE_SECURITY_HEADERS=false
+      
+      # Logging
+      - ENABLE_JSON_LOGS=false
+      - ENABLE_LOG_ROTATION=false
+    volumes:
+      - ./bot_service/core/data:/app/core/data
+      - ./bot_service/logs:/app/logs
+    restart: unless-stopped
+
+  # TTS Service - генерация речи
+  tts_service:
+    build:
+      context: ./tts_service
+      dockerfile: Dockerfile.prod
+    container_name: tts_tts_service_dev
+    ports:
+      - "8001:8001"
+    environment:
+      - ENVIRONMENT=development
+      - TTS_DEBUG=true
+      - TTS_LOG_LEVEL=DEBUG
+      - DATABASE_URL=sqlite:///./tts_service.db
+      - HUGGINGFACE_TOKEN=your_hf_token
+      - HF_HOME=/app/f5_tts_cache
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+      - TTS_WORKERS=2
+    volumes:
+      - ./tts_service/audio:/app/audio
+      - ./tts_service/logs:/app/logs
+      - tts_cache:/app/f5_tts_cache
+    restart: unless-stopped
+
+  # Frontend - React UI с nginx (без SSL)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        - VITE_BOT_SERVICE_URL=http://localhost:8000
+        - VITE_BOT_SERVICE_WS_URL=ws://localhost:8000
+        - VITE_TTS_SERVICE_URL=http://localhost:8001
+    container_name: tts_frontend_dev
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx-dev.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - bot_service
+    restart: unless-stopped
+
+volumes:
+  tts_cache:
+    driver: local
+
+networks:
+  default:
+    name: tts_network_dev
+    driver: bridge

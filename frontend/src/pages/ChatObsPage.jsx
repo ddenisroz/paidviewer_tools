@@ -9,8 +9,8 @@ const ChatObsPage = () => {
     const messagesEndRef = useRef(null);
     
     // Получаем параметры из URL
-    const platform = searchParams.get('platform') || 'twitch';
-    const combined = searchParams.get('combined') === 'true';
+    const userId = searchParams.get('userId');
+    const platformFilter = searchParams.get('platformFilter') || 'all';
     const fontSize = searchParams.get('fontSize') || '14px';
     const fontFamily = searchParams.get('fontFamily') || 'Arial';
     const backgroundColor = searchParams.get('backgroundColor') || '#1a1a1a';
@@ -67,26 +67,57 @@ const ChatObsPage = () => {
         }
     };
 
-    // Подключение к чату (заглушка для демонстрации)
+    // Подключение к реальному чату пользователя
     useEffect(() => {
-        setIsConnected(true);
-        
-        // Симуляция получения сообщений
-        const interval = setInterval(() => {
-            const mockMessages = [
-                { id: Date.now(), username: 'viewer1', text: 'Привет всем!', platform: 'twitch', timestamp: new Date() },
-                { id: Date.now() + 1, username: 'viewer2', text: 'Отличный стрим!', platform: 'vk', timestamp: new Date() },
-                { id: Date.now() + 2, username: 'viewer3', text: 'Когда следующий стрим?', platform: 'twitch', timestamp: new Date() }
-            ];
-            
-            setMessages(prev => {
-                const newMessages = [...prev, ...mockMessages];
-                return newMessages.slice(-maxMessages);
-            });
-        }, 3000);
+        if (!userId) {
+            console.error('User ID not provided');
+            return;
+        }
 
-        return () => clearInterval(interval);
-    }, [maxMessages]);
+        // WebSocket URL для чата пользователя
+        const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/chat/${userId}`;
+        const ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+            console.log('Connected to user chat:', userId);
+            setIsConnected(true);
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                console.log('Received message:', data);
+                
+                // Фильтруем сообщения по платформе
+                if (platformFilter === 'all' || 
+                    (platformFilter === 'twitch' && data.platform === 'twitch') ||
+                    (platformFilter === 'vk' && data.platform === 'vk') ||
+                    (platformFilter === 'combined' && (data.platform === 'twitch' || data.platform === 'vk'))) {
+                    
+                    setMessages(prev => {
+                        const newMessages = [...prev, data];
+                        return newMessages.slice(-maxMessages);
+                    });
+                }
+            } catch (error) {
+                console.error('Error parsing message:', error);
+            }
+        };
+
+        ws.onclose = () => {
+            console.log('Disconnected from chat');
+            setIsConnected(false);
+        };
+
+        ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            setIsConnected(false);
+        };
+
+        return () => {
+            ws.close();
+        };
+    }, [userId, platformFilter, maxMessages]);
 
     // Автоскролл к последнему сообщению
     useEffect(() => {
@@ -110,7 +141,9 @@ const ChatObsPage = () => {
     };
 
     const formatTime = (timestamp) => {
-        return timestamp.toLocaleTimeString('ru-RU', { 
+        // Если timestamp это строка (ISO), создаем Date объект
+        const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+        return date.toLocaleTimeString('ru-RU', { 
             hour: '2-digit', 
             minute: '2-digit' 
         });

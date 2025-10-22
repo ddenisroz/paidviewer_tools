@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { API_BASE_URL } from '../../constants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +21,7 @@ import {
 import { useApi } from '@/hooks/useApi';
 import LootboxWidgetConfigurator from '../../components/widgets/LootboxConfigurator';
 import DropsTriggersConfigurator from '../../components/widgets/DropsTriggersConfigurator';
+import PageWrapper from '../../components/PageWrapper';
 
 const DropsMainPage = () => {
   const [activeTab, setActiveTab] = useState('config');
@@ -27,43 +29,66 @@ const DropsMainPage = () => {
   const [rewards, setRewards] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [widgetUrl, setWidgetUrl] = useState(null);
 
-  const { get, post, put, del } = useApi();
+  const loadDropsData = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Загружаем все данные параллельно напрямую через fetch
+      // Используем импортированную константу
+      
+      const [configResponse, rewardsResponse, historyResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/drops/config/default`, { credentials: 'include' }),
+        fetch(`${API_BASE_URL}/api/drops/rewards/default`, { credentials: 'include' }),
+        fetch(`${API_BASE_URL}/api/drops/history/default?limit=20`, { credentials: 'include' })
+      ]);
+
+      const [configData, rewardsData, historyData] = await Promise.all([
+        configResponse.json(),
+        rewardsResponse.json(),
+        historyResponse.json()
+      ]);
+
+      if (configData?.success) {
+        setConfig(configData.data);
+      }
+
+      if (rewardsData?.success) {
+        setRewards(rewardsData.data);
+      }
+
+      if (historyData?.success) {
+        setHistory(historyData.data);
+      }
+
+    } catch (error) {
+      // Ошибка загрузки данных дропов
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const generateWidgetUrl = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/drops/widget-url`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        setWidgetUrl(data.data.url);
+      }
+    } catch (error) {
+      console.error('Error generating widget URL:', error);
+    }
+  };
 
   // Загрузка данных
   useEffect(() => {
     loadDropsData();
-  }, []);
-
-  const loadDropsData = async () => {
-    try {
-      setLoading(true);
-      const channelName = 'default'; // Получаем из контекста пользователя
-      
-      // Загружаем конфигурацию
-      const configResponse = await get(`/api/drops/config/${channelName}`);
-      if (configResponse.success) {
-        setConfig(configResponse.data);
-      }
-
-      // Загружаем награды
-      const rewardsResponse = await get(`/api/drops/rewards/${channelName}`);
-      if (rewardsResponse.success) {
-        setRewards(rewardsResponse.data);
-      }
-
-      // Загружаем историю
-      const historyResponse = await get(`/api/drops/history/${channelName}?limit=20`);
-      if (historyResponse.success) {
-        setHistory(historyResponse.data);
-      }
-
-    } catch (error) {
-      console.error('Error loading drops data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [loadDropsData]);
 
   // Статистика
   const getStats = () => {
@@ -83,9 +108,11 @@ const DropsMainPage = () => {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
+      <PageWrapper 
+        title="🎁 Drops System"
+        description="Управление системой наград и дропов для стримеров"
+      >
         <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="h-24 bg-gray-200 rounded"></div>
@@ -93,27 +120,21 @@ const DropsMainPage = () => {
           </div>
           <div className="h-96 bg-gray-200 rounded"></div>
         </div>
-      </div>
+      </PageWrapper>
     );
   }
 
   return (
-    <div className="container mx-auto p-6">
-      {/* Заголовок */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            🎁 Drops System
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Управление системой наград и дропов для стримеров
-          </p>
-        </div>
+    <PageWrapper 
+      title="🎁 Drops System"
+      description="Управление системой наград и дропов для стримеров"
+      actions={
         <Button onClick={loadDropsData} variant="outline">
           <Settings className="w-4 h-4 mr-2" />
           Обновить
         </Button>
-      </div>
+      }
+    >
 
       {/* Статистика */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -221,7 +242,51 @@ const DropsMainPage = () => {
 
         {/* Виджет лутбокса */}
         <TabsContent value="widget" className="mt-6">
-          <LootboxWidgetConfigurator />
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gift className="w-5 h-5" />
+                OBS Виджет для Drops
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <h3 className="font-semibold mb-2">URL для OBS Browser Source:</h3>
+                {widgetUrl ? (
+                  <div className="space-y-2">
+                    <div className="p-2 bg-white dark:bg-gray-700 rounded border font-mono text-sm break-all">
+                      {widgetUrl}
+                    </div>
+                    <Button 
+                      onClick={() => navigator.clipboard.writeText(widgetUrl)}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Копировать URL
+                    </Button>
+                  </div>
+                ) : (
+                  <Button onClick={generateWidgetUrl} className="w-full">
+                    <Gift className="w-4 h-4 mr-2" />
+                    Сгенерировать URL виджета
+                  </Button>
+                )}
+              </div>
+              
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                  Как использовать:
+                </h4>
+                <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                  <li>1. Скопируйте URL выше</li>
+                  <li>2. В OBS добавьте Browser Source</li>
+                  <li>3. Вставьте URL в поле URL</li>
+                  <li>4. Установите размер 1920x1080 (или нужный вам)</li>
+                  <li>5. Виджет будет показывать награды в реальном времени</li>
+                </ol>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Мифический Drops */}
@@ -234,14 +299,14 @@ const DropsMainPage = () => {
           <HistoryTab history={history} onUpdate={loadDropsData} />
         </TabsContent>
       </Tabs>
-    </div>
+    </PageWrapper>
   );
 };
 
 // Компонент конфигурации
 const ConfigTab = ({ config, onUpdate }) => {
   const [formData, setFormData] = useState({});
-  const { put } = useApi();
+  const configUpdateApi = useApi(`/api/drops/config/${config?.channel_name || 'default'}`);
 
   useEffect(() => {
     if (config) {
@@ -251,12 +316,12 @@ const ConfigTab = ({ config, onUpdate }) => {
 
   const handleSave = async () => {
     try {
-      const response = await put(`/api/drops/config/${config.channel_name}`, formData);
-      if (response.success) {
+      const response = await configUpdateApi.execute(formData, { method: 'PUT' });
+      if (response?.success) {
         onUpdate();
       }
     } catch (error) {
-      console.error('Error saving config:', error);
+      // Ошибка сохранения конфигурации
     }
   };
 

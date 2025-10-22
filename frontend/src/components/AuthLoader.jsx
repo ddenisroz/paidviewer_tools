@@ -37,7 +37,7 @@ const AuthLoader = ({ platform = 'Twitch', countdown = 0 }) => {
             clearInterval(interval);
             clearInterval(stepInterval);
         };
-    }, []);
+    }, [steps.length]);
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
             {/* Затемненный фон */}

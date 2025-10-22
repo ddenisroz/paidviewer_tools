@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../constants';
 import { Gift, Plus, Edit, Trash2, Upload } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { TwitchIcon, VKIcon } from '../components/PlatformIcons';
@@ -17,7 +18,7 @@ const PointsManagementPage = () => {
       setLoading(true);
       
       // Загружаем реальные награды с платформы
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/points/rewards/${selectedPlatform}`, {
+      const response = await fetch(`${API_BASE_URL}/api/points/rewards/${selectedPlatform}`, {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
@@ -165,7 +166,7 @@ const RewardsTab = ({ rewards, platform, onRewardCreated, showCreate, setShowCre
         formData.append('sound', newReward.soundFile);
       }
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/points/rewards/${platform}/create`, {
+      const response = await fetch(`${API_BASE_URL}/api/points/rewards/${platform}/create`, {
         method: 'POST',
         credentials: 'include',
         body: formData
@@ -193,7 +194,7 @@ const RewardsTab = ({ rewards, platform, onRewardCreated, showCreate, setShowCre
 
   const deleteReward = async (rewardId) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/points/rewards/${platform}/${rewardId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/points/rewards/${platform}/${rewardId}`, {
         method: 'DELETE',
         credentials: 'include'
       });

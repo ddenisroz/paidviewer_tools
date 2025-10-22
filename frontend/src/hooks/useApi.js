@@ -5,7 +5,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 
-const API_BASE_URL = import.meta.env.VITE_BOT_SERVICE_URL || 'http://localhost:8000';
+import { API_BASE_URL } from '../constants';
 
 /**
  * @typedef {Object} ApiState

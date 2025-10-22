@@ -260,7 +260,7 @@ class BackupManager:
         """Ежедневный бэкап TTS"""
         try:
             # Бэкап БД
-            db_path = "tts_service.db"
+            db_path = "data/app_data.db"
             if os.path.exists(db_path):
                 self.create_database_backup(db_path)
             
@@ -272,7 +272,7 @@ class BackupManager:
         """Еженедельный полный бэкап TTS"""
         try:
             # Бэкап БД
-            db_path = "tts_service.db"
+            db_path = "data/app_data.db"
             if os.path.exists(db_path):
                 self.create_database_backup(db_path)
             

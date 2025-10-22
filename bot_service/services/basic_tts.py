@@ -43,7 +43,9 @@ class BasicTTS:
         if temp_dir:
             self.temp_dir = Path(temp_dir)
         else:
-            self.temp_dir = Path(tempfile.gettempdir()) / "bot_service_tts"
+            # Создаем временную директорию в папке проекта
+            from core.project_paths import TEMP_DIR
+            self.temp_dir = TEMP_DIR / "tts_audio"
         
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"✅ Базовая TTS (gTTS) инициализирована. Temp dir: {self.temp_dir}")

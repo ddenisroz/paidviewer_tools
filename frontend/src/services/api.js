@@ -2,8 +2,10 @@
 import axios from 'axios';
 import { toast } from 'sonner';
 
+import { API_BASE_URL } from '../constants';
+
 const api = axios.create({
-    baseURL: import.meta.env.VITE_BOT_SERVICE_URL || 'http://localhost:8000',
+    baseURL: API_BASE_URL,
     withCredentials: true,
 });
 
@@ -20,17 +22,16 @@ api.interceptors.request.use(
 
 // Create a separate admin API client that uses admin_token
 const adminApi = axios.create({
-    baseURL: import.meta.env.VITE_BOT_SERVICE_URL || 'http://localhost:8000',
+    baseURL: API_BASE_URL,
     withCredentials: true,
 });
 
-// Add a request interceptor for admin API to set the admin token
+// Add a request interceptor for admin API
+// Теперь полагаемся на httpOnly cookies с withCredentials
 adminApi.interceptors.request.use(
     (config) => {
-        const adminToken = localStorage.getItem('admin_token');
-        if (adminToken) {
-            config.headers['Authorization'] = `Bearer ${adminToken}`;
-        }
+        // Админские токены теперь передаются через httpOnly cookies
+        // с withCredentials: true, что безопаснее localStorage
         return config;
     },
     (error) => {

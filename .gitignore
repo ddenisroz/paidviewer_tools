@@ -342,3 +342,111 @@ __pycache__/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# ======== PROJECT SPECIFIC (Added Oct 22, 2025) ========
+
+# Database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+bot_service/*.db
+bot_service/*.db-*
+tts_service/*.db
+tts_service/*.db-*
+
+# Log files
+*.log
+bot_service/*.log
+tts_service/*.log
+bot_service/logs/*.log
+tts_service/logs/*.log
+
+# Environment files
+.env
+.env.*
+!.env.example
+!env.example
+bot_service/.env
+bot_service/.env.*
+!bot_service/env.example
+frontend/.env
+frontend/.env.*
+!frontend/env.example
+tts_service/.env
+tts_service/.env.*
+!tts_service/env.example
+
+# Temp and cache
+temp/
+tmp/
+cache/
+bot_service/temp/
+bot_service/cache/
+tts_service/temp/
+tts_service/cache/
+frontend/dist/
+frontend/build/
+
+# Personal notes and prompts
+prompt.txt
+notes.txt
+todo.txt
+.cursor/
+
+# Backup folders
+backups/
+bot_service/backups/
+tts_service/backups/
+
+# Audio files (TTS generated)
+*.wav
+*.mp3
+*.ogg
+*.flac
+bot_service/temp/tts_audio/*.wav
+bot_service/temp/tts_audio/*.mp3
+tts_service/audio/*.wav
+tts_service/audio/*.mp3
+
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Node modules
+node_modules/
+frontend/node_modules/
+
+# Build outputs
+dist/
+build/
+frontend/dist/
+frontend/build/
+
+# IDE specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+
+# OS specific
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+
+# Git artifacts
+*.orig
+*.rej
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+ssl/
+certs/

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Генератор placeholder картинок для лутбоксов</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: white;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .lootbox {
+            width: 200px;
+            height: 200px;
+            border: 2px solid;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 10px;
+            position: relative;
+            cursor: pointer;
+        }
+        .common { border-color: #6B7280; background: #374151; }
+        .rare { border-color: #3B82F6; background: #1E40AF; }
+        .epic { border-color: #9333EA; background: #581C87; }
+        .legendary { border-color: #FBBF24; background: #D97706; }
+        
+        .glow {
+            box-shadow: 0 0 20px currentColor;
+        }
+        
+        .legendary.glow {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 20px #FBBF24; }
+            50% { box-shadow: 0 0 40px #FBBF24; }
+        }
+        
+        .controls {
+            margin: 20px 0;
+        }
+        
+        button {
+            background: #4F46E5;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #4338CA;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Генератор placeholder картинок для лутбоксов</h1>
+        <p>Нажмите на лутбокс, чтобы скачать картинку как PNG</p>
+        
+        <div class="controls">
+            <button onclick="generateAll()">Сгенерировать все</button>
+            <button onclick="clearAll()">Очистить</button>
+        </div>
+        
+        <h2>Common (Обычные)</h2>
+        <div class="lootbox common" onclick="downloadImage(this, 'common-closed')">CLOSED</div>
+        <div class="lootbox common" onclick="downloadImage(this, 'common-opening1')">OPENING 1</div>
+        <div class="lootbox common" onclick="downloadImage(this, 'common-opening2')">OPENING 2</div>
+        <div class="lootbox common" onclick="downloadImage(this, 'common-opened')">OPENED</div>
+        
+        <h2>Rare (Редкие)</h2>
+        <div class="lootbox rare glow" onclick="downloadImage(this, 'rare-closed')">CLOSED</div>
+        <div class="lootbox rare glow" onclick="downloadImage(this, 'rare-opening1')">OPENING 1</div>
+        <div class="lootbox rare glow" onclick="downloadImage(this, 'rare-opening2')">OPENING 2</div>
+        <div class="lootbox rare glow" onclick="downloadImage(this, 'rare-opening3')">OPENING 3</div>
+        <div class="lootbox rare glow" onclick="downloadImage(this, 'rare-opened')">OPENED</div>
+        
+        <h2>Epic (Эпические)</h2>
+        <div class="lootbox epic glow" onclick="downloadImage(this, 'epic-closed')">CLOSED</div>
+        <div class="lootbox epic glow" onclick="downloadImage(this, 'epic-opening1')">OPENING 1</div>
+        <div class="lootbox epic glow" onclick="downloadImage(this, 'epic-opening2')">OPENING 2</div>
+        <div class="lootbox epic glow" onclick="downloadImage(this, 'epic-opening3')">OPENING 3</div>
+        <div class="lootbox epic glow" onclick="downloadImage(this, 'epic-opening4')">OPENING 4</div>
+        <div class="lootbox epic glow" onclick="downloadImage(this, 'epic-opened')">OPENED</div>
+        
+        <h2>Legendary (Легендарные)</h2>
+        <div class="lootbox legendary glow" onclick="downloadImage(this, 'legendary-closed')">CLOSED</div>
+        <div class="lootbox legendary glow" onclick="downloadImage(this, 'legendary-opening1')">OPENING 1</div>
+        <div class="lootbox legendary glow" onclick="downloadImage(this, 'legendary-opening2')">OPENING 2</div>
+        <div class="lootbox legendary glow" onclick="downloadImage(this, 'legendary-opening3')">OPENING 3</div>
+        <div class="lootbox legendary glow" onclick="downloadImage(this, 'legendary-opening4')">OPENING 4</div>
+        <div class="lootbox legendary glow" onclick="downloadImage(this, 'legendary-opening5')">OPENING 5</div>
+        <div class="lootbox legendary glow" onclick="downloadImage(this, 'legendary-opened')">OPENED</div>
+    </div>
+
+    <script>
+        function downloadImage(element, filename) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = 256;
+            canvas.height = 256;
+            
+            // Копируем стили элемента
+            const computedStyle = window.getComputedStyle(element);
+            const bgColor = computedStyle.backgroundColor;
+            const borderColor = computedStyle.borderColor;
+            const borderWidth = parseInt(computedStyle.borderWidth);
+            
+            // Рисуем фон
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, 256, 256);
+            
+            // Рисуем рамку
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = borderWidth * 2;
+            ctx.strokeRect(borderWidth, borderWidth, 256 - borderWidth * 2, 256 - borderWidth * 2);
+            
+            // Рисуем текст
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(element.textContent, 128, 128);
+            
+            // Добавляем эффект свечения для редких и выше
+            if (element.classList.contains('glow')) {
+                ctx.shadowColor = borderColor;
+                ctx.shadowBlur = 20;
+                ctx.fillText(element.textContent, 128, 128);
+            }
+            
+            // Скачиваем
+            const link = document.createElement('a');
+            link.download = filename + '.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+        
+        function generateAll() {
+            const lootboxes = document.querySelectorAll('.lootbox');
+            lootboxes.forEach((box, index) => {
+                setTimeout(() => {
+                    box.click();
+                }, index * 500);
+            });
+        }
+        
+        function clearAll() {
+            // Очистка не нужна, но можно добавить функционал
+        }
+    </script>
+</body>
+</html>

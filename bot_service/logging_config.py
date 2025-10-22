@@ -25,11 +25,11 @@ class QuietLoggingConfig:
                         self.audit_logs_dir, self.monitoring_logs_dir]:
             dir_path.mkdir(exist_ok=True)
     
-    def setup_logging(self, log_level: str = "WARNING"):
-        """Настройка тихого логирования для сервиса"""
+    def setup_logging(self, log_level: str = "DEBUG"):
+        """Настройка логирования для сервиса"""
         
         # Получаем уровень логирования
-        level = getattr(logging, log_level.upper(), logging.WARNING)
+        level = getattr(logging, log_level.upper(), logging.DEBUG)
         
         # Создаем форматтеры
         detailed_formatter = logging.Formatter(
@@ -49,7 +49,7 @@ class QuietLoggingConfig:
         # Очищаем существующие обработчики
         app_logger.handlers.clear()
         
-        # 1. Ротация логов по дням (только WARNING и выше)
+        # 1. Ротация логов по дням (INFO и выше)
         daily_handler = logging.handlers.TimedRotatingFileHandler(
             filename=self.app_logs_dir / f"{self.service_name}.log",
             when='midnight',
@@ -58,7 +58,7 @@ class QuietLoggingConfig:
             encoding='utf-8'
         )
         daily_handler.setFormatter(detailed_formatter)
-        daily_handler.setLevel(logging.WARNING)
+        daily_handler.setLevel(logging.INFO)  # Записываем INFO и выше в файлы
         app_logger.addHandler(daily_handler)
         
         # 2. Отдельный файл для ошибок
@@ -73,10 +73,13 @@ class QuietLoggingConfig:
         error_handler.setLevel(logging.ERROR)
         app_logger.addHandler(error_handler)
         
-        # 3. Консольный вывод только для WARNING и выше
+        # 3. Консольный вывод для DEBUG и выше
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(simple_formatter)
-        console_handler.setLevel(logging.WARNING)
+        console_handler.setLevel(logging.DEBUG)
+        # Устанавливаем кодировку UTF-8 для консоли
+        if hasattr(console_handler.stream, 'reconfigure'):
+            console_handler.stream.reconfigure(encoding='utf-8')
         app_logger.addHandler(console_handler)
         
         # 4. Логгер для аудита (критические действия)
@@ -121,7 +124,7 @@ class QuietLoggingConfig:
         monitoring_handler.setFormatter(simple_formatter)
         monitoring_logger.addHandler(monitoring_handler)
         
-        # Настройка внешних библиотек - отключаем DEBUG
+        # Настройка внешних библиотек
         logging.getLogger("uvicorn").setLevel(logging.WARNING)
         logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
         logging.getLogger("fastapi").setLevel(logging.WARNING)
@@ -144,7 +147,7 @@ class QuietLoggingConfig:
         twitch_logger = logging.getLogger('api.twitch_api')
         twitch_logger.setLevel(logging.INFO)
         
-        # Bot service - только INFO и выше
+        # Bot service - INFO и выше
         bot_logger = logging.getLogger('bot_service')
         bot_logger.setLevel(logging.INFO)
         
@@ -184,25 +187,25 @@ tts_logging_config = QuietLoggingConfig("tts_service")
 def log_important(message, level=logging.INFO):
     """Логирует только важные события"""
     logger = logging.getLogger('bot_service')
-    logger.log(level, f"🔔 {message}")
+    logger.log(level, f"[IMPORTANT] {message}")
 
 def log_error(message, exception=None):
     """Логирует ошибки с дополнительной информацией"""
     logger = logging.getLogger('bot_service')
     if exception:
-        logger.error(f"❌ {message}: {str(exception)}", exc_info=True)
+        logger.error(f"[ERROR] {message}: {str(exception)}", exc_info=True)
     else:
-        logger.error(f"❌ {message}")
+        logger.error(f"[ERROR] {message}")
 
 def log_success(message):
     """Логирует успешные операции"""
     logger = logging.getLogger('bot_service')
-    logger.info(f"✅ {message}")
+    logger.info(f"[SUCCESS] {message}")
 
 def log_warning(message):
     """Логирует предупреждения"""
     logger = logging.getLogger('bot_service')
-    logger.warning(f"⚠️ {message}")
+    logger.warning(f"[WARNING] {message}")
 
 def enable_debug_mode():
     """Временно включает DEBUG режим для отладки"""

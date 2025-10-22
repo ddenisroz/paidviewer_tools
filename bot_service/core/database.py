@@ -1,7 +1,7 @@
 # core/database.py
 import os
 import logging
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey, JSON, Text, Float, text, Index, UniqueConstraint
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey, JSON, Text, Float, text, Index, UniqueConstraint, CheckConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
 from datetime import datetime
@@ -13,12 +13,8 @@ from core.datetime_utils import utcnow_naive
 # Настройка логирования
 logger = logging.getLogger(__name__)
 
-# Определяем директорию для данных
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(SCRIPT_DIR, "data")
-
-# Создаем директорию если её нет
-os.makedirs(DATA_DIR, exist_ok=True)
+# Импортируем централизованные пути
+from .project_paths import DATA_DIR
 
 # Определяем путь к файлу базы данных
 DATABASE_URL = f"sqlite:///{os.path.join(DATA_DIR, 'app_data.db')}"
@@ -39,15 +35,99 @@ try:
     class User(Base):
         """Модель единой учетной записи пользователя в приложении."""
         __tablename__ = 'users'
-        __table_args__ = {'extend_existing': True}
+        __table_args__ = (
+            UniqueConstraint('twitch_username', name='uq_user_twitch_username'),
+            UniqueConstraint('vk_username', name='uq_user_vk_username'),
+            {'extend_existing': True}
+        )
         id = Column(Integer, primary_key=True, index=True)
         is_admin = Column(Boolean, default=False)
+        is_active = Column(Boolean, default=True)
         obs_token = Column(String, nullable=True)  # OBS токен для постоянной ссылки
         is_blocked = Column(Boolean, default=False)  # Заблокирован ли пользователь
         blocked_reason = Column(String, nullable=True)  # Причина блокировки
         blocked_at = Column(DateTime, nullable=True)  # Дата блокировки
         created_at = Column(DateTime, default=utcnow_naive)
         
+        # Username'ы платформ
+        twitch_username = Column(String, nullable=True, unique=True)
+        vk_username = Column(String, nullable=True, unique=True)  # Ник пользователя VK (для отображения)
+        vk_channel_name = Column(String, nullable=True, unique=True)  # Ник канала VK Live (для подключения бота)
+        
+        # DonationAlerts интеграция
+        donationalerts_user_id = Column(String, nullable=True)
+        donationalerts_access_token = Column(String, nullable=True)
+        donationalerts_refresh_token = Column(String, nullable=True)
+        
+        # Настройки TTS
+        tts_listening_mode = Column(String, default='website')  # 'website' или 'obs'
+        tts_enabled = Column(Boolean, default=False)  # Включен ли TTS - по умолчанию выключен, пользователь включает вручную
+        donationalerts_token_expires = Column(DateTime, nullable=True)
+        temp_oauth_state = Column(String, nullable=True)
+        
+        # Настройки объединения полей
+        combine_titles = Column(Boolean, default=False)  # Объединять поля названий
+        combine_categories = Column(Boolean, default=False)  # Объединять поля категорий
+        
+    class UserSettings(Base):
+        """Модель для пользовательских настроек интерфейса"""
+        __tablename__ = "user_settings"
+        __table_args__ = {'extend_existing': True}
+        
+        id = Column(Integer, primary_key=True, index=True)
+        user_id = Column(Integer, nullable=True, unique=True)  # Для обычных пользователей
+        session_id = Column(String, nullable=True, unique=True)  # Для гостей
+        
+        # Настройки чата
+        chat_enabled = Column(Boolean, default=True)
+        chat_max_messages = Column(Integer, default=50)
+        chat_show_timestamps = Column(Boolean, default=True)
+        chat_show_platform = Column(Boolean, default=True)
+        chat_show_user_roles = Column(Boolean, default=True)
+        chat_animation_duration = Column(Integer, default=500)
+        chat_animation_type = Column(String, default="slide")
+        
+        # Каналы платформ для бота
+        channel_name = Column(String, nullable=True)  # Twitch канал
+        vk_channel_name = Column(String, nullable=True)  # VK Live канал
+        
+        # Настройки OBS чата
+        obs_width = Column(Integer, default=400)
+        obs_height = Column(Integer, default=300)
+        obs_font_size = Column(Integer, default=14)
+        obs_font_family = Column(String, default="Arial")
+        obs_font_weight = Column(String, default="normal")
+        obs_background_color = Column(String, default="#000000")
+        obs_background_image = Column(String, nullable=True)
+        obs_text_color = Column(String, default="#ffffff")
+        obs_border_radius = Column(Integer, default=8)
+        obs_border_color = Column(String, default="#333333")
+        obs_border_width = Column(Integer, default=1)
+        obs_message_bg = Column(String, default="#1a1a1a")
+        obs_message_border_radius = Column(Integer, default=4)
+        obs_message_margin = Column(Integer, default=2)
+        obs_message_padding = Column(Integer, default=8)
+        
+        # Цвета ролей для OBS
+        obs_moderator_color = Column(String, default="#00ff00")
+        obs_vip_color = Column(String, default="#ffd700")
+        obs_subscriber_color = Column(String, default="#ff6b6b")
+        obs_normal_color = Column(String, default="#ffffff")
+        
+        # Настройки объединения полей (только UI настройки)
+        combine_titles = Column(Boolean, default=False)
+        combine_categories = Column(Boolean, default=False)
+        
+        # Метаданные
+        created_at = Column(DateTime, default=utcnow_naive)
+        updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
+        
+        # Ограничение: должен быть заполнен либо user_id, либо session_id
+        __table_args__ = (
+            CheckConstraint('(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)', name='check_user_or_session_settings'),
+            {'extend_existing': True}
+        )
+
     class WhitelistedChannel(Base):
         """Модель для белого списка каналов"""
         __tablename__ = "whitelisted_channels"
@@ -63,6 +143,19 @@ try:
         id = Column(Integer, primary_key=True, index=True)
         channel_name = Column(String, index=True, nullable=False)
         username = Column(String, index=True, nullable=False)
+
+    class TTSBlockedUser(Base):
+        """Модель пользователей, заблокированных от TTS"""
+        __tablename__ = "tts_blocked_users"
+        __table_args__ = {'extend_existing': True}
+        id = Column(Integer, primary_key=True, index=True)
+        user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+        channel_name = Column(String, nullable=False, index=True)
+        platform = Column(String, nullable=False)  # 'twitch' or 'vk'
+        username = Column(String, nullable=False)
+        blocked_at = Column(DateTime, default=utcnow_naive)
+        blocked_by = Column(Integer, nullable=True)  # ID пользователя, который заблокировал
+        reason = Column(String, nullable=True)
 
 
 
@@ -138,6 +231,7 @@ try:
         refresh_token = Column(String, nullable=True)
         expires_at = Column(DateTime, nullable=True)
         scopes = Column(JSON, nullable=True) # Права доступа (scopes)
+        is_active = Column(Boolean, default=True)  # Активен ли токен (для логаута без удаления)
         created_at = Column(DateTime, default=utcnow_naive)
         updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
@@ -300,6 +394,7 @@ try:
         channel_name = Column(String, nullable=False, index=True)  # Название канала
         command_name = Column(String, nullable=False, index=True)  # Название команды (без !)
         command_type = Column(String, nullable=False)  # 'basic' или 'custom'
+        description = Column(String, nullable=True)  # Описание команды
         response_text = Column(String, nullable=True)  # Ответ команды (для кастомных)
         is_enabled = Column(Boolean, default=True)  # Включена ли команда
         platforms = Column(String, nullable=False, default='twitch,vk')  # Платформы через запятую
@@ -324,47 +419,95 @@ try:
         created_at = Column(DateTime, default=utcnow_naive)
         updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
-    class Auction(Base):
-        """Модель аукциона за баллы канала"""
-        __tablename__ = 'auctions'
+    class AudioSettings(Base):
+        """Модель настроек звука для пользователей"""
+        __tablename__ = 'audio_settings'
         __table_args__ = {'extend_existing': True}
         id = Column(Integer, primary_key=True, index=True)
-        user_id = Column(Integer, ForeignKey('users.id'), nullable=False)  # Владелец канала
-        channel_name = Column(String, nullable=False, index=True)
-        title = Column(String, nullable=False)  # Название лота
-        description = Column(String, nullable=True)  # Описание лота
-        image_url = Column(String, nullable=True)  # Изображение лота
-        starting_bid = Column(Integer, nullable=False, default=10)  # Стартовая ставка
-        current_bid = Column(Integer, nullable=False, default=0)  # Текущая ставка
-        bid_increment = Column(Integer, nullable=False, default=10)  # Шаг ставки
-        duration_minutes = Column(Integer, nullable=False, default=5)  # Длительность в минутах
-        status = Column(String, nullable=False, default='pending')  # pending, active, completed, cancelled
-        winner_id = Column(String, nullable=True, index=True)  # ID победителя
-        winner_name = Column(String, nullable=True)  # Имя победителя
-        winner_platform = Column(String, nullable=True)  # Платформа победителя
-        platforms = Column(JSON, nullable=False, default=lambda: ['twitch', 'vk'])  # Доступные платформы
-        auto_extend = Column(Boolean, default=True)  # Автопродление при ставке в последние секунды
-        min_participants = Column(Integer, nullable=False, default=2)  # Минимум участников
-        max_bid_limit = Column(Integer, nullable=True)  # Максимальная ставка
-        created_at = Column(DateTime, default=datetime.utcnow, index=True)
-        started_at = Column(DateTime, nullable=True)
-        ends_at = Column(DateTime, nullable=True)
-        completed_at = Column(DateTime, nullable=True)
+        user_id = Column(Integer, ForeignKey('users.id'), nullable=False, unique=True)
+        website_volume = Column(Integer, nullable=False, default=50)  # Громкость на сайте (0-100)
+        obs_volume = Column(Integer, nullable=False, default=50)  # Громкость в OBS (0-100)
+        created_at = Column(DateTime, default=utcnow_naive)
+        updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
-    class AuctionBid(Base):
-        """Модель ставок в аукционе"""
-        __tablename__ = 'auction_bids'
+    class TTSUserSettings(Base):
+        """Модель базовых настроек TTS для пользователей"""
+        __tablename__ = 'tts_user_settings'
         __table_args__ = {'extend_existing': True}
         id = Column(Integer, primary_key=True, index=True)
-        auction_id = Column(Integer, ForeignKey('auctions.id'), nullable=False, index=True)
-        user_id = Column(Integer, ForeignKey('users.id'), nullable=False)  # Владелец канала
-        bidder_id = Column(String, nullable=False, index=True)  # ID участника
-        bidder_name = Column(String, nullable=False)  # Имя участника
-        platform = Column(String, nullable=False)  # Платформа участника
-        channel_name = Column(String, nullable=False)
-        bid_amount = Column(Integer, nullable=False)  # Размер ставки
-        is_valid = Column(Boolean, default=True)  # Валидна ли ставка
-        created_at = Column(DateTime, default=datetime.utcnow, index=True)
+        user_id = Column(Integer, nullable=True, unique=True)  # Для обычных пользователей
+        session_id = Column(String, nullable=True, unique=True)  # Для гостей
+        
+        # Основные настройки TTS
+        engine = Column(String, nullable=False, default='gtts')  # 'gtts' или 'f5tts'
+        voice = Column(String, nullable=False, default='female_1')  # Голос для озвучки
+        listening_mode = Column(String, nullable=False, default='website')  # 'website' или 'obs'
+        
+        # Фильтры эмодзи и смайлов
+        enable_7tv = Column(Boolean, nullable=False, default=True)  # Включить 7TV смайлы
+        enable_twitch = Column(Boolean, nullable=False, default=True)  # Включить Twitch смайлы
+        enable_lexicon_filter = Column(Boolean, nullable=False, default=True)  # Включить фильтр лексики
+        enable_custom_lexicon = Column(Boolean, nullable=False, default=False)  # Включить пользовательский словарь
+        
+        # Дополнительные параметры
+        max_message_length = Column(Integer, nullable=False, default=500)  # Максимальная длина сообщения
+        skip_commands = Column(Boolean, nullable=False, default=True)  # Пропускать команды (начинающиеся с !)
+        use_local_tts = Column(Boolean, nullable=False, default=False)  # Использовать локальный TTS F5 движок
+        
+        created_at = Column(DateTime, default=utcnow_naive)
+        updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
+        
+        # Ограничение: должен быть заполнен либо user_id, либо session_id
+        __table_args__ = (
+            CheckConstraint('(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)', name='check_user_or_session'),
+            {'extend_existing': True}
+        )
+
+    class LocalTTSEndpoint(Base):
+        """Модель конфигурации локального TTS F5 движка"""
+        __tablename__ = 'local_tts_endpoints'
+        __table_args__ = {'extend_existing': True}
+        id = Column(Integer, primary_key=True, index=True)
+        user_id = Column(Integer, ForeignKey('users.id'), nullable=False, unique=True)
+        
+        # Конфигурация endpoint
+        endpoint_url = Column(String, nullable=False)  # URL локального TTS сервиса (например: http://localhost:8001)
+        api_key = Column(String, nullable=True)  # Опциональный API ключ для безопасности
+        is_active = Column(Boolean, default=True)  # Активен ли endpoint
+        use_local = Column(Boolean, default=False)  # Использовать локальный вместо централизованного
+        
+        # Статус и мониторинг
+        last_health_check = Column(DateTime, nullable=True)  # Последняя проверка здоровья
+        is_healthy = Column(Boolean, default=False)  # Доступен ли сервис
+        health_check_failures = Column(Integer, default=0)  # Количество неудачных проверок
+        
+        # Метаданные
+        tts_version = Column(String, nullable=True)  # Версия TTS движка
+        gpu_info = Column(JSON, nullable=True)  # Информация о GPU
+        
+        created_at = Column(DateTime, default=utcnow_naive)
+        updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
+
+    class AdminUser(Base):
+        """Модель администраторов системы"""
+        __tablename__ = 'admin_users'
+        __table_args__ = {'extend_existing': True}
+        id = Column(Integer, primary_key=True, index=True)
+        platform = Column(String, nullable=False)  # 'twitch', 'vk', etc.
+        platform_user_id = Column(String, nullable=False)  # ID пользователя на платформе
+        username = Column(String, nullable=True)  # Имя пользователя на платформе
+        is_active = Column(Boolean, default=True)  # Активен ли админ
+        permissions = Column(JSON, nullable=True)  # Дополнительные права
+        created_by = Column(Integer, ForeignKey('users.id'), nullable=True)  # Кто создал админа
+        created_at = Column(DateTime, default=utcnow_naive)
+        updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
+        
+        # Уникальный индекс для platform + platform_user_id
+        __table_args__ = (
+            UniqueConstraint('platform', 'platform_user_id', name='uq_admin_platform_user'),
+            {'extend_existing': True}
+        )
+
 
 
     class SupportTicket(Base):
@@ -421,6 +564,7 @@ class ChatMessage(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     channel_name = Column(String, nullable=False, index=True)
     platform = Column(String, nullable=False)  # twitch, vk_live
+    author_username = Column(String, nullable=True, index=True)  # Имя пользователя из чата
     message = Column(Text, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     is_deleted = Column(Boolean, default=False)
@@ -446,9 +590,6 @@ class UserProgression(Base):
     total_donated = Column(Float, default=0.0)
     total_donations_count = Column(Integer, default=0)
     
-    # Лутбоксы
-    free_lootboxes_opened = Column(Integer, default=0)
-    paid_lootboxes_opened = Column(Integer, default=0)
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -480,21 +621,6 @@ class UserAchievement(Base):
     channel_name = Column(String, nullable=False, index=True)
     earned_at = Column(DateTime, default=datetime.utcnow)
     is_claimed = Column(Boolean, default=False)  # Забрана ли награда
-
-class Lootbox(Base):
-    """Лутбоксы"""
-    __tablename__ = "lootboxes"
-    __table_args__ = {'extend_existing': True}
-    
-    id = Column(Integer, primary_key=True, index=True)
-    channel_name = Column(String, nullable=False, index=True)
-    name = Column(String, nullable=False)
-    description = Column(Text)
-    type = Column(String, nullable=False)  # free, paid
-    price = Column(Float, default=0.0)  # Цена для paid лутбоксов
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
 
 class DonationAlert(Base):
     """Донаты через DonationAlerts"""
@@ -721,3 +847,15 @@ def init_db():
         db.close()
     
     logger.info("✅ База данных инициализирована")
+
+class SecurityLog(Base):
+    """Логи безопасности"""
+    __tablename__ = 'security_logs'
+    __table_args__ = {'extend_existing': True}
+    id = Column(Integer, primary_key=True, index=True)
+    event_type = Column(String, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    ip_address = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
+    details = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=utcnow_naive, index=True)

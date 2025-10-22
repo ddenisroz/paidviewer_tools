@@ -27,7 +27,7 @@ class ChatWidget {
             this.addTestMessages();
             
         } catch (error) {
-            console.error('Error initializing chat widget:', error);
+            // Ошибка инициализации виджета чата
         }
     }
     
@@ -121,8 +121,13 @@ class ChatWidget {
         const urlParams = new URLSearchParams(window.location.search);
         const userId = urlParams.get('user') || 'default';
         
-        const wsUrl = `ws://localhost:8000/ws/chat-widget/${userId}`;
-        this.ws = new WebSocket(wsUrl);
+        const wsUrl = `${this.config.wsUrl || window.location.protocol === 'https:' ? 'wss://' + window.location.host : 'ws://' + window.location.host}/ws/chat-widget/${userId}`;
+        if (wsUrl && !wsUrl.includes('null')) {
+            this.ws = new WebSocket(wsUrl);
+        } else {
+            console.warn('Invalid WebSocket URL:', wsUrl);
+            return;
+        }
         
         this.ws.onopen = () => {
             // Chat widget connected');
@@ -136,7 +141,7 @@ class ChatWidget {
                     this.addMessage(data);
                 }
             } catch (error) {
-                console.error('Error parsing WebSocket message:', error);
+                // Ошибка парсинга WebSocket сообщения
             }
         };
         
@@ -147,7 +152,7 @@ class ChatWidget {
         };
         
         this.ws.onerror = (error) => {
-            console.error('WebSocket error:', error);
+            // WebSocket ошибка
         };
     }
     
@@ -218,7 +223,7 @@ class ChatWidget {
             content += ` <span class="timestamp">[${time}]</span>`;
         }
         
-        messageElement.innerHTML = content;
+        messageElement.textContent = content;
         
         // Добавляем в контейнер
         messagesContainer.appendChild(messageElement);
@@ -253,20 +258,22 @@ class ChatWidget {
     }
     
     addTestMessages() {
-        // Добавляем тестовые сообщения для демонстрации
-        const testMessages = [
-            { username: 'StreamerBot', message: 'Добро пожаловать на стрим!', role: 'moderator' },
-            { username: 'Viewer123', message: 'Привет всем! 👋', role: 'normal' },
-            { username: 'VIP_User', message: 'Отличный контент!', role: 'vip' },
-            { username: 'Subscriber', message: 'Спасибо за стрим!', role: 'subscriber' },
-            { username: 'Moderator', message: 'Помните о правилах чата', role: 'moderator' }
-        ];
-        
-        testMessages.forEach((msg, index) => {
-            setTimeout(() => {
-                this.addMessage(msg);
-            }, index * 2000);
-        });
+        // Добавляем тестовые сообщения только в режиме разработки
+        if (this.config.debugMode) {
+            const testMessages = [
+                { username: 'StreamerBot', message: 'Добро пожаловать на стрим!', role: 'moderator' },
+                { username: 'Viewer123', message: 'Привет всем! 👋', role: 'normal' },
+                { username: 'VIP_User', message: 'Отличный контент!', role: 'vip' },
+                { username: 'Subscriber', message: 'Спасибо за стрим!', role: 'subscriber' },
+                { username: 'Moderator', message: 'Помните о правилах чата', role: 'moderator' }
+            ];
+            
+            testMessages.forEach((msg, index) => {
+                setTimeout(() => {
+                    this.addMessage(msg);
+                }, index * 2000);
+            });
+        }
     }
     
     escapeHtml(text) {

@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
-import api from '../services/api';
-import logger from '../utils/logger';
+import { botService } from '../services/microservices';
+import { youtubeLogger as logger } from '../utils/logger';
 import { useAuth } from './AuthContext';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 // Контекст для глобального состояния плеера
 const PlayerContext = createContext();
@@ -109,7 +110,24 @@ const playerReducer = (state, action) => {
 export const PlayerProvider = ({ children }) => {
     const [state, dispatch] = useReducer(playerReducer, initialState);
     const lastUpdateTimeRef = useRef(0);
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, isGuest } = useAuth();
+    
+    // WebSocket для синхронизации YouTube плеера
+    const wsBaseUrl = import.meta.env.VITE_BOT_SERVICE_WS_URL;
+    const wsUrl = isAuthenticated && wsBaseUrl ? `${wsBaseUrl.replace('http', 'ws')}/ws/chat/1` : null;
+    
+    const { isConnected } = useWebSocket(wsUrl, {
+        onMessage: (data) => {
+            if (data.type === 'youtube_state') {
+                handleYoutubeStateUpdate(data);
+            }
+        },
+        onError: (error) => {
+            logger.error('YouTube WebSocket error:', error);
+        },
+        autoReconnect: true,
+        maxReconnectAttempts: 5
+    });
 
     // Загрузка очереди и текущего видео
     const loadQueue = async () => {
@@ -120,7 +138,7 @@ export const PlayerProvider = ({ children }) => {
         
         try {
             dispatch({ type: playerActions.SET_LOADING, payload: true });
-            const response = await api.get('/api/youtube/queue');
+            const response = await botService.get('/api/youtube/queue');
             const data = response.data;
             
             dispatch({ 
@@ -134,7 +152,7 @@ export const PlayerProvider = ({ children }) => {
             
             logger.debug('Queue loaded:', data);
         } catch (error) {
-            console.error('Error loading queue:', error);
+            logger.error('Error loading queue:', error);
             
             // Не показываем ошибки для rate limiting и CORS
             if (error.response?.status === 429 || error.code === 'ERR_NETWORK') {
@@ -156,7 +174,7 @@ export const PlayerProvider = ({ children }) => {
         
         try {
             logger.debug('Skipping to next video');
-            const response = await api.post('/api/youtube/player/next');
+            const response = await botService.post('/api/youtube/player/next');
             
             if (response.data.success) {
                 dispatch({ 
@@ -300,7 +318,7 @@ export const PlayerProvider = ({ children }) => {
     };
 
     const handlePlayerError = (event) => {
-        console.error('YouTube player error:', event);
+        logger.error('YouTube player error:', event);
     };
 
     // Закрытие плеера
@@ -361,28 +379,9 @@ export const PlayerProvider = ({ children }) => {
         // Обновление времени воспроизведения
         const timeInterval = setInterval(updateTime, 3000);
         
-        // WebSocket подключение для синхронизации YouTube плеера
-        const ws = new WebSocket(`ws://localhost:8000/ws/chat/1`);
-        
-        ws.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                if (data.type === 'youtube_state') {
-                    handleYoutubeStateUpdate(data);
-                }
-            } catch (error) {
-                logger.error('Error parsing WebSocket message:', error);
-            }
-        };
-        
-        ws.onerror = (error) => {
-            logger.error('WebSocket error:', error);
-        };
-        
         return () => {
             clearInterval(interval);
             clearInterval(timeInterval);
-            ws.close();
         };
     }, [isAuthenticated]);
 

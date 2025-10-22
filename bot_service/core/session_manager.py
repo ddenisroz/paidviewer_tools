@@ -22,9 +22,9 @@ class SessionManager:
         # - закрытии браузера
         # - потере фокуса окна
 
-    def create_or_get_user_by_platform(self, platform: str, platform_user_id: str, avatar_url: str, db: Session, current_user_id: int = None) -> User:
+    def create_or_get_user_by_platform(self, platform: str, platform_user_id: str, avatar_url: str, db: Session, current_user_id: int = None, username: str = None) -> User:
         """Находит пользователя по ID платформы или создает нового, если он не найден."""
-        logger.info(f"🔍 Looking for existing user with {platform} ID: {platform_user_id}")
+        logger.info(f"[SEARCH] Looking for existing user with {platform} ID: {platform_user_id}")
         
         # Ищем по токенам текущей платформы
         token = db.query(UserToken).filter(
@@ -33,97 +33,338 @@ class SessionManager:
         ).first()
 
         if token:
-            logger.info(f"✅ Found existing token for {platform} user {platform_user_id}")
+            logger.info(f"[OK] Found existing token for {platform} user {platform_user_id}")
             # Получаем пользователя по user_id
             user = db.query(User).filter(User.id == token.user_id).first()
             if user:
-                logger.info(f"✅ Found existing user (ID: {user.id}) for {platform} user {platform_user_id}")
+                logger.info(f"[OK] Found existing user (ID: {user.id}) for {platform} user {platform_user_id}")
+                # Обновляем username если он передан и еще не установлен
+                if username and platform == "twitch" and not user.twitch_username:
+                    user.twitch_username = username
+                    db.commit()
+                    logger.info(f"[UPDATE] Set twitch_username to {username}")
+                elif username and platform == "vk" and not user.vk_username:
+                    user.vk_username = username
+                    db.commit()
+                    logger.info(f"[UPDATE] Set vk_username to {username}")
                 return user
             else:
-                logger.warning(f"⚠️ Token found but user ID {token.user_id} doesn't exist - creating new user")
+                logger.warning(f"[WARN] Token found but user ID {token.user_id} doesn't exist - creating new user")
         else:
-            logger.info(f"❌ No existing token found for {platform} user {platform_user_id}")
+            logger.info(f"[ERROR] No existing token found for {platform} user {platform_user_id}")
             
             # Если есть current_user_id (пользователь подключает интеграцию), добавляем токен к текущему пользователю
             if current_user_id:
-                logger.info(f"🔗 User {current_user_id} is connecting {platform} integration - adding token to existing account")
+                logger.info(f"[CHANNELS] User {current_user_id} is connecting {platform} integration - adding token to existing account")
                 user = db.query(User).filter(User.id == current_user_id).first()
                 if user:
-                    logger.info(f"✅ Adding {platform} token to existing user {current_user_id}")
+                    logger.info(f"[OK] Adding {platform} token to existing user {current_user_id}")
                     return user
                 else:
-                    logger.warning(f"⚠️ Current user {current_user_id} not found - creating new user")
+                    logger.warning(f"[WARN] Current user {current_user_id} not found - creating new user")
         
         # Создаем нового пользователя (если токен не найден или пользователь не найден)
         logger.info(f"🆕 Creating a new user for {platform} user {platform_user_id}")
         
-        # Проверяем, должен ли пользователь быть админом по platform:user_id
-        import os
-        admin_users_raw = os.getenv("ADMIN_USERS", "")
-        admin_users = [admin.strip() for admin in admin_users_raw.split(",") if admin.strip()]
+        # БЕЗОПАСНОСТЬ: Проверяем админские права через базу данных
+        # Создаем пользователя как обычного, админские права назначаются отдельно
+        is_admin = False
         
-        # Проверяем админские права по platform:user_id
-        admin_key = f"{platform}:{platform_user_id}"
-        is_admin = admin_key in admin_users
+        # Проверяем, есть ли пользователь в таблице админов
+        from core.database import AdminUser
+        admin_user = db.query(AdminUser).filter(
+            AdminUser.platform == platform,
+            AdminUser.platform_user_id == platform_user_id
+        ).first()
         
-        logger.info(f"Admin check: platform='{platform}', platform_user_id='{platform_user_id}', admin_key='{admin_key}', admin_users={admin_users}, is_admin={is_admin}")
+        if admin_user and admin_user.is_active:
+            is_admin = True
+            logger.info(f"Admin user found in database: {platform}:{platform_user_id}")
         
+        logger.info(f"Creating new user: platform='{platform}', platform_user_id='{platform_user_id}', is_admin={is_admin}")
+        
+        # Создаем пользователя с username если он передан
         new_user = User(is_admin=is_admin)
+        if username and platform == "twitch":
+            new_user.twitch_username = username
+        elif username and platform == "vk":
+            new_user.vk_username = username
+            
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
         
         if is_admin:
-            logger.info(f"✅ Created new admin user with ID: {new_user.id}")
+            logger.info(f"[OK] Created new admin user with ID: {new_user.id}")
         else:
-            logger.info(f"✅ Created new user with ID: {new_user.id}")
+            logger.info(f"[OK] Created new user with ID: {new_user.id}")
         return new_user
 
-    def _merge_user_accounts(self, source_user_id: int, target_user_id: int, db: Session):
-        """Объединяет аккаунты пользователей: переносит все данные с source_user_id на target_user_id"""
-        logger.info(f"🔄 Merging user {source_user_id} into user {target_user_id}")
-        
+    def convert_guest_to_authenticated(self, guest_session_id: str, platform: str, platform_user_id: str, avatar_url: str, access_token: str, refresh_token: str, expires_at: datetime, scopes: list, username: str = None) -> User:
+        """Превращает гостевую сессию в авторизованную с переносом настроек"""
+        db = next(get_db())
         try:
-            # Переносим все токены
-            source_tokens = db.query(UserToken).filter(UserToken.user_id == source_user_id).all()
-            for token in source_tokens:
-                logger.info(f"  📝 Moving token {token.id} (platform: {token.platform}) from user {source_user_id} to user {target_user_id}")
-                token.user_id = target_user_id
+            # Получаем гостевую сессию
+            guest_session = db.query(UserSession).filter(
+                UserSession.session_id == guest_session_id,
+                UserSession.user_id == -1
+            ).first()
             
-            # Переносим все сессии
-            source_sessions = db.query(UserSession).filter(UserSession.user_id == source_user_id).all()
-            for session in source_sessions:
-                logger.info(f"  🔄 Moving session {session.id} from user {source_user_id} to user {target_user_id}")
-                session.user_id = target_user_id
+            if not guest_session:
+                raise ValueError(f"Guest session {guest_session_id} not found")
             
-            # Переносим голоса (если есть)
-            from core.database import Voice
-            source_voices = db.query(Voice).filter(Voice.owner_id == source_user_id).all()
-            for voice in source_voices:
-                logger.info(f"  🎵 Moving voice {voice.id} from user {source_user_id} to user {target_user_id}")
-                voice.owner_id = target_user_id
+            # Создаем нового авторизованного пользователя
+            new_user = User(is_admin=False, is_active=True)
+            db.add(new_user)
+            db.commit()
+            db.refresh(new_user)
             
-            # Удаляем исходного пользователя
-            source_user = db.query(User).filter(User.id == source_user_id).first()
-            if source_user:
-                db.delete(source_user)
-                logger.info(f"  🗑️ Removed source user {source_user_id}")
+            # Сохраняем токены платформы
+            self.save_user_tokens(
+                user_id=new_user.id,
+                platform=platform,
+                platform_user_id=platform_user_id,
+                avatar_url=avatar_url,
+                access_token=access_token,
+                refresh_token=refresh_token,
+                expires_at=expires_at,
+                scopes=scopes
+            )
+            
+            # Сохраняем username
+            if platform == "twitch" and username:
+                new_user.twitch_username = username
+            elif platform == "vk" and username:
+                new_user.vk_username = username
+            
+            # Переносим настройки от гостя (ищем по session_id)
+            guest_settings = db.query(UserSettings).filter(UserSettings.session_id == session_id).first()
+            if guest_settings:
+                new_settings = UserSettings(
+                    user_id=new_user.id,
+                    chat_enabled=guest_settings.chat_enabled,
+                    chat_max_messages=guest_settings.chat_max_messages,
+                    chat_show_timestamps=guest_settings.chat_show_timestamps,
+                    chat_show_platform=guest_settings.chat_show_platform,
+                    chat_show_user_roles=guest_settings.chat_show_user_roles,
+                    chat_animation_duration=guest_settings.chat_animation_duration,
+                    chat_animation_type=guest_settings.chat_animation_type,
+                    obs_width=guest_settings.obs_width,
+                    obs_height=guest_settings.obs_height,
+                    obs_font_size=guest_settings.obs_font_size,
+                    obs_font_color=guest_settings.obs_font_color,
+                    obs_background_color=guest_settings.obs_background_color,
+                    obs_message_spacing=guest_settings.obs_message_spacing,
+                    obs_show_avatars=guest_settings.obs_show_avatars,
+                    obs_avatar_size=guest_settings.obs_avatar_size,
+                    obs_message_fade_time=guest_settings.obs_message_fade_time,
+                    obs_message_display_limit=guest_settings.obs_message_display_limit,
+                    obs_text_shadow=guest_settings.obs_text_shadow,
+                    obs_border_radius=guest_settings.obs_border_radius,
+                    obs_padding=guest_settings.obs_padding,
+                    obs_max_width=guest_settings.obs_max_width,
+                    obs_text_align=guest_settings.obs_text_align,
+                    obs_custom_css=guest_settings.obs_custom_css,
+                    combine_titles=guest_settings.combine_titles,
+                    combine_categories=guest_settings.combine_categories
+                )
+                db.add(new_settings)
+            
+            # Переносим TTS настройки от гостя (ищем по session_id)
+            guest_tts_settings = db.query(TTSUserSettings).filter(TTSUserSettings.session_id == session_id).first()
+            if guest_tts_settings:
+                new_tts_settings = TTSUserSettings(
+                    user_id=new_user.id,
+                    enable_7tv=guest_tts_settings.enable_7tv,
+                    enable_twitch=guest_tts_settings.enable_twitch,
+                    enable_lexicon_filter=guest_tts_settings.enable_lexicon_filter,
+                    enable_custom_lexicon=guest_tts_settings.enable_custom_lexicon
+                )
+                db.add(new_tts_settings)
+            
+                # Завершаем ВСЕ гостевые сессии для этого канала
+                channel_name = platform_user_id.lower()
+                self.terminate_guest_sessions_for_channel(channel_name, "converted_to_authenticated")
+                
+                # Обновляем текущую сессию - меняем user_id с -1 на новый ID
+                guest_session.user_id = new_user.id
+                guest_session.device_info = {
+                    **guest_session.device_info,
+                    "converted_from_guest": True,
+                    "conversion_platform": platform,
+                    "conversion_timestamp": datetime.utcnow().isoformat()
+                }
             
             db.commit()
-            logger.info(f"✅ Successfully merged user {source_user_id} into user {target_user_id}")
+            
+            logger.info(f"✅ Converted guest session {guest_session_id} to authenticated user {new_user.id} with {platform} integration")
+            
+            return new_user
             
         except Exception as e:
-            logger.error(f"❌ Error merging users: {e}")
             db.rollback()
+            logger.error(f"Error converting guest session to authenticated: {e}")
             raise
+        finally:
+            db.close()
+    
+    def _merge_user_accounts(self, source_user_id: int, target_user_id: int, db: Session):
+        """Объединяет два аккаунта: переносит все данные от source к target"""
+        try:
+            logger.info(f"Merging user {source_user_id} into user {target_user_id}")
+            
+            # Получаем пользователей
+            source_user = db.query(User).filter(User.id == source_user_id).first()
+            target_user = db.query(User).filter(User.id == target_user_id).first()
+            
+            if not source_user or not target_user:
+                raise ValueError("Source or target user not found")
+            
+            # Переносим username'ы если их нет у target
+            if not target_user.twitch_username and source_user.twitch_username:
+                target_user.twitch_username = source_user.twitch_username
+            if not target_user.vk_username and source_user.vk_username:
+                target_user.vk_username = source_user.vk_username
+            
+            # Переносим токены
+            source_tokens = db.query(UserToken).filter(UserToken.user_id == source_user_id).all()
+            for token in source_tokens:
+                # Проверяем, нет ли уже токена этой платформы у target
+                existing_token = db.query(UserToken).filter(
+                    UserToken.user_id == target_user_id,
+                    UserToken.platform == token.platform
+                ).first()
+                
+                if not existing_token:
+                    # Переносим токен
+                    token.user_id = target_user_id
+                else:
+                    # Обновляем существующий токен
+                    existing_token.access_token = token.access_token
+                    existing_token.refresh_token = token.refresh_token
+                    existing_token.expires_at = token.expires_at
+                    existing_token.scopes = token.scopes
+                    existing_token.avatar_url = token.avatar_url
+                    existing_token.platform_user_id = token.platform_user_id
+                    
+                    # Удаляем старый токен
+                    db.delete(token)
+            
+            # Переносим настройки пользователя
+            source_settings = db.query(UserSettings).filter(UserSettings.user_id == source_user_id).first()
+            target_settings = db.query(UserSettings).filter(UserSettings.user_id == target_user_id).first()
+            
+            if source_settings and target_settings:
+                # Обновляем настройки target данными из source (приоритет у source)
+                for column in UserSettings.__table__.columns:
+                    if column.name not in ['id', 'user_id']:
+                        source_value = getattr(source_settings, column.name)
+                        if source_value is not None:
+                            setattr(target_settings, column.name, source_value)
+            
+            # Переносим TTS настройки
+            source_tts_settings = db.query(TTSUserSettings).filter(TTSUserSettings.user_id == source_user_id).first()
+            target_tts_settings = db.query(TTSUserSettings).filter(TTSUserSettings.user_id == target_user_id).first()
+            
+            if source_tts_settings and target_tts_settings:
+                # Обновляем TTS настройки target данными из source
+                for column in TTSUserSettings.__table__.columns:
+                    if column.name not in ['id', 'user_id', 'created_at', 'updated_at']:
+                        source_value = getattr(source_tts_settings, column.name)
+                        if source_value is not None:
+                            setattr(target_tts_settings, column.name, source_value)
+            
+            # Обновляем сессии: меняем user_id с source на target
+            db.query(UserSession).filter(UserSession.user_id == source_user_id).update({
+                UserSession.user_id: target_user_id
+            })
+            
+            # Переносим другие связанные данные (если есть)
+            # Здесь можно добавить перенос команд, голосов, истории и т.д.
+            
+            db.commit()
+            logger.info(f"Successfully merged user {source_user_id} into user {target_user_id}")
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error merging user accounts: {e}")
+            raise
+    
+    def terminate_guest_sessions_for_channel(self, channel_name: str, reason: str = "converted_to_authenticated"):
+        """Завершает все гостевые сессии для канала при конвертации в авторизованную"""
+        db = next(get_db())
+        try:
+            from sqlalchemy import text
+            guest_sessions = db.query(UserSession).filter(
+                UserSession.user_id == -1,
+                UserSession.is_active == True,
+                text("JSON_EXTRACT(device_info, '$.monitored_channel') = :channel")
+            ).params(channel=channel_name).all()
+            
+            for session in guest_sessions:
+                session.is_active = False
+                session.ended_at = datetime.utcnow()
+                session.device_info = {
+                    **session.device_info,
+                    "termination_reason": reason,
+                    "terminated_at": datetime.utcnow().isoformat()
+                }
+                logger.info(f"Terminated guest session {session.session_id} for channel {channel_name}: {reason}")
+            
+            db.commit()
+            logger.info(f"Terminated {len(guest_sessions)} guest sessions for channel {channel_name}")
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error terminating guest sessions: {e}")
+            raise
+        finally:
+            db.close()
+    
+    def terminate_user_sessions_for_channel(self, user_id: int, channel_name: str, reason: str = "user_logout"):
+        """Завершает все сессии пользователя для канала при логауте"""
+        db = next(get_db())
+        try:
+            from sqlalchemy import text
+            user_sessions = db.query(UserSession).filter(
+                UserSession.user_id == user_id,
+                UserSession.is_active == True,
+                text("JSON_EXTRACT(device_info, '$.monitored_channel') = :channel")
+            ).params(channel=channel_name).all()
+            
+            for session in user_sessions:
+                session.is_active = False
+                session.ended_at = datetime.utcnow()
+                session.device_info = {
+                    **session.device_info,
+                    "termination_reason": reason,
+                    "terminated_at": datetime.utcnow().isoformat()
+                }
+                logger.info(f"Terminated user session {session.session_id} for channel {channel_name}: {reason}")
+            
+            db.commit()
+            logger.info(f"Terminated {len(user_sessions)} user sessions for channel {channel_name}")
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error terminating user sessions: {e}")
+            raise
+        finally:
+            db.close()
 
     def save_user_tokens(self, user_id: int, platform: str, platform_user_id: str, 
                         avatar_url: str = None, access_token: str = None, 
                         refresh_token: str = None, expires_at: datetime = None, scopes: list = None):
         """Сохраняет или обновляет токены пользователя для платформы"""
+        from core.token_encryption import encrypt_token
+        
         db = next(get_db())
         try:
-            logger.info(f"💾 Saving tokens for user {user_id}, platform {platform}, platform_user_id {platform_user_id}")
+            logger.info(f"[SAVE] Saving tokens for user {user_id}, platform {platform}, platform_user_id {platform_user_id}")
+            
+            # Шифруем токены перед сохранением
+            encrypted_access_token = encrypt_token(access_token) if access_token else None
+            encrypted_refresh_token = encrypt_token(refresh_token) if refresh_token else None
             
             # Ищем существующий токен для этой платформы и пользователя
             existing_token = db.query(UserToken).filter(
@@ -131,15 +372,23 @@ class SessionManager:
                 UserToken.platform == platform
             ).first()
             
+            # Проверяем все токены пользователя для диагностики
+            all_user_tokens = db.query(UserToken).filter(UserToken.user_id == user_id).all()
+            logger.info(f"[SAVE] User {user_id} currently has {len(all_user_tokens)} tokens in DB:")
+            for t in all_user_tokens:
+                logger.info(f"   - {t.platform}: platform_user_id={t.platform_user_id}, has_access_token={bool(t.access_token)}, is_active={getattr(t, 'is_active', 'N/A')}")
+            
             if existing_token:
-                logger.info(f"🔄 Updating existing token for user {user_id}, platform {platform}")
+                logger.info(f"[REFRESH] Updating existing token for user {user_id}, platform {platform}")
                 # Обновляем существующий токен
                 existing_token.platform_user_id = platform_user_id
                 existing_token.avatar_url = avatar_url
-                existing_token.access_token = access_token
-                existing_token.refresh_token = refresh_token
+                existing_token.access_token = encrypted_access_token
+                existing_token.refresh_token = encrypted_refresh_token
                 existing_token.expires_at = expires_at
                 existing_token.scopes = scopes
+                if hasattr(existing_token, 'is_active'):
+                    existing_token.is_active = True  # Активируем токен при повторной авторизации
             else:
                 logger.info(f"🆕 Creating new token for user {user_id}, platform {platform}")
                 # Создаем новый токен
@@ -148,18 +397,18 @@ class SessionManager:
                     platform=platform,
                     platform_user_id=platform_user_id,
                     avatar_url=avatar_url,
-                    access_token=access_token,
-                    refresh_token=refresh_token,
+                    access_token=encrypted_access_token,
+                    refresh_token=encrypted_refresh_token,
                     expires_at=expires_at,
                     scopes=scopes
                 )
                 db.add(new_token)
             
             db.commit()
-            logger.info(f"✅ Successfully saved tokens for user {user_id}, platform {platform}")
+            logger.info(f"[OK] Successfully saved tokens for user {user_id}, platform {platform}")
             
         except Exception as e:
-            logger.error(f"❌ Error saving tokens for user {user_id}: {e}")
+            logger.error(f"[ERROR] Error saving tokens for user {user_id}: {e}")
             db.rollback()
             raise
         finally:
@@ -167,11 +416,16 @@ class SessionManager:
 
     def create_session(self, user_id: int, device_info: Optional[Dict] = None) -> str:
         """Создает новую сессию для пользователя, завершая все его предыдущие сессии."""
+        logger.info(f"🔧 create_session called for user_id: {user_id}, device_info: {device_info}")
         db = next(get_db())
         try:
+            logger.info(f"🔧 Terminating existing sessions for user {user_id}")
             self.terminate_user_sessions(user_id, "new_login", db)
             
             session_id = str(uuid.uuid4())
+            logger.info(f"🔧 Generated session_id: {session_id}")
+            
+            logger.info(f"Creating session {session_id} for user {user_id} with device_info: {device_info}")
             
             new_session = UserSession(
                 user_id=user_id,
@@ -179,15 +433,105 @@ class SessionManager:
                 device_info=device_info or {},
                 is_active=True
             )
+            logger.info(f"🔧 Created UserSession object: {new_session}")
+            
+            logger.info(f"🔧 Adding session to database...")
             db.add(new_session)
+            logger.info(f"🔧 Committing to database...")
             db.commit()
+            logger.info(f"🔧 Database commit successful")
+            
+            # Обновляем объект из базы данных
+            db.refresh(new_session)
+            
+            # Явно сбрасываем кеш для гарантии свежих данных
+            db.expire_all()
+            db.commit()
+            
+            # Проверяем, что сессия действительно создана
+            logger.info(f"🔧 Verifying session creation in database...")
+            created_session = db.query(UserSession).filter(UserSession.session_id == session_id).first()
+            if created_session:
+                logger.info(f"✅ Session {session_id} successfully created in database for user {user_id}")
+                logger.info(f"✅ Session details: user_id={created_session.user_id}, is_active={created_session.is_active}")
+            else:
+                logger.error(f"❌ Failed to create session {session_id} in database for user {user_id}")
             
             logger.info(f"Created new session {session_id} for unified user {user_id}")
             return session_id
         except Exception as e:
+            logger.error(f"❌ Error creating session for user {user_id}: {e}")
+            logger.error(f"❌ Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
             db.rollback()
-            logger.error(f"Error creating session for user {user_id}: {e}")
             raise
+        finally:
+            db.close()
+            logger.info(f"🔧 Database connection closed")
+
+    def update_session(self, session_id: int, device_info: Optional[Dict] = None) -> bool:
+        """Обновляет существующую сессию новыми данными"""
+        logger.info(f"🔄 update_session called for session_id: {session_id}, device_info: {device_info}")
+        db = next(get_db())
+        try:
+            session = db.query(UserSession).filter(UserSession.id == session_id).first()
+            if not session:
+                logger.warning(f"Session {session_id} not found")
+                return False
+            
+            if device_info:
+                session.device_info = device_info
+            from datetime import datetime
+            session.updated_at = datetime.utcnow()
+            
+            db.commit()
+            logger.info(f"✅ Session {session_id} updated successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error updating session {session_id}: {e}")
+            db.rollback()
+            return False
+        finally:
+            db.close()
+
+    def get_user_tokens(self, user_id: int, platform: str) -> Optional[Dict]:
+        """Получает токены пользователя с расшифровкой"""
+        from core.token_encryption import decrypt_token, is_token_encrypted
+        
+        db = next(get_db())
+        try:
+            token_record = db.query(UserToken).filter(
+                UserToken.user_id == user_id,
+                UserToken.platform == platform
+            ).first()
+            
+            if not token_record:
+                return None
+            
+            # Расшифровываем токены
+            access_token = token_record.access_token
+            refresh_token = token_record.refresh_token
+            
+            # Проверяем, зашифрованы ли токены
+            if access_token and is_token_encrypted(access_token):
+                access_token = decrypt_token(access_token)
+            
+            if refresh_token and is_token_encrypted(refresh_token):
+                refresh_token = decrypt_token(refresh_token)
+            
+            return {
+                'access_token': access_token,
+                'refresh_token': refresh_token,
+                'expires_at': token_record.expires_at,
+                'scopes': token_record.scopes,
+                'platform_user_id': token_record.platform_user_id,
+                'avatar_url': token_record.avatar_url
+            }
+        except Exception as e:
+            logger.error(f"Error getting tokens for user {user_id}, platform {platform}: {e}")
+            return None
         finally:
             db.close()
 
@@ -218,6 +562,7 @@ class SessionManager:
             
             # Уведомляем connection_manager о новой активной сессии
             try:
+                from core.connection_manager import get_connection_manager
                 from core.connection_manager import get_connection_manager
                 connection_manager = get_connection_manager()
                 connection_manager.add_active_session(channel_name, session_id)
@@ -342,15 +687,9 @@ class SessionManager:
             
             db.commit()
             
-            # Отправка WebSocket уведомления о завершении сессии
-            if reason in ["new_login"]:
-                try:
-                    from core.connection_manager import ConnectionManager
-                    manager = ConnectionManager()
-                    import asyncio
-                    asyncio.create_task(manager.notify_session_terminated(str(user_id), reason))
-                except Exception as e:
-                    logger.error(f"Error sending WebSocket notification for user {user_id}: {e}")
+            # Уведомление о завершении сессии (опционально)
+            # WebSocket уведомления обрабатываются через connection_manager
+            logger.info(f"Sessions terminated for user {user_id}, reason: {reason}")
         except Exception as e:
             db.rollback()
             logger.error(f"Error terminating sessions for user {user_id}: {e}")
@@ -366,20 +705,20 @@ class SessionManager:
             
             # Получаем все токены пользователя перед удалением для логирования
             tokens = db.query(UserToken).filter_by(user_id=user_id).all()
-            logger.info(f"🗑️ Clearing {len(tokens)} tokens for user {user_id}")
+            logger.info(f"[DELETE] Clearing {len(tokens)} tokens for user {user_id}")
             
             for token in tokens:
-                logger.info(f"🗑️ Removing {token.platform} token for {token.platform_user_id}")
+                logger.info(f"[DELETE] Removing {token.platform} token for {token.platform_user_id}")
             
             # Удаляем все токены пользователя
             deleted_count = db.query(UserToken).filter_by(user_id=user_id).delete()
             db.commit()
             
-            logger.info(f"✅ Successfully removed {deleted_count} tokens for user {user_id}")
+            logger.info(f"[OK] Successfully removed {deleted_count} tokens for user {user_id}")
             return True
             
         except Exception as e:
-            logger.error(f"❌ Error clearing tokens for user {user_id}: {e}")
+            logger.error(f"[ERROR] Error clearing tokens for user {user_id}: {e}")
             db.rollback()
             return False
         finally:
@@ -398,20 +737,20 @@ class SessionManager:
                 logger.warning(f"No {platform} tokens found for user {user_id}")
                 return True
             
-            logger.info(f"🗑️ Removing {len(tokens)} {platform} tokens for user {user_id}")
+            logger.info(f"[DELETE] Removing {len(tokens)} {platform} tokens for user {user_id}")
             
             for token in tokens:
-                logger.info(f"🗑️ Removing {token.platform} token for {token.platform_user_id}")
+                logger.info(f"[DELETE] Removing {token.platform} token for {token.platform_user_id}")
             
             # Удаляем токены конкретной платформы
             deleted_count = db.query(UserToken).filter_by(user_id=user_id, platform=platform).delete()
             db.commit()
             
-            logger.info(f"✅ Successfully removed {deleted_count} {platform} tokens for user {user_id}")
+            logger.info(f"[OK] Successfully removed {deleted_count} {platform} tokens for user {user_id}")
             return True
             
         except Exception as e:
-            logger.error(f"❌ Error removing {platform} tokens for user {user_id}: {e}")
+            logger.error(f"[ERROR] Error removing {platform} tokens for user {user_id}: {e}")
             db.rollback()
             return False
         finally:
@@ -431,6 +770,7 @@ class SessionManager:
             
             # Уведомляем connection_manager о завершении сессии
             try:
+                from core.connection_manager import get_connection_manager
                 from core.connection_manager import get_connection_manager
                 connection_manager = get_connection_manager()
                 
@@ -452,14 +792,24 @@ class SessionManager:
 
     def validate_session(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Проверяет валидность сессии и возвращает данные о пользователе и его интеграциях."""
+        # Валидация session_id
+        if not session_id or len(session_id) < 10:
+            logger.warning(f"Invalid session_id format: {session_id}")
+            return None
+            
         db = next(get_db())
         try:
+            # ВАЖНО: Обновляем сессию для получения последних данных из БД
+            db.expire_all()
+            db.commit()
+            
             session = db.query(UserSession).filter_by(session_id=session_id, is_active=True).first()
+            
             if not session:
+                logger.debug(f"Invalid or inactive session: {session_id[:20]}...")
                 return None
             
             # Проверяем таймаут только для очень старых сессий (30 дней)
-            # НЕ разлогиниваем пользователей при сворачивании браузера, смене вкладки или закрытии браузера
             time_since_activity = datetime.utcnow() - session.last_activity
             if time_since_activity > self.session_timeout:
                 logger.info(f"Session {session_id} expired after {time_since_activity.days} days of inactivity")
@@ -472,14 +822,27 @@ class SessionManager:
             if time_since_activity > timedelta(hours=1):
                 session.last_activity = datetime.utcnow()
                 db.commit()
-                logger.debug(f"Updated last_activity for session {session_id}")
+            
+            # Обработка гостевых сессий (user_id = -1)
+            if session.user_id == -1:
+                return {
+                    "user_id": -1,
+                    "id": -1,
+                    "is_admin": False,
+                    "is_blocked": False,
+                    "blocked_reason": None,
+                    "blocked_at": None,
+                    "integrations": {},
+                    "is_guest": True,
+                    "device_info": session.device_info
+                }
             
             user = db.query(User).filter_by(id=session.user_id).first()
             if not user:
+                logger.warning(f"User not found for session {session_id[:20]}... user_id={session.user_id}")
                 return None
             
-            integrations = db.query(UserToken).filter_by(user_id=user.id).all()
-            
+            # ИНТЕГРАЦИИ НЕ ВКЛЮЧАЕМ В СЕССИЮ - они будут проверяться через API с валидацией токенов
             return {
                 "user_id": user.id,
                 "id": user.id, 
@@ -487,12 +850,7 @@ class SessionManager:
                 "is_blocked": user.is_blocked,
                 "blocked_reason": user.blocked_reason,
                 "blocked_at": user.blocked_at,
-                "integrations": {
-                    token.platform: {
-                        "platform_user_id": token.platform_user_id,
-                        "avatar_url": token.avatar_url
-                    } for token in integrations
-                }
+                "integrations": {}  # Пустые интеграции - проверяются через API
             }
         except Exception as e:
             logger.error(f"Error validating session {session_id}: {e}")
@@ -513,20 +871,29 @@ class SessionManager:
                 logger.info(f"No tokens found for user {user_id} to clear")
                 return True
             
-            logger.info(f"🗑️ Clearing ALL {len(tokens)} tokens for user {user_id} on logout:")
+            logger.info(f"[DELETE] Clearing ALL {len(tokens)} tokens for user {user_id} on logout:")
             
             for token in tokens:
-                logger.info(f"🗑️ Removing {token.platform} token for {token.platform_user_id}")
+                logger.info(f"[DELETE] Removing {token.platform} token for {token.platform_user_id}")
             
             # Удаляем ВСЕ токены пользователя
             deleted_count = db.query(UserToken).filter_by(user_id=user_id).delete()
             db.commit()
             
-            logger.info(f"✅ Successfully cleared ALL {deleted_count} tokens for user {user_id}")
+            # Проверяем что токены действительно удалены
+            remaining_tokens = db.query(UserToken).filter_by(user_id=user_id).all()
+            if remaining_tokens:
+                logger.error(f"❌ [LOGOUT ERROR] {len(remaining_tokens)} tokens still remain after deletion for user {user_id}!")
+                for token in remaining_tokens:
+                    logger.error(f"   - Remaining token: platform={token.platform}, platform_user_id={token.platform_user_id}")
+            else:
+                logger.info(f"✅ [LOGOUT VERIFIED] All tokens deleted for user {user_id}")
+            
+            logger.info(f"[OK] Successfully cleared {deleted_count} tokens for user {user_id}")
             return True
             
         except Exception as e:
-            logger.error(f"❌ Error clearing all tokens for user {user_id}: {e}")
+            logger.error(f"[ERROR] Error clearing all tokens for user {user_id}: {e}")
             db.rollback()
             return False
         finally:
@@ -539,9 +906,21 @@ class SessionManager:
             token = db.query(UserToken).filter_by(user_id=user_id, platform=platform).first()
             if not token:
                 return None
+            
+            # Расшифровываем токены
+            from core.token_encryption import decrypt_token, is_token_encrypted
+            
+            access_token = token.access_token
+            refresh_token = token.refresh_token
+            
+            if access_token and is_token_encrypted(access_token):
+                access_token = decrypt_token(access_token)
+            if refresh_token and is_token_encrypted(refresh_token):
+                refresh_token = decrypt_token(refresh_token)
+            
             return {
-                "access_token": token.access_token,
-                "refresh_token": token.refresh_token,
+                "access_token": access_token,
+                "refresh_token": refresh_token,
                 "expires_at": token.expires_at,
                 "platform_user_id": token.platform_user_id,
                 "avatar_url": token.avatar_url,
@@ -550,57 +929,6 @@ class SessionManager:
         finally:
             db.close()
 
-    def save_user_tokens(self, user_id: int, platform: str, platform_user_id: str, 
-                         avatar_url: str = None, access_token: str = None,
-                         refresh_token: Optional[str] = None, expires_at: Optional[datetime] = None,
-                         scopes: Optional[List[str]] = None) -> bool:
-        """Сохраняет или обновляет токены и данные интеграции для пользователя."""
-        db = next(get_db())
-        try:
-            token = db.query(UserToken).filter_by(user_id=user_id, platform=platform).first()
-            
-            if token:
-                # Обновляем
-                token.access_token = access_token
-                token.refresh_token = refresh_token
-                token.expires_at = expires_at
-                token.avatar_url = avatar_url
-                token.scopes = scopes
-                token.updated_at = datetime.utcnow()
-            else:
-                # Создаем
-                token = UserToken(
-                    user_id=user_id,
-                    platform=platform,
-                    platform_user_id=platform_user_id,
-                    avatar_url=avatar_url,
-                    access_token=access_token,
-                    refresh_token=refresh_token,
-                    expires_at=expires_at,
-                    scopes=scopes
-                )
-                db.add(token)
-            
-            db.commit()
-            logger.info(f"Saved tokens for unified user {user_id} on platform {platform}")
-            
-            # Уведомление фронтенда
-            try:
-                from core.connection_manager import ConnectionManager
-                import asyncio
-                manager = ConnectionManager()
-                # Отправляем уведомление всем подключенным пользователям
-                asyncio.create_task(manager.broadcast(f"Integration update: {platform} connected for user {user_id}"))
-            except Exception as e:
-                logger.error(f"Error sending WebSocket notification for user {user_id}: {e}")
-
-            return True
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Error saving tokens for user {user_id}, platform {platform}: {e}")
-            return False
-        finally:
-            db.close()
 
     async def _notify_guest_session_terminated(self, channel_name: str, reason: str):
         """Вспомогательный метод для уведомлений"""
@@ -619,5 +947,65 @@ class SessionManager:
             await manager.notify_all_sessions_terminated_for_channel(channel_name, reason)
         except Exception as e:
             logger.error(f"Error in _notify_all_sessions_terminated_for_channel: {e}")
+
+    def cleanup_old_sessions(self, days_old: int = 7) -> int:
+        """Удаляет старые неактивные сессии старше указанного количества дней."""
+        db = next(get_db())
+        try:
+            cutoff_date = datetime.utcnow() - timedelta(days=days_old)
+            
+            # Находим старые неактивные сессии
+            old_sessions = db.query(UserSession).filter(
+                UserSession.is_active == False,
+                UserSession.last_activity < cutoff_date
+            ).all()
+            
+            count = len(old_sessions)
+            if count > 0:
+                # Удаляем старые сессии
+                for session in old_sessions:
+                    db.delete(session)
+                
+                db.commit()
+                logger.info(f"[BROOM] Cleaned up {count} old inactive sessions (older than {days_old} days)")
+            else:
+                logger.debug(f"No old sessions to clean up (older than {days_old} days)")
+            
+            return count
+            
+        except Exception as e:
+            logger.error(f"Error cleaning up old sessions: {e}")
+            db.rollback()
+            return 0
+        finally:
+            db.close()
+
+    def get_session_stats(self) -> dict:
+        """Возвращает статистику по сессиям."""
+        db = next(get_db())
+        try:
+            total_sessions = db.query(UserSession).count()
+            active_sessions = db.query(UserSession).filter(UserSession.is_active == True).count()
+            inactive_sessions = total_sessions - active_sessions
+            
+            # Старые неактивные сессии (старше 7 дней)
+            cutoff_date = datetime.utcnow() - timedelta(days=7)
+            old_inactive = db.query(UserSession).filter(
+                UserSession.is_active == False,
+                UserSession.last_activity < cutoff_date
+            ).count()
+            
+            return {
+                "total_sessions": total_sessions,
+                "active_sessions": active_sessions,
+                "inactive_sessions": inactive_sessions,
+                "old_inactive_sessions": old_inactive
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting session stats: {e}")
+            return {}
+        finally:
+            db.close()
 
 session_manager = SessionManager()

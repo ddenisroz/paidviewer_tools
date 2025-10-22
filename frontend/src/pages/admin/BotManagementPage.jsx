@@ -11,9 +11,11 @@ import {
 import { toast } from 'sonner';
 import { botService } from '../../services/microservices';
 import { useTtsHealth } from '../../context/TtsHealthContext';
+import { TTS_SERVICE_URL } from '../../constants';
 
 const BotManagementPage = () => {
     const [bots, setBots] = useState([]);
+    const [ttsStatus, setTtsStatus] = useState(null);
     const [loading, setLoading] = useState(true);
     const [restarting, setRestarting] = useState({});
     const { isHealthy: ttsIsHealthy, isChecking: ttsIsChecking, lastCheck: ttsLastCheck } = useTtsHealth();
@@ -22,12 +24,28 @@ const BotManagementPage = () => {
         try {
             setLoading(true);
             const response = await botService.get('/api/admin/bots/status');
-            setBots(response.data.bots || []);
+            // Преобразуем объект ботов в массив
+            const botsData = response.data?.bots || {};
+            const botsArray = Object.entries(botsData).map(([name, data]) => ({
+                name,
+                ...data
+            }));
+            setBots(botsArray);
         } catch (error) {
             console.error('Error loading bots status:', error);
             toast.error('Ошибка загрузки статуса ботов');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadTtsStatus = async () => {
+        try {
+            const response = await botService.get('/api/admin/tts/status');
+            setTtsStatus(response.data?.tts_service || null);
+        } catch (error) {
+            console.error('Error loading TTS status:', error);
+            setTtsStatus({ status: 'error', healthy: false, error: 'Failed to check TTS status' });
         }
     };
 
@@ -91,11 +109,12 @@ const BotManagementPage = () => {
     };
 
     const getBotServiceStatus = () => {
-        if (!bots || bots.length === 0) return 'stopped';
+        const botsArray = Array.isArray(bots) ? bots : [];
+        if (botsArray.length === 0) return 'stopped';
         
         // Если хотя бы один бот работает, считаем сервис работающим
-        const hasRunningBot = bots.some(bot => bot.status === 'running');
-        const hasErrorBot = bots.some(bot => bot.status === 'error');
+        const hasRunningBot = botsArray.some(bot => bot.status === 'running');
+        const hasErrorBot = botsArray.some(bot => bot.status === 'error');
         
         if (hasRunningBot) return 'running';
         if (hasErrorBot) return 'error';
@@ -115,19 +134,20 @@ const BotManagementPage = () => {
     };
 
     const getBotServiceDescription = () => {
-        if (!bots || bots.length === 0) {
+        const botsArray = Array.isArray(bots) ? bots : [];
+        if (botsArray.length === 0) {
             return 'Загрузка статуса...';
         }
         
-        const twitchBot = bots.find(bot => bot.platform === 'twitch');
-        const vkBot = bots.find(bot => bot.platform === 'vk_live');
+        const twitchBot = botsArray.find(bot => bot.platform === 'twitch');
+        const vkBot = botsArray.find(bot => bot.platform === 'vk_live');
         
         const twitchStatus = twitchBot ? twitchBot.status : 'stopped';
         const vkStatus = vkBot ? vkBot.status : 'stopped';
         const twitchChannels = twitchBot ? twitchBot.connected_channels || 0 : 0;
         const vkChannels = vkBot ? vkBot.connected_channels || 0 : 0;
         
-        const lastActivity = bots.length > 0 ? new Date(bots[0].last_activity).toLocaleString('ru-RU') : 'Неизвестно';
+        const lastActivity = botsArray.length > 0 ? new Date(botsArray[0].last_activity).toLocaleString('ru-RU') : 'Неизвестно';
         
         return `Twitch: ${twitchStatus} (${twitchChannels} каналов) • VK: ${vkStatus} (${vkChannels} каналов) • ${lastActivity}`;
     };
@@ -136,6 +156,7 @@ const BotManagementPage = () => {
 
     useEffect(() => {
         loadBotsStatus();
+        loadTtsStatus();
     }, []);
 
     if (loading) {
@@ -235,22 +256,22 @@ const BotManagementPage = () => {
                                         <Badge 
                                             variant="outline" 
                                             className={
-                                                ttsIsHealthy 
+                                                ttsStatus?.healthy 
                                                     ? "text-green-600 border-green-600" 
                                                     : "text-red-600 border-red-600"
                                             }
                                         >
-                                            {ttsIsHealthy ? 'Готов' : 'Недоступен'}
+                                            {ttsStatus?.healthy ? 'Готов' : 'Недоступен'}
                                         </Badge>
                                     </h3>
                                     <p className="text-sm text-slate-400">
-                                        Движок синтеза речи • {ttsIsHealthy ? 'Последняя активность' : 'Статус'}: {ttsIsHealthy ? (ttsLastCheck ? ttsLastCheck.toLocaleString('ru-RU') : 'Проверяется...') : 'Недоступен'}
+                                        Движок синтеза речи • Статус: {ttsStatus?.status || 'Проверяется...'} • URL: {ttsStatus?.url || TTS_SERVICE_URL}
                                     </p>
                                 </div>
                             </div>
                             
                             <div className="flex items-center space-x-2">
-                                {!ttsIsHealthy && (
+                                {!ttsStatus?.healthy && (
                                     <Button
                                         size="sm"
                                         variant="outline"
@@ -266,7 +287,7 @@ const BotManagementPage = () => {
                                         Перезапустить
                                     </Button>
                                 )}
-                                {ttsIsHealthy && (
+                                {ttsStatus?.healthy && (
                                     <div className="flex items-center space-x-2 text-green-600">
                                         <CheckCircle className="w-4 h-4" />
                                         <span className="text-sm">Работает</span>

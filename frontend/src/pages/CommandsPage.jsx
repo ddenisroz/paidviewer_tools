@@ -38,6 +38,7 @@ import api from '../services/api';
 import { toast } from 'sonner';
 import { CardSkeleton } from '@/components/ui/skeleton';
 import { PageLoader } from '@/components/ui/loader';
+import PageWrapper from '../components/PageWrapper';
 
 
     const CommandsPage = () => {
@@ -326,7 +327,7 @@ import { PageLoader } from '@/components/ui/loader';
                     </div>
             </div>
                     <div className="text-right">
-                        {getPlatformLabel(command.platforms)}
+                        {getPlatformLabel(command.platforms || 'twitch,vk')}
                     </div>
                 </div>
 
@@ -369,37 +370,30 @@ import { PageLoader } from '@/components/ui/loader';
 
     if (!isAuthenticated) {
         return (
-            <div className="container mx-auto p-6">
+            <PageWrapper title="Команды чата">
                 <Card>
                     <CardContent className="flex items-center justify-center h-64">
                         <div className="text-center space-y-4">
                             <Settings className="h-16 w-16 mx-auto text-muted-foreground" />
                             <p className="text-muted-foreground">Войдите в систему для управления командами</p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </PageWrapper>
         );
     }
 
     // Ранний return для загрузки - сохраняем структуру контейнера
     if (loading) {
         return (
-            <div className="container mx-auto p-6 space-y-6">
-                <div>
-                    <h1 className="text-3xl font-bold mb-6 text-foreground">Команды чата</h1>
-                </div>
+            <PageWrapper title="Команды чата">
                 <PageLoader message="Загрузка команд..." />
-            </div>
+            </PageWrapper>
         );
     }
 
     return (
-        <div className="container mx-auto p-6 space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold mb-6 text-foreground">Команды чата</h1>
-            </div>
-
+        <PageWrapper title="Команды чата">
             <Tabs defaultValue="basic" className="space-y-6">
                 <TabsList>
                     <TabsTrigger value="basic">Базовые команды</TabsTrigger>
@@ -781,7 +775,7 @@ import { PageLoader } from '@/components/ui/loader';
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </div>
+        </PageWrapper>
     );
 };
 

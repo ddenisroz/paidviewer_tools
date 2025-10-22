@@ -1,33 +1,53 @@
 // src/components/IntegrationsDialog.jsx
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useDonationAlerts } from '../context/DonationAlertsContext';
 import { useAuth } from '../context/AuthContext';
 import { TwitchIcon, VKIcon } from './PlatformIcons';
-import { Gift, AlertCircle } from 'lucide-react';
+import { Gift, AlertCircle, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 const IntegrationsDialog = ({ open, onOpenChange }) => {
+    const navigate = useNavigate();
     const { integrations, loading, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
     const { isConnected: daConnected, isLoading: daLoading, error: daError, connect: daConnect, disconnect: daDisconnect } = useDonationAlerts();
     const { loginWithTwitch, loginWithVk } = useAuth();
-
     // Проверяем, есть ли хотя бы одна основная интеграция
     const hasMainIntegration = integrations.twitch?.enabled || integrations.vk?.enabled;
 
-    const handleToggle = (platform, isEnabled) => {
-        if (platform === 'twitch') {
-            updateTwitchIntegration(!isEnabled);
-        } else if (platform === 'vk') {
-            updateVkIntegration(!isEnabled);
+    // Обработчик для Twitch - такой же как в SettingsPage
+    const handleTwitchToggle = async (newEnabled) => {
+        try {
+            if (newEnabled) {
+                // Подключение - закрываем диалог и перенаправляем на OAuth
+                onOpenChange(false);
+            }
+            await updateTwitchIntegration(newEnabled);
+        } catch (error) {
+            console.error('Error toggling Twitch integration:', error);
+        }
+    };
+
+    // Обработчик для VK - такой же как в SettingsPage
+    const handleVkToggle = async (newEnabled) => {
+        try {
+            if (newEnabled) {
+                // Подключение - закрываем диалог и перенаправляем на OAuth
+                onOpenChange(false);
+            }
+            await updateVkIntegration(newEnabled);
+        } catch (error) {
+            console.error('Error toggling VK integration:', error);
         }
     };
 
     const handleDonationAlertsConnect = async () => {
         if (!hasMainIntegration) {
-            alert('Сначала подключите хотя бы одну основную платформу (Twitch или VK Live)');
+            toast.error('Сначала подключите хотя бы одну основную платформу (Twitch или VK Live)');
             return;
         }
         
@@ -38,11 +58,32 @@ const IntegrationsDialog = ({ open, onOpenChange }) => {
         await daDisconnect();
     };
 
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent 
+                className="z-50"
+                onPointerDownOutside={(e) => e.preventDefault()}
+                onInteractOutside={(e) => e.preventDefault()}
+                onClick={(e) => e.stopPropagation()}
+            >
                 <DialogHeader>
-                    <DialogTitle>Интеграции</DialogTitle>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <DialogTitle>Интеграции</DialogTitle>
+                            <DialogDescription>
+                                Управление подключениями к платформам
+                            </DialogDescription>
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onOpenChange(false)}
+                            className="h-6 w-6"
+                        >
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
                 </DialogHeader>
                 <div className="space-y-4">
                     {/* Twitch Integration */}
@@ -51,11 +92,11 @@ const IntegrationsDialog = ({ open, onOpenChange }) => {
                             <TwitchIcon />
                             <p className="font-semibold">Twitch</p>
                         </div>
-                        <Switch
-                            checked={integrations.twitch?.enabled || false}
-                            onCheckedChange={() => handleToggle('twitch', integrations.twitch?.enabled)}
-                            disabled={loading}
-                        />
+                            <Switch
+                                checked={integrations.twitch?.enabled || false}
+                                onCheckedChange={handleTwitchToggle}
+                                disabled={loading || integrations.twitch?.enabled === null}
+                            />
                     </div>
                     
                     {/* VK Live Integration */}
@@ -64,37 +105,39 @@ const IntegrationsDialog = ({ open, onOpenChange }) => {
                             <VKIcon />
                             <p className="font-semibold">VK Live</p>
                         </div>
-                        <Switch
-                            checked={integrations.vk?.enabled || false}
-                            onCheckedChange={() => handleToggle('vk', integrations.vk?.enabled)}
-                            disabled={loading}
-                        />
+                            <Switch
+                                checked={integrations.vk?.enabled || false}
+                                onCheckedChange={handleVkToggle}
+                                disabled={loading || integrations.vk?.enabled === null}
+                            />
                     </div>
 
                     {/* Разделитель */}
                     <div className="border-t border-gray-200 dark:border-gray-700 my-4"></div>
 
                     {/* DonationAlerts Integration */}
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between">
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between py-2">
                             <div className="flex items-center space-x-2">
                                 <img 
-                                    src="https://donationalerts.com/favicon.ico" 
+                                    src="/src/images/logos/DA_Alert_Color.svg" 
                                     alt="DonationAlerts" 
                                     className="h-5 w-5"
+                                    onError={(e) => {
+                                        e.target.style.display = 'none';
+                                        e.target.nextSibling.style.display = 'block';
+                                    }}
                                 />
-                                <div>
-                                    <p className="font-semibold">DonationAlerts</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {hasMainIntegration ? 'Доступно для подключения' : 'Требует основную интеграцию'}
-                                    </p>
-                                </div>
+                                <Gift className="h-5 w-5 text-orange-500" style={{display: 'none'}} />
+                                <p className="font-semibold">DonationAlerts</p>
                             </div>
-                            <Switch
-                                checked={daConnected}
-                                onCheckedChange={daConnected ? handleDonationAlertsDisconnect : handleDonationAlertsConnect}
-                                disabled={daLoading || !hasMainIntegration}
-                            />
+                            <div className="flex items-center">
+                                <Switch
+                                    checked={daConnected}
+                                    onCheckedChange={daConnected ? handleDonationAlertsDisconnect : handleDonationAlertsConnect}
+                                    disabled={daLoading || !hasMainIntegration}
+                                />
+                            </div>
                         </div>
                         
                         {!hasMainIntegration && (
@@ -105,7 +148,6 @@ const IntegrationsDialog = ({ open, onOpenChange }) => {
                                 </p>
                             </div>
                         )}
-                        
                         {daError && (
                             <div className="flex items-center space-x-2 p-2 bg-red-50 dark:bg-red-900/20 rounded-md">
                                 <AlertCircle className="w-4 h-4 text-red-600" />
@@ -121,7 +163,7 @@ const IntegrationsDialog = ({ open, onOpenChange }) => {
                         variant="outline" 
                         onClick={() => {
                             onOpenChange(false);
-                            window.location.href = '/dashboard/settings';
+                            navigate('/dashboard/settings');
                         }}
                         className="w-full"
                     >

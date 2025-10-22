@@ -11,6 +11,7 @@ import { useDonationAlerts } from '../context/DonationAlertsContext';
 import { useAuth } from '../context/AuthContext';
 import { Loader } from '@/components/ui/loader';
 import InboxPage from './InboxPage';
+import PageWrapper from '../components/PageWrapper';
 
 const SettingsPage = () => {
     const { user } = useAuth();
@@ -34,28 +35,13 @@ const SettingsPage = () => {
         await daDisconnect();
     };
 
-    // В гостевом режиме показываем настройки без загрузки
-    const isGuestMode = localStorage.getItem('guestModeEnabled') === 'true';
-    
-    if (isLoading && !isGuestMode) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                    <p className="text-muted-foreground">Загрузка настроек...</p>
-                </div>
-            </div>
-        );
-    }
+    // Убираем глобальный прелоадер
 
     return (
-        <div className="container mx-auto p-6 space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold mb-6 text-foreground">Настройки</h1>
-                <p className="text-muted-foreground">
-                    Управление интеграциями и настройками бота
-                </p>
-            </div>
+        <PageWrapper 
+            title="Настройки"
+            description="Управление интеграциями и настройками бота"
+        >
 
             {/* Табы */}
             <div className="flex space-x-1 bg-muted p-1 rounded-lg w-fit">
@@ -129,22 +115,30 @@ const SettingsPage = () => {
                             onCheckedChange={updateVkIntegration}
                         />
                     </div>
-                </CardContent>
-            </Card>
 
-            {/* DonationAlerts Integration */}
-            <Card>
-                <CardHeader>
+                    <Separator />
+
+                    {/* DonationAlerts Integration */}
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <img 
-                                src="https://donationalerts.com/favicon.ico" 
-                                alt="DonationAlerts" 
-                                className="h-5 w-5"
-                            />
-                            <CardTitle>
-                                DonationAlerts
-                            </CardTitle>
+                        <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                                <img 
+                                    src="/src/images/logos/DA_Alert_Color.svg" 
+                                    alt="DonationAlerts" 
+                                    className="h-5 w-5"
+                                    onError={(e) => {
+                                        e.target.style.display = 'none';
+                                        e.target.nextSibling.style.display = 'block';
+                                    }}
+                                />
+                                <Gift className="h-5 w-5 text-orange-500" style={{display: 'none'}} />
+                                <Label className="text-base font-medium">
+                                    DonationAlerts
+                                </Label>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                                {daConnected ? 'Подключен' : 'Подключение для получения донатов'}
+                            </p>
                         </div>
                         <Switch
                             checked={daConnected}
@@ -152,31 +146,33 @@ const SettingsPage = () => {
                             disabled={daLoading || !hasMainIntegration}
                         />
                     </div>
-                    <CardDescription>
-                        {daConnected ? 'Подключен' : ''}
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    
-                    {daConnected && !hasMainIntegration && (
-                        <div className="flex items-center space-x-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-md">
-                            <AlertCircle className="w-4 h-4 text-yellow-600" />
-                            <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                                Сначала подключите основную платформу (Twitch или VK Live)
-                            </p>
-                        </div>
-                    )}
-                    
-                    {daError && (
-                        <div className="flex items-center space-x-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-md">
-                            <AlertCircle className="w-4 h-4 text-red-600" />
-                            <p className="text-sm text-red-700 dark:text-red-300">
-                                {daError}
-                            </p>
-                        </div>
-                    )}
                 </CardContent>
             </Card>
+
+            {/* Дополнительная информация для DonationAlerts */}
+            {(daConnected && !hasMainIntegration) || daError ? (
+                <Card>
+                    <CardContent className="space-y-4">
+                        {daConnected && !hasMainIntegration && (
+                            <div className="flex items-center space-x-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-md">
+                                <AlertCircle className="w-4 h-4 text-yellow-600" />
+                                <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                                    Сначала подключите основную платформу (Twitch или VK Live)
+                                </p>
+                            </div>
+                        )}
+                        
+                        {daError && (
+                            <div className="flex items-center space-x-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-md">
+                                <AlertCircle className="w-4 h-4 text-red-600" />
+                                <p className="text-sm text-red-700 dark:text-red-300">
+                                    {daError}
+                                </p>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            ) : null}
 
             {/* User Info */}
             <Card>
@@ -199,7 +195,7 @@ const SettingsPage = () => {
             {activeTab === 'tickets' && (
                 <InboxPage />
             )}
-        </div>
+        </PageWrapper>
     );
 };
 

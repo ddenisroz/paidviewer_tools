@@ -6,7 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Gift, Trophy, Star, Coins, Calendar, MessageSquare, TrendingUp, Check, X, Settings, BarChart3, Plus } from 'lucide-react';
 import api from '../services/api';
-import logger from '../utils/logger';
+import { dropsLogger as logger } from '../utils/logger';
 import { CardSkeleton } from './ui/skeleton';
 import ImageLootbox from './ImageLootbox';
 import { 
@@ -17,16 +17,16 @@ import {
 } from '../utils/lootboxImages';
 
 const LootboxSystem = ({ channelName }) => {
-    const [progression, setProgression] = useState(null);
-    const [lootboxes, setLootboxes] = useState([]);
+    const [, setProgression] = useState(null);
+    const [, setLootboxes] = useState([]);
     const [recentOpenings, setRecentOpenings] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [openingLootbox, setOpeningLootbox] = useState(null);
+    const [, setOpeningLootbox] = useState(null);
     const [selectedPlatform, setSelectedPlatform] = useState('twitch'); // 'twitch' или 'vk'
-    const [calendarData, setCalendarData] = useState({});
-    const [donationLootboxes, setDonationLootboxes] = useState([]);
-    const [achievementLootboxes, setAchievementLootboxes] = useState([]);
-    const [lootboxSettings, setLootboxSettings] = useState({
+    const [, ] = useState({});
+    const [, ] = useState([]);
+    const [, ] = useState([]);
+    const [lootboxSettings] = useState({
         rarityRates: {
             common: 60,
             rare: 25,
@@ -117,7 +117,7 @@ const LootboxSystem = ({ channelName }) => {
         }
     };
 
-    const openLootbox = async (lootboxId) => {
+    const _openLootbox = async (lootboxId) => {
         try {
             setOpeningLootbox(lootboxId);
             const response = await api.post('/lootbox/open', { lootbox_id: lootboxId });
@@ -135,7 +135,7 @@ const LootboxSystem = ({ channelName }) => {
         }
     };
 
-    const showLootboxResult = (result) => {
+    const showLootboxResult = () => {
         // Здесь можно добавить модальное окно с результатом
         // Lootbox result:', result);
         // TODO: Показать анимацию результата

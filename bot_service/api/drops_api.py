@@ -3,14 +3,16 @@ import logging
 import json
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, validator
 import random
+import time
 
-from core.database import get_db, DropsConfig, DropsReward, DropsQuality, DropsType, UserStreak, DropsHistory, MythicalDropsSession
+from core.database import get_db, DropsConfig, DropsReward, DropsQuality, DropsType, UserStreak, DropsHistory, MythicalDropsSession, DonationAlert, UserToken
 from auth.auth import get_current_user
 from core.datetime_utils import utcnow_naive
+from utils.enhanced_logger import log_request, log_response, drops_logger
 
 logger = logging.getLogger(__name__)
 
@@ -535,3 +537,351 @@ async def get_drops_history(
     except Exception as e:
         logger.error(f"Error getting drops history: {e}")
         raise HTTPException(status_code=500, detail="Ошибка получения истории лутбоксов")
+
+@router.post("/open")
+async def open_drops(
+    request: DropsOpenRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Открывает лутбокс для зрителя"""
+    try:
+        from services.drops_service import DropsService
+        drops_service = DropsService(db)
+        
+        # Получаем конфигурацию для канала (используем первый доступный канал)
+        config = db.query(DropsConfig).filter(
+            DropsConfig.user_id == current_user["id"]
+        ).first()
+        
+        if not config:
+            raise HTTPException(status_code=404, detail="Конфигурация Drops не найдена")
+        
+        result = None
+        
+        if request.drops_type == "streak":
+            result = drops_service.process_streak_drops(
+                current_user["id"], config.channel_name, config.platform,
+                request.viewer_id, request.viewer_name
+            )
+        elif request.drops_type == "donation":
+            result = drops_service.process_donation_drops(
+                current_user["id"], config.channel_name, config.platform,
+                request.viewer_id, request.viewer_name, request.donation_amount
+            )
+        elif request.drops_type == "mythical":
+            result = drops_service.process_mythical_drops(
+                current_user["id"], config.channel_name, config.platform,
+                request.viewer_id, request.viewer_name
+            )
+        
+        if result:
+            return {
+                "success": True,
+                "data": result
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Лутбокс не доступен"
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error opening drops: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка открытия лутбокса")
+
+@router.get("/stats/{channel_name}")
+async def get_drops_stats(
+    channel_name: str,
+    platform: str = "twitch",
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получает статистику Drops для канала"""
+    try:
+        # Общая статистика
+        total_drops = db.query(DropsHistory).filter(
+            DropsHistory.user_id == current_user["id"],
+            DropsHistory.channel_name == channel_name,
+            DropsHistory.platform == platform
+        ).count()
+        
+        # Статистика по типам
+        streak_drops = db.query(DropsHistory).filter(
+            DropsHistory.user_id == current_user["id"],
+            DropsHistory.channel_name == channel_name,
+            DropsHistory.platform == platform,
+            DropsHistory.drops_type == "streak"
+        ).count()
+        
+        donation_drops = db.query(DropsHistory).filter(
+            DropsHistory.user_id == current_user["id"],
+            DropsHistory.channel_name == channel_name,
+            DropsHistory.platform == platform,
+            DropsHistory.drops_type == "donation"
+        ).count()
+        
+        mythical_drops = db.query(DropsHistory).filter(
+            DropsHistory.user_id == current_user["id"],
+            DropsHistory.channel_name == channel_name,
+            DropsHistory.platform == platform,
+            DropsHistory.drops_type == "mythical"
+        ).count()
+        
+        # Топ зрителей
+        top_viewers = db.query(
+            DropsHistory.viewer_name,
+            db.func.count(DropsHistory.id).label('drops_count')
+        ).filter(
+            DropsHistory.user_id == current_user["id"],
+            DropsHistory.channel_name == channel_name,
+            DropsHistory.platform == platform
+        ).group_by(DropsHistory.viewer_name).order_by(
+            db.func.count(DropsHistory.id).desc()
+        ).limit(10).all()
+        
+        return {
+            "success": True,
+            "data": {
+                "total_drops": total_drops,
+                "streak_drops": streak_drops,
+                "donation_drops": donation_drops,
+                "mythical_drops": mythical_drops,
+                "top_viewers": [
+                    {"viewer_name": viewer, "drops_count": count}
+                    for viewer, count in top_viewers
+                ]
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting drops stats: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка получения статистики Drops")
+
+# === TRIGGERS API (STUB) ===
+@router.get("/triggers")
+async def get_drops_triggers(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получает список триггеров Drops (stub)"""
+    try:
+        logger.info(f"📦 [DROPS] Getting triggers for user {current_user.get('id')}")
+        # Возвращаем пустой список триггеров - функция в разработке
+        return {
+            "success": True,
+            "triggers": []
+        }
+    except Exception as e:
+        logger.error(f"❌ [DROPS] Error getting triggers: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка получения триггеров")
+
+@router.post("/triggers")
+async def create_drops_trigger(
+    request: dict,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Создает новый триггер Drops (stub)"""
+    try:
+        logger.info(f"📦 [DROPS] Creating trigger for user {current_user.get('id')}")
+        return {
+            "success": True,
+            "message": "Триггер будет создан",
+            "trigger_id": 1
+        }
+    except Exception as e:
+        logger.error(f"❌ [DROPS] Error creating trigger: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка создания триггера")
+
+@router.put("/triggers/{trigger_id}")
+async def update_drops_trigger(
+    trigger_id: int,
+    request: dict,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Обновляет триггер Drops (stub)"""
+    try:
+        logger.info(f"📦 [DROPS] Updating trigger {trigger_id} for user {current_user.get('id')}")
+        return {
+            "success": True,
+            "message": "Триггер будет обновлен"
+        }
+    except Exception as e:
+        logger.error(f"❌ [DROPS] Error updating trigger: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка обновления триггера")
+
+@router.delete("/triggers/{trigger_id}")
+async def delete_drops_trigger(
+    trigger_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Удаляет триггер Drops (stub)"""
+    try:
+        logger.info(f"📦 [DROPS] Deleting trigger {trigger_id} for user {current_user.get('id')}")
+        return {
+            "success": True,
+            "message": "Триггер будет удален"
+        }
+    except Exception as e:
+        logger.error(f"❌ [DROPS] Error deleting trigger: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка удаления триггера")
+
+@router.post("/triggers/test/{trigger_id}")
+async def test_drops_trigger(
+    trigger_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Тестирует триггер Drops (stub)"""
+    try:
+        logger.info(f"📦 [DROPS] Testing trigger {trigger_id} for user {current_user.get('id')}")
+        return {
+            "success": True,
+            "message": "Триггер тестируется"
+        }
+    except Exception as e:
+        logger.error(f"❌ [DROPS] Error testing trigger: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка тестирования триггера")
+
+@router.post("/widget-url")
+async def generate_widget_url(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Генерирует URL для OBS виджета"""
+    try:
+        import secrets
+        import os
+        
+        # Генерируем уникальный токен
+        token = secrets.token_urlsafe(32)
+        
+        # Сохраняем токен в БД (можно использовать существующую таблицу или создать новую)
+        # Для простоты используем obs_token пользователя
+        user = db.query(User).filter(User.id == current_user["id"]).first()
+        if user:
+            user.obs_token = token
+            db.commit()
+        
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        widget_url = f"{frontend_url}/drops-widget/{token}"
+        
+        return {
+            "success": True,
+            "data": {
+                "url": widget_url,
+                "token": token
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error generating widget URL: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка генерации URL виджета")
+
+@router.post("/donationalerts/webhook")
+async def donationalerts_webhook(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Обработка вебхука от DonationAlerts для Drops"""
+    try:
+        from services.drops_service import DropsService
+        from core.database import DonationAlert
+        
+        # Получаем данные из вебхука
+        data = await request.json()
+        
+        # Извлекаем информацию о донате
+        donation_amount = data.get('amount', 0)
+        donor_name = data.get('username', 'Anonymous')
+        donor_id = data.get('user_id', 'unknown')
+        message = data.get('message', '')
+        alert_id = data.get('id', '')  # Уникальный ID от DonationAlerts
+        
+        logger.info(f"🎁 [DONATION DROPS] Received donation: {donor_name} - {donation_amount}₽")
+        
+        # Получаем пользователя по DonationAlerts ID
+        user_token = db.query(UserToken).filter(
+            UserToken.platform == 'donationalerts',
+            UserToken.platform_user_id == str(data.get('user_id', ''))
+        ).first()
+        
+        if not user_token:
+            logger.warning(f"No user found for DonationAlerts ID: {data.get('user_id')}")
+            return {"success": False, "message": "User not found"}
+        
+        # === СОХРАНЯЕМ ДОНАТ В БД ===
+        try:
+            # Проверяем, не обработан ли этот донат уже
+            existing_donation = db.query(DonationAlert).filter(
+                DonationAlert.alert_id == alert_id
+            ).first()
+            
+            if not existing_donation:
+                # Создаем новую запись о донате
+                donation_record = DonationAlert(
+                    user_id=user_token.user_id,
+                    channel_name=user_token.platform_username or 'default',
+                    amount=float(donation_amount),
+                    currency=data.get('currency', 'RUB'),
+                    message=message,
+                    alert_id=alert_id,
+                    is_processed=False
+                )
+                db.add(donation_record)
+                logger.info(f"✅ [DONATION RECORD] Saved donation {alert_id} from {donor_name}")
+            else:
+                logger.info(f"ℹ️ [DONATION RECORD] Donation {alert_id} already recorded")
+        except Exception as e:
+            logger.error(f"Error saving donation record: {e}")
+            # Не прерываем обработку Drops если сохранение не удалось
+        
+        # Инициализируем DropsService
+        drops_service = DropsService(db)
+        
+        # Обрабатываем донат Drops
+        result = drops_service.process_donation_drops(
+            user_id=user_token.user_id,
+            channel_name=user_token.platform_username or 'default',
+            platform='donationalerts',
+            viewer_id=donor_id,
+            viewer_name=donor_name,
+            donation_amount=donation_amount
+        )
+        
+        # Сохраняем изменения в БД (донат и drops)
+        try:
+            db.commit()
+        except Exception as e:
+            logger.error(f"Error committing donation and drops to DB: {e}")
+            db.rollback()
+        
+        if result:
+            logger.info(f"🎁 [DONATION DROPS] {donor_name} получил {result['reward']} ({result['quality']})")
+            
+            # Отправляем событие в WebSocket для OBS виджета
+            from utils.websocket_helper import broadcast_drops_event
+            await broadcast_drops_event(result)
+            
+            return {
+                "success": True,
+                "message": "Drops processed successfully",
+                "data": result
+            }
+        else:
+            return {
+                "success": False,
+                "message": "No drops available for this donation"
+            }
+            
+    except Exception as e:
+        logger.error(f"Error processing DonationAlerts webhook: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }

@@ -10,7 +10,6 @@ import { ToastProvider } from './components/ui/toast.jsx'
 import { TtsProvider } from './context/TtsContext.jsx'
 import { TtsHealthProvider } from './context/TtsHealthContext.jsx'
 import { TtsCardProvider } from './context/TtsCardContext.jsx'
-import { ActiveChannelsProvider } from './context/ActiveChannelsContext.jsx'
 import { ChatProvider } from './context/ChatContext.jsx'
 
 
@@ -25,9 +24,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <ChatProvider>
                   <DataProvider>
                     <TtsProvider>
-                      <ActiveChannelsProvider>
-                        <App />
-                      </ActiveChannelsProvider>
+                      <App />
                     </TtsProvider>
                   </DataProvider>
                 </ChatProvider>

@@ -8,68 +8,21 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useIntegrations } from '../../context/IntegrationsContext';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { toast } from 'sonner';
+import { API_BASE_URL } from '../../constants';
 
 const ChannelPointsPage = () => {
     const { integrations } = useIntegrations();
+    const { user } = useAuth();
     const navigate = useNavigate();
     const [selectedPlatform, setSelectedPlatform] = useState('twitch');
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [rewards, setRewards] = useState({
-        twitch: [
-        {
-            id: '1',
-                title: 'Звуковой эффект',
-                description: 'Проигрывает забавный звук в стриме',
-            cost: 500,
-            enabled: true,
-                category: 'Звуки',
-                usageCount: 24,
-                cooldown: 30
-        },
-        {
-            id: '2', 
-                title: 'Смена музыки',
-                description: 'Переключает трек в плейлисте стримера',
-            cost: 1000,
-            enabled: true,
-                category: 'Музыка',
-                usageCount: 12,
-                cooldown: 60
-            },
-            {
-                id: '3',
-                title: 'Сообщение на экране',
-                description: 'Отображает ваше сообщение на экране стримера',
-                cost: 750,
-                enabled: false,
-                category: 'Интерактив',
-                usageCount: 8,
-                cooldown: 45
-            }
-        ],
-        vk: [
-        {
-            id: '1',
-                title: 'Реакция стримера',
-                description: 'Стример покажет эмоцию по вашему выбору',
-            cost: 100,
-            enabled: true,
-                category: 'Реакции',
-                usageCount: 45,
-                cooldown: 15
-            },
-            {
-                id: '2',
-                title: 'Вопрос стримеру',
-                description: 'Ваш вопрос будет зачитан в приоритете',
-                cost: 200,
-                enabled: true,
-                category: 'Общение',
-                usageCount: 18,
-                cooldown: 20
-            }
-        ]
+        twitch: [],
+        vk: []
     });
+    const [loading, setLoading] = useState(true);
 
     const [newReward, setNewReward] = useState({
         title: '',
@@ -85,54 +38,166 @@ const ChannelPointsPage = () => {
     const hasVkIntegration = integrations.vk?.enabled || false;
     const isFunctionEnabled = hasTwitchIntegration || hasVkIntegration;
 
-    // Устанавливаем активную платформу по умолчанию
+    // Загрузка наград с API
+    const loadRewards = async () => {
+        try {
+            setLoading(true);
+            const response = await fetch(`${API_BASE_URL}/api/points/rewards`, {
+                credentials: 'include'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    // Группируем награды по платформам
+                    const groupedRewards = {
+                        twitch: data.rewards.filter(r => r.platform === 'twitch'),
+                        vk: data.rewards.filter(r => r.platform === 'vk')
+                    };
+                    setRewards(groupedRewards);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading rewards:', error);
+            toast.error('Ошибка загрузки наград');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Устанавливаем активную платформу по умолчанию и загружаем данные
     useEffect(() => {
         if (hasTwitchIntegration && !hasVkIntegration) {
             setSelectedPlatform('twitch');
         } else if (hasVkIntegration && !hasTwitchIntegration) {
             setSelectedPlatform('vk');
         }
-    }, [hasTwitchIntegration, hasVkIntegration]);
+        
+        if (isFunctionEnabled) {
+            loadRewards();
+        }
+    }, [hasTwitchIntegration, hasVkIntegration, isFunctionEnabled]);
 
-    const handleCreateReward = () => {
-        if (!newReward.title || !newReward.description) return;
+    const handleCreateReward = async () => {
+        if (!newReward.title || !newReward.description) {
+            toast.error('Заполните название и описание');
+            return;
+        }
 
-        const reward = {
-            id: Date.now().toString(),
-            ...newReward,
-            usageCount: 0
-        };
+        try {
+            const channelName = selectedPlatform === 'twitch' 
+                ? user?.twitch_name 
+                : user?.vk_username;
+            
+            if (!channelName) {
+                toast.error('Не удалось определить имя канала');
+                return;
+            }
 
-        setRewards(prev => ({
-            ...prev,
-            [selectedPlatform]: [...prev[selectedPlatform], reward]
-        }));
+            const response = await fetch(`${API_BASE_URL}/api/points/rewards/create`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    platform: selectedPlatform,
+                    channel_name: channelName,
+                    title: newReward.title,
+                    description: newReward.description,
+                    cost: newReward.cost,
+                    background_color: '#3B82F6',
+                    reward_type: newReward.category || 'custom'
+                })
+            });
 
-        setNewReward({
-            title: '',
-            description: '',
-            cost: 100,
-            category: '',
-            cooldown: 30,
-            enabled: true
-        });
-        setShowCreateForm(false);
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    toast.success('Награда создана успешно!');
+                    loadRewards(); // Перезагружаем награды
+                    setNewReward({
+                        title: '',
+                        description: '',
+                        cost: 100,
+                        category: '',
+                        cooldown: 30,
+                        enabled: true
+                    });
+                    setShowCreateForm(false);
+                } else {
+                    toast.error(data.error || 'Ошибка создания награды');
+                }
+            } else {
+                toast.error('Ошибка создания награды');
+            }
+        } catch (error) {
+            console.error('Error creating reward:', error);
+            toast.error('Ошибка создания награды');
+        }
     };
 
-    const handleToggleReward = (rewardId) => {
-        setRewards(prev => ({
-            ...prev,
-            [selectedPlatform]: prev[selectedPlatform].map(reward =>
-                reward.id === rewardId ? { ...reward, enabled: !reward.enabled } : reward
-            )
-        }));
+    const handleToggleReward = async (rewardId) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/points/rewards/${rewardId}/toggle`, {
+                method: 'PATCH',
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    toast.success(data.message);
+                    // Обновляем локальное состояние
+                    setRewards(prev => ({
+                        ...prev,
+                        [selectedPlatform]: prev[selectedPlatform].map(reward =>
+                            reward.id === rewardId ? { ...reward, enabled: !reward.enabled } : reward
+                        )
+                    }));
+                } else {
+                    toast.error(data.error || 'Ошибка переключения награды');
+                }
+            } else {
+                toast.error('Ошибка переключения награды');
+            }
+        } catch (error) {
+            console.error('Error toggling reward:', error);
+            toast.error('Ошибка переключения награды');
+        }
     };
 
-    const handleDeleteReward = (rewardId) => {
-        setRewards(prev => ({
-            ...prev,
-            [selectedPlatform]: prev[selectedPlatform].filter(reward => reward.id !== rewardId)
-        }));
+    const handleDeleteReward = async (rewardId) => {
+        if (!window.confirm('Вы уверены, что хотите удалить эту награду?')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/points/rewards/${rewardId}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    toast.success(data.message);
+                    // Удаляем из локального состояния
+                    setRewards(prev => ({
+                        ...prev,
+                        [selectedPlatform]: prev[selectedPlatform].filter(reward => reward.id !== rewardId)
+                    }));
+                } else {
+                    toast.error(data.error || 'Ошибка удаления награды');
+                }
+            } else {
+                const errorData = await response.json();
+                toast.error(errorData.detail || 'Ошибка удаления награды');
+            }
+        } catch (error) {
+            console.error('Error deleting reward:', error);
+            toast.error('Ошибка удаления награды');
+        }
     };
 
     const getStats = () => {
@@ -168,6 +233,17 @@ const ChannelPointsPage = () => {
     }
 
     const stats = getStats();
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-96">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">Загрузка наград...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

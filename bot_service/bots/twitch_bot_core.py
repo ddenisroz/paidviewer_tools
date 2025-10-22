@@ -1,0 +1,139 @@
+# bot_service/bots/twitch_bot_core.py
+"""Основной класс Twitch бота"""
+import os
+import logging
+import asyncio
+import time
+from typing import List, Set, Optional
+from twitchio.ext import commands
+from core.connection_manager import ConnectionManager
+from core.database import BotCommand
+from api.tts_api import TTSAPI
+from api.youtube_api import YouTubeAPI
+from utils.role_checker import RoleChecker
+from constants import DEFAULT_BACKEND_URL
+
+# Настройка логирования для TwitchIO
+logging.getLogger('twitchio').setLevel(logging.INFO)
+logging.getLogger('twitchio.websocket').setLevel(logging.INFO)
+logging.getLogger('twitchio.client').setLevel(logging.INFO)
+
+logger = logging.getLogger('bot_service')
+
+class TwitchBotCore(commands.Bot):
+    """Основной класс Twitch бота"""
+    
+    def __init__(self, token: str, initial_channels: List[str], connection_manager: ConnectionManager):
+        logger.info(f"[BOT] CREATING TWITCH BOT")
+        logger.info(f"[INFO] Token: {token[:10]}...")
+        logger.info(f"[CHANNELS] Initial channels: {initial_channels}")
+        
+        self.connection_manager = connection_manager
+        self.tts_api = TTSAPI()
+        self.youtube_api = YouTubeAPI()
+        
+        logger.info(f"[WRENCH] Initializing TwitchIO Bot...")
+        super().__init__(
+            token=token,
+            prefix='!',
+            initial_channels=initial_channels
+        )
+        logger.info(f"[OK] TwitchIO Bot initialized")
+
+    async def event_ready(self):
+        """Вызывается когда бот готов к работе"""
+        logger.info(f'[BOT] TWITCH BOT READY!')
+        logger.info(f'[INFO] Bot logged in as: {self.nick}')
+        logger.info(f'[ID] Bot user id: {self.user_id}')
+        logger.info(f'[CHANNELS] Connected to channels: {self.connected_channels}')
+        logger.info(f'[BOT] BOT IS NOW LISTENING FOR MESSAGES IN ALL CHANNELS!')
+        logger.info(f'[BOT] BOT IS NOW LISTENING FOR MESSAGES IN THESE CHANNELS')
+        
+        for channel in self.connected_channels:
+            logger.info(f'[OK] MONITORING CHAT: {channel.name}')
+
+    async def event_message(self, message):
+        """Обработка входящих сообщений"""
+        # Пропускаем сообщения бота
+        if message.echo:
+            logger.debug(f"[SKIP] Bot message: {message.content}")
+            return
+
+        
+        # Логируем сообщение
+        logger.info(f'💬 [TWITCH CHAT] {message.channel.name}: {message.author.name}: {message.content}')
+        
+        # Отправляем сообщение в chatbox через WebSocket
+        try:
+            from utils.websocket_helper import broadcast_chat_message
+            
+            # Отправляем в chatbox
+            await broadcast_chat_message(
+                username=message.author.name,
+                content=message.content,
+                platform='twitch',
+                channel=message.channel.name
+            )
+            
+            # NOTE: TTS обрабатывается в twitch_bot.py::_handle_tts()
+            # Не дублируем вызов здесь!
+            
+        except Exception as e:
+            logger.error(f'❌ [ERROR] Failed to process chat message: {e}')
+            import traceback
+            logger.error(traceback.format_exc())
+        
+        # Обрабатываем команды
+        await self.handle_commands(message)
+
+    async def event_channel_joined(self, channel):
+        """Вызывается при подключении к каналу"""
+        logger.info(f'[JOIN] Joined channel: {channel.name}')
+
+    async def event_channel_left(self, channel):
+        """Вызывается при отключении от канала"""
+        logger.info(f'[LEFT] Left channel: {channel.name}')
+
+    async def event_error(self, error):
+        """Обработка ошибок"""
+        logger.error(f'[ERROR] Twitch bot error: {error}')
+
+    def get_channel_info(self, channel_name: str) -> Optional[dict]:
+        """Получить информацию о канале"""
+        for channel in self.connected_channels:
+            if channel.name.lower() == channel_name.lower():
+                return {
+                    'name': channel.name,
+                    'id': getattr(channel, 'id', None),
+                    'connected': True
+                }
+        return None
+
+    def is_connected_to_channel(self, channel_name: str) -> bool:
+        """Проверить подключение к каналу"""
+        return any(channel.name.lower() == channel_name.lower() 
+                  for channel in self.connected_channels)
+
+    async def join_channel(self, channel_name: str):
+        """Подключиться к каналу"""
+        try:
+            await self.join_channels([channel_name])
+            logger.info(f'[JOIN] Joined channel: {channel_name}')
+            return True
+        except Exception as e:
+            logger.error(f'[ERROR] Failed to join channel {channel_name}: {e}')
+            return False
+
+    async def leave_channel(self, channel_name: str):
+        """Отключиться от канала"""
+        try:
+            await self.part_channels([channel_name])
+            logger.info(f'[LEFT] Left channel: {channel_name}')
+            return True
+        except Exception as e:
+            logger.error(f'[ERROR] Failed to leave channel {channel_name}: {e}')
+            return False
+
+    def get_connected_channels_list(self) -> List[str]:
+        """Получить список подключенных каналов"""
+        return [channel.name for channel in self.connected_channels]

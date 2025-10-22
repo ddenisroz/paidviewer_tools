@@ -295,52 +295,6 @@ export const buildUrl = (base, params = {}) => {
   return url.toString();
 };
 
-// === РАБОТА С ЛОКАЛЬНЫМ ХРАНИЛИЩЕМ ===
-
-/**
- * Безопасное чтение из localStorage с парсингом JSON
- * @param {string} key - Ключ
- * @param {any} defaultValue - Значение по умолчанию
- * @returns {any} Значение из localStorage или defaultValue
- */
-export const getFromStorage = (key, defaultValue = null) => {
-  try {
-    const item = localStorage.getItem(key);
-    if (item === null) return defaultValue;
-    return JSON.parse(item);
-  } catch (error) {
-    console.warn(`Error reading from localStorage key "${key}":`, error);
-    return defaultValue;
-  }
-};
-
-/**
- * Безопасная запись в localStorage с сериализацией JSON
- * @param {string} key - Ключ
- * @param {any} value - Значение для сохранения
- * @returns {boolean} Успешность операции
- */
-export const setToStorage = (key, value) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-    return true;
-  } catch (error) {
-    console.warn(`Error writing to localStorage key "${key}":`, error);
-    return false;
-  }
-};
-
-/**
- * Удаление из localStorage
- * @param {string} key - Ключ для удаления
- */
-export const removeFromStorage = (key) => {
-  try {
-    localStorage.removeItem(key);
-  } catch (error) {
-    console.warn(`Error removing from localStorage key "${key}":`, error);
-  }
-};
 
 // === РАБОТА С COOKIES ===
 

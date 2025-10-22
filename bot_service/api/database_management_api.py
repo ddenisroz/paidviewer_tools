@@ -22,7 +22,7 @@ async def get_database_stats(
     """Получает статистику базы данных"""
     try:
         # Проверяем права доступа (только админы)
-        if current_user.get("role") != "admin":
+        if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Access denied")
         
         cleanup_service = DatabaseCleanupService(db)
@@ -46,7 +46,7 @@ async def cleanup_database(
     """Очищает старые данные из базы данных"""
     try:
         # Проверяем права доступа (только админы)
-        if current_user.get("role") != "admin":
+        if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Access denied")
         
         cleanup_service = DatabaseCleanupService(db)
@@ -71,7 +71,7 @@ async def optimize_database(
     """Оптимизирует базу данных"""
     try:
         # Проверяем права доступа (только админы)
-        if current_user.get("role") != "admin":
+        if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Access denied")
         
         cleanup_service = DatabaseCleanupService(db)
@@ -98,7 +98,7 @@ async def get_user_database_stats(
     """Получает статистику сообщений конкретного пользователя"""
     try:
         # Проверяем права доступа (только админы)
-        if current_user.get("role") != "admin":
+        if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Access denied")
         
         cleanup_service = DatabaseCleanupService(db)
@@ -129,7 +129,7 @@ async def cleanup_user_data(
     """Очищает старые данные конкретного пользователя"""
     try:
         # Проверяем права доступа (только админы)
-        if current_user.get("role") != "admin":
+        if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Access denied")
         
         cleanup_service = DatabaseCleanupService(db)
@@ -159,7 +159,7 @@ async def sync_message_counts(
     """Синхронизирует счетчики сообщений пользователей с реальными данными"""
     try:
         # Проверяем права доступа (только админы)
-        if current_user.get("role") != "admin":
+        if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Access denied")
         
         cleanup_service = DatabaseCleanupService(db)

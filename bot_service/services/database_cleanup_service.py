@@ -16,12 +16,13 @@ class DatabaseCleanupService:
     def __init__(self, db: Session):
         self.db = db
         
-        # Настройки лимитов
+        # Настройки лимитов (только по лимитам, без очистки по возрасту)
         self.MAX_CHAT_MESSAGES_PER_USER = 3000  # Максимум сообщений на пользователя
         self.MAX_TOTAL_CHAT_MESSAGES = 100000  # Максимум сообщений в чате всего
         self.MAX_PSYCHOLOGY_ANALYSES = 0  # Анализы больше не хранятся в БД
-        self.CHAT_MESSAGES_RETENTION_DAYS = 90  # Хранить сообщения 90 дней
-        self.PSYCHOLOGY_RETENTION_DAYS = 0  # Анализы не хранятся - генерируются и удаляются
+        self.CHAT_MESSAGES_RETENTION_DAYS = 30  # Дни хранения сообщений
+        self.PSYCHOLOGY_RETENTION_DAYS = 0  # Анализы не хранятся, установлен в 0
+        # Убираем очистку по возрасту - только по лимитам!
         
     def get_database_stats(self) -> Dict[str, Any]:
         """Получает статистику базы данных"""
@@ -80,27 +81,13 @@ class DatabaseCleanupService:
             return {}
     
     def cleanup_old_data(self) -> Dict[str, int]:
-        """Очищает старые данные из базы данных"""
+        """Очищает данные ТОЛЬКО по лимитам (без очистки по возрасту)"""
         try:
             cleanup_stats = {
                 'messages_deleted': 0,
-                'analyses_deleted': 0,
-                'users_cleaned': 0
+                'users_cleaned': 0,
+                'cleanup_reason': 'limit_based_only'
             }
-            
-            # Очистка старых сообщений
-            cutoff_date = utcnow_naive() - timedelta(days=self.CHAT_MESSAGES_RETENTION_DAYS)
-            old_messages = self.db.query(ChatMessage).filter(
-                ChatMessage.timestamp < cutoff_date
-            )
-            
-            messages_count = old_messages.count()
-            if messages_count > 0:
-                old_messages.delete(synchronize_session=False)
-                cleanup_stats['messages_deleted'] = messages_count
-                logger.info(f"Deleted {messages_count} old chat messages")
-            
-            # Анализы больше не хранятся в БД - пропускаем очистку
             
             # Очистка избыточных сообщений (если превышен общий лимит)
             total_messages = self.db.query(ChatMessage).count()
@@ -109,20 +96,24 @@ class DatabaseCleanupService:
                 oldest_messages = self.db.query(ChatMessage).order_by(ChatMessage.timestamp.asc()).limit(excess_count)
                 oldest_messages.delete(synchronize_session=False)
                 cleanup_stats['messages_deleted'] += excess_count
-                logger.info(f"Deleted {excess_count} excess messages to maintain total limit")
+                logger.info(f"🗑️ Deleted {excess_count} excess messages to maintain total limit ({self.MAX_TOTAL_CHAT_MESSAGES})")
             
             # Очистка избыточных сообщений на пользователя (если превышен лимит на пользователя)
-            self._cleanup_user_message_limits()
+            user_cleanup_count = self._cleanup_user_message_limits()
+            cleanup_stats['messages_deleted'] += user_cleanup_count
             
-            # Анализы больше не хранятся в БД - пропускаем агрессивную очистку
+            if cleanup_stats['messages_deleted'] == 0:
+                logger.info("✅ No messages deleted - all within limits")
+            else:
+                logger.info(f"✅ Cleanup completed: {cleanup_stats['messages_deleted']} messages deleted (limit-based only)")
             
             self.db.commit()
             return cleanup_stats
             
         except Exception as e:
-            logger.error(f"Error cleaning up old data: {e}")
+            logger.error(f"❌ Error cleaning up old data: {e}")
             self.db.rollback()
-            return {}
+            return {'messages_deleted': 0, 'users_cleaned': 0, 'error': str(e)}
     
     def optimize_database(self) -> Dict[str, Any]:
         """Оптимизирует базу данных"""
@@ -176,6 +167,8 @@ class DatabaseCleanupService:
         try:
             from sqlalchemy import func
             
+            total_deleted = 0
+            
             # Находим пользователей с превышением лимита
             user_message_counts = self.db.query(
                 ChatMessage.user_id,
@@ -195,10 +188,14 @@ class DatabaseCleanupService:
                 deleted_count = oldest_messages.count()
                 if deleted_count > 0:
                     oldest_messages.delete(synchronize_session=False)
+                    total_deleted += deleted_count
                     logger.info(f"Deleted {deleted_count} excess messages for user {user_id} (limit: {self.MAX_CHAT_MESSAGES_PER_USER})")
+            
+            return total_deleted
                     
         except Exception as e:
             logger.error(f"Error cleaning up user message limits: {e}")
+            return 0
     
     def sync_user_message_counts(self) -> Dict[str, int]:
         """Синхронизирует счетчики сообщений пользователей с реальными данными в базе"""

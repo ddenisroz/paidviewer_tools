@@ -4,7 +4,22 @@
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-const WS_BASE_URL = import.meta.env.VITE_BOT_SERVICE_WS_URL || 'ws://localhost:8000';
+import { getWebSocketBaseUrl } from '../utils/urlUtils';
+
+const WS_BASE_URL = import.meta.env.VITE_BOT_SERVICE_WS_URL || getWebSocketBaseUrl();
+
+// Глобальный счетчик попыток подключения для предотвращения перегрузки
+let globalConnectionAttempts = 0;
+const MAX_GLOBAL_ATTEMPTS = parseInt(import.meta.env.VITE_WS_MAX_GLOBAL_ATTEMPTS || '5', 10);
+const RESET_INTERVAL_MS = parseInt(import.meta.env.VITE_WS_RESET_INTERVAL_MS || '30000', 10);
+
+// Сброс глобального счетчика через заданный интервал
+setInterval(() => {
+  if (globalConnectionAttempts > 0) {
+    console.log(`useWebSocket: Resetting global connection attempts counter (was ${globalConnectionAttempts})`);
+    globalConnectionAttempts = 0;
+  }
+}, RESET_INTERVAL_MS);
 
 /**
  * @typedef {Object} WebSocketState
@@ -38,9 +53,9 @@ export function useWebSocket(endpoint, options = {}) {
     onError,
     autoConnect = true,
     autoReconnect = true,
-    reconnectInterval = 3000,
-    maxReconnectAttempts = 10,
-    heartbeatInterval = 30000
+    reconnectInterval = parseInt(import.meta.env.VITE_WS_RECONNECT_INTERVAL || '5000', 10),
+    maxReconnectAttempts = parseInt(import.meta.env.VITE_WS_MAX_RECONNECT_ATTEMPTS || '5', 10),
+    heartbeatInterval = parseInt(import.meta.env.VITE_WS_HEARTBEAT_INTERVAL || '30000', 10)
   } = options;
 
   const [isConnected, setIsConnected] = useState(false);
@@ -118,21 +133,43 @@ export function useWebSocket(endpoint, options = {}) {
 
   // Подключение
   const connect = useCallback(() => {
-    if (!isMountedRef.current) return;
+    if (!isMountedRef.current) {
+      return;
+    }
     
-    // Если уже подключены или подключаемся, ничего не делаем
-    if (wsRef.current && (
-      wsRef.current.readyState === WebSocket.OPEN ||
-      wsRef.current.readyState === WebSocket.CONNECTING
-    )) {
+    // Если endpoint не задан, не подключаемся
+    if (!endpoint) {
+      return;
+    }
+    
+    // Проверяем глобальный лимит попыток подключения
+    if (globalConnectionAttempts >= MAX_GLOBAL_ATTEMPTS) {
+      console.log(`useWebSocket: Global connection limit reached (${globalConnectionAttempts}/${MAX_GLOBAL_ATTEMPTS}), skipping`);
+      return;
+    }
+    
+    // Закрываем существующее соединение перед созданием нового
+    if (wsRef.current) {
+      console.log(`useWebSocket: Closing existing connection before creating new one. State: ${wsRef.current.readyState}`);
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    
+    if (isConnecting) {
+      console.log(`useWebSocket: Already connecting, skipping`);
       return;
     }
 
+    globalConnectionAttempts++;
     setIsConnecting(true);
     setError(null);
 
     try {
-      const url = `${WS_BASE_URL}${endpoint}`;
+      // Если endpoint уже содержит полный URL, используем его как есть
+      // Иначе добавляем к базовому URL
+      const url = endpoint.startsWith('ws://') || endpoint.startsWith('wss://') 
+        ? endpoint 
+        : `${WS_BASE_URL}${endpoint}`;
       const ws = new WebSocket(url);
 
       ws.onopen = (event) => {
@@ -141,7 +178,7 @@ export function useWebSocket(endpoint, options = {}) {
           return;
         }
 
-        // WebSocket connected
+        globalConnectionAttempts = Math.max(0, globalConnectionAttempts - 1); // Уменьшаем счетчик при успехе
         setIsConnected(true);
         setIsConnecting(false);
         setError(null);
@@ -161,8 +198,8 @@ export function useWebSocket(endpoint, options = {}) {
         try {
           const data = JSON.parse(event.data);
           
-          // Игнорируем pong сообщения
-          if (data.type === 'pong') {
+          // Игнорируем ping/pong сообщения (heartbeat)
+          if (data.type === 'pong' || data.type === 'ping') {
             return;
           }
 
@@ -180,7 +217,7 @@ export function useWebSocket(endpoint, options = {}) {
       ws.onerror = (event) => {
         if (!isMountedRef.current) return;
 
-        console.error(`WebSocket error: ${endpoint}`, event);
+        globalConnectionAttempts = Math.max(0, globalConnectionAttempts - 1); // Уменьшаем счетчик при ошибке
         const err = new Error('WebSocket connection error');
         setError(err);
         setIsConnecting(false);
@@ -204,15 +241,16 @@ export function useWebSocket(endpoint, options = {}) {
           onClose(event);
         }
 
-        // Автоматическое переподключение
-        if (autoReconnect && reconnectAttemptsRef.current < maxReconnectAttempts) {
+        // Автоматическое переподключение только если соединение не установлено
+        if (autoReconnect && !isConnected && reconnectAttemptsRef.current < maxReconnectAttempts) {
           reconnectAttemptsRef.current += 1;
-          const delay = reconnectInterval * reconnectAttemptsRef.current;
+          const maxDelay = parseInt(import.meta.env.VITE_WS_MAX_RECONNECT_DELAY || '10000', 10);
+          const delay = Math.min(reconnectInterval * Math.pow(2, reconnectAttemptsRef.current - 1), maxDelay); // Exponential backoff
           
-          // WebSocket reconnecting
+          console.log(`useWebSocket: Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
 
           reconnectTimeoutRef.current = setTimeout(() => {
-            if (isMountedRef.current) {
+            if (isMountedRef.current && !isConnected) {
               connect();
             }
           }, delay);
@@ -250,7 +288,16 @@ export function useWebSocket(endpoint, options = {}) {
 
   // Автоматическое подключение при монтировании
   useEffect(() => {
+    // Отмечаем что компонент смонтирован
+    isMountedRef.current = true;
+    
+    // Не подключаемся если endpoint null или уже подключены
+    if (!endpoint || isConnected) {
+      return;
+    }
+    
     if (autoConnect) {
+      // Подключаемся сразу без задержки для первого подключения
       connect();
     }
 
@@ -259,13 +306,14 @@ export function useWebSocket(endpoint, options = {}) {
       isMountedRef.current = false;
       disconnect();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [endpoint]); // Убираем autoConnect и connect из зависимостей чтобы избежать пересоздания
 
   // Reconnect функция для ручного вызова
   const reconnect = useCallback(() => {
     disconnect();
     reconnectAttemptsRef.current = 0;
-    setTimeout(connect, 100);
+    const initialDelay = parseInt(import.meta.env.VITE_WS_INITIAL_CONNECT_DELAY || '100', 10);
+    setTimeout(connect, initialDelay);
   }, [connect, disconnect]);
 
   return {

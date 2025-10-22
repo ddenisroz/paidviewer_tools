@@ -1,4 +1,5 @@
 import * as React from "react"
+import { useState, useRef } from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 
@@ -23,25 +24,119 @@ const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => (
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
-const DialogContent = React.forwardRef(({ className, children, ...props }, ref) => (
-  <DialogPortal>
-    <DialogOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
-        className
-      )}
-      {...props}>
-      {children}
-      <DialogPrimitive.Close
-        className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
-  </DialogPortal>
-))
+const DialogContent = React.forwardRef(({ className, children, closeOnOverlayClick = true, closeOnEscape = true, ...props }, ref) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const dialogRef = useRef(null);
+  const overlayRef = useRef(null);
+
+  // Получаем состояние открытия из Radix
+  const [open, setOpen] = React.useState(false);
+  
+  React.useEffect(() => {
+    // Слушаем изменения состояния от Radix
+    const handleStateChange = (newOpen) => {
+      setOpen(newOpen);
+      if (newOpen) {
+        setIsVisible(true);
+        setIsAnimating(true);
+        const timer = setTimeout(() => setIsAnimating(false), 50);
+        return () => clearTimeout(timer);
+      } else {
+        setIsAnimating(true);
+        const timer = setTimeout(() => {
+          setIsVisible(false);
+          setIsAnimating(false);
+        }, 200);
+        return () => clearTimeout(timer);
+      }
+    };
+
+    // Подписываемся на изменения состояния
+    const dialog = dialogRef.current?.closest('[data-state]');
+    if (dialog) {
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'attributes' && mutation.attributeName === 'data-state') {
+            const state = dialog.getAttribute('data-state');
+            handleStateChange(state === 'open');
+          }
+        });
+      });
+      observer.observe(dialog, { attributes: true });
+      return () => observer.disconnect();
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = 'unset';
+      };
+    }
+  }, [open]);
+
+  React.useEffect(() => {
+    const handleEscape = (e) => {
+      if (closeOnEscape && e.key === 'Escape' && open) {
+        // Закрываем диалог через Radix
+        const closeButton = dialogRef.current?.querySelector('[data-radix-dialog-close]');
+        closeButton?.click();
+      }
+    };
+
+    if (open) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [open, closeOnEscape]);
+
+  const handleOverlayClick = (e) => {
+    if (closeOnOverlayClick && e.target === overlayRef.current) {
+      const closeButton = dialogRef.current?.querySelector('[data-radix-dialog-close]');
+      closeButton?.click();
+    }
+  };
+
+  return (
+    <DialogPortal>
+      <DialogOverlay 
+        ref={overlayRef}
+        onClick={handleOverlayClick}
+        className={cn(
+          "transition-opacity duration-200",
+          isAnimating ? "opacity-0" : "opacity-100"
+        )}
+      />
+      <DialogPrimitive.Content
+        ref={dialogRef}
+        className={cn(
+          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg",
+          "transform transition-all duration-200",
+          isAnimating ? "scale-95 opacity-0" : "scale-100 opacity-100",
+          className
+        )}
+        onPointerDownOutside={(e) => {
+          // Проверяем, кликнули ли на overlay
+          if (closeOnOverlayClick && overlayRef.current && overlayRef.current.contains(e.target)) {
+            // Клик на overlay - разрешаем закрытие
+            return;
+          }
+          // Клик вне overlay (например, на элементы вне диалога) - предотвращаем закрытие
+          e.preventDefault();
+        }}
+        {...props}>
+        {children}
+        <DialogPrimitive.Close
+          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </DialogPortal>
+  )
+})
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
 const DialogHeader = ({

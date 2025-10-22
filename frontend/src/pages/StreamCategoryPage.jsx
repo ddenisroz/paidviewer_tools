@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tag, Save, RefreshCw, CheckCircle, XCircle, Search } from 'lucide-react';
-import api from '../services/api';
+import { botService } from '../services/microservices';
 import { toast } from 'sonner';
 
 const StreamCategoryPage = () => {
@@ -22,6 +22,14 @@ const StreamCategoryPage = () => {
     const [vkCategories, setVkCategories] = useState([]);
     const [currentStreamInfo, setCurrentStreamInfo] = useState({});
 
+    // Обработчик выбора категории с логированием
+    const handleTwitchCategoryChange = (categoryId) => {
+        console.log('🎮 [CATEGORY] Selected Twitch category ID:', categoryId);
+        const category = twitchCategories.find(cat => cat.id === categoryId);
+        console.log('🎮 [CATEGORY] Category details:', category);
+        setTwitchCategory(categoryId);
+    };
+
     // Загружаем данные при монтировании
     useEffect(() => {
         loadStreamInfo();
@@ -32,7 +40,7 @@ const StreamCategoryPage = () => {
     // Загружаем информацию о текущем стриме
     const loadStreamInfo = async () => {
         try {
-            const response = await api.get('/api/twitch/stream-info');
+            const response = await botService.get('/api/twitch/stream-info');
             const data = response.data;
             setCurrentStreamInfo(data);
             if (data.category_id) {
@@ -46,8 +54,8 @@ const StreamCategoryPage = () => {
     // Загружаем категории Twitch
     const loadTwitchCategories = async (search = '') => {
         try {
-            const response = await api.get(`/api/twitch/categories?search=${search}`);
-            setTwitchCategories(response.data);
+            const response = await botService.get(`/api/twitch/categories?search=${search}`);
+            setTwitchCategories(response.data.categories || []);
         } catch (error) {
             console.error('Error loading Twitch categories:', error);
             // Fallback на моковые данные
@@ -77,23 +85,32 @@ const StreamCategoryPage = () => {
     };
 
     const updateTwitchCategory = async () => {
-        // 🚀 Начинаем обновление категории:', twitchCategory);
+        console.log('🚀 [UPDATE] Starting Twitch category update');
+        console.log('🚀 [UPDATE] Selected category ID:', twitchCategory);
+        
+        if (!twitchCategory) {
+            toast.error('Пожалуйста, выберите категорию');
+            return;
+        }
+        
         setIsLoading(true);
         setStatus(prev => ({ ...prev, twitch: 'loading' }));
         
         try {
-            // 📡 Отправляем API запрос с category_id:', twitchCategory);
-            const response = await api.post('/api/twitch/stream/category', {
-                category_id: twitchCategory
-            });
+            const payload = {
+                twitch: {
+                    category_id: twitchCategory
+                }
+            };
+            console.log('🚀 [UPDATE] Sending payload:', payload);
             
-            // ✅ Получен ответ от API:', response.data);
+            const response = await botService.post('/api/stream/update', payload);
+            console.log('✅ [UPDATE] Response:', response.data);
             
             if (response.data.success) {
                 setStatus(prev => ({ ...prev, twitch: 'success' }));
                 setLastUpdate(new Date());
-                toast.success(response.data.message);
-                // 🎉 Категория успешно обновлена!');
+                toast.success(response.data.message || 'Категория обновлена');
                 
                 // Обновляем информацию о стриме
                 await loadStreamInfo();
@@ -105,8 +122,8 @@ const StreamCategoryPage = () => {
                 setStatus(prev => ({ ...prev, twitch: 'idle' }));
             }, 3000);
         } catch (error) {
-            console.error('❌ Ошибка обновления категории:', error);
-            console.error('📄 Детали ошибки:', error.response?.data);
+            console.error('❌ [UPDATE] Ошибка обновления категории:', error);
+            console.error('📄 [UPDATE] Детали ошибки:', error.response?.data);
             setStatus(prev => ({ ...prev, twitch: 'error' }));
             
             const errorMessage = error.response?.data?.detail || 
@@ -125,17 +142,34 @@ const StreamCategoryPage = () => {
         setStatus(prev => ({ ...prev, vk: 'loading' }));
         
         try {
-            // Здесь будет реальный API вызов к VK Live API
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            setStatus(prev => ({ ...prev, vk: 'success' }));
-            setLastUpdate(new Date());
+            const response = await botService.post('/api/stream/update', {
+                vk: {
+                    category_id: vkCategory
+                }
+            });
+            
+            if (response.data.success) {
+                setStatus(prev => ({ ...prev, vk: 'success' }));
+                setLastUpdate(new Date());
+                toast.success(response.data.message || 'Категория обновлена');
+            } else {
+                throw new Error(response.data.message || response.data.error);
+            }
             
             setTimeout(() => {
                 setStatus(prev => ({ ...prev, vk: 'idle' }));
             }, 3000);
         } catch (error) {
-            console.error('Error updating VK category:', error);
+            console.error('❌ Ошибка обновления категории VK:', error);
+            console.error('📄 Детали ошибки:', error.response?.data);
             setStatus(prev => ({ ...prev, vk: 'error' }));
+            
+            const errorMessage = error.response?.data?.detail || 
+                               error.response?.data?.message || 
+                               error.message || 
+                               'Неизвестная ошибка обновления категории';
+            
+            toast.error(errorMessage);
         } finally {
             setIsLoading(false);
         }
@@ -172,12 +206,12 @@ const StreamCategoryPage = () => {
     // Обработка поиска Twitch категорий
     const handleTwitchSearch = (search) => {
         setTwitchSearch(search);
-        loadTwitchCategories(search);
+        if (search.length >= 3) {
+            loadTwitchCategories(search);
+        }
     };
 
-    const filteredTwitchCategories = twitchCategories.filter(cat => 
-        cat.name.toLowerCase().includes(twitchSearch.toLowerCase())
-    );
+    const filteredTwitchCategories = twitchCategories;
 
     const filteredVkCategories = vkCategories.filter(cat => 
         cat.name.toLowerCase().includes(vkSearch.toLowerCase())
@@ -235,7 +269,7 @@ const StreamCategoryPage = () => {
 
                     <div className="space-y-2">
                         <Label>Выберите категорию</Label>
-                        <Select value={twitchCategory} onValueChange={setTwitchCategory}>
+                        <Select value={twitchCategory} onValueChange={handleTwitchCategoryChange}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Выберите категорию" />
                             </SelectTrigger>

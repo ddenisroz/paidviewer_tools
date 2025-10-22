@@ -4,6 +4,8 @@
  */
 
 import {
+    botService,
+    ttsService,
     getAdminVoices as getAdminVoicesApi,
     getGlobalVoices as getGlobalVoicesApi,
     uploadVoice as uploadVoiceApi,
@@ -22,6 +24,9 @@ import {
     transcribeUserVoice as transcribeUserVoiceApi,
     testVoice as testVoiceApi,
 } from './microservices';
+
+// Реэкспортируем сервисы для удобства использования
+export { botService, ttsService };
 
 // --- Voice Management ---
 

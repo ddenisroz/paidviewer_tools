@@ -31,7 +31,6 @@ export default defineConfig({
             './src/context/TtsHealthContext.jsx',
             './src/context/PlayerContext.jsx',
             './src/context/ChatContext.jsx',
-            './src/context/ActiveChannelsContext.jsx',
             './src/context/TtsCardContext.jsx',
             './src/context/DonationAlertsContext.jsx'
           ],
@@ -59,8 +58,7 @@ export default defineConfig({
           
           // Admin pages отдельно (используются редко)
           'admin': [
-            './src/pages/AdminPage.jsx',
-            './src/pages/admin/SessionManagementPage.jsx',
+            './src/pages/admin/AdminPage.jsx',
             './src/pages/admin/UserManagementPage.jsx',
             './src/pages/admin/MonitoringPage.jsx',
             './src/pages/admin/BotManagementPage.jsx',

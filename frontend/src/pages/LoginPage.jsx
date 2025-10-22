@@ -2,18 +2,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useActiveChannels } from '../context/ActiveChannelsContext';
 // TtsHealthContext не нужен на странице логина
 import api from '../services/api';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Circle, Activity, Copy, Check } from 'lucide-react';
+import { toast } from 'sonner';
 import CookieConsent from '@/components/CookieConsent';
-import '../components/ActiveChannelsCarousel.css';
 
 // Иконка Twitch "Glitch" (точная)
 const TwitchIcon = (props) => (
@@ -38,8 +37,7 @@ const VKIcon = (props) => (
 
 
 const LoginPage = () => {
-    const { loginWithTwitch, loginWithVk, setGuestMode } = useAuth();
-    const { activeChannels } = useActiveChannels();
+    const { loginWithTwitch, loginWithVk, setGuestMode, isAuthenticated, isLoading } = useAuth();
     // TtsHealthContext не нужен на странице логина
     const navigate = useNavigate();
     const [title, setTitle] = useState('');
@@ -61,10 +59,18 @@ const LoginPage = () => {
     const [verificationModalOpen, setVerificationModalOpen] = useState(false);
     const [verificationCode, setVerificationCode] = useState('');
     const [verificationTimeout, setVerificationTimeout] = useState(60);
-    const [isVerifying, setIsVerifying] = useState(false);
+    const [, setIsVerifying] = useState(false);
     const [verificationTimers, setVerificationTimers] = useState({ timer: null, verificationTimer: null });
     const [isCodeCopied, setIsCodeCopied] = useState(false);
     const [isDisconnecting, setIsDisconnecting] = useState(false);
+
+    // Проверяем аутентификацию при загрузке страницы
+    useEffect(() => {
+        if (!isLoading && isAuthenticated) {
+            // Пользователь уже аутентифицирован, перенаправляем на дашборд
+            navigate('/dashboard', { replace: true });
+        }
+    }, [isAuthenticated, isLoading, navigate]);
 
     useEffect(() => {
         if (isTyping && title.length < fullTitle.length) {
@@ -111,9 +117,10 @@ const LoginPage = () => {
         };
     }, [verificationTimers]);
 
-    const handleVkLogin = () => {
+    const _handleVkLogin = () => {
         // 🖱️ Кнопка VK Live нажата!');
-        window.location.href = 'http://localhost:8000/auth/vk';
+        const backendUrl = API_BASE_URL;
+        window.location.href = `${backendUrl}/auth/vk`;
     };
 
     const handleGuestMode = () => {
@@ -130,50 +137,23 @@ const LoginPage = () => {
         setChannelError('');
 
         try {
-            // Подключаем бота к каналу с верификацией
+            // Генерируем код для гостевого доступа
             const response = await api.post('/api/chat/guest/connect', {
                 channel_name: guestUsername.trim()
             });
             
-            // LoginPage: API response:', response.data);
-            // LoginPage: verification_required:', response.data.verification_required);
-            // LoginPage: verified:', response.data.verified);
+            console.log('[LoginPage] Guest connect response:', response.data);
             
-            // Проверяем конфликт сессий
-            if (response.data.conflict) {
-                // LoginPage: Session conflict detected');
-                toast.error(`Канал ${guestUsername} уже используется авторизованным пользователем. Гостевой доступ заблокирован.`);
-                setGuestModalOpen(false);
-                return;
-            }
-            
-            // Если требуется верификация, показываем попап с кодом
-            if (response.data.verification_required) {
-                // LoginPage: Verification required, showing modal');
+            // Новый API возвращает код напрямую
+            if (response.data.success && response.data.verification_code) {
                 setVerificationCode(response.data.verification_code);
-                setVerificationTimeout(response.data.timeout);
+                setVerificationTimeout(response.data.expires_in_seconds || 60);
+                setGuestPlatform(response.data.platform);
                 setGuestModalOpen(false);
                 setVerificationModalOpen(true);
                 startVerificationTimer();
-            } else if (response.data.verified) {
-                // Если бот уже верифицирован, сразу входим в гостевой режим
-                // LoginPage: Bot already verified, entering guest mode');
-                try {
-                    await setGuestMode({
-                        username: guestUsername.trim(),
-                        platform: guestPlatform,
-                        isGuest: true
-                    });
-                    setGuestModalOpen(false);
-                    navigate('/dashboard');
-                } catch (error) {
-                    console.error('LoginPage: Failed to set guest mode:', error);
-                    setChannelError(error.message || 'Ошибка входа в гостевой режим');
-                }
             } else {
-                // Если верификация не требуется, показываем ошибку
-                // LoginPage: No verification required, showing error');
-                setChannelError('Верификация обязательна для безопасности');
+                setChannelError('Ошибка генерации кода верификации');
             }
             
         } catch (error) {
@@ -198,42 +178,43 @@ const LoginPage = () => {
             });
         }, 1000);
 
-        // Автоматически проверяем верификацию каждые 3 секунды
+        // Автоматически проверяем верификацию каждые 2 секунды
         const verificationTimer = setInterval(async () => {
             if (isDisconnecting) {
-                // LoginPage: Disconnect in progress, skipping automatic verification check');
                 return;
             }
             
             try {
-                const response = await api.get(`/api/chat/guest/status?channel_name=${guestUsername}`);
-                if (response.data.verified) {
+                const response = await api.post('/api/chat/guest/check', {
+                    channel_name: guestUsername.trim()
+                });
+                
+                // Проверяем, что запрос успешен и код подтвержден
+                if (response.data.success && response.data.confirmed) {
                     // Очищаем все таймеры
                     clearInterval(verificationTimer);
                     clearInterval(timer);
                     setVerificationTimers({ timer: null, verificationTimer: null });
                     
-                    // Верификация успешна, входим в гостевой режим
+                    // Финализируем сессию
                     try {
-                        await setGuestMode({
-                            username: guestUsername.trim(),
-                            platform: guestPlatform,
-                            isGuest: true
+                        const finalizeResponse = await api.post('/api/chat/guest/finalize', {
+                            channel_name: guestUsername.trim()
                         });
-                        setVerificationModalOpen(false);
-                        navigate('/dashboard');
+                        
+                        if (finalizeResponse.data.success) {
+                            await setGuestMode({
+                                username: guestUsername.trim(),
+                                platform: guestPlatform,
+                                isGuest: true
+                            });
+                            setVerificationModalOpen(false);
+                            navigate('/dashboard');
+                        }
                     } catch (error) {
-                        console.error('LoginPage: Failed to set guest mode after verification:', error);
-                        setChannelError(error.message || 'Ошибка входа в гостевой режим');
+                        console.error('[LoginPage] Failed to finalize guest session:', error);
+                        setChannelError(error.response?.data?.detail || 'Ошибка входа в гостевой режим');
                     }
-                } else if (!response.data.connected) {
-                    // Бот отключился, закрываем попап и перезагружаем страницу
-                    // LoginPage: Bot disconnected, closing verification modal');
-                    clearInterval(verificationTimer);
-                    clearInterval(timer);
-                    setVerificationTimers({ timer: null, verificationTimer: null });
-                    setVerificationModalOpen(false);
-                    window.location.reload();
                 }
             } catch (error) {
                 console.error('LoginPage: Failed to check verification automatically:', error);
@@ -267,7 +248,7 @@ const LoginPage = () => {
     };
 
 
-    const checkVerificationStatus = async () => {
+    const _checkVerificationStatus = async () => {
         if (isDisconnecting) {
             // LoginPage: Disconnect in progress, skipping verification check');
             return;
@@ -275,8 +256,12 @@ const LoginPage = () => {
         
         setIsVerifying(true);
         try {
-            const response = await api.get(`/api/chat/guest/status?channel_name=${guestUsername}`);
-            if (response.data.verified) {
+            // Финализируем гостевую сессию
+            const response = await api.post('/api/chat/guest/finalize', {
+                channel_name: guestUsername.trim()
+            });
+            
+            if (response.data.success) {
                 // Верификация успешна, входим в гостевой режим
                 try {
                     await setGuestMode({
@@ -290,11 +275,9 @@ const LoginPage = () => {
                     console.error('LoginPage: Failed to set guest mode after manual verification:', error);
                     setChannelError(error.message || 'Ошибка входа в гостевой режим');
                 }
-            } else if (!response.data.connected) {
-                // Бот отключился, закрываем попап и перезагружаем страницу
-                // LoginPage: Bot disconnected, closing verification modal');
-                setVerificationModalOpen(false);
-                window.location.reload();
+            } else {
+                // Код еще не подтвержден
+                toast.error('Код не подтвержден владельцем канала');
             }
         } catch (error) {
             console.error('LoginPage: Failed to check verification:', error);
@@ -322,63 +305,20 @@ const LoginPage = () => {
         }
     };
 
+    // Показываем загрузку пока проверяем аутентификацию
+    if (isLoading) {
+        return (
+            <div className="login-page-bg min-h-screen flex items-center justify-center text-white font-sans">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-400 mx-auto mb-4"></div>
+                    <p className="text-slate-400">Проверка аутентификации...</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="login-page-bg min-h-screen flex items-center justify-center text-white font-sans p-4 relative">
-           {/* Секция активных каналов в правом верхнем углу */}
-           {activeChannels.length > 0 && (
-               <div className="absolute top-8 right-8 w-64 z-10">
-                   <div className="text-center mb-3">
-                       <h3 className="text-lg font-bold text-purple-400 mb-2">Уже подключились</h3>
-                   </div>
-                   <div className="vertical-carousel relative overflow-hidden rounded-xl" style={{height: '320px'}}>
-                       <div className={`flex flex-col h-full ${activeChannels.length > 4 ? 'animate-scroll-smooth' : ''}`}>
-                           {/* Показываем только реальные данные без дублирования */}
-                           {activeChannels.map((channel, index) => (
-                               <div 
-                                   key={channel.id}
-                                   className="carousel-item flex items-center justify-center px-3 py-2 cursor-pointer h-[60px] flex-shrink-0 hover:bg-purple-500/10 rounded-lg transition-colors"
-                                   onClick={() => {
-                                       const url = channel.platform === 'twitch' 
-                                           ? `https://twitch.tv/${channel.username}`
-                                           : `https://vk.com/video/@${channel.username}`;
-                                       window.open(url, '_blank');
-                                   }}
-                               >
-                                   <div className="relative">
-                                       <img 
-                                           src={channel.avatar}
-                                           alt={channel.username}
-                                           className={`w-8 h-8 rounded-full object-cover avatar-border ${channel.isOnline ? 'live' : ''}`}
-                                           onError={(e) => {
-                                               // Fallback на ui-avatars если аватарка не загрузилась
-                                               e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(channel.username)}&background=1f2937&color=ffffff&size=32`;
-                                           }}
-                                       />
-                                       {channel.isOnline && (
-                                           <div className="live-badge">LIVE</div>
-                                       )}
-                                   </div>
-                                   <div className="ml-2 text-center">
-                                       <div className="text-white font-medium text-xs">
-                                           {channel.username}
-                                       </div>
-                                       <div className="flex items-center justify-center gap-1 mt-0.5">
-                                           {channel.platform === 'twitch' ? (
-                                               <TwitchIcon className="h-2.5 w-2.5 text-purple-400" />
-                                           ) : (
-                                               <VKIcon className="h-2.5 w-2.5 text-blue-400" />
-                                           )}
-                                           <span className="text-xs text-slate-300 capitalize">
-                                               {channel.platform}
-                                           </span>
-                                       </div>
-                                   </div>
-                               </div>
-                           ))}
-                       </div>
-                   </div>
-               </div>
-           )}
             
             <Card className="login-card w-full max-w-sm shadow-2xl">
                 <CardHeader className="text-center pt-10 pb-4">
@@ -405,8 +345,9 @@ const LoginPage = () => {
 
                         <button
                             onClick={() => {
-                                // 🖱️ Кнопка VK Live нажата!');
+                                console.log('🔵 [LOGIN PAGE] VK Live button clicked!');
                                 loginWithVk();
+                                console.log('🔵 [LOGIN PAGE] loginWithVk() called');
                             }}
                             className="w-full bg-red-800 hover:bg-red-900 text-white font-semibold py-3 px-5 rounded-lg transition-colors duration-300 flex items-center justify-center text-base"
                         >
@@ -429,6 +370,7 @@ const LoginPage = () => {
                         >
                             Гостевой режим
                         </button>
+
                     </div>
                 </CardContent>
             </Card>
@@ -440,9 +382,9 @@ const LoginPage = () => {
                         <DialogTitle className="text-center text-white">
                             Гостевой режим
                         </DialogTitle>
-                        <p className="text-sm text-gray-400 text-center mt-2">
+                        <DialogDescription className="text-sm text-gray-400 text-center mt-2">
                             Введите данные для входа в гостевой режим. Бот автоматически подключится к указанному каналу.
-                        </p>
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <div>
@@ -515,6 +457,9 @@ const LoginPage = () => {
                         <DialogTitle className="text-center text-white">
                             Требуется верификация
                         </DialogTitle>
+                        <DialogDescription className="text-sm text-gray-400 text-center mt-2">
+                            Введите код верификации для завершения авторизации
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <div className="text-center">

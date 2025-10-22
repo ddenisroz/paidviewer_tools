@@ -782,7 +782,7 @@ class RussianTTS:
             result_path = self.synthesize_speech(
                 text=text,
                 ref_audio_path=voice_audio_path,
-                ref_text="",  # TODO: получать референсный текст из базы данных
+                ref_text=""
                 **kwargs
             )
             
@@ -866,27 +866,7 @@ if __name__ == "__main__":
     tts = RussianTTS()
     
     if tts.russian_tts:
-        print("✅ Русская модель загружена успешно!")
-        
-        # Тест с русским текстом
-        print("\n🧪 Тест с русским текстом:")
-        result = tts.synthesize_speech(
-            text="Привет! Как дела?",
-            ref_audio_path="test_ref.wav",
-            ref_text="Это тестовое аудио"
-        )
-        if result:
-            print(f"✅ Результат: {result}")
-        
-        # Тест с английским текстом
-        print("\n🧪 Тест с английским текстом:")
-        result = tts.synthesize_speech(
-            text="Hello! How are you?",
-            ref_audio_path="test_ref.wav",
-            ref_text="This is a test audio"
-        )
-        if result:
-            print(f"✅ Результат: {result}")
+        logger.info("Russian TTS model loaded successfully")
     else:
-        print("❌ Ошибка загрузки моделей!")
+        logger.error("Failed to load TTS models")
 

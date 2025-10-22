@@ -1,39 +1,29 @@
 import React, { useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import AuthLoader from '../components/AuthLoader';
 
 const AuthCallbackPage = () => {
     const navigate = useNavigate();
-    const { loginAndFetchUser } = useAuth();
-    const [searchParams] = useSearchParams();
-
-    // Определяем платформу по URL
-    const isVkCallback = window.location.pathname.includes('/auth/vk/callback');
-    const platform = isVkCallback ? 'VK Live' : 'Twitch';
+    const { refreshAuthStatus } = useAuth();
 
     useEffect(() => {
-        const token = searchParams.get('token');
-        // 🔑 Токен из URL:', token);
-        // 🔗 Платформа:', platform);
-
         const handleCallback = async () => {
-            if (token) {
-                // ✅ Токен найден, пытаемся авторизоваться...');
-                await loginAndFetchUser(token);
-                // После успешного получения пользователя, перенаправляем на дашборд.
+            try {
+                // Обновляем статус аутентификации (cookie уже установлен backend'ом)
+                await refreshAuthStatus();
+                // Перенаправляем на дашборд
                 navigate('/dashboard', { replace: true });
-            } else {
-                // Если токена нет, возможно, произошла ошибка
-                console.error("❌ Токен не найден в URL после авторизации");
+            } catch (error) {
+                console.error("❌ Ошибка при обновлении статуса аутентификации:", error);
                 navigate('/login', { replace: true });
             }
         };
 
         handleCallback();
-    }, [loginAndFetchUser, navigate, searchParams, platform]);
+    }, [refreshAuthStatus, navigate]);
 
-    return <AuthLoader platform={platform} />;
+    // Возвращаем null чтобы ничего не отображать
+    return null;
 };
 
 export default AuthCallbackPage;

@@ -19,8 +19,7 @@ class BackgroundTaskManager:
         
         self.running = True
         self.tasks = [
-            asyncio.create_task(self.cleanup_cache_periodically()),
-            asyncio.create_task(self.cleanup_old_files_periodically())
+            asyncio.create_task(self.cleanup_files_periodically())
         ]
         logger.info("Background tasks started")
 
@@ -41,35 +40,23 @@ class BackgroundTaskManager:
         self.tasks = []
         logger.info("Background tasks stopped")
 
-    async def cleanup_cache_periodically(self):
-        """Периодически удаляет старые .wav файлы из папок с разными временами хранения."""
+    async def cleanup_files_periodically(self):
+        """Периодическая очистка файлов (теперь использует безопасный сервис)"""
         while self.running:
             try:
-                # Очистка временных файлов (1 час)
-                file_manager.cleanup_old_files(max_age_hours=1)
+                # Используем новый безопасный сервис очистки
+                from tts_service.safe_cleanup_service import safe_cleanup_service
+                cleanup_stats = safe_cleanup_service.cleanup_old_files()
                 
-                # Очистка тестовых файлов (24 часа)
-                file_manager.cleanup_old_files(max_age_hours=24)
-                
-                # Ждем 30 минут до следующей очистки
-                await asyncio.sleep(1800)
-                
-            except Exception as e:
-                logger.error(f"Error in cleanup_cache_periodically: {e}")
-                await asyncio.sleep(300)  # Ждем 5 минут при ошибке
-
-    async def cleanup_old_files_periodically(self):
-        """Периодическая очистка старых файлов"""
-        while self.running:
-            try:
-                # Очистка файлов старше 7 дней
-                file_manager.cleanup_old_files(max_age_hours=168)
+                if cleanup_stats['files_deleted'] > 0:
+                    mb_freed = cleanup_stats['bytes_freed'] / (1024 * 1024)
+                    logger.info(f"🧹 TTS Service cleanup: {cleanup_stats['files_deleted']} files deleted, {mb_freed:.1f} MB freed")
                 
                 # Ждем 6 часов до следующей очистки
                 await asyncio.sleep(21600)
                 
             except Exception as e:
-                logger.error(f"Error in cleanup_old_files_periodically: {e}")
+                logger.error(f"❌ Error in TTS Service file cleanup: {e}")
                 await asyncio.sleep(3600)  # Ждем 1 час при ошибке
 
     async def cleanup_temp_file_delayed(self, file_path: Path, delay_seconds: int = 300):

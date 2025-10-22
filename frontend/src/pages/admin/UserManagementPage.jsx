@@ -1,45 +1,47 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { 
     Users, 
-    Edit, 
-    Trash2, 
+    Search, 
     Shield, 
-    ShieldOff, 
-    Search,
+    Ban, 
+    Trash2, 
+    Edit, 
+    Plus,
+    Filter,
+    Download,
+    Upload,
     RefreshCw,
-    AlertCircle,
     CheckCircle,
+    XCircle,
+    AlertCircle,
+    UserCheck,
+    UserX,
+    Twitch,
+    MessageCircle,
+    ChevronDown,
+    ChevronUp,
+    SortAsc,
+    SortDesc,
+    Eye,
+    EyeOff,
+    Settings,
     Monitor,
     Clock,
     Activity,
     Globe,
     Tv,
     Youtube,
-    Settings,
-    Filter,
-    Eye,
-    EyeOff,
     Wifi,
-    WifiOff,
-    UserCheck,
-    UserX,
-    Ban,
-    Unlock,
-    MoreVertical,
-    ChevronDown,
-    ChevronRight,
-    Plus,
-    List,
-    CheckCircle2,
-    XCircle
+    WifiOff
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { botService } from '../../services/microservices';
@@ -51,42 +53,38 @@ const UserManagementPage = () => {
     const [loading, setLoading] = useState(true);
     const [sessionsLoading, setSessionsLoading] = useState(false);
     const [integrationsLoading, setIntegrationsLoading] = useState(false);
+    
+    // Фильтры и поиск
     const [searchTerm, setSearchTerm] = useState('');
+    const [roleFilter, setRoleFilter] = useState('all');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [integrationFilter, setIntegrationFilter] = useState('all');
+    const [whitelistFilter, setWhitelistFilter] = useState('all');
+    
+    // Сортировка
+    const [sortField, setSortField] = useState('id');
+    const [sortDirection, setSortDirection] = useState('asc');
+    
+    // Диалоги
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+    const [whitelistDialogOpen, setWhitelistDialogOpen] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
-    const [activeSubTab, setActiveSubTab] = useState('users'); // 'users' или 'sessions'
-    
-    // Whitelist states
-    const [whitelistChannels, setWhitelistChannels] = useState({ twitch: [], vk: [] });
-    const [newChannel, setNewChannel] = useState('');
-    const [newPlatform, setNewPlatform] = useState('twitch');
-    const [whitelistLoading, setWhitelistLoading] = useState(false);
-    
-    // Фильтры
-    const [filters, setFilters] = useState({
-        role: 'all', // all, admin, user, blocked
-        status: 'all', // all, active, inactive, blocked
-        platform: 'all', // all, twitch, vk, youtube
-        hasIntegrations: 'all' // all, yes, no
-    });
-    
-    // Состояние развернутых карточек
-    const [expandedUsers, setExpandedUsers] = useState(new Set());
-    
-    // Формы
     const [editForm, setEditForm] = useState({
         is_admin: false
     });
     const [blockForm, setBlockForm] = useState({
         reason: ''
     });
+    const [whitelistForm, setWhitelistForm] = useState({
+        channel_name: ''
+    });
 
     const loadUsers = async () => {
         try {
             setLoading(true);
             const response = await botService.get('/api/admin/users');
-            setUsers(response.data || []);
+            setUsers(response.data?.users || []);
         } catch (error) {
             console.error('Error loading users:', error);
             toast.error('Ошибка загрузки пользователей');
@@ -99,7 +97,7 @@ const UserManagementPage = () => {
         try {
             setSessionsLoading(true);
             const response = await botService.get('/api/admin/sessions');
-            setSessions(response.data.sessions || []);
+            setSessions(response.data?.sessions || []);
         } catch (error) {
             console.error('Error loading sessions:', error);
             toast.error('Ошибка загрузки сессий');
@@ -112,7 +110,7 @@ const UserManagementPage = () => {
         try {
             setIntegrationsLoading(true);
             const response = await botService.get('/api/integrations');
-            setIntegrations(response.data || []);
+            setIntegrations(response.data?.integrations || []);
         } catch (error) {
             console.error('Error loading integrations:', error);
             toast.error('Ошибка загрузки интеграций');
@@ -121,157 +119,111 @@ const UserManagementPage = () => {
         }
     };
 
-    const loadWhitelist = async () => {
-        try {
-            setWhitelistLoading(true);
-            const response = await botService.get('/api/admin/whitelist');
-            setWhitelistChannels({ twitch: response.data.whitelist_users || [], vk: [] });
-        } catch (error) {
-            console.error('Error loading whitelist:', error);
-            toast.error('Ошибка загрузки белого списка');
-        } finally {
-            setWhitelistLoading(false);
-        }
-    };
-
-    const addToWhitelist = async () => {
-        if (!newChannel.trim()) {
-            toast.error('Введите название канала');
-            return;
-        }
-
-        try {
-            await botService.post('/api/admin/whitelist/add', {
-                username: newChannel.trim(),
-            });
-            await loadWhitelist();
-            setNewChannel('');
-            toast.success(`Канал ${newChannel} добавлен в белый список`);
-        } catch (error) {
-            toast.error(error.response?.data?.detail || 'Ошибка добавления канала');
-        }
-    };
-
-    const removeFromWhitelist = async (channel) => {
-        try {
-            await botService.delete('/api/admin/whitelist/remove', {
-                data: { username: channel }
-            });
-            await loadWhitelist();
-            toast.success(`Канал ${channel} удален из белого списка`);
-        } catch (error) {
-            toast.error(error.response?.data?.detail || 'Ошибка удаления канала');
-        }
-    };
-
-    // Функции для управления фильтрами
-    const updateFilter = (key, value) => {
-        setFilters(prev => ({ ...prev, [key]: value }));
-    };
-
-    const clearFilters = () => {
-        setFilters({
-            role: 'all',
-            status: 'all',
-            platform: 'all',
-            hasIntegrations: 'all'
-        });
-    };
-
-    // Функции для управления развернутыми карточками
-    const toggleUserExpansion = (userId) => {
-        const newExpanded = new Set(expandedUsers);
-        if (newExpanded.has(userId)) {
-            newExpanded.delete(userId);
-        } else {
-            newExpanded.add(userId);
-        }
-        setExpandedUsers(newExpanded);
-    };
-
-
-    const updateUser = async () => {
-        try {
-            await botService.put(`/api/admin/users/${currentUser.id}`, editForm);
-            toast.success('Пользователь обновлен');
-            setEditDialogOpen(false);
-            setCurrentUser(null);
-            await loadUsers();
-        } catch (error) {
-            console.error('Error updating user:', error);
-            toast.error(error.response?.data?.error || 'Ошибка обновления пользователя');
-        }
-    };
-
-    const deleteUser = async (userId) => {
-        if (!window.confirm('Вы уверены, что хотите удалить этого пользователя?')) {
-            return;
-        }
-
-        try {
-            await botService.delete(`/api/admin/users/${userId}`);
-            toast.success('Пользователь удален');
-            await loadUsers();
-        } catch (error) {
-            console.error('Error deleting user:', error);
-            toast.error(error.response?.data?.error || 'Ошибка удаления пользователя');
-        }
-    };
-
-    const blockUser = async () => {
-        try {
-            await botService.post(`/api/admin/users/${currentUser.id}/block`, blockForm);
-            toast.success('Пользователь заблокирован');
-            setBlockDialogOpen(false);
-            setCurrentUser(null);
-            setBlockForm({ reason: '' });
-            await loadUsers();
-        } catch (error) {
-            console.error('Error blocking user:', error);
-            toast.error(error.response?.data?.error || 'Ошибка блокировки пользователя');
-        }
-    };
-
-    const unblockUser = async (userId) => {
-        try {
-            await botService.post(`/api/admin/users/${userId}/unblock`);
-            toast.success('Пользователь разблокирован');
-            await loadUsers();
-        } catch (error) {
-            console.error('Error unblocking user:', error);
-            toast.error(error.response?.data?.error || 'Ошибка разблокировки пользователя');
-        }
-    };
-
-    const terminateSession = async (session) => {
-        try {
-            if (session.session_type === 'active_user') {
-                await botService.delete(`/api/admin/sessions/user/${session.user_id}`);
-            } else {
-                await botService.delete(`/api/admin/sessions/${session.channel}`);
-            }
-            toast.success('Сессия завершена');
-            await loadSessions();
-        } catch (error) {
-            console.error('Error terminating session:', error);
-            toast.error('Ошибка завершения сессии');
-        }
-    };
-
-    const formatLastActivity = (timestamp) => {
-        if (!timestamp) return 'Неизвестно';
+    // Фильтрация и сортировка пользователей
+    const filteredAndSortedUsers = useMemo(() => {
+        const botsArray = Array.isArray(users) ? users : [];
+        const sessionsArray = Array.isArray(sessions) ? sessions : [];
+        const integrationsArray = Array.isArray(integrations) ? integrations : [];
         
-        const date = new Date(timestamp);
-        const now = new Date();
-        const diffMs = now - date;
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMins / 60);
-        const diffDays = Math.floor(diffHours / 24);
+        let filtered = botsArray.filter(user => {
+            // Поиск по ID пользователя
+            const matchesUserId = `User_${user.id}`.toLowerCase().includes(searchTerm.toLowerCase());
+            
+            // Поиск по никнеймам платформ
+            const matchesPlatformUsername = user.integrations ? 
+                Object.values(user.integrations).some(integration => 
+                    integration.username?.toLowerCase().includes(searchTerm.toLowerCase())
+                ) : false;
+            
+            // Поиск по Twitch username
+            const matchesTwitchUsername = user.twitch_username?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
+            
+            // Поиск по VK username
+            const matchesVkUsername = user.vk_username?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
+            
+            const matchesSearch = matchesUserId || matchesPlatformUsername || matchesTwitchUsername || matchesVkUsername;
+            
+            // Фильтр по роли
+            const matchesRole = roleFilter === 'all' || 
+                (roleFilter === 'admin' && user.is_admin) ||
+                (roleFilter === 'user' && !user.is_admin);
+            
+            // Фильтр по статусу
+            const matchesStatus = statusFilter === 'all' ||
+                (statusFilter === 'active' && !user.is_blocked) ||
+                (statusFilter === 'blocked' && user.is_blocked);
+            
+            // Фильтр по интеграциям
+            const matchesIntegration = integrationFilter === 'all' ||
+                (integrationFilter === 'twitch' && user.integrations?.twitch?.connected) ||
+                (integrationFilter === 'vk' && user.integrations?.vk?.connected) ||
+                (integrationFilter === 'none' && user.total_integrations === 0);
+            
+            // Фильтр по whitelist
+            const matchesWhitelist = whitelistFilter === 'all' ||
+                (whitelistFilter === 'whitelisted' && user.is_whitelisted) ||
+                (whitelistFilter === 'not_whitelisted' && !user.is_whitelisted);
+            
+            return matchesSearch && matchesRole && matchesStatus && matchesIntegration && matchesWhitelist;
+        });
+        
+        // Сортировка
+        filtered.sort((a, b) => {
+            let aValue = a[sortField];
+            let bValue = b[sortField];
+            
+            // Обработка специальных полей
+            if (sortField === 'total_integrations') {
+                aValue = a.total_integrations || 0;
+                bValue = b.total_integrations || 0;
+            } else if (sortField === 'created_at') {
+                aValue = new Date(a.created_at || 0);
+                bValue = new Date(b.created_at || 0);
+            }
+            
+            if (typeof aValue === 'string') {
+                aValue = aValue.toLowerCase();
+                bValue = bValue.toLowerCase();
+            }
+            
+            if (sortDirection === 'asc') {
+                return aValue > bValue ? 1 : -1;
+            } else {
+                return aValue < bValue ? 1 : -1;
+            }
+        });
+        
+        return filtered;
+    }, [users, sessions, integrations, searchTerm, roleFilter, statusFilter, integrationFilter, whitelistFilter, sortField, sortDirection]);
 
-        if (diffMins < 1) return 'Только что';
-        if (diffMins < 60) return `${diffMins} мин. назад`;
-        if (diffHours < 24) return `${diffHours} ч. назад`;
-        return `${diffDays} дн. назад`;
+    const handleSort = (field) => {
+        if (sortField === field) {
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortDirection('asc');
+        }
+    };
+
+    const getSortIcon = (field) => {
+        if (sortField !== field) return null;
+        return sortDirection === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />;
+    };
+
+    const formatDate = (dateString) => {
+        if (!dateString) return 'Не указано';
+        return new Date(dateString).toLocaleString('ru-RU');
+    };
+
+    const getIntegrationIcon = (platform) => {
+        switch (platform) {
+            case 'twitch':
+                return <Twitch className="w-4 h-4 text-purple-400" />;
+            case 'vk':
+                return <MessageCircle className="w-4 h-4 text-blue-400" />;
+            default:
+                return <Globe className="w-4 h-4 text-gray-400" />;
+        }
     };
 
     const openEditDialog = (user) => {
@@ -288,57 +240,74 @@ const UserManagementPage = () => {
         setBlockDialogOpen(true);
     };
 
-    const formatDate = (dateString) => {
-        if (!dateString) return 'Не указано';
-        return new Date(dateString).toLocaleString('ru-RU');
+    const handleEditUser = async () => {
+        try {
+            await botService.put(`/api/admin/users/${currentUser.id}`, editForm);
+            toast.success('Пользователь обновлен');
+            setEditDialogOpen(false);
+            loadUsers();
+        } catch (error) {
+            console.error('Error updating user:', error);
+            toast.error('Ошибка обновления пользователя');
+        }
     };
 
-    // Расширенная фильтрация пользователей
-    const filteredUsers = users.filter(user => {
-        const matchesSearch = `User_${user.id}`.toLowerCase().includes(searchTerm.toLowerCase());
+    const handleBlockUser = async () => {
+        try {
+            await botService.post(`/api/admin/users/${currentUser.id}/block`, {
+                reason: blockForm.reason
+            });
+            toast.success('Пользователь заблокирован');
+            setBlockDialogOpen(false);
+            loadUsers();
+        } catch (error) {
+            console.error('Error blocking user:', error);
+            toast.error('Ошибка блокировки пользователя');
+        }
+    };
+
+    const handleDeleteUser = async (userId) => {
+        if (!confirm('Вы уверены, что хотите удалить этого пользователя?')) return;
         
-        // Фильтр по роли
-        const matchesRole = filters.role === 'all' || 
-            (filters.role === 'admin' && user.is_admin) ||
-            (filters.role === 'user' && !user.is_admin) ||
-            (filters.role === 'blocked' && user.is_blocked);
-        
-        // Фильтр по статусу
-        const userSessions = sessions.filter(session => session.user_id === user.id);
-        const isActive = userSessions.length > 0;
-        const matchesStatus = filters.status === 'all' ||
-            (filters.status === 'active' && isActive) ||
-            (filters.status === 'inactive' && !isActive) ||
-            (filters.status === 'blocked' && user.is_blocked);
-        
-        // Фильтр по платформе
-        const userPlatforms = userSessions.map(session => session.platform).filter(Boolean);
-        const matchesPlatform = filters.platform === 'all' ||
-            userPlatforms.includes(filters.platform);
-        
-        // Фильтр по интеграциям
-        const userIntegrations = integrations.filter(integration => integration.user_id === user.id);
-        const hasIntegrations = userIntegrations.length > 0;
-        const matchesIntegrations = filters.hasIntegrations === 'all' ||
-            (filters.hasIntegrations === 'yes' && hasIntegrations) ||
-            (filters.hasIntegrations === 'no' && !hasIntegrations);
-        
-        return matchesSearch && matchesRole && matchesStatus && matchesPlatform && matchesIntegrations;
-    });
+        try {
+            await botService.delete(`/api/admin/users/${userId}`);
+            toast.success('Пользователь удален');
+            loadUsers();
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            toast.error('Ошибка удаления пользователя');
+        }
+    };
+
+    const handleAddToWhitelist = async () => {
+        try {
+            await botService.post('/api/admin/whitelist/add', {
+                channel_name: whitelistForm.channel_name
+            });
+            toast.success('Канал добавлен в whitelist');
+            setWhitelistDialogOpen(false);
+            setWhitelistForm({ channel_name: '' });
+            loadUsers(); // Перезагружаем для обновления статуса whitelist
+        } catch (error) {
+            console.error('Error adding to whitelist:', error);
+            toast.error('Ошибка добавления в whitelist');
+        }
+    };
 
     useEffect(() => {
         loadUsers();
         loadSessions();
         loadIntegrations();
-        loadWhitelist();
     }, []);
 
     if (loading) {
         return (
             <div className="container mx-auto p-6">
                 <div className="flex items-center justify-center h-64">
-                    <RefreshCw className="h-8 w-8 animate-spin text-purple-500" />
-                    <span className="ml-2 text-lg">Загрузка пользователей...</span>
+                    <div className="text-center">
+                        <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-purple-400" />
+                        <p className="text-slate-400">Загрузка пользователей...</p>
+                    </div>
                 </div>
             </div>
         );
@@ -346,530 +315,354 @@ const UserManagementPage = () => {
 
     return (
         <div className="container mx-auto p-6 space-y-6">
+            {/* Заголовок */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold mb-6 text-foreground flex items-center">
-                        <Users className="w-8 h-8 mr-3 text-purple-500" />
+                    <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+                        <Users className="w-8 h-8 text-purple-400" />
                         Управление пользователями
                     </h1>
-                    <p className="text-muted-foreground mt-2">
-                        Редактирование и блокировка пользователей системы
+                    <p className="text-slate-400 mt-2">
+                        Управление пользователями, их ролями и интеграциями
                     </p>
                 </div>
-                
-                <div className="flex items-center space-x-4">
-                    <Button onClick={activeSubTab === 'users' ? loadUsers : loadSessions} variant="outline">
-                        <RefreshCw className="w-4 h-4 mr-2" />
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={loadUsers} disabled={loading}>
+                        <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                         Обновить
                     </Button>
+                    <Dialog open={whitelistDialogOpen} onOpenChange={setWhitelistDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button>
+                                <Plus className="w-4 h-4 mr-2" />
+                                Добавить в whitelist
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Добавить канал в whitelist</DialogTitle>
+                                <DialogDescription>
+                                    Добавьте канал в whitelist для доступа к TTS
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                                <div>
+                                    <Label htmlFor="channel_name">Название канала</Label>
+                                    <Input
+                                        id="channel_name"
+                                        value={whitelistForm.channel_name}
+                                        onChange={(e) => setWhitelistForm({ ...whitelistForm, channel_name: e.target.value })}
+                                        placeholder="Введите название канала..."
+                                        className="mt-1"
+                                    />
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setWhitelistDialogOpen(false)}>
+                                    Отмена
+                                </Button>
+                                <Button onClick={handleAddToWhitelist}>
+                                    Добавить
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
                 </div>
             </div>
 
-            {/* Подтабы */}
-            <div className="flex space-x-1 bg-slate-800/50 p-1 rounded-lg mb-6">
-                <Button
-                    variant={activeSubTab === 'users' ? 'default' : 'ghost'}
-                    onClick={() => setActiveSubTab('users')}
-                    className={`flex-1 ${activeSubTab === 'users' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
-                >
-                    <Users className="h-4 w-4 mr-2" />
-                    Пользователи
-                </Button>
-                <Button
-                    variant={activeSubTab === 'sessions' ? 'default' : 'ghost'}
-                    onClick={() => setActiveSubTab('sessions')}
-                    className={`flex-1 ${activeSubTab === 'sessions' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
-                >
-                    <Activity className="h-4 w-4 mr-2" />
-                    Сессии
-                </Button>
-                <Button
-                    variant={activeSubTab === 'whitelist' ? 'default' : 'ghost'}
-                    onClick={() => setActiveSubTab('whitelist')}
-                    className={`flex-1 ${activeSubTab === 'whitelist' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
-                >
-                    <List className="h-4 w-4 mr-2" />
-                    TTS Whitelist
-                </Button>
-            </div>
-
-
-            {/* Контент в зависимости от активного подтаба */}
-            {activeSubTab === 'users' ? (
-                <>
-                    {/* Поиск и фильтры */}
-                    <div className="space-y-4">
+            {/* Фильтры */}
+            <Card className="bg-slate-800/50 border-slate-700">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Filter className="w-5 h-5" />
+                        Фильтры и поиск
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
                         {/* Поиск */}
-                        <div className="flex items-center space-x-4">
-                            <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                                 <Input
-                                    placeholder="Поиск пользователей..."
+                            placeholder="Поиск по ID, никнейму или платформе..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="pl-10"
+                            className="pl-10 bg-slate-700/50 border-slate-600"
                                 />
-                            </div>
-                            <Button variant="outline" onClick={clearFilters}>
-                                <Filter className="w-4 h-4 mr-2" />
-                                Сбросить фильтры
-                            </Button>
                         </div>
 
-                        {/* Панель фильтров */}
-                        <Card className="bg-slate-800/50">
-                            <CardContent className="p-4">
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                    {/* Фильтр по роли */}
-                                    <div>
-                                        <Label className="text-sm font-medium mb-2 block">Роль</Label>
-                                        <Select value={filters.role} onValueChange={(value) => updateFilter('role', value)}>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Все роли" />
+                    {/* Фильтры в ряд */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="space-y-2">
+                            <Label>Роль</Label>
+                            <Select value={roleFilter} onValueChange={setRoleFilter}>
+                                <SelectTrigger className="bg-slate-700/50 border-slate-600">
+                                    <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="all">Все роли</SelectItem>
                                                 <SelectItem value="admin">Администраторы</SelectItem>
                                                 <SelectItem value="user">Пользователи</SelectItem>
-                                                <SelectItem value="blocked">Заблокированные</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
 
-                                    {/* Фильтр по статусу */}
-                                    <div>
-                                        <Label className="text-sm font-medium mb-2 block">Статус</Label>
-                                        <Select value={filters.status} onValueChange={(value) => updateFilter('status', value)}>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Все статусы" />
+                        <div className="space-y-2">
+                            <Label>Статус</Label>
+                            <Select value={statusFilter} onValueChange={setStatusFilter}>
+                                <SelectTrigger className="bg-slate-700/50 border-slate-600">
+                                    <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="all">Все статусы</SelectItem>
                                                 <SelectItem value="active">Активные</SelectItem>
-                                                <SelectItem value="inactive">Неактивные</SelectItem>
                                                 <SelectItem value="blocked">Заблокированные</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
 
-                                    {/* Фильтр по платформе */}
-                                    <div>
-                                        <Label className="text-sm font-medium mb-2 block">Платформа</Label>
-                                        <Select value={filters.platform} onValueChange={(value) => updateFilter('platform', value)}>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Все платформы" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">Все платформы</SelectItem>
-                                                <SelectItem value="twitch">Twitch</SelectItem>
-                                                <SelectItem value="vk">VK Live</SelectItem>
-                                                <SelectItem value="youtube">YouTube</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                        <div className="space-y-2">
+                            <Label>Интеграции</Label>
+                            <Select value={integrationFilter} onValueChange={setIntegrationFilter}>
+                                <SelectTrigger className="bg-slate-700/50 border-slate-600">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Все</SelectItem>
+                                    <SelectItem value="twitch">Twitch</SelectItem>
+                                    <SelectItem value="vk">VK Live</SelectItem>
+                                    <SelectItem value="none">Без интеграций</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
 
-                                    {/* Фильтр по интеграциям */}
-                                    <div>
-                                        <Label className="text-sm font-medium mb-2 block">Интеграции</Label>
-                                        <Select value={filters.hasIntegrations} onValueChange={(value) => updateFilter('hasIntegrations', value)}>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Все" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">Все</SelectItem>
-                                                <SelectItem value="yes">С интеграциями</SelectItem>
-                                                <SelectItem value="no">Без интеграций</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                        <div className="space-y-2">
+                            <Label>Whitelist</Label>
+                            <Select value={whitelistFilter} onValueChange={setWhitelistFilter}>
+                                <SelectTrigger className="bg-slate-700/50 border-slate-600">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Все</SelectItem>
+                                    <SelectItem value="whitelisted">В whitelist</SelectItem>
+                                    <SelectItem value="not_whitelisted">Не в whitelist</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                                 </div>
                             </CardContent>
                         </Card>
-                    </div>
 
-                    {/* Список пользователей */}
-                    <div className="grid gap-4">
-                        {filteredUsers.map((user) => {
-                            const userSessions = sessions.filter(session => session.user_id === user.id);
-                            const userIntegrations = integrations.filter(integration => integration.user_id === user.id);
-                            const isExpanded = expandedUsers.has(user.id);
-                            const isActive = userSessions.length > 0;
+            {/* Таблица пользователей */}
+            <Card className="bg-slate-800/50 border-slate-700">
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <CardTitle>
+                            Пользователи ({filteredAndSortedUsers.length})
+                        </CardTitle>
+                        <div className="flex gap-2 text-sm text-slate-400">
+                            <span>Сортировка: {sortField} ({sortDirection})</span>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead>
+                                <tr className="border-b border-slate-700">
+                                    <th className="text-left p-3">
+                                        <button 
+                                            onClick={() => handleSort('id')}
+                                            className="flex items-center gap-2 hover:text-purple-400 transition-colors"
+                                        >
+                                            ID {getSortIcon('id')}
+                                        </button>
+                                    </th>
+                                    <th className="text-left p-3">Пользователь</th>
+                                    <th className="text-left p-3">
+                                        <button 
+                                            onClick={() => handleSort('total_integrations')}
+                                            className="flex items-center gap-2 hover:text-purple-400 transition-colors"
+                                        >
+                                            Интеграции {getSortIcon('total_integrations')}
+                                        </button>
+                                    </th>
+                                    <th className="text-left p-3">Whitelist</th>
+                                    <th className="text-left p-3">Роль</th>
+                                    <th className="text-left p-3">Статус</th>
+                                    <th className="text-left p-3">
+                                        <button 
+                                            onClick={() => handleSort('created_at')}
+                                            className="flex items-center gap-2 hover:text-purple-400 transition-colors"
+                                        >
+                                            Создан {getSortIcon('created_at')}
+                                        </button>
+                                    </th>
+                                    <th className="text-left p-3">Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredAndSortedUsers.map((user) => {
+                                    const sessionsArray = Array.isArray(sessions) ? sessions : [];
+                                    const hasActiveSession = sessionsArray.some(session => 
+                                session.user_id === user.id && 
+                                session.session_type === 'active_user'
+                            );
                             
                             return (
-                                <Card key={user.id} className={`${user.is_blocked ? 'border-red-500/50 bg-red-900/20' : 'border-slate-700'} transition-all duration-200 hover:border-purple-500/50`}>
-                                    <CardContent className="p-6">
-                                        {/* Основная информация */}
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center space-x-4">
+                                        <tr key={user.id} className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors">
+                                            <td className="p-3">
+                                                <span className="font-mono text-sm">#{user.id}</span>
+                                            </td>
+                                            <td className="p-3">
+                                                <div className="flex items-center gap-3">
                                                 <div className="flex-shrink-0">
-                                                    {user.is_admin ? (
-                                                        <Shield className="w-8 h-8 text-purple-500" />
-                                                    ) : (
-                                                        <Users className="w-8 h-8 text-gray-500" />
+                                                        <Shield className="w-5 h-5 text-purple-400" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-semibold">User_{user.id}</div>
+                                                        <div className="text-sm text-slate-400">
+                                                            {user.twitch_username && `@${user.twitch_username}`}
+                                                            {user.twitch_username && user.vk_username && ' • '}
+                                                            {user.vk_username && `@${user.vk_username}`}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="p-3">
+                                                <div className="flex items-center gap-2">
+                                                    {user.integrations?.twitch?.connected && (
+                                                        <div className="flex items-center gap-1" title="Twitch подключен">
+                                                            <Twitch className="w-4 h-4 text-purple-400" />
+                                                        </div>
+                                                    )}
+                                                    {user.integrations?.vk?.connected && (
+                                                        <div className="flex items-center gap-1" title="VK Live подключен">
+                                                            <MessageCircle className="w-4 h-4 text-blue-400" />
+                                                        </div>
+                                                    )}
+                                                    {user.total_integrations === 0 && (
+                                                        <span className="text-slate-500 text-sm">Нет подключений</span>
                                                     )}
                                                 </div>
-                                                <div className="flex-1">
-                                                    <div className="flex items-center space-x-3">
-                                                        <h3 className="text-lg font-semibold flex items-center space-x-2">
-                                                            <span>User_{user.id}</span>
-                                                            {user.is_admin && (
-                                                                <Badge variant="default" className="bg-purple-600">Админ</Badge>
-                                                            )}
-                                                            {user.is_blocked && (
-                                                                <Badge variant="destructive">Заблокирован</Badge>
-                                                            )}
-                                                            {isActive && (
-                                                                <Badge variant="outline" className="border-green-500 text-green-400">
-                                                                    <Wifi className="w-3 h-3 mr-1" />
+                                            </td>
+                                            <td className="p-3">
+                                                {user.is_whitelisted ? (
+                                                    <Badge variant="outline" className="text-green-600 border-green-600">
+                                                        <CheckCircle className="w-3 h-3 mr-1" />
+                                                        В whitelist
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="outline" className="text-slate-500 border-slate-500">
+                                                        <XCircle className="w-3 h-3 mr-1" />
+                                                        Не в whitelist
+                                                    </Badge>
+                                                )}
+                                            </td>
+                                            <td className="p-3">
+                                                {user.is_admin ? (
+                                                    <Badge variant="outline" className="text-purple-600 border-purple-600">
+                                                        <Shield className="w-3 h-3 mr-1" />
+                                                        Админ
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="outline" className="text-slate-500 border-slate-500">
+                                                        Пользователь
+                                                    </Badge>
+                                                )}
+                                            </td>
+                                            <td className="p-3">
+                                                <div className="flex items-center gap-2">
+                                                    {user.is_blocked ? (
+                                                        <Badge variant="outline" className="text-red-600 border-red-600">
+                                                            <Ban className="w-3 h-3 mr-1" />
+                                                            Заблокирован
+                                                        </Badge>
+                                                    ) : (
+                                                        <Badge variant="outline" className="text-green-600 border-green-600">
+                                                            <CheckCircle className="w-3 h-3 mr-1" />
                                                                     Активен
                                                                 </Badge>
                                                             )}
-                                                        </h3>
-                                                    </div>
-                                                    <p className="text-sm text-gray-400 mt-1">
-                                                        ID: {user.id} • Создан: {formatDate(user.created_at)}
-                                                    </p>
-                                                    {user.is_blocked && (
-                                                        <p className="text-sm text-red-400 mt-1">
-                                                            Причина: {user.blocked_reason || 'Не указана'} • 
-                                                            Заблокирован: {formatDate(user.blocked_at)}
-                                                        </p>
+                                                    {hasActiveSession && (
+                                                        <Badge variant="outline" className="text-blue-600 border-blue-600">
+                                                            <Wifi className="w-3 h-3 mr-1" />
+                                                            Онлайн
+                                                        </Badge>
                                                     )}
                                                 </div>
-                                            </div>
-                                            
-                                            <div className="flex items-center space-x-2">
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => toggleUserExpansion(user.id)}
-                                                >
-                                                    {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                                                </Button>
-                                                
-                                                <div className="flex items-center space-x-1">
-                                                    {user.is_blocked ? (
+                                            </td>
+                                            <td className="p-3">
+                                                <span className="text-sm text-slate-400">
+                                                    {formatDate(user.created_at)}
+                                                </span>
+                                            </td>
+                                            <td className="p-3">
+                                                <div className="flex items-center gap-2">
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
-                                                            onClick={() => unblockUser(user.id)}
-                                                            className="text-green-400 border-green-500 hover:bg-green-500/20"
+                                                        onClick={() => openEditDialog(user)}
                                                         >
-                                                            <Unlock className="w-4 h-4 mr-1" />
-                                                            Разблокировать
+                                                        <Edit className="w-3 h-3" />
                                                         </Button>
-                                                    ) : (
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
                                                             onClick={() => openBlockDialog(user)}
-                                                            className="text-red-400 border-red-500 hover:bg-red-500/20"
+                                                        className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
                                                         >
-                                                            <Ban className="w-4 h-4 mr-1" />
-                                                            Заблокировать
+                                                        <Ban className="w-3 h-3" />
                                                         </Button>
-                                                    )}
-                                                    
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
-                                                        onClick={() => openEditDialog(user)}
-                                                        className="text-blue-400 border-blue-500 hover:bg-blue-500/20"
+                                                        onClick={() => handleDeleteUser(user.id)}
+                                                        className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
                                                     >
-                                                        <Edit className="w-4 h-4 mr-1" />
-                                                        Редактировать
-                                                    </Button>
-                                                    
-                                                    <Button
-                                                        size="sm"
-                                                        variant="destructive"
-                                                        onClick={() => deleteUser(user.id)}
-                                                    >
-                                                        <Trash2 className="w-4 h-4 mr-1" />
-                                                        Удалить
+                                                        <Trash2 className="w-3 h-3" />
                                                     </Button>
                                                 </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Развернутая информация */}
-                                        {isExpanded && (
-                                            <div className="mt-6 pt-6 border-t border-slate-700">
-                                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                                    {/* Активные сессии */}
-                                                    <div>
-                                                        <h4 className="text-sm font-medium text-gray-300 mb-3 flex items-center">
-                                                            <Activity className="w-4 h-4 mr-2" />
-                                                            Активные сессии ({userSessions.length})
-                                                        </h4>
-                                                        {userSessions.length > 0 ? (
-                                                            <div className="space-y-2">
-                                                                {userSessions.map((session, index) => (
-                                                                    <div key={index} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
-                                                                        <div className="flex items-center space-x-3">
-                                                                            {session.platform === 'twitch' && <Tv className="w-4 h-4 text-purple-400" />}
-                                                                            {session.platform === 'vk' && <Globe className="w-4 h-4 text-blue-400" />}
-                                                                            {session.platform === 'youtube' && <Youtube className="w-4 h-4 text-red-400" />}
-                                                                            <div>
-                                                                                <p className="text-sm font-medium">
-                                                                                    {session.platform === 'twitch' && 'Twitch'}
-                                                                                    {session.platform === 'vk' && 'VK Live'}
-                                                                                    {session.platform === 'youtube' && 'YouTube'}
-                                                                                </p>
-                                                                                <p className="text-xs text-gray-400">
-                                                                                    Подключен: {formatDate(session.connected_at)}
-                                                                                </p>
-                                                                            </div>
-                                                                        </div>
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            onClick={() => {
-                                                                                // TODO: Завершить сессию
-                                                                                toast.info('Функция завершения сессии будет добавлена');
-                                                                            }}
-                                                                            className="text-red-400 border-red-500 hover:bg-red-500/20"
-                                                                        >
-                                                                            <WifiOff className="w-3 h-3 mr-1" />
-                                                                            Завершить
-                                                                        </Button>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        ) : (
-                                                            <p className="text-sm text-gray-500 italic">Нет активных сессий</p>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Интеграции */}
-                                                    <div>
-                                                        <h4 className="text-sm font-medium text-gray-300 mb-3 flex items-center">
-                                                            <Settings className="w-4 h-4 mr-2" />
-                                                            Интеграции ({userIntegrations.length})
-                                                        </h4>
-                                                        {userIntegrations.length > 0 ? (
-                                                            <div className="space-y-2">
-                                                                {userIntegrations.map((integration, index) => (
-                                                                    <div key={index} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
-                                                                        <div className="flex items-center space-x-3">
-                                                                            {integration.platform === 'twitch' && <Tv className="w-4 h-4 text-purple-400" />}
-                                                                            {integration.platform === 'vk' && <Globe className="w-4 h-4 text-blue-400" />}
-                                                                            {integration.platform === 'youtube' && <Youtube className="w-4 h-4 text-red-400" />}
-                                                                            <div>
-                                                                                <p className="text-sm font-medium">
-                                                                                    {integration.platform === 'twitch' && 'Twitch'}
-                                                                                    {integration.platform === 'vk' && 'VK Live'}
-                                                                                    {integration.platform === 'youtube' && 'YouTube'}
-                                                                                </p>
-                                                                                <p className="text-xs text-gray-400">
-                                                                                    {integration.is_active ? 'Активна' : 'Неактивна'}
-                                                                                </p>
-                                                                            </div>
-                                                                        </div>
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            onClick={() => {
-                                                                                // TODO: Управление интеграцией
-                                                                                toast.info('Функция управления интеграциями будет добавлена');
-                                                                            }}
-                                                                            className="text-blue-400 border-blue-500 hover:bg-blue-500/20"
-                                                                        >
-                                                                            <Settings className="w-3 h-3 mr-1" />
-                                                                            Управление
-                                                                        </Button>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        ) : (
-                                                            <p className="text-sm text-gray-500 italic">Нет подключенных интеграций</p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
+                                            </td>
+                                        </tr>
                             );
                         })}
-                    </div>
-                </>
-            ) : (
-                <>
-                    {/* Статистика сессий */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                        <Card className="bg-slate-800/50 border-slate-700">
-                            <CardContent className="p-6">
-                                <div className="flex items-center">
-                                    <div className="p-3 bg-green-600/20 rounded-lg">
-                                        <Users className="w-6 h-6 text-green-400" />
-                                    </div>
-                                    <div className="ml-4">
-                                        <p className="text-sm text-slate-400">Активные сессии</p>
-                                        <p className="text-2xl font-bold text-white">
-                                            {sessions.filter(s => s.session_type === 'active_user').length}
-                                        </p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card className="bg-slate-800/50 border-slate-700">
-                            <CardContent className="p-6">
-                                <div className="flex items-center">
-                                    <div className="p-3 bg-blue-600/20 rounded-lg">
-                                        <Monitor className="w-6 h-6 text-blue-400" />
-                                    </div>
-                                    <div className="ml-4">
-                                        <p className="text-sm text-slate-400">Всего сессий</p>
-                                        <p className="text-2xl font-bold text-white">{sessions.length}</p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card className="bg-slate-800/50 border-slate-700">
-                            <CardContent className="p-6">
-                                <div className="flex items-center">
-                                    <div className="p-3 bg-purple-600/20 rounded-lg">
-                                        <Clock className="w-6 h-6 text-purple-400" />
-                                    </div>
-                                    <div className="ml-4">
-                                        <p className="text-sm text-slate-400">Неактивные</p>
-                                        <p className="text-2xl font-bold text-white">
-                                            {sessions.filter(s => s.session_type === 'pending_verification').length}
-                                        </p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Список сессий */}
-                    <div className="space-y-4">
-                        {sessionsLoading ? (
-                            <div className="flex items-center justify-center h-32">
-                                <RefreshCw className="h-8 w-8 animate-spin text-purple-500" />
-                                <span className="ml-2 text-lg">Загрузка сессий...</span>
+                            </tbody>
+                        </table>
+                        
+                        {filteredAndSortedUsers.length === 0 && (
+                            <div className="text-center py-8">
+                                <Users className="w-12 h-12 mx-auto mb-4 text-slate-500" />
+                                <p className="text-slate-400">Пользователи не найдены</p>
                             </div>
-                        ) : sessions.length === 0 ? (
-                            <Card className="bg-slate-800/50 border-slate-700">
-                                <CardContent className="p-8 text-center">
-                                    <AlertCircle className="w-12 h-12 mx-auto mb-4 text-slate-500" />
-                                    <p className="text-lg font-medium mb-2 text-white">Нет активных сессий</p>
-                                    <p className="text-sm text-slate-400">Активные сессии будут отображаться здесь</p>
-                                </CardContent>
-                            </Card>
-                        ) : (
-                            sessions.map((session) => (
-                                <Card key={session.user_id || session.channel} className="bg-slate-800/50 border-slate-700">
-                                    <CardContent className="p-6">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex-1">
-                                                <div className="flex items-center space-x-3 mb-2">
-                                                    <Users className="w-4 h-4 text-green-500" />
-                                                    <span className="font-medium text-white">
-                                                        {session.channel || `User_${session.user_id}`}
-                                                    </span>
-                                                    {session.is_admin && (
-                                                        <Badge variant="outline" className="text-purple-600 border-purple-200">
-                                                            Админ
-                                                        </Badge>
-                                                    )}
-                                                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
-                                                        Активна
-                                                    </Badge>
-                                                </div>
-                                                <div className="flex items-center space-x-4 text-xs text-slate-400">
-                                                    <span>ID: {session.user_id || session.channel}</span>
-                                                    <span>Создана: {new Date(session.created_at).toLocaleString('ru-RU')}</span>
-                                                    <span>Активность: {formatLastActivity(session.last_activity)}</span>
-                                                </div>
-                                                
-                                                {/* Twitch каналы */}
-                                                {session.twitch_channels && session.twitch_channels.length > 0 && (
-                                                    <div className="mt-3 space-y-2">
-                                                        <div className="text-xs font-medium text-purple-300 flex items-center">
-                                                            <span className="w-2 h-2 bg-purple-500 rounded-full mr-2"></span>
-                                                            Twitch каналы:
-                                                        </div>
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {session.twitch_channels.map((channel, idx) => (
-                                                                <Badge key={idx} variant="outline" className="text-xs bg-purple-900/20 border-purple-500/30 text-purple-300">
-                                                                    {channel.display_name || channel.channel_name}
-                                                                    {channel.is_live && (
-                                                                        <span className="ml-1 w-1.5 h-1.5 bg-red-500 rounded-full inline-block"></span>
-                                                                    )}
-                                                                </Badge>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                
-                                                {/* VK каналы */}
-                                                {session.vk_channels && session.vk_channels.length > 0 && (
-                                                    <div className="mt-3 space-y-2">
-                                                        <div className="text-xs font-medium text-blue-300 flex items-center">
-                                                            <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                                                            VK Live каналы:
-                                                        </div>
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {session.vk_channels.map((channel, idx) => (
-                                                                <Badge key={idx} variant="outline" className="text-xs bg-blue-900/20 border-blue-500/30 text-blue-300">
-                                                                    {channel.display_name || channel.channel_name}
-                                                                    {channel.is_live && (
-                                                                        <span className="ml-1 w-1.5 h-1.5 bg-red-500 rounded-full inline-block"></span>
-                                                                    )}
-                                                                </Badge>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => terminateSession(session)}
-                                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                            >
-                                                <Trash2 className="w-4 h-4 mr-1" />
-                                                Завершить
-                                            </Button>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ))
                         )}
                     </div>
-                </>
-            )}
+                </CardContent>
+            </Card>
 
             {/* Диалог редактирования */}
             <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Редактировать пользователя</DialogTitle>
+                        <DialogTitle>Редактирование пользователя</DialogTitle>
+                        <DialogDescription>
+                            Измените настройки пользователя
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
-                        <div>
-                            <Label>ID пользователя: {currentUser?.id}</Label>
-                        </div>
                         <div className="flex items-center space-x-2">
-                            <input
-                                type="checkbox"
-                                id="edit_is_admin"
+                            <Checkbox
+                                id="is_admin"
                                 checked={editForm.is_admin}
-                                onChange={(e) => setEditForm({...editForm, is_admin: e.target.checked})}
+                                onCheckedChange={(checked) => setEditForm({ ...editForm, is_admin: checked })}
                             />
-                            <Label htmlFor="edit_is_admin">Администратор</Label>
+                            <Label htmlFor="is_admin">Администратор</Label>
                         </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
                             Отмена
                         </Button>
-                        <Button onClick={updateUser}>
+                        <Button onClick={handleEditUser}>
                             Сохранить
                         </Button>
                     </DialogFooter>
@@ -880,20 +673,20 @@ const UserManagementPage = () => {
             <Dialog open={blockDialogOpen} onOpenChange={setBlockDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Заблокировать пользователя</DialogTitle>
+                        <DialogTitle>Блокировка пользователя</DialogTitle>
+                        <DialogDescription>
+                            Заблокировать пользователя с указанием причины
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
-                        <p className="text-sm text-gray-600">
-                            Заблокировать пользователя <strong>User_{currentUser?.id}</strong>?
-                        </p>
                         <div>
-                            <Label htmlFor="block_reason">Причина блокировки</Label>
+                            <Label htmlFor="reason">Причина блокировки</Label>
                             <Textarea
-                                id="block_reason"
+                                id="reason"
                                 value={blockForm.reason}
-                                onChange={(e) => setBlockForm({...blockForm, reason: e.target.value})}
+                                onChange={(e) => setBlockForm({ ...blockForm, reason: e.target.value })}
                                 placeholder="Укажите причину блокировки..."
-                                rows={3}
+                                className="mt-1"
                             />
                         </div>
                     </div>
@@ -901,7 +694,10 @@ const UserManagementPage = () => {
                         <Button variant="outline" onClick={() => setBlockDialogOpen(false)}>
                             Отмена
                         </Button>
-                        <Button variant="destructive" onClick={blockUser}>
+                        <Button 
+                            onClick={handleBlockUser}
+                            className="bg-red-600 hover:bg-red-700"
+                        >
                             Заблокировать
                         </Button>
                     </DialogFooter>

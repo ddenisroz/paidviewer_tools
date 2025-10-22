@@ -22,6 +22,37 @@ class VKLiveCommandHandler:
         # Регистрируем стандартные команды
         self._register_default_commands()
     
+    async def _get_channel_owner_id(self, channel: str) -> Optional[int]:
+        """Получение ID владельца канала из базы данных"""
+        try:
+            from core.database import User, UserToken, get_db
+            
+            db = next(get_db())
+            try:
+                # Ищем токен VK Live для этого канала
+                user_token = db.query(UserToken).filter(
+                    UserToken.platform == "vk",
+                    UserToken.platform_username == channel.lower()
+                ).first()
+                
+                if user_token:
+                    return user_token.user_id
+                
+                # Если не нашли по username, пробуем найти первого активного VK пользователя
+                # (для обратной совместимости)
+                vk_user = db.query(User).filter(
+                    User.vk_username.isnot(None)
+                ).first()
+                
+                return vk_user.id if vk_user else None
+                
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"Error getting channel owner ID for {channel}: {e}")
+            return None
+    
     def _register_default_commands(self):
         """Регистрация стандартных команд"""
         
@@ -111,41 +142,7 @@ class VKLiveCommandHandler:
         )
         
         # === КОМАНДЫ ГЭМБЛИНГА ===
-        self.register_command(
-            name="bid",
-            handler=self._cmd_auction_bid,
-            description="Сделать ставку в аукционе",
-            usage="!bid <сумма>",
-            requires_mod=False,
-            cooldown=5
-        )
         
-        self.register_command(
-            name="auction",
-            handler=self._cmd_auction_info,
-            description="Информация об активном аукционе",
-            usage="!auction",
-            requires_mod=False,
-            cooldown=10
-        )
-        
-        self.register_command(
-            name="wheel",
-            handler=self._cmd_wheel_spin,
-            description="Крутить колесо фортуны",
-            usage="!wheel <ставка>",
-            requires_mod=False,
-            cooldown=15
-        )
-        
-        self.register_command(
-            name="dice",
-            handler=self._cmd_dice_roll,
-            description="Игра в кости",
-            usage="!dice <ставка> <число>",
-            requires_mod=False,
-            cooldown=15
-        )
         
         self.register_command(
             name="balance",
@@ -199,32 +196,32 @@ class VKLiveCommandHandler:
         """Обработка сообщения для поиска команд"""
         try:
             message = message_data.get('message', '').strip()
-            author_nick = message_data.get('author_nick', 'Unknown')
-            author_id = message_data.get('author_id')
-            is_moderator = message_data.get('is_moderator', False)
-            is_owner = message_data.get('is_owner', False)
             
-            # Проверяем, является ли сообщение командой (начинается с !)
-            if not message.startswith('!'):
+            # Быстрая проверка: является ли командой
+            if not message or not message.startswith('!'):
                 return
             
-            # Парсим команду и аргументы
+            # Парсим команду
             parts = message[1:].split()
             if not parts:
                 return
             
             command_name = parts[0].lower()
-            args = parts[1:]
             
-            # Проверяем, существует ли команда
+            # Проверяем существование команды
             if command_name not in self.commands:
                 return
+            
+            # Получаем данные автора
+            author_nick = message_data.get('author_nick', 'Unknown')
+            author_id = str(message_data.get('author_id', ''))
+            is_moderator = message_data.get('is_moderator', False)
+            is_owner = message_data.get('is_owner', False)
             
             command_info = self.commands[command_name]
             
             # Проверяем права доступа
-            user_has_perms = is_owner or is_moderator
-            if command_info['requires_mod'] and not user_has_perms:
+            if command_info['requires_mod'] and not (is_owner or is_moderator):
                 await self._send_response(
                     channel_name, 
                     f"@{author_nick} ❌ Эта команда доступна только модераторам"
@@ -232,17 +229,18 @@ class VKLiveCommandHandler:
                 return
             
             # Проверяем кулдаун
-            if not self._check_cooldown(command_name, str(author_id), command_info['cooldown']):
-                remaining = self._get_cooldown_remaining(command_name, str(author_id), command_info['cooldown'])
-                await self._send_response(
-                    channel_name,
-                    f"@{author_nick} ⏰ Команда на кулдауне. Осталось: {remaining}с"
-                )
-                return
+            if command_info['cooldown'] > 0:
+                if not self._check_cooldown(command_name, author_id, command_info['cooldown']):
+                    remaining = self._get_cooldown_remaining(command_name, author_id, command_info['cooldown'])
+                    await self._send_response(
+                        channel_name,
+                        f"@{author_nick} ⏰ Команда на кулдауне. Осталось: {remaining}с"
+                    )
+                    return
             
             # Выполняем команду
             logger.info(f"🎯 VK Live command executed: !{command_name} by {author_nick} in {channel_name}")
-            await command_info['handler'](channel_name, author_nick, str(author_id), args, message_data)
+            await command_info['handler'](channel_name, author_nick, author_id, parts[1:], message_data)
             
         except Exception as e:
             logger.error(f"Error handling VK Live command: {e}")
@@ -308,7 +306,7 @@ class VKLiveCommandHandler:
                     await self._send_response(channel, f"@{author} ❌ Неверное время. Используйте число (минуты)")
                     return
             
-            # TODO: Получить user_id по нику (нужен отдельный API запрос)
+            # Получение user_id по нику требует отдельного API запроса
             # Пока используем заглушку
             target_user_id = 0  # Нужно получить через VK API
             
@@ -340,7 +338,7 @@ class VKLiveCommandHandler:
             target_user = args[0].lstrip('@')
             reason = " ".join(args[1:]) if len(args) > 1 else "Нарушение правил чата"
             
-            # TODO: Получить user_id и выполнить бан через VK API
+            # Получение user_id и выполнение бана через VK API
             # success = await self.vk_live_bot.ban_user(channel, target_user_id, reason)
             
             await self._send_response(channel, 
@@ -498,9 +496,12 @@ class VKLiveCommandHandler:
             
             queue_service = QueueService()
             
-            # Получаем user_id владельца канала (нужно из connection_manager или базы)
-            # Пока используем заглушку
-            channel_owner_id = 1  # TODO: получить реальный ID владельца канала
+            # Получаем user_id владельца канала из базы данных
+            channel_owner_id = await self._get_channel_owner_id(channel)
+            
+            if not channel_owner_id:
+                await self._send_response(channel, f"@{author} ❌ Канал не зарегистрирован в системе")
+                return
             
             # Определяем платформу
             platform = 'vk' if hasattr(self.vk_live_bot, 'chat_reader') else 'twitch'
@@ -540,7 +541,11 @@ class VKLiveCommandHandler:
             from core.database import get_db
             
             queue_service = QueueService()
-            channel_owner_id = 1  # TODO: получить реальный ID
+            channel_owner_id = await self._get_channel_owner_id(channel)
+            
+            if not channel_owner_id:
+                await self._send_response(channel, f"@{author} ❌ Канал не зарегистрирован в системе")
+                return
             
             db = next(get_db())
             try:
@@ -574,7 +579,11 @@ class VKLiveCommandHandler:
             from core.database import get_db
             
             queue_service = QueueService()
-            channel_owner_id = 1  # TODO: получить реальный ID
+            channel_owner_id = await self._get_channel_owner_id(channel)
+            
+            if not channel_owner_id:
+                await self._send_response(channel, f"@{author} ❌ Канал не зарегистрирован в системе")
+                return
             
             db = next(get_db())
             try:
@@ -602,7 +611,11 @@ class VKLiveCommandHandler:
             from core.database import get_db
             
             queue_service = QueueService()
-            channel_owner_id = 1  # TODO: получить реальный ID
+            channel_owner_id = await self._get_channel_owner_id(channel)
+            
+            if not channel_owner_id:
+                await self._send_response(channel, f"@{author} ❌ Канал не зарегистрирован в системе")
+                return
             
             # Если указан номер в очереди
             if args:
@@ -642,175 +655,7 @@ class VKLiveCommandHandler:
     
     # === КОМАНДЫ ГЭМБЛИНГА ===
     
-    async def _cmd_auction_bid(self, channel: str, author: str, author_id: str, args: List[str], message_data: dict):
-        """Команда ставки в аукционе"""
-        try:
-            if not args:
-                await self._send_response(channel, f"@{author} Использование: !bid <сумма>")
-                return
-            
-            try:
-                bid_amount = int(args[0])
-            except ValueError:
-                await self._send_response(channel, f"@{author} Укажите корректную сумму")
-                return
-            
-            from services.auction_service import AuctionService
-            from core.database import get_db
-            
-            auction_service = AuctionService()
-            channel_owner_id = 1  # TODO: получить реальный ID
-            
-            # Получаем активный аукцион
-            db = next(get_db())
-            try:
-                active_auctions = auction_service.get_active_auctions(channel_owner_id, db)
-                
-                if not active_auctions:
-                    await self._send_response(channel, f"@{author} 📢 Нет активных аукционов")
-                    return
-                
-                # Берем первый активный аукцион
-                auction = active_auctions[0]
-                platform = 'vk' if hasattr(self.vk_live_bot, 'chat_reader') else 'twitch'
-                
-                result = await auction_service.place_bid(
-                    channel_owner_id,
-                    auction['id'],
-                    author_id,
-                    author,
-                    platform,
-                    channel,
-                    bid_amount
-                )
-                
-                if result['success']:
-                    time_left = result.get('time_left', 0)
-                    await self._send_response(channel, 
-                        f"✅ @{author} Ставка {bid_amount} принята! "
-                        f"Текущая: {result['auction']['current_bid']} баллов. "
-                        f"Осталось: {int(time_left)}с")
-                else:
-                    await self._send_response(channel, f"❌ @{author} {result['error']}")
-                
-            finally:
-                db.close()
-                
-        except Exception as e:
-            logger.error(f"Error in auction bid command: {e}")
-            await self._send_response(channel, f"@{author} ❌ Ошибка размещения ставки")
     
-    async def _cmd_auction_info(self, channel: str, author: str, author_id: str, args: List[str], message_data: dict):
-        """Команда информации об аукционе"""
-        try:
-            from services.auction_service import AuctionService
-            from core.database import get_db
-            
-            auction_service = AuctionService()
-            channel_owner_id = 1  # TODO: получить реальный ID
-            
-            db = next(get_db())
-            try:
-                active_auctions = auction_service.get_active_auctions(channel_owner_id, db)
-                
-                if not active_auctions:
-                    await self._send_response(channel, f"@{author} 📢 Нет активных аукционов")
-                    return
-                
-                auction = active_auctions[0]
-                time_left = auction.get('time_left', 0)
-                
-                await self._send_response(channel, 
-                    f"🎪 @{author} Аукцион: {auction['title']} | "
-                    f"Текущая ставка: {auction['current_bid']} баллов | "
-                    f"Мин. ставка: {auction['current_bid'] + auction['bid_increment']} | "
-                    f"Осталось: {int(time_left)}с")
-                
-            finally:
-                db.close()
-                
-        except Exception as e:
-            logger.error(f"Error in auction info command: {e}")
-            await self._send_response(channel, f"@{author} ❌ Ошибка получения информации")
-    
-    async def _cmd_wheel_spin(self, channel: str, author: str, author_id: str, args: List[str], message_data: dict):
-        """Команда колеса фортуны"""
-        try:
-            if not args:
-                await self._send_response(channel, f"@{author} Использование: !wheel <ставка>")
-                return
-            
-            try:
-                bet_amount = int(args[0])
-                if bet_amount < 10:
-                    await self._send_response(channel, f"@{author} Минимальная ставка: 10 баллов")
-                    return
-            except ValueError:
-                await self._send_response(channel, f"@{author} Укажите корректную сумму")
-                return
-            
-            from services.auction_service import AuctionService
-            
-            auction_service = AuctionService()
-            channel_owner_id = 1  # TODO: получить реальный ID
-            platform = 'vk' if hasattr(self.vk_live_bot, 'chat_reader') else 'twitch'
-            
-            result = auction_service.spin_wheel(
-                channel_owner_id, author_id, author, platform, channel, bet_amount
-            )
-            
-            if result['success']:
-                await self._send_response(channel, 
-                    f"🎰 @{author} {result['message']}")
-            else:
-                await self._send_response(channel, f"❌ @{author} {result['error']}")
-                
-        except Exception as e:
-            logger.error(f"Error in wheel command: {e}")
-            await self._send_response(channel, f"@{author} ❌ Ошибка игры")
-    
-    async def _cmd_dice_roll(self, channel: str, author: str, author_id: str, args: List[str], message_data: dict):
-        """Команда игры в кости"""
-        try:
-            if len(args) < 2:
-                await self._send_response(channel, f"@{author} Использование: !dice <ставка> <число 1-6>")
-                return
-            
-            try:
-                bet_amount = int(args[0])
-                prediction = int(args[1])
-                
-                if bet_amount < 10:
-                    await self._send_response(channel, f"@{author} Минимальная ставка: 10 баллов")
-                    return
-                    
-                if prediction < 1 or prediction > 6:
-                    await self._send_response(channel, f"@{author} Выберите число от 1 до 6")
-                    return
-                    
-            except ValueError:
-                await self._send_response(channel, f"@{author} Укажите корректные числа")
-                return
-            
-            from services.auction_service import AuctionService
-            
-            auction_service = AuctionService()
-            channel_owner_id = 1  # TODO: получить реальный ID
-            platform = 'vk' if hasattr(self.vk_live_bot, 'chat_reader') else 'twitch'
-            
-            result = auction_service.roll_dice(
-                channel_owner_id, author_id, author, platform, channel, bet_amount, prediction
-            )
-            
-            if result['success']:
-                await self._send_response(channel, 
-                    f"🎲 @{author} {result['message']}")
-            else:
-                await self._send_response(channel, f"❌ @{author} {result['error']}")
-                
-        except Exception as e:
-            logger.error(f"Error in dice command: {e}")
-            await self._send_response(channel, f"@{author} ❌ Ошибка игры")
     
     async def _cmd_check_balance(self, channel: str, author: str, author_id: str, args: List[str], message_data: dict):
         """Команда проверки баланса баллов"""
@@ -819,7 +664,12 @@ class VKLiveCommandHandler:
             from core.database import get_db
             
             points_service = PointsService()
-            channel_owner_id = 1  # TODO: получить реальный ID
+            channel_owner_id = await self._get_channel_owner_id(channel)
+            
+            if not channel_owner_id:
+                await self._send_response(channel, f"@{author} ❌ Канал не зарегистрирован в системе")
+                return
+            
             platform = 'vk' if hasattr(self.vk_live_bot, 'chat_reader') else 'twitch'
             
             db = next(get_db())

@@ -122,3 +122,20 @@ export function getSimilarCategories(categoryName, fromPlatform, targetCategorie
         .map(id => similar.find(cat => cat.id === id))
         .slice(0, 5); // Максимум 5 похожих
 }
+
+// Legacy экспорты для обратной совместимости (если где-то используются)
+export const CATEGORY_MAPPING = categoryMapping;
+
+export const CATEGORY_ICONS = {
+  'just-chatting': '💬',
+  'music': '🎵',
+  'gaming': '🎮',
+  'art': '🎨',
+  'sports': '⚽',
+  'science-tech': '🔬',
+  'asmr': '🎧',
+  'cooking': '👨‍🍳',
+  'travel': '✈️',
+  'education': '📚',
+  'other': '📺'
+};

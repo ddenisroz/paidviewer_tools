@@ -1,5 +1,5 @@
 // src/components/ChatCard.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +15,9 @@ import {
     Twitch,
     MessageCircle,
     Copy,
-    Download
+    RefreshCw,
+    Eye,
+    ExternalLink
 } from 'lucide-react';
 import { VKIcon } from './PlatformIcons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -24,17 +26,44 @@ import { toast } from 'sonner';
 import { useChat } from '../context/ChatContext';
 import { useAuth } from '../context/AuthContext';
 import ChatContextMenu from './ChatContextMenu';
+import SwipeableMessage from './chat/SwipeableMessage';
 import { microservicesAPI } from '../services/microservices';
 import { getAllEmotesForChannel } from '../utils/emotes';
 import MessageContent from './MessageContent';
 
-const ChatCard = ({ integrations }) => {
-    const { user } = useAuth();
-    const { messages: chatMessages, isConnected } = useChat();
+const ChatCard = ({ integrations, isOnHomePage = true }) => {
+    const { user, isGuest } = useAuth();
+    const { messages: chatMessages, isConnected, setMessages } = useChat();
     
-    const [twitchChatEnabled, setTwitchChatEnabled] = useState(false);
-    const [vkChatEnabled, setVkChatEnabled] = useState(false);
-    const [combinedChat, setCombinedChat] = useState(false);
+    // Автоматическое включение при наличии интеграций
+    const [twitchChatVisible, setTwitchChatVisible] = useState(() => {
+        // Загружаем из localStorage или используем дефолт true
+        const saved = localStorage.getItem('chatFilter_twitch');
+        return saved !== null ? saved === 'true' : true;
+    });
+    const [vkChatVisible, setVkChatVisible] = useState(() => {
+        // Загружаем из localStorage или используем дефолт true
+        const saved = localStorage.getItem('chatFilter_vk');
+        return saved !== null ? saved === 'true' : true;
+    });
+    
+    // Чат включен автоматически, если есть хотя бы одна интеграция или если это гость
+    let twitchEnabled, vkEnabled;
+    if (isGuest) {
+        // Для гостей показываем чат только той платформы, к которой подключен гость
+        twitchEnabled = user?.platform === 'twitch';
+        vkEnabled = user?.platform === 'vk';
+    } else {
+        // Для обычных пользователей используем интеграции
+        twitchEnabled = integrations?.twitch?.enabled;
+        vkEnabled = integrations?.vk?.enabled;
+    }
+    
+    const twitchChatEnabled = twitchEnabled && isOnHomePage;
+    const vkChatEnabled = vkEnabled && isOnHomePage;
+    
+    // Автоматическое объединение: если включены обе платформы, то показываем объединенный чат
+    const combinedChat = twitchChatEnabled && vkChatEnabled;
     const [showObsSettings, setShowObsSettings] = useState(false);
     const messagesEndRef = useRef(null);
     
@@ -96,23 +125,33 @@ const ChatCard = ({ integrations }) => {
         }
     });
 
-    const twitchEnabled = integrations?.twitch?.enabled;
-    const vkEnabled = integrations?.vk?.enabled;
+    // Сохраняем настройки фильтров в localStorage
+    useEffect(() => {
+        localStorage.setItem('chatFilter_twitch', twitchChatVisible.toString());
+    }, [twitchChatVisible]);
+    
+    useEffect(() => {
+        localStorage.setItem('chatFilter_vk', vkChatVisible.toString());
+    }, [vkChatVisible]);
 
-    // Фильтруем сообщения по настройкам виджета
-    const filteredMessages = chatMessages.filter(msg => {
-        const platformFilter = obsSettings.platformFilter || 'combined';
-        
-        switch (platformFilter) {
-            case 'twitch':
-                return msg.platform === 'twitch';
-            case 'vk':
-                return msg.platform === 'vk';
-            case 'combined':
-            default:
-                return true;
+    // Фильтруем сообщения по включенным платформам и видимости
+    const filteredMessages = useMemo(() => {
+        // Если не на главной странице - не показываем сообщения
+        if (!isOnHomePage) {
+            return [];
         }
-    }).slice(-50); // Ограничиваем последними 50 сообщениями
+        
+        return chatMessages.filter(msg => {
+            // Фильтр по платформам
+            if (msg.platform === 'twitch' && (!twitchChatEnabled || !twitchChatVisible)) {
+                return false;
+            }
+            if (msg.platform === 'vk' && (!vkChatEnabled || !vkChatVisible)) {
+                return false;
+            }
+            return true;
+        }).slice(-50); // Ограничиваем последними 50 сообщениями
+    }, [chatMessages, twitchChatEnabled, vkChatEnabled, twitchChatVisible, vkChatVisible, isOnHomePage]);
 
     // Логирование для отладки
     useEffect(() => {
@@ -120,10 +159,17 @@ const ChatCard = ({ integrations }) => {
         // 💬 ChatCard - Messages array:', chatMessages.slice(0, 3));
     }, [chatMessages, filteredMessages]);
 
-    // Автоскролл к последнему сообщению (только для отдельного окна)
+    // Автоскролл к последнему сообщению
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
+
+    // Автоматический скролл при новых сообщениях (отключен, т.к. новые сообщения вверху)
+    // useEffect(() => {
+    //     if (filteredMessages.length > 0) {
+    //         scrollToBottom();
+    //     }
+    // }, [filteredMessages.length]);
 
     // Загружаем список заблокированных пользователей TTS
     useEffect(() => {
@@ -132,17 +178,24 @@ const ChatCard = ({ integrations }) => {
         }
     }, [user]);
 
+    // Загружаем историю сообщений при монтировании
+    useEffect(() => {
+        if (user?.id && (integrations?.twitch?.enabled || integrations?.vk?.enabled)) {
+            loadChatHistory();
+        }
+    }, [user?.id, integrations?.twitch?.enabled, integrations?.vk?.enabled]);
+
     // Загружаем 7TV смайлы
     useEffect(() => {
-        if (user?.twitch_name) {
+        if (user?.twitch_username) {
             loadEmotes();
         }
-    }, [user?.twitch_name]);
+    }, [user?.twitch_username]);
 
     const loadEmotes = async () => {
         try {
-            // 🎭 Loading 7TV emotes for channel:', user.twitch_name);
-            const emotesData = await getAllEmotesForChannel(user.twitch_name);
+            // 🎭 Loading 7TV emotes for channel:', user.twitch_username);
+            const emotesData = await getAllEmotesForChannel(user.twitch_username);
             // 🎭 Loaded emotes:', emotesData);
             setEmotes(emotesData);
         } catch (error) {
@@ -169,7 +222,7 @@ const ChatCard = ({ integrations }) => {
                 <head>
                     <meta charset="UTF-8">
                     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>Чат - ${user?.twitch_name || 'Streamer'}</title>
+                    <title>Чат - ${user?.twitch_username || 'Streamer'}</title>
                     <style>
                         body {
                             margin: 0;
@@ -335,11 +388,28 @@ const ChatCard = ({ integrations }) => {
                 newWindow.chatData.emotes = emotes;
                 newWindow.chatData.isConnected = isConnected;
                 
-                messagesContainer.innerHTML = '';
-                // Используем chatMessages вместо filteredMessages для отдельного окна
-                const messagesToShow = newWindow.chatData.messages;
+                messagesContainer.textContent = '';
+                // Фильтруем сообщения для отдельного окна с учетом видимости платформ
+                const messagesToShow = newWindow.chatData.messages.filter(msg => {
+                    // Фильтр по платформам с учетом видимости
+                    if (msg.platform === 'twitch' && (!twitchChatEnabled || !twitchChatVisible)) {
+                        return false;
+                    }
+                    if (msg.platform === 'vk' && (!vkChatEnabled || !vkChatVisible)) {
+                        return false;
+                    }
+                    return true;
+                }).slice(-50); // Лимит 50 сообщений
                 if (messagesToShow.length === 0) {
-                    messagesContainer.innerHTML = '<div class="empty"><div>💬</div><div>Нет сообщений</div></div>';
+                    const emptyDiv = document.createElement('div');
+                emptyDiv.className = 'empty';
+                const iconDiv = document.createElement('div');
+                iconDiv.textContent = '💬';
+                const textDiv = document.createElement('div');
+                textDiv.textContent = 'Нет сообщений';
+                emptyDiv.appendChild(iconDiv);
+                emptyDiv.appendChild(textDiv);
+                messagesContainer.appendChild(emptyDiv);
                 } else {
                     messagesToShow.forEach(msg => {
                         const messageDiv = newWindow.document.createElement('div');
@@ -358,12 +428,33 @@ const ChatCard = ({ integrations }) => {
                         // Обрабатываем смайлы
                         const processedContent = processEmotes(content, newWindow.chatData.emotes.channelEmotes, newWindow.chatData.emotes.globalEmotes);
 
-                        messageDiv.innerHTML = `
-                            <span class="timestamp">${timestamp}</span>
-                            <span class="platform-icon">${platformIcon}</span>
-                            <span class="username" style="color: ${msg.author_color || '#ffffff'}">${username}:</span>
-                            <span class="content">${processedContent.includes('<img') ? processedContent : content}</span>
-                        `;
+                        // Создаем элементы безопасно
+                        const timestampSpan = newWindow.document.createElement('span');
+                        timestampSpan.className = 'timestamp';
+                        timestampSpan.textContent = timestamp;
+                        
+                        const platformIconSpan = newWindow.document.createElement('span');
+                        platformIconSpan.className = 'platform-icon';
+                        platformIconSpan.innerHTML = platformIcon;
+                        
+                        const usernameSpan = newWindow.document.createElement('span');
+                        usernameSpan.className = 'username';
+                        usernameSpan.style.color = msg.author_color || '#ffffff';
+                        usernameSpan.textContent = `${username}:`;
+                        
+                        const contentSpan = newWindow.document.createElement('span');
+                        contentSpan.className = 'content';
+                        // Используем innerHTML для отображения смайлов
+                        if (processedContent && processedContent.includes('<img')) {
+                            contentSpan.innerHTML = processedContent;
+                        } else {
+                            contentSpan.textContent = content;
+                        }
+                        
+                        messageDiv.appendChild(timestampSpan);
+                        messageDiv.appendChild(platformIconSpan);
+                        messageDiv.appendChild(usernameSpan);
+                        messageDiv.appendChild(contentSpan);
                         
                         // Добавляем обработчик правого клика для контекстного меню
                         messageDiv.addEventListener('contextmenu', (e) => {
@@ -455,36 +546,86 @@ const ChatCard = ({ integrations }) => {
         }
     };
 
+    const loadChatHistory = async () => {
+        try {
+            console.log('📜 [CHAT] Loading chat history...');
+            
+            const limit = 500; // Загружаем последние 500 сообщений из env
+            const historyMessages = [];
+            
+            // Загружаем историю для Twitch
+            if (twitchChatEnabled && user?.twitch_username) {
+                try {
+                    const response = await microservicesAPI.get(`/api/chat/history`, {
+                        params: {
+                            platform: 'twitch',
+                            channel: user.twitch_username,
+                            limit
+                        }
+                    });
+                    
+                    if (response.data.success && response.data.messages) {
+                        console.log(`📜 [CHAT] Loaded ${response.data.messages.length} Twitch messages`);
+                        historyMessages.push(...response.data.messages);
+                    }
+                } catch (error) {
+                    console.error('❌ Error loading Twitch history:', error);
+                }
+            }
+            
+            // Загружаем историю для VK
+            if (vkChatEnabled && user?.vk_username) {
+                try {
+                    const response = await microservicesAPI.get(`/api/chat/history`, {
+                        params: {
+                            platform: 'vk',
+                            channel: user.vk_username,
+                            limit
+                        }
+                    });
+                    
+                    if (response.data.success && response.data.messages) {
+                        console.log(`📜 [CHAT] Loaded ${response.data.messages.length} VK messages`);
+                        historyMessages.push(...response.data.messages);
+                    }
+                } catch (error) {
+                    console.error('❌ Error loading VK history:', error);
+                }
+            }
+            
+            // Устанавливаем загруженные сообщения в состояние чата
+            if (historyMessages.length > 0) {
+                // Сортируем по timestamp (старые в начале)
+                historyMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                
+                // Обновляем состояние чата историческими сообщениями
+                setMessages(historyMessages);
+                console.log(`✅ [CHAT] Loaded ${historyMessages.length} messages into chat`);
+            } else {
+                console.log('📜 [CHAT] No history messages found');
+            }
+        } catch (error) {
+            console.error('❌ Error loading chat history:', error);
+        }
+    };
+
     const loadBlockedUsers = async () => {
         try {
-            const twitchChannel = user?.twitch_name;
-            const vkChannel = user?.vk_username;
+            console.log('🔇 [CHAT] Loading muted users...');
             
-            const blockedSet = new Set();
+            // Используем единый endpoint для обеих платформ
+            const response = await microservicesAPI.get('/api/moderation/muted-users');
             
-            if (twitchChannel) {
-                const response = await microservicesAPI.get('/api/moderation/tts/blocked', {
-                    params: { channel_name: twitchChannel, platform: 'twitch' }
+            if (response.data.success) {
+                const blockedSet = new Set();
+                
+                response.data.blocked_users.forEach(u => {
+                    blockedSet.add(`${u.platform}:${u.username.toLowerCase()}`);
                 });
-                if (response.data.success) {
-                    response.data.blocked_users.forEach(u => {
-                        blockedSet.add(`twitch:${u.username.toLowerCase()}`);
-                    });
-                }
+                
+                console.log(`🔇 [CHAT] Loaded ${blockedSet.size} muted users:`, Array.from(blockedSet));
+                setTtsBlockedUsers(blockedSet);
             }
-            
-            if (vkChannel) {
-                const response = await microservicesAPI.get('/api/moderation/tts/blocked', {
-                    params: { channel_name: vkChannel, platform: 'vk' }
-                });
-                if (response.data.success) {
-                    response.data.blocked_users.forEach(u => {
-                        blockedSet.add(`vk:${u.username.toLowerCase()}`);
-                    });
-                }
-            }
-            
-            setTtsBlockedUsers(blockedSet);
         } catch (error) {
             console.error('Error loading blocked users:', error);
         }
@@ -492,9 +633,19 @@ const ChatCard = ({ integrations }) => {
 
     const handleContextMenu = (e, msg) => {
         e.preventDefault();
+        
+        // Получаем координаты элемента ника (а не клика)
+        const target = e.currentTarget;
+        const rect = target.getBoundingClientRect();
+        
+        // Позиционируем меню под ником (слева)
+        const x = rect.left; // Начало ника
+        const y = rect.bottom + 4; // Под ником + 4px отступ
+        
+        console.log(`📍 [CONTEXT MENU] Opening below nickname: x=${x}, y=${y}, for user: ${msg.author_name || msg.author}`);
         setContextMenu({
-            x: e.clientX,
-            y: e.clientY,
+            x,
+            y,
             message: msg
         });
     };
@@ -506,7 +657,7 @@ const ChatCard = ({ integrations }) => {
         // Получаем имя канала из сообщения или из пользователя
         let channelName = msg.channel;
         if (!channelName) {
-            channelName = platform === 'twitch' ? user?.twitch_name : user?.vk_username;
+            channelName = platform === 'twitch' ? user?.twitch_username : user?.vk_username;
         }
         
         // Context menu action:', { action, username, platform, channelName, msg });
@@ -518,116 +669,41 @@ const ChatCard = ({ integrations }) => {
         }
 
         try {
-            switch (action) {
-                case 'block_tts':
-                    await microservicesAPI.post('/api/moderation/tts/block', {
-                        username,
-                        platform,
-                        channel_name: channelName
-                    });
-                    toast.success(`${username} заблокирован для TTS`);
+        switch (action) {
+            case 'block_tts':
+            case 'unblock_tts': {
+                console.log(`🔇 [CHAT MUTE] ${action} для ${username} (${platform})`);
+                    
+                const response = await microservicesAPI.post('/api/moderation/toggle-mute', {
+                    username,
+                    platform,
+                    channel_name: channelName,
+                    duration_seconds: 0,  // Не применяем платформенный мут
+                    reason: action === 'block_tts' ? 'Заглушен в TTS' : undefined
+                });
+                
+                console.log('🔇 [CHAT MUTE] Response:', response.data);
+                
+                const resultAction = response.data?.action;  // 'muted' или 'unmuted'
+                
+                // Обновляем локальный state
+                if (resultAction === 'muted') {
                     setTtsBlockedUsers(prev => new Set(prev).add(`${platform}:${username.toLowerCase()}`));
-                    break;
-
-                case 'unblock_tts':
-                    await microservicesAPI.post('/api/moderation/tts/unblock', {
-                        username,
-                        platform,
-                        channel_name: channelName
-                    });
-                    toast.success(`${username} разблокирован для TTS`);
+                    toast.success(`🔇 ${username} заглушен в TTS`);
+                } else {
                     setTtsBlockedUsers(prev => {
                         const newSet = new Set(prev);
                         newSet.delete(`${platform}:${username.toLowerCase()}`);
                         return newSet;
                     });
-                    break;
+                    toast.success(`🔊 ${username} разглушен в TTS`);
+                }
+                break;
+            }
 
-                case 'timeout_10m':
-                    await microservicesAPI.post('/api/moderation/timeout', {
-                        username,
-                        user_id: msg.author_id,
-                        platform,
-                        channel_name: channelName,
-                        duration: 600,
-                        reason: 'Таймаут через чат'
-                    });
-                    toast.success(`${username} получил таймаут на 10 минут`);
-                    break;
-
-                case 'timeout_1h':
-                    await microservicesAPI.post('/api/moderation/timeout', {
-                        username,
-                        user_id: msg.author_id,
-                        platform,
-                        channel_name: channelName,
-                        duration: 3600,
-                        reason: 'Таймаут через чат'
-                    });
-                    toast.success(`${username} получил таймаут на 1 час`);
-                    break;
-
-                case 'ban':
-                    await microservicesAPI.post('/api/moderation/ban', {
-                        username,
-                        user_id: msg.author_id,
-                        platform,
-                        channel_name: channelName,
-                        reason: 'Бан через чат'
-                    });
-                    toast.success(`${username} забанен`);
-                    break;
-
-                case 'add_moderator':
-                    await microservicesAPI.post('/api/moderation/role', {
-                        username,
-                        user_id: msg.author_id,
-                        platform,
-                        channel_name: channelName,
-                        role: 'moderator',
-                        action: 'add'
-                    });
-                    toast.success(`${username} назначен модератором`);
-                    break;
-
-                case 'remove_moderator':
-                    await microservicesAPI.post('/api/moderation/role', {
-                        username,
-                        user_id: msg.author_id,
-                        platform,
-                        channel_name: channelName,
-                        role: 'moderator',
-                        action: 'remove'
-                    });
-                    toast.success(`${username} снят с модератора`);
-                    break;
-
-                case 'add_vip':
-                    await microservicesAPI.post('/api/moderation/role', {
-                        username,
-                        user_id: msg.author_id,
-                        platform,
-                        channel_name: channelName,
-                        role: 'vip',
-                        action: 'add'
-                    });
-                    toast.success(`${username} назначен VIP`);
-                    break;
-
-                case 'remove_vip':
-                    await microservicesAPI.post('/api/moderation/role', {
-                        username,
-                        user_id: msg.author_id,
-                        platform,
-                        channel_name: channelName,
-                        role: 'vip',
-                        action: 'remove'
-                    });
-                    toast.success(`${username} снят с VIP`);
-                    break;
-
-                default:
-                    console.warn('Unknown action:', action);
+            default:
+                console.warn('Unknown action:', action);
+                break;
             }
         } catch (error) {
             console.error('Error executing moderation action:', error);
@@ -635,11 +711,14 @@ const ChatCard = ({ integrations }) => {
         }
     };
 
-    // Генерация URL для OBS
-    const generateObsUrl = (platform) => {
+    // Состояние для сгенерированного URL
+    const [generatedObsUrl, setGeneratedObsUrl] = useState('');
+    const [hasExistingUrl, setHasExistingUrl] = useState(false);
+
+    // Генерация URL для OBS (один URL с автоматической фильтрацией)
+    const generateObsUrl = () => {
         const baseUrl = window.location.origin;
         const params = new URLSearchParams({
-            platform,
             width: obsSettings.width,
             height: obsSettings.height,
             fontSize: obsSettings.fontSize,
@@ -661,7 +740,6 @@ const ChatCard = ({ integrations }) => {
             showUserRoles: obsSettings.showUserRoles,
             animationDuration: obsSettings.animationDuration,
             animationType: obsSettings.animationType,
-            platformFilter: obsSettings.platformFilter,
             // Цвета ролей
             moderatorColor: obsSettings.colors.moderator,
             vipColor: obsSettings.colors.vip,
@@ -669,65 +747,69 @@ const ChatCard = ({ integrations }) => {
             normalColor: obsSettings.colors.normal
         });
         
-        if (combinedChat) {
-            params.set('combined', 'true');
+        // Автоматическая фильтрация на основе включенных платформ
+        if (twitchChatEnabled && vkChatEnabled) {
+            // Если включены обе платформы - показываем все сообщения
+            params.set('platformFilter', 'combined');
+        } else if (twitchChatEnabled) {
+            // Если включен только Twitch
+            params.set('platformFilter', 'twitch');
+        } else if (vkChatEnabled) {
+            // Если включен только VK
+            params.set('platformFilter', 'vk');
+        } else {
+            // Если ничего не включено - показываем все (пустой фильтр)
+            params.set('platformFilter', 'all');
+        }
+        
+        // Добавляем ID пользователя для получения его личного чата
+        if (user && user.id) {
+            params.set('userId', user.id.toString());
         }
         
         return `${baseUrl}/chat/obs?${params.toString()}`;
     };
+
+    // Функция для генерации и отображения URL
+    const handleGenerateObsUrl = () => {
+        const url = generateObsUrl();
+        setGeneratedObsUrl(url);
+        setHasExistingUrl(true);
+        console.log('🔗 Generated OBS URL:', url);
+    };
+
+    // Функция для показа существующего URL
+    const handleShowExistingUrl = () => {
+        const url = generateObsUrl();
+        setGeneratedObsUrl(url);
+        setHasExistingUrl(true);
+        console.log('👁️ Showing existing URL:', url);
+    };
+
+    // Проверяем, есть ли уже сохраненные настройки OBS (значит URL уже был сгенерирован)
+    useEffect(() => {
+        const hasObsSettings = Object.values(obsSettings).some(value => 
+            value !== null && value !== undefined && value !== ''
+        );
+        setHasExistingUrl(hasObsSettings);
+    }, [obsSettings]);
+
+    // Автоматически обновляем URL при изменении настроек (если URL уже был сгенерирован)
+    useEffect(() => {
+        if (generatedObsUrl) {
+            const newUrl = generateObsUrl();
+            if (newUrl !== generatedObsUrl) {
+                setGeneratedObsUrl(newUrl);
+                console.log('🔄 URL auto-updated:', newUrl);
+            }
+        }
+    }, [obsSettings, twitchChatEnabled, vkChatEnabled, generatedObsUrl, user]);
 
     const copyToClipboard = (text) => {
         navigator.clipboard.writeText(text);
         toast.success('URL скопирован в буфер обмена');
     };
 
-    const downloadHtml = (platform) => {
-        const url = generateObsUrl(platform);
-        const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Overlay</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: transparent;
-            font-family: ${obsSettings.fontFamily};
-            font-size: ${obsSettings.fontSize};
-            color: ${obsSettings.textColor};
-        }
-        .chat-container {
-            padding: 10px;
-            overflow: hidden;
-        }
-    </style>
-</head>
-<body>
-    <div class="chat-container" id="chat">
-        <p>Загрузка чата...</p>
-    </div>
-    <script>
-        // WebSocket подключение к чату
-        const ws = new WebSocket('${url.replace('http', 'ws')}');
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            // Обработка сообщений
-            // data
-        };
-    </script>
-</body>
-</html>
-`;
-        const blob = new Blob([htmlContent], { type: 'text/html' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `${platform}-chat-overlay.html`;
-        link.click();
-        toast.success('HTML файл скачан');
-    };
 
     // Экспортируем функции в глобальную область для доступа из отдельного окна чата
     React.useEffect(() => {
@@ -741,7 +823,7 @@ const ChatCard = ({ integrations }) => {
 
     if (showObsSettings) {
         // Режим настроек виджета OBS
-        return (
+    return (
             <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between">
@@ -750,11 +832,12 @@ const ChatCard = ({ integrations }) => {
                             Настройки виджета чата для OBS
                         </CardTitle>
                         <Button
-                            variant="ghost"
+                            variant="default"
                             size="sm"
                             onClick={() => setShowObsSettings(false)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2"
                         >
-                            <X className="h-4 w-4" />
+                            ← Назад
                         </Button>
                     </div>
                 </CardHeader>
@@ -899,8 +982,8 @@ const ChatCard = ({ integrations }) => {
                                 min={10}
                                 step={5}
                                 className="w-full"
-                            />
-                        </div>
+            />
+        </div>
 
                         <div className="space-y-2">
                             <Label>Фильтр платформ</Label>
@@ -955,98 +1038,69 @@ const ChatCard = ({ integrations }) => {
                     <div className="space-y-4">
                         <h3 className="text-lg font-semibold">URL для OBS</h3>
                         
-                        {/* Twitch */}
-                        {twitchEnabled && (
-                            <div className="space-y-2 p-3 border rounded-lg">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <Twitch className="h-4 w-4 text-purple-500" />
-                                    <span className="font-medium text-sm">Twitch</span>
-                                </div>
-                                <div className="flex gap-2">
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => copyToClipboard(generateObsUrl('twitch'))}
-                                    >
-                                        <Copy className="h-3 w-3 mr-2" />
-                                        Копировать URL
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => downloadHtml('twitch')}
-                                    >
-                                        <Download className="h-3 w-3 mr-2" />
-                                        Скачать HTML
-                                    </Button>
-                                </div>
-                                <div className="text-xs text-muted-foreground break-all">
-                                    {generateObsUrl('twitch')}
-                                </div>
+                        {/* Универсальный URL с автоматической фильтрацией */}
+                        <div className="space-y-2 p-3 border rounded-lg bg-blue-500/10">
+                            <div className="flex items-center gap-2 mb-2">
+                                <MessageSquare className="h-4 w-4 text-blue-500" />
+                                <span className="font-medium text-sm">Универсальный чат</span>
+                                <span className="text-xs text-muted-foreground">
+                                    (автоматически фильтрует по включенным платформам)
+                                </span>
                             </div>
-                        )}
-
-                        {/* VK Live */}
-                        {vkEnabled && (
-                            <div className="space-y-2 p-3 border rounded-lg">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <VKIcon className="h-4 w-4 text-blue-500" />
-                                    <span className="font-medium text-sm">VK Live</span>
-                                </div>
-                                <div className="flex gap-2">
+                            <div className="flex gap-2">
+                                {!generatedObsUrl ? (
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        onClick={() => copyToClipboard(generateObsUrl('vk'))}
+                                        onClick={hasExistingUrl ? handleShowExistingUrl : handleGenerateObsUrl}
                                     >
-                                        <Copy className="h-3 w-3 mr-2" />
-                                        Копировать URL
+                                        {hasExistingUrl ? (
+                                            <Eye className="h-3 w-3 mr-2" />
+                                        ) : (
+                                            <RefreshCw className="h-3 w-3 mr-2" />
+                                        )}
+                                        {hasExistingUrl ? 'Показать URL' : 'Сгенерировать URL'}
                                     </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => downloadHtml('vk')}
-                                    >
-                                        <Download className="h-3 w-3 mr-2" />
-                                        Скачать HTML
-                                    </Button>
-                                </div>
-                                <div className="text-xs text-muted-foreground break-all">
-                                    {generateObsUrl('vk')}
-                                </div>
+                                ) : (
+                                    <>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => copyToClipboard(generatedObsUrl)}
+                                        >
+                                            <Copy className="h-3 w-3 mr-2" />
+                                            Скопировать
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={handleGenerateObsUrl}
+                                        >
+                                            <RefreshCw className="h-3 w-3 mr-2" />
+                                            Обновить URL
+                                        </Button>
+                                    </>
+                                )}
                             </div>
-                        )}
-
-                        {/* Объединенный */}
-                        {twitchEnabled && vkEnabled && (
-                            <div className="space-y-2 p-3 border rounded-lg bg-green-500/10">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <Merge className="h-4 w-4 text-green-500" />
-                                    <span className="font-medium text-sm">Объединенный чат</span>
-                                </div>
-                                <div className="flex gap-2">
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => copyToClipboard(generateObsUrl('combined'))}
-                                    >
-                                        <Copy className="h-3 w-3 mr-2" />
-                                        Копировать URL
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => downloadHtml('combined')}
-                                    >
-                                        <Download className="h-3 w-3 mr-2" />
-                                        Скачать HTML
-                                    </Button>
-                                </div>
+                            {generatedObsUrl && (
                                 <div className="text-xs text-muted-foreground break-all">
-                                    {generateObsUrl('combined')}
+                                    {generatedObsUrl}
                                 </div>
+                            )}
+                            {!generatedObsUrl && (
+                                <div className="text-xs text-muted-foreground italic">
+                                    Нажмите "Сгенерировать URL" чтобы создать ссылку с текущими настройками
+                                </div>
+                            )}
+                            <div className="text-xs text-muted-foreground">
+                                <strong>Текущая фильтрация:</strong> {
+                                    twitchChatEnabled && vkChatEnabled ? 'Объединенный чат (Twitch + VK Live)' :
+                                    twitchChatEnabled ? 'Только Twitch' :
+                                    vkChatEnabled ? 'Только VK Live' :
+                                    'Все платформы'
+                                }
                             </div>
-                        )}
+                        </div>
                     </div>
                 </CardContent>
             </Card>
@@ -1056,77 +1110,80 @@ const ChatCard = ({ integrations }) => {
     // Основной режим чата
     return (
         <Card>
-            <CardHeader>
-                <div className="flex items-center justify-between">
+            <CardHeader className="pb-2">
+                {/* Одна строка: заголовок слева, кнопки справа */}
+                <div className="flex items-center justify-between gap-2">
+                    {/* Заголовок слева */}
                     <CardTitle className="flex items-center gap-2">
                         <MessageSquare className="h-6 w-6" />
                         ChatBox
                     </CardTitle>
+                    
+                    {/* Все кнопки справа */}
                     <div className="flex items-center gap-2">
-                        {/* Кнопки-переключатели в заголовке */}
-                        {twitchEnabled && (
+                        {twitchChatEnabled && (
                             <Button
-                                variant={twitchChatEnabled ? "default" : "outline"}
+                                variant="outline"
                                 size="sm"
-                                onClick={() => setTwitchChatEnabled(!twitchChatEnabled)}
-                                className={`h-8 px-3 transition-all ${
-                                    twitchChatEnabled 
-                                        ? 'bg-purple-500 hover:bg-purple-600 text-white border-purple-500' 
-                                        : 'border-purple-300 text-purple-600 hover:border-purple-500 hover:bg-transparent'
+                                onClick={() => setTwitchChatVisible(!twitchChatVisible)}
+                                className={`h-8 w-20 px-3 transition-all ${
+                                    twitchChatVisible 
+                                        ? 'bg-purple-800 hover:bg-purple-900 text-white border-purple-800' 
+                                        : 'border-gray-400 text-gray-300 hover:border-gray-300 hover:bg-transparent'
                                 }`}
+                                title={twitchChatVisible ? 'Скрыть Twitch сообщения' : 'Показать Twitch сообщения'}
                             >
                                 <Twitch className="h-3 w-3 mr-1" />
-                                {twitchChatEnabled ? 'ВКЛ' : 'ВЫКЛ'}
+                                {twitchChatVisible ? 'ВКЛ' : 'ВЫКЛ'}
                             </Button>
                         )}
-                        {vkEnabled && (
+                        {vkChatEnabled && (
                             <Button
-                                variant={vkChatEnabled ? "default" : "outline"}
+                                variant="outline"
                                 size="sm"
-                                onClick={() => setVkChatEnabled(!vkChatEnabled)}
-                                className={`h-8 px-3 transition-all ${
-                                    vkChatEnabled 
-                                        ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500' 
-                                        : 'border-blue-300 text-blue-600 hover:border-blue-500 hover:bg-transparent'
+                                onClick={() => setVkChatVisible(!vkChatVisible)}
+                                className={`h-8 w-20 px-3 transition-all ${
+                                    vkChatVisible 
+                                        ? 'bg-blue-400 hover:bg-blue-500 text-white border-blue-400' 
+                                        : 'border-gray-400 text-gray-300 hover:border-gray-300 hover:bg-transparent'
                                 }`}
+                                title={vkChatVisible ? 'Скрыть VK Live сообщения' : 'Показать VK Live сообщения'}
                             >
                                 <VKIcon className="h-3 w-3 mr-1" />
-                                {vkChatEnabled ? 'ВКЛ' : 'ВЫКЛ'}
-                            </Button>
-                        )}
-                        {twitchEnabled && vkEnabled && (
-                            <Button
-                                variant={combinedChat ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setCombinedChat(!combinedChat)}
-                                className={`h-8 px-3 transition-all ${
-                                    combinedChat 
-                                        ? 'bg-green-500 hover:bg-green-600 text-white border-green-500' 
-                                        : 'border-green-300 text-green-600 hover:border-green-500 hover:bg-transparent'
-                                }`}
-                            >
-                                <Merge className="h-3 w-3 mr-1" />
-                                {combinedChat ? 'ВКЛ' : 'ВЫКЛ'}
+                                {vkChatVisible ? 'ВКЛ' : 'ВЫКЛ'}
                             </Button>
                         )}
                         <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             onClick={() => setShowObsSettings(true)}
                             title="Настройки виджета OBS"
+                            className="h-8 w-20 px-3 transition-all border-gray-400 text-gray-300 hover:border-blue-400 hover:text-blue-400 hover:bg-blue-400/10"
                         >
-                            <Settings className="h-4 w-4" />
+                            OBS
                         </Button>
+                        {(twitchChatEnabled || vkChatEnabled) && isOnHomePage && (
+                            <Button 
+                                onClick={openChatWindow}
+                                variant="outline"
+                                size="sm"
+                                className="h-8 w-20 px-2 gap-1 transition-all border-gray-400 text-gray-300 hover:border-blue-400 hover:text-blue-400 hover:bg-blue-400/10"
+                                title="Открыть чат в отдельном окне"
+                            >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                                <span className="text-xs">Окно</span>
+                            </Button>
+                        )}
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="pt-0">
 
-                {/* Отображение сообщений или кнопка открытия чата */}
-                {(twitchChatEnabled || vkChatEnabled) ? (
-                    <div className="space-y-4">
-                        {/* Область сообщений */}
-                        <div className="h-[300px] border rounded-lg bg-muted/5 overflow-hidden p-4 flex flex-col-reverse">
+                {/* Отображение сообщений (автоматически включено при наличии интеграций) */}
+                {(twitchChatEnabled || vkChatEnabled) && isOnHomePage ? (
+                    <div>
+                        {/* Область сообщений - увеличена высота */}
+                        <div className="h-[400px] border rounded-lg bg-muted/5 overflow-y-auto p-4 flex flex-col-reverse">
                             {filteredMessages.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                                     <MessageSquare className="h-12 w-12 mb-3 opacity-50" />
@@ -1137,65 +1194,76 @@ const ChatCard = ({ integrations }) => {
                                 </div>
                             ) : (
                                 <div className="space-y-0.5">
-                                    {filteredMessages.slice(-50).reverse().map((msg, index) => (
-                                        <div
+                                    {filteredMessages.slice(-100).reverse().map((msg, index) => (
+                                        <SwipeableMessage
                                             key={`${msg.id || index}-${msg.timestamp}`}
-                                            className="flex items-start gap-1.5 p-1 rounded hover:bg-muted/50 transition-colors"
-                                            onContextMenu={(e) => handleContextMenu(e, msg)}
+                                            message={msg}
+                                            onSwipeAction={handleContextMenuAction}
                                         >
-                                            <div className="flex-shrink-0 mt-0.5">
-                                                {msg.platform === 'twitch' ? (
-                                                    <Twitch className="w-3.5 h-3.5 text-purple-500" />
-                                                ) : (
-                                                    <VKIcon className="w-3.5 h-3.5 text-blue-500" />
-                                                )}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-1.5 flex-wrap">
-                                                    <span className="text-xs text-muted-foreground">
-                                                        {new Date(msg.timestamp * 1000).toLocaleTimeString('ru-RU', { 
-                                                            hour: '2-digit', 
-                                                            minute: '2-digit' 
-                                                        })}
-                                                    </span>
-                                                    <span 
-                                                        className="font-medium text-sm cursor-pointer hover:underline"
-                                                        style={{ color: msg.author_color || '#ffffff' }}
-                                                        onClick={(e) => handleContextMenu(e, msg)}
-                                                        title="Кликните для открытия меню действий"
-                                                    >
-                                                        {msg.author_name || msg.author || 'Unknown'}:
-                                                    </span>
-                                                    <span className="text-sm break-words">
-                                                        {msg.content || msg.message || 'Нет содержимого'}
-                                                    </span>
+                                            <div
+                                                className="flex items-start gap-1.5 p-1 rounded hover:bg-muted/50 transition-colors"
+                                                onContextMenu={(e) => handleContextMenu(e, msg)}
+                                            >
+                                                <div className="flex-shrink-0 mt-0.5">
+                                                    {msg.platform === 'twitch' ? (
+                                                        <Twitch className="w-3.5 h-3.5 text-purple-400" />
+                                                    ) : (
+                                                        <VKIcon className="w-3.5 h-3.5 text-red-400" />
+                                                    )}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {new Date(msg.timestamp).toLocaleTimeString('ru-RU', { 
+                                                                hour: '2-digit', 
+                                                                minute: '2-digit' 
+                                                            })}
+                                                        </span>
+                                                        <span 
+                                                            className={`font-medium text-sm cursor-pointer hover:underline ${
+                                                                msg.platform === 'twitch' 
+                                                                    ? 'text-purple-400' 
+                                                                    : msg.platform === 'vk' 
+                                                                        ? 'text-red-400' 
+                                                                        : ''
+                                                            }`}
+                                                            style={
+                                                                msg.platform === 'twitch' || msg.platform === 'vk'
+                                                                    ? undefined // Используем Tailwind класс для платформ
+                                                                    : { color: msg.author_color || '#ffffff' } // Fallback для других платформ
+                                                            }
+                                                            onClick={(e) => handleContextMenu(e, msg)}
+                                                            title="Кликните для открытия меню действий"
+                                                        >
+                                                            {msg.author_name || msg.author || 'Unknown'}:
+                                                        </span>
+                                                        <span className="text-sm break-words">
+                                                            {msg.content || msg.message || 'Нет содержимого'}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        </SwipeableMessage>
                                     ))}
+                                    <div ref={messagesEndRef} />
                                     </div>
                                 )}
                         </div>
-                        
-                        {/* Кнопка открытия отдельного окна */}
-                        <div className="flex justify-center mt-2">
-                            <Button 
-                                onClick={openChatWindow}
-                                variant="outline"
-                                size="sm"
-                                className="gap-2"
-                            >
-                                <MessageSquare className="h-4 w-4" />
-                                Открыть в отдельном окне
-                            </Button>
+                    </div>
+                ) : !isOnHomePage ? (
+                    <div className="min-h-[200px] flex items-center justify-center">
+                        <div className="text-center text-muted-foreground py-8">
+                            <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                            <p className="text-sm">Чат активен только на главной странице</p>
+                            <p className="text-xs mt-2">Перейдите на главную для просмотра сообщений</p>
                         </div>
                     </div>
                 ) : (
                     <div className="min-h-[200px] flex items-center justify-center">
                         <div className="text-center text-muted-foreground py-8">
                             <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                            <p className="text-sm">Включите хотя бы один чат для отображения сообщений</p>
-                            {user?.id && <p className="text-xs mt-2">Пользователь: {user.username || user.twitch_name || user.vk_name}</p>}
+                            <p className="text-sm">Чат будет активен автоматически при подключении платформ</p>
+                            {user?.id && <p className="text-xs mt-2">Пользователь: {user.username || user.twitch_username || user.vk_username}</p>}
                         </div>
                     </div>
                 )}

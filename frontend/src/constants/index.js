@@ -4,9 +4,11 @@
  */
 
 // === URL КОНСТАНТЫ ===
-export const API_BASE_URL = 'http://localhost:8000';
-export const WS_BASE_URL = 'ws://localhost:8000';
-export const TTS_SERVICE_URL = 'http://localhost:8001';
+import { getApiBaseUrl, getWebSocketBaseUrl, getTtsServiceUrl } from '../utils/urlUtils';
+
+export const API_BASE_URL = getApiBaseUrl();
+export const WS_BASE_URL = getWebSocketBaseUrl();
+export const TTS_SERVICE_URL = getTtsServiceUrl();
 
 // === МАРШРУТЫ ===
 export const ROUTES = {
@@ -29,10 +31,10 @@ export const API_ENDPOINTS = {
   
   // Twitch
   TWITCH_LOGIN: '/api/auth/twitch/login',
-  TWITCH_AUTH: '/auth/twitch',
+  TWITCH_AUTH: '/auth/twitch/login',
   
   // VK
-  VK_AUTH: '/auth/vk',
+  VK_AUTH: '/auth/vk/login',
   VK_GUEST_START: '/auth/vk/guest/start',
   VK_GUEST_VERIFY: '/auth/vk/guest/verify',
   

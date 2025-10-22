@@ -459,4 +459,4 @@ if __name__ == "__main__":
     
     for test in test_cases:
         result = convert_numbers_in_text(test)
-        print(f"'{test}' -> '{result}'")
+        logger.info(f"Number conversion: '{test}' -> '{result}'")

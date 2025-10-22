@@ -78,3 +78,55 @@ class YouTubeAPI:
         
         quality_key = quality_map.get(quality, "mqdefault")
         return f"https://img.youtube.com/vi/{video_id}/{quality_key}.jpg"
+
+    async def add_to_queue(self, url: str, requester_name: str, channel_name: str = "twitch", platform: str = "twitch") -> Dict[str, Any]:
+        """Добавить видео в очередь (для команды !sr)"""
+        try:
+            # Проверяем валидность URL
+            if not self.validate_url(url):
+                return {"success": False, "error": "Неверный YouTube URL"}
+            
+            # Получаем информацию о видео
+            video_info = self.get_video_info(url)
+            if not video_info:
+                return {"success": False, "error": "Не удалось получить информацию о видео"}
+            
+            # Используем QueueService для добавления в очередь
+            from services.queue_service import QueueService
+            from core.database import get_db
+            
+            queue_service = QueueService()
+            db = next(get_db())
+            
+            # Определяем user_id по имени канала (для Twitch) - case-insensitive
+            from core.database import User
+            from sqlalchemy import func
+            user = db.query(User).filter(func.lower(User.twitch_username) == channel_name.lower()).first()
+            user_id = user.id if user else 1  # Используем ID 1 если пользователь не найден
+            
+            result = await queue_service.add_video_to_queue(
+                user_id=user_id,
+                video_url=url,
+                channel_name=channel_name,
+                platform=platform,
+                requester_name=requester_name,
+                requester_id=requester_name,
+                is_paid=False,
+                points_cost=None,
+                db=db
+            )
+            
+            if result.get("success"):
+                queue_item = result.get("queue_item", {})
+                return {
+                    "success": True,
+                    "title": video_info["title"],
+                    "position": queue_item.get("position", 1),
+                    "queue_item": queue_item
+                }
+            else:
+                return {"success": False, "error": result.get("error", "Ошибка добавления в очередь")}
+                
+        except Exception as e:
+            logger.error(f"Error adding video to queue: {e}")
+            return {"success": False, "error": str(e)}

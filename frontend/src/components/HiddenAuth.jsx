@@ -1,18 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../constants';
+// import { useNavigate } from 'react-router-dom';
 import AuthLoader from './AuthLoader';
-import { toast } from 'sonner';
-import { useAuth } from '../context/AuthContext';
+// import { toast } from 'sonner';
+// import { useAuth } from '../context/AuthContext';
 
 const HiddenAuth = () => {
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [isLoading, setIsLoading] = useState(false); // Убираем прелоадер
+    const [error] = useState(null);
     const [countdown, setCountdown] = useState(3);
-    const [isAuthSuccess, setIsAuthSuccess] = useState(false);
-    const [isNavigating, setIsNavigating] = useState(false);
-    const [isProcessing, setIsProcessing] = useState(false);
-    const navigate = useNavigate();
-    const { refreshUser } = useAuth();
+    const [isAuthSuccess] = useState(false);
+    // const [isNavigating, setIsNavigating] = useState(false);
+    // const [isProcessing, setIsProcessing] = useState(false);
+    // const navigate = useNavigate();
+    // const { refreshUser } = useAuth();
 
     useEffect(() => {
         // Счетчик обратного отсчета
@@ -21,7 +22,7 @@ const HiddenAuth = () => {
                 if (prev <= 1) {
                     clearInterval(countdownInterval);
                     // Получаем URL авторизации и открываем popup
-                    const apiBaseUrl = import.meta.env.VITE_BOT_SERVICE_URL || 'http://localhost:8000';
+                    const apiBaseUrl = API_BASE_URL;
                     
                     // Получаем URL авторизации от API
                     fetch(`${apiBaseUrl}/api/auth/twitch/login`)
@@ -37,10 +38,15 @@ const HiddenAuth = () => {
                             const handleMessage = (event) => {
                                 // 📨 Получено сообщение:', event.data, 'от origin:', event.origin);
                                 
-                                // Принимаем сообщения от localhost:8000 (бэкенд) или от текущего origin
+                                // Принимаем сообщения от разрешенных origins
+                                const frontendUrl = import.meta.env.VITE_FRONTEND_URL;
+                                if (!frontendUrl) {
+                                    throw new Error('VITE_FRONTEND_URL environment variable is required');
+                                }
+                                
                                 const allowedOrigins = [
-                                    'http://localhost:8000',
-                                    'http://localhost:5173',
+                                    API_BASE_URL,
+                                    frontendUrl,
                                     window.location.origin
                                 ];
                                 
@@ -53,8 +59,10 @@ const HiddenAuth = () => {
                                     // ✅ Авторизация Twitch успешна!');
                                     popup.close();
                                     window.removeEventListener('message', handleMessage);
-                                    // Обновляем статус авторизации
-                                    window.location.reload();
+                                    // Обновляем статус авторизации принудительно
+                                    window.dispatchEvent(new CustomEvent('auth_refresh_required'));
+                                    // Дополнительно перезагружаем страницу для гарантии
+                                    setTimeout(() => window.location.reload(), 1000);
                                 } else if (event.data.type === 'TWITCH_AUTH_ERROR') {
                                     console.error('❌ Ошибка авторизации Twitch:', event.data.error);
                                     popup.close();
@@ -72,10 +80,10 @@ const HiddenAuth = () => {
                                 }
                             }, 1000);
                         })
-                        .catch(error => {
-                            console.error('❌ Ошибка при получении URL авторизации:', error);
+                        .catch(() => {
+                            // console.error('❌ Ошибка при получении URL авторизации:', error);
                             // Fallback на старый способ
-                            const popup = window.open(
+                            window.open(
                                 `${apiBaseUrl}/auth/twitch`,
                                 'twitch_auth',
                                 'width=600,height=700,scrollbars=yes,resizable=yes'

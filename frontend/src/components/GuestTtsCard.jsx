@@ -295,7 +295,7 @@ const GuestTtsCard = () => {
                     </div>
 
                     {/* Верификация */}
-                    {// GuestTtsCard: Rendering verificationRequired:', verificationRequired)}
+                    {/* GuestTtsCard: Rendering verificationRequired:', verificationRequired) */}
                     {verificationRequired && (
                         <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                             <div className="flex items-center gap-2 mb-2">

@@ -148,19 +148,19 @@ class DropsService:
             "reward": reward.name,
             "reward_type": reward.reward_type,
             "reward_value": reward.reward_value,
+            "streak_days": streak.current_streak,
             "sound_file": reward.sound_file,
-            "sound_volume": reward.sound_volume,
-            "streak_days": streak.current_streak
+            "sound_volume": reward.sound_volume
         }
     
-    def process_donation_drops(self, user_id: int, channel_name: str, platform: str, viewer_id: str, viewer_name: str, amount: float) -> Optional[Dict[str, Any]]:
-        """Обрабатывает донат Drops"""
+    def process_donation_drops(self, user_id: int, channel_name: str, platform: str, viewer_id: str, viewer_name: str, donation_amount: float) -> Optional[Dict[str, Any]]:
+        """Обрабатывает донатные Drops"""
         config = self.get_config(user_id, channel_name, platform)
         if not config or not config.donation_enabled:
             return None
         
         # Определяем качество по сумме доната
-        quality_name = self._get_donation_quality(amount, config)
+        quality_name = self._get_donation_quality(donation_amount, config)
         if not quality_name:
             return None
         
@@ -176,7 +176,7 @@ class DropsService:
         # Записываем в историю
         self._record_drops_history(
             user_id, channel_name, platform, viewer_id, viewer_name,
-            "donation", quality.id, reward, donation_amount=amount
+            "donation", quality.id, reward, donation_amount=donation_amount
         )
         
         return {
@@ -186,10 +186,126 @@ class DropsService:
             "reward": reward.name,
             "reward_type": reward.reward_type,
             "reward_value": reward.reward_value,
+            "donation_amount": donation_amount,
             "sound_file": reward.sound_file,
-            "sound_volume": reward.sound_volume,
-            "donation_amount": amount
+            "sound_volume": reward.sound_volume
         }
+    
+    def process_mythical_drops(self, user_id: int, channel_name: str, platform: str, viewer_id: str, viewer_name: str) -> Optional[Dict[str, Any]]:
+        """Обрабатывает мифические Drops"""
+        config = self.get_config(user_id, channel_name, platform)
+        if not config or not config.mythical_enabled:
+            return None
+        
+        # Проверяем, можно ли активировать мифический лутбокс
+        if not self._can_activate_mythical(config):
+            return None
+        
+        # Получаем мифическое качество
+        quality = self.get_quality_by_name("Mythical")
+        if not quality:
+            return None
+        
+        # Получаем награду
+        reward = self._get_random_reward(user_id, channel_name, platform, quality.id)
+        if not reward:
+            return None
+        
+        # Обновляем время последнего появления
+        config.mythical_last_appeared = utcnow_naive()
+        self.db.commit()
+        
+        # Записываем в историю
+        self._record_drops_history(
+            user_id, channel_name, platform, viewer_id, viewer_name,
+            "mythical", quality.id, reward
+        )
+        
+        return {
+            "type": "mythical",
+            "viewer_name": viewer_name,
+            "quality": "Mythical",
+            "reward": reward.name,
+            "reward_type": reward.reward_type,
+            "reward_value": reward.reward_value,
+            "sound_file": reward.sound_file,
+            "sound_volume": reward.sound_volume
+        }
+    
+    def _get_streak_quality(self, days: int, config: DropsConfig) -> Optional[str]:
+        """Определяет качество по дням стрика"""
+        if days >= config.streak_days_legendary:
+            return "Legendary"
+        elif days >= config.streak_days_epic:
+            return "Epic"
+        elif days >= config.streak_days_rare:
+            return "Rare"
+        elif days >= config.streak_days_common:
+            return "Common"
+        return None
+    
+    def _get_donation_quality(self, amount: float, config: DropsConfig) -> Optional[str]:
+        """Определяет качество по сумме доната"""
+        if amount >= config.donation_amount_legendary:
+            return "Legendary"
+        elif amount >= config.donation_amount_epic:
+            return "Epic"
+        elif amount >= config.donation_amount_rare:
+            return "Rare"
+        elif amount >= config.donation_amount_common:
+            return "Common"
+        return None
+    
+    def _get_random_reward(self, user_id: int, channel_name: str, platform: str, quality_id: int) -> Optional[DropsReward]:
+        """Получает случайную награду по качеству"""
+        rewards = self.get_rewards(user_id, channel_name, platform, quality_id)
+        if not rewards:
+            return None
+        
+        # Взвешенный случайный выбор
+        total_weight = sum(reward.weight for reward in rewards)
+        if total_weight == 0:
+            return None
+        
+        random_value = random.randint(1, total_weight)
+        current_weight = 0
+        
+        for reward in rewards:
+            current_weight += reward.weight
+            if random_value <= current_weight:
+                return reward
+        
+        return rewards[0]  # Fallback
+    
+    def _record_drops_history(self, user_id: int, channel_name: str, platform: str, viewer_id: str, viewer_name: str, drops_type: str, quality_id: int, reward: DropsReward, **kwargs):
+        """Записывает в историю Drops"""
+        history_entry = DropsHistory(
+            user_id=user_id,
+            channel_name=channel_name,
+            platform=platform,
+            viewer_id=viewer_id,
+            viewer_name=viewer_name,
+            drops_type=drops_type,
+            quality_id=quality_id,
+            reward_id=reward.id,
+            reward_name=reward.name,
+            reward_type=reward.reward_type,
+            reward_value=reward.reward_value,
+            **kwargs
+        )
+        
+        self.db.add(history_entry)
+        self.db.commit()
+    
+    def _can_activate_mythical(self, config: DropsConfig) -> bool:
+        """Проверяет, можно ли активировать мифический лутбокс"""
+        if not config.mythical_last_appeared:
+            return True
+        
+        now = utcnow_naive()
+        time_since_last = (now - config.mythical_last_appeared).total_seconds() / 3600  # в часах
+        
+        return time_since_last >= config.mythical_min_interval_hours
     
     def check_mythical_drops(self, user_id: int, channel_name: str, platform: str) -> bool:
         """Проверяет, можно ли запустить мифический Drops"""
