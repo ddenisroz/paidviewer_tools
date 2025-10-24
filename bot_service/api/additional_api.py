@@ -518,8 +518,7 @@ async def delete_user_account(
         logger.info(f"🗑️ [DELETE ACCOUNT] User {user_id} requested account deletion")
         
         # Получаем пользователя
-        from core.database import User, UserToken, UserSession, UserSettings, ChatMessage, ChatBoxSettings, WhitelistedChannel, AdminUser
-        from services.tts_limits_service import TTSUserSettings
+        from core.database import User, UserToken, UserSession, UserSettings, ChatMessage, ChatBoxSettings, WhitelistedChannel, AdminUser, TTSUserSettings
         
         db_user = db.query(User).filter(User.id == user_id).first()
         if not db_user:

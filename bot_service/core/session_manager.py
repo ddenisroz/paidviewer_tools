@@ -873,6 +873,7 @@ class SessionManager:
                 return {
                     "user_id": -1,
                     "id": -1,
+                    "session_id": session_id,  # 🔐 БЕЗОПАСНОСТЬ: Добавлен для проверки linked_platforms
                     "is_admin": False,
                     "is_blocked": False,
                     "blocked_reason": None,
@@ -896,7 +897,8 @@ class SessionManager:
             
             return {
                 "user_id": user.id,
-                "id": user.id, 
+                "id": user.id,
+                "session_id": session_id,  # 🔐 БЕЗОПАСНОСТЬ: Добавлен для проверки linked_platforms
                 "is_admin": user.is_admin,
                 "is_blocked": user.is_blocked,
                 "blocked_reason": user.blocked_reason,
