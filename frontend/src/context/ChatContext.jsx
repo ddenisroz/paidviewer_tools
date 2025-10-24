@@ -29,15 +29,16 @@ const messagesReducer = (state, action) => {
                 return state;
             }
             
-            const newMessages = [action.payload, ...state.slice(0, maxMessages - 1)];
+            // Добавляем новое сообщение В КОНЕЦ массива (старые вверху, новые внизу)
+            const newMessages = [...state, action.payload].slice(-maxMessages);
             return newMessages;
             
         case 'CLEAR_MESSAGES':
             return [];
             
         case 'SET_MESSAGES':
-            // Применяем ограничение на количество сообщений
-            return action.payload.slice(0, maxMessages);
+            // Применяем ограничение на количество сообщений (берём последние)
+            return action.payload.slice(-maxMessages);
             
         default:
             return state;
@@ -64,8 +65,8 @@ export const ChatProvider = ({ children }) => {
             const stored = localStorage.getItem('chat_messages');
             if (stored) {
                 const parsed = JSON.parse(stored);
-                // Ограничиваем количество загруженных сообщений
-                return parsed.slice(0, maxMessages);
+                // Ограничиваем количество загруженных сообщений (берём последние)
+                return parsed.slice(-maxMessages);
             }
         } catch (error) {
             logger.error('Error loading messages from storage:', error);
@@ -181,8 +182,20 @@ export const ChatProvider = ({ children }) => {
         onMessage: (data) => {
             setLastJsonMessage(data);
             
-            if (data.type === 'message') {
+            // 🔍 DEBUG: Логируем ВСЕ входящие WebSocket сообщения
+            console.log('🔌 [WS] Received message type:', data.type, 'Data:', data);
+            
+            if (data.type === 'message' || data.type === 'chat_message') {
                 dispatchMessages({ type: 'ADD_MESSAGE', payload: data });
+            } else if (data.type === 'chat_history') {
+                // Получили историю сообщений через WebSocket
+                console.log('📜 [WS] Processing chat_history, messages:', data.messages?.length);
+                if (data.messages && Array.isArray(data.messages)) {
+                    logger.info(`📜 Loaded ${data.messages.length} messages from WebSocket history`);
+                    dispatchMessages({ type: 'SET_MESSAGES', payload: data.messages });
+                } else {
+                    console.warn('⚠️ [WS] chat_history received but messages is not an array:', data.messages);
+                }
             } else if (data.type === 'bot_status') {
                 setBotStatus(data.status);
             } else if (data.type === 'tts_audio') {

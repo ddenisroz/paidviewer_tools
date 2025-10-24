@@ -67,12 +67,39 @@ class TwitchBotCore(commands.Bot):
         try:
             from utils.websocket_helper import broadcast_chat_message
             
+            # Парсим роли и значки из Twitch tags
+            role = None
+            badges_list = []
+            
+            # Проверяем роль (broadcaster > moderator > vip > subscriber)
+            if message.author.is_broadcaster:
+                role = 'broadcaster'
+            elif message.author.is_mod:
+                role = 'moderator'
+            elif hasattr(message.author, 'is_vip') and message.author.is_vip:
+                role = 'vip'
+            elif message.author.is_subscriber:
+                role = 'subscriber'
+            
+            # Парсим badges из tags (если доступны)
+            if hasattr(message, 'tags') and message.tags:
+                if 'badges' in message.tags:
+                    # Формат: "broadcaster/1,subscriber/12"
+                    badges_str = message.tags.get('badges', '')
+                    if badges_str:
+                        badges_list = badges_str.split(',')
+                        logger.info(f"🎖️ [BADGES PARSED] {message.author.name}: {badges_list}")
+            
+            logger.debug(f"👤 [ROLE] {message.author.name}: role={role}, badges={badges_list}")
+            
             # Отправляем в chatbox
             await broadcast_chat_message(
                 username=message.author.name,
                 content=message.content,
                 platform='twitch',
-                channel=message.channel.name
+                channel=message.channel.name,
+                role=role,
+                badges=badges_list if badges_list else None
             )
             
             # NOTE: TTS обрабатывается в twitch_bot.py::_handle_tts()

@@ -139,7 +139,8 @@ const LoginPage = () => {
         try {
             // Генерируем код для гостевого доступа
             const response = await api.post('/api/chat/guest/connect', {
-                channel_name: guestUsername.trim()
+                channel_name: guestUsername.trim(),
+                platform: guestPlatform  // ✅ Отправляем выбранную платформу
             });
             
             console.log('[LoginPage] Guest connect response:', response.data);
@@ -148,7 +149,7 @@ const LoginPage = () => {
             if (response.data.success && response.data.verification_code) {
                 setVerificationCode(response.data.verification_code);
                 setVerificationTimeout(response.data.expires_in_seconds || 60);
-                setGuestPlatform(response.data.platform);
+                // Платформу уже знаем из state, не перезаписываем
                 setGuestModalOpen(false);
                 setVerificationModalOpen(true);
                 startVerificationTimer();

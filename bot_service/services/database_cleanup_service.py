@@ -1,5 +1,6 @@
 # services/database_cleanup_service.py
 import logging
+import os
 from datetime import datetime, timedelta
 from typing import Dict, Any
 from sqlalchemy.orm import Session
@@ -16,13 +17,18 @@ class DatabaseCleanupService:
     def __init__(self, db: Session):
         self.db = db
         
-        # Настройки лимитов (только по лимитам, без очистки по возрасту)
-        self.MAX_CHAT_MESSAGES_PER_USER = 3000  # Максимум сообщений на пользователя
-        self.MAX_TOTAL_CHAT_MESSAGES = 100000  # Максимум сообщений в чате всего
-        self.MAX_PSYCHOLOGY_ANALYSES = 0  # Анализы больше не хранятся в БД
-        self.CHAT_MESSAGES_RETENTION_DAYS = 30  # Дни хранения сообщений
-        self.PSYCHOLOGY_RETENTION_DAYS = 0  # Анализы не хранятся, установлен в 0
-        # Убираем очистку по возрасту - только по лимитам!
+        # Настройки лимитов (читаем из .env или используем значения по умолчанию)
+        self.MAX_CHAT_MESSAGES_PER_USER = int(os.getenv('CHAT_MESSAGES_DB_LIMIT_PER_USER', '3000'))
+        self.MAX_TOTAL_CHAT_MESSAGES = int(os.getenv('CHAT_MESSAGES_DB_LIMIT_TOTAL', '100000'))
+        self.CHAT_MESSAGES_RETENTION_DAYS = int(os.getenv('CHAT_MESSAGES_RETENTION_DAYS', '30'))
+        
+        # Анализы больше не хранятся в БД
+        self.MAX_PSYCHOLOGY_ANALYSES = 0
+        self.PSYCHOLOGY_RETENTION_DAYS = 0
+        
+        logger.info(f"📊 Database cleanup settings: MAX_PER_USER={self.MAX_CHAT_MESSAGES_PER_USER}, "
+                   f"MAX_TOTAL={self.MAX_TOTAL_CHAT_MESSAGES}, "
+                   f"RETENTION_DAYS={self.CHAT_MESSAGES_RETENTION_DAYS}")
         
     def get_database_stats(self) -> Dict[str, Any]:
         """Получает статистику базы данных"""

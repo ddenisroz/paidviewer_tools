@@ -19,8 +19,14 @@ const TtsControlPanel = ({
     onRegenerateObsUrl,
     platformSettings,
     integrations,
-    onPlatformToggle
+    onPlatformToggle,
+    user,
+    isGuest
 }) => {
+    // Проверяем, подключена ли платформа (через OAuth или как гость)
+    const isTwitchConnected = integrations.twitch?.enabled || (isGuest && user?.platform === 'twitch');
+    const isVkConnected = integrations.vk?.enabled || (isGuest && user?.platform === 'vk');
+    
     return (
         <Card>
             <CardHeader>
@@ -153,55 +159,55 @@ const TtsControlPanel = ({
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {/* Twitch */}
                                 <div className={`flex items-center justify-between p-3 rounded-lg border ${
-                                    integrations.twitch?.enabled 
+                                    isTwitchConnected 
                                         ? 'bg-gray-800 border-gray-700' 
                                         : 'bg-gray-900 border-gray-800'
                                 }`}>
                                     <div className="flex items-center space-x-3">
                                         <TwitchIcon className={`w-5 h-5 ${
-                                            integrations.twitch?.enabled ? 'text-white' : 'text-gray-500'
+                                            isTwitchConnected ? 'text-white' : 'text-gray-500'
                                         }`} />
                                         <div>
                                             <p className="text-sm font-medium text-white">Twitch</p>
                                             <p className="text-xs text-gray-400">
-                                                {integrations.twitch?.enabled 
-                                                    ? `@${integrations.twitch?.username || 'загрузка...'}` 
+                                                {isTwitchConnected 
+                                                    ? `@${integrations.twitch?.username || user?.twitch_username || user?.username || 'загрузка...'}` 
                                                     : 'Не подключен'
                                                 }
                                             </p>
                                         </div>
                                     </div>
                                     <Switch
-                                        checked={integrations.twitch?.enabled && platformSettings.enabled_platforms?.includes('twitch')}
+                                        checked={isTwitchConnected && (platformSettings.enabled_platforms?.includes('twitch') || false)}
                                         onCheckedChange={() => onPlatformToggle('twitch')}
-                                        disabled={!integrations.twitch?.enabled}
+                                        disabled={!isTwitchConnected}
                                     />
                                 </div>
                                 
                                 {/* VK Live */}
                                 <div className={`flex items-center justify-between p-3 rounded-lg border ${
-                                    integrations.vk?.enabled 
+                                    isVkConnected 
                                         ? 'bg-gray-800 border-gray-700' 
                                         : 'bg-gray-900 border-gray-800'
                                 }`}>
                                     <div className="flex items-center space-x-3">
                                         <VKIcon className={`w-5 h-5 ${
-                                            integrations.vk?.enabled ? 'text-white' : 'text-gray-500'
+                                            isVkConnected ? 'text-white' : 'text-gray-500'
                                         }`} />
                                         <div>
                                             <p className="text-sm font-medium text-white">VK Live</p>
                                             <p className="text-xs text-gray-400">
-                                                {integrations.vk?.enabled 
-                                                    ? `@${integrations.vk?.username || 'загрузка...'}` 
+                                                {isVkConnected 
+                                                    ? `@${integrations.vk?.username || user?.vk_username || user?.username || 'загрузка...'}` 
                                                     : 'Не подключен'
                                                 }
                                             </p>
                                         </div>
                                     </div>
                                     <Switch
-                                        checked={integrations.vk?.enabled && platformSettings.enabled_platforms?.includes('vk')}
+                                        checked={isVkConnected && (platformSettings.enabled_platforms?.includes('vk') || false)}
                                         onCheckedChange={() => onPlatformToggle('vk')}
-                                        disabled={!integrations.vk?.enabled}
+                                        disabled={!isVkConnected}
                                     />
                                 </div>
                             </div>

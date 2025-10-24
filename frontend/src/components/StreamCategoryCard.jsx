@@ -12,7 +12,8 @@ import { TwitchIcon, VKIcon } from './PlatformIcons';
 import { useData } from '../context/DataContext';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useUserSettings } from '../context/UserSettingsContext';
-import { findMappedCategory } from '../constants/categoryMapping';
+import { findMappedCategory, categoryMapping } from '../constants/categoryMapping';
+import { toast } from 'sonner';
 
 // Portal dropdown для отображения поверх всех элементов
 const CategoryDropdown = ({ platform, search, onSelect, results, inputRef }) => {
@@ -75,6 +76,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
     const [isLinked, setIsLinked] = useState(false);
     const [searchTerms, setSearchTerms] = useState({ twitch: '', vk: '' });
     const [showDropdown, setShowDropdown] = useState({ twitch: false, vk: false });
+    const autoSaveTimerRef = useRef(null);
 
     const debouncedTwitchSearch = useDebounce(searchTerms.twitch, 300); // Быстрая отзывчивость
     const debouncedVkSearch = useDebounce(searchTerms.vk, 300);
@@ -143,23 +145,161 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                 const twitchCategory = currentData.twitch?.category;
                 
                 if (twitchCategory) {
-                    // Пытаемся найти соответствующую категорию для VK Live через маппинг
-                    const vkCategories = categories?.vk || [];
-                    const mappedCategory = findMappedCategory(twitchCategory.name, 'twitch', vkCategories);
+                    console.log('🔍 [AUTO-SYNC] ===== START AUTO-SYNC =====');
+                    console.log('🔍 [AUTO-SYNC] Twitch category:', twitchCategory);
+                    console.log('🔍 [AUTO-SYNC] Twitch category name:', twitchCategory.name);
                     
-                    const vkCategory = mappedCategory || twitchCategory; // Используем маппинг или ту же категорию
+                    // Применяем маппинг категорий (Just Chatting → Говорим и смотрим)
+                    const mappedName = categoryMapping[twitchCategory.name];
+                    console.log('🔍 [AUTO-SYNC] Mapping lookup result:', {
+                        twitchName: twitchCategory.name,
+                        mappedName: mappedName,
+                        hasMappedName: !!mappedName
+                    });
+                    
+                    let searchResults = null;
+                    let vkCategory = null;
+                    
+                    // Сначала пробуем маппинг
+                    if (mappedName) {
+                        console.log('🔍 [AUTO-SYNC] Trying mapped name:', mappedName);
+                        searchResults = await searchCategories('vk', mappedName);
+                        console.log('🔍 [AUTO-SYNC] Mapped search results:', searchResults);
+                        console.log('🔍 [AUTO-SYNC] Mapped search results count:', searchResults?.length || 0);
+                        console.log('🔍 [AUTO-SYNC] First result:', searchResults?.[0]);
+                        
+                        if (searchResults && searchResults.length > 0) {
+                            const candidate = searchResults[0];
+                            console.log('🔍 [AUTO-SYNC] Candidate category:', candidate);
+                            
+                            // Для маппинга используем МЯГКУЮ проверку (доверяем маппингу!)
+                            const catNormalized = candidate.name.toLowerCase().replace(/[\-–—]/g, ' ').replace(/\s+/g, ' ').trim();
+                            const queryNormalized = mappedName.toLowerCase().replace(/[\-–—]/g, ' ').replace(/\s+/g, ' ').trim();
+                            
+                            // Разбиваем на слова для точного сравнения
+                            const catWords = catNormalized.split(/\s+/);
+                            const queryWords = queryNormalized.split(/\s+/);
+                            
+                            // Good match если:
+                            // 1. Точное совпадение
+                            // 2. Хотя бы 75% слов запроса есть в категории
+                            // 3. Первое слово совпадает (для маппинга "IRL" → "Реальная жизнь" не сработает, но это OK)
+                            const matchingWords = queryWords.filter(qw => catWords.includes(qw)).length;
+                            const matchRatio = matchingWords / queryWords.length;
+                            
+                            const isGoodMatch = catNormalized === queryNormalized || 
+                                              matchRatio >= 0.75 ||
+                                              (catWords[0] === queryWords[0] && matchingWords > 0);
+                            
+                            if (isGoodMatch) {
+                                vkCategory = candidate;
+                                console.log('✅ [AUTO-SYNC] Found via mapping (good match):', vkCategory.name);
+                            } else {
+                                // Для маппинга берем первый результат даже если релевантность низкая
+                                // (маппинг создан вручную - доверяем ему)
+                                vkCategory = candidate;
+                                console.log('⚠️ [AUTO-SYNC] Using mapped category despite low text match:', {
+                                    mapped: mappedName,
+                                    found: candidate.name,
+                                    reason: 'Manual mapping takes priority'
+                                });
+                            }
+                        }
+                    }
+                    
+                    // Если по маппингу не нашли - пробуем оригинальное название
+                    if (!vkCategory) {
+                        console.log('🔍 [AUTO-SYNC] Trying original name:', twitchCategory.name);
+                        searchResults = await searchCategories('vk', twitchCategory.name);
+                        console.log('🔍 [AUTO-SYNC] Original search results:', searchResults?.length || 0);
+                        
+                        if (searchResults && searchResults.length > 0) {
+                            const candidate = searchResults[0];
+                            
+                            // Проверяем релевантность - используем только если высокая (СТРОГАЯ проверка!)
+                            const catNormalized = candidate.name.toLowerCase().replace(/[\-–—]/g, ' ').replace(/\s+/g, ' ').trim();
+                            const queryNormalized = twitchCategory.name.toLowerCase().replace(/[\-–—]/g, ' ').replace(/\s+/g, ' ').trim();
+                            
+                            // Разбиваем на слова для точного сравнения
+                            const catWords = catNormalized.split(/\s+/);
+                            const queryWords = queryNormalized.split(/\s+/);
+                            
+                            // Good match ТОЛЬКО если:
+                            // 1. Точное совпадение
+                            // 2. Все слова запроса есть в категории (для многословных запросов)
+                            const isGoodMatch = catNormalized === queryNormalized || 
+                                              (queryWords.every(qw => catWords.includes(qw)) && queryWords.length >= 2);
+                            
+                            if (isGoodMatch) {
+                                vkCategory = candidate;
+                                console.log('✅ [AUTO-SYNC] Found via original name (good match):', vkCategory.name);
+                            } else {
+                                console.warn('⚠️ [AUTO-SYNC] Found category but relevance too low:', {
+                                    query: twitchCategory.name,
+                                    found: candidate.name,
+                                    normalized: { query: queryNormalized, category: catNormalized }
+                                });
+                            }
+                        }
+                    }
+                    
+                    if (searchResults && searchResults.length > 0) {
+                        console.log('🔍 [AUTO-SYNC] Top 3 results:', searchResults.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
+                    }
+                    
+                    if (vkCategory) {
+                        // Нашли VK категорию!
+                        console.log('✅ [AUTO-SYNC] Found VK category by name:', {
+                            twitch: twitchCategory.name,
+                            vk: vkCategory.name,
+                            vkId: vkCategory.id
+                        });
                     
                     setCurrentData(prev => ({
                         ...prev,
                         vk: { ...prev.vk, category: vkCategory }
                     }));
                     
-                    // Автоматически сохраняем синхронизированную категорию
+                        const vkPayload = {
+                            category: {
+                                id: vkCategory.id,
+                                name: vkCategory.name || vkCategory.title || "",
+                                title: vkCategory.name || vkCategory.title || "",
+                                type: vkCategory.type || "games",
+                                cover_url: vkCategory.cover_url
+                            },
+                            category_id: vkCategory.id
+                        };
+                        
+                        // Отправляем только Twitch категорию, VK категорию меняем только если нашли подходящую
+                        const payload = {
+                            twitch: { category_id: twitchCategory.id },
+                            vk: vkPayload
+                        };
+                        
+                        console.log('💾 [AUTO-SYNC] Final payload (both platforms):', payload);
+                        
+                        // Уведомление об успешной автосинхронизации
+                        toast.success(`Категории синхронизированы: Twitch → VK Live (${vkCategory.name})`);
+                        
+                        saveChanges(payload, 'saveCategory');
+                    } else {
+                        // НЕ НАШЛИ VK категорию - меняем ТОЛЬКО Twitch, VK оставляем как есть
+                        console.warn('⚠️ [AUTO-SYNC] Could not find VK category for:', twitchCategory.name);
+                        console.warn('💡 [AUTO-SYNC] Only Twitch category will be updated. VK category unchanged.');
+                        
                     const payload = {
-                        twitch: { category_id: twitchCategory.id, category_name: twitchCategory.name },
-                        vk: { category_id: vkCategory.id, category_name: vkCategory.name }
-                    };
+                            twitch: { category_id: twitchCategory.id }
+                            // VK НЕ включаем - оставляем как было!
+                        };
+                        
+                        console.log('💾 [AUTO-SYNC] Final payload (Twitch only):', payload);
+                        
+                        // Уведомление что VK категория не найдена
+                        toast.warning(`VK Live категория для "${twitchCategory.name}" не найдена. Обновлена только Twitch категория.`);
+                        
                     saveChanges(payload, 'saveCategory');
+                    }
                 }
             }
         }
@@ -299,7 +439,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
         }
     };
 
-    const handleCategorySelect = (platform, category) => {
+    const handleCategorySelect = async (platform, category) => {
         console.log('🎮 [HANDLE SELECT] Category selected:', { platform, category: category.name, id: category.id, isLinked, bothEnabled });
         
         if (isLinked && bothEnabled) {
@@ -308,8 +448,59 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
             const otherCategories = categories[otherPlatform] || [];
             
             // Ищем соответствующую категорию на другой платформе
-            const mappedCategory = findMappedCategory(category.name, platform, otherCategories);
-            console.log('🎮 [HANDLE SELECT] Mapped category:', { otherPlatform, mappedCategory: mappedCategory?.name });
+            let mappedCategory = findMappedCategory(category.name, platform, otherCategories);
+            console.log('🎮 [HANDLE SELECT] Mapped category (from cache):', { otherPlatform, mappedCategory: mappedCategory?.name });
+            
+            // Если не нашли в кеше - ИЩЕМ ЧЕРЕЗ API!
+            if (!mappedCategory) {
+                // Пробуем маппинг (если есть)
+                const mappedName = categoryMapping[category.name];
+                const searchQuery = mappedName || category.name; // Если нет маппинга - ищем по оригинальному названию
+                
+                console.log('🎮 [HANDLE SELECT] Not found in cache - searching API:', {
+                    hasMappedName: !!mappedName,
+                    mappedName,
+                    searchQuery
+                });
+                
+                try {
+                    const searchResults = await searchCategories(otherPlatform, searchQuery);
+                    console.log('🎮 [HANDLE SELECT] API search results:', searchResults?.length || 0);
+                    
+                    if (searchResults && searchResults.length > 0) {
+                        // Проверяем точное совпадение
+                        mappedCategory = searchResults.find(cat => 
+                            cat.name && cat.name.toLowerCase() === searchQuery.toLowerCase()
+                        );
+                        
+                        if (!mappedCategory) {
+                            // Если точного нет - используем первый результат (если релевантен)
+                            const candidate = searchResults[0];
+                            const catNormalized = candidate.name.toLowerCase().replace(/[\-–—]/g, ' ').replace(/\s+/g, ' ').trim();
+                            const queryNormalized = searchQuery.toLowerCase().replace(/[\-–—]/g, ' ').replace(/\s+/g, ' ').trim();
+                            
+                            // Проверяем релевантность (не берем мусор!)
+                            if (catNormalized === queryNormalized || 
+                                catNormalized.startsWith(queryNormalized) ||
+                                queryNormalized.split(/\s+/).every(word => catNormalized.includes(word))) {
+                                mappedCategory = candidate;
+                                console.log('🎮 [HANDLE SELECT] Using first result (relevant):', mappedCategory.name);
+                            } else {
+                                console.warn('🎮 [HANDLE SELECT] First result not relevant:', {
+                                    query: searchQuery,
+                                    found: candidate.name
+                                });
+                            }
+                        } else {
+                            console.log('🎮 [HANDLE SELECT] Found exact match via API:', mappedCategory.name);
+                        }
+                    } else {
+                        console.warn('🎮 [HANDLE SELECT] No results from API for:', searchQuery);
+                    }
+                } catch (error) {
+                    console.error('🎮 [HANDLE SELECT] Error searching for category:', error);
+                }
+            }
             
             if (mappedCategory) {
                 // Нашли соответствующую категорию - устанавливаем разные категории для разных платформ
@@ -319,14 +510,25 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                     [platform]: { ...prev[platform], category },
                     [otherPlatform]: { ...prev[otherPlatform], category: mappedCategory },
                 }));
+                
+                // Уведомление об успешной синхронизации
+                toast.success(`Категория синхронизирована: ${category.name} → ${mappedCategory.name}`);
             } else {
-                // Не нашли соответствующую категорию - устанавливаем одинаковую (как было раньше)
-                console.log('🎮 [HANDLE SELECT] Setting same category for both platforms');
+                // Не нашли соответствующую категорию - НЕ копируем!
+                // Пользователь может вручную выбрать категорию на другой платформе
+                console.log('🎮 [HANDLE SELECT] Mapping not found - only updating selected platform');
                 setCurrentData(prev => ({
                     ...prev,
-                    twitch: { ...prev.twitch, category },
-                    vk: { ...prev.vk, category },
+                    [platform]: { ...prev[platform], category },
+                    // Другая платформа остается неизменной
                 }));
+                
+                // Уведомление что категория не найдена на другой платформе
+                const platformNames = {
+                    'twitch': 'Twitch',
+                    'vk': 'VK Live'
+                };
+                toast.warning(`Категория "${category.name}" обновлена только на ${platformNames[platform]}. Для ${platformNames[otherPlatform]} категория не найдена — выберите вручную.`);
             }
         } else {
             console.log('🎮 [HANDLE SELECT] Setting single platform category');
@@ -350,13 +552,21 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
     };
 
     const handleKeyPress = (e) => {
-        if (e.key === 'Enter' && isChanged && status.saveCategory !== 'loading') {
+        if (e.key === 'Enter' && isChanged && status.saveCategory !== 'loading' && status.saveCategory !== 'success') {
             handleSave(isLinked && bothEnabled ? 'both' : 'individual');
         }
     };
 
     const handleSave = (mode) => {
         console.log('💾 [SAVE] handleSave called:', { mode, isChanged, twitchEnabled, vkEnabled });
+        
+        // Очищаем таймер автосброса (пользователь сохраняет вручную)
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+            console.log('⏰ [AUTO-RESET] Timer cleared - user saved manually');
+        }
+        
         const payload = {};
         
         if (mode === 'both') {
@@ -365,10 +575,39 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                 payload.twitch = { category_id: currentData.twitch?.category?.id || null };
             }
             if (vkEnabled && (currentData.vk?.category?.id || null) !== (initialData.vk?.category?.id || null)) {
+                // VK требует полный объект категории
+                const vkCat = currentData.vk?.category;
+                
+                // ЗАЩИТА: Проверяем, что это не Twitch ID (UUID vs numeric string)
+                // VK ID - UUID с дефисами (например, "08c87647-7076-4e2c-8e1b-bc695c78728a")
+                // Twitch ID - числовой string (например, "1469308723")
+                const isVkUUID = vkCat?.id && vkCat.id.includes('-');
+                
+                if (!isVkUUID && vkCat?.id) {
+                    console.error('❌ [SAVE] VK category has Twitch-like ID! Skipping VK update to prevent error:', vkCat.id);
+                    console.warn('💡 [SAVE] Only Twitch will be updated. Please select VK category manually or use toggle.');
+                    
+                    // Уведомление пользователю
+                    toast.warning('VK Live категория не обновлена (неверный формат). Обновлена только Twitch категория.');
+                } else {
+                    const vkCategoryPayload = {
+                        id: vkCat?.id || "",
+                        name: vkCat?.name || vkCat?.title || "",
+                        title: vkCat?.name || vkCat?.title || "",
+                        type: vkCat?.type || "games"
+                    };
+                    
+                    // Добавляем cover_url только если он не пустой (VK API не принимает пустые строки)
+                    const coverUrl = vkCat?.box_art_url || vkCat?.cover_url || "";
+                    if (coverUrl) {
+                        vkCategoryPayload.cover_url = coverUrl;
+                    }
+                    
                 payload.vk = { 
-                    category_id: currentData.vk?.category?.id || null,
-                    category_name: currentData.vk?.category?.name || null  // Добавляем name для полной загрузки
+                        category: vkCategoryPayload,
+                        category_id: vkCat?.id || null // Fallback для совместимости
                 };
+                }
             }
         } else {
             // Индивидуальный режим - сохраняем только измененные категории
@@ -377,11 +616,37 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                 console.log('💾 [SAVE] Added Twitch to payload:', payload.twitch);
             }
             if (vkEnabled && (currentData.vk?.category?.id || null) !== (initialData.vk?.category?.id || null)) {
+                // VK требует полный объект категории (даже в раздельном режиме!)
+                const vkCat = currentData.vk?.category;
+                
+                // ЗАЩИТА: Проверяем, что это не Twitch ID (UUID vs numeric string)
+                const isVkUUID = vkCat?.id && vkCat.id.includes('-');
+                
+                if (!isVkUUID && vkCat?.id) {
+                    console.error('❌ [SAVE] VK category has Twitch-like ID! Skipping VK update:', vkCat.id);
+                    
+                    // Уведомление пользователю
+                    toast.warning('VK Live категория не обновлена (неверный формат). Пожалуйста, выберите VK категорию вручную.');
+                } else {
+                    const vkCategoryPayload = {
+                        id: vkCat?.id || "",
+                        name: vkCat?.name || vkCat?.title || "",
+                        title: vkCat?.name || vkCat?.title || "",
+                        type: vkCat?.type || "games"
+                    };
+                    
+                    // Добавляем cover_url только если он не пустой (VK API не принимает пустые строки)
+                    const coverUrl = vkCat?.box_art_url || vkCat?.cover_url || "";
+                    if (coverUrl) {
+                        vkCategoryPayload.cover_url = coverUrl;
+                    }
+                    
                 payload.vk = { 
-                    category_id: currentData.vk?.category?.id || null,
-                    category_name: currentData.vk?.category?.name || null  // Добавляем name для полной загрузки
+                        category: vkCategoryPayload,
+                        category_id: vkCat?.id || null // Fallback для совместимости
                 };
-                console.log('💾 [SAVE] Added VK to payload:', payload.vk);
+                    console.log('💾 [SAVE] Added VK to payload (full object):', payload.vk);
+                }
             }
         }
         
@@ -411,6 +676,48 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
         });
         return categoryChanged;
     }, [initialData.twitch?.category?.id, initialData.vk?.category?.id, currentData.twitch?.category?.id, currentData.vk?.category?.id, twitchEnabled, vkEnabled]);
+
+    // Автосброс изменений через 10 секунд, если пользователь не сохранил
+    useEffect(() => {
+        // Очищаем предыдущий таймер
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+        }
+
+        // Если есть несохранённые изменения - запускаем таймер
+        if (isChanged && status.saveCategory !== 'loading' && status.saveCategory !== 'success') {
+            console.log('⏰ [AUTO-RESET] Starting 10s timer to reset unsaved changes');
+            
+            autoSaveTimerRef.current = setTimeout(() => {
+                console.log('⏰ [AUTO-RESET] 10 seconds passed - resetting to initial data');
+                
+                // Сбрасываем к исходным данным
+                setCurrentData(prev => ({
+                    ...prev,
+                    twitch: { ...prev.twitch, category: initialData.twitch?.category },
+                    vk: { ...prev.vk, category: initialData.vk?.category }
+                }));
+                
+                // Обновляем инпуты
+                setSearchTerms({
+                    twitch: initialData.twitch?.category?.name || '',
+                    vk: initialData.vk?.category?.name || ''
+                });
+                
+                // Уведомление пользователю
+                toast.info('Изменения категории отменены (не были сохранены в течение 10 секунд)');
+            }, 10000); // 10 секунд
+        }
+
+        // Cleanup при размонтировании
+        return () => {
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+                autoSaveTimerRef.current = null;
+            }
+        };
+    }, [isChanged, status.saveCategory, initialData.twitch?.category, initialData.vk?.category, setCurrentData]);
 
     if (isLoading) {
         return (
@@ -639,16 +946,18 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                 <div className="p-3 pt-0 flex-shrink-0">
                     <Button 
                         onClick={() => handleSave(isLinked && bothEnabled ? 'both' : 'individual')}
-                        disabled={status.saveCategory === 'loading' || !isChanged}
+                        disabled={status.saveCategory === 'loading' || status.saveCategory === 'success' || !isChanged}
                         size="sm"
                         className="w-full flex items-center gap-2"
                     >
                         {status.saveCategory === 'loading' ? (
                             <Loader className="h-4 w-4 animate-spin" />
+                        ) : status.saveCategory === 'success' ? (
+                            <CheckCircle className="h-4 w-4" />
                         ) : (
                             <Save className="h-4 w-4" />
                         )}
-                        {status.saveCategory === 'loading' ? 'Сохранение...' : 'Сохранить'}
+                        {status.saveCategory === 'loading' ? 'Сохранение...' : status.saveCategory === 'success' ? 'Сохранено' : 'Сохранить'}
                     </Button>
                 </div>
             )}

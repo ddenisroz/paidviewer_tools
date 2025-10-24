@@ -176,6 +176,20 @@ const TtsMainPageContent = () => {
                     setTtsSettings(ttsData);
                     ttsLogger.success('TTS settings loaded:', ttsData);
                 }
+                
+                // 🔄 Загружаем настройки платформ для TTS
+                ttsLogger.api('GET', '/api/tts/platform-settings');
+                const platformResponse = await botService.get('/api/tts/platform-settings');
+                ttsLogger.apiResponse(200, '/api/tts/platform-settings', platformResponse.data);
+                
+                if (platformResponse.data) {
+                    const platformData = {
+                        enabled_platforms: platformResponse.data.enabled_platforms || ['twitch', 'vk'],
+                        global_enabled: platformResponse.data.global_enabled ?? true
+                    };
+                    setPlatformSettings(platformData);
+                    ttsLogger.success('Platform settings loaded:', platformData);
+                }
             } catch (error) {
                 ttsLogger.error('Error loading settings:', error);
                 // При ошибке загрузки с сервера используем значения по умолчанию
@@ -244,6 +258,21 @@ const TtsMainPageContent = () => {
         return () => window.removeEventListener('ai-tts-changed', handleAiTtsChange);
     }, []);
 
+    // 🔄 Слушаем изменения platform settings из ChatCard
+    useEffect(() => {
+        const handlePlatformSettingsChange = (event) => {
+            const { enabledPlatforms } = event.detail;
+            ttsLogger.info('TtsMainPage: Received tts-settings-changed event', enabledPlatforms);
+            setPlatformSettings(prev => ({
+                ...prev,
+                enabled_platforms: enabledPlatforms
+            }));
+        };
+
+        window.addEventListener('tts-settings-changed', handlePlatformSettingsChange);
+        return () => window.removeEventListener('tts-settings-changed', handlePlatformSettingsChange);
+    }, []);
+
     // Генерация OBS URL
     useEffect(() => {
         const generateUrl = async () => {
@@ -292,11 +321,18 @@ const TtsMainPageContent = () => {
             });
             
             // Сохраняем настройки на сервер
+            const newEnabledPlatforms = platformSettings.enabled_platforms.includes(platform)
+                ? platformSettings.enabled_platforms.filter(p => p !== platform)
+                : [...platformSettings.enabled_platforms, platform];
+            
             await botService.post('/api/tts/platform-settings', {
-                enabled_platforms: platformSettings.enabled_platforms.includes(platform)
-                    ? platformSettings.enabled_platforms.filter(p => p !== platform)
-                    : [...platformSettings.enabled_platforms, platform]
+                enabled_platforms: newEnabledPlatforms
             });
+            
+            // 🔄 Отправляем событие для синхронизации с другими компонентами
+            window.dispatchEvent(new CustomEvent('tts-settings-changed', {
+                detail: { enabledPlatforms: newEnabledPlatforms }
+            }));
             
             console.log(`Platform ${platform} toggled successfully`);
         } catch (error) {
@@ -616,6 +652,8 @@ const TtsMainPageContent = () => {
                     platformSettings={platformSettings}
                     integrations={integrations}
                     onPlatformToggle={handlePlatformToggle}
+                    user={user}
+                    isGuest={isGuest}
                 />
                 
                 {/* Громкость */}

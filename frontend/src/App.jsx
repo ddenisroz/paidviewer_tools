@@ -4,9 +4,6 @@ import { Toaster } from 'sonner';
 
 import AuthGuard from './components/AuthGuard';
 import Layout from './components/Layout';
-import { PlayerProvider } from './context/PlayerContext';
-import { DonationAlertsProvider } from './context/DonationAlertsContext';
-import { UserSettingsProvider } from './context/UserSettingsContext';
 
 // Убираем глобальный прелоадер
 
@@ -31,7 +28,7 @@ const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 const CommandsPage = lazy(() => import('./pages/CommandsPage'));
 const ObsTtsPage = lazy(() => import('./pages/tts/ObsTtsPage'));
 const ObsYoutubePage = lazy(() => import('./pages/tts/ObsYoutubePage'));
-const ChatObsPage = lazy(() => import('./pages/ChatObsPage'));
+const ChatOverlay = lazy(() => import('./pages/ChatOverlay'));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
 const UserManagementPage = lazy(() => import('./pages/admin/UserManagementPage'));
 const BotManagementPage = lazy(() => import('./pages/admin/BotManagementPage'));
@@ -45,12 +42,10 @@ const DropsWidget = lazy(() => import('./pages/obs/DropsWidget'));
 
 function App() {
     return (
-        <PlayerProvider>
-            <DonationAlertsProvider>
-                <UserSettingsProvider>
-                    <Toaster />
-                    <Suspense fallback={null}>
-                    <Routes>
+        <>
+            <Toaster />
+            <Suspense fallback={null}>
+                <Routes>
                         {/* Public Routes */}
                         <Route path="/login" element={<LoginPage />} />
                         <Route path="/guest" element={<GuestPage />} />
@@ -60,7 +55,7 @@ function App() {
                         <Route path="/tts-obs/:token" element={<ObsTtsPage />} />
                         <Route path="/youtube-obs/:token" element={<ObsYoutubePage />} />
                         <Route path="/drops-widget/:token" element={<DropsWidget />} />
-                        <Route path="/chat/obs" element={<ChatObsPage />} />
+                        <Route path="/chat-overlay" element={<ChatOverlay />} />
 
                         {/* Protected Routes with Layout */}
                         <Route path="/" element={<AuthGuard />}>
@@ -90,11 +85,9 @@ function App() {
                                 <Route path="dashboard/dolbaebadmintts/support" element={<AdminPage />} />
                             </Route>
                         </Route>
-                    </Routes>
-                    </Suspense>
-                </UserSettingsProvider>
-            </DonationAlertsProvider>
-        </PlayerProvider>
+                </Routes>
+            </Suspense>
+        </>
     );
 }
 

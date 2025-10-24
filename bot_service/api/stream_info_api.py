@@ -11,9 +11,17 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["stream-info"])
 
+class CategoryObject(BaseModel):
+    id: str
+    title: Optional[str] = None
+    cover_url: Optional[str] = None
+    type: Optional[str] = None
+    name: Optional[str] = None  # Alias for title (frontend uses 'name')
+
 class PlatformUpdate(BaseModel):
     title: Optional[str] = None
     category_id: Optional[str] = None
+    category: Optional[CategoryObject] = None  # Full category object for VK
 
 class StreamUpdateRequest(BaseModel):
     twitch: Optional[PlatformUpdate] = None
@@ -168,6 +176,15 @@ async def update_stream(
         logger.info(f"🎬 [STREAM UPDATE] Received request from user {user_id}")
         logger.info(f"🎬 [STREAM UPDATE] Request data: {request.dict()}")
         
+        # Детальное логирование VK данных
+        if request.vk:
+            logger.info(f"🔍 [DEBUG] request.vk exists")
+            logger.info(f"🔍 [DEBUG] request.vk dict: {request.vk.dict()}")
+            logger.info(f"🔍 [DEBUG] request.vk.category_id: {request.vk.category_id}")
+            logger.info(f"🔍 [DEBUG] request.vk.category: {request.vk.category}")
+            if request.vk.category:
+                logger.info(f"🔍 [DEBUG] request.vk.category dict: {request.vk.category.dict()}")
+        
         # Обновляем Twitch если данные переданы
         if request.twitch:
             from api.twitch_api import TwitchAPI
@@ -207,9 +224,29 @@ async def update_stream(
                 logger.info(f"✅ [VK] Title updated successfully")
                 results.append("VK title updated")
             
-            if request.vk.category_id:
-                logger.info(f"🎬 [VK] Updating category to: {request.vk.category_id}")
-                success = await vk_api.update_stream_category(str(user_id), request.vk.category_id)
+            if request.vk.category_id or request.vk.category:
+                # Детальное логирование для отладки
+                logger.info(f"🔍 [VK] request.vk.category_id = {request.vk.category_id}")
+                logger.info(f"🔍 [VK] request.vk.category = {request.vk.category}")
+                logger.info(f"🔍 [VK] type(request.vk.category) = {type(request.vk.category)}")
+                
+                # Используем полный объект категории если доступен, иначе только ID
+                category_data = None
+                if request.vk.category:
+                    # Фронтенд отправил полный объект - используем его
+                    category_data = {
+                        "id": request.vk.category.id,
+                        "title": request.vk.category.title or request.vk.category.name or "",
+                        "cover_url": request.vk.category.cover_url or "",
+                        "type": request.vk.category.type or "games"
+                    }
+                    logger.info(f"🎬 [VK] Updating category with full object: {category_data}")
+                else:
+                    # Только ID - используем старый метод (может не работать!)
+                    category_data = request.vk.category_id
+                    logger.warning(f"🎬 [VK] Updating category with ID only (may fail): {category_data}")
+                
+                success = await vk_api.update_stream_category(str(user_id), category_data)
                 if not success:
                     logger.error(f"❌ [VK] Category update failed for user {user_id}")
                     raise HTTPException(status_code=400, detail="Failed to update VK stream category")

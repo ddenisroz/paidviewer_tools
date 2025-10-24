@@ -2,7 +2,6 @@ import React, { createContext, useContext, useReducer, useEffect, useRef } from 
 import { botService } from '../services/microservices';
 import { youtubeLogger as logger } from '../utils/logger';
 import { useAuth } from './AuthContext';
-import { useWebSocket } from '../hooks/useWebSocket';
 
 // Контекст для глобального состояния плеера
 const PlayerContext = createContext();
@@ -113,21 +112,10 @@ export const PlayerProvider = ({ children }) => {
     const { isAuthenticated, isGuest } = useAuth();
     
     // WebSocket для синхронизации YouTube плеера
-    const wsBaseUrl = import.meta.env.VITE_BOT_SERVICE_WS_URL;
-    const wsUrl = isAuthenticated && wsBaseUrl ? `${wsBaseUrl.replace('http', 'ws')}/ws/chat/1` : null;
-    
-    const { isConnected } = useWebSocket(wsUrl, {
-        onMessage: (data) => {
-            if (data.type === 'youtube_state') {
-                handleYoutubeStateUpdate(data);
-            }
-        },
-        onError: (error) => {
-            logger.error('YouTube WebSocket error:', error);
-        },
-        autoReconnect: true,
-        maxReconnectAttempts: 5
-    });
+    // ОТКЛЮЧЕНО: backend не отправляет youtube_state, используем HTTP polling вместо WebSocket
+    // const wsBaseUrl = import.meta.env.VITE_BOT_SERVICE_WS_URL;
+    // const wsUrl = isAuthenticated && wsBaseUrl ? `${wsBaseUrl.replace('http', 'ws')}/ws/youtube/1` : null;
+    // const { isConnected } = useWebSocket(wsUrl, { ... });
 
     // Загрузка очереди и текущего видео
     const loadQueue = async () => {

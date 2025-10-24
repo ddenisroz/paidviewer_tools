@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Mic, MicOff, Volume2, Settings, Monitor } from 'lucide-react';
+import { Mic, MicOff, Volume2, Monitor } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { TwitchIcon, VKIcon } from './PlatformIcons';
-import { ttsService } from '../services/microservices';
+import { botService } from '../services/microservices';
 
 const TtsPlatformSelector = () => {
   const { user } = useAuth();
@@ -17,11 +17,20 @@ const TtsPlatformSelector = () => {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const response = await ttsService.get('/api/tts/settings');
+      // Добавляем cache-busting параметр для принудительного обновления
+      const response = await botService.get('/api/tts/platform-settings', {
+        params: { _t: Date.now() }  // Cache-busting достаточно, без лишних заголовков
+      });
+      console.log('🔄 [TTS SELECTOR] Loaded settings from API:', response.data);
+      console.log('🔄 [TTS SELECTOR] enabled_platforms:', response.data.enabled_platforms);
       setSettings(response.data);
+      console.log('🔄 [TTS SELECTOR] State updated. Current state:', {
+        enabled_platforms: response.data.enabled_platforms,
+        twitch_enabled: response.data.enabled_platforms.includes('twitch'),
+        vk_enabled: response.data.enabled_platforms.includes('vk')
+      });
     } catch (err) {
-      console.error('Error loading TTS settings:', err);
-      // Если настроек нет, используем значения по умолчанию
+      console.error('❌ [TTS SELECTOR] Error loading TTS settings:', err);
       setSettings({
         enabled_platforms: ['twitch', 'vk'],
         global_enabled: true
@@ -35,9 +44,18 @@ const TtsPlatformSelector = () => {
   const saveSettings = async (newSettings) => {
     try {
       setSaving(true);
-      await ttsService.put('/api/tts/settings', newSettings);
+      // Отправляем только enabled_platforms
+      await botService.post('/api/tts/platform-settings', {
+        enabled_platforms: newSettings.enabled_platforms
+      });
       setSettings(newSettings);
-      // Показываем уведомление
+      
+      // 🔄 Отправляем событие для синхронизации с нижними кнопками
+      window.dispatchEvent(new CustomEvent('tts-settings-changed', {
+        detail: { enabledPlatforms: newSettings.enabled_platforms }
+      }));
+      console.log('🔄 [TTS SELECTOR] Dispatched settings update:', newSettings.enabled_platforms);
+      
       if (window.toast) {
         window.toast.success('Настройки TTS сохранены');
       }
@@ -80,6 +98,25 @@ const TtsPlatformSelector = () => {
 
   useEffect(() => {
     loadSettings();
+    
+    // 🔄 Слушаем изменения TTS настроек из нижних кнопок
+    const handleTtsSettingsChanged = (event) => {
+      const { enabledPlatforms } = event.detail;
+      console.log('🔄 [TTS SELECTOR] Received settings update from shortcuts:', enabledPlatforms);
+      setSettings(prev => {
+        console.log('🔄 [TTS SELECTOR] Updating state from', prev.enabled_platforms, 'to', enabledPlatforms);
+        return {
+          ...prev,
+          enabled_platforms: enabledPlatforms
+        };
+      });
+    };
+    
+    window.addEventListener('tts-settings-changed', handleTtsSettingsChanged);
+    
+    return () => {
+      window.removeEventListener('tts-settings-changed', handleTtsSettingsChanged);
+    };
   }, []);
 
   if (loading) {

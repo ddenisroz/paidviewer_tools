@@ -451,11 +451,13 @@ export function isAlias(query) {
 export function expandQueryWithAliases(query) {
     const queries = [query]; // Всегда включаем исходный запрос
     
+    // Добавляем алиасы из словаря
     const aliases = getCategoriesByAlias(query);
     if (aliases.length > 0) {
         queries.push(...aliases);
     }
     
-    return queries;
+    // Убираем дубликаты
+    return [...new Set(queries)];
 }
 

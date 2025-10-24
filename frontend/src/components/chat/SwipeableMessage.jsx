@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Ban, Clock } from 'lucide-react';
+import { VolumeX } from 'lucide-react';
 
 const SwipeableMessage = ({ children, onSwipeAction, message }) => {
     const [touchStart, setTouchStart] = useState(null);
@@ -11,9 +11,8 @@ const SwipeableMessage = ({ children, onSwipeAction, message }) => {
     // Минимальное расстояние для регистрации свайпа (в пикселях)
     const minSwipeDistance = 50;
     
-    // Пороговые значения для разных действий
-    const timeoutThreshold = 80; // Таймаут 10мин
-    const banThreshold = 150;     // Бан
+    // Пороговое значение для заглушения TTS
+    const muteThreshold = 80; // Заглушить TTS
     
     const handleTouchStart = (e) => {
         setTouchEnd(null);
@@ -48,12 +47,9 @@ const SwipeableMessage = ({ children, onSwipeAction, message }) => {
         const distance = touchStart - touchEnd;
         
         // Определяем действие по дистанции свайпа
-        if (distance > banThreshold) {
-            // Бан
-            onSwipeAction('ban', message);
-        } else if (distance > timeoutThreshold) {
-            // Таймаут 10 минут
-            onSwipeAction('timeout_10m', message);
+        if (distance > muteThreshold) {
+            // Заглушить TTS
+            onSwipeAction('block_tts', message);
         }
         
         // Сбрасываем состояние
@@ -65,19 +61,13 @@ const SwipeableMessage = ({ children, onSwipeAction, message }) => {
     
     // Получаем иконку и цвет в зависимости от дистанции свайпа
     const getSwipeIndicator = () => {
-        if (swipeDistance < timeoutThreshold) {
+        if (swipeDistance < muteThreshold) {
             return null;
-        } else if (swipeDistance < banThreshold) {
-            return {
-                icon: <Clock className="w-5 h-5" />,
-                color: 'bg-yellow-500',
-                text: 'Таймаут 10м'
-            };
         } else {
             return {
-                icon: <Ban className="w-5 h-5" />,
+                icon: <VolumeX className="w-5 h-5" />,
                 color: 'bg-red-500',
-                text: 'Бан'
+                text: 'Заглушить TTS'
             };
         }
     };
@@ -112,7 +102,7 @@ const SwipeableMessage = ({ children, onSwipeAction, message }) => {
             
             {/* Контент сообщения */}
             <div 
-                className="relative bg-background transition-transform"
+                className="relative transition-transform"
                 style={{ 
                     transform: `translateX(-${swipeDistance}px)`,
                     transition: isSwiping ? 'none' : 'transform 0.3s ease-out'

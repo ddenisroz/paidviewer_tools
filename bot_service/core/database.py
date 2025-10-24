@@ -61,7 +61,7 @@ try:
         
         # Настройки TTS
         tts_listening_mode = Column(String, default='website')  # 'website' или 'obs'
-        tts_enabled = Column(Boolean, default=False)  # Включен ли TTS - по умолчанию выключен, пользователь включает вручную
+        tts_enabled = Column(Boolean, default=True)  # Включен ли TTS - включен по умолчанию для всех пользователей
         donationalerts_token_expires = Column(DateTime, nullable=True)
         temp_oauth_state = Column(String, nullable=True)
         
@@ -131,9 +131,13 @@ try:
     class WhitelistedChannel(Base):
         """Модель для белого списка каналов"""
         __tablename__ = "whitelisted_channels"
-        __table_args__ = {'extend_existing': True}
+        __table_args__ = (
+            UniqueConstraint('channel_name', 'platform', name='uix_channel_platform'),
+            {'extend_existing': True}
+        )
         id = Column(Integer, primary_key=True, index=True)
-        channel_name = Column(String, unique=True, index=True, nullable=False)
+        channel_name = Column(String, index=True, nullable=False)
+        platform = Column(String, index=True, nullable=False)  # 'twitch' или 'vk'
         created_at = Column(DateTime, default=utcnow_naive)
 
     class MutedUser(Base):
@@ -443,6 +447,9 @@ try:
         voice = Column(String, nullable=False, default='female_1')  # Голос для озвучки
         listening_mode = Column(String, nullable=False, default='website')  # 'website' или 'obs'
         
+        # Платформы для озвучки
+        enabled_platforms = Column(JSON, nullable=False, default=lambda: ['twitch', 'vk'])  # Список активных платформ
+        
         # Фильтры эмодзи и смайлов
         enable_7tv = Column(Boolean, nullable=False, default=True)  # Включить 7TV смайлы
         enable_twitch = Column(Boolean, nullable=False, default=True)  # Включить Twitch смайлы
@@ -568,6 +575,10 @@ class ChatMessage(Base):
     message = Column(Text, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     is_deleted = Column(Boolean, default=False)
+    
+    # Роли и значки пользователя
+    role = Column(String, nullable=True)  # moderator, subscriber, vip, broadcaster
+    badges = Column(JSON, nullable=True)  # Массив значков: ["broadcaster/1", "subscriber/12", "premium/1"]
 
 class UserProgression(Base):
     """Прогрессия пользователей в системе достижений"""
@@ -859,3 +870,48 @@ class SecurityLog(Base):
     user_agent = Column(String, nullable=True)
     details = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=utcnow_naive, index=True)
+
+
+class ChatBoxSettings(Base):
+    """Настройки кастомизации ChatBox для OBS виджета"""
+    __tablename__ = 'chatbox_settings'
+    __table_args__ = (
+        UniqueConstraint('user_id', name='uq_chatbox_user'),
+        UniqueConstraint('widget_token', name='uq_chatbox_token'),
+        {'extend_existing': True}
+    )
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    widget_token = Column(String, nullable=False, unique=True, index=True)  # Уникальный токен для OBS виджета
+    
+    # Настройки шрифта
+    font_family = Column(String, default='Inter')  # Google Font name
+    font_size = Column(Integer, default=16)  # в px
+    font_weight = Column(String, default='normal')  # normal, bold, 600, etc
+    text_stroke_width = Column(Integer, default=0)  # Толщина контура текста в px (0 = без контура)
+    text_stroke_color = Column(String, default='#000000')  # Цвет контура текста
+    
+    # Настройки фона
+    background_color = Column(String, default='#000000')  # Цвет фона
+    background_opacity = Column(Float, default=0.5)  # Прозрачность фона (0-1)
+    
+    # Настройки отображения
+    max_messages = Column(Integer, default=20)  # Количество отображаемых сообщений (мин: 1, макс: 50)
+    chat_direction = Column(String, default='vertical')  # vertical или horizontal
+    show_platform_icons = Column(Boolean, default=True)  # Показывать иконки платформ (Twitch/VK)
+    show_roles = Column(Boolean, default=False)  # Показывать роли пользователей (Модератор, Подписчик и т.д.)
+    show_badges = Column(Boolean, default=True)  # Показывать значки пользователей (Twitch badges через API)
+    show_avatars = Column(Boolean, default=False)  # Показывать аватары пользователей
+    
+    # Настройки цветов текста
+    text_color = Column(String, default='#FFFFFF')  # Цвет текста сообщений
+    username_color = Column(String, default='#9147FF')  # Цвет имени пользователя
+    
+    # Дополнительные настройки
+    message_spacing = Column(Integer, default=4)  # Отступ между сообщениями в px
+    border_radius = Column(Integer, default=8)  # Скругление углов в px
+    animation_duration = Column(Integer, default=300)  # Длительность анимации появления в ms
+    animation_type = Column(String, default='fade')  # Тип анимации: fade, slide-right, slide-left, scale, bounce
+    
+    created_at = Column(DateTime, default=utcnow_naive)
+    updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)

@@ -72,6 +72,26 @@ export const IntegrationsProvider = ({ children }) => {
             try {
                 setIsLoading(true);
                 const disconnectResponse = await botService.post('/api/integrations/twitch/disconnect');
+                
+                // 🔄 Автоматически удаляем Twitch из TTS enabled_platforms
+                try {
+                    const ttsSettingsResponse = await botService.get('/api/tts/platform-settings');
+                    const currentPlatforms = ttsSettingsResponse.data.enabled_platforms || [];
+                    const updatedPlatforms = currentPlatforms.filter(p => p !== 'twitch');
+                    await botService.post('/api/tts/platform-settings', {
+                        enabled_platforms: updatedPlatforms
+                    });
+                    
+                    // Отправляем событие для синхронизации с другими компонентами
+                    window.dispatchEvent(new CustomEvent('tts-settings-changed', {
+                        detail: { enabledPlatforms: updatedPlatforms }
+                    }));
+                    
+                    console.log('🔄 Automatically removed twitch from TTS enabled_platforms');
+                } catch (ttsError) {
+                    console.error('Error updating TTS settings after disconnect:', ttsError);
+                }
+                
                 // Обновляем данные пользователя из AuthContext
                 await refreshAuthStatus(true);
                 await fetchIntegrations();
@@ -95,6 +115,26 @@ export const IntegrationsProvider = ({ children }) => {
             try {
                 setIsLoading(true);
                 const disconnectResponse = await botService.post('/api/integrations/vk/disconnect');
+                
+                // 🔄 Автоматически удаляем VK из TTS enabled_platforms
+                try {
+                    const ttsSettingsResponse = await botService.get('/api/tts/platform-settings');
+                    const currentPlatforms = ttsSettingsResponse.data.enabled_platforms || [];
+                    const updatedPlatforms = currentPlatforms.filter(p => p !== 'vk');
+                    await botService.post('/api/tts/platform-settings', {
+                        enabled_platforms: updatedPlatforms
+                    });
+                    
+                    // Отправляем событие для синхронизации с другими компонентами
+                    window.dispatchEvent(new CustomEvent('tts-settings-changed', {
+                        detail: { enabledPlatforms: updatedPlatforms }
+                    }));
+                    
+                    console.log('🔄 Automatically removed vk from TTS enabled_platforms');
+                } catch (ttsError) {
+                    console.error('Error updating TTS settings after disconnect:', ttsError);
+                }
+                
                 // Обновляем данные пользователя из AuthContext
                 await refreshAuthStatus(true);
                 await fetchIntegrations();

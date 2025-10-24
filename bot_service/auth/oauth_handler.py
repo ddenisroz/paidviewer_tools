@@ -245,6 +245,13 @@ class OAuthHandler:
                         unified_user.vk_username = user_data.username
                         logger.info(f"Updated VK channel_name: {user_data.username}")
                     
+                    # 🔐 БЕЗОПАСНОСТЬ: Добавляем платформу в текущую сессию
+                    session_id_from_cookie = request.cookies.get('session_id')
+                    if session_id_from_cookie:
+                        session_manager.link_platform_to_session(session_id_from_cookie, platform, db)
+                    else:
+                        logger.warning(f"⚠️ No session_id in cookies, cannot link platform {platform}")
+                    
                     db.commit()
                     logger.info(f"Added {platform} integration to user {unified_user.id}")
                     

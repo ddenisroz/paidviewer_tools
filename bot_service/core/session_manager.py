@@ -427,6 +427,12 @@ class SessionManager:
             
             logger.info(f"Creating session {session_id} for user {user_id} with device_info: {device_info}")
             
+            # 🔐 БЕЗОПАСНОСТЬ: В сессии доступна только платформа, через которую залогинились
+            login_platform = device_info.get('platform') if device_info else None
+            if device_info and login_platform:
+                device_info['linked_platforms'] = [login_platform]  # Только платформа логина!
+                logger.info(f"🔐 Session created with ONLY {login_platform} platform access")
+            
             new_session = UserSession(
                 user_id=user_id,
                 session_id=session_id,
@@ -468,6 +474,40 @@ class SessionManager:
             raise
         finally:
             db.close()
+    
+    def link_platform_to_session(self, session_id: str, platform: str, db: Session = None) -> bool:
+        """Добавляет платформу в список linked_platforms текущей сессии (при линковке)."""
+        should_close = False
+        if db is None:
+            db = next(get_db())
+            should_close = True
+        
+        try:
+            session = db.query(UserSession).filter(UserSession.session_id == session_id).first()
+            if not session:
+                logger.warning(f"⚠️ Session {session_id} not found, cannot link platform {platform}")
+                return False
+            
+            device_info = session.device_info or {}
+            linked_platforms = device_info.get('linked_platforms', [])
+            
+            if platform not in linked_platforms:
+                linked_platforms.append(platform)
+                device_info['linked_platforms'] = linked_platforms
+                session.device_info = device_info
+                db.commit()
+                logger.info(f"🔗 Linked {platform} to session {session_id}. Linked platforms: {linked_platforms}")
+                return True
+            else:
+                logger.info(f"ℹ️ Platform {platform} already linked to session {session_id}")
+                return True
+        except Exception as e:
+            logger.error(f"❌ Error linking platform {platform} to session {session_id}: {e}")
+            db.rollback()
+            return False
+        finally:
+            if should_close:
+                db.close()
             logger.info(f"🔧 Database connection closed")
 
     def update_session(self, session_id: int, device_info: Optional[Dict] = None) -> bool:
@@ -825,6 +865,11 @@ class SessionManager:
             
             # Обработка гостевых сессий (user_id = -1)
             if session.user_id == -1:
+                # Извлекаем платформу из device_info
+                login_platform = None
+                if session.device_info and isinstance(session.device_info, dict):
+                    login_platform = session.device_info.get('platform')
+                    
                 return {
                     "user_id": -1,
                     "id": -1,
@@ -834,7 +879,8 @@ class SessionManager:
                     "blocked_at": None,
                     "integrations": {},
                     "is_guest": True,
-                    "device_info": session.device_info
+                    "device_info": session.device_info,
+                    "login_platform": login_platform
                 }
             
             user = db.query(User).filter_by(id=session.user_id).first()
@@ -843,6 +889,11 @@ class SessionManager:
                 return None
             
             # ИНТЕГРАЦИИ НЕ ВКЛЮЧАЕМ В СЕССИЮ - они будут проверяться через API с валидацией токенов
+            # Извлекаем платформу из device_info для проверки whitelist
+            login_platform = None
+            if session.device_info and isinstance(session.device_info, dict):
+                login_platform = session.device_info.get('platform')
+            
             return {
                 "user_id": user.id,
                 "id": user.id, 
@@ -850,7 +901,8 @@ class SessionManager:
                 "is_blocked": user.is_blocked,
                 "blocked_reason": user.blocked_reason,
                 "blocked_at": user.blocked_at,
-                "integrations": {}  # Пустые интеграции - проверяются через API
+                "integrations": {},  # Пустые интеграции - проверяются через API
+                "login_platform": login_platform  # Платформа, через которую пользователь авторизовался
             }
         except Exception as e:
             logger.error(f"Error validating session {session_id}: {e}")

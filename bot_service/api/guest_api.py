@@ -9,7 +9,6 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from core.session_manager import session_manager
-import re
 
 logger = logging.getLogger(__name__)
 
@@ -20,39 +19,14 @@ guest_verification_codes = {}
 
 class GuestConnectRequest(BaseModel):
     channel_name: str
+    platform: str  # 'twitch' или 'vk'
 
 class GuestVerifyRequest(BaseModel):
     channel_name: str
 
 # === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
-
-def _normalize_channel_name(channel_name: str) -> tuple[str, str]:
-    """
-    Нормализует имя канала и определяет платформу
-    
-    Returns:
-        (normalized_channel_name, platform)
-    """
-    channel_name = channel_name.strip().lower()
-    
-    if not channel_name:
-        raise HTTPException(status_code=400, detail="Channel name is required")
-    
-    # VK Live: цифровой ID или username
-    if channel_name.isdigit():
-        return channel_name, 'vk'
-    
-    if '@' in channel_name or 'vk.com' in channel_name or channel_name.startswith('zavtra_'):
-        # Извлекаем username из VK ссылки
-        if 'vk.com' in channel_name:
-            match = re.search(r'@(\w+)', channel_name)
-            channel_name = match.group(1) if match else channel_name.lstrip('@')
-        else:
-            channel_name = channel_name.lstrip('@')
-        return channel_name, 'vk'
-    
-    # Twitch по умолчанию
-    return channel_name, 'twitch'
+# 
+# ❌ УДАЛЕНО: _normalize_channel_name() - платформа теперь выбирается пользователем явно в UI!
 
 def _check_code_expired(channel_name: str) -> dict:
     """
@@ -79,7 +53,16 @@ def _check_code_expired(channel_name: str) -> dict:
 async def guest_connect(request: GuestConnectRequest):
     """Генерация кода для гостевого доступа владельца канала"""
     try:
-        channel_name, platform = _normalize_channel_name(request.channel_name)
+        # ✅ Валидация платформы
+        if request.platform not in ['twitch', 'vk']:
+            raise HTTPException(status_code=400, detail="Platform must be 'twitch' or 'vk'")
+        
+        # ✅ Нормализуем имя канала (без определения платформы - она уже есть)
+        channel_name = request.channel_name.strip().lower()
+        if not channel_name:
+            raise HTTPException(status_code=400, detail="Channel name is required")
+        
+        platform = request.platform  # ✅ Используем платформу от клиента
         
         # ПРОВЕРКА: Заблокирован ли канал?
         from core.database import get_db, SessionLocal
@@ -88,7 +71,7 @@ async def guest_connect(request: GuestConnectRequest):
         try:
             is_blocked, reason = is_channel_blocked(channel_name, db)
             if is_blocked:
-                logger.warning(f"🚫 Blocked channel attempted to connect: {channel_name} (reason: {reason})")
+                logger.warning(f"🚫 Blocked channel attempted to connect: {channel_name} ({platform}) (reason: {reason})")
                 raise HTTPException(
                     status_code=403,
                     detail=f"This channel is blocked. Reason: {reason or 'No reason provided'}"
@@ -100,11 +83,12 @@ async def guest_connect(request: GuestConnectRequest):
         code = ''.join(random.choices(string.digits, k=6))
         expires_at = datetime.utcnow() + timedelta(minutes=1)
         
-        # Сохраняем код
+        # Сохраняем код (с платформой!)
         guest_verification_codes[channel_name] = {
             "code": code,
             "expires_at": expires_at,
-            "confirmed": False
+            "confirmed": False,
+            "platform": platform  # ✅ Сохраняем платформу
         }
         
         # ВАЖНО: Подключаем бота к каналу для прослушки
@@ -147,7 +131,8 @@ async def guest_connect(request: GuestConnectRequest):
 async def guest_check(request: GuestVerifyRequest):
     """Проверка подтверждения кода владельцем (для polling)"""
     try:
-        channel_name, _ = _normalize_channel_name(request.channel_name)
+        # ✅ Нормализуем имя канала (платформа будет в stored_data)
+        channel_name = request.channel_name.strip().lower()
         
         # Проверяем наличие кода (без HTTPException)
         if channel_name not in guest_verification_codes:
@@ -196,12 +181,15 @@ async def guest_check(request: GuestVerifyRequest):
 async def guest_disconnect(request: GuestVerifyRequest):
     """Отключение гостевого режима и очистка кода верификации"""
     try:
-        channel_name, platform = _normalize_channel_name(request.channel_name)
+        # ✅ Нормализуем имя канала
+        channel_name = request.channel_name.strip().lower()
         
-        # Удаляем код верификации если есть
+        # ✅ Получаем платформу из сохранённого кода (если есть)
+        platform = None
         if channel_name in guest_verification_codes:
+            platform = guest_verification_codes[channel_name].get('platform', 'twitch')
             del guest_verification_codes[channel_name]
-            logger.info(f"🗑️ [GUEST] Removed verification code for {channel_name}")
+            logger.info(f"🗑️ [GUEST] Removed verification code for {channel_name} ({platform})")
         
         # Отключаем бота от канала
         try:
@@ -237,8 +225,12 @@ async def guest_disconnect(request: GuestVerifyRequest):
 async def guest_finalize(request: GuestVerifyRequest, http_request: Request):
     """Создание гостевой сессии после подтверждения кода"""
     try:
-        channel_name, platform = _normalize_channel_name(request.channel_name)
+        # ✅ Нормализуем имя канала
+        channel_name = request.channel_name.strip().lower()
         stored_data = _check_code_expired(channel_name)
+        
+        # ✅ Получаем платформу из сохранённого кода
+        platform = stored_data.get("platform", "twitch")
         
         # Проверяем что код подтвержден владельцем
         if not stored_data.get("confirmed", False):

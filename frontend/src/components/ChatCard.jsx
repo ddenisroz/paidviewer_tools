@@ -12,14 +12,14 @@ import {
     Settings,
     X,
     Merge,
-    Twitch,
     MessageCircle,
     Copy,
     RefreshCw,
+    ArrowDown,
     Eye,
-    ExternalLink
+    EyeOff
 } from 'lucide-react';
-import { VKIcon } from './PlatformIcons';
+import { TwitchIcon, VKIcon } from './PlatformIcons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
@@ -29,23 +29,207 @@ import ChatContextMenu from './ChatContextMenu';
 import SwipeableMessage from './chat/SwipeableMessage';
 import { microservicesAPI } from '../services/microservices';
 import { getAllEmotesForChannel } from '../utils/emotes';
+import { twitchBadgesService } from '../services/twitchBadges';
 import MessageContent from './MessageContent';
+import ChatBoxSettingsModal from './ChatBoxSettingsModal';
 
 const ChatCard = ({ integrations, isOnHomePage = true }) => {
     const { user, isGuest } = useAuth();
     const { messages: chatMessages, isConnected, setMessages } = useChat();
     
-    // Автоматическое включение при наличии интеграций
-    const [twitchChatVisible, setTwitchChatVisible] = useState(() => {
-        // Загружаем из localStorage или используем дефолт true
-        const saved = localStorage.getItem('chatFilter_twitch');
-        return saved !== null ? saved === 'true' : true;
+    // Фильтрация сообщений + TTS настройки платформ
+    // ❌ УБРАНО: больше НЕ загружаем из localStorage, только из API
+    const [twitchChatVisible, setTwitchChatVisible] = useState(true);  // Дефолтные значения
+    const [vkChatVisible, setVkChatVisible] = useState(true);  // Будут обновлены из API
+    
+    // TTS настройки (для синхронизации с кнопками-шорткатами)
+    const [ttsSettings, setTtsSettings] = useState({
+        enabled_platforms: ['twitch', 'vk'],
+        global_enabled: true
     });
-    const [vkChatVisible, setVkChatVisible] = useState(() => {
-        // Загружаем из localStorage или используем дефолт true
-        const saved = localStorage.getItem('chatFilter_vk');
-        return saved !== null ? saved === 'true' : true;
-    });
+    
+    // Показывать кнопку прокрутки вниз
+    const [showScrollButton, setShowScrollButton] = useState(false);
+    
+    // Видимость чата (для кнопки "Скрыть чат")
+    const [chatMessagesVisible, setChatMessagesVisible] = useState(true);
+    
+    // State для отслеживания загрузки badges
+    const [badgesLoaded, setBadgesLoaded] = useState(false);
+    
+    // Ref для предотвращения повторной загрузки badges и истории
+    const badgesLoadedRef = useRef(false);
+    const historyLoadedRef = useRef(false);
+    
+    // Загрузка TTS настроек и Twitch badges при монтировании (только 1 раз)
+    useEffect(() => {
+        // 🧹 Очистка ВСЕХ старых localStorage значений (больше не используются)
+        const obsoleteKeys = [
+            'chatFilter_twitch',
+            'chatFilter_vk',
+            'token',  // Старый Bearer token (заменён на cookies)
+            'auth_token',  // Возможные старые ключи
+            'user_token'
+        ];
+        
+        obsoleteKeys.forEach(key => {
+            if (localStorage.getItem(key) !== null) {
+                localStorage.removeItem(key);
+                console.log(`🧹 [CLEANUP] Removed obsolete localStorage key: ${key}`);
+            }
+        });
+        
+        console.log('🧹 [CLEANUP] Finished cleaning up obsolete localStorage');
+        
+        const loadTtsSettings = async () => {
+            try {
+                const response = await microservicesAPI.get('/api/tts/platform-settings', {
+                    params: { _t: Date.now() }  // Cache-busting достаточно
+                });
+                setTtsSettings(response.data);
+                console.log('✅ [TTS SHORTCUT] Settings loaded:', response.data);
+                console.log('✅ [TTS SHORTCUT] enabled_platforms:', response.data.enabled_platforms);
+                
+                // 🔄 СИНХРОНИЗАЦИЯ: Обновляем видимость платформ на основе API (не localStorage)
+                const enabledPlatforms = response.data.enabled_platforms || [];
+                setTwitchChatVisible(enabledPlatforms.includes('twitch'));
+                setVkChatVisible(enabledPlatforms.includes('vk'));
+                console.log('🔄 [TTS SHORTCUT] Synced visibility from API:', {
+                    enabled_platforms: enabledPlatforms,
+                    twitch: enabledPlatforms.includes('twitch'),
+                    vk: enabledPlatforms.includes('vk')
+                });
+            } catch (error) {
+                console.error('❌ [TTS SHORTCUT] Error loading settings:', error);
+            }
+        };
+        const loadBadges = async () => {
+            // Предотвращаем повторную загрузку
+            if (badgesLoadedRef.current) {
+                console.log('⏭️ [BADGES] Already loaded, skipping...');
+                return;
+            }
+            
+            try {
+                await twitchBadgesService.loadGlobalBadges();
+                console.log('✅ [BADGES] Twitch badges loaded');
+                badgesLoadedRef.current = true;
+                setBadgesLoaded(true); // Триггерим ре-рендер
+            } catch (error) {
+                console.error('❌ [BADGES] Error loading badges:', error);
+            }
+        };
+        loadTtsSettings();
+        loadBadges();
+        
+        // 🔄 Слушаем изменения TTS настроек из верхних переключателей
+        const handleTtsSettingsChanged = (event) => {
+            const { enabledPlatforms } = event.detail;
+            console.log('🔄 [TTS SHORTCUT] Received settings update:', enabledPlatforms);
+            setTwitchChatVisible(enabledPlatforms.includes('twitch'));
+            setVkChatVisible(enabledPlatforms.includes('vk'));
+            setTtsSettings(prev => ({
+                ...prev,
+                enabled_platforms: enabledPlatforms
+            }));
+        };
+        
+        window.addEventListener('tts-settings-changed', handleTtsSettingsChanged);
+        
+        return () => {
+            window.removeEventListener('tts-settings-changed', handleTtsSettingsChanged);
+        };
+    }, []);
+    
+    // Шорткат: Переключение TTS + фильтрации для Twitch
+    const handleTwitchToggle = async () => {
+        const newVisible = !twitchChatVisible;
+        
+        // 1. Переключаем фильтрацию в ChatBox
+        setTwitchChatVisible(newVisible);
+        // ❌ УБРАНО: больше НЕ сохраняем в localStorage
+        
+        // 2. Переключаем TTS для платформы
+        try {
+            // Проверяем что ttsSettings.enabled_platforms существует и является массивом
+            const enabledPlatforms = Array.isArray(ttsSettings?.enabled_platforms) 
+                ? [...ttsSettings.enabled_platforms] 
+                : [];
+            
+            const index = enabledPlatforms.indexOf('twitch');
+            
+            if (newVisible && index === -1) {
+                enabledPlatforms.push('twitch');
+            } else if (!newVisible && index > -1) {
+                enabledPlatforms.splice(index, 1);
+            }
+            
+            await microservicesAPI.post('/api/tts/platform-settings', {
+                enabled_platforms: enabledPlatforms
+            });
+            
+            setTtsSettings({
+                ...ttsSettings,
+                enabled_platforms: enabledPlatforms
+            });
+            
+            // 🔄 Отправляем событие для синхронизации с верхними переключателями
+            window.dispatchEvent(new CustomEvent('tts-settings-changed', {
+                detail: { enabledPlatforms: enabledPlatforms }
+            }));
+            
+            console.log(`🎮 [TTS SHORTCUT] Twitch ${newVisible ? 'включен' : 'выключен'}`);
+            toast.success(`Twitch озвучка ${newVisible ? 'включена' : 'выключена'}`);
+        } catch (error) {
+            console.error('❌ [TTS SHORTCUT] Error saving:', error);
+            toast.error('Ошибка сохранения настроек TTS');
+        }
+    };
+    
+    // Шорткат: Переключение TTS + фильтрации для VK
+    const handleVkToggle = async () => {
+        const newVisible = !vkChatVisible;
+        
+        // 1. Переключаем фильтрацию в ChatBox
+        setVkChatVisible(newVisible);
+        // ❌ УБРАНО: больше НЕ сохраняем в localStorage
+        
+        // 2. Переключаем TTS для платформы
+        try {
+            // Проверяем что ttsSettings.enabled_platforms существует и является массивом
+            const enabledPlatforms = Array.isArray(ttsSettings?.enabled_platforms) 
+                ? [...ttsSettings.enabled_platforms] 
+                : [];
+            
+            const index = enabledPlatforms.indexOf('vk');
+            
+            if (newVisible && index === -1) {
+                enabledPlatforms.push('vk');
+            } else if (!newVisible && index > -1) {
+                enabledPlatforms.splice(index, 1);
+            }
+            
+            await microservicesAPI.post('/api/tts/platform-settings', {
+                enabled_platforms: enabledPlatforms
+            });
+            
+            setTtsSettings({
+                ...ttsSettings,
+                enabled_platforms: enabledPlatforms
+            });
+            
+            // 🔄 Отправляем событие для синхронизации с верхними переключателями
+            window.dispatchEvent(new CustomEvent('tts-settings-changed', {
+                detail: { enabledPlatforms: enabledPlatforms }
+            }));
+            
+            console.log(`📺 [TTS SHORTCUT] VK ${newVisible ? 'включен' : 'выключен'}`);
+            toast.success(`VK озвучка ${newVisible ? 'включена' : 'выключена'}`);
+        } catch (error) {
+            console.error('❌ [TTS SHORTCUT] Error saving:', error);
+            toast.error('Ошибка сохранения настроек TTS');
+        }
+    };
     
     // Чат включен автоматически, если есть хотя бы одна интеграция или если это гость
     let twitchEnabled, vkEnabled;
@@ -65,14 +249,12 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
     // Автоматическое объединение: если включены обе платформы, то показываем объединенный чат
     const combinedChat = twitchChatEnabled && vkChatEnabled;
     const [showObsSettings, setShowObsSettings] = useState(false);
+    const [showChatBoxModal, setShowChatBoxModal] = useState(false);
     const messagesEndRef = useRef(null);
     
     // Контекстное меню
     const [contextMenu, setContextMenu] = useState(null);
     const [ttsBlockedUsers, setTtsBlockedUsers] = useState(new Set());
-    
-    // Отдельное окно чата
-    const [chatWindow, setChatWindow] = useState(null);
     
     // 7TV смайлы
     const [emotes, setEmotes] = useState({ channelEmotes: new Map(), globalEmotes: new Map() });
@@ -125,14 +307,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
         }
     });
 
-    // Сохраняем настройки фильтров в localStorage
-    useEffect(() => {
-        localStorage.setItem('chatFilter_twitch', twitchChatVisible.toString());
-    }, [twitchChatVisible]);
-    
-    useEffect(() => {
-        localStorage.setItem('chatFilter_vk', vkChatVisible.toString());
-    }, [vkChatVisible]);
+    // ❌ УБРАНО: больше НЕ сохраняем в localStorage, используем только API
 
     // Фильтруем сообщения по включенным платформам и видимости
     const filteredMessages = useMemo(() => {
@@ -159,17 +334,61 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
         // 💬 ChatCard - Messages array:', chatMessages.slice(0, 3));
     }, [chatMessages, filteredMessages]);
 
+    // Ref для контейнера сообщений
+    const messagesContainerRef = useRef(null);
+
     // Автоскролл к последнему сообщению
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
-    // Автоматический скролл при новых сообщениях (отключен, т.к. новые сообщения вверху)
-    // useEffect(() => {
-    //     if (filteredMessages.length > 0) {
-    //         scrollToBottom();
-    //     }
-    // }, [filteredMessages.length]);
+    // Проверка: пользователь внизу контейнера?
+    const isUserAtBottom = () => {
+        const container = messagesContainerRef.current;
+        if (!container) return true;
+        
+        const threshold = 150; // 150px от низа = считаем что внизу (увеличено для компенсации отступов)
+        const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+        return distanceFromBottom < threshold;
+    };
+    
+    // Обработчик скролла для показа/скрытия кнопки
+    const handleScroll = () => {
+        const atBottom = isUserAtBottom();
+        setShowScrollButton(!atBottom);
+    };
+
+    // Автоматический скролл при ПЕРВОЙ загрузке (показываем новые сообщения)
+    const hasScrolledOnLoad = useRef(false);
+    useEffect(() => {
+        if (chatMessages.length > 0 && !hasScrolledOnLoad.current) {
+            // При первой загрузке ВСЕГДА скроллим вниз (мгновенно)
+            setTimeout(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+                console.log('⬇️ Auto-scrolled to bottom on initial load');
+            }, 100);
+            hasScrolledOnLoad.current = true;
+        }
+    }, [chatMessages.length]);
+    
+    // Автоматический скролл при новых сообщениях (только если пользователь внизу)
+    const lastMessageId = filteredMessages.length > 0 ? filteredMessages[filteredMessages.length - 1]?.id : null;
+    useEffect(() => {
+        if (filteredMessages.length > 0 && hasScrolledOnLoad.current && lastMessageId) {
+            // Проверяем позицию скролла ПОСЛЕ рендера
+            // Используем requestAnimationFrame для гарантированного ожидания рендера
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    const atBottom = isUserAtBottom();
+                    console.log('🔍 [AUTOSCROLL] Check:', { atBottom, lastMessageId: String(lastMessageId).substring(0, 20) });
+                    if (atBottom) {
+                        scrollToBottom();
+                        console.log('⬇️ [AUTOSCROLL] Scrolling to bottom');
+                    }
+                }, 0);
+            });
+        }
+    }, [lastMessageId]); // Следим только за последним сообщением
 
     // Загружаем список заблокированных пользователей TTS
     useEffect(() => {
@@ -178,10 +397,17 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
         }
     }, [user]);
 
-    // Загружаем историю сообщений при монтировании
+    // Загружаем историю сообщений при монтировании (только 1 раз)
     useEffect(() => {
+        // Предотвращаем повторную загрузку
+        if (historyLoadedRef.current) {
+            console.log('⏭️ [CHAT] History already loaded, skipping...');
+            return;
+        }
+        
         if (user?.id && (integrations?.twitch?.enabled || integrations?.vk?.enabled)) {
             loadChatHistory();
+            historyLoadedRef.current = true;
         }
     }, [user?.id, integrations?.twitch?.enabled, integrations?.vk?.enabled]);
 
@@ -203,359 +429,28 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
         }
     };
 
-    const openChatWindow = () => {
-        if (chatWindow && !chatWindow.closed) {
-            chatWindow.focus();
-            return;
-        }
-
-        const newWindow = window.open(
-            '',
-            'chatWindow',
-            'width=800,height=600,scrollbars=yes,resizable=yes,toolbar=no,menubar=no,location=no,status=no'
-        );
-
-        if (newWindow) {
-            newWindow.document.write(`
-                <!DOCTYPE html>
-                <html lang="ru">
-                <head>
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>Чат - ${user?.twitch_username || 'Streamer'}</title>
-                    <style>
-                        body {
-                            margin: 0;
-                            padding: 0;
-                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                            background: #1a1a1a;
-                            color: #ffffff;
-                            height: 100vh;
-                            display: flex;
-                            flex-direction: column;
-                        }
-                        .header {
-                            background: #2d2d2d;
-                            padding: 12px 16px;
-                            border-bottom: 1px solid #404040;
-                            display: flex;
-                            justify-content: space-between;
-                            align-items: center;
-                        }
-                        .header h1 {
-                            margin: 0;
-                            font-size: 18px;
-                            font-weight: 600;
-                        }
-                        .status-info {
-                            display: flex;
-                            flex-direction: column;
-                            align-items: flex-end;
-                            gap: 4px;
-                        }
-                        .connection-status {
-                            color: #888;
-                            font-size: 12px;
-                        }
-                        .connection-status.connected {
-                            color: #4ade80;
-                        }
-                        .message-count {
-                            background: #404040;
-                            padding: 4px 8px;
-                            border-radius: 4px;
-                            font-size: 12px;
-                        }
-                        .messages {
-                            flex: 1;
-                            overflow-y: auto;
-                            padding: 16px;
-                            background: #1a1a1a;
-                        }
-                        .message {
-                            display: flex;
-                            gap: 8px;
-                            margin-bottom: 8px;
-                            padding: 4px 8px;
-                            border-radius: 4px;
-                        }
-                        .message:hover {
-                            background: rgba(255, 255, 255, 0.05);
-                        }
-                        .timestamp {
-                            color: #888;
-                            font-size: 11px;
-                            white-space: nowrap;
-                        }
-                        .platform-icon {
-                            width: 16px;
-                            height: 16px;
-                            margin-top: 2px;
-                        }
-                        .username {
-                            font-weight: 600;
-                            white-space: nowrap;
-                        }
-                        .content {
-                            flex: 1;
-                            word-break: break-word;
-                        }
-                        .content img {
-                            display: inline-block;
-                            width: 24px;
-                            height: 24px;
-                            vertical-align: middle;
-                            margin: 0 2px;
-                        }
-                        .empty {
-                            display: flex;
-                            flex-direction: column;
-                            align-items: center;
-                            justify-content: center;
-                            height: 100%;
-                            color: #888;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="header">
-                        <h1>💬 Чат</h1>
-                        <div class="status-info">
-                            <div class="connection-status" id="connectionStatus">Ожидание подключения...</div>
-                            <div class="message-count" id="messageCount">0 сообщений</div>
-                        </div>
-                    </div>
-                    <div class="messages" id="messages">
-                        <div class="empty">
-                            <div>💬</div>
-                            <div>Нет сообщений</div>
-                        </div>
-                    </div>
-                </body>
-                </html>
-            `);
-
-            newWindow.document.close();
-            setChatWindow(newWindow);
-
-            // Обработчики событий
-            const messagesContainer = newWindow.document.getElementById('messages');
-            const messageCount = newWindow.document.getElementById('messageCount');
-            const connectionStatus = newWindow.document.getElementById('connectionStatus');
-
-            // Функция для обработки смайлов (копия из emotes.js)
-            const processEmotes = (message, channelEmotes = new Map(), globalEmotes = new Map()) => {
-                if (!message || typeof message !== 'string') {
-                    return message;
-                }
-
-                // Объединяем канальные и глобальные смайлы
-                const allEmotes = new Map([...channelEmotes, ...globalEmotes]);
-                
-                // Создаем регулярное выражение для поиска смайлов
-                const emoteNames = Array.from(allEmotes.keys()).map(name => 
-                    name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-                ).join('|');
-                
-                if (emoteNames.length === 0) {
-                    return message;
-                }
-
-                const emoteRegex = new RegExp(`\\b(${emoteNames})\\b`, 'gi');
-                
-                return message.replace(emoteRegex, (match) => {
-                    const emoteName = match.toLowerCase();
-                    const emote = allEmotes.get(emoteName) || allEmotes.get(match);
-                    
-                    if (emote) {
-                        return `<img src="${emote.url}" alt="${emote.name}" class="inline-block w-6 h-6 align-middle" title="${emote.name}" />`;
-                    }
-                    
-                    return match;
-                });
-            };
-
-            // Создаем глобальные данные для отдельного окна
-            newWindow.chatData = {
-                messages: [],
-                emotes: { channelEmotes: new Map(), globalEmotes: new Map() },
-                isConnected: false
-            };
-            
-            const updateMessages = () => {
-                // Обновляем данные из родительского окна
-                newWindow.chatData.messages = chatMessages.slice(-50);
-                newWindow.chatData.emotes = emotes;
-                newWindow.chatData.isConnected = isConnected;
-                
-                messagesContainer.textContent = '';
-                // Фильтруем сообщения для отдельного окна с учетом видимости платформ
-                const messagesToShow = newWindow.chatData.messages.filter(msg => {
-                    // Фильтр по платформам с учетом видимости
-                    if (msg.platform === 'twitch' && (!twitchChatEnabled || !twitchChatVisible)) {
-                        return false;
-                    }
-                    if (msg.platform === 'vk' && (!vkChatEnabled || !vkChatVisible)) {
-                        return false;
-                    }
-                    return true;
-                }).slice(-50); // Лимит 50 сообщений
-                if (messagesToShow.length === 0) {
-                    const emptyDiv = document.createElement('div');
-                emptyDiv.className = 'empty';
-                const iconDiv = document.createElement('div');
-                iconDiv.textContent = '💬';
-                const textDiv = document.createElement('div');
-                textDiv.textContent = 'Нет сообщений';
-                emptyDiv.appendChild(iconDiv);
-                emptyDiv.appendChild(textDiv);
-                messagesContainer.appendChild(emptyDiv);
-                } else {
-                    messagesToShow.forEach(msg => {
-                        const messageDiv = newWindow.document.createElement('div');
-                        messageDiv.className = 'message';
-                        
-                        const platformIcon = msg.platform === 'twitch' 
-                            ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="#9146FF"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/></svg>'
-                            : '<svg width="16" height="16" viewBox="0 0 24 24" fill="#0077FF"><path d="M13.162 18.994c.609 0 .858-.406.851-.915-.031-1.917.714-2.949 2.059-1.604 1.488 1.488 1.796 2.519 3.603 2.519h3.2c.808 0 1.126-.26 1.126-.668 0-.863-1.421-2.386-2.625-3.504-1.686-1.565-1.765-1.602-.313-3.486 1.329-1.728 2.421-3.315 2.421-4.308 0-.897-.481-1.236-1.296-1.236h-3.233c-.612 0-.883.317-1.146.854-.311.635-1.111 2.088-1.785 2.88-.674.792-1.065.974-1.343.974-.311 0-.554-.26-.554-.668V5.31c0-.863-.26-1.236-1.003-1.236H8.937c-.311 0-.554.26-.554.668 0 .88 1.234 1.082 1.362 3.486v5.27c0 1.154-.208 1.363-.485 1.363-.885 0-3.038-3.018-4.317-6.456-.253-.63-.506-.891-1.126-.891H1.584c-.725 0-.87.345-.87.725 0 .955 1.382 6.013 3.233 9.495 1.225 2.311 2.951 3.567 5.164 3.567z"/></svg>';
-                        const username = msg.author_name || msg.author || 'Unknown';
-                        const content = msg.content || msg.message || '';
-                        const timestamp = new Date(msg.timestamp).toLocaleTimeString('ru-RU', { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                        });
-
-                        // Обрабатываем смайлы
-                        const processedContent = processEmotes(content, newWindow.chatData.emotes.channelEmotes, newWindow.chatData.emotes.globalEmotes);
-
-                        // Создаем элементы безопасно
-                        const timestampSpan = newWindow.document.createElement('span');
-                        timestampSpan.className = 'timestamp';
-                        timestampSpan.textContent = timestamp;
-                        
-                        const platformIconSpan = newWindow.document.createElement('span');
-                        platformIconSpan.className = 'platform-icon';
-                        platformIconSpan.innerHTML = platformIcon;
-                        
-                        const usernameSpan = newWindow.document.createElement('span');
-                        usernameSpan.className = 'username';
-                        usernameSpan.style.color = msg.author_color || '#ffffff';
-                        usernameSpan.textContent = `${username}:`;
-                        
-                        const contentSpan = newWindow.document.createElement('span');
-                        contentSpan.className = 'content';
-                        // Используем innerHTML для отображения смайлов
-                        if (processedContent && processedContent.includes('<img')) {
-                            contentSpan.innerHTML = processedContent;
-                        } else {
-                            contentSpan.textContent = content;
-                        }
-                        
-                        messageDiv.appendChild(timestampSpan);
-                        messageDiv.appendChild(platformIconSpan);
-                        messageDiv.appendChild(usernameSpan);
-                        messageDiv.appendChild(contentSpan);
-                        
-                        // Добавляем обработчик правого клика для контекстного меню
-                        messageDiv.addEventListener('contextmenu', (e) => {
-                            e.preventDefault();
-                            // Создаем простое контекстное меню
-                            const contextMenu = newWindow.document.createElement('div');
-                            contextMenu.style.cssText = `
-                                position: fixed;
-                                left: ${e.clientX}px;
-                                top: ${e.clientY}px;
-                                background: #2d2d2d;
-                                border: 1px solid #555;
-                                border-radius: 4px;
-                                padding: 8px 0;
-                                z-index: 1000;
-                                min-width: 150px;
-                                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                            `;
-                            
-                            const menuItem = newWindow.document.createElement('div');
-                            menuItem.style.cssText = `
-                                padding: 8px 16px;
-                                color: white;
-                                cursor: pointer;
-                                font-size: 14px;
-                            `;
-                            menuItem.textContent = 'Заблокировать TTS';
-                            menuItem.addEventListener('click', async () => {
-                                // Вызываем функцию блокировки TTS через window.opener
-                                try {
-                                    if (window.opener && window.opener.handleChatContextMenuAction) {
-                                        await window.opener.handleChatContextMenuAction('block_tts', msg);
-                                    } else {
-                                        console.error('Parent window function not available');
-                                    }
-                                } catch (error) {
-                                    console.error('Error calling context menu action:', error);
-                                }
-                                contextMenu.remove();
-                            });
-                            
-                            contextMenu.appendChild(menuItem);
-                            newWindow.document.body.appendChild(contextMenu);
-                            
-                            // Удаляем меню при клике вне его
-                            const removeMenu = (e) => {
-                                if (!contextMenu.contains(e.target)) {
-                                    contextMenu.remove();
-                                    newWindow.document.removeEventListener('click', removeMenu);
-                                }
-                            };
-                            setTimeout(() => {
-                                newWindow.document.addEventListener('click', removeMenu);
-                            }, 100);
-                        });
-                        
-                        messagesContainer.appendChild(messageDiv);
-                    });
-                }
-                
-                messageCount.textContent = `${messagesToShow.length} сообщений`;
-                // Скроллим только в отдельном окне
-                if (newWindow && !newWindow.closed) {
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                }
-            };
-
-            // Обновляем сообщения и статус подключения при изменении
-            const updateInterval = setInterval(() => {
-                updateMessages();
-                // Обновляем статус подключения
-                if (isConnected) {
-                    connectionStatus.textContent = 'Подключено';
-                    connectionStatus.className = 'connection-status connected';
-                } else {
-                    connectionStatus.textContent = 'Ожидание подключения...';
-                    connectionStatus.className = 'connection-status';
-                }
-            }, 1000);
-
-            // Очистка при закрытии окна
-            newWindow.addEventListener('beforeunload', () => {
-                clearInterval(updateInterval);
-                setChatWindow(null);
-            });
-
-            // Начальное обновление
-            updateMessages();
-        }
-    };
-
     const loadChatHistory = async () => {
         try {
             console.log('📜 [CHAT] Loading chat history...');
+            console.log('📜 [CHAT] twitchEnabled:', integrations?.twitch?.enabled, 'user.twitch_username:', user?.twitch_username);
+            console.log('📜 [CHAT] vkEnabled:', integrations?.vk?.enabled, 'user.vk_username:', user?.vk_username);
+            
+            // Убеждаемся что badges загружены ДО загрузки истории
+            try {
+                await twitchBadgesService.loadGlobalBadges();
+                setBadgesLoaded(true); // Устанавливаем СРАЗУ чтобы badges рендерились
+                console.log('✅ [CHAT] Twitch badges loaded before history');
+                                } catch (error) {
+                console.warn('⚠️ [CHAT] Failed to load badges, continuing anyway:', error);
+            }
             
             const limit = 500; // Загружаем последние 500 сообщений из env
             const historyMessages = [];
             
-            // Загружаем историю для Twitch
-            if (twitchChatEnabled && user?.twitch_username) {
+            // Загружаем историю для Twitch (не проверяем isOnHomePage - это для отображения, а не для загрузки)
+            if (integrations?.twitch?.enabled && user?.twitch_username) {
                 try {
+                    console.log('📜 [CHAT] Fetching Twitch history for:', user.twitch_username);
                     const response = await microservicesAPI.get(`/api/chat/history`, {
                         params: {
                             platform: 'twitch',
@@ -565,17 +460,27 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                     });
                     
                     if (response.data.success && response.data.messages) {
-                        console.log(`📜 [CHAT] Loaded ${response.data.messages.length} Twitch messages`);
+                        console.log(`✅ [CHAT] Loaded ${response.data.messages.length} Twitch messages`);
+                        // Отладка: проверяем первое сообщение на badges
+                        if (response.data.messages[0]) {
+                            console.log('🎖️ [CHAT HISTORY] First message badges:', response.data.messages[0].badges, 'type:', typeof response.data.messages[0].badges);
+                            console.log('🎖️ [CHAT HISTORY] First message role:', response.data.messages[0].role);
+                        }
                         historyMessages.push(...response.data.messages);
+                    } else {
+                        console.log('⚠️ [CHAT] No Twitch messages in response');
                     }
                 } catch (error) {
                     console.error('❌ Error loading Twitch history:', error);
                 }
+            } else {
+                console.log('⏭️ [CHAT] Skipping Twitch history (not enabled or no username)');
             }
             
             // Загружаем историю для VK
-            if (vkChatEnabled && user?.vk_username) {
+            if (integrations?.vk?.enabled && user?.vk_username) {
                 try {
+                    console.log('📜 [CHAT] Fetching VK history for:', user.vk_username);
                     const response = await microservicesAPI.get(`/api/chat/history`, {
                         params: {
                             platform: 'vk',
@@ -585,12 +490,16 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                     });
                     
                     if (response.data.success && response.data.messages) {
-                        console.log(`📜 [CHAT] Loaded ${response.data.messages.length} VK messages`);
+                        console.log(`✅ [CHAT] Loaded ${response.data.messages.length} VK messages`);
                         historyMessages.push(...response.data.messages);
+                    } else {
+                        console.log('⚠️ [CHAT] No VK messages in response');
                     }
                 } catch (error) {
                     console.error('❌ Error loading VK history:', error);
                 }
+            } else {
+                console.log('⏭️ [CHAT] Skipping VK history (not enabled or no username)');
             }
             
             // Устанавливаем загруженные сообщения в состояние чата
@@ -633,16 +542,20 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
 
     const handleContextMenu = (e, msg) => {
         e.preventDefault();
+        e.stopPropagation();
         
-        // Получаем координаты элемента ника (а не клика)
-        const target = e.currentTarget;
-        const rect = target.getBoundingClientRect();
+        // Используем координаты клика мыши + небольшой сдвиг, чтобы курсор не перекрывал меню
+        const x = e.clientX + 2;
+        const y = e.clientY + 2;
         
-        // Позиционируем меню под ником (слева)
-        const x = rect.left; // Начало ника
-        const y = rect.bottom + 4; // Под ником + 4px отступ
+        console.log(`📍 [CONTEXT MENU] Opening menu:`, {
+            x, y,
+            clientX: e.clientX,
+            clientY: e.clientY,
+            user: msg.author_name || msg.author,
+            viewport: { width: window.innerWidth, height: window.innerHeight }
+        });
         
-        console.log(`📍 [CONTEXT MENU] Opening below nickname: x=${x}, y=${y}, for user: ${msg.author_name || msg.author}`);
         setContextMenu({
             x,
             y,
@@ -1125,15 +1038,15 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setTwitchChatVisible(!twitchChatVisible)}
+                                onClick={handleTwitchToggle}
                                 className={`h-8 w-20 px-3 transition-all ${
                                     twitchChatVisible 
                                         ? 'bg-purple-800 hover:bg-purple-900 text-white border-purple-800' 
                                         : 'border-gray-400 text-gray-300 hover:border-gray-300 hover:bg-transparent'
                                 }`}
-                                title={twitchChatVisible ? 'Скрыть Twitch сообщения' : 'Показать Twitch сообщения'}
+                                title={twitchChatVisible ? 'Выключить TTS и скрыть сообщения Twitch' : 'Включить TTS и показать сообщения Twitch'}
                             >
-                                <Twitch className="h-3 w-3 mr-1" />
+                                <TwitchIcon className="h-3 w-3 mr-1" />
                                 {twitchChatVisible ? 'ВКЛ' : 'ВЫКЛ'}
                             </Button>
                         )}
@@ -1141,13 +1054,13 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setVkChatVisible(!vkChatVisible)}
+                                onClick={handleVkToggle}
                                 className={`h-8 w-20 px-3 transition-all ${
                                     vkChatVisible 
-                                        ? 'bg-blue-400 hover:bg-blue-500 text-white border-blue-400' 
+                                        ? 'bg-rose-700 hover:bg-rose-800 text-white border-rose-700' 
                                         : 'border-gray-400 text-gray-300 hover:border-gray-300 hover:bg-transparent'
                                 }`}
-                                title={vkChatVisible ? 'Скрыть VK Live сообщения' : 'Показать VK Live сообщения'}
+                                title={vkChatVisible ? 'Выключить TTS и скрыть сообщения VK' : 'Включить TTS и показать сообщения VK'}
                             >
                                 <VKIcon className="h-3 w-3 mr-1" />
                                 {vkChatVisible ? 'ВКЛ' : 'ВЫКЛ'}
@@ -1156,34 +1069,39 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                         <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setShowObsSettings(true)}
-                            title="Настройки виджета OBS"
+                            onClick={() => setShowChatBoxModal(true)}
+                            title="Настройки ChatBox для OBS"
                             className="h-8 w-20 px-3 transition-all border-gray-400 text-gray-300 hover:border-blue-400 hover:text-blue-400 hover:bg-blue-400/10"
                         >
                             OBS
                         </Button>
-                        {(twitchChatEnabled || vkChatEnabled) && isOnHomePage && (
-                            <Button 
-                                onClick={openChatWindow}
-                                variant="outline"
-                                size="sm"
-                                className="h-8 w-20 px-2 gap-1 transition-all border-gray-400 text-gray-300 hover:border-blue-400 hover:text-blue-400 hover:bg-blue-400/10"
-                                title="Открыть чат в отдельном окне"
-                            >
-                                <ExternalLink className="h-3.5 w-3.5" />
-                                <span className="text-xs">Окно</span>
-                            </Button>
-                        )}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setChatMessagesVisible(!chatMessagesVisible)}
+                            title={chatMessagesVisible ? 'Скрыть сообщения чата' : 'Показать сообщения чата'}
+                            className={`h-8 w-8 p-0 transition-all ${
+                                chatMessagesVisible 
+                                    ? 'text-white border-gray-600 hover:bg-gray-800' 
+                                    : 'text-gray-400 border-gray-600 hover:text-white hover:bg-gray-800'
+                            }`}
+                        >
+                            {chatMessagesVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                        </Button>
                     </div>
                 </div>
             </CardHeader>
             <CardContent className="pt-0">
 
                 {/* Отображение сообщений (автоматически включено при наличии интеграций) */}
-                {(twitchChatEnabled || vkChatEnabled) && isOnHomePage ? (
-                    <div>
+                {chatMessagesVisible && (twitchChatEnabled || vkChatEnabled) && isOnHomePage ? (
+                    <div className="relative">
                         {/* Область сообщений - увеличена высота */}
-                        <div className="h-[400px] border rounded-lg bg-muted/5 overflow-y-auto p-4 flex flex-col-reverse">
+                        <div 
+                            ref={messagesContainerRef}
+                            onScroll={handleScroll}
+                            className="h-[400px] border rounded-lg bg-gray-900/40 overflow-y-auto p-4"
+                        >
                             {filteredMessages.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                                     <MessageSquare className="h-12 w-12 mb-3 opacity-50" />
@@ -1193,34 +1111,72 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                                     </p>
                                 </div>
                             ) : (
+                                <div className="flex flex-col min-h-full">
+                                    {/* Пустой элемент чтобы прижать сообщения к низу */}
+                                    <div className="flex-grow" />
+                                    {/* Сообщения */}
                                 <div className="space-y-0.5">
-                                    {filteredMessages.slice(-100).reverse().map((msg, index) => (
+                                        {filteredMessages.map((msg) => (
                                         <SwipeableMessage
-                                            key={`${msg.id || index}-${msg.timestamp}`}
+                                            key={msg.id || `${msg.platform}-${msg.timestamp}-${msg.author}`}
                                             message={msg}
                                             onSwipeAction={handleContextMenuAction}
                                         >
                                             <div
-                                                className="flex items-start gap-1.5 p-1 rounded hover:bg-muted/50 transition-colors"
+                                                className={`p-1`}
                                                 onContextMenu={(e) => handleContextMenu(e, msg)}
                                             >
-                                                <div className="flex-shrink-0 mt-0.5">
+                                                <div className="text-sm leading-relaxed">
+                                                        {/* Иконка платформы */}
                                                     {msg.platform === 'twitch' ? (
-                                                        <Twitch className="w-3.5 h-3.5 text-purple-400" />
-                                                    ) : (
-                                                        <VKIcon className="w-3.5 h-3.5 text-red-400" />
-                                                    )}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                                        <span className="text-xs text-muted-foreground">
+                                                            <TwitchIcon 
+                                                                className="text-purple-400 inline-block align-text-bottom mr-1" 
+                                                                style={{ width: '14px', height: '14px' }}
+                                                            />
+                                                        ) : (
+                                                            <VKIcon 
+                                                                className="text-red-400 inline-block align-text-bottom mr-1" 
+                                                                style={{ width: '14px', height: '14px' }}
+                                                            />
+                                                        )}
+                                                        
+                                                        <span className="text-xs text-muted-foreground mr-1.5">
                                                             {new Date(msg.timestamp).toLocaleTimeString('ru-RU', { 
                                                                 hour: '2-digit', 
                                                                 minute: '2-digit' 
                                                             })}
                                                         </span>
+                                                        
+                                                        {/* Badges (значки Twitch) - только если badges загружены */}
+                                                        {badgesLoaded && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (
+                                                            <>
+                                                                {msg.badges.map((badge, idx) => {
+                                                                    const [badgeId, version] = badge.split('/');
+                                                                    const badgeUrl = twitchBadgesService.getBadgeUrl(badgeId, version, '1x');
+                                                                    
+                                                                    // Пропускаем badge если URL не найден
+                                                                    if (!badgeUrl) return null;
+                                                                    
+                                                                    return (
+                                                                        <img 
+                                                                            key={idx} 
+                                                                            src={badgeUrl}
+                                                                            alt={badgeId}
+                                                                            title={badge}
+                                                                            className="inline-block align-text-bottom mr-0.5"
+                                                                            style={{ width: '18px', height: '18px' }}
+                                                                            onError={(e) => {
+                                                                                // Скрываем badge если не загрузился
+                                                                                e.target.style.display = 'none';
+                                                                            }}
+                                                                        />
+                                                                    );
+                                                                })}
+                                                            </>
+                                                        )}
+                                                        
                                                         <span 
-                                                            className={`font-medium text-sm cursor-pointer hover:underline ${
+                                                            className={`font-medium cursor-pointer hover:underline ${
                                                                 msg.platform === 'twitch' 
                                                                     ? 'text-purple-400' 
                                                                     : msg.platform === 'vk' 
@@ -1229,25 +1185,45 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                                                             }`}
                                                             style={
                                                                 msg.platform === 'twitch' || msg.platform === 'vk'
-                                                                    ? undefined // Используем Tailwind класс для платформ
-                                                                    : { color: msg.author_color || '#ffffff' } // Fallback для других платформ
+                                                                    ? undefined
+                                                                    : { color: msg.author_color || '#ffffff' }
                                                             }
                                                             onClick={(e) => handleContextMenu(e, msg)}
                                                             title="Кликните для открытия меню действий"
                                                         >
                                                             {msg.author_name || msg.author || 'Unknown'}:
-                                                        </span>
-                                                        <span className="text-sm break-words">
+                                                        </span>{' '}
+                                                        
+                                                        <span className="break-words">
                                                             {msg.content || msg.message || 'Нет содержимого'}
                                                         </span>
-                                                    </div>
                                                 </div>
                                             </div>
                                         </SwipeableMessage>
                                     ))}
                                     <div ref={messagesEndRef} />
                                     </div>
+                                    </div>
                                 )}
+                        </div>
+                        
+                        {/* Кнопка прокрутки вниз */}
+                        {showScrollButton && (
+                            <button
+                                onClick={scrollToBottom}
+                                className="absolute bottom-6 right-6 bg-purple-600 hover:bg-purple-700 text-white rounded-full p-3 shadow-lg transition-all duration-200 hover:scale-110 z-10"
+                                title="Промотать вниз"
+                            >
+                                <ArrowDown className="w-5 h-5" />
+                            </button>
+                        )}
+                    </div>
+                ) : !chatMessagesVisible && isOnHomePage ? (
+                    <div className="min-h-[200px] flex items-center justify-center">
+                        <div className="text-center text-muted-foreground py-8">
+                            <EyeOff className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                            <p className="text-sm">Чат скрыт</p>
+                            <p className="text-xs mt-2">Нажмите "Показать чат" для отображения сообщений</p>
                         </div>
                     </div>
                 ) : !isOnHomePage ? (
@@ -1263,7 +1239,6 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                         <div className="text-center text-muted-foreground py-8">
                             <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />
                             <p className="text-sm">Чат будет активен автоматически при подключении платформ</p>
-                            {user?.id && <p className="text-xs mt-2">Пользователь: {user.username || user.twitch_username || user.vk_username}</p>}
                         </div>
                     </div>
                 )}
@@ -1289,6 +1264,15 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                 )}
 
             </CardContent>
+
+            {/* ChatBox Settings Modal */}
+            <ChatBoxSettingsModal
+                isOpen={showChatBoxModal}
+                onClose={() => setShowChatBoxModal(false)}
+                onSave={() => {
+                    toast.success('Настройки ChatBox сохранены!');
+                }}
+            />
 
         </Card>
     );

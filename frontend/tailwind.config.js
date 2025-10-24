@@ -71,10 +71,100 @@ module.exports = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        // Простая анимация для ChatCard (главная страница)
+        "fadeIn": {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" }
+        },
+        // Крутые анимации для OBS виджета
+        "slideInUp": {
+          "0%": { 
+            opacity: "0", 
+            transform: "translateY(20px)" 
+          },
+          "100%": { 
+            opacity: "1", 
+            transform: "translateY(0)" 
+          },
+        },
+        "slideInRight": {
+          "0%": { 
+            opacity: "0", 
+            transform: "translateX(30px)" 
+          },
+          "100%": { 
+            opacity: "1", 
+            transform: "translateX(0)" 
+          },
+        },
+        "slideInLeft": {
+          "0%": { 
+            opacity: "0", 
+            transform: "translateX(-30px)" 
+          },
+          "100%": { 
+            opacity: "1", 
+            transform: "translateX(0)" 
+          },
+        },
+        "bounceIn": {
+          "0%": { 
+            opacity: "0", 
+            transform: "scale(0.3)" 
+          },
+          "50%": { 
+            opacity: "1", 
+            transform: "scale(1.05)" 
+          },
+          "70%": { 
+            transform: "scale(0.9)" 
+          },
+          "100%": { 
+            transform: "scale(1)" 
+          },
+        },
+        "scaleIn": {
+          "0%": { 
+            opacity: "0", 
+            transform: "scale(0.8)" 
+          },
+          "100%": { 
+            opacity: "1", 
+            transform: "scale(1)" 
+          },
+        },
+        "rotateIn": {
+          "0%": { 
+            opacity: "0", 
+            transform: "rotate(-10deg) scale(0.9)" 
+          },
+          "100%": { 
+            opacity: "1", 
+            transform: "rotate(0deg) scale(1)" 
+          },
+        },
+        "glowPulse": {
+          "0%, 100%": { 
+            boxShadow: "0 0 5px rgba(147, 51, 234, 0.3)" 
+          },
+          "50%": { 
+            boxShadow: "0 0 20px rgba(147, 51, 234, 0.6), 0 0 30px rgba(147, 51, 234, 0.4)" 
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        // Простая анимация для ChatCard
+        "fadeIn": "fadeIn 0.5s ease-out",
+        // Анимации для OBS виджета
+        "slideInUp": "slideInUp 0.4s ease-out",
+        "slideInRight": "slideInRight 0.4s ease-out",
+        "slideInLeft": "slideInLeft 0.4s ease-out",
+        "bounceIn": "bounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55)",
+        "scaleIn": "scaleIn 0.3s ease-out",
+        "rotateIn": "rotateIn 0.5s ease-out",
+        "glowPulse": "glowPulse 2s ease-in-out infinite",
       },
     },
   },

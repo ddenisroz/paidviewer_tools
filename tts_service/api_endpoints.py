@@ -695,3 +695,8 @@ async def submit_gpu_task(text: str, voice: str = "female_1", user_id: Optional[
 async def get_gpu_task_result(task_id: str):
     """Получить результат GPU задачи"""
     return await tts_api_endpoints.get_gpu_task_result(task_id)
+
+@tts_api.get("/user/voices/{user_id}")
+async def get_user_voices_endpoint(user_id: int, db: Session = Depends(get_db)):
+    """Получить голоса пользователя"""
+    return tts_api_endpoints.get_user_voices(user_id, db)

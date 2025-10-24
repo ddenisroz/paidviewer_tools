@@ -1,8 +1,8 @@
 # bot_service/api/additional_api.py
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from core.database import get_db, User, UserToken, ChatMessage
+from core.database import get_db, User, UserToken, ChatMessage, UserSession
 from auth.auth import get_current_user, get_current_user_optional
 import logging
 from datetime import datetime, timedelta
@@ -13,6 +13,7 @@ router = APIRouter(prefix="/api", tags=["additional"])
 
 @router.get("/auth/status")
 async def get_auth_status(
+    request: Request,
     user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
@@ -44,6 +45,16 @@ async def get_auth_status(
                 }
             }
         
+        # 🔐 БЕЗОПАСНОСТЬ: Получаем linked_platforms из текущей сессии
+        session_id = request.cookies.get('session_id')
+        linked_platforms = []
+        
+        if session_id:
+            session = db.query(UserSession).filter(UserSession.session_id == session_id).first()
+            if session and session.device_info:
+                linked_platforms = session.device_info.get('linked_platforms', [])
+                logger.info(f"🔐 Session {session_id[:8]}... has linked_platforms: {linked_platforms}")
+        
         # Получаем токены интеграций
         tokens = db.query(UserToken).filter(UserToken.user_id == user_id).all()
         
@@ -54,7 +65,13 @@ async def get_auth_status(
             "donationalerts": {"connected": False, "username": None}
         }
         
+        # 🔐 ФИЛЬТРАЦИЯ: Показываем только платформы из linked_platforms
         for token in tokens:
+            # Пропускаем платформы, которые не в linked_platforms (если список не пустой)
+            if linked_platforms and token.platform not in linked_platforms:
+                logger.info(f"🔐 Platform {token.platform} not in linked_platforms, skipping...")
+                continue
+            
             if token.platform == "twitch":
                 integrations["twitch"] = {
                     "connected": True,
@@ -103,23 +120,23 @@ async def get_auth_status(
 @router.get("/auth/user/me")
 async def get_user_me(user: dict = Depends(get_current_user)):
     """Получить информацию о текущем пользователе"""
-    return {
+    return JSONResponse(content={
         "id": user.get("id"),
         "twitch_username": user.get("twitch_username"),
         "vk_username": user.get("vk_username"),
         "is_admin": user.get("is_admin", False),
         "created_at": user.get("created_at")
-    }
+    })
 
 @router.get("/auth/session/status")
 async def get_session_status(user: dict = Depends(get_current_user)):
     """Получить статус сессии"""
-    return {
+    return JSONResponse(content={
         "authenticated": True,
         "user_id": user.get("id"),
         "session_valid": True,
         "expires_at": None
-    }
+    })
 
 @router.post("/clear-verifications")
 async def clear_verifications(user: dict = Depends(get_current_user)):
@@ -368,12 +385,15 @@ async def get_chat_history(
         
         logger.info(f"📜 [CHAT HISTORY] Querying messages: user_id={user_id}, channel={channel}, platform={platform}, limit={limit}")
         
-        # Получаем последние сообщения для этого канала
+        # Получаем последние сообщения для этого канала (case-insensitive для имени канала)
+        from sqlalchemy import func
         query = db.query(ChatMessage).filter(
             ChatMessage.user_id == user_id,
-            ChatMessage.channel_name == channel,
+            func.lower(ChatMessage.channel_name) == channel.lower(),  # Case-insensitive поиск
             ChatMessage.is_deleted == False
         )
+        
+        logger.info(f"📜 [CHAT HISTORY] Using case-insensitive search for channel: {channel}")
         
         if platform:
             query = query.filter(ChatMessage.platform == platform)
@@ -424,17 +444,33 @@ async def get_chat_history(
                 }, status_code=500)
         
         # Преобразуем в нужный формат
+        import json
         messages_data = []
         for msg in reversed(messages):  # Реверсируем обратно для хронологического порядка
+            # Парсим badges если это строка JSON
+            badges_list = getattr(msg, 'badges', None)
+            if isinstance(badges_list, str):
+                try:
+                    badges_list = json.loads(badges_list)
+                except:
+                    badges_list = None
+            
             messages_data.append({
                 "id": msg.id,
                 "author": getattr(msg, 'author_username', None) or 'unknown',  # Используем author вместо username для совместимости с ChatCard
                 "author_name": getattr(msg, 'author_username', None) or 'unknown',
                 "content": msg.message,
+                "message": msg.message,  # Добавляем поле message для совместимости
                 "platform": msg.platform,
                 "timestamp": msg.timestamp.isoformat() if msg.timestamp else None,
-                "channel": msg.channel_name
+                "channel": msg.channel_name,
+                "role": getattr(msg, 'role', None),  # Роль пользователя
+                "badges": badges_list  # Значки пользователя (массив)
             })
+        
+        # Отладка: выводим первое сообщение с badges
+        if messages_data and len(messages_data) > 0:
+            logger.info(f"🎖️ [CHAT HISTORY API] Sample message: author={messages_data[0]['author']}, role={messages_data[0]['role']}, badges={messages_data[0]['badges']}")
         
         logger.info(f"✅ [CHAT HISTORY] Returning {len(messages_data)} messages for {platform}:{channel}")
         

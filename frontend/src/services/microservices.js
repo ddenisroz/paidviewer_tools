@@ -15,8 +15,17 @@ botService.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
-            // Перенаправляем на страницу логина при 401
-            window.location.href = '/login';
+            // 🔐 НЕ перенаправляем на /login для overlay routes (они работают по JWT token из URL)
+            const isOverlayRoute = 
+                window.location.pathname.startsWith('/chat-overlay') ||
+                window.location.pathname.startsWith('/tts-obs') ||
+                window.location.pathname.startsWith('/youtube-obs') ||
+                window.location.pathname.startsWith('/drops-widget');
+            
+            if (!isOverlayRoute) {
+                // Перенаправляем на страницу логина при 401 только для основного приложения
+                window.location.href = '/login';
+            }
         }
         return Promise.reject(error);
     }
@@ -136,7 +145,7 @@ export const updateVoiceSettings = async (voiceId, settings) => {
 };
 
 export const updateUserVoiceSettings = async (voiceId, userId, settings) => {
-    return await ttsService.put(`/api/user/voices/${voiceId}/settings?user_id=${userId}`, settings);
+    return await ttsService.put(`/api/tts/user/voices/${voiceId}/settings?user_id=${userId}`, settings);
 };
 
 export const transcribeVoice = async (voiceId) => {
@@ -156,7 +165,7 @@ export const retranscribeVoice = async (voiceId, referenceText) => {
 export const retranscribeUserVoice = async (voiceId, userId, referenceText) => {
     const formData = new FormData();
     formData.append('reference_text', referenceText);
-    return await ttsService.post(`/api/user/voices/${voiceId}/retranscribe?user_id=${userId}`, formData, {
+    return await ttsService.post(`/api/tts/user/voices/${voiceId}/retranscribe?user_id=${userId}`, formData, {
         headers: {
             'Content-Type': 'multipart/form-data',
         },
@@ -164,7 +173,7 @@ export const retranscribeUserVoice = async (voiceId, userId, referenceText) => {
 };
 
 export const transcribeUserVoice = async (voiceId, userId) => {
-    return await botService.post(`/api/user/voices/${voiceId}/transcribe?user_id=${userId}`);
+    return await ttsService.post(`/api/tts/user/voices/${voiceId}/transcribe?user_id=${userId}`);
 };
 
 // Rename voice functions
@@ -181,7 +190,7 @@ export const renameVoice = async (voiceId, newName) => {
 export const renameUserVoice = async (voiceId, userId, newName) => {
     const formData = new FormData();
     formData.append('new_name', newName);
-    return await ttsService.put(`/api/user/voices/${voiceId}/rename?user_id=${userId}`, formData, {
+    return await ttsService.put(`/api/tts/user/voices/${voiceId}/rename?user_id=${userId}`, formData, {
         headers: {
             'Content-Type': 'multipart/form-data',
         },
@@ -194,11 +203,11 @@ export const getUsers = async () => {
 
 // User
 export const getUserVoices = async (userId) => {
-    return await ttsService.get(`/api/user/voices/${userId}`);
+    return await ttsService.get(`/api/tts/user/voices/${userId}`);
 };
 
 export const uploadUserVoice = async (userId, formData) => {
-     return await ttsService.post(`/api/user/voices/upload?user_id=${userId}`, formData, {
+     return await ttsService.post(`/api/tts/user/voices/upload?user_id=${userId}`, formData, {
         headers: {
             'Content-Type': 'multipart/form-data',
         },
@@ -206,7 +215,7 @@ export const uploadUserVoice = async (userId, formData) => {
 };
 
 export const deleteUserVoice = async (voiceId, userId) => {
-    return await ttsService.delete(`/api/user/voices/${voiceId}?user_id=${userId}`);
+    return await ttsService.delete(`/api/tts/user/voices/${voiceId}?user_id=${userId}`);
 };
 
 

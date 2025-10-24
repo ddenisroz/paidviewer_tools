@@ -1,5 +1,6 @@
 // src/components/ChatContextMenu.jsx
 import React, { useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { 
     Ban, 
     Clock, 
@@ -91,10 +92,10 @@ const ChatContextMenu = ({
     // const vkAvailableActions = ['block_tts', 'unblock_tts'];
     // const twitchAvailableActions = ['block_tts', 'unblock_tts', 'timeout_10m', 'timeout_1h', 'ban', 'add_moderator', 'remove_moderator', 'add_vip', 'remove_vip'];
 
-    return (
+    return ReactDOM.createPortal(
         <div
             ref={menuRef}
-            className="fixed bg-popover border border-border rounded-md shadow-2xl py-1 z-[9999] min-w-[180px] animate-in fade-in slide-in-from-top-2 duration-150 backdrop-blur-sm"
+            className="fixed bg-popover border border-border rounded-md shadow-2xl py-1 z-[99999] min-w-[180px] animate-in fade-in slide-in-from-top-2 duration-150 backdrop-blur-sm"
             style={{
                 left: `${position.x}px`,
                 top: `${position.y}px`,
@@ -111,16 +112,17 @@ const ChatContextMenu = ({
                 {isTtsBlocked ? (
                     <>
                         <Volume2 className="h-4 w-4" />
-                        <span>Разглушить</span>
+                        <span>Разглушить TTS</span>
                     </>
                 ) : (
                     <>
                         <VolumeX className="h-4 w-4" />
-                        <span>Заглушить</span>
+                        <span>Заглушить TTS</span>
                     </>
                 )}
             </button>
-        </div>
+        </div>,
+        document.body
     );
 };
 

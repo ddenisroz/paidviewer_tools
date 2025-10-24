@@ -1032,6 +1032,7 @@ async def set_platform_settings(
         
         if not tts_settings:
             # Создаем новые настройки с выбранными платформами
+            logger.info(f"💾 [TTS SETTINGS] Creating NEW settings for user {user_id}")
             tts_settings = TTSUserSettings(
                 user_id=user_id if user_id != -1 else None,
                 session_id=session_id if user_id == -1 else None,
@@ -1040,11 +1041,16 @@ async def set_platform_settings(
             db.add(tts_settings)
         else:
             # Обновляем существующие
+            logger.info(f"💾 [TTS SETTINGS] Updating EXISTING settings for user {user_id}")
+            logger.info(f"💾 [TTS SETTINGS] OLD value: {tts_settings.enabled_platforms}")
             tts_settings.enabled_platforms = enabled_platforms if enabled_platforms else ['twitch', 'vk']
+            logger.info(f"💾 [TTS SETTINGS] NEW value: {tts_settings.enabled_platforms}")
         
         db.commit()
+        db.refresh(tts_settings)
         
-        logger.info(f"User {user_id} set enabled platforms to: {enabled_platforms}")
+        logger.info(f"✅ [TTS SETTINGS] User {user_id} set enabled platforms to: {enabled_platforms}")
+        logger.info(f"✅ [TTS SETTINGS] Saved to DB: {tts_settings.enabled_platforms}")
         return {
             "success": True,
             "message": "Платформы для озвучки обновлены",
@@ -1082,9 +1088,11 @@ async def get_platform_settings(
         
         if not tts_settings:
             # Возвращаем дефолтные настройки
+            logger.info(f"📖 [TTS SETTINGS] No settings found for user {user_id}, returning defaults")
             enabled_platforms = ['twitch', 'vk']
         else:
             enabled_platforms = tts_settings.enabled_platforms or ['twitch', 'vk']
+            logger.info(f"📖 [TTS SETTINGS] Loaded for user {user_id}: {enabled_platforms}")
         
         return {
             "success": True,
@@ -1105,36 +1113,104 @@ async def check_whitelist_status(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Проверить статус whitelist для управления голосами"""
+    """
+    Проверить статус whitelist для управления голосами
+    ВАЖНО: 
+    1. Для гостей проверяется ник + платформа из device_info
+    2. Для OAuth пользователей проверяется login_platform из сессии
+    """
     try:
+        # Для ГОСТЕЙ проверяем ник из device_info
         if user.get('is_guest', False):
-            return {
-                "is_whitelisted": False,
-                "can_manage_voices": False,
-                "message": "Гостевые пользователи не имеют доступа к управлению голосами"
-            }
+            device_info = user.get('device_info', {})
+            if not device_info:
+                logger.warning(f"Guest user has no device_info")
+                return {
+                    "is_whitelisted": False,
+                    "can_manage_voices": False,
+                    "message": "Не удалось определить данные гостевой сессии"
+                }
+            
+            monitored_channel = device_info.get('monitored_channel')
+            platform = device_info.get('platform')
+            
+            if not monitored_channel or not platform:
+                logger.warning(f"Guest user has incomplete device_info: {device_info}")
+                return {
+                    "is_whitelisted": False,
+                    "can_manage_voices": False,
+                    "message": "Не удалось определить канал или платформу"
+                }
+            
+            # Проверяем whitelist для гостевого канала
+            guest_whitelisted = db.query(WhitelistedChannel).filter(
+                WhitelistedChannel.channel_name == monitored_channel.lower(),
+                WhitelistedChannel.platform == platform
+            ).first()
+            
+            if guest_whitelisted:
+                logger.info(f"✅ Guest user {monitored_channel} ({platform}) is whitelisted")
+                return {"is_whitelisted": True, "can_manage_voices": True, "platform": platform}
+            else:
+                logger.info(f"❌ Guest user {monitored_channel} ({platform}) NOT in whitelist")
+                return {
+                    "is_whitelisted": False,
+                    "can_manage_voices": False,
+                    "message": f"Канал '{monitored_channel}' не в whitelist для платформы {platform}"
+                }
         
         db_user = db.query(User).filter(User.id == user['id']).first()
         if not db_user:
             return {"is_whitelisted": False, "can_manage_voices": False}
         
-        # Проверяем Twitch
-        if db_user.twitch_username:
+        # Получаем платформу, через которую пользователь АВТОРИЗОВАЛСЯ
+        login_platform = user.get('login_platform')
+        
+        if not login_platform:
+            logger.warning(f"User {user['id']} has no login_platform in session")
+            return {
+                "is_whitelisted": False, 
+                "can_manage_voices": False,
+                "message": "Не удалось определить платформу авторизации"
+            }
+        
+        # Проверяем whitelist ТОЛЬКО для платформы авторизации
+        if login_platform == 'twitch':
+            if not db_user.twitch_username:
+                return {"is_whitelisted": False, "can_manage_voices": False}
+                
             twitch_whitelisted = db.query(WhitelistedChannel).filter(
-                WhitelistedChannel.channel_name == db_user.twitch_username.lower()
+                WhitelistedChannel.channel_name == db_user.twitch_username.lower(),
+                WhitelistedChannel.platform == 'twitch'
             ).first()
+            
             if twitch_whitelisted:
-                return {"is_whitelisted": True, "can_manage_voices": True}
+                logger.info(f"✅ User {db_user.twitch_username} whitelisted on Twitch")
+                return {"is_whitelisted": True, "can_manage_voices": True, "platform": "twitch"}
+            else:
+                logger.warning(f"❌ User {db_user.twitch_username} NOT whitelisted on Twitch")
+                return {"is_whitelisted": False, "can_manage_voices": False}
         
-        # Проверяем VK
-        if db_user.vk_username:
+        elif login_platform == 'vk':
+            if not db_user.vk_username:
+                return {"is_whitelisted": False, "can_manage_voices": False}
+                
             vk_whitelisted = db.query(WhitelistedChannel).filter(
-                WhitelistedChannel.channel_name == db_user.vk_username.lower()
+                WhitelistedChannel.channel_name == db_user.vk_username.lower(),
+                WhitelistedChannel.platform == 'vk'
             ).first()
+            
             if vk_whitelisted:
-                return {"is_whitelisted": True, "can_manage_voices": True}
+                logger.info(f"✅ User {db_user.vk_username} whitelisted on VK")
+                return {"is_whitelisted": True, "can_manage_voices": True, "platform": "vk"}
+            else:
+                logger.warning(f"❌ User {db_user.vk_username} NOT whitelisted on VK")
+                return {"is_whitelisted": False, "can_manage_voices": False}
         
-        return {"is_whitelisted": False, "can_manage_voices": False}
+        else:
+            logger.error(f"Unknown login_platform: {login_platform}")
+            return {"is_whitelisted": False, "can_manage_voices": False}
+            
     except Exception as e:
         logger.error(f"Error checking whitelist status: {e}")
         raise HTTPException(status_code=500, detail="Ошибка проверки whitelist")

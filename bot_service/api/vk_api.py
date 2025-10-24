@@ -397,6 +397,11 @@ class VKLiveAPI:
                         "id": current_category_id if current_category_id else ""  # Пустая строка вместо None
                     }
                 }
+                
+                # Добавляем description если есть
+                if current_stream_data.get("description"):
+                    final_payload["description"] = current_stream_data.get("description")
+                    logger.info(f"📺 [VK API] Including description: {final_payload['description'][:50]}...")
 
                 # Перезаписываем новыми данными из payload
                 if "title" in payload:
@@ -430,12 +435,18 @@ class VKLiveAPI:
                                     cat_data = await cat_response.json()
                                     full_category = cat_data.get("data", {}).get("category", {})
                                     if full_category:
-                                        final_payload["category"] = {
-                                            "id": category_id,
+                                        # Формируем category БЕЗ пустого cover_url (VK API не принимает пустые строки!)
+                                        category_obj = {
+                                            "id": str(category_id),  # VK API требует строку
                                             "title": full_category.get("title", ""),
-                                            "cover_url": full_category.get("cover_url", ""),
-                                            "type": full_category.get("type", "")
+                                            "type": full_category.get("type", "games")
                                         }
+                                        # Добавляем cover_url ТОЛЬКО если он не пустой
+                                        cover_url = full_category.get("cover_url", "")
+                                        if cover_url:
+                                            category_obj["cover_url"] = cover_url
+                                        
+                                        final_payload["category"] = category_obj
                                         logger.info(f"✅ [VK API] Loaded full category: {final_payload['category']}")
                                     else:
                                         # Если не удалось загрузить, используем только ID
@@ -448,7 +459,23 @@ class VKLiveAPI:
                             final_payload["category"]["id"] = category_id
                     else:
                         # Если уже есть полная информация, используем её
-                        final_payload["category"] = payload["category"]
+                        # НО! Удаляем пустой cover_url (VK API не принимает пустые строки)
+                        category_id_raw = payload["category"]["id"]
+                        
+                        category_update = {
+                            "id": str(category_id_raw),  # VK API требует строку
+                            "title": payload["category"].get("title", ""),
+                            "type": payload["category"].get("type", "games")
+                        }
+                        # Добавляем cover_url только если он не пустой
+                        cover_url = payload["category"].get("cover_url", "")
+                        if cover_url:
+                            category_update["cover_url"] = cover_url
+                            logger.info(f"📺 [VK API] Including cover_url in category: {cover_url}")
+                        else:
+                            logger.info(f"📺 [VK API] Skipping empty cover_url")
+                        
+                        final_payload["category"] = category_update
                     
                     logger.info(f"📺 [VK API] Updating category to: {final_payload['category']}")
 
@@ -504,15 +531,40 @@ class VKLiveAPI:
         
         return await self._update_stream(user_id, payload)
 
-    async def update_stream_category(self, user_id: str, category_id: str) -> bool:
-        """Обновить категорию стрима VK Live"""
-        logger.info(f"📺 [VK API] Updating category for user {user_id} to category_id={category_id}")
+    async def update_stream_category(self, user_id: str, category_data) -> bool:
+        """Обновить категорию стрима VK Live
         
+        Args:
+            user_id: ID пользователя
+            category_data: Либо строка (category_id), либо dict с полным объектом категории
+                           Dict должен содержать: {"id": str, "title": str, "cover_url": str, "type": str}
+        """
         # Получаем текущую информацию о стриме чтобы сохранить название
         current_stream_info = await self.get_stream_info(user_id)
         logger.info(f"📺 [VK API] Current stream info retrieved: {current_stream_info}")
         
-        payload = {"category": {"id": category_id}}
+        # Формируем объект категории
+        if isinstance(category_data, dict):
+            # Полный объект категории - используем его
+            category_obj = {
+                "id": str(category_data.get("id", "")),
+                "title": category_data.get("title", ""),
+                "type": category_data.get("type", "games")
+            }
+            
+            # Добавляем cover_url ТОЛЬКО если он не пустой (VK API не принимает пустые строки!)
+            cover_url = category_data.get("cover_url", "")
+            if cover_url:
+                category_obj["cover_url"] = cover_url
+                logger.info(f"📺 [VK API] Using full category object with cover_url: {category_obj}")
+            else:
+                logger.info(f"📺 [VK API] Using full category object WITHOUT cover_url: {category_obj}")
+        else:
+            # Только ID - создаем минимальный объект (может не работать!)
+            category_obj = {"id": str(category_data)}
+            logger.warning(f"📺 [VK API] Using minimal category object (only ID): {category_obj}")
+        
+        payload = {"category": category_obj}
         
         # Если есть текущее название, сохраняем его
         if current_stream_info and current_stream_info.get("title"):

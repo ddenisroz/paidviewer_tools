@@ -10,7 +10,7 @@ const GuestPage = () => {
     const [channelName, setChannelName] = useState('');
     const [isConnecting, setIsConnecting] = useState(false);
     const [verificationCode, setVerificationCode] = useState('');
-    const [platform, setPlatform] = useState('');
+    const [platform, setPlatform] = useState('twitch'); // По умолчанию Twitch
     const [isWaitingConfirmation, setIsWaitingConfirmation] = useState(false);
     const [remainingSeconds, setRemainingSeconds] = useState(60);
 
@@ -78,15 +78,16 @@ const GuestPage = () => {
         try {
             setIsConnecting(true);
             const response = await api.post('/api/chat/guest/connect', {
-                channel_name: channelName.trim()
+                channel_name: channelName.trim(),
+                platform: platform  // ✅ Отправляем выбранную платформу
             });
             
             if (response.data.success) {
                 setVerificationCode(response.data.verification_code);
-                setPlatform(response.data.platform);
+                // Платформу уже знаем из state, не перезаписываем
                 setRemainingSeconds(response.data.expires_in_seconds || 60);
                 setIsWaitingConfirmation(true);
-                toast.success(`Попросите владельца канала написать код ${response.data.verification_code} в чат`);
+                toast.success(`Попросите владельца канала написать код ${response.data.verification_code} в чат на ${platform === 'twitch' ? 'Twitch' : 'VK Live'}`);
             } else {
                 toast.error(response.data.message || 'Ошибка подключения');
             }
@@ -115,9 +116,42 @@ const GuestPage = () => {
                 
                 {!verificationCode ? (
                     <>
+                        {/* 🎯 Выбор платформы */}
+                        <div className="space-y-3">
+                            <label className="text-sm font-medium text-card-foreground">
+                                Выберите платформу:
+                            </label>
+                            <div className="flex gap-4">
+                                <label className="flex items-center space-x-3 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="platform"
+                                        value="twitch"
+                                        checked={platform === 'twitch'}
+                                        onChange={(e) => setPlatform(e.target.value)}
+                                        disabled={isConnecting}
+                                        className="w-5 h-5 text-primary focus:ring-2 focus:ring-primary disabled:opacity-50"
+                                    />
+                                    <span className="text-lg font-medium text-[#9146FF]">Twitch</span>
+                                </label>
+                                <label className="flex items-center space-x-3 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="platform"
+                                        value="vk"
+                                        checked={platform === 'vk'}
+                                        onChange={(e) => setPlatform(e.target.value)}
+                                        disabled={isConnecting}
+                                        className="w-5 h-5 text-primary focus:ring-2 focus:ring-primary disabled:opacity-50"
+                                    />
+                                    <span className="text-lg font-medium text-[#FF0000]">VK Live</span>
+                                </label>
+                            </div>
+                        </div>
+                        
                         <input
                             type="text"
-                            placeholder="Имя канала (например: yourchy)"
+                            placeholder={platform === 'twitch' ? 'Имя канала (например: yourchy)' : 'Имя канала или ID (например: yourchy или 123456)'}
                             value={channelName}
                             onChange={(e) => setChannelName(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && handleConnect()}

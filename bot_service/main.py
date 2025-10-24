@@ -9,6 +9,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from datetime import datetime
 from fastapi import FastAPI, WebSocket, Depends, Request, HTTPException
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
@@ -63,6 +64,7 @@ from api.support_api import router as support_router
 from auth.vk_auth import router as vk_auth_router
 from auth.twitch_auth import router as twitch_auth_router
 from api.vk_api import router as vk_api_router
+from api.twitch_api_badges import router as twitch_badges_router
 from auth.donationalerts_auth import router as da_auth_router
 from api.widgets import router as widgets_router
 from api.bot_control_api import router as bot_control_router
@@ -71,6 +73,7 @@ from api.additional_api import router as additional_router
 from api.obs_integration_api import router as obs_integration_router
 from api.system_api import router as system_router
 from api.user_settings_api import router as user_settings_router
+from api.chatbox_api import router as chatbox_router
 
 from core.token_utils import get_user_token_from_db, validate_platform_token
 
@@ -643,6 +646,75 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
     )
     logger.info(f"✅ Connection added: {conn_id}")
     
+    # Отправляем историю сообщений сразу после подключения
+    try:
+        from core.database import ChatMessage, User, get_db
+        db = next(get_db())
+        try:
+            user = db.query(User).filter(User.id == user_id_int).first()
+            if user:
+                # Получаем последние 50 сообщений для всех каналов пользователя
+                messages = []
+                
+                # Twitch сообщения
+                if user.twitch_username:
+                    twitch_messages = db.query(ChatMessage).filter(
+                        ChatMessage.user_id == user_id_int,
+                        ChatMessage.platform == 'twitch'
+                    ).order_by(ChatMessage.timestamp.desc()).limit(50).all()
+                    messages.extend(twitch_messages)
+                
+                # VK сообщения
+                if user.vk_channel_name:
+                    vk_messages = db.query(ChatMessage).filter(
+                        ChatMessage.user_id == user_id_int,
+                        ChatMessage.platform == 'vk'
+                    ).order_by(ChatMessage.timestamp.desc()).limit(50).all()
+                    messages.extend(vk_messages)
+                
+                # Сортируем все сообщения по времени
+                messages.sort(key=lambda x: x.timestamp)
+                
+                # Форматируем для отправки
+                import json
+                history_data = []
+                for msg in messages[-50:]:  # Последние 50
+                    # Парсим badges если это строка JSON
+                    badges_list = msg.badges
+                    if isinstance(badges_list, str):
+                        try:
+                            badges_list = json.loads(badges_list)
+                        except:
+                            badges_list = None
+                    
+                    history_data.append({
+                        "id": msg.id,
+                        "platform": msg.platform,
+                        "author": msg.author_username,
+                        "author_name": msg.author_username,
+                        "message": msg.message,
+                        "timestamp": msg.timestamp.isoformat() if msg.timestamp else None,
+                        "role": msg.role,  # Роль пользователя
+                        "badges": badges_list  # Значки пользователя (массив)
+                    })
+                
+                # Отправляем историю
+                await websocket.send_text(json.dumps({
+                    "type": "chat_history",
+                    "messages": history_data
+                }))
+                
+                # Debug: Проверяем первое сообщение
+                if history_data:
+                    sample_msg = history_data[0]
+                    logger.info(f"📜 [WS HISTORY] Sample message: author={sample_msg.get('author')}, badges={sample_msg.get('badges')}, role={sample_msg.get('role')}")
+                
+                logger.info(f"📜 Sent {len(history_data)} messages history to ChatOverlay")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"❌ Error sending chat history: {e}")
+    
     try:
         while True:
             data = await websocket.receive_text()
@@ -890,7 +962,10 @@ async def health_check():
 async def http_exception_handler(request: Request, exc: HTTPException):
     """Логируем все HTTP исключения для диагностики"""
     logger.warning(f"HTTP {exc.status_code}: {request.method} {request.url.path} - {exc.detail}")
-    return {"detail": exc.detail, "status_code": exc.status_code}
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
 
 # --- API Routes ---
 app.include_router(tts_router)
@@ -906,6 +981,7 @@ app.include_router(points_router)
 app.include_router(session_api_router)
 app.include_router(vk_auth_router)
 app.include_router(twitch_auth_router)
+app.include_router(twitch_badges_router, prefix="/api/twitch", tags=["twitch-badges"])
 app.include_router(vk_api_router)
 app.include_router(da_auth_router)
 app.include_router(widgets_router)
@@ -916,6 +992,7 @@ app.include_router(obs_integration_router)
 app.include_router(system_router)
 app.include_router(user_settings_router)
 app.include_router(support_router)
+app.include_router(chatbox_router)
 
 # --- New API Routes ---
 from api.admin_api import router as admin_router

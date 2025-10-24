@@ -864,11 +864,17 @@ class TwitchAPI:
             
             try:
                 user = db.query(User).filter(User.id == user_id).first()
-                if not user or not user.twitch_user_id:
-                    logger.error(f"[TWITCH TIMEOUT] No twitch_user_id for user {user_id}")
+                if not user or not user.twitch_username:
+                    logger.error(f"[TWITCH TIMEOUT] No twitch_username for user {user_id}")
                     return False
                 
-                broadcaster_id = str(user.twitch_user_id)
+                # Получаем broadcaster_id через API
+                broadcaster_data = await self.get_user_by_username(user.twitch_username)
+                if not broadcaster_data:
+                    logger.error(f"[TWITCH TIMEOUT] Could not fetch broadcaster_id for {user.twitch_username}")
+                    return False
+                
+                broadcaster_id = str(broadcaster_data['id'])
             finally:
                 if should_close:
                     db.close()
@@ -947,11 +953,17 @@ class TwitchAPI:
             
             try:
                 user = db.query(User).filter(User.id == user_id).first()
-                if not user or not user.twitch_user_id:
-                    logger.error(f"[TWITCH UNTIMEOUT] No twitch_user_id for user {user_id}")
+                if not user or not user.twitch_username:
+                    logger.error(f"[TWITCH UNTIMEOUT] No twitch_username for user {user_id}")
                     return False
                 
-                broadcaster_id = str(user.twitch_user_id)
+                # Получаем broadcaster_id через API
+                broadcaster_data = await self.get_user_by_username(user.twitch_username)
+                if not broadcaster_data:
+                    logger.error(f"[TWITCH UNTIMEOUT] Could not fetch broadcaster_id for {user.twitch_username}")
+                    return False
+                
+                broadcaster_id = str(broadcaster_data['id'])
             finally:
                 if should_close:
                     db.close()

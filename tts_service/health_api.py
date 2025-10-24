@@ -16,10 +16,14 @@ health_router = APIRouter(tags=["health"])
 @health_router.get("/health")
 async def health_check():
     """Базовая проверка здоровья"""
+    # Проверяем, загружен ли TTS движок
+    tts_engine_loaded = tts_engine_manager.is_ready() if hasattr(tts_engine_manager, 'is_ready') else tts_engine_manager.is_initialized()
+    
     return {
         "status": "healthy",
         "service": "tts_service",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "tts_engine_loaded": tts_engine_loaded
     }
 
 @health_router.get("/detailed")

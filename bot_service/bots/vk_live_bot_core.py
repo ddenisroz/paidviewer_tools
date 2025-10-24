@@ -223,8 +223,16 @@ class VKLiveBotCore:
             channel_id = message.get("channel", "")  # HTTP polling передает channel в этом поле
             platform = message.get("platform", "vk")
             is_owner = author.get("is_owner", False) or author.get("is_broadcaster", False)
+            is_moderator = author.get("is_moderator", False)
             
-            logger.info(f"📩 [VK MSG] {channel_id} | {user} (owner={is_owner}): {text[:50]}")
+            # Определяем роль для VK Live
+            role = None
+            if is_owner:
+                role = 'broadcaster'
+            elif is_moderator:
+                role = 'moderator'
+            
+            logger.info(f"📩 [VK MSG] {channel_id} | {user} (owner={is_owner}, mod={is_moderator}, role={role}): {text[:50]}")
             
             # 1. Отправляем сообщение в WebSocket для отображения в chatbox
             from utils.websocket_helper import broadcast_chat_message
@@ -232,7 +240,9 @@ class VKLiveBotCore:
                 username=user,
                 content=text,
                 platform="vk",
-                channel=channel_id
+                channel=channel_id,
+                role=role,
+                badges=None  # VK Live не предоставляет badges через API
             )
             
             # 2. Проверка гостевого кода (если это 6 цифр)

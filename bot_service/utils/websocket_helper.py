@@ -14,7 +14,9 @@ async def broadcast_chat_message(
     content: str,
     platform: str,
     channel: str,
-    message_id: Optional[str] = None
+    message_id: Optional[str] = None,
+    role: Optional[str] = None,
+    badges: Optional[list] = None
 ) -> bool:
     """
     Отправить сообщение чата во все WebSocket соединения
@@ -25,6 +27,8 @@ async def broadcast_chat_message(
         platform: Платформа (twitch, vk, youtube, etc.)
         channel: Название канала
         message_id: ID сообщения (опционально, если None - генерируется автоматически)
+        role: Роль пользователя (broadcaster, moderator, vip, subscriber)
+        badges: Список значков пользователя ["broadcaster/1", "subscriber/12"]
     
     Returns:
         bool: True если сообщение отправлено хотя бы одному клиенту
@@ -38,7 +42,7 @@ async def broadcast_chat_message(
         # Формируем сообщение для фронтенда
         # Используем все варианты полей для совместимости с разными компонентами
         chat_data = {
-            "type": "message",
+            "type": "message",  # Основной тип для ChatContext
             "id": message_id or str(uuid.uuid4()),
             "author": username,
             "author_name": username,
@@ -48,6 +52,8 @@ async def broadcast_chat_message(
             "text": content,
             "platform": platform,
             "channel": channel,
+            "role": role,  # Роль пользователя (broadcaster, moderator, vip, subscriber)
+            "badges": badges,  # Список значков
             "timestamp": datetime.now().isoformat()
         }
         
@@ -83,17 +89,19 @@ async def broadcast_chat_message(
                 
                 # Если нашли владельца канала, сохраняем сообщение
                 if user_id:
-                    logger.info(f"💾 [DB] Saving message: user_id={user_id}, channel={channel}, platform={platform}, author={username}")
+                    logger.info(f"💾 [DB] Saving message: user_id={user_id}, channel={channel}, platform={platform}, author={username}, role={role}")
                     chat_message = ChatMessage(
                         user_id=user_id,
                         channel_name=channel,
                         platform=platform,
                         author_username=username,  # Сохраняем имя пользователя из чата
-                        message=content
+                        message=content,
+                        role=role,  # Роль пользователя
+                        badges=badges  # Значки пользователя (JSON массив)
                     )
                     db.add(chat_message)
                     db.commit()
-                    logger.info(f"💾 [DB] Message saved: ID={chat_message.id}, {platform}:{channel} from {username}")
+                    logger.info(f"💾 [DB] Message saved: ID={chat_message.id}, {platform}:{channel} from {username} (role={role}, badges={badges})")
                 else:
                     logger.warning(f"⚠️ [DB] Could not find channel owner for {platform}:{channel}, skipping DB save")
             finally:
@@ -178,9 +186,10 @@ async def handle_tts_for_message(
         db = SessionLocal()
         try:
             # Находим владельца канала
+            # Case-insensitive поиск для всех платформ
+            from sqlalchemy import func
+            
             if platform == 'twitch':
-                # Case-insensitive поиск для Twitch
-                from sqlalchemy import func
                 channel_owner = db.query(User).filter(
                     func.lower(User.twitch_username) == channel_identifier.lower()
                 ).first()

@@ -28,8 +28,9 @@ const AnalyticsPage = () => {
       
       // Загружаем реальные метрики с бэкенда
       const response = await fetch('/api/admin/analytics', {
+        credentials: 'include',  // Отправляем cookies для авторизации
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         }
       });
       

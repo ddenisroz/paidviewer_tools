@@ -10,6 +10,52 @@ const DataContext = createContext();
 export const useData = () => useContext(DataContext);
 
 /**
+ * Нормализует строку для сравнения (убирает дефисы, тире, множественные пробелы)
+ */
+function normalizeString(str) {
+    return str
+        .toLowerCase()
+        .replace(/[\-–—]/g, ' ')  // Заменяем дефисы и тире на пробелы
+        .replace(/\s+/g, ' ')      // Убираем множественные пробелы
+        .trim();
+}
+
+/**
+ * Вычисляет расстояние Левенштейна между двумя строками (для fuzzy matching)
+ * @param {string} a - Первая строка
+ * @param {string} b - Вторая строка
+ * @returns {number} - Количество изменений (вставок, удалений, замен)
+ */
+function levenshteinDistance(a, b) {
+    const matrix = [];
+    
+    // Инициализация первой строки и столбца
+    for (let i = 0; i <= b.length; i++) {
+        matrix[i] = [i];
+    }
+    for (let j = 0; j <= a.length; j++) {
+        matrix[0][j] = j;
+    }
+    
+    // Заполнение матрицы
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1, // замена
+                    matrix[i][j - 1] + 1,     // вставка
+                    matrix[i - 1][j] + 1      // удаление
+                );
+            }
+        }
+    }
+    
+    return matrix[b.length][a.length];
+}
+
+/**
  * Вычисляет релевантность категории для запроса
  * Чем меньше score, тем выше релевантность
  * УПРОЩЕННАЯ И УЛУЧШЕННАЯ ВЕРСИЯ
@@ -18,15 +64,22 @@ function calculateRelevance(categoryName, query) {
     const catLower = categoryName.toLowerCase();
     const queryLower = query.toLowerCase();
     
-    // 1. Точное совпадение - наивысший приоритет
-    if (catLower === queryLower) return 0;
+    // Нормализованные версии (дефисы → пробелы, множественные пробелы → один)
+    const catNormalized = normalizeString(categoryName);
+    const queryNormalized = normalizeString(query);
     
-    // 2. Начинается с запроса - очень высокий приоритет
-    if (catLower.startsWith(queryLower)) return 1;
+    // 1. Точное совпадение (с нормализацией) - наивысший приоритет
+    if (catNormalized === queryNormalized) return 0;
     
-    // Разбиваем на слова
-    const catWords = catLower.split(/[\s:,\-–—()]+/).filter(w => w.length > 0);
-    const queryWords = queryLower.split(/[\s:,\-–—()]+/).filter(w => w.length > 0);
+    // 1.5. Точное совпадение БЕЗ нормализации (например, одинаковые дефисы)
+    if (catLower === queryLower) return 0.5;
+    
+    // 2. Начинается с запроса (с нормализацией) - очень высокий приоритет
+    if (catNormalized.startsWith(queryNormalized)) return 1;
+    
+    // Разбиваем на слова (используем НОРМАЛИЗОВАННЫЕ строки!)
+    const catWords = catNormalized.split(/\s+/).filter(w => w.length > 0);
+    const queryWords = queryNormalized.split(/\s+/).filter(w => w.length > 0);
     
     // 3. Первое слово категории точно совпадает с первым словом запроса
     if (catWords.length > 0 && queryWords.length > 0 && catWords[0] === queryWords[0]) {
@@ -58,8 +111,8 @@ function calculateRelevance(categoryName, query) {
         return 7 + (queryWords.length - exactMatches);
     }
     
-    // 7. Содержит всю строку запроса целиком
-    if (catLower.includes(queryLower)) {
+    // 7. Содержит всю строку запроса целиком (с нормализацией)
+    if (catNormalized.includes(queryNormalized)) {
         return 10;
     }
     
@@ -80,18 +133,47 @@ function calculateRelevance(categoryName, query) {
     }
     
     // 11. Нечеткое совпадение по символам (только для коротких запросов)
-    if (queryLower.length <= 5) {
+    if (queryNormalized.length <= 5) {
         let matchCount = 0;
         let lastIndex = -1;
-        for (const char of queryLower) {
-            const index = catLower.indexOf(char, lastIndex + 1);
+        for (const char of queryNormalized) {
+            const index = catNormalized.indexOf(char, lastIndex + 1);
             if (index > lastIndex) {
                 matchCount++;
                 lastIndex = index;
             }
         }
-        const fuzzyScore = matchCount / queryLower.length;
+        const fuzzyScore = matchCount / queryNormalized.length;
         if (fuzzyScore > 0.8) return 30;
+    }
+    
+    // 12. Fuzzy matching по расстоянию Левенштейна (для опечаток)
+    // "conter strike" vs "counter strike" → distance = 1
+    const distance = levenshteinDistance(catNormalized, queryNormalized);
+    const maxLength = Math.max(catNormalized.length, queryNormalized.length);
+    const similarity = 1 - (distance / maxLength);
+    
+    // Если похожесть > 80% (1-2 опечатки в слове из 10-15 символов)
+    if (similarity > 0.8) {
+        return 25 + Math.floor(distance); // Чем меньше расстояние, тем выше приоритет
+    }
+    
+    // Fuzzy matching для отдельных слов (по словам)
+    const wordFuzzyMatches = queryWords.filter(qw => {
+        return catWords.some(cw => {
+            const wordDist = levenshteinDistance(cw, qw);
+            const wordMaxLen = Math.max(cw.length, qw.length);
+            const wordSim = 1 - (wordDist / wordMaxLen);
+            return wordSim > 0.75; // 75% похожести для слова
+        });
+    }).length;
+    
+    if (wordFuzzyMatches === queryWords.length) {
+        // Все слова найдены с небольшими опечатками
+        return 28;
+    } else if (wordFuzzyMatches > queryWords.length / 2) {
+        // Больше половины слов найдены
+        return 30 + (queryWords.length - wordFuzzyMatches);
     }
     
     // Не релевантно
@@ -279,8 +361,23 @@ export const DataProvider = ({ children }) => {
                     changesFound = true;
                 }
                 if (initialData.vk.category?.id !== currentData.vk.category?.id) {
+                    // Отправляем ПОЛНЫЙ объект категории (VK API требует все поля!)
+                    const vkCategoryPayload = {
+                        id: currentData.vk.category?.id,
+                        name: currentData.vk.category?.name,
+                        title: currentData.vk.category?.name, // VK API использует 'title' вместо 'name'
+                        type: currentData.vk.category?.type || "games"
+                    };
+                    
+                    // Добавляем cover_url ТОЛЬКО если он не пустой (VK API не принимает пустые строки!)
+                    const coverUrl = currentData.vk.category?.box_art_url || currentData.vk.category?.cover_url || "";
+                    if (coverUrl) {
+                        vkCategoryPayload.cover_url = coverUrl;
+                    }
+                    
+                    payload.vk.category = vkCategoryPayload;
+                    // Fallback для обратной совместимости
                     payload.vk.category_id = currentData.vk.category?.id;
-                    payload.vk.category_name = currentData.vk.category?.name;  // Добавляем name для полной загрузки
                     changesFound = true;
                 }
             }
@@ -299,6 +396,8 @@ export const DataProvider = ({ children }) => {
             addToast({ type: 'info', title: 'Информация', message: 'Нет изменений для сохранения.' });
             return;
         }
+
+        console.log('📤 [DataContext] Final payload before sending:', JSON.stringify(payload, null, 2));
 
         try {
             await botService.post('/api/stream/update', payload);
@@ -346,17 +445,17 @@ export const DataProvider = ({ children }) => {
                 title: 'Требуется авторизация', 
                 message: 'Пожалуйста, войдите в систему для поиска категорий.' 
             });
-            return;
+            return [];
         }
         
         if (integrationsLoading) {
             console.log('DataContext: Integrations still loading, skipping search');
-            return;
+            return [];
         }
         
         if (!integrations[platform]?.enabled) {
             console.log('DataContext: Platform not enabled, skipping search');
-            return;
+            return [];
         }
         
         setLoading(prev => ({ ...prev, categories: true }));
@@ -416,6 +515,9 @@ export const DataProvider = ({ children }) => {
             });
             
             setCategories(prev => ({...prev, [platform]: mergedCategories}));
+            
+            // Возвращаем результаты для использования в других компонентах (например, auto-sync)
+            return mergedCategories;
         } catch (error) {
             console.error(`Error searching ${platform} categories:`, error);
             if (error.response?.status === 401) {
@@ -433,6 +535,7 @@ export const DataProvider = ({ children }) => {
                     message: `Не удалось найти категории: ${error.message}` 
                 });
             }
+            return [];
         } finally {
             setLoading(prev => ({ ...prev, categories: false }));
         }

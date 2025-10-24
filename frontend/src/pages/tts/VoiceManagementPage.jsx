@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Trash2, Settings, TestTube2, Globe, User, Edit } from 'lucide-react';
+import { Upload, Trash2, Settings, TestTube2, Globe, User, Edit, Lock, AlertCircle } from 'lucide-react';
 import { Slider } from "@/components/ui/slider";
 import { useToast } from '../../components/ui/toast';
 import { useButtonPosition } from '../../hooks/useButtonPosition';
@@ -100,18 +100,19 @@ const VoiceManagementPageContent = () => {
         initializeTts();
     }, [initializeTts]);
 
-    // Проверяем whitelist статус пользователя
+    // Проверяем whitelist статус пользователя (включая гостей)
     const checkWhitelistStatus = useCallback(async () => {
-        if (!user || user.isGuest) {
+        if (!user) {
             setWhitelistStatus({
                 is_whitelisted: false,
                 can_manage_voices: false,
-                message: "Гостевые пользователи не имеют доступа к управлению голосами"
+                message: "Пользователь не авторизован"
             });
             return;
         }
         
         try {
+            // API проверяет whitelist для всех: OAuth пользователей и гостей
             const response = await botService.get('/api/voices/whitelist-status');
             setWhitelistStatus(response.data);
         } catch (error) {
@@ -126,11 +127,21 @@ const VoiceManagementPageContent = () => {
 
     const loadVoices = useCallback(async () => {
         if (!user) return;
+        
+        // Проверяем whitelist статус перед загрузкой голосов
+        // Для гостей и OAuth пользователей без whitelist - не загружаем голоса
+        if (whitelistStatus && !whitelistStatus.can_manage_voices) {
+            console.log(`${user.isGuest ? 'Guest' : 'User'} not in whitelist - F5-TTS not available`);
+            setVoices([]);
+            setLoading(false);
+            return;
+        }
+        
         try {
             setLoading(true);
             let response;
             if (user.isGuest) {
-                // Для гостей загружаем только глобальные голоса
+                // Для гостей загружаем только глобальные голоса (если они в whitelist)
                 response = await getGlobalVoices();
             } else {
                 // Для авторизованных пользователей загружаем их голоса
@@ -157,7 +168,7 @@ const VoiceManagementPageContent = () => {
         } finally {
             setLoading(false);
         }
-    }, [user, addToast]);
+    }, [user, addToast, whitelistStatus]);
 
     useEffect(() => {
         // Загружаем голоса и проверяем whitelist независимо от TTS сервиса
@@ -630,14 +641,64 @@ const VoiceManagementPageContent = () => {
                    </DialogContent>
                </Dialog>
 
+            {/* Уведомление для пользователей без whitelist */}
+            {!user?.isGuest && whitelistStatus && !whitelistStatus.can_manage_voices && (
+                <div className="mb-6 bg-orange-900/20 border border-orange-500/50 rounded-lg p-4 flex items-start gap-3">
+                    <Lock className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                        <h3 className="text-orange-300 font-semibold mb-1">Доступ к F5-TTS ограничен</h3>
+                        <p className="text-orange-200/80 text-sm">
+                            Вы не находитесь в белом списке (whitelist) и не можете использовать F5-TTS для AI озвучки. 
+                            Для получения доступа обратитесь к администратору системы.
+                        </p>
+                        <p className="text-orange-200/60 text-xs mt-2">
+                            💡 Вам доступна только базовая озвучка (gTTS) через основные настройки TTS.
+                        </p>
+                    </div>
+                </div>
+            )}
+            
+            {/* Уведомление для гостевого режима */}
+            {user?.isGuest && whitelistStatus && !whitelistStatus.can_manage_voices && (
+                <div className="mb-6 bg-blue-900/20 border border-blue-500/50 rounded-lg p-4 flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                        <h3 className="text-blue-300 font-semibold mb-1">Гостевой режим - Канал не в whitelist</h3>
+                        <p className="text-blue-200/80 text-sm">
+                            Канал, к которому вы подключились, не находится в whitelist. F5-TTS (AI озвучка) недоступен.
+                        </p>
+                        <p className="text-blue-200/60 text-xs mt-2">
+                            💡 Вам доступна только базовая озвучка (gTTS) через основные настройки TTS.
+                        </p>
+                        <p className="text-blue-200/60 text-xs mt-1">
+                            💡 Для получения доступа к F5-TTS обратитесь к администратору для добавления канала в whitelist.
+                        </p>
+                    </div>
+                </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                  {loading ? (
                      <p className="text-slate-400 col-span-full">Загрузка голосов...</p>
                  ) : voices.length === 0 ? (
                      <div className="col-span-full text-center py-12">
                          <div className="text-slate-400 text-lg mb-4">
-                             <User className="h-12 w-12 mx-auto mb-4 text-slate-500" />
-                             <p>Загрузите свой первый голос</p>
+                             {whitelistStatus && !whitelistStatus.can_manage_voices ? (
+                                 <>
+                                     <Lock className="h-12 w-12 mx-auto mb-4 text-orange-500" />
+                                     <p>F5-TTS недоступен без whitelist</p>
+                                     <p className="text-sm text-slate-500 mt-2">
+                                         {user?.isGuest 
+                                             ? 'Канал не в whitelist. Используйте базовую озвучку (gTTS)'
+                                             : 'Используйте базовую озвучку (gTTS)'}
+                                     </p>
+                                 </>
+                             ) : (
+                                 <>
+                                     <User className="h-12 w-12 mx-auto mb-4 text-slate-500" />
+                                     <p>{user?.isGuest ? 'Голоса доступны для использования' : 'Загрузите свой первый голос'}</p>
+                                 </>
+                             )}
                          </div>
                      </div>
                  ) : voices.map((voice) => (
