@@ -9,6 +9,7 @@ import TtsErrorCard from '../../components/TtsErrorCard';
 import PageWrapper from '../../components/PageWrapper';
 import { useToast } from '../../components/ui/toast';
 import { getTtsWebSocketUrl } from '../../utils/urlUtils';
+import { toast } from 'sonner';
 
 // Импорты новых компонентов
 import TtsControlPanel from '../../components/tts/TtsControlPanel';
@@ -305,6 +306,9 @@ const TtsMainPageContent = () => {
                 detail: { enabledPlatforms: newEnabledPlatforms }
             }));
             
+            const platformName = platform === 'twitch' ? 'Twitch' : 'VK';
+            const action = newEnabledPlatforms.includes(platform) ? 'включена' : 'отключена';
+            toast.success(`${platformName} озвучка ${action}`);
             console.log(`Platform ${platform} toggled successfully`);
         } catch (error) {
             console.error('Error toggling platform:', error);
@@ -388,18 +392,18 @@ const TtsMainPageContent = () => {
         try {
             if (enabled) {
                 await botService.post('/api/tts/enable');
+                toast.success('🔊 Базовая озвучка включена');
             } else {
                 await botService.post('/api/tts/disable');
+                toast.success('🔇 Базовая озвучка отключена');
             }
             console.log('Basic TTS state saved:', enabled);
         } catch (error) {
             console.error('Error saving basic TTS state:', error);
             if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
-                addToast({
-                    title: 'Ошибка',
-                    description: 'Ошибка сохранения состояния TTS',
-                    variant: 'destructive'
-                });
+                toast.error('Ошибка сохранения состояния TTS');
+            } else {
+                toast.error('Сервер недоступен');
             }
         }
     };
@@ -407,16 +411,16 @@ const TtsMainPageContent = () => {
     // Функция для сохранения состояния ИИ TTS
     const saveAiTtsState = async (enabled) => {
         try {
-            // Здесь должна быть логика сохранения состояния ИИ TTS
+            const engine = enabled ? 'local' : 'cloud';
+            await botService.post('/api/tts/engine', { engine_type: engine });
+            toast.success(`Движок: ${enabled ? '💻 Локальный F5-TTS' : '☁️ Облачный'}`);
             console.log('AI TTS state saved:', enabled);
         } catch (error) {
             console.error('Error saving AI TTS state:', error);
             if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
-                addToast({
-                    title: 'Ошибка',
-                    description: 'Ошибка сохранения состояния ИИ TTS',
-                    variant: 'destructive'
-                });
+                toast.error('Ошибка переключения движка TTS');
+            } else {
+                toast.error('Сервер недоступен');
             }
         }
     };
@@ -442,15 +446,14 @@ const TtsMainPageContent = () => {
         setListeningMode(mode);
         try {
             await botService.post('/api/tts/listening-mode', { listeningMode: mode });
+            toast.success(`Режим: ${mode === 'website' ? '🌐 Браузер' : '📺 OBS'}`);
             console.log('Listening mode saved:', mode);
         } catch (error) {
             console.error('Error saving listening mode:', error);
             if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
-                addToast({
-                    title: 'Ошибка',
-                    description: 'Ошибка сохранения режима прослушивания',
-                    variant: 'destructive'
-                });
+                toast.error('Ошибка сохранения режима прослушивания');
+            } else {
+                toast.error('Сервер недоступен');
             }
         }
     };
@@ -464,23 +467,17 @@ const TtsMainPageContent = () => {
                 // Формируем URL для OBS WebSocket
                 const obsUrl = getTtsWebSocketUrl(token);
                 setObsUrl(obsUrl);
+                toast.success('🔄 OBS URL перегенерирован');
             } else {
                 setObsUrl('');
+                toast.error('Не удалось получить токен OBS');
             }
         } catch (error) {
             console.error('Error regenerating OBS URL:', error);
             if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
-                addToast({
-                    title: 'Ошибка',
-                    description: 'Ошибка перегенерации OBS URL',
-                    variant: 'destructive'
-                });
+                toast.error('Ошибка перегенерации OBS URL');
             } else {
-                addToast({
-                    title: 'Ошибка',
-                    description: 'TTS сервис недоступен',
-                    variant: 'destructive'
-                });
+                toast.error('TTS сервис недоступен');
             }
             setObsUrl('');
         }

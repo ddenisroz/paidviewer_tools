@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { API_BASE_URL } from '../constants';
 import { useAuth } from './AuthContext';
+import { saveReturnUrl } from '../utils/oauthRedirect';
 
 const DonationAlertsContext = createContext();
 
@@ -80,6 +81,8 @@ export const DonationAlertsProvider = ({ children }) => {
             const data = await response.json();
             
             if (data.auth_url) {
+                // 💾 Сохраняем текущую страницу перед редиректом
+                saveReturnUrl();
                 // Прямое перенаправление на страницу авторизации
                 window.location.href = data.auth_url;
                 return true;

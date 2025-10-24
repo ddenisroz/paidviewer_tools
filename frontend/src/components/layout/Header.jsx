@@ -7,6 +7,7 @@ import { useIntegrations } from '../../context/IntegrationsContext';
 import { Button } from '../ui/button';
 import { TwitchIcon, VKIcon } from '../PlatformIcons';
 import { API_BASE_URL } from '../../constants';
+import { saveReturnUrl } from '../../utils/oauthRedirect';
 
 const Header = () => {
     const { user, logout, isGuest, isAuthenticated, refreshAuthStatus } = useAuth();
@@ -32,6 +33,8 @@ const Header = () => {
             if (platform === 'twitch') {
                 const newEnabled = !integrations?.twitch?.enabled;
                 if (newEnabled) {
+                    // 💾 Сохраняем текущую страницу перед редиректом
+                    saveReturnUrl();
                     // Подключение - перенаправляем на OAuth
                     window.location.href = `${API_BASE_URL}/auth/twitch/login`;
                 } else {
@@ -50,6 +53,8 @@ const Header = () => {
                         const data = await response.json();
                         console.log('🔵 [HEADER] VK auth response:', data);
                         if (data.auth_url) {
+                            // 💾 Сохраняем текущую страницу перед редиректом
+                            saveReturnUrl();
                             console.log('🔵 [HEADER] Redirecting to:', data.auth_url);
                             window.location.href = data.auth_url;
                         } else {
@@ -84,6 +89,8 @@ const Header = () => {
                         if (response.ok) {
                             const data = await response.json();
                             if (data.success && data.auth_url) {
+                                // 💾 Сохраняем текущую страницу перед редиректом
+                                saveReturnUrl();
                                 // Перенаправляем на страницу авторизации DonationAlerts
                                 window.location.href = data.auth_url;
                             } else {

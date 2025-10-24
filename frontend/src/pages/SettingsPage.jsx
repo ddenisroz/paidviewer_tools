@@ -1,5 +1,6 @@
 // src/pages/SettingsPage.jsx
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -13,13 +14,27 @@ import { Loader } from '@/components/ui/loader';
 import InboxPage from './InboxPage';
 import PageWrapper from '../components/PageWrapper';
 import DeleteAccountModal from '../components/DeleteAccountModal';
+import { getAndClearReturnUrl } from '../utils/oauthRedirect';
 
 const SettingsPage = () => {
+    const navigate = useNavigate();
     const { user } = useAuth();
     const { integrations, isLoading, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
     const { isConnected: daConnected, isLoading: daLoading, error: daError, connect: daConnect, disconnect: daDisconnect } = useDonationAlerts();
     const [activeTab, setActiveTab] = React.useState('settings');
     const [showDeleteModal, setShowDeleteModal] = React.useState(false);
+
+    // 🔄 Обработка возврата после OAuth - редиректим на сохраненную страницу
+    useEffect(() => {
+        const returnUrl = getAndClearReturnUrl();
+        if (returnUrl) {
+            console.log('🔄 [OAuth] Redirecting back to:', returnUrl);
+            // Небольшая задержка чтобы пользователь увидел что он на Settings
+            setTimeout(() => {
+                navigate(returnUrl, { replace: true });
+            }, 100);
+        }
+    }, [navigate]);
 
     // Проверяем, есть ли хотя бы одна основная интеграция
     const hasMainIntegration = integrations.twitch?.enabled || integrations.vk?.enabled;
