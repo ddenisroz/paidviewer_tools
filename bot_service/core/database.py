@@ -61,7 +61,7 @@ try:
         
         # Настройки TTS
         tts_listening_mode = Column(String, default='website')  # 'website' или 'obs'
-        tts_enabled = Column(Boolean, default=True)  # Включен ли TTS - включен по умолчанию для всех пользователей
+        tts_enabled = Column(Boolean, default=False)  # Включен ли TTS - выключен по умолчанию для новых пользователей
         donationalerts_token_expires = Column(DateTime, nullable=True)
         temp_oauth_state = Column(String, nullable=True)
         

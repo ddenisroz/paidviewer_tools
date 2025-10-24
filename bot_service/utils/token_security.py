@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from core.database import UserSession, get_db
-from services.token_service import get_user_token_from_db
+from core.token_utils import get_user_token_from_db
 
 logger = logging.getLogger(__name__)
 
