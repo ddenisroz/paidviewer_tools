@@ -148,11 +148,15 @@ const TtsMainPageContent = () => {
             
             ttsLogger.info('Loading TTS settings from server...');
             try {
-                // Загружаем настройки звука
-                ttsLogger.api('GET', '/api/tts/audio-settings');
-                const audioResponse = await botService.get('/api/tts/audio-settings');
-                ttsLogger.apiResponse(200, '/api/tts/audio-settings', audioResponse.data);
+                // 🚀 ОПТИМИЗАЦИЯ: Parallel API calls вместо sequential (было 3 последовательных запроса)
+                const [audioResponse, ttsResponse, platformResponse, ttsStatusResponse] = await Promise.all([
+                    botService.get('/api/tts/audio-settings'),
+                    botService.get('/api/tts/settings'),
+                    botService.get('/api/tts/platform-settings'),
+                    botService.get('/api/tts/status')
+                ]);
                 
+                // Обрабатываем настройки звука
                 if (audioResponse.data) {
                     const audioData = {
                         websiteVolume: audioResponse.data.websiteVolume || 50
@@ -161,11 +165,7 @@ const TtsMainPageContent = () => {
                     ttsLogger.success('Audio settings loaded:', audioData);
                 }
                 
-                // Загружаем настройки TTS
-                ttsLogger.api('GET', '/api/tts/settings');
-                const ttsResponse = await botService.get('/api/tts/settings');
-                ttsLogger.apiResponse(200, '/api/tts/settings', ttsResponse.data);
-                
+                // Обрабатываем настройки TTS
                 if (ttsResponse.data) {
                     const ttsData = {
                         enable7TV: ttsResponse.data.enable7TV ?? true,
@@ -177,11 +177,7 @@ const TtsMainPageContent = () => {
                     ttsLogger.success('TTS settings loaded:', ttsData);
                 }
                 
-                // 🔄 Загружаем настройки платформ для TTS
-                ttsLogger.api('GET', '/api/tts/platform-settings');
-                const platformResponse = await botService.get('/api/tts/platform-settings');
-                ttsLogger.apiResponse(200, '/api/tts/platform-settings', platformResponse.data);
-                
+                // Обрабатываем настройки платформ
                 if (platformResponse.data) {
                     const platformData = {
                         enabled_platforms: platformResponse.data.enabled_platforms || ['twitch', 'vk'],
@@ -190,6 +186,23 @@ const TtsMainPageContent = () => {
                     setPlatformSettings(platformData);
                     ttsLogger.success('Platform settings loaded:', platformData);
                 }
+                
+                // Обрабатываем состояние TTS (было в отдельном useEffect)
+                if (ttsStatusResponse.data) {
+                    const isTtsEnabled = ttsStatusResponse.data.enabled || false;
+                    const engineType = ttsStatusResponse.data.engine_type || 'gtts';
+                    
+                    setBasicTtsEnabled(isTtsEnabled);
+                    setAiTtsEnabled(isTtsEnabled && isHealthy);
+                    setTtsEngine(engineType === 'local' ? 'local' : 'cloud');
+                    
+                    ttsLogger.info('TTS engine loaded:', engineType);
+                }
+                
+                // Режим прослушивания
+                if (user?.tts_listening_mode) {
+                    setListeningMode(user.tts_listening_mode);
+                }
             } catch (error) {
                 ttsLogger.error('Error loading settings:', error);
                 // При ошибке загрузки с сервера используем значения по умолчанию
@@ -197,44 +210,7 @@ const TtsMainPageContent = () => {
         };
 
         loadSettings();
-    }, [isAuthenticated]);
-    
-
-    // Загрузка состояний TTS с сервера
-    useEffect(() => {
-        const loadTtsStates = async () => {
-            if (!isAuthenticated) return;
-            
-            try {
-                // Загружаем состояние TTS с TTS сервиса
-                const ttsStatusResponse = await botService.get('/api/tts/status');
-                const isTtsEnabled = ttsStatusResponse.data?.enabled || false;
-                const engineType = ttsStatusResponse.data?.engine_type || 'gtts';
-                
-                setBasicTtsEnabled(isTtsEnabled);
-                setAiTtsEnabled(isTtsEnabled && isHealthy);
-                
-                // Устанавливаем движок TTS (cloud = gtts, local = f5tts/local)
-                setTtsEngine(engineType === 'local' ? 'local' : 'cloud');
-                ttsLogger.info('TTS engine loaded:', engineType);
-                
-                // Загружаем режим прослушивания
-                if (user?.tts_listening_mode) {
-                    setListeningMode(user.tts_listening_mode);
-                }
-            } catch (error) {
-                console.error('Error loading TTS states:', error);
-                // Fallback на локальные состояния
-                setBasicTtsEnabled(ttsEnabled);
-                setAiTtsEnabled(ttsEnabled && isHealthy);
-                setTtsEngine('cloud'); // По умолчанию облачный
-            }
-        };
-
-        if (isAuthenticated) {
-            loadTtsStates();
-        }
-    }, [isAuthenticated, ttsEnabled, isHealthy, user?.tts_listening_mode]);
+    }, [isAuthenticated, isHealthy, user?.tts_listening_mode]);
 
     // Слушаем изменения Basic TTS с главной страницы
     useEffect(() => {
@@ -308,23 +284,18 @@ const TtsMainPageContent = () => {
         try {
             setPlatformLoading(true);
             
-            // Обновляем состояние платформы
-            setPlatformSettings(prev => {
-                const newEnabledPlatforms = prev.enabled_platforms.includes(platform)
-                    ? prev.enabled_platforms.filter(p => p !== platform)
-                    : [...prev.enabled_platforms, platform];
-                
-                return {
-                    ...prev,
-                    enabled_platforms: newEnabledPlatforms
-                };
-            });
-            
-            // Сохраняем настройки на сервер
+            // 🐛 FIX: Вычисляем newEnabledPlatforms ОДИН РАЗ, чтобы избежать race condition
             const newEnabledPlatforms = platformSettings.enabled_platforms.includes(platform)
                 ? platformSettings.enabled_platforms.filter(p => p !== platform)
                 : [...platformSettings.enabled_platforms, platform];
             
+            // Обновляем локальное состояние
+            setPlatformSettings(prev => ({
+                ...prev,
+                enabled_platforms: newEnabledPlatforms
+            }));
+            
+            // Сохраняем на сервер (используем ТОТ ЖЕ массив)
             await botService.post('/api/tts/platform-settings', {
                 enabled_platforms: newEnabledPlatforms
             });

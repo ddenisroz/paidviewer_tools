@@ -27,20 +27,17 @@ const TtsQuickSettings = () => {
 
     // Синхронизация с TtsContext после загрузки
     useEffect(() => {
-        // Синхронизируем только если уже инициализировались
-        if (initializedRef.current) {
-            setTtsEnabled(contextTtsEnabled);
-            logger.info('TtsQuickSettings: Synced with TtsContext', { contextTtsEnabled });
-        }
+        // 🐛 FIX: Убираем проверку initializedRef.current для немедленного обновления toggle
+        setTtsEnabled(contextTtsEnabled);
+        logger.info('TtsQuickSettings: Synced with TtsContext', { contextTtsEnabled });
     }, [contextTtsEnabled]);
 
     // Слушаем изменения Basic TTS из настроек
     useEffect(() => {
         const handleTtsStatusChange = (event) => {
-            if (initializedRef.current) {
-                logger.info('TtsQuickSettings: Received tts-status-changed event', event.detail);
-                setTtsEnabled(event.detail.enabled);
-            }
+            // 🐛 FIX: Убираем проверку initializedRef.current для немедленного обновления toggle
+            logger.info('TtsQuickSettings: Received tts-status-changed event', event.detail);
+            setTtsEnabled(event.detail.enabled);
         };
 
         window.addEventListener('tts-status-changed', handleTtsStatusChange);
@@ -60,29 +57,24 @@ const TtsQuickSettings = () => {
 
     const loadSettings = async () => {
         try {
-            const response = await botService.get('/api/tts/status');
+            // 🚀 ОПТИМИЗАЦИЯ: Parallel API calls вместо sequential
+            const [statusResponse, configResponse] = await Promise.all([
+                botService.get('/api/tts/status'),
+                botService.get('/api/local-tts/config').catch(() => ({ data: { configured: false } }))
+            ]);
             
             // Загружаем начальное состояние TTS из API
-            setTtsEnabled(response.data.enabled || false);
-            setAiTtsEnabled(response.data.engine_type === 'local');
-            
-            // Проверяем доступность локального TTS
-            try {
-                const configResponse = await botService.get('/api/local-tts/config');
-                setAiTtsAvailable(configResponse.data.configured || false);
-                logger.info('TtsQuickSettings: Local TTS availability:', configResponse.data.configured);
-            } catch (err) {
-                logger.warn('TtsQuickSettings: Could not check local TTS availability');
-                setAiTtsAvailable(false);
-            }
+            setTtsEnabled(statusResponse.data.enabled || false);
+            setAiTtsEnabled(statusResponse.data.engine_type === 'local');
+            setAiTtsAvailable(configResponse.data.configured || false);
             
             // Отмечаем что инициализация завершена
             initializedRef.current = true;
             
             logger.info('TtsQuickSettings: Loaded initial state', {
-                ttsEnabled: response.data.enabled,
-                aiTtsEnabled: response.data.engine_type === 'local',
-                aiTtsAvailable: aiTtsAvailable
+                ttsEnabled: statusResponse.data.enabled,
+                aiTtsEnabled: statusResponse.data.engine_type === 'local',
+                aiTtsAvailable: configResponse.data.configured
             });
         } catch (error) {
             console.error('Failed to load TTS settings:', error);
