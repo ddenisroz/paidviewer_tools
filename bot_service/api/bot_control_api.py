@@ -1,7 +1,7 @@
 # bot_service/api/bot_control_api.py
 from fastapi import APIRouter, Depends, HTTPException
 from auth.auth import get_current_user
-from core.token_utils import get_user_token_from_db
+from core.token_manager import token_manager
 from core.connection_manager import get_connection_manager
 from core.database import UserToken, get_db
 from sqlalchemy.orm import Session
@@ -17,9 +17,9 @@ async def get_bot_status(user: dict = Depends(get_current_user), db: Session = D
     try:
         user_id = user.get("id")
         
-        # Получаем токены пользователя
-        twitch_token = get_user_token_from_db(user_id, "twitch")
-        vk_token = get_user_token_from_db(user_id, "vk")
+        # Получаем токены пользователя (без проверки session - это статус бота)
+        twitch_token = token_manager.get_user_token_data(user_id, "twitch", require_session_check=False)
+        vk_token = token_manager.get_user_token_data(user_id, "vk", require_session_check=False)
         
         bot_status = {
             "connected": False,
@@ -74,9 +74,9 @@ async def connect_chat(user: dict = Depends(get_current_user)):
         user_id = user.get("id")
         logger.info(f"Chat connect requested by user {user_id}")
         
-        # Проверяем наличие токенов
-        twitch_token = get_user_token_from_db(user_id, "twitch")
-        vk_token = get_user_token_from_db(user_id, "vk")
+        # Проверяем наличие токенов (без проверки session - это управление ботом)
+        twitch_token = token_manager.get_user_token_data(user_id, "twitch", require_session_check=False)
+        vk_token = token_manager.get_user_token_data(user_id, "vk", require_session_check=False)
         
         if not twitch_token and not vk_token:
             return {"success": False, "error": "Нет подключенных платформ. Подключите Twitch или VK Live"}

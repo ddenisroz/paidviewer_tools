@@ -13,6 +13,7 @@ import base64
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from core.token_utils import get_user_token_from_db
+from core.token_manager import token_manager
 from core.session_manager import session_manager
 from constants import DEFAULT_BACKEND_URL
 
@@ -40,7 +41,7 @@ class VKLiveAPI:
         
     def _get_user_token(self, user_id: str, session_id: Optional[str] = None) -> Optional[str]:
         """
-        Получить токен пользователя VK.
+        Получить токен пользователя VK через TokenManager.
         
         Args:
             user_id: ID пользователя
@@ -50,20 +51,14 @@ class VKLiveAPI:
             Access token или None
         """
         try:
-            # 🔐 БЕЗОПАСНОСТЬ: Если передан session_id - используем проверку linked_platforms
-            if session_id:
-                from utils.token_security import get_user_token_safe
-                return get_user_token_safe(user_id, "vk", session_id)
-            
-            # Старая логика (для обратной совместимости с ботами и фоновыми задачами)
-            tokens = get_user_token_from_db(user_id, "vk")
-            if tokens and tokens.get("access_token"):
-                # get_user_token_from_db уже возвращает расшифрованный токен
-                token = tokens["access_token"]
-                logger.debug(f"Retrieved VK token for user {user_id}")
-                return token
-            logger.warning(f"No VK token found for user {user_id}")
-            return None
+            # 🚀 UNIFIED: Используем TokenManager для единообразного получения токенов
+            user_id_int = int(user_id) if isinstance(user_id, str) else user_id
+            return token_manager.get_user_token(
+                user_id=user_id_int,
+                platform="vk",
+                session_id=session_id,
+                require_session_check=session_id is not None  # Проверяем session только если он передан
+            )
         except Exception as e:
             logger.error(f"Error getting VK token for user {user_id}: {e}")
             return None

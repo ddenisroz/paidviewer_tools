@@ -58,9 +58,15 @@ async def get_twitch_stream_info(user: dict = Depends(get_current_user)):
         connection_manager = get_connection_manager()
         twitch_api = TwitchAPI(connection_manager)
         
-        # Получаем информацию о канале пользователя из базы данных
-        from core.token_utils import get_user_token_from_db
-        tokens = get_user_token_from_db(user_id, "twitch")
+        # Получаем информацию о канале пользователя через TokenManager
+        from core.token_manager import token_manager
+        session_id = user.get("session_id")
+        tokens = token_manager.get_user_token_data(
+            user_id=user_id,
+            platform="twitch",
+            session_id=session_id,
+            require_session_check=True  # Проверяем linked_platforms для безопасности
+        )
         
         if not tokens:
             logger.warning(f"No Twitch tokens found for user {user_id}")
