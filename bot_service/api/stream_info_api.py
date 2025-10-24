@@ -127,6 +127,7 @@ async def get_vk_stream_info(user: dict = Depends(get_current_user)):
     """Получить информацию о VK Live стриме"""
     try:
         user_id = user.get("id")
+        session_id = user.get("session_id")
         if user_id is None:
             raise HTTPException(status_code=401, detail="User not authenticated")
         
@@ -135,8 +136,8 @@ async def get_vk_stream_info(user: dict = Depends(get_current_user)):
         
         from api.vk_api import vk_api
         
-        # Получаем информацию о стриме VK
-        stream_info = await vk_api.get_stream_info(str(user_id))
+        # Получаем информацию о стриме VK (с проверкой безопасности)
+        stream_info = await vk_api.get_stream_info(str(user_id), session_id)
         
         return JSONResponse(content={
             "is_live": stream_info.get("online", False),
@@ -171,6 +172,7 @@ async def update_stream(
     
     try:
         user_id = user.get("id")
+        session_id = user.get("session_id")
         results = []
         
         logger.info(f"🎬 [STREAM UPDATE] Received request from user {user_id}")
@@ -217,7 +219,7 @@ async def update_stream(
             
             if request.vk.title is not None:
                 logger.info(f"🎬 [VK] Updating title to: {request.vk.title}")
-                success = await vk_api.update_stream_title(str(user_id), request.vk.title)
+                success = await vk_api.update_stream_title(str(user_id), request.vk.title, session_id)
                 if not success:
                     logger.error(f"❌ [VK] Title update failed for user {user_id}")
                     raise HTTPException(status_code=400, detail="Failed to update VK stream title")
@@ -246,7 +248,7 @@ async def update_stream(
                     category_data = request.vk.category_id
                     logger.warning(f"🎬 [VK] Updating category with ID only (may fail): {category_data}")
                 
-                success = await vk_api.update_stream_category(str(user_id), category_data)
+                success = await vk_api.update_stream_category(str(user_id), category_data, session_id)
                 if not success:
                     logger.error(f"❌ [VK] Category update failed for user {user_id}")
                     raise HTTPException(status_code=400, detail="Failed to update VK stream category")

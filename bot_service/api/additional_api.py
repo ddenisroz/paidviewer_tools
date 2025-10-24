@@ -487,3 +487,122 @@ async def get_chat_history(
             "messages": [],
             "error": str(e)
         }, status_code=500)
+
+@router.post("/user/delete-account")
+async def delete_user_account(
+    request: Request,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    ПОЛНОЕ удаление аккаунта пользователя.
+    
+    Удаляет ВСЕ данные пользователя из базы данных:
+    - User
+    - UserToken (все токены)
+    - UserSession (все сессии)
+    - TTSUserSettings
+    - UserSettings
+    - ChatMessage
+    - ChatBoxSettings
+    - WhitelistedChannel
+    - AdminUser (если есть)
+    
+    После удаления пользователь будет разлогинен.
+    """
+    try:
+        user_id = user.get("id")
+        if not user_id:
+            raise HTTPException(status_code=400, detail="User ID not found")
+        
+        logger.info(f"🗑️ [DELETE ACCOUNT] User {user_id} requested account deletion")
+        
+        # Получаем пользователя
+        from core.database import User, UserToken, UserSession, UserSettings, ChatMessage, ChatBoxSettings, WhitelistedChannel, AdminUser
+        from services.tts_limits_service import TTSUserSettings
+        
+        db_user = db.query(User).filter(User.id == user_id).first()
+        if not db_user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Отключаем боты от каналов перед удалением
+        from core.connection_manager import get_connection_manager
+        connection_manager = get_connection_manager()
+        
+        if db_user.twitch_username:
+            connection_manager.disable_tts_for_channel(db_user.twitch_username.lower())
+            logger.info(f"🗑️ Disconnected Twitch bot from {db_user.twitch_username}")
+        
+        if db_user.vk_channel_name or db_user.vk_username:
+            channel_name = db_user.vk_channel_name or db_user.vk_username
+            try:
+                import main
+                if main.vk_live_bot_instance:
+                    await main.vk_live_bot_instance.disconnect_from_channel(channel_name)
+                connection_manager.disable_tts_for_channel(channel_name.lower())
+                logger.info(f"🗑️ Disconnected VK bot from {channel_name}")
+            except Exception as e:
+                logger.error(f"Error disconnecting VK bot: {e}")
+        
+        # Удаляем все связанные данные
+        deleted_counts = {}
+        
+        # 1. UserToken
+        deleted_counts['tokens'] = db.query(UserToken).filter(UserToken.user_id == user_id).delete()
+        
+        # 2. UserSession
+        deleted_counts['sessions'] = db.query(UserSession).filter(UserSession.user_id == user_id).delete()
+        
+        # 3. TTSUserSettings
+        deleted_counts['tts_settings'] = db.query(TTSUserSettings).filter(TTSUserSettings.user_id == user_id).delete()
+        
+        # 4. UserSettings
+        deleted_counts['user_settings'] = db.query(UserSettings).filter(UserSettings.user_id == user_id).delete()
+        
+        # 5. ChatMessage
+        deleted_counts['chat_messages'] = db.query(ChatMessage).filter(ChatMessage.user_id == user_id).delete()
+        
+        # 6. ChatBoxSettings
+        deleted_counts['chatbox_settings'] = db.query(ChatBoxSettings).filter(ChatBoxSettings.user_id == user_id).delete()
+        
+        # 7. WhitelistedChannel (если пользователь был в whitelist)
+        deleted_counts['whitelist'] = db.query(WhitelistedChannel).filter(
+            WhitelistedChannel.channel_name == db_user.twitch_username
+        ).delete()
+        deleted_counts['whitelist'] += db.query(WhitelistedChannel).filter(
+            WhitelistedChannel.channel_name == db_user.vk_username
+        ).delete()
+        
+        # 8. AdminUser (если пользователь был админом)
+        deleted_counts['admin'] = db.query(AdminUser).filter(
+            AdminUser.platform_user_id.in_([
+                db_user.twitch_user_id if hasattr(db_user, 'twitch_user_id') else None,
+                str(user_id)
+            ])
+        ).delete()
+        
+        # 9. Удаляем самого пользователя
+        db.delete(db_user)
+        
+        # Коммитим все изменения
+        db.commit()
+        
+        logger.info(f"✅ [DELETE ACCOUNT] Successfully deleted user {user_id}")
+        logger.info(f"📊 [DELETE ACCOUNT] Deleted counts: {deleted_counts}")
+        
+        # Очищаем cookie сессии
+        response = JSONResponse(content={
+            "success": True,
+            "message": "Account successfully deleted",
+            "deleted_data": deleted_counts
+        })
+        response.delete_cookie(key="session_id", path="/")
+        
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ [DELETE ACCOUNT] Error deleting account: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error deleting account: {str(e)}")

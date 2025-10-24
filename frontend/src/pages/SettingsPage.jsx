@@ -5,19 +5,21 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Twitch, Video, Inbox, Settings, Gift, AlertCircle } from 'lucide-react';
+import { Twitch, Video, Inbox, Settings, Gift, AlertCircle, Trash2 } from 'lucide-react';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useDonationAlerts } from '../context/DonationAlertsContext';
 import { useAuth } from '../context/AuthContext';
 import { Loader } from '@/components/ui/loader';
 import InboxPage from './InboxPage';
 import PageWrapper from '../components/PageWrapper';
+import DeleteAccountModal from '../components/DeleteAccountModal';
 
 const SettingsPage = () => {
     const { user } = useAuth();
     const { integrations, isLoading, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
     const { isConnected: daConnected, isLoading: daLoading, error: daError, connect: daConnect, disconnect: daDisconnect } = useDonationAlerts();
     const [activeTab, setActiveTab] = React.useState('settings');
+    const [showDeleteModal, setShowDeleteModal] = React.useState(false);
 
     // Проверяем, есть ли хотя бы одна основная интеграция
     const hasMainIntegration = integrations.twitch?.enabled || integrations.vk?.enabled;
@@ -188,6 +190,46 @@ const SettingsPage = () => {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Danger Zone - Delete Account */}
+            <Card className="border-red-500/20 bg-red-500/5">
+                <CardHeader>
+                    <CardTitle className="text-red-500 flex items-center gap-2">
+                        <Trash2 className="h-5 w-5" />
+                        Опасная зона
+                    </CardTitle>
+                    <CardDescription>
+                        Необратимые действия с вашим аккаунтом
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        <div>
+                            <h3 className="text-sm font-medium text-white mb-2">
+                                Удалить аккаунт навсегда
+                            </h3>
+                            <p className="text-sm text-gray-400 mb-4">
+                                После удаления все ваши данные будут безвозвратно уничтожены. 
+                                Это действие нельзя отменить.
+                            </p>
+                            <Button
+                                variant="destructive"
+                                onClick={() => setShowDeleteModal(true)}
+                                className="bg-red-600 hover:bg-red-700"
+                            >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Удалить аккаунт
+                            </Button>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Delete Account Modal */}
+            <DeleteAccountModal 
+                isOpen={showDeleteModal}
+                onClose={() => setShowDeleteModal(false)}
+            />
             </>
             )}
 

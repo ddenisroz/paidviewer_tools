@@ -38,9 +38,24 @@ class VKLiveAPI:
             await asyncio.sleep(wait_time)
         self.rate_limiter.last_request_time = time.time()
         
-    def _get_user_token(self, user_id: str) -> Optional[str]:
-        """Получить токен пользователя VK"""
+    def _get_user_token(self, user_id: str, session_id: Optional[str] = None) -> Optional[str]:
+        """
+        Получить токен пользователя VK.
+        
+        Args:
+            user_id: ID пользователя
+            session_id: ID сессии (опционально). Если передан - используется безопасная проверка linked_platforms
+        
+        Returns:
+            Access token или None
+        """
         try:
+            # 🔐 БЕЗОПАСНОСТЬ: Если передан session_id - используем проверку linked_platforms
+            if session_id:
+                from utils.token_security import get_user_token_safe
+                return get_user_token_safe(user_id, "vk", session_id)
+            
+            # Старая логика (для обратной совместимости с ботами и фоновыми задачами)
             tokens = get_user_token_from_db(user_id, "vk")
             if tokens and tokens.get("access_token"):
                 # get_user_token_from_db уже возвращает расшифрованный токен
@@ -123,12 +138,12 @@ class VKLiveAPI:
             logger.error(f"Error refreshing VK token for user {user_id}: {e}")
             return None
 
-    async def search_categories(self, query: str, user_id: str) -> Optional[List[Dict[str, Any]]]:
+    async def search_categories(self, query: str, user_id: str, session_id: Optional[str] = None) -> Optional[List[Dict[str, Any]]]:
         """Поиск категорий VK Live по названию
         
         NOTE: Требует токен стримера (из OAuth). Если стример не авторизован - вернет пустой список.
         """
-        token = self._get_user_token(user_id)
+        token = self._get_user_token(user_id, session_id)
         if not token:
             logger.info(f"User {user_id} has not authorized VK Live via OAuth. Categories unavailable.")
             return []
@@ -224,7 +239,7 @@ class VKLiveAPI:
             logger.error(f"VK Live API /v1/current_user request failed: {e}")
         return None
     
-    async def get_stream_info(self, user_id: str) -> Dict[str, Any]:
+    async def get_stream_info(self, user_id: str, session_id: Optional[str] = None) -> Dict[str, Any]:
         """Получить информацию о стриме, опираясь на статус стрима в ответе /v1/channel."""
         default_offline = {
             "online": False, "title": "Стрим оффлайн", "category": "Общение",
@@ -232,7 +247,7 @@ class VKLiveAPI:
             "description": "", "thumbnail": ""
         }
         try:
-            token = self._get_user_token(user_id)
+            token = self._get_user_token(user_id, session_id)
             if not token:
                 logger.info(f"User {user_id} has not authorized VK Live via OAuth. Bot can work in chat, but stream info unavailable.")
                 return {
@@ -320,12 +335,12 @@ class VKLiveAPI:
             logger.error(f"Error getting VK stream info for {user_id}: {e}")
             return default_offline
 
-    async def _update_stream(self, user_id: str, payload: Dict[str, Any]) -> bool:
+    async def _update_stream(self, user_id: str, payload: Dict[str, Any], session_id: Optional[str] = None) -> bool:
         """Вспомогательный метод для обновления данных стрима (JSON)."""
         try:
             logger.info(f"📺 [VK API] _update_stream called for user {user_id} with payload: {payload}")
             
-            token = self._get_user_token(user_id)
+            token = self._get_user_token(user_id, session_id)
             if not token:
                 logger.error(f"❌ [VK API] No token found for user {user_id}")
                 return False
@@ -519,28 +534,29 @@ class VKLiveAPI:
             logger.error(traceback.format_exc())
             return False
 
-    async def update_stream_title(self, user_id: str, title: str) -> bool:
+    async def update_stream_title(self, user_id: str, title: str, session_id: Optional[str] = None) -> bool:
         """Обновить название стрима VK Live"""
         # Получаем текущую информацию о стриме чтобы сохранить категорию
-        current_stream_info = await self.get_stream_info(user_id)
+        current_stream_info = await self.get_stream_info(user_id, session_id)
         payload = {"title": title}
         
         # Если есть текущая категория, сохраняем её
         if current_stream_info and current_stream_info.get("category_id"):
             payload["category"] = {"id": current_stream_info["category_id"]}
         
-        return await self._update_stream(user_id, payload)
+        return await self._update_stream(user_id, payload, session_id)
 
-    async def update_stream_category(self, user_id: str, category_data) -> bool:
+    async def update_stream_category(self, user_id: str, category_data, session_id: Optional[str] = None) -> bool:
         """Обновить категорию стрима VK Live
         
         Args:
             user_id: ID пользователя
             category_data: Либо строка (category_id), либо dict с полным объектом категории
                            Dict должен содержать: {"id": str, "title": str, "cover_url": str, "type": str}
+            session_id: ID сессии для проверки безопасности (опционально)
         """
         # Получаем текущую информацию о стриме чтобы сохранить название
-        current_stream_info = await self.get_stream_info(user_id)
+        current_stream_info = await self.get_stream_info(user_id, session_id)
         logger.info(f"📺 [VK API] Current stream info retrieved: {current_stream_info}")
         
         # Формируем объект категории
@@ -572,7 +588,7 @@ class VKLiveAPI:
             logger.info(f"📺 [VK API] Preserving current title: {payload['title']}")
         
         logger.info(f"📺 [VK API] Sending update with payload: {payload}")
-        result = await self._update_stream(user_id, payload)
+        result = await self._update_stream(user_id, payload, session_id)
         
         if result:
             logger.info(f"✅ [VK API] Category updated successfully for user {user_id}")
@@ -581,14 +597,14 @@ class VKLiveAPI:
         
         return result
 
-    async def get_categories(self, search: str = "", user_id: str = None) -> List[Dict[str, Any]]:
+    async def get_categories(self, search: str = "", user_id: str = None, session_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Получить список категорий VK Live
         
         Автоматически обновляет токен если он истёк перед запросом.
         """
         logger.info(f"📺 [VK CATEGORIES] Fetching for user {user_id}, search: '{search}'")
         
-        token = self._get_user_token(user_id)
+        token = self._get_user_token(user_id, session_id)
         
         # Если токена нет или если получим 401, пытаемся обновить через refresh token
         if not token:
@@ -967,11 +983,12 @@ async def update_vk_category(
     """Обновить категорию VK Live стрима"""
     try:
         user_id = current_user.get('id')
+        session_id = current_user.get('session_id')
         category_id = request.categoryId
         
         logger.info(f"🔄 Updating VK category for user {user_id} to {category_id}")
         
-        result = await vk_api.update_stream_category(user_id, category_id)
+        result = await vk_api.update_stream_category(user_id, category_id, session_id)
         
         if result:
             return JSONResponse(content={"success": True, "message": "Категория успешно обновлена"})
@@ -991,11 +1008,12 @@ async def update_vk_title(
     """Обновить название VK Live стрима"""
     try:
         user_id = current_user.get('id')
+        session_id = current_user.get('session_id')
         title = request.title
         
         logger.info(f"🔄 Updating VK title for user {user_id} to '{title}'")
         
-        result = await vk_api.update_stream_title(user_id, title)
+        result = await vk_api.update_stream_title(user_id, title, session_id)
         
         if result:
             return JSONResponse(content={"success": True, "message": "Название успешно обновлено"})
@@ -1015,6 +1033,7 @@ async def get_vk_categories(
     """Получить список категорий VK Live"""
     try:
         user_id = current_user.get('id') if current_user else None
+        session_id = current_user.get('session_id') if current_user else None
         
         logger.info(f"📺 [VK CATEGORIES] Fetching for user {user_id} with search: '{search}'")
         
@@ -1041,7 +1060,7 @@ async def get_vk_categories(
                 status_code=200
             )
         
-        categories = await vk_api.get_categories(search=search, user_id=str(user_id) if user_id else None)
+        categories = await vk_api.get_categories(search=search, user_id=str(user_id) if user_id else None, session_id=session_id)
         
         logger.info(f"✅ [VK CATEGORIES] Found {len(categories)} categories")
         
@@ -1065,8 +1084,9 @@ async def get_vk_stream_info(
     """Получить информацию о VK Live стриме"""
     try:
         user_id = current_user.get('id')
+        session_id = current_user.get('session_id')
         
-        stream_info = await vk_api.get_stream_info(user_id)
+        stream_info = await vk_api.get_stream_info(user_id, session_id)
         
         if stream_info:
             return JSONResponse(content=stream_info)
