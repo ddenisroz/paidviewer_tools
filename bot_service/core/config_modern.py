@@ -31,6 +31,9 @@ class ModernConfig(BaseSettings):
     jwt_refresh_token_expire_days: int = Field(default=7, description="Refresh token expiry")
     token_encryption_key: str = Field(default="tsWOwRqyIbRBATNPyONTd0K1sHLzVPbEeVFmMc7T8II=", description="Key for encrypting OAuth tokens")
     
+    # Environment
+    environment: str = Field(default="development", description="Environment: development, staging, production")
+    
     # === RATE LIMITING ===
     rate_limit_enabled: bool = Field(default=True, description="Enable rate limiting")
     rate_limit_requests_per_minute: int = Field(default=60, description="Default rate limit")
@@ -69,6 +72,31 @@ class ModernConfig(BaseSettings):
     environment: str = Field(default="development", description="Environment")
     debug: bool = Field(default=False, description="Debug mode")
     log_level: str = Field(default="INFO", description="Log level")
+    
+    @validator('secret_key')
+    def validate_secret_key(cls, v, values):
+        """❌ КРИТИЧНО: SECRET_KEY должен быть изменен с default в production!"""
+        environment = values.get('environment', 'development')
+        if environment == 'production' and v == "your-super-secret-jwt-key-here":
+            raise ValueError(
+                "🚨 PRODUCTION ERROR: SECRET_KEY must be changed from default value! "
+                "Generate a secure key with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+            )
+        if len(v) < 32:
+            logger.warning(f"⚠️ SECRET_KEY is too short ({len(v)} chars), recommended 32+ characters")
+        return v
+    
+    @validator('token_encryption_key')
+    def validate_encryption_key(cls, v, values):
+        """❌ КРИТИЧНО: TOKEN_ENCRYPTION_KEY должен быть изменен с default в production!"""
+        environment = values.get('environment', 'development')
+        default_key = "tsWOwRqyIbRBATNPyONTd0K1sHLzVPbEeVFmMc7T8II="
+        if environment == 'production' and v == default_key:
+            raise ValueError(
+                "🚨 PRODUCTION ERROR: TOKEN_ENCRYPTION_KEY must be changed from default value! "
+                "Generate a key with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+            )
+        return v
     
     @validator('jwt_secret_key')
     def validate_jwt_secret(cls, v, values):

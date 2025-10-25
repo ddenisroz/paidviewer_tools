@@ -11,9 +11,10 @@ from core.database import User, UserSession, UserToken
 from core.session_manager import session_manager
 from constants import (
     Platform, ErrorMessages, SuccessMessages, 
-    FRONTEND_REDIRECTS, SESSION_MAX_AGE_SECONDS,
+    FRONTEND_REDIRECTS,
     HTTP_STATUS
 )
+from core.cookie_config import get_session_cookie_settings
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -419,15 +420,9 @@ class OAuthHandler:
         response = RedirectResponse(url=oauth_result.redirect_url)
         
         if oauth_result.session_id:
-            response.set_cookie(
-                key="session_id", 
-                value=oauth_result.session_id, 
-                httponly=True,
-                secure=False,  # В продакшене должно быть True
-                samesite="lax",
-                path="/",  # Явно указываем путь
-                max_age=SESSION_MAX_AGE_SECONDS
-            )
+            # ✅ Production-ready cookie settings с автоматическим secure=True в prod
+            cookie_settings = get_session_cookie_settings(oauth_result.session_id)
+            response.set_cookie(**cookie_settings)
         
         return response
     

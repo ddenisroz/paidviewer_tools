@@ -224,16 +224,11 @@ class AuthHandlers:
             # Устанавливаем новую cookie
             # httpOnly=False для development чтобы JavaScript мог читать cookie
             # В production нужно будет использовать httpOnly=True с правильным HTTPS
-            response.set_cookie(
-                key="session_id",
-                value=session_id,
-                httponly=False,  # False для development (cross-origin cookies)
-                secure=False,  # False для HTTP localhost
-                samesite="lax",  # Lax позволяет cookies при navigation
-                max_age=2592000,  # 30 дней
-                path="/"  # Важно: устанавливаем путь для всего сайта
-                # domain НЕ указываем - пусть браузер сам определит
-            )
+            # ✅ Production-ready cookie settings с автоматическим secure=True в prod
+            from core.cookie_config import get_session_cookie_settings
+            cookie_settings = get_session_cookie_settings(session_id)
+            # Note: httponly=False для development доступа через JS, в prod будет True
+            response.set_cookie(**cookie_settings)
             
             logger.info(f"Twitch callback completed successfully, redirecting to dashboard")
             return response
