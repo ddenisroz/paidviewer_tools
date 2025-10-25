@@ -14,7 +14,6 @@ import { Loader } from '@/components/ui/loader';
 import InboxPage from './InboxPage';
 import PageWrapper from '../components/PageWrapper';
 import DeleteAccountModal from '../components/DeleteAccountModal';
-import { getAndClearReturnUrl } from '../utils/oauthRedirect';
 
 const SettingsPage = () => {
     const navigate = useNavigate();
@@ -24,17 +23,7 @@ const SettingsPage = () => {
     const [activeTab, setActiveTab] = React.useState('settings');
     const [showDeleteModal, setShowDeleteModal] = React.useState(false);
 
-    // 🔄 Обработка возврата после OAuth - редиректим на сохраненную страницу
-    useEffect(() => {
-        const returnUrl = getAndClearReturnUrl();
-        if (returnUrl) {
-            console.log('🔄 [OAuth] Redirecting back to:', returnUrl);
-            // Небольшая задержка чтобы пользователь увидел что он на Settings
-            setTimeout(() => {
-                navigate(returnUrl, { replace: true });
-            }, 100);
-        }
-    }, [navigate]);
+    // ✅ Логика returnUrl теперь только в HomePage.jsx
 
     // Проверяем, есть ли хотя бы одна основная интеграция
     const hasMainIntegration = integrations.twitch?.enabled || integrations.vk?.enabled;

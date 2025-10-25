@@ -1,5 +1,6 @@
 // src/pages/HomePage.jsx
 import React, { useMemo, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useAuth } from '../context/AuthContext';
@@ -12,13 +13,31 @@ import StreamCategoryCard from '../components/StreamCategoryCard';
 import GuestStubs from '../components/GuestStubs';
 import IntegrationsDisabledPlaceholder from '../components/IntegrationsDisabledPlaceholder';
 import TtsQuickSettings from '../components/TtsQuickSettings';
+import { getAndClearReturnUrl } from '../utils/oauthRedirect';
 
 
 
 const HomePage = () => {
+    const navigate = useNavigate();
     const { isAuthenticated, isGuest, user } = useAuth();
     const { integrations, isLoading: integrationsLoading } = useIntegrations();
     const { streamHistory } = useData();
+    
+    // 🔄 Обработка возврата после OAuth - ТОЛЬКО ОДИН РАЗ при монтировании
+    useEffect(() => {
+        // Проверяем returnUrl только когда:
+        // 1. Пользователь аутентифицирован
+        // 2. Это первый рендер (монтирование)
+        if (!isAuthenticated) return;
+        
+        const returnUrl = getAndClearReturnUrl();
+        if (returnUrl) {
+            console.log('🔄 [OAuth] Redirecting back from dashboard to:', returnUrl);
+            // Используем replace чтобы не добавлять /dashboard в историю
+            navigate(returnUrl, { replace: true });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Пустой массив зависимостей - срабатывает ТОЛЬКО при монтировании
     
     // Дополнительные данные для VK Live
     const [vkStreamInfo, setVkStreamInfo] = useState(null);

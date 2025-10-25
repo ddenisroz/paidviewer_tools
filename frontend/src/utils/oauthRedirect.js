@@ -18,8 +18,8 @@ export function saveReturnUrl() {
         const currentPath = window.location.pathname + window.location.search;
         
         // Не сохраняем если мы уже на главной или логине
-        if (currentPath === '/dashboard' || currentPath === '/login' || currentPath === '/') {
-            console.log('🔄 [OAuth] Skipping save - already on main page');
+        if (currentPath === '/dashboard' || currentPath === '/login' || currentPath === '/' || currentPath.startsWith('/dashboard?')) {
+            console.log('🔄 [OAuth] Skipping save - already on main page or has query params');
             return;
         }
         
@@ -58,9 +58,9 @@ export function getAndClearReturnUrl() {
             }
         }
         
-        // Не возвращаем на /dashboard или корень
-        if (returnUrl === '/dashboard' || returnUrl === '/') {
-            console.log('🔄 [OAuth] Return URL is main page, ignoring');
+        // Не возвращаем на /dashboard или корень (включая query params)
+        if (returnUrl === '/dashboard' || returnUrl === '/' || returnUrl.startsWith('/dashboard?') || returnUrl.startsWith('/login')) {
+            console.log('🔄 [OAuth] Return URL is main page or login, ignoring');
             return null;
         }
         
