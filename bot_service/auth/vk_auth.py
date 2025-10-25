@@ -17,6 +17,7 @@ from constants import DEFAULT_BACKEND_URL, DEFAULT_FRONTEND_URL
 # Импорт функции отключения ботов будет сделан локально
 import base64
 import secrets
+from core.security_modern import limiter
 
 # Загружаем переменные окружения
 load_dotenv()
@@ -41,7 +42,8 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 
 @router.get("/auth/vk")
-async def vk_auth():
+@limiter.limit("10/minute")
+async def vk_auth(request: Request):
     """Инициация VK Live авторизации"""
     if not VK_CLIENT_ID:
         raise HTTPException(status_code=500, detail="VK_CLIENT_ID not configured")
@@ -61,7 +63,8 @@ async def vk_auth():
     return RedirectResponse(url=auth_url)
 
 @router.get("/auth/vk/login")
-async def login_vk():
+@limiter.limit("10/minute")
+async def login_vk(request: Request):
     """API endpoint для VK login (для совместимости с фронтендом)"""
     if not VK_CLIENT_ID:
         raise HTTPException(status_code=500, detail="VK_CLIENT_ID not configured")
@@ -79,10 +82,19 @@ async def login_vk():
     )
     
     logger.info(f"VK Live API login URL generated: {auth_url}")
-    return {"auth_url": auth_url}
+    # Редирект на VK OAuth вместо возврата JSON
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=auth_url)
 
 @router.get("/auth/vk/callback")
+@limiter.limit("20/minute")
 async def vk_callback(request: Request, db: Session = Depends(get_db), code: str = None, error: str = None, error_description: str = None, current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional)):
+    
+    logger.info("=" * 80)
+    logger.info("🔔 VK CALLBACK FUNCTION CALLED!")
+    logger.info(f"🔔 VK callback URL: {request.url}")
+    logger.info(f"🔔 VK callback cookies: {list(request.cookies.keys())}")
+    logger.info("=" * 80)
     
     # Логируем все параметры запроса для отладки
     logger.info(f"VK callback received. Query params: {dict(request.query_params)}")
@@ -278,7 +290,9 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
         raise HTTPException(status_code=500, detail="Internal server error during VK authentication")
 
 @router.post("/auth/vk/guest/start")
+@limiter.limit("5/minute")
 async def start_vk_guest_verification(
+    request: Request,
     channel_name: str,
     db: Session = Depends(get_db)
 ):
@@ -320,6 +334,7 @@ async def start_vk_guest_verification(
     }
 
 @router.post("/auth/vk/guest/verify")
+@limiter.limit("5/minute")
 async def verify_vk_guest(
     request: Request,
     channel_name: str,

@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { botService, loginVk } from '../services/microservices';
 import { toast } from 'sonner';
 import { authLogger as logger } from '../utils/logger';
+import { API_BASE_URL } from '../constants';
 
 // Глобальный флаг для предотвращения множественных проверок аутентификации
 let globalAuthCheckInProgress = false;
@@ -122,16 +123,8 @@ export const AuthProvider = ({ children }) => {
     }, [isAuthenticated, user?.id]); // Зависимости корректны - только меняющиеся значения
 
     const loginWithTwitch = () => {
-        botService.get('/auth/twitch/login')
-            .then(response => {
-                if (response.data.auth_url) {
-                    window.location.href = response.data.auth_url;
-                }
-            })
-            .catch(error => {
-                logger.error("Twitch login error:", error);
-                toast.error('Ошибка при входе через Twitch.');
-            });
+        // Прямой редирект на OAuth endpoint (бэкенд сделает 302 редирект на Twitch)
+        window.location.href = `${API_BASE_URL}/auth/twitch/login`;
     };
 
     const loginWithVk = () => {

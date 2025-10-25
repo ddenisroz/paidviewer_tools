@@ -14,6 +14,7 @@ from core.datetime_utils import utcnow_naive
 from auth.auth import get_current_user_optional
 from auth.oauth_handler import oauth_handler, OAuthUserData
 from constants import Platform, DEFAULT_FRONTEND_URL, HTTP_STATUS
+from core.security_modern import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,8 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", DEFAULT_FRONTEND_URL)
 
 
 @router.get("/auth/twitch/login")
-async def login_twitch():
+@limiter.limit("10/minute")
+async def login_twitch(request: Request):
     """Инициировать Twitch OAuth"""
     try:
         if not TWITCH_CLIENT_ID:
@@ -50,7 +52,9 @@ async def login_twitch():
         )
         
         logger.info(f"Twitch OAuth login URL generated: {auth_url}")
-        return {"auth_url": auth_url}
+        # Редирект на Twitch OAuth вместо возврата JSON
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=auth_url)
     
     except Exception as e:
         logger.error(f"Error generating Twitch login URL: {e}")
@@ -58,6 +62,7 @@ async def login_twitch():
 
 
 @router.get("/auth/twitch/callback")
+@limiter.limit("20/minute")
 async def twitch_callback(
     request: Request,
     db: Session = Depends(get_db),

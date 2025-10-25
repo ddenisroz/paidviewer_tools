@@ -355,7 +355,10 @@ class SessionManager:
     def save_user_tokens(self, user_id: int, platform: str, platform_user_id: str, 
                         avatar_url: str = None, access_token: str = None, 
                         refresh_token: str = None, expires_at: datetime = None, scopes: list = None):
-        """Сохраняет или обновляет токены пользователя для платформы"""
+        """
+        Сохраняет или обновляет токены пользователя для платформы.
+        Безопасность обеспечивается через is_active флаг и деактивацию при новом логине.
+        """
         from core.token_encryption import encrypt_token
         
         db = next(get_db())
@@ -475,63 +478,6 @@ class SessionManager:
         finally:
             db.close()
     
-    def link_platform_to_session(self, session_id: str, platform: str, db: Session = None) -> bool:
-        """Добавляет платформу в список linked_platforms текущей сессии (при линковке)."""
-        logger.info(f"🔗 [LINK PLATFORM] START - session: {session_id[:8]}..., platform: {platform}")
-        
-        should_close = False
-        if db is None:
-            db = next(get_db())
-            should_close = True
-            logger.debug(f"🔗 [LINK PLATFORM] Created new DB session")
-        
-        try:
-            logger.debug(f"🔗 [LINK PLATFORM] Querying session from database...")
-            session = db.query(UserSession).filter(UserSession.session_id == session_id).first()
-            
-            if not session:
-                logger.warning(f"⚠️ [LINK PLATFORM] Session {session_id[:8]}... NOT FOUND in database!")
-                return False
-            
-            logger.info(f"🔗 [LINK PLATFORM] Session found - user_id: {session.user_id}, is_active: {session.is_active}")
-            
-            device_info = session.device_info or {}
-            logger.debug(f"🔗 [LINK PLATFORM] Current device_info keys: {list(device_info.keys())}")
-            
-            linked_platforms = device_info.get('linked_platforms', [])
-            logger.info(f"🔗 [LINK PLATFORM] Current linked_platforms BEFORE: {linked_platforms}")
-            
-            if platform not in linked_platforms:
-                logger.info(f"🔗 [LINK PLATFORM] Adding '{platform}' to linked_platforms...")
-                linked_platforms.append(platform)
-                device_info['linked_platforms'] = linked_platforms
-                session.device_info = device_info
-                
-                logger.debug(f"🔗 [LINK PLATFORM] Updated device_info: {device_info}")
-                logger.debug(f"🔗 [LINK PLATFORM] Committing to database...")
-                db.commit()
-                
-                logger.info(f"✅ [LINK PLATFORM] SUCCESS - '{platform}' added! Linked platforms AFTER: {linked_platforms}")
-                
-                # Верификация: перечитываем из БД
-                db.refresh(session)
-                verified_platforms = session.device_info.get('linked_platforms', [])
-                logger.info(f"✅ [LINK PLATFORM] VERIFIED from DB: {verified_platforms}")
-                
-                return True
-            else:
-                logger.info(f"ℹ️ [LINK PLATFORM] Platform '{platform}' already in linked_platforms: {linked_platforms}")
-                return True
-        except Exception as e:
-            logger.error(f"❌ [LINK PLATFORM] EXCEPTION: {e}", exc_info=True)
-            db.rollback()
-            logger.error(f"❌ [LINK PLATFORM] Rolled back transaction")
-            return False
-        finally:
-            if should_close:
-                db.close()
-            logger.info(f"🔧 Database connection closed")
-
     def update_session(self, session_id: int, device_info: Optional[Dict] = None) -> bool:
         """Обновляет существующую сессию новыми данными"""
         logger.info(f"🔄 update_session called for session_id: {session_id}, device_info: {device_info}")

@@ -5,8 +5,8 @@
 """
 import logging
 from typing import Optional, Dict, Any
+from sqlalchemy.orm import Session
 from core.token_utils import get_user_token_from_db
-from utils.token_security import get_user_token_safe
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +15,8 @@ class TokenManager:
     """
     Универсальный менеджер для работы с токенами пользователей.
     
-    Обеспечивает:
-    1. Безопасное получение токенов с проверкой linked_platforms
-    2. Совместимость с ботами (без session_id)
-    3. Единый интерфейс для всех платформ
+    Проверяет только is_active флаг токена.
+    Безопасность через деактивацию токенов при новом логине.
     """
     
     @staticmethod
@@ -26,68 +24,69 @@ class TokenManager:
         user_id: int,
         platform: str,
         session_id: Optional[str] = None,
-        require_session_check: bool = True
+        require_session_check: bool = False,
+        db: Session = None
     ) -> Optional[str]:
         """
-        Получить токен пользователя с опциональной проверкой linked_platforms.
+        Получить access token пользователя для указанной платформы.
         
         Args:
             user_id: ID пользователя
             platform: Платформа ('twitch', 'vk', 'donationalerts')
-            session_id: ID сессии для проверки linked_platforms
-            require_session_check: Требовать ли проверку session (для API endpoints = True, для ботов = False)
+            session_id: НЕ используется (для обратной совместимости)
+            require_session_check: НЕ используется (для обратной совместимости)
+            db: Database session (опционально, для предотвращения race conditions)
         
         Returns:
-            str: Access token или None
-        
-        Raises:
-            HTTPException 403: Если платформа не в linked_platforms
+            str: Access token или None (если токен не найден или is_active=False)
         """
         try:
-            # Если есть session_id И требуется проверка безопасности - используем безопасный метод
-            if session_id and require_session_check:
-                logger.debug(f"🔐 [TOKEN MANAGER] Using safe token retrieval for user {user_id}, platform {platform}, session {session_id[:8]}...")
-                return get_user_token_safe(user_id, platform, session_id)
+            logger.debug(f"📦 [TOKEN MANAGER] Getting token for user {user_id}, platform {platform}")
+            tokens = get_user_token_from_db(user_id, platform, db)
             
-            # Иначе - прямое получение из БД (для ботов и фоновых задач)
-            logger.debug(f"📦 [TOKEN MANAGER] Using direct DB retrieval for user {user_id}, platform {platform}")
-            tokens = get_user_token_from_db(user_id, platform)
-            if tokens and tokens.get("access_token"):
-                return tokens["access_token"]
+            if not tokens:
+                logger.warning(f"❌ [TOKEN MANAGER] No token found for user {user_id}, platform {platform}")
+                return None
             
-            logger.warning(f"❌ [TOKEN MANAGER] No token found for user {user_id}, platform {platform}")
-            return None
+            if not tokens.get("access_token"):
+                logger.warning(f"❌ [TOKEN MANAGER] Token exists but access_token is empty for user {user_id}, platform {platform}")
+                return None
+            
+            logger.debug(f"✅ [TOKEN MANAGER] Token retrieved for user {user_id}, platform {platform}")
+            return tokens["access_token"]
             
         except Exception as e:
             logger.error(f"❌ [TOKEN MANAGER] Error getting token for user {user_id}, platform {platform}: {e}")
-            raise
+            return None
     
     @staticmethod
     def get_user_token_data(
         user_id: int,
         platform: str,
         session_id: Optional[str] = None,
-        require_session_check: bool = True
+        require_session_check: bool = False,
+        db: Session = None
     ) -> Optional[Dict[str, Any]]:
         """
         Получить полные данные токена (не только access_token).
+        
+        Args:
+            user_id: ID пользователя
+            platform: Платформа
+            session_id: НЕ используется
+            require_session_check: НЕ используется
+            db: Database session (опционально, для предотвращения race conditions)
         
         Returns:
             dict: Данные токена (platform_user_id, access_token, refresh_token, expires_at, etc.)
         """
         try:
-            if session_id and require_session_check:
-                # Сначала проверяем безопасность
-                access_token = get_user_token_safe(user_id, platform, session_id)
-                if not access_token:
-                    return None
-            
-            # Получаем полные данные
-            return get_user_token_from_db(user_id, platform)
+            logger.debug(f"📦 [TOKEN MANAGER] Getting token DATA for user {user_id}, platform {platform}")
+            return get_user_token_from_db(user_id, platform, db)
             
         except Exception as e:
             logger.error(f"❌ [TOKEN MANAGER] Error getting token data for user {user_id}, platform {platform}: {e}")
-            raise
+            return None
 
 
 # Singleton instance

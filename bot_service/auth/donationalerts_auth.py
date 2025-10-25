@@ -12,6 +12,7 @@ from core.session_manager import session_manager
 from core.datetime_utils import utcnow_naive
 from auth.auth import get_current_user_optional
 from constants import DEFAULT_FRONTEND_URL
+from core.security_modern import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ if not DA_REDIRECT_URI:
     logger.warning("DONATIONALERTS_REDIRECT_URI not set, using default value")
 
 @router.get("/auth/donationalerts/callback")
+@limiter.limit("20/minute")
 async def donationalerts_callback(
     request: Request,
     code: str = None,
@@ -45,6 +47,12 @@ async def donationalerts_callback(
     current_user: dict = Depends(get_current_user_optional)
 ):
     """DonationAlerts OAuth callback"""
+    
+    logger.info("=" * 80)
+    logger.info("🔔 DONATIONALERTS CALLBACK FUNCTION CALLED!")
+    logger.info(f"🔔 DA callback URL: {request.url}")
+    logger.info(f"🔔 DA callback cookies: {list(request.cookies.keys())}")
+    logger.info("=" * 80)
     
     # Обработка отмены авторизации
     if error:
@@ -160,22 +168,6 @@ async def donationalerts_callback(
                 logger.info(f"✅ Created DonationAlerts token for user {user_id}")
             
             db.commit()
-            
-            # 🔐 ВАЖНО: Добавляем платформу в linked_platforms текущей сессии
-            from core.session_manager import session_manager
-            session_id = request.cookies.get('session_id')
-            
-            logger.info(f"🍪 [DA AUTH] All cookies: {list(request.cookies.keys())}")
-            logger.info(f"🍪 [DA AUTH] session_id from cookie: {session_id[:8] if session_id else 'NONE'}")
-            
-            if session_id:
-                logger.info(f"🔐 [DA AUTH] Calling link_platform_to_session...")
-                logger.info(f"🔐 [DA AUTH] Parameters: session_id={session_id[:8]}..., platform=donationalerts, user_id={user_id}")
-                result = session_manager.link_platform_to_session(session_id, 'donationalerts', db)
-                logger.info(f"✅ [DA AUTH] link_platform_to_session result: {result}")
-                logger.info(f"✅ Linked DonationAlerts to session {session_id[:8]}...")
-            else:
-                logger.warning(f"⚠️ [DA AUTH] No session_id in cookies for user {user_id}, cannot link platform!")
             
             # 4. Редиректим на дашборд
             logger.info(f"✅ DonationAlerts integration completed for user {user_id}")

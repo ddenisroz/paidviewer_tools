@@ -24,7 +24,8 @@ async def get_donationalerts_status(
         # Проверяем наличие токена DonationAlerts
         token = db.query(UserToken).filter(
             UserToken.user_id == user_id,
-            UserToken.platform == "donationalerts"
+            UserToken.platform == "donationalerts",
+            UserToken.is_active == True
         ).first()
         
         if token:

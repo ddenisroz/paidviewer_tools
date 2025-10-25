@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { botService } from '../services/microservices';
+import { saveReturnUrl } from '../utils/oauthRedirect';
+import { API_BASE_URL } from '../constants';
 
 const IntegrationsContext = createContext();
 
@@ -11,13 +13,18 @@ export const IntegrationsProvider = ({ children }) => {
     const [integrations, setIntegrations] = useState({
         twitch: { enabled: null }, // null = загрузка, false = отключено, true = включено
         vk: { enabled: null },
+        donationalerts: { enabled: null },
     });
     const [isLoading, setIsLoading] = useState(false);
     const [initialLoad, setInitialLoad] = useState(true);
 
     const fetchIntegrations = useCallback(async () => {
         if (isAuthenticated === false) {
-            setIntegrations({ twitch: { enabled: false }, vk: { enabled: false } });
+            setIntegrations({ 
+                twitch: { enabled: false }, 
+                vk: { enabled: false },
+                donationalerts: { enabled: false }
+            });
             setIsLoading(false);
             setInitialLoad(false);
             return;
@@ -34,6 +41,10 @@ export const IntegrationsProvider = ({ children }) => {
                     enabled: !!user.integrations.vk?.connected,  // Проверяем поле connected
                     username: user.integrations.vk?.username || null
                 },
+                donationalerts: {
+                    enabled: !!user.integrations.donationalerts?.connected,
+                    username: user.integrations.donationalerts?.username || null
+                },
             };
             setIntegrations(newIntegrations);
             setIsLoading(false);
@@ -43,7 +54,11 @@ export const IntegrationsProvider = ({ children }) => {
 
         // Если данные еще не загружены, показываем состояние загрузки
         if (isAuthenticated === null) {
-            setIntegrations({ twitch: { enabled: null }, vk: { enabled: null } });
+            setIntegrations({ 
+                twitch: { enabled: null }, 
+                vk: { enabled: null },
+                donationalerts: { enabled: null }
+            });
             setIsLoading(true);
             setInitialLoad(true);
         }
@@ -64,9 +79,10 @@ export const IntegrationsProvider = ({ children }) => {
 
     const updateTwitchIntegration = async (enabled, onClose = null) => {
         if (enabled) {
-            // Подключить Twitch интеграцию - перенаправить на OAuth
+            // Подключить Twitch интеграцию - прямой редирект на OAuth
             if (onClose) onClose(); // Закрываем попап перед перенаправлением
-            loginWithTwitch();
+            saveReturnUrl(); // Сохраняем текущую страницу
+            window.location.href = `${API_BASE_URL}/auth/twitch/login`;
         } else {
             // Отключить Twitch интеграцию
             try {
@@ -105,11 +121,11 @@ export const IntegrationsProvider = ({ children }) => {
 
     const updateVkIntegration = async (enabled, onClose = null) => {
         if (enabled) {
-            // Подключить VK интеграцию - перенаправить на OAuth
+            // Подключить VK интеграцию - прямой редирект на OAuth
             console.log('🔵 [INTEGRATIONS] VK integration enable requested');
             if (onClose) onClose(); // Закрываем попап перед перенаправлением
-            console.log('🔵 [INTEGRATIONS] Calling loginWithVk()');
-            loginWithVk();
+            saveReturnUrl(); // Сохраняем текущую страницу
+            window.location.href = `${API_BASE_URL}/auth/vk/login`;
         } else {
             // Отключить VK интеграцию
             try {

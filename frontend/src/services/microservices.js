@@ -40,38 +40,22 @@ export const ttsService = axios.create({
 // --- Authentication ---
 export const loginTwitch = async () => {
     try {
-        // Получаем URL авторизации от API
-        const response = await botService.get('/api/auth/twitch/login');
-        const { auth_url } = response.data;
-        
-        // Перенаправляем на Twitch OAuth
-        window.location.href = auth_url;
+        console.log('🔵 [TWITCH AUTH] Redirecting to /auth/twitch/login');
+        // Прямой редирект на Twitch OAuth (бэкенд сделает 302 на Twitch)
+        window.location.href = `${API_BASE_URL}/auth/twitch/login`;
     } catch (error) {
-        console.error('❌ Ошибка при получении URL авторизации:', error);
-        // Fallback на старый способ
-        window.location.href = `${botService.defaults.baseURL}/auth/twitch/login`;
+        console.error('❌ Ошибка при входе через Twitch:', error);
+        toast.error('Ошибка при входе через Twitch.');
     }
 };
 
 export const loginVk = async () => {
     try {
-        console.log('🔵 [VK AUTH] Requesting auth URL from /auth/vk/login');
-        // Получаем URL авторизации от API
-        const response = await botService.get('/auth/vk/login');
-        console.log('🔵 [VK AUTH] Response received:', response.data);
-        const { auth_url } = response.data;
-        
-        if (!auth_url) {
-            console.error('❌ [VK AUTH] No auth_url in response:', response.data);
-            toast.error('Не удалось получить URL авторизации VK');
-            return;
-        }
-        
-        console.log('🔵 [VK AUTH] Redirecting to:', auth_url);
-        // Перенаправляем на VK OAuth
-        window.location.href = auth_url;
+        console.log('🔵 [VK AUTH] Redirecting to /auth/vk/login');
+        // Прямой редирект на VK OAuth (бэкенд сделает 302 на VK)
+        window.location.href = `${API_BASE_URL}/auth/vk/login`;
     } catch (error) {
-        console.error('❌ Ошибка при получении VK URL авторизации:', error);
+        console.error('❌ Ошибка при входе через VK Live:', error);
         toast.error('Ошибка при входе через VK Live.');
     }
 };

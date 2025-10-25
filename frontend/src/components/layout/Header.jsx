@@ -43,38 +43,21 @@ const Header = () => {
             } else if (platform === 'vk') {
                 const newEnabled = !integrations?.vk?.enabled;
                 if (newEnabled) {
-                    // Подключение - получаем auth_url и перенаправляем
-                    console.log('🔵 [HEADER] VK integration toggle - fetching auth URL');
-                    try {
-                        const response = await fetch(`${API_BASE_URL}/auth/vk/login`, {
-                            method: 'GET',
-                            credentials: 'include'
-                        });
-                        const data = await response.json();
-                        console.log('🔵 [HEADER] VK auth response:', data);
-                        if (data.auth_url) {
-                            // 💾 Сохраняем текущую страницу перед редиректом
-                            saveReturnUrl();
-                            console.log('🔵 [HEADER] Redirecting to:', data.auth_url);
-                            window.location.href = data.auth_url;
-                        } else {
-                            console.error('❌ [HEADER] No auth_url in response');
-                            toast.error('Не удалось получить URL авторизации VK');
-                        }
-                    } catch (error) {
-                        console.error('❌ [HEADER] Error fetching VK auth URL:', error);
-                        toast.error('Ошибка при получении URL авторизации VK');
-                    }
+                    // 💾 Сохраняем текущую страницу перед редиректом
+                    saveReturnUrl();
+                    // Прямой редирект на VK OAuth
+                    window.location.href = `${API_BASE_URL}/auth/vk/login`;
                 } else {
                     await updateVkIntegration(newEnabled);
                 }
             } else if (platform === 'donationalerts') {
-                if (integrations?.donationalerts?.connected) {
+                if (integrations?.donationalerts?.enabled) {
                     // Отключаем DonationAlerts
                     await fetch(`${API_BASE_URL}/api/integrations/donationalerts/disconnect`, { 
                         method: 'POST',
                         credentials: 'include'
                     });
+                    await refreshAuthStatus(); // Обновляем статус интеграций
                 } else {
                     // Подключаем DonationAlerts - используем тот же подход, что и в DonationAlertsContext
                     try {
@@ -194,13 +177,13 @@ const Header = () => {
                                     <button
                                         onClick={() => handleIntegrationToggle('donationalerts')}
                                         className={`w-12 h-6 rounded-full transition-colors ${
-                                            integrations?.donationalerts?.connected 
+                                            integrations?.donationalerts?.enabled 
                                                 ? 'bg-orange-500' 
                                                 : 'bg-slate-600'
                                         }`}
                                     >
                                         <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                                            integrations?.donationalerts?.connected ? 'translate-x-6' : 'translate-x-0.5'
+                                            integrations?.donationalerts?.enabled ? 'translate-x-6' : 'translate-x-0.5'
                                         }`} />
                                     </button>
                                 </div>

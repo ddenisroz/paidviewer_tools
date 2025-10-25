@@ -74,6 +74,7 @@ from api.obs_integration_api import router as obs_integration_router
 from api.system_api import router as system_router
 from api.user_settings_api import router as user_settings_router
 from api.chatbox_api import router as chatbox_router
+from api.monitoring_api import router as monitoring_router
 
 from core.token_utils import get_user_token_from_db, validate_platform_token
 
@@ -267,7 +268,8 @@ async def lifespan(app: FastAPI):
                 # Включаем TTS для VK каналов
                 vk_token = db.query(UserToken).filter(
                     UserToken.user_id == user.id,
-                    UserToken.platform == 'vk'
+                    UserToken.platform == 'vk',
+                    UserToken.is_active == True
                 ).first()
                 if vk_token and vk_token.platform_user_id:
                     connection_manager.enable_tts_for_channel(vk_token.platform_user_id)
@@ -457,7 +459,8 @@ async def lifespan(app: FastAPI):
                         try:
                             vk_token_record = db_temp.query(UserToken).filter(
                                 UserToken.platform == 'vk',
-                                UserToken.access_token.isnot(None)
+                                UserToken.access_token.isnot(None),
+                                UserToken.is_active == True
                             ).first()
                             
                             if vk_token_record:
@@ -766,40 +769,15 @@ async def websocket_test(websocket: WebSocket):
 # Старые WebSocket endpoints удалены - используем memory_websocket_manager напрямую
 
 # --- Auth Endpoints ---
-@app.get("/auth/twitch/login")
-async def api_login_twitch():
-    return await auth_handlers.api_twitch_login()
+# УДАЛЕНО: старый endpoint /auth/twitch/login - используется роутер из twitch_auth.py
 
 @app.get("/test-callback")
 async def test_callback():
     logger.info("Test callback route called!")
     return {"message": "Test callback works"}
 
-@app.get("/auth/twitch/callback")
-async def twitch_callback(request: Request, db: Session = Depends(get_db)):
-    logger.info(f"Twitch callback route called")
-    
-    code = request.query_params.get("code")
-    if not code:
-        logger.error("No code parameter in callback URL")
-        raise HTTPException(status_code=400, detail="Missing authorization code")
-    
-    try:
-        result = await auth_handlers.twitch_callback(code, request, db)
-        return result
-    except Exception as e:
-        logger.error(f"Error in twitch callback route: {e}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise
-
-@app.get("/auth/twitch")
-async def auth_twitch():
-    return await auth_handlers.api_twitch_auth()
-
-@app.get("/api/auth/twitch")
-async def api_auth_twitch():
-    return await auth_handlers.api_twitch_auth()
+# Twitch OAuth endpoints moved to auth/twitch_auth.py router
+# Removed duplicate endpoints to avoid conflicts
 
 @app.post("/api/auth/logout")
 async def logout(current_user: dict = Depends(get_current_user)):
@@ -1005,6 +983,7 @@ app.include_router(admin_router)
 app.include_router(active_channels_router)
 app.include_router(stream_history_router)
 app.include_router(donationalerts_router)
+app.include_router(monitoring_router)
 app.include_router(guest_router)
 
 # --- Static Files for Widgets ---

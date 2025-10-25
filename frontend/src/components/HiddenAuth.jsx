@@ -24,71 +24,60 @@ const HiddenAuth = () => {
                     // Получаем URL авторизации и открываем popup
                     const apiBaseUrl = API_BASE_URL;
                     
-                    // Получаем URL авторизации от API
-                    fetch(`${apiBaseUrl}/api/auth/twitch/login`)
-                        .then(response => response.json())
-                        .then(data => {
-                            const popup = window.open(
-                                data.auth_url,
-                                'twitch_auth',
-                                'width=600,height=700,scrollbars=yes,resizable=yes'
-                            );
+                    // Открываем popup напрямую с OAuth endpoint (без AJAX)
+                    const popup = window.open(
+                        `${apiBaseUrl}/auth/twitch/login`,
+                        'twitch_auth',
+                        'width=600,height=700,scrollbars=yes,resizable=yes'
+                    );
+                    
+                    if (popup) {
+                        // Слушаем сообщения от popup окна
+                        const handleMessage = (event) => {
+                            // 📨 Получено сообщение:', event.data, 'от origin:', event.origin);
                             
-                            // Слушаем сообщения от popup окна
-                            const handleMessage = (event) => {
-                                // 📨 Получено сообщение:', event.data, 'от origin:', event.origin);
-                                
-                                // Принимаем сообщения от разрешенных origins
-                                const frontendUrl = import.meta.env.VITE_FRONTEND_URL;
-                                if (!frontendUrl) {
-                                    throw new Error('VITE_FRONTEND_URL environment variable is required');
-                                }
-                                
-                                const allowedOrigins = [
-                                    API_BASE_URL,
-                                    frontendUrl,
-                                    window.location.origin
-                                ];
-                                
-                                if (!allowedOrigins.includes(event.origin)) {
-                                    // ❌ Сообщение от неразрешенного origin:', event.origin);
-                                    return;
-                                }
-                                
-                                if (event.data.type === 'TWITCH_AUTH_SUCCESS') {
-                                    // ✅ Авторизация Twitch успешна!');
-                                    popup.close();
-                                    window.removeEventListener('message', handleMessage);
-                                    // Обновляем статус авторизации принудительно
-                                    window.dispatchEvent(new CustomEvent('auth_refresh_required'));
-                                    // Дополнительно перезагружаем страницу для гарантии
-                                    setTimeout(() => window.location.reload(), 1000);
-                                } else if (event.data.type === 'TWITCH_AUTH_ERROR') {
-                                    console.error('❌ Ошибка авторизации Twitch:', event.data.error);
-                                    popup.close();
-                                    window.removeEventListener('message', handleMessage);
-                                }
-                            };
+                            // Принимаем сообщения от разрешенных origins
+                            const frontendUrl = import.meta.env.VITE_FRONTEND_URL;
+                            if (!frontendUrl) {
+                                throw new Error('VITE_FRONTEND_URL environment variable is required');
+                            }
                             
-                            window.addEventListener('message', handleMessage);
+                            const allowedOrigins = [
+                                API_BASE_URL,
+                                frontendUrl,
+                                window.location.origin
+                            ];
                             
-                            // Проверяем, не закрыли ли popup
-                            const checkClosed = setInterval(() => {
-                                if (popup.closed) {
-                                    clearInterval(checkClosed);
-                                    window.removeEventListener('message', handleMessage);
-                                }
-                            }, 1000);
-                        })
-                        .catch(() => {
-                            // console.error('❌ Ошибка при получении URL авторизации:', error);
-                            // Fallback на старый способ
-                            window.open(
-                                `${apiBaseUrl}/auth/twitch`,
-                                'twitch_auth',
-                                'width=600,height=700,scrollbars=yes,resizable=yes'
-                            );
-                        });
+                            if (!allowedOrigins.includes(event.origin)) {
+                                // ❌ Сообщение от неразрешенного origin:', event.origin);
+                                return;
+                            }
+                            
+                            if (event.data.type === 'TWITCH_AUTH_SUCCESS') {
+                                // ✅ Авторизация Twitch успешна!');
+                                popup.close();
+                                window.removeEventListener('message', handleMessage);
+                                // Обновляем статус авторизации принудительно
+                                window.dispatchEvent(new CustomEvent('auth_refresh_required'));
+                                // Дополнительно перезагружаем страницу для гарантии
+                                setTimeout(() => window.location.reload(), 1000);
+                            } else if (event.data.type === 'TWITCH_AUTH_ERROR') {
+                                console.error('❌ Ошибка авторизации Twitch:', event.data.error);
+                                popup.close();
+                                window.removeEventListener('message', handleMessage);
+                            }
+                        };
+                        
+                        window.addEventListener('message', handleMessage);
+                        
+                        // Проверяем, не закрыли ли popup
+                        const checkClosed = setInterval(() => {
+                            if (popup.closed) {
+                                clearInterval(checkClosed);
+                                window.removeEventListener('message', handleMessage);
+                            }
+                        }, 1000);
+                    }
                     
                     return 0;
                 }
