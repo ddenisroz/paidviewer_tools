@@ -42,26 +42,38 @@ def get_user_token_safe(
         should_close_db = True
     
     try:
+        logger.info(f"🔐 [TOKEN SAFE] START - user: {user_id}, platform: {platform}, session: {session_id[:8]}...")
+        
         # 1. Получаем текущую сессию
+        logger.debug(f"🔐 [TOKEN SAFE] Step 1: Querying session from database...")
         session = db.query(UserSession).filter(
             UserSession.session_id == session_id,
             UserSession.is_active == True
         ).first()
         
         if not session:
-            logger.warning(f"🚫 [SECURITY] Session {session_id[:8]}... not found or inactive")
+            logger.warning(f"🚫 [TOKEN SAFE] Session {session_id[:8]}... NOT FOUND or inactive!")
             raise HTTPException(status_code=401, detail="Session not found or expired")
         
-        # 2. Извлекаем linked_platforms
-        device_info = session.device_info or {}
-        linked_platforms = device_info.get('linked_platforms', [])
+        logger.info(f"🔐 [TOKEN SAFE] Session found - user_id: {session.user_id}, created: {session.created_at}")
         
-        logger.info(f"🔐 [SECURITY] User {user_id} session {session_id[:8]}... has linked_platforms: {linked_platforms}")
+        # 2. Извлекаем linked_platforms
+        logger.debug(f"🔐 [TOKEN SAFE] Step 2: Extracting linked_platforms...")
+        device_info = session.device_info or {}
+        logger.debug(f"🔐 [TOKEN SAFE] device_info keys: {list(device_info.keys())}")
+        
+        linked_platforms = device_info.get('linked_platforms', [])
+        logger.info(f"🔐 [TOKEN SAFE] linked_platforms from DB: {linked_platforms} (type: {type(linked_platforms)})")
         
         # 3. Проверяем, что платформа в списке
+        logger.debug(f"🔐 [TOKEN SAFE] Step 3: Checking if '{platform}' in linked_platforms...")
+        logger.debug(f"🔐 [TOKEN SAFE] linked_platforms is empty: {not linked_platforms}")
+        logger.debug(f"🔐 [TOKEN SAFE] platform '{platform}' in list: {platform in linked_platforms if linked_platforms else 'N/A (list empty)'}")
+        
         if linked_platforms and platform not in linked_platforms:
             logger.warning(
-                f"🚫 [SECURITY] User {user_id} tried to access '{platform}' "
+                f"🚫 [TOKEN SAFE] SECURITY CHECK FAILED! "
+                f"User {user_id} tried to access '{platform}' "
                 f"but session only has: {linked_platforms}"
             )
             raise HTTPException(
@@ -70,13 +82,17 @@ def get_user_token_safe(
                        f"Please reconnect via {platform.capitalize()} OAuth."
             )
         
+        logger.info(f"✅ [TOKEN SAFE] Security check PASSED for platform '{platform}'")
+        
         # 4. Если проверка прошла - получаем токен
+        logger.debug(f"🔐 [TOKEN SAFE] Step 4: Fetching token from database...")
         tokens = get_user_token_from_db(user_id, platform)
+        
         if tokens and tokens.get("access_token"):
-            logger.info(f"✅ [SECURITY] Token for '{platform}' retrieved for user {user_id}")
+            logger.info(f"✅ [TOKEN SAFE] Token retrieved successfully for '{platform}', user {user_id}")
             return tokens["access_token"]
         
-        logger.warning(f"⚠️ [SECURITY] No token found for user {user_id} on platform '{platform}'")
+        logger.warning(f"⚠️ [TOKEN SAFE] No token found for user {user_id} on platform '{platform}'")
         return None
         
     except HTTPException:

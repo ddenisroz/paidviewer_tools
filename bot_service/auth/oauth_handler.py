@@ -159,6 +159,14 @@ class OAuthHandler:
                             user_id=current_user['id'],
                             device_info=device_info
                         )
+                        logger.info(f"✅ Created replacement session: {new_session_id}")
+                        
+                        # 🔐 ВАЖНО: Добавляем платформу в linked_platforms новой сессии
+                        logger.info(f"🔐 [OAUTH HANDLER] Calling link_platform_to_session for replacement session...")
+                        logger.info(f"🔐 [OAUTH HANDLER] Parameters: session_id={new_session_id[:8]}..., platform={platform}")
+                        result = session_manager.link_platform_to_session(new_session_id, platform, db)
+                        logger.info(f"✅ [OAUTH HANDLER] link_platform_to_session result: {result}")
+                        logger.info(f"✅ Linked platform '{platform}' to replacement session {new_session_id[:8]}...")
                         
                         # Объединяем аккаунты если нужно
                         if existing_user.id != current_user['id']:
@@ -185,6 +193,7 @@ class OAuthHandler:
                             existing_token.expires_at = user_data.expires_at
                             existing_token.scopes = user_data.scopes
                             existing_token.avatar_url = user_data.avatar_url
+                            existing_token.is_active = True  # Активируем токен при повторной авторизации
                         else:
                             # Создаем новый токен
                             session_manager.save_user_tokens(
@@ -207,6 +216,20 @@ class OAuthHandler:
                             # Также сохраняем в vk_username для обратной совместимости
                             unified_user.vk_username = user_data.username
                             logger.info(f"Updated VK channel_name: {user_data.username}")
+                        
+                        # 🔐 ВАЖНО: Добавляем платформу в linked_platforms текущей сессии
+                        session_id_from_cookie = request.cookies.get('session_id')
+                        logger.info(f"🍪 [OAUTH HANDLER] Cookies present: {list(request.cookies.keys())}")
+                        logger.info(f"🍪 [OAUTH HANDLER] session_id from cookie: {session_id_from_cookie[:8] if session_id_from_cookie else 'NONE'}")
+                        
+                        if session_id_from_cookie:
+                            logger.info(f"🔐 [OAUTH HANDLER] Calling link_platform_to_session for existing user token update...")
+                            logger.info(f"🔐 [OAUTH HANDLER] Parameters: session_id={session_id_from_cookie[:8]}..., platform={platform}")
+                            result = session_manager.link_platform_to_session(session_id_from_cookie, platform, db)
+                            logger.info(f"✅ [OAUTH HANDLER] link_platform_to_session result: {result}")
+                            logger.info(f"✅ Linked platform '{platform}' to existing session {session_id_from_cookie[:8]}...")
+                        else:
+                            logger.warning(f"⚠️ [OAUTH HANDLER] No session_id in cookies, cannot link platform {platform} for existing user")
                         
                         db.commit()
                         logger.info(f"Updated {platform} tokens for user {unified_user.id}")
@@ -248,10 +271,15 @@ class OAuthHandler:
                     
                     # 🔐 БЕЗОПАСНОСТЬ: Добавляем платформу в текущую сессию
                     session_id_from_cookie = request.cookies.get('session_id')
+                    logger.info(f"🍪 [OAUTH HANDLER] Cookies present: {list(request.cookies.keys())}")
+                    logger.info(f"🍪 [OAUTH HANDLER] session_id from cookie: {session_id_from_cookie[:8] if session_id_from_cookie else 'NONE'}")
+                    
                     if session_id_from_cookie:
-                        session_manager.link_platform_to_session(session_id_from_cookie, platform, db)
+                        logger.info(f"🔐 [OAUTH HANDLER] Calling link_platform_to_session for linking scenario...")
+                        result = session_manager.link_platform_to_session(session_id_from_cookie, platform, db)
+                        logger.info(f"🔐 [OAUTH HANDLER] link_platform_to_session result: {result}")
                     else:
-                        logger.warning(f"⚠️ No session_id in cookies, cannot link platform {platform}")
+                        logger.warning(f"⚠️ [OAUTH HANDLER] No session_id in cookies, cannot link platform {platform}")
                     
                     db.commit()
                     logger.info(f"Added {platform} integration to user {unified_user.id}")
@@ -343,6 +371,13 @@ class OAuthHandler:
                         device_info=device_info
                     )
                     logger.info(f"✅ New session created: {session_id}")
+                    
+                    # 🔐 ВАЖНО: Добавляем платформу в linked_platforms новой сессии
+                    logger.info(f"🔐 [OAUTH HANDLER] Calling link_platform_to_session for new session (existing user)...")
+                    logger.info(f"🔐 [OAUTH HANDLER] Parameters: session_id={session_id[:8]}..., platform={platform}")
+                    result = session_manager.link_platform_to_session(session_id, platform, db)
+                    logger.info(f"✅ [OAUTH HANDLER] link_platform_to_session result: {result}")
+                    logger.info(f"✅ Linked platform '{platform}' to session {session_id[:8]}...")
                 else:
                     # Завершаем ВСЕ предыдущие сессии пользователя (принцип одной активной сессии)
                     logger.info(f"🔒 New user login. Terminating all sessions for user {unified_user.id}...")
@@ -362,6 +397,14 @@ class OAuthHandler:
                         user_id=unified_user.id,
                         device_info=device_info
                     )
+                    logger.info(f"✅ New session created: {session_id}")
+                    
+                    # 🔐 ВАЖНО: Добавляем платформу в linked_platforms новой сессии
+                    logger.info(f"🔐 [OAUTH HANDLER] Calling link_platform_to_session for new user session...")
+                    logger.info(f"🔐 [OAUTH HANDLER] Parameters: session_id={session_id[:8]}..., platform={platform}")
+                    result = session_manager.link_platform_to_session(session_id, platform, db)
+                    logger.info(f"✅ [OAUTH HANDLER] link_platform_to_session result: {result}")
+                    logger.info(f"✅ Linked platform '{platform}' to session {session_id[:8]}...")
                 
                 # Уведомляем connection_manager о новой активной сессии
                 try:

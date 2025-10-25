@@ -152,9 +152,9 @@ async def get_chat_status(user: dict = Depends(get_current_user)):
     try:
         user_id = user.get("id")
         
-        # Используем ту же логику что и в bot_status
-        twitch_token = get_user_token_from_db(user_id, "twitch")
-        vk_token = get_user_token_from_db(user_id, "vk")
+        # Используем TokenManager (не требует session check для bot status)
+        twitch_token = token_manager.get_user_token_data(user_id, "twitch", require_session_check=False)
+        vk_token = token_manager.get_user_token_data(user_id, "vk", require_session_check=False)
         
         chat_status = {
             "connected": False,
@@ -196,9 +196,9 @@ async def reconnect_chat(user: dict = Depends(get_current_user)):
         user_id = user.get("id")
         logger.info(f"Chat reconnect requested by user {user_id}")
         
-        # Получаем токены
-        twitch_token = get_user_token_from_db(user_id, "twitch")
-        vk_token = get_user_token_from_db(user_id, "vk")
+        # Получаем токены через TokenManager
+        twitch_token = token_manager.get_user_token_data(user_id, "twitch", require_session_check=False)
+        vk_token = token_manager.get_user_token_data(user_id, "vk", require_session_check=False)
         
         if not twitch_token and not vk_token:
             return {"success": False, "error": "Нет подключенных платформ"}
