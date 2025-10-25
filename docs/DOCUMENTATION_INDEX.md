@@ -1,6 +1,6 @@
 # 📚 Индекс документации TTS_TTV_0.02
 
-**Последнее обновление:** 22 октября 2025
+**Последнее обновление:** 25 октября 2025 (Session 7)
 
 ---
 
@@ -43,16 +43,17 @@
 
 | Документ | Описание |
 |----------|----------|
-| [PATCH_FIXES_OCT_21_2025.md](PATCH_FIXES_OCT_21_2025.md) | Исправления от 21 октября 2025 |
-| [DEPLOYMENT_READY.txt](DEPLOYMENT_READY.txt) | Чеклист готовности к деплою |
+| [SESSION_7_TOKEN_AND_UX.md](SESSION_7_TOKEN_AND_UX.md) | ✨ Session 7 (24-25.10.2025): TokenManager + UX |
+| [AI_AGENT_CHECKLIST.md](AI_AGENT_CHECKLIST.md) | Чеклист для AI-агентов перед началом работы |
 
 ### 🟡 Специализированные
 
 | Документ | Описание |
 |----------|----------|
+| [TOKEN_SYSTEM_UNIFIED.md](TOKEN_SYSTEM_UNIFIED.md) | 🔐 Унифицированная система токенов (TokenManager) |
 | [SECURITY_LOGIC.md](SECURITY_LOGIC.md) | Логика безопасности и авторизации |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Инструкции по деплою |
-| [CATEGORY_MAPPING_RESTORE.md](CATEGORY_MAPPING_RESTORE.md) | Восстановление маппинга категорий |
+| [CATEGORY_MAPPING_GUIDE.md](CATEGORY_MAPPING_GUIDE.md) | Гайд по категориям стрима |
 | [VK_USERNAME_AND_ADMIN_USERS_EXPLANATION.md](VK_USERNAME_AND_ADMIN_USERS_EXPLANATION.md) | Объяснение VK username логики |
 
 ### 📂 VK Live API
@@ -116,7 +117,12 @@
 
 - [CURRENT_STATUS.md](CURRENT_STATUS.md) - Секция "Управление стримом"
 - [vk/Методы.Категории.md](vk/Методы.Категории.md) - VK API
-- [CATEGORY_MAPPING_RESTORE.md](CATEGORY_MAPPING_RESTORE.md) - Маппинг
+- [CATEGORY_MAPPING_GUIDE.md](CATEGORY_MAPPING_GUIDE.md) - Маппинг категорий
+
+### Как работают токены?
+
+- [TOKEN_SYSTEM_UNIFIED.md](TOKEN_SYSTEM_UNIFIED.md) - Унифицированная система TokenManager
+- [SECURITY_LOGIC.md](SECURITY_LOGIC.md) - Безопасность и `linked_platforms`
 
 ### VK Live API не работает?
 
@@ -129,22 +135,29 @@
 
 | Документ | Актуальность | Статус |
 |----------|--------------|--------|
-| CURRENT_STATUS.md | 22.10.2025 | ✅ Актуально |
+| CURRENT_STATUS.md | 25.10.2025 | ✅ Актуально |
+| SESSION_7_TOKEN_AND_UX.md | 25.10.2025 | ✅ Актуально |
+| TOKEN_SYSTEM_UNIFIED.md | 25.10.2025 | ✅ Актуально |
 | LLM_DEVELOPMENT_RULES.md | 22.10.2025 | ✅ Актуально |
 | QUICK_FIX_GUIDE.md | 21.10.2025 | ✅ Актуально |
 | ARCHITECTURE_GUIDE.md | 20.10.2025 | ✅ Актуально |
 | DEVELOPER_GUIDE.md | 20.10.2025 | ✅ Актуально |
-| DEPLOYMENT_READY.txt | 21.10.2025 | 🟡 Частично устарел |
-| PATCH_FIXES_OCT_21_2025.md | 21.10.2025 | ✅ Актуально |
+| AI_AGENT_CHECKLIST.md | 22.10.2025 | ✅ Актуально |
 
 ---
 
 ## 🚀 Что нового?
 
+### 25 октября 2025 (Session 7)
+- ✨ Создан **SESSION_7_TOKEN_AND_UX.md** - полный отчет о Session 7
+- ✨ Создан **TOKEN_SYSTEM_UNIFIED.md** - документация TokenManager
+- ✅ Обновлен **CURRENT_STATUS.md** - добавлена секция Session 7
+- ✅ Обновлен **DOCUMENTATION_INDEX.md** - этот файл
+- 🗑️ Удалено 5 устаревших файлов (SESSION_6_FINAL_FIXES, CATEGORY_MAPPING_RESTORE, и др.)
+
 ### 22 октября 2025
 - ✅ Добавлен **CURRENT_STATUS.md** - главный источник правды о состоянии проекта
 - ✅ Обновлен **LLM_DEVELOPMENT_RULES.md** v3.0.0 - усилены правила для AI
-- ✅ Обновлен **DOCUMENTATION_INDEX.md** - этот файл
 
 ### 21 октября 2025
 - ✅ Критические фиксы TTS
@@ -184,7 +197,7 @@
 
 ---
 
-**Версия индекса:** 2.0  
-**Последнее обновление:** 22 октября 2025  
+**Версия индекса:** 3.0  
+**Последнее обновление:** 25 октября 2025 (Session 7)  
 **Статус:** ✅ Актуально
 

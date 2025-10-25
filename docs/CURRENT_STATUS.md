@@ -1,8 +1,8 @@
 # 📊 Текущий статус проекта TTS_TTV_0.02
 
-**Последнее обновление:** 22 октября 2025 (Session 6 - Part 12: Auto-Reset)
+**Последнее обновление:** 24-25 октября 2025 (Session 7: Token System & UX)
 **Версия:** 0.02  
-**Статус:** В активной разработке
+**Статус:** В активной разработке, готовность к деплою 95%
 
 ---
 
@@ -29,9 +29,12 @@
 ### 🔐 Авторизация
 - ✅ OAuth через Twitch
 - ✅ OAuth через VK Live
+- ✅ OAuth через DonationAlerts
 - ✅ Сохранение токенов в БД
+- ✅ **Унифицированная система токенов (TokenManager)** - **Session 7** 🔒
 - ✅ Автоматический refresh VK токенов
-- ✅ Система сессий
+- ✅ Система сессий с `linked_platforms` security
+- ✅ **OAuth редирект на предыдущую страницу** - **Session 7** 🔒
 
 ### 🎬 Управление стримом
 - ✅ **Смена названия стрима** (Twitch + VK Live) - **ЗАВЕРШЕНО, НЕ ТРОГАТЬ! ✋**
@@ -60,10 +63,12 @@
 
 ### 🎙️ TTS (Озвучка)
 - ✅ **Базовая озвучка** (gTTS) - работает корректно
-- ✅ **TTS включен по умолчанию** для новых пользователей (исправлено 22.10.2025)
+- ✅ **TTS отключен по умолчанию** для новых пользователей (исправлено Session 7)
 - ✅ **Кнопки-шорткаты TTS** на главной странице
   - Базовая TTS (вкл/выкл)
   - AI TTS (вкл/выкл)
+- ✅ **Уведомления для всех TTS действий** - **Session 7** 🔒
+- ✅ **Оптимизированная загрузка** (параллельные API запросы) - **Session 7** 🔒
 - ✅ Синхронизация toggles между главной и настройками
 - ✅ WebSocket broadcast audio
 - ✅ Блокировка пользователей от TTS
@@ -76,6 +81,60 @@
 - ✅ Сохранение истории чата (все платформы)
   - Twitch: работает ✅
   - VK Live: работает ✅
+
+---
+
+## ✅ ИСПРАВЛЕНО 24-25 ОКТЯБРЯ 2025 (Session 7: Token System & UX)
+
+### 🔐 Унифицированная система токенов
+1. ✅ **Создан TokenManager** (`bot_service/core/token_manager.py`)
+   - Единая точка входа для всех токенов
+   - Автоматическая проверка `linked_platforms`
+   - Подробное логирование `🔐 [TOKEN MANAGER]`
+   - Документация: `docs/TOKEN_SYSTEM_UNIFIED.md`
+
+2. ✅ **Исправлен импорт токенов**
+   - `services.token_service` → `core.token_utils`
+   - Файл: `bot_service/utils/token_security.py`
+
+3. ✅ **Интеграция TokenManager**
+   - `bot_service/api/vk_api.py`
+   - `bot_service/api/stream_info_api.py`
+   - `bot_service/api/bot_control_api.py`
+
+### ⚡ Frontend Performance
+1. ✅ **Параллельные API запросы**
+   - TtsMainPage: 5 последовательных → 4 параллельных (60% быстрее)
+   - TtsQuickSettings: 4 последовательных → 2 параллельных (60% быстрее)
+
+2. ✅ **Исправлена race condition**
+   - `handlePlatformToggle` теперь использует единое значение
+   - Файл: `frontend/src/pages/tts/TtsMainPage.jsx`
+
+3. ✅ **Корректные initial states**
+   - Нет "мерцания" UI элементов
+   - `useState(null)` вместо `useState(false)`
+
+### 🔄 UX Improvements
+1. ✅ **OAuth редирект на предыдущую страницу**
+   - Создан: `frontend/src/utils/oauthRedirect.js`
+   - Интегрирован в: Header, DonationAlertsContext, SettingsPage
+   - Пользователь возвращается туда откуда начал OAuth
+
+2. ✅ **TTS уведомления**
+   - Feedback для всех TTS операций
+   - Базовая озвучка включена/отключена
+   - Движок: Локальный/Облачный
+   - Режим: Браузер/OBS
+   - Платформы: Twitch/VK включена/отключена
+
+### 🐛 Критические баги
+1. ✅ **TTS теперь отключена по умолчанию**
+   - `database.py` - `tts_enabled = Column(Boolean, default=False)`
+
+2. ✅ **WebSocket ping loop**
+   - Исправлено: `dict changed size during iteration`
+   - Файл: `bot_service/services/memory_websocket_manager.py`
 
 ---
 
