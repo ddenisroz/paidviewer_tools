@@ -1,6 +1,39 @@
 // Маппинг категорий между Twitch и VK Live
 // Категории с похожим содержанием но разными названиями и ID
 
+// Кеш для нормализованных результатов поиска (для производительности)
+const normalizationCache = new Map();
+
+/**
+ * Нормализация названия категории для лучшего поиска
+ * @param {string} name - оригинальное название
+ * @returns {string} - нормализованное название
+ */
+function normalizeCategoryName(name) {
+    if (!name) return '';
+    
+    // Проверяем кеш
+    if (normalizationCache.has(name)) {
+        return normalizationCache.get(name);
+    }
+    
+    const normalized = name
+        .toLowerCase()
+        .trim()
+        // Убираем специальные символы (кроме пробелов и тире)
+        .replace(/[:\u2019''`]/g, '')  // Убираем двоеточия и апострофы
+        .replace(/\s+/g, ' ')  // Множественные пробелы → один
+        .replace(/\s*-\s*/g, ' ')  // Тире с пробелами → пробел
+        .replace(/&/g, 'and');  // & → and
+    
+    // Сохраняем в кеш (максимум 1000 записей)
+    if (normalizationCache.size < 1000) {
+        normalizationCache.set(name, normalized);
+    }
+    
+    return normalized;
+}
+
 export const categoryMapping = {
     // === ОСНОВНЫЕ КАТЕГОРИИ (Twitch → VK) ===
     'Just Chatting': 'Говорим и смотрим',
@@ -229,7 +262,141 @@ export const categoryMapping = {
     'Karaoke': 'Караоке',
     'Meditation': 'Медитация',
     'Wellness': 'Здоровье',
-    'Mental Health': 'Психология'
+    'Mental Health': 'Психология',
+    
+    // === СОВРЕМЕННЫЕ ИГРЫ 2024-2025 ===
+    'The First Descendant': 'The First Descendant',
+    'Black Myth: Wukong': 'Black Myth Wukong',
+    'Black Myth Wukong': 'Black Myth Wukong',
+    'Wukong': 'Black Myth Wukong',
+    'Helldivers 2': 'Helldivers',
+    'Helldivers II': 'Helldivers',
+    'Dragon Age: The Veilguard': 'Dragon Age',
+    'Dragon Age Veilguard': 'Dragon Age',
+    'S.T.A.L.K.E.R. 2: Heart of Chornobyl': 'STALKER 2',
+    'STALKER 2': 'STALKER 2',
+    'Silent Hill 2 Remake': 'Silent Hill',
+    'Metaphor: ReFantazio': 'Metaphor',
+    'Metaphor ReFantazio': 'Metaphor',
+    'Like a Dragon: Infinite Wealth': 'Like a Dragon',
+    'Yakuza': 'Like a Dragon',
+    'Tekken 8': 'Tekken',
+    'Street Fighter 6': 'Street Fighter',
+    'Mortal Kombat 1': 'Mortal Kombat',
+    'Granblue Fantasy: Relink': 'Granblue Fantasy',
+    'Granblue Fantasy Relink': 'Granblue Fantasy',
+    'Final Fantasy VII Rebirth': 'Final Fantasy',
+    'FF7 Rebirth': 'Final Fantasy',
+    'Persona 3 Reload': 'Persona',
+    'Persona 3': 'Persona',
+    'Persona 5 Royal': 'Persona',
+    'Manor Lords': 'Manor Lords',
+    'Hades II': 'Hades',
+    'Hades 2': 'Hades',
+    'Animal Well': 'Animal Well',
+    'Balatro': 'Balatro',
+    'Unicorn Overlord': 'Unicorn Overlord',
+    'The Finals': 'The Finals',
+    'XDefiant': 'XDefiant',
+    'Wuthering Waves': 'Wuthering Waves',
+    'Zenless Zone Zero': 'Zenless Zone Zero',
+    'ZZZ': 'Zenless Zone Zero',
+    'Throne and Liberty': 'Throne and Liberty',
+    'Blue Protocol': 'Blue Protocol',
+    'Enshrouded': 'Enshrouded',
+    'Nightingale': 'Nightingale',
+    'Last Epoch': 'Last Epoch',
+    'Gray Zone Warfare': 'Gray Zone Warfare',
+    'Arena Breakout': 'Arena Breakout',
+    'Marvel Rivals': 'Marvel Rivals',
+    'Spider-Man 2': 'Spider-Man',
+    'Marvel\'s Spider-Man 2': 'Spider-Man',
+    'Alan Wake 2': 'Alan Wake',
+    'Alan Wake II': 'Alan Wake',
+    'Atomic Heart': 'Atomic Heart',
+    'Lies of P': 'Lies of P',
+    'Lords of the Fallen': 'Lords of the Fallen',
+    'Remnant 2': 'Remnant',
+    'Remnant II': 'Remnant',
+    'Armored Core VI': 'Armored Core',
+    'Armored Core 6': 'Armored Core',
+    'Robocop: Rogue City': 'Robocop',
+    'Payday 3': 'Payday',
+    'Call of Duty: Modern Warfare III': 'Call of Duty',
+    'Call of Duty: MW3': 'Call of Duty',
+    'COD MW3': 'Call of Duty',
+    'MW3': 'Call of Duty',
+    'Counter-Strike 2': 'CS2',
+    'CS2': 'CS2',
+    'Counter Strike 2': 'CS2',
+    'Deadlock': 'Deadlock',
+    'Halo Infinite': 'Halo',
+    'Warzone 2': 'Call of Duty',
+    'DMZ': 'Call of Duty',
+    'Call of Duty: Black Ops 6': 'Call of Duty',
+    'Black Ops 6': 'Call of Duty',
+    'BO6': 'Call of Duty',
+    
+    // === ДОПОЛНИТЕЛЬНЫЕ ВАРИАЦИИ ПОПУЛЯРНЫХ ИГР ===
+    'GTA 5': 'GTA V',
+    'GTA V': 'GTA V',
+    'GTA Online': 'GTA V',
+    'CS GO': 'CS:GO',
+    'CSGO': 'CS:GO',
+    'Counter Strike GO': 'CS:GO',
+    'LoL': 'League of Legends',
+    'League': 'League of Legends',
+    'Dota': 'Dota 2',
+    'WoW': 'World of Warcraft',
+    'EFT': 'Escape from Tarkov',
+    'Tarkov': 'Escape from Tarkov',
+    'PUBG': 'PUBG: BATTLEGROUNDS',
+    'PUBG Battlegrounds': 'PUBG: BATTLEGROUNDS',
+    'Valorant': 'VALORANT',  // Добавляем вариант без капса
+    'Val': 'VALORANT',
+    'Apex': 'Apex Legends',
+    'OW2': 'Overwatch 2',
+    'Overwatch': 'Overwatch 2',
+    'R6': 'Rainbow Six Siege',
+    'R6 Siege': 'Rainbow Six Siege',
+    'Siege': 'Rainbow Six Siege',
+    'DBD': 'Dead by Daylight',
+    'BG3': 'Baldur\'s Gate 3',
+    'Baldurs Gate 3': 'Baldur\'s Gate 3',
+    'Baldurs Gate': 'Baldur\'s Gate 3',
+    'POE': 'Path of Exile',
+    'PoE': 'Path of Exile',
+    'FF14': 'Final Fantasy XIV',
+    'FFXIV': 'Final Fantasy XIV',
+    'FF 14': 'Final Fantasy XIV',
+    'RDR2': 'Red Dead Redemption 2',
+    'RDR 2': 'Red Dead Redemption 2',
+    'Red Dead 2': 'Red Dead Redemption 2',
+    'Sims 4': 'The Sims 4',
+    'TS4': 'The Sims 4',
+    'ETS2': 'Euro Truck Simulator 2',
+    'ATS': 'American Truck Simulator',
+    'MSFS': 'Microsoft Flight Simulator',
+    'FS': 'Microsoft Flight Simulator',
+    'Flight Sim': 'Microsoft Flight Simulator',
+    'ARK': 'ARK: Survival Evolved',
+    'Ark Survival': 'ARK: Survival Evolved',
+    'Cities Skylines': 'Cities: Skylines',
+    'CS Skylines': 'Cities: Skylines',
+    'FNAF': 'Five Nights at Freddy\'s',
+    'Five Nights at Freddys': 'Five Nights at Freddy\'s',
+    'OSRS': 'Old School RuneScape',
+    'RS': 'Old School RuneScape',
+    'RuneScape': 'Old School RuneScape',
+    'WoT': 'World of Tanks',
+    'SC2': 'StarCraft II',
+    'Starcraft 2': 'StarCraft II',
+    'HS': 'Hearthstone',
+    'AoE4': 'Age of Empires IV',
+    'Age of Empires 4': 'Age of Empires IV',
+    'Civ 6': 'Civilization VI',
+    'Civilization 6': 'Civilization VI',
+    'BDO': 'Black Desert Online'
 };
 
 /**
@@ -244,7 +411,10 @@ export function findMappedCategory(categoryName, fromPlatform, targetCategories)
         return null;
     }
 
-    // Ищем точное совпадение по имени
+    // Нормализуем входное название для лучшего поиска
+    const normalizedInput = normalizeCategoryName(categoryName);
+
+    // 1. Ищем точное совпадение по оригинальному имени
     let exactMatch = targetCategories.find(cat => 
         cat.name && cat.name.toLowerCase() === categoryName.toLowerCase()
     );
@@ -253,7 +423,16 @@ export function findMappedCategory(categoryName, fromPlatform, targetCategories)
         return exactMatch;
     }
 
-    // Ищем через маппинг
+    // 2. Ищем точное совпадение по нормализованному имени
+    let normalizedMatch = targetCategories.find(cat => 
+        cat.name && normalizeCategoryName(cat.name) === normalizedInput
+    );
+    
+    if (normalizedMatch) {
+        return normalizedMatch;
+    }
+
+    // 3. Ищем через маппинг (оригинальное название)
     const mappedName = categoryMapping[categoryName];
     if (mappedName) {
         const mappedCategory = targetCategories.find(cat => 
@@ -261,6 +440,22 @@ export function findMappedCategory(categoryName, fromPlatform, targetCategories)
         );
         if (mappedCategory) {
             return mappedCategory;
+        }
+    }
+
+    // 4. Ищем через маппинг (нормализованное название)
+    // Проверяем все ключи маппинга на совпадение с нормализованным вводом
+    for (const [key, value] of Object.entries(categoryMapping)) {
+        if (normalizeCategoryName(key) === normalizedInput) {
+            const mappedCategory = targetCategories.find(cat => 
+                cat.name && (
+                    cat.name.toLowerCase() === value.toLowerCase() ||
+                    normalizeCategoryName(cat.name) === normalizeCategoryName(value)
+                )
+            );
+            if (mappedCategory) {
+                return mappedCategory;
+            }
         }
     }
 
