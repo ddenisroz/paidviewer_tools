@@ -182,6 +182,39 @@ async def save_chatbox_settings(
     )
     
     logger.info(f"📦 [CHATBOX] Settings saved for user {user_id}")
+    
+    # 🔄 Отправляем WebSocket событие для обновления ChatOverlay в реальном времени
+    from services.memory_websocket_manager import get_connection_manager
+    connection_manager = get_connection_manager()
+    
+    settings_update_event = {
+        "type": "chatbox_settings_updated",
+        "data": {
+            "font_family": settings.font_family,
+            "font_size": settings.font_size,
+            "font_weight": settings.font_weight,
+            "background_color": settings.background_color,
+            "background_opacity": settings.background_opacity,
+            "max_messages": settings.max_messages,
+            "show_platform_icons": settings.show_platform_icons,
+            "show_roles": settings.show_roles,
+            "show_badges": settings.show_badges,
+            "show_avatars": settings.show_avatars,
+            "text_color": settings.text_color,
+            "text_stroke_width": settings.text_stroke_width,
+            "text_stroke_color": settings.text_stroke_color,
+            "username_color": settings.username_color,
+            "message_spacing": settings.message_spacing,
+            "border_radius": settings.border_radius,
+            "animation_duration": settings.animation_duration,
+            "animation_type": settings.animation_type,
+            "chat_direction": settings.chat_direction
+        }
+    }
+    
+    await connection_manager.send_to_user(user_id, settings_update_event)
+    logger.info(f"🔄 [CHATBOX] Sent settings update event to user {user_id} WebSocket connections")
+    
     return response
 
 

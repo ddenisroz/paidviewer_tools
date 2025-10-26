@@ -94,9 +94,17 @@ const ChatOverlay = () => {
         }
         
         loadSettings();
+        
+        // 🔄 Fallback: Периодическая проверка настроек (каждые 30 секунд)
+        // На случай если WebSocket событие потерялось
+        const pollInterval = setInterval(() => {
+            loadSettings(true); // isPolling = true
+        }, 30000); // 30 секунд
+        
+        return () => clearInterval(pollInterval);
     }, [token]);
     
-    const loadSettings = async () => {
+    const loadSettings = async (isPolling = false) => {
         try {
             const response = await botService.get(`/api/chatbox/settings/by-token/${token}`);
             
@@ -113,22 +121,30 @@ const ChatOverlay = () => {
                 chat_direction: response.data.chat_direction || 'vertical'  // Нормализуем chat_direction
             };
             
-            console.log(`✅ [SETTINGS] Animation: ${normalizedSettings.animation_type} (${normalizedSettings.animation_duration}ms)`);
-            console.log(`✅ [SETTINGS] Chat direction: ${normalizedSettings.chat_direction}`);
+            // Логи только при первой загрузке (не при polling)
+            if (!isPolling) {
+                console.log(`✅ [SETTINGS] Animation: ${normalizedSettings.animation_type} (${normalizedSettings.animation_duration}ms)`);
+                console.log(`✅ [SETTINGS] Chat direction: ${normalizedSettings.chat_direction}`);
+            }
             
             setSettings(normalizedSettings);
             
-            // Загружаем Twitch badges
-            await twitchBadgesService.loadGlobalBadges();
-            
-            // Подключаемся к WebSocket после загрузки настроек
-            connectWebSocket(normalizedSettings.user_id);
+            // Загружаем Twitch badges только при первой загрузке
+            if (!isPolling) {
+                await twitchBadgesService.loadGlobalBadges();
+                // Подключаемся к WebSocket после загрузки настроек
+                connectWebSocket(normalizedSettings.user_id);
+            }
         } catch (error) {
             console.error('❌ Error loading ChatBox settings:', error);
             console.error('Full error:', error.response?.data || error.message);
-            setError(`Ошибка загрузки настроек: ${error.response?.data?.detail || error.message}`);
+            if (!isPolling) {
+                setError(`Ошибка загрузки настроек: ${error.response?.data?.detail || error.message}`);
+            }
         } finally {
-            setLoading(false);
+            if (!isPolling) {
+                setLoading(false);
+            }
         }
     };
     
@@ -160,6 +176,25 @@ const ChatOverlay = () => {
         ws.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
+                
+                // 🔄 Обработка обновления настроек ChatBox
+                if (data.type === 'chatbox_settings_updated') {
+                    console.log('🔄 [CHATBOX] Received settings update event, reloading...');
+                    setSettings(prevSettings => ({
+                        ...prevSettings,
+                        ...data.data,
+                        // Нормализуем числовые значения
+                        font_size: parseInt(data.data.font_size) || prevSettings?.font_size || 16,
+                        text_stroke_width: parseInt(data.data.text_stroke_width) || prevSettings?.text_stroke_width || 0,
+                        background_opacity: parseFloat(data.data.background_opacity) ?? prevSettings?.background_opacity ?? 0.5,
+                        max_messages: parseInt(data.data.max_messages) || prevSettings?.max_messages || 20,
+                        message_spacing: parseInt(data.data.message_spacing) || prevSettings?.message_spacing || 4,
+                        animation_duration: parseInt(data.data.animation_duration) || prevSettings?.animation_duration || 300,
+                        border_radius: parseInt(data.data.border_radius) || prevSettings?.border_radius || 8
+                    }));
+                    console.log('✅ [CHATBOX] Settings updated in real-time!');
+                    return;
+                }
                 
                 if (data.type === 'message' || data.type === 'chat_message') {
                     // Проверяем в ref СРАЗУ (защита от race condition при множественных WebSocket)
