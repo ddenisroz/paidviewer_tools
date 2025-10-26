@@ -96,9 +96,8 @@ async def validate_platform_token(token) -> bool:
             # Пытаемся автоматически обновить токен
             if token.platform == 'twitch':
                 from api.twitch_api import TwitchAPI
-                from services.memory_websocket_manager import get_connection_manager
-                connection_manager = get_connection_manager()
-                twitch_api = TwitchAPI(connection_manager)
+                from services.memory_websocket_manager import memory_websocket_manager
+                twitch_api = TwitchAPI(memory_websocket_manager)
                 refresh_success = await twitch_api._refresh_user_token(token.user_id)
                 
                 if refresh_success:
@@ -151,9 +150,8 @@ async def validate_platform_token(token) -> bool:
                         
                         # Пытаемся обновить токен через refresh_token
                         from api.twitch_api import TwitchAPI
-                        from services.memory_websocket_manager import get_connection_manager
-                        connection_manager = get_connection_manager()
-                        twitch_api = TwitchAPI(connection_manager)
+                        from services.memory_websocket_manager import memory_websocket_manager
+                        twitch_api = TwitchAPI(memory_websocket_manager)
                         refresh_success = await twitch_api._refresh_user_token(token.user_id)
                         
                         if refresh_success:

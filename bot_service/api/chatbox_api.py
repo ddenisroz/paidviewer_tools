@@ -184,8 +184,7 @@ async def save_chatbox_settings(
     logger.info(f"📦 [CHATBOX] Settings saved for user {user_id}")
     
     # 🔄 Отправляем WebSocket событие для обновления ChatOverlay в реальном времени
-    from services.memory_websocket_manager import get_connection_manager
-    connection_manager = get_connection_manager()
+    from services.memory_websocket_manager import memory_websocket_manager
     
     settings_update_event = {
         "type": "chatbox_settings_updated",
@@ -212,7 +211,7 @@ async def save_chatbox_settings(
         }
     }
     
-    await connection_manager.send_to_user(user_id, settings_update_event)
+    await memory_websocket_manager.send_to_user(user_id, settings_update_event)
     logger.info(f"🔄 [CHATBOX] Sent settings update event to user {user_id} WebSocket connections")
     
     return response
