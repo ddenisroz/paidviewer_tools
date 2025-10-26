@@ -40,12 +40,20 @@ export const categoryMapping = {
     'Just Chatting': 'Говорим и смотрим',
     'Talk Shows & Podcasts': 'Говорим и смотрим',
     'Podcasts & Talk Shows': 'Говорим и смотрим',
+    'Podcasting': 'Говорим и смотрим',
+    'Podcast': 'Говорим и смотрим',
     'Chatting': 'Говорим и смотрим',
     'Chat': 'Говорим и смотрим',
     'Talking': 'Говорим и смотрим',
     'IRL': 'Говорим и смотрим',  // In Real Life
     'Real Life': 'Говорим и смотрим',
     'Variety': 'Говорим и смотрим',
+    'Variety Shows': 'Говорим и смотрим',
+    'Reaction Content': 'Говорим и смотрим',
+    'Reactions': 'Говорим и смотрим',
+    'VTuber': 'Говорим и смотрим',
+    'VTubers': 'Говорим и смотрим',
+    'Virtual YouTuber': 'Говорим и смотрим',
     
     // Музыка
     'Music': 'Музыка',
@@ -76,6 +84,10 @@ export const categoryMapping = {
     'Video Games': 'Игры',
     'Retro': 'Игры',
     'Retro Gaming': 'Игры',
+    'Games + Demos': 'Игры',
+    'Game Demos': 'Игры',
+    'Gaming Demos': 'Игры',
+    'Demos': 'Игры',
     
     // Спорт
     'Sports': 'Спорт',
@@ -102,11 +114,18 @@ export const categoryMapping = {
     'Science': 'Технологии',
     'Software and Game Development': 'Технологии',
     'Software Development': 'Технологии',
+    'Web Development': 'Технологии',
+    'Mobile Development': 'Технологии',
     'Programming': 'Технологии',
     'Coding': 'Технологии',
     'Development': 'Технологии',
     'IT': 'Технологии',
     'Computers': 'Технологии',
+    'Blockchain': 'Технологии',
+    'Crypto': 'Технологии',
+    'Cryptocurrency': 'Технологии',
+    'NFT': 'Технологии',
+    'Web3': 'Технологии',
     
     // Кулинария
     'Food & Drink': 'Кулинария',
@@ -135,12 +154,17 @@ export const categoryMapping = {
     'Blackjack': 'Азартные игры',
     'Roulette': 'Азартные игры',
     'Gambling': 'Азартные игры',
+    'Virtual Casino': 'Азартные игры',
+    'Crypto Casino': 'Азартные игры',
     
     // События / Мероприятия
     'Special Events': 'Мероприятия',
     'Events': 'Мероприятия',
     'Conventions': 'Мероприятия',
     'Conferences': 'Мероприятия',
+    'Charity Streams': 'Мероприятия',
+    'Charity': 'Мероприятия',
+    'Fundraising': 'Мероприятия',
     
     // === ДОПОЛНИТЕЛЬНЫЕ КАТЕГОРИИ (Twitch → VK) ===
     // Животные
@@ -200,6 +224,9 @@ export const categoryMapping = {
     'Always On': 'Круглосуточно',
     '24/7': 'Круглосуточно',
     'Marathon': 'Круглосуточно',
+    'I\'m Only Sleeping': 'Круглосуточно',  // Спящий стрим
+    'Sleeping': 'Круглосуточно',
+    'Sleep Stream': 'Круглосуточно',
     
     // === ИГРОВЫЕ ЖАНРЫ (Twitch → VK, если есть отдельные категории) ===
     'RPG': 'RPG',
@@ -227,8 +254,15 @@ export const categoryMapping = {
     'Puzzle Games': 'Головоломки',
     'Rhythm Games': 'Ритм-игры',
     'Rhythm': 'Ритм-игры',
+    'Just Dance': 'Ритм-игры',
+    'Dance Central': 'Ритм-игры',
+    'Guitar Hero': 'Ритм-игры',
+    'Rock Band': 'Ритм-игры',
     'Indie Games': 'Инди',
     'Indie': 'Инди',
+    'Roleplay': 'Говорим и смотрим',  // На VK нет отдельной категории RP
+    'RP': 'Говорим и смотрим',
+    'Role-Playing': 'Говорим и смотрим',
     
     // === ОБРАТНЫЙ МАППИНГ (VK → Twitch) ===
     // Основные категории VK → Twitch
@@ -364,8 +398,26 @@ export const categoryMapping = {
     'Fall Guys': 'Fall Guys',
     'Rocket League': 'Rocket League',
     'FIFA 23': 'FIFA',
+    'FIFA 24': 'FIFA',
+    'FIFA': 'FIFA',
     'FC 24': 'FC 24',
+    'FC 25': 'FC 24',
+    'EA Sports FC': 'FC 24',
     'NBA 2K': 'NBA 2K',
+    'NBA 2K24': 'NBA 2K',
+    'NBA 2K25': 'NBA 2K',
+    'Madden NFL': 'Madden NFL',
+    'Madden': 'Madden NFL',
+    'Forza Horizon': 'Forza Horizon',
+    'Forza Horizon 5': 'Forza Horizon',
+    'Forza Motorsport': 'Forza',
+    'Need for Speed': 'Need for Speed',
+    'NFS': 'Need for Speed',
+    'Assetto Corsa': 'Assetto Corsa',
+    'Gran Turismo': 'Gran Turismo',
+    'F1': 'F1',
+    'F1 2024': 'F1',
+    'Formula 1': 'F1',
     'Cyberpunk 2077': 'Cyberpunk 2077',
     'Elden Ring': 'Elden Ring',
     'Hogwarts Legacy': 'Hogwarts Legacy',
