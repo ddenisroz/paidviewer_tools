@@ -36,60 +36,170 @@ function normalizeCategoryName(name) {
 
 export const categoryMapping = {
     // === ОСНОВНЫЕ КАТЕГОРИИ (Twitch → VK) ===
+    // Общение / Just Chatting
     'Just Chatting': 'Говорим и смотрим',
     'Talk Shows & Podcasts': 'Говорим и смотрим',
     'Podcasts & Talk Shows': 'Говорим и смотрим',
+    'Chatting': 'Говорим и смотрим',
+    'Chat': 'Говорим и смотрим',
+    'Talking': 'Говорим и смотрим',
+    'IRL': 'Говорим и смотрим',  // In Real Life
+    'Real Life': 'Говорим и смотрим',
+    'Variety': 'Говорим и смотрим',
+    
+    // Музыка
     'Music': 'Музыка',
+    'Music & Performing Arts': 'Музыка',
+    'Performing Arts': 'Музыка',
+    'DJ': 'Музыка',
+    'Music Production': 'Музыка',
+    'Karaoke': 'Караоке',
+    'Караоке': 'Караоке',
+    
+    // Творчество / Искусство
     'Creative': 'Творчество',
     'Art': 'Творчество',
     'Makers & Crafting': 'Творчество',
     'Digital Art': 'Творчество',
+    'Drawing & Painting': 'Творчество',
+    'Drawing': 'Творчество',
+    'Painting': 'Творчество',
+    'Crafts & DIY': 'Творчество',
+    'DIY': 'Творчество',
+    'Photography': 'Творчество',
+    'Handmade': 'Творчество',
+    
+    // Игры
     'Gaming': 'Игры',
     'Games': 'Игры',
+    'Game': 'Игры',
+    'Video Games': 'Игры',
     'Retro': 'Игры',
-    'IRL': 'Говорим и смотрим',  // In Real Life → на VK ближайшая "Говорим и смотрим" (Just Chatting аналог)
-    'Real Life': 'Говорим и смотрим',
-    'Sports': 'Спорт',
-    'Travel & Outdoors': 'Путешествия',
-    'Science & Technology': 'Технологии',
-    'Software and Game Development': 'Технологии',
-    'Software Development': 'Технологии',
-    'Food & Drink': 'Кулинария',
-    'Cooking': 'Кулинария',
-    'ASMR': 'АСМР',
-    'Chess': 'Интеллектуальные игры',
-    'Slots': 'Азартные игры',
-    'Casino': 'Азартные игры',
-    'Poker': 'Азартные игры',
-    'Blackjack': 'Азартные игры',
-    'Roulette': 'Азартные игры',
-    'Special Events': 'Мероприятия',
-    'Events': 'Мероприятия',
+    'Retro Gaming': 'Игры',
     
-    // === ДОПОЛНИТЕЛЬНЫЕ КАТЕГОРИИ (Twitch → VK) ===
-    'Animals, Aquariums, and Zoos': 'Животные',
-    'Animals': 'Животные',
-    'Pets & Animals': 'Животные',
-    'Anime': 'Аниме',
-    'Beauty & Makeup': 'Красота',
+    // Спорт
+    'Sports': 'Спорт',
+    'Sport': 'Спорт',
     'Fitness & Health': 'Спорт',
     'Fitness': 'Спорт',
     'Health & Fitness': 'Спорт',
     'Yoga': 'Спорт',
     'Workout': 'Спорт',
-    'Pools, Hot Tubs, and Beaches': 'IRL',
-    'Politics': 'Общественное',
-    'News': 'Новости',
-    'Esports': 'Киберспорт',
-    'Educational': 'Обучение',
-    'Education': 'Обучение',
-    'Always On': 'Круглосуточно',
-    '24/7': 'Круглосуточно',
-    'Tabletop RPGs': 'Настольные игры',
+    'Training': 'Спорт',
+    'Gym': 'Спорт',
+    
+    // Путешествия
+    'Travel & Outdoors': 'Путешествия',
+    'Travel': 'Путешествия',
+    'Outdoors': 'Путешествия',
+    'Nature': 'Путешествия',
+    'Hiking': 'Путешествия',
+    
+    // Технологии / Наука
+    'Science & Technology': 'Технологии',
+    'Technology': 'Технологии',
+    'Tech': 'Технологии',
+    'Science': 'Технологии',
+    'Software and Game Development': 'Технологии',
+    'Software Development': 'Технологии',
+    'Programming': 'Технологии',
+    'Coding': 'Технологии',
+    'Development': 'Технологии',
+    'IT': 'Технологии',
+    'Computers': 'Технологии',
+    
+    // Кулинария
+    'Food & Drink': 'Кулинария',
+    'Cooking': 'Кулинария',
+    'Food': 'Кулинария',
+    'Baking': 'Кулинария',
+    'Recipes': 'Кулинария',
+    
+    // ASMR
+    'ASMR': 'АСМР',
+    'Relaxation': 'АСМР',
+    
+    // Интеллектуальные игры
+    'Chess': 'Интеллектуальные игры',
     'Board Games': 'Настольные игры',
+    'Tabletop Games': 'Настольные игры',
+    'Tabletop RPGs': 'Настольные игры',
     'Card Games': 'Настольные игры',
     'Magic: The Gathering': 'Настольные игры',
     'Yu-Gi-Oh!': 'Настольные игры',
+    
+    // Азартные игры
+    'Slots': 'Азартные игры',
+    'Casino': 'Азартные игры',
+    'Poker': 'Азартные игры',
+    'Blackjack': 'Азартные игры',
+    'Roulette': 'Азартные игры',
+    'Gambling': 'Азартные игры',
+    
+    // События / Мероприятия
+    'Special Events': 'Мероприятия',
+    'Events': 'Мероприятия',
+    'Conventions': 'Мероприятия',
+    'Conferences': 'Мероприятия',
+    
+    // === ДОПОЛНИТЕЛЬНЫЕ КАТЕГОРИИ (Twitch → VK) ===
+    // Животные
+    'Animals, Aquariums, and Zoos': 'Животные',
+    'Animals': 'Животные',
+    'Pets & Animals': 'Животные',
+    'Pets': 'Животные',
+    'Wildlife': 'Животные',
+    'Aquariums': 'Животные',
+    'Zoos': 'Животные',
+    
+    // Аниме
+    'Anime': 'Аниме',
+    'Manga': 'Аниме',
+    'Japanese Animation': 'Аниме',
+    
+    // Красота
+    'Beauty & Makeup': 'Красота',
+    'Beauty': 'Красота',
+    'Makeup': 'Красота',
+    'Fashion': 'Красота',
+    'Style': 'Красота',
+    'Hair & Beauty': 'Красота',
+    
+    // Бассейны / IRL
+    'Pools, Hot Tubs, and Beaches': 'Говорим и смотрим',  // На VK это скорее Just Chatting категория
+    'Hot Tubs': 'Говорим и смотрим',
+    'Beaches': 'Путешествия',
+    
+    // Общественное / Политика
+    'Politics': 'Общественное',
+    'Social': 'Общественное',
+    'Current Events': 'Общественное',
+    'Discussion': 'Общественное',
+    
+    // Новости
+    'News': 'Новости',
+    'News & Politics': 'Новости',
+    
+    // Киберспорт
+    'Esports': 'Киберспорт',
+    'E-sports': 'Киберспорт',
+    'Competitive Gaming': 'Киберспорт',
+    'Pro Gaming': 'Киберспорт',
+    'Tournaments': 'Киберспорт',
+    
+    // Обучение
+    'Educational': 'Обучение',
+    'Education': 'Обучение',
+    'Learning': 'Обучение',
+    'Tutorial': 'Обучение',
+    'Tutorials': 'Обучение',
+    'Teaching': 'Обучение',
+    'Study': 'Обучение',
+    
+    // Круглосуточно
+    'Always On': 'Круглосуточно',
+    '24/7': 'Круглосуточно',
+    'Marathon': 'Круглосуточно',
     
     // === ИГРОВЫЕ ЖАНРЫ (Twitch → VK, если есть отдельные категории) ===
     'RPG': 'RPG',
@@ -121,30 +231,93 @@ export const categoryMapping = {
     'Indie': 'Инди',
     
     // === ОБРАТНЫЙ МАППИНГ (VK → Twitch) ===
+    // Основные категории VK → Twitch
     'Говорим и смотрим': 'Just Chatting',
+    'Общение': 'Just Chatting',
+    'Разговоры': 'Just Chatting',
+    'Чат': 'Just Chatting',
+    
     'Музыка': 'Music',
+    'Пение': 'Music',
+    'Вокал': 'Music',
+    
     'Творчество': 'Art',
+    'Искусство': 'Art',
+    'Рисование': 'Art',
+    'Живопись': 'Art',
+    'Ручная работа': 'Art',
+    
     'Игры': 'Gaming',
-    // 'IRL' убран - нет прямого аналога на VK
+    'Видеоигры': 'Gaming',
+    'Геймплей': 'Gaming',
+    
     'Спорт': 'Sports',
+    'Фитнес': 'Fitness & Health',
+    'Тренировки': 'Fitness & Health',
+    'Йога': 'Yoga',
+    
     'Путешествия': 'Travel & Outdoors',
+    'Туризм': 'Travel & Outdoors',
+    'Природа': 'Travel & Outdoors',
+    
     'Технологии': 'Science & Technology',
+    'Наука': 'Science & Technology',
+    'IT': 'Science & Technology',
+    'Программирование': 'Software Development',
+    'Разработка': 'Software Development',
+    
     'Кулинария': 'Food & Drink',
+    'Готовка': 'Cooking',
+    'Еда': 'Food & Drink',
+    'Выпечка': 'Food & Drink',
+    
     'АСМР': 'ASMR',
+    
     'Интеллектуальные игры': 'Chess',
+    'Шахматы': 'Chess',
+    
     'Азартные игры': 'Slots',
+    'Казино': 'Casino',
+    'Покер': 'Poker',
+    
     'Мероприятия': 'Special Events',
+    'События': 'Special Events',
+    'Конференции': 'Special Events',
+    
     'Животные': 'Animals, Aquariums, and Zoos',
+    'Питомцы': 'Pets & Animals',
+    'Дикая природа': 'Animals',
+    
     'Аниме': 'Anime',
+    'Манга': 'Anime',
+    
     'Красота': 'Beauty & Makeup',
+    'Макияж': 'Beauty & Makeup',
+    'Мода': 'Beauty & Makeup',
+    'Стиль': 'Beauty & Makeup',
+    
     'Общественное': 'Politics',
+    'Политика': 'Politics',
+    'Дискуссия': 'Politics',
+    
     'Новости': 'News',
+    
     'Киберспорт': 'Esports',
+    'Турниры': 'Esports',
+    
     'Обучение': 'Educational',
+    'Образование': 'Educational',
+    'Уроки': 'Educational',
+    'Учеба': 'Educational',
+    
     'Круглосуточно': 'Always On',
-    'Реальная жизнь': 'IRL',  // VK → Twitch (если на VK есть такая категория)
+    'Марафон': 'Always On',
+    
+    'Реальная жизнь': 'IRL',
+    'IRL': 'IRL',
 
-    'Настольные игры': 'Tabletop RPGs',
+    // Жанры игр VK → Twitch
+    'Настольные игры': 'Board Games',
     'Стратегии': 'Strategy Games',
     'Симуляторы': 'Simulation',
     'Гонки': 'Racing',
@@ -154,12 +327,16 @@ export const categoryMapping = {
     'MOBA': 'MOBA',
     'MMORPG': 'MMORPG',
     'Хоррор': 'Horror',
+    'Ужасы': 'Horror',
     'Экшн': 'Action',
+    'Экшен': 'Action',
     'Приключения': 'Adventure',
     'Платформеры': 'Platformer',
     'Головоломки': 'Puzzle',
+    'Пазлы': 'Puzzle',
     'Ритм-игры': 'Rhythm Games',
     'Инди': 'Indie Games',
+    'Инди-игры': 'Indie Games',
     
     // === СПЕЦИФИЧНЫЕ КАТЕГОРИИ (если названия отличаются) ===
     // Twitch использует полные названия, VK может использовать сокращенные
@@ -257,12 +434,10 @@ export const categoryMapping = {
     'Goose Goose Duck': 'Goose Goose Duck',
     'Gartic Phone': 'Gartic Phone',
     'Jackbox Party Packs': 'Jackbox',
-    'Music Production': 'Музыка',
-    'DJ': 'Музыка',
-    'Karaoke': 'Караоке',
     'Meditation': 'Медитация',
     'Wellness': 'Здоровье',
     'Mental Health': 'Психология',
+    'Psychology': 'Психология',
     
     // === СОВРЕМЕННЫЕ ИГРЫ 2024-2025 ===
     'The First Descendant': 'The First Descendant',
