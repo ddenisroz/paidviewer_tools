@@ -91,10 +91,46 @@ async def validate_platform_token(token) -> bool:
         
         # Проверяем истек ли токен по времени
         if token.expires_at and token.expires_at < datetime.utcnow():
-            logger.warning(f"Token for {token.platform} expired at {token.expires_at}")
-            is_valid = False
-            token_validation_cache.set(token.user_id, token.platform, is_valid)
-            return is_valid
+            logger.warning(f"Token for {token.platform} expired at {token.expires_at}, attempting auto-refresh...")
+            
+            # Пытаемся автоматически обновить токен
+            if token.platform == 'twitch':
+                from api.twitch_api import TwitchAPI
+                from services.memory_websocket_manager import get_connection_manager
+                connection_manager = get_connection_manager()
+                twitch_api = TwitchAPI(connection_manager)
+                refresh_success = await twitch_api._refresh_user_token(token.user_id)
+                
+                if refresh_success:
+                    logger.info(f"✅ {token.platform.upper()} token auto-refreshed (expired)")
+                    # Инвалидируем кеш и возвращаем True
+                    token_validation_cache.invalidate(token.user_id, token.platform)
+                    return True
+                else:
+                    logger.error(f"❌ Failed to auto-refresh expired {token.platform} token")
+                    is_valid = False
+                    token_validation_cache.set(token.user_id, token.platform, is_valid)
+                    return is_valid
+                    
+            elif token.platform == 'vk':
+                from api.vk_api import VKLiveAPI
+                vk_api = VKLiveAPI()
+                new_access_token = await vk_api._refresh_user_token(token.user_id)
+                
+                if new_access_token:
+                    logger.info(f"✅ {token.platform.upper()} token auto-refreshed (expired)")
+                    token_validation_cache.invalidate(token.user_id, token.platform)
+                    return True
+                else:
+                    logger.error(f"❌ Failed to auto-refresh expired {token.platform} token")
+                    is_valid = False
+                    token_validation_cache.set(token.user_id, token.platform, is_valid)
+                    return is_valid
+            else:
+                # Для других платформ без refresh - возвращаем False
+                is_valid = False
+                token_validation_cache.set(token.user_id, token.platform, is_valid)
+                return is_valid
         
         # Валидация через API платформы
         is_valid = False
@@ -110,6 +146,24 @@ async def validate_platform_token(token) -> bool:
                     if response.status_code == 200:
                         logger.info(f"✅ Twitch token valid for user {token.user_id}")
                         is_valid = True
+                    elif response.status_code == 401:
+                        logger.warning(f"⚠️ Twitch token expired or invalid, attempting refresh...")
+                        
+                        # Пытаемся обновить токен через refresh_token
+                        from api.twitch_api import TwitchAPI
+                        from services.memory_websocket_manager import get_connection_manager
+                        connection_manager = get_connection_manager()
+                        twitch_api = TwitchAPI(connection_manager)
+                        refresh_success = await twitch_api._refresh_user_token(token.user_id)
+                        
+                        if refresh_success:
+                            logger.info("✅ Twitch token successfully auto-refreshed!")
+                            is_valid = True
+                            # Инвалидируем кеш чтобы при следующей проверке взять свежий токен
+                            token_validation_cache.invalidate(token.user_id, 'twitch')
+                        else:
+                            logger.error("❌ Failed to refresh Twitch token")
+                            is_valid = False
                     else:
                         response_text = await response.text()
                         logger.warning(f"⚠️ Twitch token validation failed: status={response.status_code}, response={response_text}")

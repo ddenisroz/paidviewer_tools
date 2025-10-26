@@ -1046,7 +1046,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                                 }`}
                                 title={twitchChatVisible ? 'Выключить TTS и скрыть сообщения Twitch' : 'Включить TTS и показать сообщения Twitch'}
                             >
-                                <TwitchIcon className="h-3 w-3 mr-1" />
+                                <TwitchIcon className="h-4 w-4 mr-1" />
                                 {twitchChatVisible ? 'ВКЛ' : 'ВЫКЛ'}
                             </Button>
                         )}
@@ -1062,7 +1062,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                                 }`}
                                 title={vkChatVisible ? 'Выключить TTS и скрыть сообщения VK' : 'Включить TTS и показать сообщения VK'}
                             >
-                                <VKIcon className="h-3 w-3 mr-1" />
+                                <VKIcon className="h-4 w-4 mr-1" />
                                 {vkChatVisible ? 'ВКЛ' : 'ВЫКЛ'}
                             </Button>
                         )}
@@ -1131,12 +1131,12 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                                                     {msg.platform === 'twitch' ? (
                                                             <TwitchIcon 
                                                                 className="text-purple-400 inline-block align-text-bottom mr-1" 
-                                                                style={{ width: '14px', height: '14px' }}
+                                                                style={{ width: '18px', height: '18px' }}
                                                             />
                                                         ) : (
                                                             <VKIcon 
                                                                 className="text-red-400 inline-block align-text-bottom mr-1" 
-                                                                style={{ width: '14px', height: '14px' }}
+                                                                style={{ width: '18px', height: '18px' }}
                                                             />
                                                         )}
                                                         

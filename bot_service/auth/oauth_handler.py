@@ -234,6 +234,7 @@ class OAuthHandler:
                             existing_token.scopes = user_data.scopes
                             existing_token.avatar_url = user_data.avatar_url
                             existing_token.is_active = True  # Активируем токен при повторной авторизации
+                            logger.info(f"✅ Token updated for platform {platform}")
                         else:
                             # Создаем новый токен
                             session_manager.save_user_tokens(
@@ -246,6 +247,12 @@ class OAuthHandler:
                                 expires_at=user_data.expires_at,
                                 scopes=user_data.scopes
                             )
+                            logger.info(f"✅ New token created for platform {platform}")
+                        
+                        # 🔥 ВАЖНО: Инвалидируем кеш валидации токена после OAuth
+                        from core.token_validation_cache import token_validation_cache
+                        token_validation_cache.invalidate(existing_user.id, platform)
+                        logger.info(f"🗑️ Token validation cache invalidated for user {existing_user.id}, platform {platform}")
                         
                         # Обновляем username
                         if platform == "twitch" and hasattr(user_data, 'username'):
@@ -284,6 +291,10 @@ class OAuthHandler:
                         expires_at=user_data.expires_at,
                         scopes=user_data.scopes
                     )
+                    # 🔥 Инвалидируем кеш после сохранения токена
+                    from core.token_validation_cache import token_validation_cache
+                    token_validation_cache.invalidate(unified_user.id, platform)
+                    logger.info(f"🗑️ Token validation cache invalidated after session creation")
                     
                     # Обновляем username
                     if platform == "twitch" and hasattr(user_data, 'username'):
@@ -349,6 +360,11 @@ class OAuthHandler:
                     unified_user.vk_channel_name = user_data.username
                     # Также сохраняем в vk_username для обратной совместимости
                     unified_user.vk_username = user_data.username
+                
+                # 🔥 ВАЖНО: Инвалидируем кеш валидации токена после сохранения
+                from core.token_validation_cache import token_validation_cache
+                token_validation_cache.invalidate(unified_user.id, platform)
+                logger.info(f"🗑️ Token validation cache invalidated for user {unified_user.id}, platform {platform}")
                 
                 db.commit()
                 logger.info(f"User {unified_user.id} updated with {platform} username: {getattr(unified_user, f'{platform}_username', 'None')}")

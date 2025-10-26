@@ -419,6 +419,10 @@ class TwitchAPI:
                             scopes=tokens.get("scopes", [])
                         )
                         
+                        # 🔥 Инвалидируем кеш после обновления токена
+                        from core.token_validation_cache import token_validation_cache
+                        token_validation_cache.invalidate(user_id, "twitch")
+                        
                         logger.info(f"Twitch token refreshed for user {user_id}")
                         return True
                     else:

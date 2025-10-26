@@ -131,6 +131,11 @@ class SessionManager:
                 scopes=scopes
             )
             
+            # 🔥 Инвалидируем кеш после конвертации гостевой сессии
+            from core.token_validation_cache import token_validation_cache
+            token_validation_cache.invalidate(new_user.id, platform)
+            logger.info(f"🗑️ Token validation cache invalidated for new user {new_user.id}, platform {platform}")
+            
             # Сохраняем username
             if platform == "twitch" and username:
                 new_user.twitch_username = username
