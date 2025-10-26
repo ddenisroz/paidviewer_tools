@@ -128,6 +128,12 @@ async def save_chatbox_settings(
     user_id = current_user["id"]
     settings = db.query(ChatBoxSettings).filter(ChatBoxSettings.user_id == user_id).first()
     
+    logger.info(f"📦 [CHATBOX] 🔍 DEBUG: Existing settings found in DB: {settings is not None}")
+    if settings:
+        logger.info(f"📦 [CHATBOX] 🔍 DEBUG: Current token in DB: {settings.widget_token}")
+    else:
+        logger.info(f"📦 [CHATBOX] 🔍 DEBUG: No existing settings, will create new")
+    
     if not settings:
         # Создаем новые настройки
         logger.info(f"📦 [CHATBOX] Creating new settings for user {user_id}")
@@ -223,7 +229,7 @@ async def get_settings_by_token(
     db: Session = Depends(get_db)
 ):
     """Получить настройки ChatBox по токену (для OBS виджета, без авторизации)"""
-    logger.info(f"📦 [CHATBOX] Getting settings by token: {token[:8]}...")
+    logger.info(f"📦 [CHATBOX] 🔍 REQUEST: Getting settings by token: {token}")
     
     settings = db.query(ChatBoxSettings).filter(ChatBoxSettings.widget_token == token).first()
     

@@ -10,10 +10,52 @@ const ChatOverlay = () => {
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
     
+    // ✅ ВСЕ useState В НАЧАЛЕ!
     const [settings, setSettings] = useState(null);
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [wsStatus, setWsStatus] = useState('connecting'); // 'connecting', 'connected', 'reconnecting', 'error'
+    const [contextMenu, setContextMenu] = useState(null); // {x, y, username, platform}
+    const [channelName, setChannelName] = useState(null); // Имя канала для API запросов
+    const [lastAddedMessageId, setLastAddedMessageId] = useState(null); // ID последнего добавленного сообщения для анимации
     
+    // ✅ ВСЕ useRef ПОСЛЕ useState!
+    const wsRef = useRef(null);
+    const messagesEndRef = useRef(null);
+    const processedMessageIds = useRef(new Set()); // Для защиты от race condition
+    const reconnectAttempts = useRef(0); // Счетчик попыток переподключения
+    const reconnectTimeout = useRef(null); // Таймер переподключения
+    
+    // ✅ useMemo ПОСЛЕ useState и useRef!
+    // 🎨 Применяем настройки к контейнеру (useMemo для пересчета при изменении settings)
+    const containerStyle = useMemo(() => {
+        if (!settings) return {};
+        
+        console.log('🎨 [STYLES] Recalculating containerStyle with font_family:', settings?.font_family);
+        
+        return {
+            width: '100vw',
+            height: '100vh',
+            padding: '16px',
+            fontFamily: settings?.font_family || 'Inter, sans-serif',
+            fontSize: `${settings?.font_size || 16}px`,
+            fontWeight: settings?.font_weight || 'normal',
+            color: settings?.text_color || '#FFFFFF',
+            // Прозрачность фона через rgba (можно полностью убрать фон)
+            backgroundColor: (() => {
+                const hex = settings?.background_color || '#000000';
+                const opacity = settings?.background_opacity ?? 0.8;
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+            })(),
+            overflow: 'hidden' // Скрываем скролл контейнера, чтобы работал внутренний
+        };
+    }, [settings?.font_family, settings?.font_size, settings?.font_weight, settings?.text_color, settings?.background_color, settings?.background_opacity]);
+    
+    // ✅ ВСЕ useEffect ПОСЛЕ useMemo!
     // CSS для горизонтального скролла
     useEffect(() => {
         const style = document.createElement('style');
@@ -40,16 +82,51 @@ const ChatOverlay = () => {
         document.head.appendChild(style);
         return () => document.head.removeChild(style);
     }, []);
-    const [error, setError] = useState(null);
-    const [wsStatus, setWsStatus] = useState('connecting'); // 'connecting', 'connected', 'reconnecting', 'error'
-    const [contextMenu, setContextMenu] = useState(null); // {x, y, username, platform}
-    const [channelName, setChannelName] = useState(null); // Имя канала для API запросов
-    const [lastAddedMessageId, setLastAddedMessageId] = useState(null); // ID последнего добавленного сообщения для анимации
-    const wsRef = useRef(null);
-    const messagesEndRef = useRef(null);
-    const processedMessageIds = useRef(new Set()); // Для защиты от race condition
-    const reconnectAttempts = useRef(0); // Счетчик попыток переподключения
-    const reconnectTimeout = useRef(null); // Таймер переподключения
+    
+    // 🔤 Динамическая загрузка Google Fonts
+    useEffect(() => {
+        if (!settings?.font_family) return;
+        
+        // Список стандартных системных шрифтов (не требуют загрузки)
+        const systemFonts = [
+            'Arial', 'Helvetica', 'Times New Roman', 'Times', 'Courier New', 'Courier',
+            'Verdana', 'Georgia', 'Palatino', 'Garamond', 'Comic Sans MS', 'Trebuchet MS',
+            'Arial Black', 'Impact', 'Inter', 'sans-serif', 'serif', 'monospace'
+        ];
+        
+        const fontFamily = settings.font_family;
+        const isSystemFont = systemFonts.some(sf => fontFamily.includes(sf));
+        
+        if (isSystemFont) {
+            console.log(`🔤 [FONT] Using system font: ${fontFamily}`);
+            return;
+        }
+        
+        // Проверяем, не загружен ли уже этот шрифт
+        const existingLink = document.querySelector(`link[href*="${fontFamily.replace(/\s+/g, '+')}"]`);
+        if (existingLink) {
+            console.log(`🔤 [FONT] Font already loaded: ${fontFamily}`);
+            return;
+        }
+        
+        // Загружаем Google Font
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = `https://fonts.googleapis.com/css2?family=${fontFamily.replace(/\s+/g, '+')}:wght@400;500;600;700&display=swap`;
+        
+        console.log(`🔤 [FONT] Loading Google Font: ${fontFamily}`);
+        console.log(`🔗 [FONT] URL: ${link.href}`);
+        
+        document.head.appendChild(link);
+        
+        // Cleanup при размонтировании компонента
+        return () => {
+            if (document.head.contains(link)) {
+                document.head.removeChild(link);
+                console.log(`🗑️ [FONT] Removed font: ${fontFamily}`);
+            }
+        };
+    }, [settings?.font_family]);
     
     // ВАЖНО: все хуки должны быть В НАЧАЛЕ, ПЕРЕД условными return!
     // Функция для получения стиля сообщения (с анимацией или без)
@@ -180,18 +257,29 @@ const ChatOverlay = () => {
                 // 🔄 Обработка обновления настроек ChatBox
                 if (data.type === 'chatbox_settings_updated') {
                     console.log('🔄 [CHATBOX] Received settings update event, reloading...');
-                    setSettings(prevSettings => ({
-                        ...prevSettings,
-                        ...data.data,
-                        // Нормализуем числовые значения
-                        font_size: parseInt(data.data.font_size) || prevSettings?.font_size || 16,
-                        text_stroke_width: parseInt(data.data.text_stroke_width) || prevSettings?.text_stroke_width || 0,
-                        background_opacity: parseFloat(data.data.background_opacity) ?? prevSettings?.background_opacity ?? 0.5,
-                        max_messages: parseInt(data.data.max_messages) || prevSettings?.max_messages || 20,
-                        message_spacing: parseInt(data.data.message_spacing) || prevSettings?.message_spacing || 4,
-                        animation_duration: parseInt(data.data.animation_duration) || prevSettings?.animation_duration || 300,
-                        border_radius: parseInt(data.data.border_radius) || prevSettings?.border_radius || 8
-                    }));
+                    console.log('📦 [CHATBOX] data.data:', data.data);
+                    console.log('🔤 [CHATBOX] font_family from event:', data.data.font_family);
+                    
+                    setSettings(prevSettings => {
+                        const updatedSettings = {
+                            ...prevSettings,
+                            ...data.data,
+                            // Нормализуем числовые значения
+                            font_size: parseInt(data.data.font_size) || prevSettings?.font_size || 16,
+                            text_stroke_width: parseInt(data.data.text_stroke_width) || prevSettings?.text_stroke_width || 0,
+                            background_opacity: parseFloat(data.data.background_opacity) ?? prevSettings?.background_opacity ?? 0.5,
+                            max_messages: parseInt(data.data.max_messages) || prevSettings?.max_messages || 20,
+                            message_spacing: parseInt(data.data.message_spacing) || prevSettings?.message_spacing || 4,
+                            animation_duration: parseInt(data.data.animation_duration) || prevSettings?.animation_duration || 300,
+                            border_radius: parseInt(data.data.border_radius) || prevSettings?.border_radius || 8
+                        };
+                        
+                        console.log('📦 [CHATBOX] Previous settings:', prevSettings);
+                        console.log('📦 [CHATBOX] Updated settings object:', updatedSettings);
+                        console.log('🔤 [CHATBOX] Final font_family:', updatedSettings.font_family);
+                        
+                        return updatedSettings;
+                    });
                     console.log('✅ [CHATBOX] Settings updated in real-time!');
                     return;
                 }
@@ -414,27 +502,6 @@ const ChatOverlay = () => {
             </div>
         );
     }
-    
-    // Применяем настройки к контейнеру
-    const containerStyle = {
-        width: '100vw',
-        height: '100vh',
-        padding: '16px',
-        fontFamily: settings.font_family,
-        fontSize: `${settings.font_size}px`,
-        fontWeight: settings.font_weight,
-        color: settings.text_color,
-        // Прозрачность фона через rgba (можно полностью убрать фон)
-        backgroundColor: (() => {
-            const hex = settings.background_color || '#000000';
-            const opacity = settings.background_opacity ?? 0.8;
-            const r = parseInt(hex.slice(1, 3), 16);
-            const g = parseInt(hex.slice(3, 5), 16);
-            const b = parseInt(hex.slice(5, 7), 16);
-            return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-        })(),
-        overflow: 'hidden' // Скрываем скролл контейнера, чтобы работал внутренний
-    };
     
     const getMessageSpacing = (index) => {
         // В горизонтальном режиме используем gap, поэтому marginTop не нужен

@@ -292,6 +292,9 @@ export const ChatProvider = ({ children }) => {
             } else if (data.type === 'ping' || data.type === 'pong') {
                 // Игнорируем ping/pong сообщения (heartbeat)
                 return;
+            } else if (data.type === 'chatbox_settings_updated') {
+                // Игнорируем события обновления настроек ChatOverlay (они предназначены для OBS виджета)
+                return;
             } else {
                 logger.debug('Unknown message type:', data.type);
             }
