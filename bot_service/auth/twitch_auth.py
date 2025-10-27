@@ -122,6 +122,9 @@ async def twitch_callback(
             refresh_token = token_data.get("refresh_token")
             expires_in = token_data.get("expires_in", 3600)
             
+            # Логируем реальное время жизни токена
+            logger.info(f"🔐 [TWITCH AUTH] Token expires_in: {expires_in} seconds ({expires_in / 3600:.1f} hours)")
+            
             expires_at = utcnow_naive() + timedelta(seconds=expires_in)
             scopes = token_data.get("scope", [])
             

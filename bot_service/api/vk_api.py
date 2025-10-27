@@ -106,6 +106,9 @@ class VKLiveAPI:
                         new_refresh_token = token_data.get("refresh_token", refresh_token)
                         expires_in = token_data.get("expires_in", 3600)
                         
+                        # Логируем реальное время жизни токена
+                        logger.info(f"🔐 [VK REFRESH] Token expires_in: {expires_in} seconds ({expires_in / 3600:.1f} hours)")
+                        
                         # Обновляем токены в базе данных
                         from core.datetime_utils import utcnow_naive
                         from datetime import timedelta

@@ -171,6 +171,9 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
             from core.datetime_utils import utcnow_naive
             expires_at = utcnow_naive() + timedelta(seconds=expires_in)
             scopes = token_data.get("scope", "").split(",")
+            
+            # Логируем реальное время жизни токена
+            logger.info(f"🔐 [VK AUTH] Token expires_in: {expires_in} seconds ({expires_in / 3600:.1f} hours)")
 
             # --- 2. Получение информации о пользователе ---
             logger.info(f"Attempting to get user info with token...")
