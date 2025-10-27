@@ -54,6 +54,7 @@
 | [SECURITY_LOGIC.md](SECURITY_LOGIC.md) | Логика безопасности и авторизации |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Инструкции по деплою |
 | [CATEGORY_MAPPING_GUIDE.md](CATEGORY_MAPPING_GUIDE.md) | Гайд по категориям стрима |
+| [UNIFIED_COMMANDS.md](UNIFIED_COMMANDS.md) | 🔗 Унифицированные команды !game и !title |
 | [VK_USERNAME_AND_ADMIN_USERS_EXPLANATION.md](VK_USERNAME_AND_ADMIN_USERS_EXPLANATION.md) | Объяснение VK username логики |
 
 ### 📂 VK Live API
