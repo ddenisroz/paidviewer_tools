@@ -18,11 +18,13 @@ from typing import Optional, Dict, Any
 import psutil
 import GPUtil
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
 import uvicorn
+import aiofiles
+import hashlib
 
 # Настройка логирования
 logging.basicConfig(
@@ -42,10 +44,14 @@ class TTSConfig:
         self.config_file = Path('config.json')
         self.models_dir = Path('models')
         self.logs_dir = Path('logs')
+        self.voices_dir = Path('user_voices')  # Директория для пользовательских голосов
+        self.samples_dir = Path('reference_audio')  # Директория для референсных сэмплов
         
         # Создаем необходимые директории
         self.models_dir.mkdir(exist_ok=True)
         self.logs_dir.mkdir(exist_ok=True)
+        self.voices_dir.mkdir(exist_ok=True)
+        self.samples_dir.mkdir(exist_ok=True)
         
         # Загружаем или создаем конфигурацию
         self.config = self._load_or_create_config()
@@ -468,6 +474,290 @@ async def get_audio_file(filename: str):
         return FileResponse(audio_path)
     else:
         raise HTTPException(status_code=404, detail="Аудио файл не найден")
+
+# ===== Voice Management Endpoints =====
+
+@app.get("/api/voices/list")
+async def list_voices():
+    """Получить список всех голосов (базовых + пользовательских)"""
+    try:
+        voices = []
+        
+        # Базовые голоса (предустановленные)
+        base_voices = [
+            {"id": "female_1", "name": "Женский 1", "type": "base", "language": "ru"},
+            {"id": "male_1", "name": "Мужской 1", "type": "base", "language": "ru"},
+            {"id": "female_2", "name": "Женский 2", "type": "base", "language": "ru"},
+            {"id": "male_2", "name": "Мужской 2", "type": "base", "language": "ru"}
+        ]
+        voices.extend(base_voices)
+        
+        # Пользовательские голоса
+        voices_dir = config.voices_dir
+        if voices_dir.exists():
+            for voice_folder in voices_dir.iterdir():
+                if voice_folder.is_dir():
+                    metadata_file = voice_folder / "metadata.json"
+                    if metadata_file.exists():
+                        try:
+                            with open(metadata_file, 'r', encoding='utf-8') as f:
+                                metadata = json.load(f)
+                                voices.append({
+                                    "id": voice_folder.name,
+                                    "name": metadata.get('name', voice_folder.name),
+                                    "type": "custom",
+                                    "language": metadata.get('language', 'ru'),
+                                    "created_at": metadata.get('created_at'),
+                                    "samples_count": len(list(voice_folder.glob('*.wav')))
+                                })
+                        except Exception as e:
+                            logger.error(f"Error loading voice metadata {voice_folder.name}: {e}")
+        
+        return {"success": True, "voices": voices}
+        
+    except Exception as e:
+        logger.error(f"Error listing voices: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/voices/create")
+async def create_voice(
+    name: str = Form(...),
+    language: str = Form("ru"),
+    description: str = Form("")
+):
+    """Создать новый пользовательский голос"""
+    try:
+        # Генерируем уникальный ID
+        voice_id = f"custom_{hashlib.md5(name.encode()).hexdigest()[:8]}"
+        voice_folder = config.voices_dir / voice_id
+        
+        # Проверяем, не существует ли уже
+        if voice_folder.exists():
+            raise HTTPException(status_code=400, detail="Голос с таким именем уже существует")
+        
+        # Создаем папку
+        voice_folder.mkdir(parents=True, exist_ok=True)
+        
+        # Создаем метаданные
+        metadata = {
+            "id": voice_id,
+            "name": name,
+            "language": language,
+            "description": description,
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat()
+        }
+        
+        # Сохраняем метаданные
+        metadata_file = voice_folder / "metadata.json"
+        with open(metadata_file, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+        
+        logger.info(f"Created voice: {voice_id} ({name})")
+        
+        return {
+            "success": True,
+            "voice_id": voice_id,
+            "message": "Голос создан. Теперь загрузите референсные аудио сэмплы."
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating voice: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/voices/{voice_id}/upload")
+async def upload_voice_sample(
+    voice_id: str,
+    file: UploadFile = File(...),
+    sample_text: str = Form(None)
+):
+    """Загрузить референсный аудио сэмпл для голоса"""
+    try:
+        voice_folder = config.voices_dir / voice_id
+        
+        # Проверяем существование голоса
+        if not voice_folder.exists():
+            raise HTTPException(status_code=404, detail="Голос не найден")
+        
+        # Проверяем формат файла
+        if not file.filename.endswith(('.wav', '.mp3', '.flac')):
+            raise HTTPException(status_code=400, detail="Поддерживаются только WAV, MP3, FLAC")
+        
+        # Генерируем имя файла
+        file_ext = Path(file.filename).suffix
+        timestamp = int(datetime.now().timestamp())
+        sample_filename = f"sample_{timestamp}{file_ext}"
+        sample_path = voice_folder / sample_filename
+        
+        # Сохраняем файл
+        async with aiofiles.open(sample_path, 'wb') as out_file:
+            content = await file.read()
+            await out_file.write(content)
+        
+        # Сохраняем метаданные сэмпла
+        if sample_text:
+            sample_metadata = {
+                "filename": sample_filename,
+                "text": sample_text,
+                "uploaded_at": datetime.now().isoformat(),
+                "duration": None,  # TODO: получить длительность
+                "size": len(content)
+            }
+            
+            samples_meta_file = voice_folder / "samples.json"
+            samples_meta = []
+            
+            if samples_meta_file.exists():
+                with open(samples_meta_file, 'r', encoding='utf-8') as f:
+                    samples_meta = json.load(f)
+            
+            samples_meta.append(sample_metadata)
+            
+            with open(samples_meta_file, 'w', encoding='utf-8') as f:
+                json.dump(samples_meta, f, indent=2, ensure_ascii=False)
+        
+        # Обновляем метаданные голоса
+        metadata_file = voice_folder / "metadata.json"
+        if metadata_file.exists():
+            with open(metadata_file, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+            
+            metadata['updated_at'] = datetime.now().isoformat()
+            metadata['samples_count'] = len(list(voice_folder.glob('sample_*.*')))
+            
+            with open(metadata_file, 'w', encoding='utf-8') as f:
+                json.dump(metadata, f, indent=2, ensure_ascii=False)
+        
+        logger.info(f"Uploaded sample for voice {voice_id}: {sample_filename}")
+        
+        return {
+            "success": True,
+            "filename": sample_filename,
+            "message": "Сэмпл успешно загружен"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading voice sample: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/voices/{voice_id}/samples")
+async def get_voice_samples(voice_id: str):
+    """Получить список сэмплов для голоса"""
+    try:
+        voice_folder = config.voices_dir / voice_id
+        
+        if not voice_folder.exists():
+            raise HTTPException(status_code=404, detail="Голос не найден")
+        
+        samples = []
+        samples_meta_file = voice_folder / "samples.json"
+        samples_meta = []
+        
+        if samples_meta_file.exists():
+            with open(samples_meta_file, 'r', encoding='utf-8') as f:
+                samples_meta = json.load(f)
+        
+        # Получаем все аудио файлы
+        for sample_file in voice_folder.glob('sample_*.*'):
+            # Ищем метаданные для этого файла
+            meta = next((s for s in samples_meta if s['filename'] == sample_file.name), None)
+            
+            samples.append({
+                "filename": sample_file.name,
+                "path": f"/api/voices/{voice_id}/samples/{sample_file.name}",
+                "text": meta.get('text') if meta else None,
+                "uploaded_at": meta.get('uploaded_at') if meta else None,
+                "size": sample_file.stat().st_size
+            })
+        
+        return {"success": True, "samples": samples}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting voice samples: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/voices/{voice_id}/samples/{filename}")
+async def get_voice_sample_file(voice_id: str, filename: str):
+    """Получить файл сэмпла"""
+    try:
+        sample_path = config.voices_dir / voice_id / filename
+        
+        if not sample_path.exists():
+            raise HTTPException(status_code=404, detail="Сэмпл не найден")
+        
+        return FileResponse(
+            sample_path,
+            media_type="audio/wav",
+            filename=filename
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting sample file: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/voices/{voice_id}/samples/{filename}")
+async def delete_voice_sample(voice_id: str, filename: str):
+    """Удалить сэмпл"""
+    try:
+        sample_path = config.voices_dir / voice_id / filename
+        
+        if not sample_path.exists():
+            raise HTTPException(status_code=404, detail="Сэмпл не найден")
+        
+        # Удаляем файл
+        sample_path.unlink()
+        
+        # Обновляем метаданные
+        samples_meta_file = config.voices_dir / voice_id / "samples.json"
+        if samples_meta_file.exists():
+            with open(samples_meta_file, 'r', encoding='utf-8') as f:
+                samples_meta = json.load(f)
+            
+            samples_meta = [s for s in samples_meta if s['filename'] != filename]
+            
+            with open(samples_meta_file, 'w', encoding='utf-8') as f:
+                json.dump(samples_meta, f, indent=2, ensure_ascii=False)
+        
+        logger.info(f"Deleted sample {filename} from voice {voice_id}")
+        
+        return {"success": True, "message": "Сэмпл удалён"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting sample: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/voices/{voice_id}")
+async def delete_voice(voice_id: str):
+    """Удалить голос со всеми сэмплами"""
+    try:
+        voice_folder = config.voices_dir / voice_id
+        
+        if not voice_folder.exists():
+            raise HTTPException(status_code=404, detail="Голос не найден")
+        
+        # Удаляем папку со всем содержимым
+        import shutil
+        shutil.rmtree(voice_folder)
+        
+        logger.info(f"Deleted voice: {voice_id}")
+        
+        return {"success": True, "message": "Голос удалён"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting voice: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 def main():
     """Главная функция"""
