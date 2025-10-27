@@ -7,7 +7,9 @@
 import { useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import cacheManager from '../utils/cacheManager';
-import logger from '../utils/logger';
+import Logger from '../utils/logger';
+
+const logger = new Logger('CACHE_WS');
 
 export const useCacheWebSocketSync = () => {
   const { user, isAuthenticated } = useAuth();

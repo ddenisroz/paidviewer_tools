@@ -52,6 +52,24 @@ export const AuthProvider = ({ children }) => {
                 setIsGuest(false);
                 setUser(null);
             }
+            
+            // 🧹 Очищаем URL параметры после успешной проверки авторизации
+            // Убираем ?auth=twitch&success=1 и подобные параметры
+            const currentUrl = new URL(window.location.href);
+            const hasAuthParams = currentUrl.searchParams.has('auth') || 
+                                  currentUrl.searchParams.has('success') || 
+                                  currentUrl.searchParams.has('error');
+            
+            if (hasAuthParams) {
+                // Удаляем параметры авторизации
+                currentUrl.searchParams.delete('auth');
+                currentUrl.searchParams.delete('success');
+                currentUrl.searchParams.delete('error');
+                
+                // Обновляем URL без перезагрузки страницы
+                window.history.replaceState({}, '', currentUrl.pathname + currentUrl.search);
+                logger.debug('Auth URL params cleaned');
+            }
         } catch (error) {
             logger.error('Authentication check failed:', error);
             // Только при HTTP 401/403 считаем, что пользователь не аутентифицирован

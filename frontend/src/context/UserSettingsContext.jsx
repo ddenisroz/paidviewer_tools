@@ -3,7 +3,9 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useAuth } from './AuthContext';
 import { botService } from '../services/microservices';
 import cacheManager, { CACHE_CONFIG } from '../utils/cacheManager';
-import logger from '../utils/logger';
+import Logger from '../utils/logger';
+
+const logger = new Logger('USER_SETTINGS');
 
 const UserSettingsContext = createContext();
 
