@@ -1037,6 +1037,202 @@ class UniversalCommandHandler:
             await vk_bot.send_message(channel_name, 
                 f"@{author_name} ❌ Ошибка изменения громкости")
     
+    # === OTHER COMMANDS ===
+    
+    async def _handle_help(self, ctx, bot, args, platform, db):
+        """Handler для !help (Twitch)"""
+        try:
+            # Получаем user_id владельца канала
+            from core.database import User, BotCommand
+            user = db.query(User).filter(
+                User.twitch_username == ctx.channel.name.lower()
+            ).first()
+            
+            if not user:
+                await ctx.send(f"@{ctx.author.name} ❌ Канал не найден")
+                return
+            
+            # Получаем доступные команды
+            from core.command_executor import CommandExecutor
+            executor = CommandExecutor()
+            
+            # Получаем все команды (global + override + custom)
+            all_commands = executor.find_command(None, user.id, 'twitch', db, get_all=True)
+            
+            # Формируем список команд
+            cmd_list = []
+            for cmd in all_commands[:10]:  # Первые 10 команд
+                cmd_list.append(f"!{cmd.command_name}")
+            
+            if cmd_list:
+                commands_text = ", ".join(cmd_list)
+                total = len(all_commands)
+                if total > 10:
+                    await ctx.send(f"📋 Доступные команды: {commands_text}... (всего: {total})")
+                else:
+                    await ctx.send(f"📋 Доступные команды: {commands_text}")
+            else:
+                await ctx.send(f"@{ctx.author.name} ℹ️ Команды не найдены")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !help handler: {e}", exc_info=True)
+            await ctx.send(f"@{ctx.author.name} ❌ Ошибка получения списка команд")
+    
+    async def _handle_help_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
+        """Handler для !help (VK)"""
+        try:
+            # Получаем user_id владельца канала
+            from core.database import User, BotCommand
+            user = db.query(User).filter(
+                User.vk_username == channel_name.lower()
+            ).first()
+            
+            if not user:
+                await vk_bot.send_message(channel_name, f"@{author_name} ❌ Канал не найден")
+                return
+            
+            # Получаем доступные команды
+            from core.command_executor import CommandExecutor
+            executor = CommandExecutor()
+            
+            # Получаем все команды (global + override + custom)
+            all_commands = executor.find_command(None, user.id, 'vk', db, get_all=True)
+            
+            # Формируем список команд
+            cmd_list = []
+            for cmd in all_commands[:10]:  # Первые 10 команд
+                cmd_list.append(f"!{cmd.command_name}")
+            
+            if cmd_list:
+                commands_text = ", ".join(cmd_list)
+                total = len(all_commands)
+                if total > 10:
+                    await vk_bot.send_message(channel_name,
+                        f"📋 Доступные команды: {commands_text}... (всего: {total})")
+                else:
+                    await vk_bot.send_message(channel_name,
+                        f"📋 Доступные команды: {commands_text}")
+            else:
+                await vk_bot.send_message(channel_name, f"@{author_name} ℹ️ Команды не найдены")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !help VK handler: {e}", exc_info=True)
+            await vk_bot.send_message(channel_name, 
+                f"@{author_name} ❌ Ошибка получения списка команд")
+    
+    async def _handle_ytvolume(self, ctx, bot, args, platform, db):
+        """Handler для !ytvolume (Twitch)"""
+        try:
+            if not args:
+                await ctx.send(f"@{ctx.author.name} ❌ Использование: !ytvolume <0-100>")
+                return
+            
+            try:
+                volume = int(args)
+                if not 0 <= volume <= 100:
+                    raise ValueError
+            except ValueError:
+                await ctx.send(f"@{ctx.author.name} ❌ Громкость должна быть от 0 до 100")
+                return
+            
+            # Получаем user_id владельца канала
+            from core.database import User
+            user = db.query(User).filter(
+                User.twitch_username == ctx.channel.name.lower()
+            ).first()
+            
+            if not user:
+                await ctx.send(f"@{ctx.author.name} ❌ Канал не найден")
+                return
+            
+            # Устанавливаем громкость YouTube через UserSettings
+            from core.database import UserSettings
+            settings = db.query(UserSettings).filter(
+                UserSettings.user_id == user.id
+            ).first()
+            
+            if not settings:
+                settings = UserSettings(user_id=user.id)
+                db.add(settings)
+            
+            settings.youtube_volume = volume
+            db.commit()
+            
+            await ctx.send(f"@{ctx.author.name} 🎵 Громкость YouTube: {volume}%")
+            self.logger.info(f"✓ YouTube volume set to {volume}% for {ctx.channel.name}")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !ytvolume handler: {e}", exc_info=True)
+            db.rollback()
+            await ctx.send(f"@{ctx.author.name} ❌ Ошибка изменения громкости")
+    
+    async def _handle_ytvolume_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
+        """Handler для !ytvolume (VK)"""
+        try:
+            if not args:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ❌ Использование: !ytvolume <0-100>")
+                return
+            
+            try:
+                volume = int(args)
+                if not 0 <= volume <= 100:
+                    raise ValueError
+            except ValueError:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ❌ Громкость должна быть от 0 до 100")
+                return
+            
+            # Получаем user_id владельца канала
+            from core.database import User
+            user = db.query(User).filter(
+                User.vk_username == channel_name.lower()
+            ).first()
+            
+            if not user:
+                await vk_bot.send_message(channel_name, f"@{author_name} ❌ Канал не найден")
+                return
+            
+            # Устанавливаем громкость YouTube через UserSettings
+            from core.database import UserSettings
+            settings = db.query(UserSettings).filter(
+                UserSettings.user_id == user.id
+            ).first()
+            
+            if not settings:
+                settings = UserSettings(user_id=user.id)
+                db.add(settings)
+            
+            settings.youtube_volume = volume
+            db.commit()
+            
+            await vk_bot.send_message(channel_name, 
+                f"@{author_name} 🎵 Громкость YouTube: {volume}%")
+            self.logger.info(f"✓ YouTube volume set to {volume}% for VK {channel_name}")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !ytvolume VK handler: {e}", exc_info=True)
+            db.rollback()
+            await vk_bot.send_message(channel_name, 
+                f"@{author_name} ❌ Ошибка изменения громкости")
+    
+    async def _handle_analyze(self, ctx, bot, args, platform, db):
+        """Handler для !analyze (Twitch) - заглушка"""
+        try:
+            await ctx.send(f"@{ctx.author.name} 🤖 Функция анализа чата в разработке")
+            self.logger.info(f"!analyze called by {ctx.author.name} on {ctx.channel.name}")
+        except Exception as e:
+            self.logger.error(f"Error in !analyze handler: {e}", exc_info=True)
+    
+    async def _handle_analyze_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
+        """Handler для !analyze (VK) - заглушка"""
+        try:
+            await vk_bot.send_message(channel_name, 
+                f"@{author_name} 🤖 Функция анализа чата в разработке")
+            self.logger.info(f"!analyze called by {author_name} on VK {channel_name}")
+        except Exception as e:
+            self.logger.error(f"Error in !analyze VK handler: {e}", exc_info=True)
+    
     # === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ===
     
     async def _get_channel_owner_id_twitch(self, channel_name: str) -> Optional[int]:
