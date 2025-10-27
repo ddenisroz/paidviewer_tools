@@ -1,483 +1,456 @@
+// frontend/src/pages/tts/LocalTTSSettingsPage.jsx
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
     Server, 
-    Home, 
     CheckCircle, 
     XCircle, 
-    AlertCircle,
-    RefreshCw,
-    Save,
-    Trash2,
-    ExternalLink,
-    Download,
-    Search,
-    Zap
+    Loader2, 
+    Copy, 
+    ExternalLink, 
+    AlertTriangle,
+    Cpu,
+    HardDrive,
+    Zap,
+    RefreshCw
 } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
 import { toast } from 'sonner';
-import { API_BASE_URL } from '../../constants';
+import { botService } from '../../services/microservices';
 
 const LocalTTSSettingsPage = () => {
-    const [config, setConfig] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [testing, setTesting] = useState(false);
-    const [autoSearching, setAutoSearching] = useState(false);
-    const [downloading, setDownloading] = useState(false);
-    
-    const [formData, setFormData] = useState({
+    const [config, setConfig] = useState({
         endpoint_url: 'http://localhost:8001',
         api_key: '',
         use_local: false
     });
-
-    // Загрузка конфигурации
-    const loadConfig = async () => {
-        try {
-            setLoading(true);
-            const response = await fetch(`${API_BASE_URL}/api/local-tts/config`, {
-                credentials: 'include'
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success && data.config) {
-                    setConfig(data.config);
-                    setFormData({
-                        endpoint_url: data.config.endpoint_url,
-                        api_key: '',
-                        use_local: data.config.use_local
-                    });
-                }
-            }
-        } catch (error) {
-            console.error('Error loading local TTS config:', error);
-            toast.error('Ошибка загрузки конфигурации');
-        } finally {
-            setLoading(false);
-        }
-    };
+    
+    const [testing, setTesting] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [testResult, setTestResult] = useState(null);
+    const [healthData, setHealthData] = useState(null);
+    const [statusData, setStatusData] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         loadConfig();
     }, []);
 
-    // Автопоиск локального TTS
-    const autoSearchTTS = async () => {
+    const loadConfig = async () => {
         try {
-            setAutoSearching(true);
+            setLoading(true);
+            const response = await botService.get('/api/local-tts/config');
             
-            // Пробуем стандартные порты
-            const ports = [8001, 8002, 8003, 8004, 8005];
-            const foundEndpoints = [];
-            
-            for (const port of ports) {
-                try {
-                    const response = await fetch(`http://localhost:${port}/health`, {
-                        method: 'GET',
-                        timeout: 2000
-                    });
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.status === 'healthy') {
-                            foundEndpoints.push({
-                                url: `http://localhost:${port}`,
-                                version: data.version,
-                                gpu: data.gpu_info?.name || 'Unknown'
-                            });
-                        }
-                    }
-                } catch (error) {
-                    // Порт недоступен, продолжаем поиск
-                }
-            }
-            
-            if (foundEndpoints.length > 0) {
-                const endpoint = foundEndpoints[0]; // Берем первый найденный
-                setFormData(prev => ({
-                    ...prev,
-                    endpoint_url: endpoint.url
-                }));
-                
-                toast.success('Локальный TTS найден!', {
-                    description: `${endpoint.gpu} - ${endpoint.url}`
-                });
-                
-                // Автоматически тестируем подключение
-                await testConnection();
-            } else {
-                toast.info('Локальный TTS не найден', {
-                    description: 'Скачайте и установите TTS F5 Simple'
+            if (response.data.config) {
+                setConfig({
+                    endpoint_url: response.data.config.endpoint_url || 'http://localhost:8001',
+                    api_key: response.data.config.api_key || '',
+                    use_local: response.data.config.use_local || false
                 });
             }
         } catch (error) {
-            console.error('Error auto-searching TTS:', error);
-            toast.error('Ошибка автопоиска');
+            console.error('Error loading config:', error);
         } finally {
-            setAutoSearching(false);
+            setLoading(false);
         }
     };
 
-    // Скачивание TTS F5 Simple
-    const downloadTTSF5Simple = async () => {
-        try {
-            setDownloading(true);
-            
-            // Создаем ссылку для скачивания
-            const downloadUrl = `${API_BASE_URL}/api/local-tts/download-simple`;
-            
-            // Открываем ссылку в новом окне
-            window.open(downloadUrl, '_blank');
-            
-            toast.success('Скачивание началось!', {
-                description: 'Следуйте инструкциям в скачанном архиве'
-            });
-            
-        } catch (error) {
-            console.error('Error downloading TTS F5 Simple:', error);
-            toast.error('Ошибка скачивания');
-        } finally {
-            setDownloading(false);
-        }
-    };
-
-    // Тест подключения
     const testConnection = async () => {
-        if (!formData.endpoint_url) {
-            toast.error('Укажите URL локального TTS');
-            return;
-        }
-
         try {
             setTesting(true);
-            const response = await fetch(`${API_BASE_URL}/api/local-tts/test-connection`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    endpoint_url: formData.endpoint_url,
-                    api_key: formData.api_key || null
-                })
+            setTestResult(null);
+            setHealthData(null);
+            setStatusData(null);
+
+            const response = await botService.post('/api/local-tts/test-connection', {
+                endpoint_url: config.endpoint_url,
+                api_key: config.api_key
             });
 
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success) {
-                    toast.success('Подключение успешно!', {
-                        description: `Версия: ${data.version || 'N/A'}`
-                    });
-                } else {
-                    toast.error('Не удалось подключиться', {
-                        description: data.message
-                    });
-                }
+            if (response.data.success) {
+                setTestResult({ success: true, message: 'Соединение успешно!' });
+                setHealthData(response.data.health_data);
+                setStatusData(response.data.status_data);
+                toast.success('✅ Соединение установлено!');
             } else {
-                toast.error('Ошибка тестирования подключения');
+                setTestResult({ 
+                    success: false, 
+                    message: response.data.error || 'Не удалось подключиться' 
+                });
+                toast.error('❌ Ошибка подключения');
             }
         } catch (error) {
-            console.error('Error testing connection:', error);
-            toast.error('Ошибка тестирования подключения');
+            setTestResult({ 
+                success: false, 
+                message: error.response?.data?.detail || 'Ошибка подключения к серверу' 
+            });
+            toast.error('❌ Ошибка подключения');
         } finally {
             setTesting(false);
         }
     };
 
-    // Сохранение конфигурации
     const saveConfig = async () => {
-        if (!formData.endpoint_url) {
-            toast.error('Укажите URL локального TTS');
-            return;
-        }
-
         try {
             setSaving(true);
-            const response = await fetch(`${API_BASE_URL}/api/local-tts/config`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    endpoint_url: formData.endpoint_url,
-                    api_key: formData.api_key || null,
-                    use_local: formData.use_local
-                })
+
+            const response = await botService.post('/api/local-tts/config', {
+                endpoint_url: config.endpoint_url,
+                api_key: config.api_key,
+                use_local: config.use_local
             });
 
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success) {
-                    toast.success(data.message);
-                    await loadConfig();
-                } else {
-                    toast.error(data.message || 'Ошибка сохранения');
-                }
-            } else {
-                const errorData = await response.json();
-                toast.error(errorData.detail || 'Ошибка сохранения конфигурации');
+            if (response.data.success) {
+                toast.success('✅ Настройки сохранены!');
+                await loadConfig(); // Перезагружаем конфиг
             }
         } catch (error) {
             console.error('Error saving config:', error);
-            toast.error('Ошибка сохранения конфигурации');
+            toast.error('❌ Ошибка сохранения');
         } finally {
             setSaving(false);
         }
     };
 
-    // Переключение использования локального TTS
-    const toggleLocal = async () => {
+    const toggleService = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/local-tts/toggle`, {
-                method: 'POST',
-                credentials: 'include'
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success) {
-                    toast.success(data.message);
-                    setFormData(prev => ({ ...prev, use_local: data.use_local }));
-                    await loadConfig();
-                } else {
-                    toast.error(data.message || 'Ошибка переключения');
-                }
+            const response = await botService.post('/api/local-tts/toggle');
+            
+            if (response.data.success) {
+                setConfig(prev => ({ ...prev, use_local: response.data.use_local }));
+                toast.success(response.data.message);
             } else {
-                const errorData = await response.json();
-                toast.error(errorData.detail || 'Ошибка переключения');
+                toast.error(response.data.message);
             }
         } catch (error) {
-            console.error('Error toggling local TTS:', error);
-            toast.error('Ошибка переключения');
+            console.error('Error toggling service:', error);
+            toast.error('❌ Ошибка переключения сервиса');
         }
     };
 
-    // Удаление конфигурации
-    const deleteConfig = async () => {
-        if (!window.confirm('Вы уверены, что хотите удалить конфигурацию локального TTS?')) {
-            return;
-        }
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/local-tts/config`, {
-                method: 'DELETE',
-                credentials: 'include'
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success) {
-                    toast.success(data.message);
-                    setConfig(null);
-                    setFormData({
-                        endpoint_url: 'http://localhost:8001',
-                        api_key: '',
-                        use_local: false
-                    });
-                }
-            } else {
-                toast.error('Ошибка удаления конфигурации');
-            }
-        } catch (error) {
-            console.error('Error deleting config:', error);
-            toast.error('Ошибка удаления конфигурации');
-        }
+    const copyToClipboard = (text) => {
+        navigator.clipboard.writeText(text);
+        toast.success('📋 Скопировано в буфер обмена');
     };
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-96">
-                <div className="text-center">
-                    <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2" />
-                    <p className="text-muted-foreground">Загрузка...</p>
-                </div>
+            <div className="container mx-auto p-6 flex items-center justify-center min-h-screen">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
             </div>
         );
     }
 
     return (
-        <div className="space-y-6 max-w-3xl">
-            <div>
-                <h1 className="text-2xl font-bold mb-1">Локальный TTS F5</h1>
-                <p className="text-sm text-muted-foreground">
-                    Настройте локальный движок для генерации озвучки на вашей видеокарте
-                </p>
+        <div className="container mx-auto p-6 space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                        <Server className="w-8 h-8" />
+                        Локальный TTS сервис
+                    </h1>
+                    <p className="text-muted-foreground mt-2">
+                        Подключите свой локальный F5-TTS сервис для генерации озвучки
+                    </p>
+                </div>
             </div>
 
-            {/* Быстрый старт */}
-            <Card>
+            {/* Инструкция по установке */}
+            <Card className="bg-blue-500/10 border-blue-500/30">
                 <CardHeader>
-                    <CardTitle className="text-lg">Быстрый старт</CardTitle>
+                    <CardTitle className="text-blue-400 flex items-center gap-2">
+                        <ExternalLink className="w-5 h-5" />
+                        Как установить локальный TTS сервис?
+                    </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                        <Button 
-                            onClick={autoSearchTTS}
-                            disabled={autoSearching}
-                            variant="outline"
-                            className="h-16 flex flex-col gap-1"
-                        >
-                            {autoSearching ? (
-                                <>
-                                    <RefreshCw className="w-5 h-5 animate-spin" />
-                                    <span className="text-sm">Поиск...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Search className="w-5 h-5" />
-                                    <span className="text-sm">Автопоиск TTS</span>
-                                </>
-                            )}
-                        </Button>
-                        
-                        <Button 
-                            onClick={downloadTTSF5Simple}
-                            disabled={downloading}
-                            className="h-16 flex flex-col gap-1"
-                        >
-                            {downloading ? (
-                                <>
-                                    <RefreshCw className="w-5 h-5 animate-spin" />
-                                    <span className="text-sm">Скачивание...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Download className="w-5 h-5" />
-                                    <span className="text-sm">Скачать TTS F5</span>
-                                </>
-                            )}
-                        </Button>
+                <CardContent className="space-y-4">
+                    <div className="space-y-3 text-sm">
+                        <div className="flex items-start gap-3">
+                            <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0">1</span>
+                            <div>
+                                <p className="font-medium">Перейдите в папку проекта:</p>
+                                <code className="block bg-gray-800 p-2 rounded mt-1">
+                                    cd tts_service_simple
+                                </code>
+                            </div>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                            <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0">2</span>
+                            <div>
+                                <p className="font-medium">Установите зависимости:</p>
+                                <code className="block bg-gray-800 p-2 rounded mt-1">
+                                    python install.py
+                                </code>
+                            </div>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                            <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0">3</span>
+                            <div>
+                                <p className="font-medium">Запустите сервис:</p>
+                                <code className="block bg-gray-800 p-2 rounded mt-1">
+                                    start.bat  # Windows<br/>
+                                    ./start.sh # Linux/Mac
+                                </code>
+                            </div>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                            <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0">4</span>
+                            <div>
+                                <p className="font-medium">Найдите API ключ в файле <code>config.json</code></p>
+                                <p className="text-muted-foreground text-xs mt-1">
+                                    Откройте файл и скопируйте значение поля "api_key"
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                    
-                    <div className="text-xs text-muted-foreground text-center py-2 border-t">
-                        💡 Сначала скачайте TTS F5, затем используйте автопоиск
+
+                    <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-3 flex items-start gap-2">
+                        <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                        <div className="text-sm text-yellow-200">
+                            <p className="font-medium">Системные требования:</p>
+                            <ul className="list-disc list-inside mt-1 space-y-1 text-xs text-yellow-200/80">
+                                <li>Python 3.8+</li>
+                                <li>NVIDIA GPU с VRAM ≥ 6GB (рекомендуется)</li>
+                                <li>8GB RAM (16GB рекомендуется)</li>
+                            </ul>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Статус конфигурации */}
-            {config && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg flex items-center gap-2">
-                            {config.is_healthy ? (
-                                <CheckCircle className="w-5 h-5 text-green-500" />
-                            ) : (
-                                <XCircle className="w-5 h-5 text-red-500" />
-                            )}
-                            Статус: <span className={config.is_healthy ? 'text-green-500' : 'text-red-500'}>
-                                {config.is_healthy ? 'Работает' : 'Недоступен'}
-                            </span>
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                        <div className="text-sm">
-                            <span className="text-muted-foreground">Endpoint: </span>
-                            <span className="font-mono">{config.endpoint_url}</span>
-                        </div>
-                        {config.tts_version && (
-                            <div className="text-sm">
-                                <span className="text-muted-foreground">Версия: </span>
-                                <span>{config.tts_version}</span>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Настройки */}
+            {/* Настройки подключения */}
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-lg">Настройки подключения</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                        <Server className="w-5 h-5" />
+                        Настройки подключения
+                    </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="endpoint_url" className="text-sm">URL локального TTS</Label>
+                        <Label htmlFor="endpoint_url">URL сервиса</Label>
                         <Input
                             id="endpoint_url"
-                            type="url"
+                            value={config.endpoint_url}
+                            onChange={(e) => setConfig({ ...config, endpoint_url: e.target.value })}
                             placeholder="http://localhost:8001"
-                            value={formData.endpoint_url}
-                            onChange={(e) => setFormData(prev => ({
-                                ...prev,
-                                endpoint_url: e.target.value
-                            }))}
                         />
+                        <p className="text-xs text-muted-foreground">
+                            По умолчанию: http://localhost:8001
+                        </p>
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="api_key" className="text-sm">API ключ (опционально)</Label>
-                        <Input
-                            id="api_key"
-                            type="password"
-                            placeholder="Оставьте пустым"
-                            value={formData.api_key}
-                            onChange={(e) => setFormData(prev => ({
-                                ...prev,
-                                api_key: e.target.value
-                            }))}
-                        />
+                        <Label htmlFor="api_key">API ключ</Label>
+                        <div className="flex gap-2">
+                            <Input
+                                id="api_key"
+                                type="password"
+                                value={config.api_key}
+                                onChange={(e) => setConfig({ ...config, api_key: e.target.value })}
+                                placeholder="Введите API ключ из config.json"
+                            />
+                            {config.api_key && (
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => copyToClipboard(config.api_key)}
+                                >
+                                    <Copy className="w-4 h-4" />
+                                </Button>
+                            )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Найдите в файле tts_service_simple/config.json
+                        </p>
                     </div>
 
-                    <div className="flex gap-2 pt-2">
-                        <Button 
-                            onClick={testConnection} 
-                            variant="outline"
-                            disabled={testing}
+                    <div className="flex gap-2">
+                        <Button
+                            onClick={testConnection}
+                            disabled={testing || !config.endpoint_url || !config.api_key}
                             className="flex-1"
                         >
                             {testing ? (
                                 <>
-                                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                    Тест...
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Проверка...
                                 </>
                             ) : (
                                 <>
                                     <CheckCircle className="w-4 h-4 mr-2" />
-                                    Тест
+                                    Тест соединения
                                 </>
                             )}
                         </Button>
 
-                        <Button 
-                            onClick={saveConfig} 
-                            disabled={saving}
-                            className="flex-1"
+                        <Button
+                            onClick={saveConfig}
+                            disabled={saving || !config.endpoint_url || !config.api_key}
+                            className="flex-1 bg-green-600 hover:bg-green-700"
                         >
                             {saving ? (
                                 <>
-                                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                     Сохранение...
                                 </>
                             ) : (
-                                <>
-                                    <Save className="w-4 h-4 mr-2" />
-                                    Сохранить
-                                </>
+                                'Сохранить'
                             )}
                         </Button>
-
-                        {config && (
-                            <Button 
-                                onClick={deleteConfig} 
-                                variant="destructive"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                            </Button>
-                        )}
                     </div>
+
+                    {/* Результат теста */}
+                    {testResult && (
+                        <div className={`p-4 rounded-lg flex items-center gap-3 ${
+                            testResult.success 
+                                ? 'bg-green-500/10 border border-green-500/30' 
+                                : 'bg-red-500/10 border border-red-500/30'
+                        }`}>
+                            {testResult.success ? (
+                                <CheckCircle className="w-5 h-5 text-green-400" />
+                            ) : (
+                                <XCircle className="w-5 h-5 text-red-400" />
+                            )}
+                            <span className={testResult.success ? 'text-green-300' : 'text-red-300'}>
+                                {testResult.message}
+                            </span>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
+
+            {/* Статус сервиса */}
+            {healthData && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Zap className="w-5 h-5" />
+                            Статус сервиса
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <p className="text-sm text-muted-foreground">Статус</p>
+                                <p className="text-lg font-semibold flex items-center gap-2">
+                                    <CheckCircle className="w-5 h-5 text-green-400" />
+                                    {healthData.status === 'healthy' ? 'Работает' : 'Ошибка'}
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <p className="text-sm text-muted-foreground">Версия</p>
+                                <p className="text-lg font-semibold">{healthData.version}</p>
+                            </div>
+
+                            {healthData.gpu_info && (
+                                <>
+                                    <div className="space-y-2">
+                                        <p className="text-sm text-muted-foreground flex items-center gap-2">
+                                            <Cpu className="w-4 h-4" />
+                                            GPU
+                                        </p>
+                                        <p className="text-lg font-semibold">{healthData.gpu_info.name}</p>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <p className="text-sm text-muted-foreground flex items-center gap-2">
+                                            <HardDrive className="w-4 h-4" />
+                                            VRAM
+                                        </p>
+                                        <p className="text-lg font-semibold">
+                                            {(healthData.gpu_info.memory_total / 1024).toFixed(1)} GB
+                                        </p>
+                                    </div>
+                                </>
+                            )}
+
+                            <div className="space-y-2">
+                                <p className="text-sm text-muted-foreground">Uptime</p>
+                                <p className="text-lg font-semibold">
+                                    {Math.floor(healthData.uptime / 3600)}ч {Math.floor((healthData.uptime % 3600) / 60)}м
+                                </p>
+                            </div>
+                        </div>
+
+                        {statusData && (
+                            <div className="mt-4 pt-4 border-t border-gray-700">
+                                <h4 className="text-sm font-medium mb-3">Статистика</h4>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Всего запросов</p>
+                                        <p className="text-lg font-semibold">{statusData.stats.total_requests}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Успешных</p>
+                                        <p className="text-lg font-semibold text-green-400">
+                                            {statusData.stats.successful_requests}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Ошибок</p>
+                                        <p className="text-lg font-semibold text-red-400">
+                                            {statusData.stats.failed_requests}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Среднее время</p>
+                                        <p className="text-lg font-semibold">
+                                            {statusData.stats.average_processing_time.toFixed(2)}с
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <Button
+                            variant="outline"
+                            onClick={testConnection}
+                            className="mt-4 w-full"
+                        >
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Обновить статус
+                        </Button>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Переключатель использования */}
+            {testResult?.success && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Использование локального TTS</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                            <div>
+                                <p className="font-medium">Использовать локальный TTS</p>
+                                <p className="text-sm text-muted-foreground">
+                                    {config.use_local 
+                                        ? 'Бот использует локальный сервис для генерации озвучки'
+                                        : 'Бот использует облачный сервис (если доступен)'
+                                    }
+                                </p>
+                            </div>
+                            <Button
+                                onClick={toggleService}
+                                variant={config.use_local ? 'default' : 'outline'}
+                            >
+                                {config.use_local ? 'Включено' : 'Выключено'}
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
         </div>
     );
 };
 
 export default LocalTTSSettingsPage;
-

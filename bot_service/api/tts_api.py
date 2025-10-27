@@ -1455,23 +1455,53 @@ async def test_local_tts_connection(
 ):
     """Проверить подключение к локальному TTS"""
     try:
-        health_status = await check_local_tts_health(request.endpoint_url, request.api_key)
+        # Проверяем health endpoint
+        headers = {}
+        if request.api_key:
+            headers['Authorization'] = f'Bearer {request.api_key}'
         
-        if health_status['healthy']:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # Получаем health данные
+            health_response = await client.get(f"{request.endpoint_url}/health", headers=headers)
+            
+            if health_response.status_code != 200:
+                return {
+                    "success": False,
+                    "error": f"Сервер вернул код {health_response.status_code}"
+                }
+            
+            health_data = health_response.json()
+            
+            # Получаем status данные
+            try:
+                status_response = await client.get(f"{request.endpoint_url}/api/status", headers=headers)
+                status_data = status_response.json() if status_response.status_code == 200 else None
+            except Exception:
+                status_data = None
+            
             return {
                 "success": True,
-                "message": "Подключение успешно",
-                "version": health_status.get('version')
-            }
-        else:
-            return {
-                "success": False,
-                "message": f"Не удалось подключиться: {health_status.get('error')}"
+                "message": "Подключение установлено",
+                "health_data": health_data,
+                "status_data": status_data
             }
             
+    except httpx.TimeoutException:
+        return {
+            "success": False,
+            "error": "Timeout: сервис не отвечает. Убедитесь что он запущен."
+        }
+    except httpx.ConnectError:
+        return {
+            "success": False,
+            "error": "Не удалось подключиться. Проверьте что сервис запущен и URL корректен."
+        }
     except Exception as e:
         logger.error(f"Error testing connection: {e}")
-        return {"success": False, "message": str(e)}
+        return {
+            "success": False,
+            "error": f"Ошибка подключения: {str(e)}"
+        }
 
 # ============================================================================
 # FILTERS AND BLOCKED USERS MANAGEMENT
