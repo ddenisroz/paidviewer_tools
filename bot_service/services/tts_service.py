@@ -209,8 +209,8 @@ class TTSService:
                     engine='gtts',
                     voice='female_1',
                     listening_mode='website',
-                    enable_7tv=True,
-                    enable_twitch=True,
+                    enable_7tv=False,
+                    enable_twitch=False,
                     enable_lexicon_filter=True,
                     enable_custom_lexicon=False,
                     max_message_length=500,
@@ -222,8 +222,8 @@ class TTSService:
                     "engine": 'gtts',
                     "voice": 'female_1',
                     "listeningMode": 'website',
-                    "enable7TV": True,
-                    "enableTwitch": True,
+                    "enable7TV": False,
+                    "enableTwitch": False,
                     "enableLexiconFilter": True,
                     "enableCustomLexicon": False,
                     "maxMessageLength": 500,
@@ -233,8 +233,8 @@ class TTSService:
         except Exception as e:
             logger.error(f"Error getting TTS settings: {e}")
             return {
-                "enable7TV": True,
-                "enableTwitch": True,
+                "enable7TV": False,
+                "enableTwitch": False,
                 "enableLexiconFilter": True,
                 "enableCustomLexicon": False
             }

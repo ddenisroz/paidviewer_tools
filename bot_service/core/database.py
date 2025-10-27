@@ -460,8 +460,8 @@ try:
         enabled_platforms = Column(JSON, nullable=False, default=lambda: ['twitch', 'vk'])  # Список активных платформ
         
         # Фильтры эмодзи и смайлов
-        enable_7tv = Column(Boolean, nullable=False, default=True)  # Включить 7TV смайлы
-        enable_twitch = Column(Boolean, nullable=False, default=True)  # Включить Twitch смайлы
+        enable_7tv = Column(Boolean, nullable=False, default=False)  # Включить 7TV смайлы
+        enable_twitch = Column(Boolean, nullable=False, default=False)  # Включить Twitch смайлы
         enable_lexicon_filter = Column(Boolean, nullable=False, default=True)  # Включить фильтр лексики
         enable_custom_lexicon = Column(Boolean, nullable=False, default=False)  # Включить пользовательский словарь
         
