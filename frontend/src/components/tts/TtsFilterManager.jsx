@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, Plus, UserX, ChevronDown } from 'lucide-react';
+import { X, Plus, UserX, ChevronDown, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { botService } from '../../services/microservices';
 import { useIntegrations } from '../../context/IntegrationsContext';
