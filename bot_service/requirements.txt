@@ -2,6 +2,7 @@ fastapi
 uvicorn
 python-dotenv
 sqlalchemy
+alembic
 aiohttp
 aiofiles
 httpx
