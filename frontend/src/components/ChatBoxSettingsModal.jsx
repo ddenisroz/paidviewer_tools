@@ -1,7 +1,7 @@
 // src/components/ChatBoxSettingsModal.jsx
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Copy, Check, RefreshCw } from 'lucide-react';
+import { X, Copy, Check, RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -623,7 +623,14 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                             disabled={saving}
                             className="bg-purple-600 hover:bg-purple-700 min-w-[120px]"
                         >
-                            {saving ? 'Сохранение...' : 'Сохранить'}
+                            {saving ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Сохранение...
+                                </>
+                            ) : (
+                                'Сохранить'
+                            )}
                         </Button>
                     </div>
                 </div>
