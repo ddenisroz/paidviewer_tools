@@ -365,12 +365,6 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                         background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((settings?.text_stroke_width || 0) / 3) * 100}%, #374151 ${((settings?.text_stroke_width || 0) / 3) * 100}%, #374151 100%)`
                                     }}
                                 />
-                                <div className="flex justify-between text-xs text-gray-500">
-                                    <span>Выкл</span>
-                                    <span>Тонкая</span>
-                                    <span>Средняя</span>
-                                    <span>Жирная</span>
-                                </div>
                             </div>
                             
                             {/* Background Opacity */}
