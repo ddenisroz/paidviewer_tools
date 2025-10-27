@@ -69,67 +69,74 @@ async def _get_commands_impl(current_user: dict, db: Session):
     commands_logger.info(f"Getting commands for user {user_id}")
     
     try:
-        # Получаем базовые команды пользователя
-        basic_commands = db.query(BotCommand).filter(
-            BotCommand.command_type == 'basic',
+        # 1. Получаем ГЛОБАЛЬНЫЕ команды (доступны всем)
+        global_commands = db.query(BotCommand).filter(
+            BotCommand.command_type == 'global',
+            BotCommand.user_id == None
+        ).all()
+        
+        # 2. Получаем USER OVERRIDES (персональные настройки базовых команд)
+        override_commands = db.query(BotCommand).filter(
+            BotCommand.command_type == 'override',
             BotCommand.user_id == current_user["id"]
         ).all()
         
-        # Получаем кастомные команды пользователя
+        # 3. Получаем КАСТОМНЫЕ команды пользователя
         custom_commands = db.query(BotCommand).filter(
             BotCommand.command_type == 'custom',
             BotCommand.user_id == current_user["id"]
         ).all()
         
-        # Преобразуем в нужный формат
-        basic_commands_data = []
-        for cmd in basic_commands:
-            # Парсим теги из строки в список
+        # 4. Поддержка старых 'basic' команд (backward compatibility)
+        old_basic_commands = db.query(BotCommand).filter(
+            BotCommand.command_type == 'basic',
+            BotCommand.user_id == current_user["id"]
+        ).all()
+        
+        # Преобразуем команды в нужный формат
+        def command_to_dict(cmd, command_type_label):
+            """Вспомогательная функция для преобразования команды"""
             tags = []
             if cmd.tags:
                 tags = [tag.strip() for tag in cmd.tags.split(',') if tag.strip()]
             
-            basic_commands_data.append({
+            return {
                 "id": cmd.id,
                 "command_name": cmd.command_name,
-                "response_text": cmd.response_text,
+                "response_text": cmd.response_text or "",
                 "platforms": cmd.platforms or "twitch,vk",
                 "allowed_roles": cmd.allowed_roles or "all",
                 "cooldown_seconds": cmd.cooldown_seconds or 0,
                 "is_enabled": cmd.is_enabled,
                 "description": cmd.description,
+                "command_type": cmd.command_type,
+                "parent_command_id": cmd.parent_command_id,
+                "alias": cmd.alias,
                 "created_at": cmd.created_at.isoformat() if cmd.created_at else None,
                 "updated_at": cmd.updated_at.isoformat() if cmd.updated_at else None,
-                "tags": tags  # Используем реальные теги из базы
-            })
+                "tags": tags
+            }
         
-        custom_commands_data = []
-        for cmd in custom_commands:
-            # Парсим теги из строки в список
-            tags = ["custom"]  # Кастомные команды всегда имеют тег "custom"
-            if cmd.tags:
-                tags.extend([tag.strip() for tag in cmd.tags.split(',') if tag.strip()])
-            
-            custom_commands_data.append({
-                "id": cmd.id,
-                "command_name": cmd.command_name,
-                "response_text": cmd.response_text,
-                "platforms": cmd.platforms or "twitch,vk",
-                "allowed_roles": cmd.allowed_roles or "all",
-                "cooldown_seconds": cmd.cooldown_seconds or 0,
-                "is_enabled": cmd.is_enabled,
-                "description": cmd.description,
-                "created_at": cmd.created_at.isoformat() if cmd.created_at else None,
-                "updated_at": cmd.updated_at.isoformat() if cmd.updated_at else None,
-                "tags": tags  # Используем реальные теги из базы + "custom"
-            })
+        # Формируем глобальные команды
+        global_commands_data = [command_to_dict(cmd, "global") for cmd in global_commands]
+        
+        # Формируем user overrides
+        override_commands_data = [command_to_dict(cmd, "override") for cmd in override_commands]
+        
+        # Объединяем глобальные команды и старые 'basic' для backward compatibility
+        basic_commands_data = global_commands_data + [command_to_dict(cmd, "basic") for cmd in old_basic_commands]
+        
+        # Формируем кастомные команды
+        custom_commands_data = [command_to_dict(cmd, "custom") for cmd in custom_commands]
         
         result = {
             "success": True,
-            "basic_commands": basic_commands_data,
+            "global_commands": global_commands_data,  # Новое: глобальные команды
+            "override_commands": override_commands_data,  # Новое: user overrides
+            "basic_commands": basic_commands_data,  # Backward compatibility: global + old basic
             "custom_commands": custom_commands_data
         }
-        commands_logger.info(f"✓ Returned {len(basic_commands_data)} basic + {len(custom_commands_data)} custom commands")
+        commands_logger.info(f"✓ Returned {len(global_commands_data)} global + {len(override_commands_data)} overrides + {len(custom_commands_data)} custom commands")
         log_response("/api/commands", 200, result)
         return result
         
@@ -158,6 +165,18 @@ async def create_command_no_slash(
 
 async def _create_command_impl(command_data: CommandCreate, current_user: dict, db: Session):
     try:
+        # Проверяем лимит кастомных команд (максимум 5 на пользователя)
+        custom_commands_count = db.query(BotCommand).filter(
+            BotCommand.command_type == 'custom',
+            BotCommand.user_id == current_user["id"]
+        ).count()
+        
+        if custom_commands_count >= 5:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Достигнут лимит кастомных команд (максимум 5). Удалите ненужные команды перед созданием новых."
+            )
+        
         # Проверяем, не существует ли уже такая команда
         existing_command = db.query(BotCommand).filter(
             BotCommand.command_name == command_data.command_name,
