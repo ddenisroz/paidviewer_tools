@@ -172,6 +172,18 @@ export const AuthProvider = ({ children }) => {
                 logger.info('[AUTH] User cache cleared on logout');
             }
             
+            // 🔌 Очищаем SharedWebSocket (глобальный cleanup)
+            try {
+                const { getSharedWebSocket } = await import('../utils/sharedWebSocket');
+                const wsManager = getSharedWebSocket(userId);
+                if (wsManager) {
+                    wsManager.cleanup();
+                    logger.info('[AUTH] WebSocket cleaned up on logout');
+                }
+            } catch (error) {
+                logger.error('[AUTH] Failed to cleanup WebSocket:', error);
+            }
+            
             toast.success('Вы успешно вышли из системы.');
         } catch (error) {
             logger.error('Logout failed:', error);

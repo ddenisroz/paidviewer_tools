@@ -345,14 +345,36 @@ class SharedWebSocketManager {
     }
 }
 
-// Singleton instance
-let instance = null;
+// 🔒 Singleton Pattern - глобальный менеджер для ВСЕХ вкладок и контекстов
+// Один экземпляр на весь браузер (все вкладки синхронизируются через BroadcastChannel)
+let globalInstance = null;
 
-export const getSharedWebSocket = () => {
-    if (!instance) {
-        instance = new SharedWebSocketManager();
+/**
+ * Получить глобальный экземпляр SharedWebSocketManager (Singleton)
+ * @param {string|number} userId - ID пользователя для подключения
+ * @returns {SharedWebSocketManager}
+ */
+export const getSharedWebSocket = (userId) => {
+    // Если экземпляр уже существует И userId не изменился - возвращаем его
+    if (globalInstance && globalInstance.userId === userId) {
+        return globalInstance;
     }
-    return instance;
+    
+    // Если userId изменился - чистим старый экземпляр и создаём новый
+    if (globalInstance && globalInstance.userId !== userId) {
+        logger.warn(`[SINGLETON] User changed from ${globalInstance.userId} to ${userId}, recreating manager`);
+        globalInstance.cleanup();
+        globalInstance = null;
+    }
+    
+    // Создаём новый экземпляр
+    if (!globalInstance) {
+        logger.info(`[SINGLETON] Creating new global SharedWebSocketManager for user ${userId}`);
+        globalInstance = new SharedWebSocketManager();
+        globalInstance.init(userId);
+    }
+    
+    return globalInstance;
 };
 
 export default getSharedWebSocket;

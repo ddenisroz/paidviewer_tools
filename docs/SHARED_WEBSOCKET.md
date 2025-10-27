@@ -47,7 +47,9 @@ Shared WebSocket система использует **Leader Election** для 
 
 ### Компоненты
 
-#### 1. **SharedWebSocketManager** (`frontend/src/utils/sharedWebSocket.js`)
+#### 1. **SharedWebSocketManager** (`frontend/src/utils/sharedWebSocket.js`) - **SINGLETON**
+
+**🔒 Важно:** `SharedWebSocketManager` является глобальным Singleton - один экземпляр на весь браузер.
 
 Singleton класс, управляющий WebSocket соединением и координацией между вкладками.
 
@@ -143,6 +145,87 @@ setInterval(() => {
 3. Followers → _electLeader()
 4. First to respond → становится новым лидером
 ```
+
+---
+
+## 🔒 Singleton Pattern
+
+### Проблема (до исправления)
+
+**Множественные экземпляры:**
+```javascript
+// ChatContext.jsx
+const manager1 = new SharedWebSocketManager(); // ← Экземпляр #1
+
+// ChatOverlay.jsx
+const manager2 = new SharedWebSocketManager(); // ← Экземпляр #2
+
+// HomePage.jsx
+const manager3 = new SharedWebSocketManager(); // ← Экземпляр #3
+```
+
+**Результат:** 3 WebSocket подключения вместо 1
+
+---
+
+### Решение: Глобальный Singleton
+
+```javascript
+// frontend/src/utils/sharedWebSocket.js
+
+let globalInstance = null;
+
+export const getSharedWebSocket = (userId) => {
+    // Если экземпляр уже существует И userId не изменился
+    if (globalInstance && globalInstance.userId === userId) {
+        return globalInstance; // ← Возвращаем существующий
+    }
+    
+    // Если userId изменился - пересоздаём
+    if (globalInstance && globalInstance.userId !== userId) {
+        globalInstance.cleanup();
+        globalInstance = null;
+    }
+    
+    // Создаём ОДИН экземпляр
+    if (!globalInstance) {
+        globalInstance = new SharedWebSocketManager();
+        globalInstance.init(userId);
+    }
+    
+    return globalInstance;
+};
+```
+
+### Использование
+
+```javascript
+// frontend/src/hooks/useSharedWebSocket.js
+
+const wsManagerRef = useRef(null);
+
+useEffect(() => {
+    // ✅ Получаем Singleton (создаётся только 1 раз)
+    wsManagerRef.current = getSharedWebSocket(userId);
+    
+    // Добавляем обработчик
+    wsManagerRef.current.addMessageHandler(handleMessage);
+    
+    return () => {
+        // ❌ НЕ вызываем cleanup() - instance shared!
+        wsManagerRef.current.removeMessageHandler(handleMessage);
+    };
+}, [userId]);
+```
+
+### Результат
+
+| Компонент | До Singleton | После Singleton |
+|-----------|--------------|-----------------|
+| ChatContext | WebSocket #1 | → Singleton |
+| ChatOverlay | WebSocket #2 | → Singleton |
+| HomePage | WebSocket #3 | → Singleton |
+| **ИТОГО** | **3 подключения** | **1 подключение** ✅ |
 
 ---
 

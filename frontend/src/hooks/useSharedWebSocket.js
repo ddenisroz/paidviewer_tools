@@ -33,22 +33,22 @@ export const useSharedWebSocket = (userId, onMessage) => {
             return;
         }
 
-        logger.info(`Initializing shared WebSocket for user ${userId}`);
+        logger.debug(`[HOOK] Requesting shared WebSocket for user ${userId}`);
         
-        // Получаем singleton instance
-        wsManagerRef.current = getSharedWebSocket();
+        // 🔒 Получаем singleton instance (он сам инициализируется если нужно)
+        wsManagerRef.current = getSharedWebSocket(userId);
         
-        // Инициализируем для данного пользователя
-        wsManagerRef.current.init(userId);
-        
-        // Добавляем обработчик сообщений
+        // ✅ Добавляем обработчик сообщений
         wsManagerRef.current.addMessageHandler(handleMessage);
+        
+        logger.debug(`[HOOK] Message handler registered for user ${userId}`);
 
-        // Cleanup при размонтировании
+        // 🧹 Cleanup при размонтировании - удаляем ТОЛЬКО обработчик
         return () => {
             if (wsManagerRef.current) {
+                logger.debug(`[HOOK] Removing message handler for user ${userId}`);
                 wsManagerRef.current.removeMessageHandler(handleMessage);
-                // Не вызываем cleanup() здесь, так как instance shared между компонентами
+                // ❌ НЕ вызываем cleanup() - instance используется другими компонентами!
             }
         };
     }, [userId, handleMessage]);
