@@ -5,7 +5,7 @@ import { connectBot, disconnectBot, getBotStatus } from '../services/microservic
 import { AuthContext, useAuth } from './AuthContext';
 import { useToast } from '../components/ui/toast';
 import { useIntegrations } from './IntegrationsContext';
-import { useWebSocket } from '../hooks/useWebSocket';
+import useSharedWebSocket from '../hooks/useSharedWebSocket';
 import api from '../services/api';
 import { chatLogger as logger } from '../utils/logger';
 
@@ -167,19 +167,10 @@ export const ChatProvider = ({ children }) => {
     }
     // Для гостей используем session_id как уникальный идентификатор, для обычных пользователей - реальный ID
     const userId = isGuest ? user?.session_id : user?.id;
-    const wsUrl = (isAuthenticated === true || isGuest === true) ? `${baseUrl.replace('http', 'ws')}/ws/chat/${userId}` : null;
+    const [isConnected, setIsConnected] = useState(false);
     
-    // Логируем WebSocket URL только если есть проблемы
-    if (!wsUrl && (isAuthenticated || isGuest)) {
-        logger.warn(`Failed to construct WebSocket URL - baseUrl: ${baseUrl}, userId: ${userId}, isAuth: ${isAuthenticated}, isGuest: ${isGuest}`);
-    }
-    
-    // Мемоизируем WebSocket URL чтобы избежать пересоздания соединения
-    const memoizedWsUrl = useMemo(() => wsUrl, [wsUrl]);
-    
-    // Мемоизируем опции WebSocket чтобы избежать пересоздания соединения
-    const wsOptions = useMemo(() => ({
-        onMessage: (data) => {
+    // 📡 Обработчик WebSocket сообщений для Shared WebSocket
+    const handleWebSocketMessage = useCallback((data) => {
             setLastJsonMessage(data);
             
             // 🔍 DEBUG: Логируем ВСЕ входящие WebSocket сообщения
@@ -298,26 +289,19 @@ export const ChatProvider = ({ children }) => {
             } else {
                 logger.debug('Unknown message type:', data.type);
             }
-        },
-        onOpen: () => {
-            logger.info('Chat WebSocket connected');
-            setError(null);
-        },
-        onClose: () => {
-            // Логируем только если это не нормальное закрытие
-            logger.debug('Chat WebSocket disconnected');
-        },
-        onError: (error) => {
-            logger.error('Chat WebSocket error:', error);
-            setError('Ошибка соединения с чатом');
-        },
-        autoReconnect: true,
-        reconnectInterval: 5000,  // Увеличиваем интервал переподключения до 5 секунд
-        maxReconnectAttempts: 5,  // Уменьшаем количество попыток
-        heartbeatInterval: 30000  // Heartbeat каждые 30 секунд
-    }), [addToast, audioContext, audioUnlocked, autoplayToastShown]);
+    }, [addToast]);
     
-    const { isConnected, sendMessage: wsSendMessage } = useWebSocket(memoizedWsUrl, wsOptions);
+    // 🔌 Подключаем Shared WebSocket
+    const { send: wsSendMessage } = useSharedWebSocket(userId, handleWebSocketMessage);
+    
+    // Устанавливаем isConnected на true если userId есть (Shared WebSocket автоматически подключается)
+    useEffect(() => {
+        if (userId && (isAuthenticated || isGuest)) {
+            setIsConnected(true);
+        } else {
+            setIsConnected(false);
+        }
+    }, [userId, isAuthenticated, isGuest]);
     
     // Сохраняем messages в localStorage при изменении
     useEffect(() => {

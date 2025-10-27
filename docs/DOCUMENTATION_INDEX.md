@@ -1,6 +1,6 @@
 # 📚 Индекс документации TTS_TTV_0.02
 
-**Последнее обновление:** 25 октября 2025 (Session 7)
+**Последнее обновление:** 27 октября 2025 (Session 9)
 
 ---
 
@@ -51,6 +51,9 @@
 | Документ | Описание |
 |----------|----------|
 | [TOKEN_SYSTEM_UNIFIED.md](TOKEN_SYSTEM_UNIFIED.md) | 🔐 Унифицированная система токенов (TokenManager) |
+| [SHARED_WEBSOCKET.md](SHARED_WEBSOCKET.md) | 🔌 **Shared WebSocket с Leader Election (Session 9)** |
+| [CACHING_SYSTEM.md](CACHING_SYSTEM.md) | 💾 Система кэширования с multi-tab sync |
+| [GUEST_MODE_SUPPORT.md](GUEST_MODE_SUPPORT.md) | 👤 Гостевой режим (без авторизации) |
 | [SECURITY_LOGIC.md](SECURITY_LOGIC.md) | Логика безопасности и авторизации |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Инструкции по деплою |
 | [CATEGORY_MAPPING_GUIDE.md](CATEGORY_MAPPING_GUIDE.md) | Гайд по категориям стрима |
