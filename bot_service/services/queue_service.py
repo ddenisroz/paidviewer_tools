@@ -311,6 +311,90 @@ class QueueService:
             if should_close:
                 db.close()
     
+    def remove_last_user_video(
+        self, 
+        user_id: int, 
+        requester_id: str, 
+        requester_name: str,
+        platform: str,
+        db: Session = None
+    ) -> Dict[str, Any]:
+        """
+        Удаление последнего видео, добавленного конкретным пользователем (команда !wronglink)
+        
+        Args:
+            user_id: ID владельца канала
+            requester_id: ID пользователя, который добавил видео
+            requester_name: Имя пользователя
+            platform: Платформа (twitch/vk)
+            db: Database session
+        
+        Returns:
+            Dict с результатом операции
+        """
+        if db is None:
+            db = next(get_db())
+            should_close = True
+        else:
+            should_close = False
+        
+        try:
+            # Ищем последнее pending видео этого пользователя
+            last_video = db.query(YouTubeQueue).filter(
+                and_(
+                    YouTubeQueue.user_id == user_id,
+                    YouTubeQueue.requester_id == requester_id,
+                    YouTubeQueue.platform == platform,
+                    YouTubeQueue.status == 'pending'
+                )
+            ).order_by(desc(YouTubeQueue.added_at)).first()
+            
+            if not last_video:
+                return {
+                    "success": False,
+                    "error": f"@{requester_name}, у вас нет видео в очереди"
+                }
+            
+            video_title = last_video.title
+            
+            # Возвращаем баллы, если видео было платным
+            if last_video.is_paid and last_video.points_cost:
+                self._refund_points_sync(
+                    user_id, requester_id, requester_name,
+                    platform, last_video.channel_name, 
+                    last_video.points_cost, 
+                    f"Wronglink refund: {video_title}", 
+                    db
+                )
+            
+            # Удаляем из очереди
+            last_video.status = 'skipped'
+            
+            # Перестраиваем позиции
+            self._rebuild_positions(user_id, db)
+            
+            db.commit()
+            
+            logger.info(f"[WRONGLINK] User {requester_name} removed their video: {video_title}")
+            return {
+                "success": True,
+                "message": f"@{requester_name}, видео '{video_title}' удалено из очереди",
+                "refunded": last_video.is_paid,
+                "points_refunded": last_video.points_cost if last_video.is_paid else 0
+            }
+            
+        except Exception as e:
+            if db:
+                db.rollback()
+            logger.error(f"[WRONGLINK] Error removing last user video: {e}")
+            return {
+                "success": False,
+                "error": f"@{requester_name}, ошибка удаления видео"
+            }
+        finally:
+            if should_close:
+                db.close()
+    
     async def _refund_points(
         self, 
         user_id: int, 

@@ -627,6 +627,78 @@ class UniversalCommandHandler:
             self.logger.error(f"Error in !queue handler: {e}", exc_info=True)
             await ctx.send(f"@{ctx.author.name} ❌ Ошибка получения очереди")
     
+    async def _handle_wronglink(self, ctx, bot, args, platform, db):
+        """Handler для !wronglink (Twitch) - удаление последнего своего видео"""
+        try:
+            from services.queue_service import QueueService
+            from core.database import User
+            
+            # Получаем user_id владельца канала
+            user = db.query(User).filter(
+                User.twitch_username == ctx.channel.name.lower()
+            ).first()
+            
+            if not user:
+                await ctx.send(f"@{ctx.author.name} ❌ Канал не найден")
+                return
+            
+            queue_service = QueueService()
+            result = queue_service.remove_last_user_video(
+                user_id=user.id,
+                requester_id=str(ctx.author.id),
+                requester_name=ctx.author.name,
+                platform='twitch',
+                db=db
+            )
+            
+            if result['success']:
+                refund_msg = ""
+                if result.get('refunded'):
+                    refund_msg = f" (возвращено {result['points_refunded']} баллов)"
+                await ctx.send(f"{result['message']}{refund_msg}")
+            else:
+                await ctx.send(result['error'])
+            
+        except Exception as e:
+            self.logger.error(f"Error in !wronglink handler: {e}", exc_info=True)
+            await ctx.send(f"@{ctx.author.name} ❌ Ошибка удаления видео")
+    
+    async def _handle_wronglink_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
+        """Handler для !wronglink (VK) - удаление последнего своего видео"""
+        try:
+            from services.queue_service import QueueService
+            from core.database import User
+            
+            # Получаем user_id владельца канала
+            user = db.query(User).filter(
+                User.vk_username == channel_name.lower()
+            ).first()
+            
+            if not user:
+                await vk_bot.send_message(channel_name, f"@{author_name} ❌ Канал не найден")
+                return
+            
+            queue_service = QueueService()
+            result = queue_service.remove_last_user_video(
+                user_id=user.id,
+                requester_id=str(author_id),
+                requester_name=author_name,
+                platform='vk',
+                db=db
+            )
+            
+            if result['success']:
+                refund_msg = ""
+                if result.get('refunded'):
+                    refund_msg = f" (возвращено {result['points_refunded']} баллов)"
+                await vk_bot.send_message(channel_name, f"{result['message']}{refund_msg}")
+            else:
+                await vk_bot.send_message(channel_name, result['error'])
+            
+        except Exception as e:
+            self.logger.error(f"Error in !wronglink VK handler: {e}", exc_info=True)
+            await vk_bot.send_message(channel_name, f"@{author_name} ❌ Ошибка удаления видео")
+    
     async def _handle_queue_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
         """Handler для !queue (VK)"""
         try:

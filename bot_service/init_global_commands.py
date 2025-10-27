@@ -55,6 +55,13 @@ def init_global_commands():
                 "cooldown_seconds": 10
             },
             {
+                "command_name": "wronglink",
+                "description": "Отменить последнее заказанное вами видео",
+                "tags": "Медиа и интерактивность",
+                "allowed_roles": "all",
+                "cooldown_seconds": 5
+            },
+            {
                 "command_name": "title",
                 "description": "Сменить название стрима",
                 "tags": "Управление трансляцией",
