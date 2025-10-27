@@ -87,6 +87,8 @@ class TtsSettingsRequest(BaseModel):
     maxMessageLength: int = Field(500, ge=50, le=2000)
     skipCommands: bool = Field(True)
     useLocalTTS: bool = Field(False)
+    filterReplies: bool = Field(False)  # Фильтровать ответы
+    filterMentions: bool = Field(False)  # Фильтровать упоминания
     
     @validator('engine')
     def validate_engine(cls, v):
@@ -462,6 +464,8 @@ async def save_tts_settings(
             max_message_length=request.maxMessageLength,
             skip_commands=request.skipCommands,
             use_local_tts=request.useLocalTTS,
+            filter_replies=request.filterReplies,
+            filter_mentions=request.filterMentions,
             **user_filters
         )
         

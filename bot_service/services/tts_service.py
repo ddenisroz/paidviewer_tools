@@ -244,7 +244,8 @@ class TTSService:
                                user_id: int = None, session_id: str = None,
                                engine: str = None, voice: str = None, listening_mode: str = None,
                                max_message_length: int = None, skip_commands: bool = None,
-                               use_local_tts: bool = None) -> bool:
+                               use_local_tts: bool = None,
+                               filter_replies: bool = None, filter_mentions: bool = None) -> bool:
         """Сохранить базовые настройки TTS пользователя"""
         try:
             # Ищем настройки по user_id или session_id
@@ -280,6 +281,10 @@ class TTSService:
                     settings.skip_commands = skip_commands
                 if use_local_tts is not None:
                     settings.use_local_tts = use_local_tts
+                if filter_replies is not None:
+                    settings.filter_replies = filter_replies
+                if filter_mentions is not None:
+                    settings.filter_mentions = filter_mentions
             else:
                 # Создаем новые настройки для любого пользователя (включая гостей)
                 settings = TTSUserSettings(
@@ -293,7 +298,9 @@ class TTSService:
                     enable_lexicon_filter=enable_lexicon_filter,
                     enable_custom_lexicon=enable_custom_lexicon,
                     max_message_length=max_message_length or 500,
-                    skip_commands=skip_commands if skip_commands is not None else True
+                    skip_commands=skip_commands if skip_commands is not None else True,
+                    filter_replies=filter_replies if filter_replies is not None else False,
+                    filter_mentions=filter_mentions if filter_mentions is not None else False
                 )
                 self.db.add(settings)
             

@@ -61,6 +61,8 @@ const TtsMainPageContent = () => {
         enableTwitch: true,
         enableLexiconFilter: true,
         enableCustomLexicon: false,
+        filterReplies: false,
+        filterMentions: false,
     });
     
     // Состояния сохранения
@@ -171,7 +173,9 @@ const TtsMainPageContent = () => {
                         enable7TV: ttsResponse.data.enable7TV ?? true,
                         enableTwitch: ttsResponse.data.enableTwitch ?? true,
                         enableLexiconFilter: ttsResponse.data.enableLexiconFilter ?? true,
-                        enableCustomLexicon: ttsResponse.data.enableCustomLexicon ?? false
+                        enableCustomLexicon: ttsResponse.data.enableCustomLexicon ?? false,
+                        filterReplies: ttsResponse.data.filterReplies ?? false,
+                        filterMentions: ttsResponse.data.filterMentions ?? false
                     };
                     setTtsSettings(ttsData);
                     ttsLogger.success('TTS settings loaded:', ttsData);

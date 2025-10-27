@@ -92,6 +92,12 @@ class BasicTTS:
         if not processed_text:
             return ""
         
+        # 🛡️ АВТОФИЛЬТР: Блокируем URL-адреса
+        url_pattern = r'(https?://|www\.|[a-zA-Z0-9-]+\.(com|ru|net|org|tv|gg|me|io|co|us|uk|de|fr|cn|jp|br|in|au|ca|eu))'
+        if re.search(url_pattern, processed_text, re.IGNORECASE):
+            logger.warning(f"⛔ Текст содержит URL - блокируем: {processed_text[:50]}...")
+            return ""
+        
         # Проверяем, состоит ли текст только из символов
         text_no_spaces = processed_text.replace(" ", "")
         has_letter_or_digit = any(c.isalnum() for c in text_no_spaces)

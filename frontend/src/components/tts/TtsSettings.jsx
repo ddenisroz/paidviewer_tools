@@ -56,6 +56,43 @@ const TtsSettings = ({
                             </Label>
                         </div>
                     </div>
+                    
+                    {/* 🛡️ Фильтры сообщений */}
+                    <div className="mt-4 pt-4 border-t border-gray-700">
+                        <h3 className="text-sm font-semibold text-gray-300 mb-3">Фильтры сообщений</h3>
+                        
+                        <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                            <div className="flex flex-col">
+                                <Label htmlFor="filterReplies" className="text-sm font-medium">
+                                    Игнорировать ответы
+                                </Label>
+                                <span className="text-xs text-gray-400 mt-1">
+                                    Не озвучивать сообщения-ответы (reply)
+                                </span>
+                            </div>
+                            <Switch
+                                id="filterReplies"
+                                checked={ttsSettings.filterReplies || false}
+                                onCheckedChange={(checked) => handleSettingChange('filterReplies', checked)}
+                            />
+                        </div>
+                        
+                        <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg mt-3">
+                            <div className="flex flex-col">
+                                <Label htmlFor="filterMentions" className="text-sm font-medium">
+                                    Игнорировать упоминания
+                                </Label>
+                                <span className="text-xs text-gray-400 mt-1">
+                                    Не озвучивать сообщения с @упоминаниями
+                                </span>
+                            </div>
+                            <Switch
+                                id="filterMentions"
+                                checked={ttsSettings.filterMentions || false}
+                                onCheckedChange={(checked) => handleSettingChange('filterMentions', checked)}
+                            />
+                        </div>
+                    </div>
                 </div>
             </CardContent>
         </Card>

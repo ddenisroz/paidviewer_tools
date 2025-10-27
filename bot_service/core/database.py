@@ -470,6 +470,10 @@ try:
         skip_commands = Column(Boolean, nullable=False, default=True)  # Пропускать команды (начинающиеся с !)
         use_local_tts = Column(Boolean, nullable=False, default=False)  # Использовать локальный TTS F5 движок
         
+        # Фильтры сообщений (опциональные)
+        filter_replies = Column(Boolean, nullable=False, default=False)  # Фильтровать ответы (reply)
+        filter_mentions = Column(Boolean, nullable=False, default=False)  # Фильтровать упоминания (@username)
+        
         created_at = Column(DateTime, default=utcnow_naive)
         updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
         

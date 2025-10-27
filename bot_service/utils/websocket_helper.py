@@ -140,7 +140,9 @@ async def handle_tts_for_message(
     platform: str,
     tts_api,
     connection_manager,
-    skip_if_command: bool = True
+    skip_if_command: bool = True,
+    is_reply: bool = False,
+    mentioned_users: list = None
 ) -> Dict[str, Any]:
     """
     Обработать TTS для сообщения
@@ -153,6 +155,8 @@ async def handle_tts_for_message(
         tts_api: Экземпляр TTSAPI
         connection_manager: Менеджер соединений
         skip_if_command: Пропустить команды (начинаются с !)
+        is_reply: Является ли сообщение ответом (reply)
+        mentioned_users: Список упомянутых пользователей (@username)
     
     Returns:
         Dict с результатом: {"success": bool, "error": str|None, "tts_type": str|None}
@@ -322,6 +326,30 @@ async def handle_tts_for_message(
                 logger.info(f"⛔ User {username} is blocked from TTS by owner")
                 db.close()
                 return {"success": False, "error": "User is blocked from TTS"}
+            
+            # 🛡️ ФИЛЬТР ОТВЕТОВ (если включен)
+            if tts_user_settings.filter_replies and is_reply:
+                logger.info(f"⏭️ [{platform.upper()} TTS] Skipping reply message (filter_replies=True)")
+                db.close()
+                return {"success": False, "error": "Reply messages are filtered"}
+            
+            # 🛡️ ФИЛЬТР УПОМИНАНИЙ (если включен)
+            if tts_user_settings.filter_mentions and mentioned_users:
+                # Проверяем есть ли упоминания в тексте (через @ или просто список)
+                has_mentions = False
+                if mentioned_users and len(mentioned_users) > 0:
+                    has_mentions = True
+                else:
+                    # Дополнительная проверка через regex для @username
+                    import re
+                    mention_pattern = r'@\w+'
+                    if re.search(mention_pattern, text):
+                        has_mentions = True
+                
+                if has_mentions:
+                    logger.info(f"⏭️ [{platform.upper()} TTS] Skipping message with mentions (filter_mentions=True)")
+                    db.close()
+                    return {"success": False, "error": "Messages with mentions are filtered"}
             
             # Используем отфильтрованный текст для TTS
             text_for_tts = filtered_text
