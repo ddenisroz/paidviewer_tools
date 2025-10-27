@@ -81,11 +81,10 @@ import PageWrapper from '../components/PageWrapper';
     // Роли согласно Twitch API и VK API
     // Twitch: broadcaster, moderator, vip, subscriber, founder
     // VK: owner (алиас broadcaster), moderator
+    // Владелец канала (broadcaster) имеет доступ ко всем командам автоматически
     const roleOptions = [
         { value: 'all', label: 'Все зрители', icon: <Users className="h-3 w-3" /> },
-        { value: 'broadcaster', label: 'Владелец канала', icon: <Crown className="h-3 w-3" /> },
-        { value: 'moderator,broadcaster', label: 'Модераторы и выше', icon: <ShieldCheck className="h-3 w-3" /> },
-        { value: 'moderator', label: 'Только модераторы', icon: <ShieldCheck className="h-3 w-3" /> },
+        { value: 'moderator', label: 'Модераторы', icon: <ShieldCheck className="h-3 w-3" /> },
         { value: 'vip', label: 'VIP (только Twitch)', icon: <Star className="h-3 w-3" /> },
         { value: 'subscriber', label: 'Подписчики (только Twitch)', icon: <Star className="h-3 w-3" /> }
     ];
@@ -262,8 +261,12 @@ import PageWrapper from '../components/PageWrapper';
     };
 
     const getRoleLabel = (role) => {
+        // Broadcaster всегда имеет доступ ко всем командам
+        if (role === 'broadcaster') {
+            return 'Владелец канала';
+        }
+        
         // Нормализуем роль - сортируем для совместимости
-        // "broadcaster,moderator" === "moderator,broadcaster"
         const normalizedRole = role?.split(',').sort().join(',');
         const option = roleOptions.find(opt => {
             const normalizedValue = opt.value?.split(',').sort().join(',');
@@ -273,6 +276,11 @@ import PageWrapper from '../components/PageWrapper';
     };
 
     const getRoleIcon = (role) => {
+        // Broadcaster всегда имеет доступ ко всем командам
+        if (role === 'broadcaster') {
+            return <Crown className="h-3 w-3" />;
+        }
+        
         const normalizedRole = role?.split(',').sort().join(',');
         const option = roleOptions.find(opt => {
             const normalizedValue = opt.value?.split(',').sort().join(',');
