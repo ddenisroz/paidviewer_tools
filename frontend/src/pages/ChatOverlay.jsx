@@ -481,15 +481,8 @@ const ChatOverlay = () => {
         setContextMenu({ x, y, username, platform });
     };
     
-    // Статусы подключения для индикатора
-    const statusConfig = {
-        connecting: { emoji: '🔌', text: 'Подключение...', color: '#FFA500' },
-        connected: { emoji: '✅', text: 'Подключено', color: '#00C851' },
-        reconnecting: { emoji: '🔄', text: 'Переподключение...', color: '#FFBB33' },
-        error: { emoji: '❌', text: 'Ошибка подключения', color: '#FF4444' }
-    };
-    
-    const currentStatus = statusConfig[wsStatus] || statusConfig.connecting;
+    // ✅ SharedWebSocket управляет статусом автоматически
+    // Индикатор статуса подключения больше не нужен
     
     return (
         <>
@@ -582,28 +575,6 @@ const ChatOverlay = () => {
                     }
                 `}
             </style>
-            
-            {/* Индикатор статуса подключения */}
-            {wsStatus !== 'connected' && (
-                <div style={{
-                    position: 'fixed',
-                    top: '10px',
-                    right: '10px',
-                    background: 'rgba(0,0,0,0.8)',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '14px',
-                    color: currentStatus.color,
-                    animation: wsStatus === 'connecting' || wsStatus === 'reconnecting' ? 'pulse 1.5s ease-in-out infinite' : 'none',
-                    zIndex: 9999
-                }}>
-                    <span>{currentStatus.emoji}</span>
-                    <span>{currentStatus.text}</span>
-                </div>
-            )}
             
             <div style={containerStyle}>
                 {messages.length === 0 ? (
