@@ -591,6 +591,452 @@ class UniversalCommandHandler:
             await vk_bot.send_message(channel_name, 
                 f"@{author_name} ❌ Ошибка получения очереди")
     
+    # === STREAM MANAGEMENT COMMANDS ===
+    
+    async def _handle_title(self, ctx, bot, args, platform, db):
+        """Handler для !title (Twitch)"""
+        try:
+            if not args:
+                await ctx.send(f"@{ctx.author.name} ❌ Использование: !title <новое название>")
+                return
+            
+            # Получаем user_id владельца канала
+            from core.database import User
+            user = db.query(User).filter(
+                User.twitch_username == ctx.channel.name.lower()
+            ).first()
+            
+            if not user:
+                await ctx.send(f"@{ctx.author.name} ❌ Канал не найден")
+                return
+            
+            # Обновляем название через Twitch API
+            from api.twitch_api import TwitchAPI
+            from core.connection_manager import get_connection_manager
+            connection_manager = get_connection_manager()
+            twitch_api = TwitchAPI(connection_manager)
+            
+            success = await twitch_api.update_stream_title(user.id, args)
+            
+            if success:
+                # Обрезаем название для отображения
+                display_title = args[:50] + '...' if len(args) > 50 else args
+                await ctx.send(f"@{ctx.author.name} ✅ Название изменено на: {display_title}")
+                self.logger.info(f"✓ Title changed for {ctx.channel.name}")
+            else:
+                await ctx.send(f"@{ctx.author.name} ❌ Не удалось изменить название")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !title handler: {e}", exc_info=True)
+            await ctx.send(f"@{ctx.author.name} ❌ Ошибка изменения названия")
+    
+    async def _handle_title_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
+        """Handler для !title (VK)"""
+        try:
+            if not args:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ❌ Использование: !title <новое название>")
+                return
+            
+            # Получаем user_id владельца канала
+            from core.database import User
+            user = db.query(User).filter(
+                User.vk_username == channel_name.lower()
+            ).first()
+            
+            if not user:
+                await vk_bot.send_message(channel_name, f"@{author_name} ❌ Канал не найден")
+                return
+            
+            # Обновляем название через VK API
+            from api.vk_api import VKLiveAPI
+            vk_api = VKLiveAPI()
+            
+            success = await vk_api.update_stream_title(str(user.id), args)
+            
+            if success:
+                # Обрезаем название для отображения
+                display_title = args[:50] + '...' if len(args) > 50 else args
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ✅ Название изменено на: {display_title}")
+                self.logger.info(f"✓ Title changed for VK {channel_name}")
+            else:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ❌ Не удалось изменить название")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !title VK handler: {e}", exc_info=True)
+            await vk_bot.send_message(channel_name, 
+                f"@{author_name} ❌ Ошибка изменения названия")
+    
+    # === TTS COMMANDS ===
+    
+    async def _handle_voice(self, ctx, bot, args, platform, db):
+        """Handler для !voice (Twitch)"""
+        try:
+            if not args:
+                await ctx.send(f"@{ctx.author.name} ❌ Использование: !voice <имя голоса>")
+                return
+            
+            # Получаем user_id владельца канала
+            from core.database import User
+            user = db.query(User).filter(
+                User.twitch_username == ctx.channel.name.lower()
+            ).first()
+            
+            if not user:
+                await ctx.send(f"@{ctx.author.name} ❌ Канал не найден")
+                return
+            
+            # Получаем настройки TTS
+            from services.tts_service import TTSService
+            tts_service = TTSService()
+            
+            # Устанавливаем голос
+            success = await tts_service.set_voice(user.id, args.lower(), db)
+            
+            if success:
+                await ctx.send(f"@{ctx.author.name} 🎙️ Голос изменён на: {args}")
+                self.logger.info(f"✓ Voice changed to {args} for {ctx.channel.name}")
+            else:
+                await ctx.send(f"@{ctx.author.name} ❌ Голос '{args}' не найден")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !voice handler: {e}", exc_info=True)
+            await ctx.send(f"@{ctx.author.name} ❌ Ошибка смены голоса")
+    
+    async def _handle_voice_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
+        """Handler для !voice (VK)"""
+        try:
+            if not args:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ❌ Использование: !voice <имя голоса>")
+                return
+            
+            # Получаем user_id владельца канала
+            from core.database import User
+            user = db.query(User).filter(
+                User.vk_username == channel_name.lower()
+            ).first()
+            
+            if not user:
+                await vk_bot.send_message(channel_name, f"@{author_name} ❌ Канал не найден")
+                return
+            
+            # Получаем настройки TTS
+            from services.tts_service import TTSService
+            tts_service = TTSService()
+            
+            # Устанавливаем голос
+            success = await tts_service.set_voice(user.id, args.lower(), db)
+            
+            if success:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} 🎙️ Голос изменён на: {args}")
+                self.logger.info(f"✓ Voice changed to {args} for VK {channel_name}")
+            else:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ❌ Голос '{args}' не найден")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !voice VK handler: {e}", exc_info=True)
+            await vk_bot.send_message(channel_name, 
+                f"@{author_name} ❌ Ошибка смены голоса")
+    
+    async def _handle_randomvoice(self, ctx, bot, args, platform, db):
+        """Handler для !randomvoice (Twitch)"""
+        try:
+            # Получаем user_id владельца канала
+            from core.database import User
+            user = db.query(User).filter(
+                User.twitch_username == ctx.channel.name.lower()
+            ).first()
+            
+            if not user:
+                await ctx.send(f"@{ctx.author.name} ❌ Канал не найден")
+                return
+            
+            # Получаем настройки TTS
+            from services.tts_service import TTSService
+            tts_service = TTSService()
+            
+            # Устанавливаем случайный голос
+            voice_name = await tts_service.set_random_voice(user.id, db)
+            
+            if voice_name:
+                await ctx.send(f"@{ctx.author.name} 🎲 Случайный голос: {voice_name}")
+                self.logger.info(f"✓ Random voice {voice_name} for {ctx.channel.name}")
+            else:
+                await ctx.send(f"@{ctx.author.name} ❌ Не удалось выбрать случайный голос")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !randomvoice handler: {e}", exc_info=True)
+            await ctx.send(f"@{ctx.author.name} ❌ Ошибка выбора случайного голоса")
+    
+    async def _handle_randomvoice_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
+        """Handler для !randomvoice (VK)"""
+        try:
+            # Получаем user_id владельца канала
+            from core.database import User
+            user = db.query(User).filter(
+                User.vk_username == channel_name.lower()
+            ).first()
+            
+            if not user:
+                await vk_bot.send_message(channel_name, f"@{author_name} ❌ Канал не найден")
+                return
+            
+            # Получаем настройки TTS
+            from services.tts_service import TTSService
+            tts_service = TTSService()
+            
+            # Устанавливаем случайный голос
+            voice_name = await tts_service.set_random_voice(user.id, db)
+            
+            if voice_name:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} 🎲 Случайный голос: {voice_name}")
+                self.logger.info(f"✓ Random voice {voice_name} for VK {channel_name}")
+            else:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ❌ Не удалось выбрать случайный голос")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !randomvoice VK handler: {e}", exc_info=True)
+            await vk_bot.send_message(channel_name, 
+                f"@{author_name} ❌ Ошибка выбора случайного голоса")
+    
+    async def _handle_mute(self, ctx, bot, args, platform, db):
+        """Handler для !mute (Twitch)"""
+        try:
+            if not args:
+                await ctx.send(f"@{ctx.author.name} ❌ Использование: !mute <username>")
+                return
+            
+            # Получаем user_id владельца канала
+            from core.database import User
+            user = db.query(User).filter(
+                User.twitch_username == ctx.channel.name.lower()
+            ).first()
+            
+            if not user:
+                await ctx.send(f"@{ctx.author.name} ❌ Канал не найден")
+                return
+            
+            # Блокируем пользователя для TTS
+            from services.tts_service import TTSService
+            tts_service = TTSService()
+            
+            target_username = args.strip().lower()
+            success = tts_service.block_user(user.id, target_username, 'twitch', db)
+            
+            if success:
+                await ctx.send(f"@{ctx.author.name} 🔇 TTS отключен для: {target_username}")
+                self.logger.info(f"✓ User {target_username} muted for {ctx.channel.name}")
+            else:
+                await ctx.send(f"@{ctx.author.name} ⚠️ Пользователь уже в списке")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !mute handler: {e}", exc_info=True)
+            await ctx.send(f"@{ctx.author.name} ❌ Ошибка блокировки пользователя")
+    
+    async def _handle_mute_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
+        """Handler для !mute (VK)"""
+        try:
+            if not args:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ❌ Использование: !mute <username>")
+                return
+            
+            # Получаем user_id владельца канала
+            from core.database import User
+            user = db.query(User).filter(
+                User.vk_username == channel_name.lower()
+            ).first()
+            
+            if not user:
+                await vk_bot.send_message(channel_name, f"@{author_name} ❌ Канал не найден")
+                return
+            
+            # Блокируем пользователя для TTS
+            from services.tts_service import TTSService
+            tts_service = TTSService()
+            
+            target_username = args.strip().lower()
+            success = tts_service.block_user(user.id, target_username, 'vk', db)
+            
+            if success:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} 🔇 TTS отключен для: {target_username}")
+                self.logger.info(f"✓ User {target_username} muted for VK {channel_name}")
+            else:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ⚠️ Пользователь уже в списке")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !mute VK handler: {e}", exc_info=True)
+            await vk_bot.send_message(channel_name, 
+                f"@{author_name} ❌ Ошибка блокировки пользователя")
+    
+    async def _handle_unmute(self, ctx, bot, args, platform, db):
+        """Handler для !unmute (Twitch)"""
+        try:
+            if not args:
+                await ctx.send(f"@{ctx.author.name} ❌ Использование: !unmute <username>")
+                return
+            
+            # Получаем user_id владельца канала
+            from core.database import User
+            user = db.query(User).filter(
+                User.twitch_username == ctx.channel.name.lower()
+            ).first()
+            
+            if not user:
+                await ctx.send(f"@{ctx.author.name} ❌ Канал не найден")
+                return
+            
+            # Разблокируем пользователя для TTS
+            from services.tts_service import TTSService
+            tts_service = TTSService()
+            
+            target_username = args.strip().lower()
+            success = tts_service.unblock_user(user.id, target_username, 'twitch', db)
+            
+            if success:
+                await ctx.send(f"@{ctx.author.name} 🔊 TTS включен для: {target_username}")
+                self.logger.info(f"✓ User {target_username} unmuted for {ctx.channel.name}")
+            else:
+                await ctx.send(f"@{ctx.author.name} ⚠️ Пользователь не найден в списке")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !unmute handler: {e}", exc_info=True)
+            await ctx.send(f"@{ctx.author.name} ❌ Ошибка разблокировки пользователя")
+    
+    async def _handle_unmute_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
+        """Handler для !unmute (VK)"""
+        try:
+            if not args:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ❌ Использование: !unmute <username>")
+                return
+            
+            # Получаем user_id владельца канала
+            from core.database import User
+            user = db.query(User).filter(
+                User.vk_username == channel_name.lower()
+            ).first()
+            
+            if not user:
+                await vk_bot.send_message(channel_name, f"@{author_name} ❌ Канал не найден")
+                return
+            
+            # Разблокируем пользователя для TTS
+            from services.tts_service import TTSService
+            tts_service = TTSService()
+            
+            target_username = args.strip().lower()
+            success = tts_service.unblock_user(user.id, target_username, 'vk', db)
+            
+            if success:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} 🔊 TTS включен для: {target_username}")
+                self.logger.info(f"✓ User {target_username} unmuted for VK {channel_name}")
+            else:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ⚠️ Пользователь не найден в списке")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !unmute VK handler: {e}", exc_info=True)
+            await vk_bot.send_message(channel_name, 
+                f"@{author_name} ❌ Ошибка разблокировки пользователя")
+    
+    async def _handle_ttsvolume(self, ctx, bot, args, platform, db):
+        """Handler для !ttsvolume (Twitch)"""
+        try:
+            if not args:
+                await ctx.send(f"@{ctx.author.name} ❌ Использование: !ttsvolume <0-100>")
+                return
+            
+            try:
+                volume = int(args)
+                if not 0 <= volume <= 100:
+                    raise ValueError
+            except ValueError:
+                await ctx.send(f"@{ctx.author.name} ❌ Громкость должна быть от 0 до 100")
+                return
+            
+            # Получаем user_id владельца канала
+            from core.database import User
+            user = db.query(User).filter(
+                User.twitch_username == ctx.channel.name.lower()
+            ).first()
+            
+            if not user:
+                await ctx.send(f"@{ctx.author.name} ❌ Канал не найден")
+                return
+            
+            # Устанавливаем громкость TTS
+            from services.tts_service import TTSService
+            tts_service = TTSService()
+            
+            success = await tts_service.set_volume(user.id, volume, db)
+            
+            if success:
+                await ctx.send(f"@{ctx.author.name} 🔊 Громкость TTS: {volume}%")
+                self.logger.info(f"✓ TTS volume set to {volume}% for {ctx.channel.name}")
+            else:
+                await ctx.send(f"@{ctx.author.name} ❌ Не удалось изменить громкость")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !ttsvolume handler: {e}", exc_info=True)
+            await ctx.send(f"@{ctx.author.name} ❌ Ошибка изменения громкости")
+    
+    async def _handle_ttsvolume_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
+        """Handler для !ttsvolume (VK)"""
+        try:
+            if not args:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ❌ Использование: !ttsvolume <0-100>")
+                return
+            
+            try:
+                volume = int(args)
+                if not 0 <= volume <= 100:
+                    raise ValueError
+            except ValueError:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ❌ Громкость должна быть от 0 до 100")
+                return
+            
+            # Получаем user_id владельца канала
+            from core.database import User
+            user = db.query(User).filter(
+                User.vk_username == channel_name.lower()
+            ).first()
+            
+            if not user:
+                await vk_bot.send_message(channel_name, f"@{author_name} ❌ Канал не найден")
+                return
+            
+            # Устанавливаем громкость TTS
+            from services.tts_service import TTSService
+            tts_service = TTSService()
+            
+            success = await tts_service.set_volume(user.id, volume, db)
+            
+            if success:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} 🔊 Громкость TTS: {volume}%")
+                self.logger.info(f"✓ TTS volume set to {volume}% for VK {channel_name}")
+            else:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ❌ Не удалось изменить громкость")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !ttsvolume VK handler: {e}", exc_info=True)
+            await vk_bot.send_message(channel_name, 
+                f"@{author_name} ❌ Ошибка изменения громкости")
+    
     # === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ===
     
     async def _get_channel_owner_id_twitch(self, channel_name: str) -> Optional[int]:
