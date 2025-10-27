@@ -4,6 +4,7 @@ import { Toaster } from 'sonner';
 
 import AuthGuard from './components/AuthGuard';
 import Layout from './components/Layout';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useCacheWebSocketSync } from './hooks/useCacheWebSocketSync';
 
 // Убираем глобальный прелоадер
@@ -48,8 +49,9 @@ function App() {
     return (
         <>
             <Toaster />
-            <Suspense fallback={null}>
-                <Routes>
+            <ErrorBoundary>
+                <Suspense fallback={null}>
+                    <Routes>
                         {/* Public Routes */}
                         <Route path="/login" element={<LoginPage />} />
                         <Route path="/guest" element={<GuestPage />} />
@@ -89,8 +91,9 @@ function App() {
                                 <Route path="dashboard/dolbaebadmintts/support" element={<AdminPage />} />
                             </Route>
                         </Route>
-                </Routes>
-            </Suspense>
+                    </Routes>
+                </Suspense>
+            </ErrorBoundary>
         </>
     );
 }
