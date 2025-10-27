@@ -398,15 +398,15 @@ class TwitchAPI:
                 
                 async with session.post(url, data=data) as response:
                     if response.status == 200:
-                    token_data = await response.json()
-                    new_access_token = token_data["access_token"]
-                    new_refresh_token = token_data.get("refresh_token", refresh_token)
-                    expires_in = token_data.get("expires_in", 3600)
-                    
-                    # Логируем реальное время жизни токена
-                    logger.info(f"🔐 [TWITCH REFRESH] Token expires_in: {expires_in} seconds ({expires_in / 3600:.1f} hours)")
-                    
-                    # Обновляем токены в базе данных
+                        token_data = await response.json()
+                        new_access_token = token_data["access_token"]
+                        new_refresh_token = token_data.get("refresh_token", refresh_token)
+                        expires_in = token_data.get("expires_in", 3600)
+                        
+                        # Логируем реальное время жизни токена
+                        logger.info(f"🔐 [TWITCH REFRESH] Token expires_in: {expires_in} seconds ({expires_in / 3600:.1f} hours)")
+                        
+                        # Обновляем токены в базе данных
                         from core.datetime_utils import utcnow_naive
                         from datetime import timedelta
                         expires_at = utcnow_naive() + timedelta(seconds=expires_in)
