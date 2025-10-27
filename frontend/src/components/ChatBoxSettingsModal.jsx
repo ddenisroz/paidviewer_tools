@@ -356,20 +356,29 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                             {/* Text Stroke */}
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
-                                    <Label className="text-white">Контур текста (читаемость)</Label>
-                                    <span className="text-sm text-gray-400">{settings?.text_stroke_width || 0}px</span>
+                                    <Label className="text-white">Обводка букв (читаемость)</Label>
+                                    <span className="text-sm text-gray-400">
+                                        {settings?.text_stroke_width === 0 ? 'Выкл' : `${settings?.text_stroke_width || 0}px`}
+                                    </span>
                                 </div>
                                 <input
                                     type="range"
                                     min="0"
-                                    max="5"
+                                    max="3"
+                                    step="0.5"
                                     value={settings?.text_stroke_width || 0}
-                                    onChange={(e) => handleChange('text_stroke_width', parseInt(e.target.value))}
+                                    onChange={(e) => handleChange('text_stroke_width', parseFloat(e.target.value))}
                                     className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                                     style={{
-                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((settings?.text_stroke_width || 0) / 5) * 100}%, #374151 ${((settings?.text_stroke_width || 0) / 5) * 100}%, #374151 100%)`
+                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((settings?.text_stroke_width || 0) / 3) * 100}%, #374151 ${((settings?.text_stroke_width || 0) / 3) * 100}%, #374151 100%)`
                                     }}
                                 />
+                                <div className="flex justify-between text-xs text-gray-500">
+                                    <span>Выкл</span>
+                                    <span>Тонкая</span>
+                                    <span>Средняя</span>
+                                    <span>Жирная</span>
+                                </div>
                             </div>
                             
                             {/* Background Opacity */}

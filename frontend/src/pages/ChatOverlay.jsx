@@ -839,12 +839,8 @@ const ChatOverlay = () => {
                                     overflowWrap: 'break-word',
                                     wordWrap: 'break-word',
                                     ...(settings.text_stroke_width > 0 ? {
-                                        textShadow: `
-                                            -${settings.text_stroke_width}px -${settings.text_stroke_width}px 0 ${settings.text_stroke_color || '#000000'},
-                                            ${settings.text_stroke_width}px -${settings.text_stroke_width}px 0 ${settings.text_stroke_color || '#000000'},
-                                            -${settings.text_stroke_width}px ${settings.text_stroke_width}px 0 ${settings.text_stroke_color || '#000000'},
-                                            ${settings.text_stroke_width}px ${settings.text_stroke_width}px 0 ${settings.text_stroke_color || '#000000'}
-                                        `
+                                        WebkitTextStroke: `${settings.text_stroke_width}px ${settings.text_stroke_color || '#000000'}`,
+                                        paintOrder: 'stroke fill'
                                     } : {})
                                 }}>
                                     <span 
