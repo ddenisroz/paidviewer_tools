@@ -96,18 +96,19 @@ async def _get_commands_impl(current_user: dict, db: Session):
             BotCommand.user_id == current_user["id"]
         ).all()
         
-        # 4. Поддержка старых 'basic' команд (backward compatibility)
-        old_basic_commands = db.query(BotCommand).filter(
-            BotCommand.command_type == 'basic',
-            BotCommand.user_id == current_user["id"]
-        ).all()
-        
         # Преобразуем команды в нужный формат
         def command_to_dict(cmd, command_type_label):
             """Вспомогательная функция для преобразования команды"""
+            # Теги теперь хранятся как одна категория (не разделены запятыми)
+            # Например: "TTS ИИ озвучка", "Медиа и интерактивность"
             tags = []
             if cmd.tags:
-                tags = [tag.strip() for tag in cmd.tags.split(',') if tag.strip()]
+                # Если в теге есть запятая - это старый формат, разбиваем
+                # Если нет - это новый формат (одна категория)
+                if ',' in cmd.tags:
+                    tags = [tag.strip() for tag in cmd.tags.split(',') if tag.strip()]
+                else:
+                    tags = [cmd.tags.strip()]
             
             return {
                 "id": cmd.id,
@@ -132,20 +133,35 @@ async def _get_commands_impl(current_user: dict, db: Session):
         # Формируем user overrides
         override_commands_data = [command_to_dict(cmd, "override") for cmd in override_commands]
         
-        # Объединяем глобальные команды и старые 'basic' для backward compatibility
-        basic_commands_data = global_commands_data + [command_to_dict(cmd, "basic") for cmd in old_basic_commands]
+        # Для basic_commands объединяем global + overrides
+        # Overrides имеют приоритет над global командами с тем же именем
+        basic_commands_dict = {}
+        
+        # Сначала добавляем глобальные команды
+        for cmd_data in global_commands_data:
+            basic_commands_dict[cmd_data["command_name"]] = cmd_data
+        
+        # Затем перезаписываем overrides (они имеют приоритет)
+        for cmd_data in override_commands_data:
+            # Для override используем parent_command_id чтобы найти имя глобальной команды
+            parent_cmd = next((g for g in global_commands_data if g["id"] == cmd_data["parent_command_id"]), None)
+            if parent_cmd:
+                # Override перезаписывает глобальную команду
+                basic_commands_dict[parent_cmd["command_name"]] = cmd_data
+        
+        basic_commands_data = list(basic_commands_dict.values())
         
         # Формируем кастомные команды
         custom_commands_data = [command_to_dict(cmd, "custom") for cmd in custom_commands]
         
         result = {
             "success": True,
-            "global_commands": global_commands_data,  # Новое: глобальные команды
-            "override_commands": override_commands_data,  # Новое: user overrides
-            "basic_commands": basic_commands_data,  # Backward compatibility: global + old basic
+            "global_commands": global_commands_data,  # Глобальные команды
+            "override_commands": override_commands_data,  # User overrides
+            "basic_commands": basic_commands_data,  # Merged (global + overrides)
             "custom_commands": custom_commands_data
         }
-        commands_logger.info(f"✓ Returned {len(global_commands_data)} global + {len(override_commands_data)} overrides + {len(custom_commands_data)} custom commands")
+        commands_logger.info(f"✓ Returned {len(global_commands_data)} global + {len(override_commands_data)} overrides + {len(basic_commands_data)} merged basic + {len(custom_commands_data)} custom commands")
         log_response("/api/commands", 200, result)
         return result
         

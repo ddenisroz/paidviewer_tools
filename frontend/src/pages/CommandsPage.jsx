@@ -499,7 +499,7 @@ import PageWrapper from '../components/PageWrapper';
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-all duration-200">
                                     {getFilteredBasicCommands().map(command => (
-                                        <div key={command.command_name} className="transition-all duration-200">
+                                        <div key={command.id} className="transition-all duration-200">
                                         <CommandCard
                                             command={command}
                                             type="basic"

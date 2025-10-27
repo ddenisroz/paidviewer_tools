@@ -17,102 +17,103 @@ def init_global_commands():
     
     try:
         # Глобальные базовые команды (доступны всем)
+        # Категории: "Медиа и интерактивность", "TTS ИИ озвучка", "Управление трансляцией", "Общее"
         global_commands = [
             {
                 "command_name": "help",
                 "description": "Показать список всех доступных команд",
-                "tags": "информация",
+                "tags": "Общее",
                 "allowed_roles": "all",
                 "cooldown_seconds": 5
             },
             {
                 "command_name": "sr",
                 "description": "Заказать YouTube видео (song request)",
-                "tags": "медиа запросы",
+                "tags": "Медиа и интерактивность",
                 "allowed_roles": "all",
                 "cooldown_seconds": 10
             },
             {
                 "command_name": "skip",
                 "description": "Пропустить текущее видео",
-                "tags": "медиа запросы",
+                "tags": "Медиа и интерактивность",
                 "allowed_roles": "moderator,broadcaster",
                 "cooldown_seconds": 5
             },
             {
                 "command_name": "clear",
                 "description": "Очистить очередь видео",
-                "tags": "медиа запросы",
+                "tags": "Медиа и интерактивность",
                 "allowed_roles": "moderator,broadcaster",
                 "cooldown_seconds": 10
             },
             {
                 "command_name": "queue",
                 "description": "Показать очередь YouTube видео",
-                "tags": "медиа запросы",
+                "tags": "Медиа и интерактивность",
                 "allowed_roles": "all",
                 "cooldown_seconds": 10
             },
             {
                 "command_name": "title",
                 "description": "Сменить название стрима",
-                "tags": "управление",
+                "tags": "Управление трансляцией",
                 "allowed_roles": "broadcaster",
                 "cooldown_seconds": 30
             },
             {
                 "command_name": "game",
                 "description": "Сменить категорию/игру стрима",
-                "tags": "управление",
+                "tags": "Управление трансляцией",
                 "allowed_roles": "broadcaster",
                 "cooldown_seconds": 30
             },
             {
                 "command_name": "ttsvolume",
                 "description": "Настроить громкость TTS (0-100)",
-                "tags": "TTS озвучка",
+                "tags": "TTS ИИ озвучка",
                 "allowed_roles": "broadcaster,moderator",
                 "cooldown_seconds": 5
             },
             {
                 "command_name": "ytvolume",
                 "description": "Настроить громкость YouTube (0-100)",
-                "tags": "TTS озвучка",
+                "tags": "Медиа и интерактивность",
                 "allowed_roles": "broadcaster,moderator",
                 "cooldown_seconds": 5
             },
             {
                 "command_name": "voice",
                 "description": "Выбрать голос для TTS",
-                "tags": "TTS озвучка",
+                "tags": "TTS ИИ озвучка",
                 "allowed_roles": "all",
                 "cooldown_seconds": 30
             },
             {
                 "command_name": "randomvoice",
                 "description": "Выбрать случайный голос для TTS",
-                "tags": "TTS озвучка",
+                "tags": "TTS ИИ озвучка",
                 "allowed_roles": "all",
                 "cooldown_seconds": 30
             },
             {
                 "command_name": "mute",
                 "description": "Отключить TTS для пользователя",
-                "tags": "TTS озвучка",
+                "tags": "TTS ИИ озвучка",
                 "allowed_roles": "broadcaster,moderator",
                 "cooldown_seconds": 5
             },
             {
                 "command_name": "unmute",
                 "description": "Включить TTS для пользователя",
-                "tags": "TTS озвучка",
+                "tags": "TTS ИИ озвучка",
                 "allowed_roles": "broadcaster,moderator",
                 "cooldown_seconds": 5
             },
             {
                 "command_name": "analyze",
                 "description": "Отправить историю сообщений на анализ ИИ",
-                "tags": "информация",
+                "tags": "Общее",
                 "allowed_roles": "broadcaster",
                 "cooldown_seconds": 60
             }
