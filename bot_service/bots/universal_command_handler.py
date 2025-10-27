@@ -266,6 +266,102 @@ class UniversalCommandHandler:
                 channel_name, author_name, author_id, [args], message_data
             )
     
+    async def _handle_game(self, ctx, bot, args, platform, db):
+        """Handler для !game (Twitch)"""
+        try:
+            if not args:
+                await ctx.send(f"@{ctx.author.name} ❌ Использование: !game <название игры>")
+                return
+            
+            # Получаем user_id владельца канала
+            from core.database import User
+            user = db.query(User).filter(
+                User.twitch_username == ctx.channel.name.lower()
+            ).first()
+            
+            if not user:
+                await ctx.send(f"@{ctx.author.name} ❌ Канал не найден")
+                return
+            
+            # Ищем игру через Twitch API
+            from api.twitch_api import TwitchAPI
+            from core.connection_manager import get_connection_manager
+            connection_manager = get_connection_manager()
+            twitch_api = TwitchAPI(connection_manager)
+            
+            # Поиск игры
+            games = await twitch_api.search_categories(args)
+            if not games:
+                await ctx.send(f"@{ctx.author.name} ❌ Игра '{args}' не найдена")
+                return
+            
+            # Берём первую найденную игру
+            game = games[0]
+            game_id = game.get('id')
+            game_name = game.get('name', args)
+            
+            # Обновляем категорию
+            success = await twitch_api.update_stream_category(user.id, game_id)
+            
+            if success:
+                await ctx.send(f"@{ctx.author.name} ✅ Игра изменена на: {game_name}")
+                self.logger.info(f"✓ Game changed to {game_name} for {ctx.channel.name}")
+            else:
+                await ctx.send(f"@{ctx.author.name} ❌ Не удалось изменить игру")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !game handler: {e}", exc_info=True)
+            await ctx.send(f"@{ctx.author.name} ❌ Ошибка изменения игры")
+    
+    async def _handle_game_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
+        """Handler для !game (VK)"""
+        try:
+            if not args:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ❌ Использование: !game <название игры>")
+                return
+            
+            # Получаем user_id владельца канала
+            from core.database import User
+            user = db.query(User).filter(
+                User.vk_username == channel_name.lower()
+            ).first()
+            
+            if not user:
+                await vk_bot.send_message(channel_name, f"@{author_name} ❌ Канал не найден")
+                return
+            
+            # Ищем игру через VK API
+            from api.vk_api import VKLiveAPI
+            vk_api = VKLiveAPI()
+            
+            # Поиск игры
+            categories = await vk_api.get_categories(search=args, user_id=str(user.id))
+            if not categories:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ❌ Игра '{args}' не найдена")
+                return
+            
+            # Берём первую найденную игру
+            category = categories[0]
+            
+            # Обновляем категорию
+            success = await vk_api.update_stream_category(str(user.id), category)
+            
+            if success:
+                game_name = category.get('title', args)
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ✅ Игра изменена на: {game_name}")
+                self.logger.info(f"✓ Game changed to {game_name} for VK {channel_name}")
+            else:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ❌ Не удалось изменить игру")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !game VK handler: {e}", exc_info=True)
+            await vk_bot.send_message(channel_name, 
+                f"@{author_name} ❌ Ошибка изменения игры")
+    
     # === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ===
     
     async def _get_channel_owner_id_twitch(self, channel_name: str) -> Optional[int]:
