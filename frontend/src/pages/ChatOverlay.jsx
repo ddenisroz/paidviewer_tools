@@ -5,6 +5,7 @@ import { TwitchIcon, VKIcon } from '../components/PlatformIcons';
 import { botService } from '../services/microservices';
 import MessageContent from '../components/MessageContent';
 import { twitchBadgesService } from '../services/twitchBadges';
+import useSharedWebSocket from '../hooks/useSharedWebSocket';
 
 const ChatOverlay = () => {
     const [searchParams] = useSearchParams();
@@ -15,17 +16,14 @@ const ChatOverlay = () => {
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [wsStatus, setWsStatus] = useState('connecting'); // 'connecting', 'connected', 'reconnecting', 'error'
     const [contextMenu, setContextMenu] = useState(null); // {x, y, username, platform}
     const [channelName, setChannelName] = useState(null); // Имя канала для API запросов
     const [lastAddedMessageId, setLastAddedMessageId] = useState(null); // ID последнего добавленного сообщения для анимации
+    const [userId, setUserId] = useState(null); // ID пользователя для WebSocket
     
     // ✅ ВСЕ useRef ПОСЛЕ useState!
-    const wsRef = useRef(null);
     const messagesEndRef = useRef(null);
     const processedMessageIds = useRef(new Set()); // Для защиты от race condition
-    const reconnectAttempts = useRef(0); // Счетчик попыток переподключения
-    const reconnectTimeout = useRef(null); // Таймер переподключения
     
     // ✅ useMemo ПОСЛЕ useState и useRef!
     // 🎨 Применяем настройки к контейнеру (useMemo для пересчета при изменении settings)
@@ -209,8 +207,8 @@ const ChatOverlay = () => {
             // Загружаем Twitch badges только при первой загрузке
             if (!isPolling) {
                 await twitchBadgesService.loadGlobalBadges();
-                // Подключаемся к WebSocket после загрузки настроек
-                connectWebSocket(normalizedSettings.user_id);
+                // Сохраняем userId для WebSocket (подключение через useSharedWebSocket)
+                setUserId(normalizedSettings.user_id);
             }
         } catch (error) {
             console.error('❌ Error loading ChatBox settings:', error);
@@ -225,190 +223,106 @@ const ChatOverlay = () => {
         }
     };
     
-    const connectWebSocket = (userId) => {
-        // Очищаем предыдущий таймер
-        if (reconnectTimeout.current) {
-            clearTimeout(reconnectTimeout.current);
-            reconnectTimeout.current = null;
-        }
-        
-        // Ограничение на попытки переподключения
-        const MAX_RECONNECT_ATTEMPTS = 10;
-        if (reconnectAttempts.current >= MAX_RECONNECT_ATTEMPTS) {
-            console.error(`❌ Max reconnect attempts reached (${MAX_RECONNECT_ATTEMPTS}), giving up`);
-            setWsStatus('error');
+    // 📡 Обработчик WebSocket сообщений
+    const handleWebSocketMessage = React.useCallback((data) => {
+        // 🔄 Обработка инвалидации кэша
+        if (data.type === 'cache_invalidate') {
+            console.log('🔄 [CACHE] Received cache invalidation:', data.cache_key);
+            if (data.cache_key === 'cache_chatbox_settings') {
+                console.log('🔄 [CHATBOX] Reloading settings due to backend update...');
+                loadSettings(true);
+            }
             return;
         }
         
-        const wsUrl = `ws://localhost:8000/ws/chat/${userId}`;
-        setWsStatus('connecting');
-        
-        const ws = new WebSocket(wsUrl);
-        
-        ws.onopen = () => {
-            setWsStatus('connected');
-            reconnectAttempts.current = 0; // Сброс счетчика при успешном подключении
-        };
-        
-        ws.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
+        // 🔄 Обработка обновления настроек ChatBox
+        if (data.type === 'chatbox_settings_updated') {
+            console.log('🔄 [CHATBOX] Received settings update event');
+            
+            setSettings(prevSettings => {
+                const updatedSettings = {
+                    ...prevSettings,
+                    ...data.data,
+                    font_size: parseInt(data.data.font_size) || prevSettings?.font_size || 16,
+                    text_stroke_width: parseInt(data.data.text_stroke_width) || prevSettings?.text_stroke_width || 0,
+                    background_opacity: parseFloat(data.data.background_opacity) ?? prevSettings?.background_opacity ?? 0.5,
+                    max_messages: parseInt(data.data.max_messages) || prevSettings?.max_messages || 20,
+                    message_spacing: parseInt(data.data.message_spacing) || prevSettings?.message_spacing || 4,
+                    message_fade_seconds: parseInt(data.data.message_fade_seconds) || prevSettings?.message_fade_seconds || 60,
+                    animation_duration: parseInt(data.data.animation_duration) || prevSettings?.animation_duration || 300,
+                    border_radius: parseInt(data.data.border_radius) || prevSettings?.border_radius || 8
+                };
                 
-                // 🔄 Обработка инвалидации кэша (для синхронизации с бэком)
-                if (data.type === 'cache_invalidate') {
-                    console.log('🔄 [CACHE] Received cache invalidation:', data.cache_key);
-                    // В ChatOverlay мы не используем cacheManager напрямую,
-                    // но можем перезагрузить настройки если это касается chatbox_settings
-                    if (data.cache_key === 'cache_chatbox_settings') {
-                        console.log('🔄 [CHATBOX] Reloading settings due to backend update...');
-                        // Перезагружаем настройки с сервера
-                        loadSettingsByToken();
-                    }
-                    return;
-                }
+                return updatedSettings;
+            });
+            return;
+        }
+        
+        // 💬 Обработка новых сообщений
+        if (data.type === 'message' || data.type === 'chat_message') {
+            const messageId = data.id || `${data.timestamp}-${data.author}-${data.message}`;
+            
+            if (processedMessageIds.current.has(messageId)) {
+                return;
+            }
+            
+            processedMessageIds.current.add(messageId);
+            setLastAddedMessageId(messageId);
+            
+            setTimeout(() => {
+                setLastAddedMessageId(null);
+            }, (settings?.animation_duration || 300) + 100);
+            
+            setMessages(prev => {
+                const isDuplicate = prev.some(msg => 
+                    msg.id === data.id || 
+                    (msg.timestamp === data.timestamp && msg.author === data.author && msg.message === data.message)
+                );
                 
-                // 🔄 Обработка обновления настроек ChatBox
-                if (data.type === 'chatbox_settings_updated') {
-                    console.log('🔄 [CHATBOX] Received settings update event, reloading...');
-                    console.log('📦 [CHATBOX] data.data:', data.data);
-                    console.log('🔤 [CHATBOX] font_family from event:', data.data.font_family);
-                    
-                    setSettings(prevSettings => {
-                        const updatedSettings = {
-                            ...prevSettings,
-                            ...data.data,
-                            // Нормализуем числовые значения
-                            font_size: parseInt(data.data.font_size) || prevSettings?.font_size || 16,
-                            text_stroke_width: parseInt(data.data.text_stroke_width) || prevSettings?.text_stroke_width || 0,
-                            background_opacity: parseFloat(data.data.background_opacity) ?? prevSettings?.background_opacity ?? 0.5,
-                            max_messages: parseInt(data.data.max_messages) || prevSettings?.max_messages || 20,
-                            message_spacing: parseInt(data.data.message_spacing) || prevSettings?.message_spacing || 4,
-                            message_fade_seconds: parseInt(data.data.message_fade_seconds) || prevSettings?.message_fade_seconds || 60,
-                            animation_duration: parseInt(data.data.animation_duration) || prevSettings?.animation_duration || 300,
-                            border_radius: parseInt(data.data.border_radius) || prevSettings?.border_radius || 8
-                        };
-                        
-                        console.log('📦 [CHATBOX] Previous settings:', prevSettings);
-                        console.log('📦 [CHATBOX] Updated settings object:', updatedSettings);
-                        console.log('🔤 [CHATBOX] Final font_family:', updatedSettings.font_family);
-                        
-                        return updatedSettings;
-                    });
-                    console.log('✅ [CHATBOX] Settings updated in real-time!');
-                    return;
-                }
+                if (isDuplicate) return prev;
                 
-                if (data.type === 'message' || data.type === 'chat_message') {
-                    // Проверяем в ref СРАЗУ (защита от race condition при множественных WebSocket)
-                    const messageId = data.id || `${data.timestamp}-${data.author}-${data.message}`;
-                    
-                    if (processedMessageIds.current.has(messageId)) {
-                        return;
-                    }
-                    
-                    // Добавляем в ref СРАЗУ
-                    processedMessageIds.current.add(messageId);
-                    
-                    // Устанавливаем ID последнего сообщения для анимации
-                    setLastAddedMessageId(messageId);
-                    
-                    // Сбрасываем после окончания анимации (берем длительность из настроек + 100ms запаса)
-                    const animationDuration = (settings?.animation_duration || 300) + 100;
-                    setTimeout(() => {
-                        setLastAddedMessageId(null);
-                    }, animationDuration);
-                    
-                    setMessages(prev => {
-                        // Дополнительная проверка в state (на всякий случай)
-                        const isDuplicate = prev.some(msg => 
-                            msg.id === data.id || 
-                            (msg.timestamp === data.timestamp && 
-                             msg.author === data.author && 
-                             msg.message === data.message)
-                        );
-                        
-                        if (isDuplicate) {
-                            return prev;
-                        }
-                        
-                        const newMessages = [...prev, data];
-                        const maxMessages = settings?.max_messages || 20;
-                        const result = newMessages.slice(-maxMessages);
-                        
-                        // Очищаем ref от старых ID (оставляем только последние maxMessages)
-                        if (processedMessageIds.current.size > maxMessages * 2) {
-                            const recentIds = new Set(result.map(msg => 
-                                msg.id || `${msg.timestamp}-${msg.author}-${msg.message}`
-                            ));
-                            processedMessageIds.current = recentIds;
-                        }
-                        
-                        return result;
-                    });
-                } else if (data.type === 'chat_history') {
-                    console.log(`📜 Loaded ${data.messages?.length || 0} messages from WebSocket history`);
-                    
-                    // Проверяем первое сообщение для дебага
-                    if (data.messages && data.messages.length > 0) {
-                        const sample = data.messages[0];
-                        console.log('📜 Sample history message:', sample);
-                        console.log('📜 Has badges?', 'badges' in sample, 'Value:', sample.badges);
-                        console.log('📜 Has role?', 'role' in sample, 'Value:', sample.role);
-                    }
-                    
-                    const historyLength = data.messages?.length || 0;
-                    const maxMessages = settings?.max_messages || 50;
-                    
-                    // Удаляем дубликаты из истории
-                    const uniqueMessages = [];
-                    const seenIds = new Set();
-                    
-                    for (const msg of (data.messages || [])) {
-                        const uniqueKey = msg.id || `${msg.timestamp}-${msg.author}-${msg.message}`;
-                        if (!seenIds.has(uniqueKey)) {
-                            seenIds.add(uniqueKey);
-                            uniqueMessages.push(msg);
-                        }
-                    }
-                    
-                    setMessages(uniqueMessages);
-                    
-                    // Инициализируем ref с ID из истории
-                    processedMessageIds.current = new Set(uniqueMessages.map(msg => 
+                const newMessages = [...prev, data];
+                const maxMessages = settings?.max_messages || 20;
+                const result = newMessages.slice(-maxMessages);
+                
+                if (processedMessageIds.current.size > maxMessages * 2) {
+                    const recentIds = new Set(result.map(msg => 
                         msg.id || `${msg.timestamp}-${msg.author}-${msg.message}`
                     ));
-                    
-                    // Мгновенный скролл вниз после загрузки истории
-                    setTimeout(() => {
-                        messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
-                    }, 100);
+                    processedMessageIds.current = recentIds;
                 }
-            } catch (error) {
-                console.error('❌ Error parsing WebSocket message:', error);
+                
+                return result;
+            });
+        } 
+        // 📜 Обработка истории сообщений
+        else if (data.type === 'chat_history') {
+            console.log(`📜 Loaded ${data.messages?.length || 0} messages from history`);
+            
+            const uniqueMessages = [];
+            const seenIds = new Set();
+            
+            for (const msg of (data.messages || [])) {
+                const uniqueKey = msg.id || `${msg.timestamp}-${msg.author}-${msg.message}`;
+                if (!seenIds.has(uniqueKey)) {
+                    seenIds.add(uniqueKey);
+                    uniqueMessages.push(msg);
+                }
             }
-        };
-        
-        ws.onerror = (error) => {
-            console.error('❌ WebSocket error:', error);
-            setWsStatus('error');
-        };
-        
-        ws.onclose = () => {
-            setWsStatus('reconnecting');
-            reconnectAttempts.current += 1;
             
-            // Exponential backoff: 3s, 6s, 12s, 24s, ...
-            const baseDelay = 3000;
-            const maxDelay = 30000; // Максимум 30 секунд
-            const delay = Math.min(baseDelay * Math.pow(2, reconnectAttempts.current - 1), maxDelay);
+            setMessages(uniqueMessages);
+            processedMessageIds.current = new Set(uniqueMessages.map(msg => 
+                msg.id || `${msg.timestamp}-${msg.author}-${msg.message}`
+            ));
             
-            reconnectTimeout.current = setTimeout(() => {
-                connectWebSocket(userId);
-            }, delay);
-        };
-        
-        wsRef.current = ws;
-    };
+            setTimeout(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+            }, 100);
+        }
+    }, [settings]);
+    
+    // 🔌 Подключаем Shared WebSocket
+    useSharedWebSocket(userId, handleWebSocketMessage);
     
     // Автопрокрутка к последнему сообщению
     useEffect(() => {
@@ -421,19 +335,6 @@ const ChatOverlay = () => {
             });
         }
     }, [messages, settings?.chat_direction]);
-    
-    // Cleanup WebSocket и таймеров
-    useEffect(() => {
-        return () => {
-            if (reconnectTimeout.current) {
-                clearTimeout(reconnectTimeout.current);
-                reconnectTimeout.current = null;
-            }
-            if (wsRef.current) {
-                wsRef.current.close();
-            }
-        };
-    }, []);
     
     // Автоматическое исчезание сообщений
     useEffect(() => {
