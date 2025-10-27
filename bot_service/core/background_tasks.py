@@ -17,12 +17,14 @@ class BackgroundTasks:
     
     async def cleanup_old_chat_messages(self):
         """
-        Автоматическая очистка старых сообщений чата
+        Автоматическая очистка сообщений чата по лимитам
         
-        Лимиты (читаются из .env):
-        - MAX_CHAT_MESSAGES_PER_USER: 3000 сообщений на пользователя
-        - MAX_TOTAL_CHAT_MESSAGES: 100000 сообщений всего
-        - CHAT_MESSAGES_RETENTION_DAYS: 30 дней
+        Удаляет ТОЛЬКО самые старые сообщения при превышении лимитов:
+        - MAX_CHAT_MESSAGES_PER_USER: 3000 на пользователя (default)
+        - MAX_TOTAL_CHAT_MESSAGES: 100000 всего (default)
+        
+        НЕ удаляет по возрасту! Только по количеству.
+        Параметр CHAT_MESSAGES_RETENTION_DAYS используется только для статистики.
         """
         while True:
             await asyncio.sleep(3600)  # Проверяем каждый час
