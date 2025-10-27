@@ -89,7 +89,20 @@ class YouTubeAPI:
             # Получаем информацию о видео
             video_info = self.get_video_info(url)
             if not video_info:
-                return {"success": False, "error": "Не удалось получить информацию о видео"}
+                # Fallback: создаем базовую запись если не удалось получить инфо
+                video_id = self.extract_video_id(url)
+                if not video_id:
+                    return {"success": False, "error": "Не удалось извлечь ID видео"}
+                    
+                logger.warning(f"Could not fetch video info for {url}, using fallback")
+                video_info = {
+                    "video_id": video_id,
+                    "title": f"YouTube Video {video_id}",
+                    "url": url,
+                    "duration": 0,
+                    "thumbnail_url": f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
+                    "author": "Unknown Channel"
+                }
             
             # Используем QueueService для добавления в очередь
             from services.queue_service import QueueService
