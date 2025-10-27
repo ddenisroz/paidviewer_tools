@@ -680,6 +680,7 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
                 
                 # Форматируем для отправки
                 import json
+                import time
                 history_data = []
                 for msg in messages[-50:]:  # Последние 50
                     # Парсим badges если это строка JSON
@@ -690,13 +691,18 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
                         except:
                             badges_list = None
                     
+                    # Конвертируем datetime в миллисекунды (JavaScript Date.now() формат)
+                    timestamp_ms = None
+                    if msg.timestamp:
+                        timestamp_ms = int(msg.timestamp.timestamp() * 1000)
+                    
                     history_data.append({
                         "id": msg.id,
                         "platform": msg.platform,
                         "author": msg.author_username,
                         "author_name": msg.author_username,
                         "message": msg.message,
-                        "timestamp": msg.timestamp.isoformat() if msg.timestamp else None,
+                        "timestamp": timestamp_ms,
                         "role": msg.role,  # Роль пользователя
                         "badges": badges_list  # Значки пользователя (массив)
                     })

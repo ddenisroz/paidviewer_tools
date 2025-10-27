@@ -41,6 +41,7 @@ async def broadcast_chat_message(
         
         # Формируем сообщение для фронтенда
         # Используем все варианты полей для совместимости с разными компонентами
+        import time
         chat_data = {
             "type": "message",  # Основной тип для ChatContext
             "id": message_id or str(uuid.uuid4()),
@@ -54,7 +55,7 @@ async def broadcast_chat_message(
             "channel": channel,
             "role": role,  # Роль пользователя (broadcaster, moderator, vip, subscriber)
             "badges": badges,  # Список значков
-            "timestamp": datetime.now().isoformat()
+            "timestamp": int(time.time() * 1000)  # Миллисекунды (JavaScript Date.now() формат)
         }
         
         # Пытаемся сохранить сообщение в БД для истории

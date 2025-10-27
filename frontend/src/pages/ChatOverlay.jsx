@@ -440,7 +440,7 @@ const ChatOverlay = () => {
         const fadeSeconds = settings?.message_fade_seconds;
         
         // Если настройка = 60 (максимум), сообщения не исчезают
-        if (!fadeSeconds || fadeSeconds >= 60 || messages.length === 0) {
+        if (!fadeSeconds || fadeSeconds >= 60) {
             return;
         }
         
@@ -449,6 +449,9 @@ const ChatOverlay = () => {
             const now = Date.now();
             
             setMessages(prev => {
+                // Если нет сообщений, ничего не делаем
+                if (prev.length === 0) return prev;
+                
                 const filtered = prev.filter(msg => {
                     const messageAge = (now - msg.timestamp) / 1000; // в секундах
                     return messageAge < fadeSeconds;
@@ -464,7 +467,7 @@ const ChatOverlay = () => {
         }, 1000); // Проверяем каждую секунду
         
         return () => clearInterval(interval);
-    }, [settings?.message_fade_seconds, messages.length]);
+    }, [settings?.message_fade_seconds]);
     
     // Закрытие контекстного меню при клике вне его
     useEffect(() => {
