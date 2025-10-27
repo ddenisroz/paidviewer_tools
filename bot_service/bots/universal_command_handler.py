@@ -271,15 +271,15 @@ class UniversalCommandHandler:
     async def _get_channel_owner_id_twitch(self, channel_name: str) -> Optional[int]:
         """Получить user_id владельца Twitch канала"""
         try:
-            from core.database import UserToken
+            from core.database import User
             db = next(get_db())
             try:
-                user_token = db.query(UserToken).filter(
-                    UserToken.platform == "twitch",
-                    UserToken.platform_username == channel_name.lower()
+                # Ищем пользователя по twitch_username
+                user = db.query(User).filter(
+                    User.twitch_username == channel_name.lower()
                 ).first()
                 
-                return user_token.user_id if user_token else None
+                return user.id if user else None
             finally:
                 db.close()
         except Exception as e:
@@ -289,15 +289,15 @@ class UniversalCommandHandler:
     async def _get_channel_owner_id_vk(self, channel_name: str) -> Optional[int]:
         """Получить user_id владельца VK канала"""
         try:
-            from core.database import UserToken
+            from core.database import User
             db = next(get_db())
             try:
-                user_token = db.query(UserToken).filter(
-                    UserToken.platform == "vk",
-                    UserToken.platform_username == channel_name.lower()
+                # Ищем пользователя по vk_username
+                user = db.query(User).filter(
+                    User.vk_username == channel_name.lower()
                 ).first()
                 
-                return user_token.user_id if user_token else None
+                return user.id if user else None
             finally:
                 db.close()
         except Exception as e:

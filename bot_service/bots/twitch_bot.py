@@ -119,6 +119,12 @@ class Bot(TwitchBotCore):
         
         # Обработка Drops для стриков
         await self._handle_drops(message)
+    
+    async def handle_commands(self, message):
+        """Переопределяем handle_commands чтобы отключить автоматическую обработку TwitchIO"""
+        # Команды обрабатываются в event_message через UniversalCommandHandler
+        # Не вызываем super().handle_commands()
+        pass
 
     async def _handle_tts(self, message):
         """Обработка TTS для сообщений из Twitch"""
