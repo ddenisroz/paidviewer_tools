@@ -216,10 +216,12 @@ class BackgroundTasks:
     async def refresh_user_oauth_tokens(self):
         """
         Проактивное обновление OAuth токенов пользователей
-        Проверяет каждые 6 часов и обновляет токены, которые истекут в течение 2 часов
+        Проверяет каждые 2 часа и обновляет токены, которые истекут в течение 1 часа
         
-        Twitch токены: живут 4 часа, обновляем за 2 часа до истечения
-        VK токены: живут 24 часа, обновляем за 2 часа до истечения
+        Twitch токены: живут 4 часа
+        VK токены: живут 30 дней
+        
+        Проверка каждые 2 часа гарантирует что Twitch токены (4ч) будут обновлены вовремя
         """
         from core.database import SessionLocal, UserToken
         from core.datetime_utils import utcnow_naive
@@ -228,14 +230,14 @@ class BackgroundTasks:
         
         while True:
             try:
-                await asyncio.sleep(21600)  # Проверяем каждые 6 часов (6 * 60 * 60)
+                await asyncio.sleep(7200)  # Проверяем каждые 2 часа (2 * 60 * 60)
                 
                 logger.info("🔄 [TOKEN REFRESH] Checking for expiring user OAuth tokens...")
                 
                 db = SessionLocal()
                 try:
-                    # Находим токены которые истекут в течение следующих 2 часов
-                    threshold = utcnow_naive() + timedelta(hours=2)
+                    # Находим токены которые истекут в течение следующего часа
+                    threshold = utcnow_naive() + timedelta(hours=1)
                     
                     expiring_tokens = db.query(UserToken).filter(
                         UserToken.expires_at.isnot(None),
@@ -291,7 +293,7 @@ class BackgroundTasks:
             asyncio.create_task(self.cleanup_old_chat_messages()),      # Очистка истории чата (каждый час)
             asyncio.create_task(self.cleanup_expired_sessions()),       # Очистка истекших сессий (каждые 5 минут)
             asyncio.create_task(self.refresh_vk_bot_token()),          # Обновление VK bot токена (каждые 50 минут)
-            asyncio.create_task(self.refresh_user_oauth_tokens()),     # Обновление OAuth токенов (каждые 6 часов)
+            asyncio.create_task(self.refresh_user_oauth_tokens()),     # Обновление OAuth токенов (каждые 2 часа)
             asyncio.create_task(self.cleanup_task()),                  # Очистка неактивных каналов (каждую минуту)
             asyncio.create_task(self.cleanup_deleted_accounts())       # Окончательное удаление аккаунтов (каждые 24 часа)
         ]
@@ -300,7 +302,7 @@ class BackgroundTasks:
         logger.info("   - cleanup_old_chat_messages (every 1 hour)")
         logger.info("   - cleanup_expired_sessions (every 5 minutes)")
         logger.info("   - refresh_vk_bot_token (every 50 minutes)")
-        logger.info("   - refresh_user_oauth_tokens (every 6 hours)")
+        logger.info("   - refresh_user_oauth_tokens (every 2 hours)")
         logger.info("   - cleanup_task (every 1 minute)")
         logger.info("   - cleanup_deleted_accounts (every 24 hours)")
     
