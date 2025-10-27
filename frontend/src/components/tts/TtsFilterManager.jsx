@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, Plus, UserX, AlertCircle, ChevronDown } from 'lucide-react';
+import { X, Plus, UserX, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { botService } from '../../services/microservices';
 import { useIntegrations } from '../../context/IntegrationsContext';
@@ -250,8 +250,7 @@ const TtsFilterManager = React.memo(() => {
                 data-testid="tts-filter-header"
             >
                 <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                        <AlertCircle className="h-5 w-5" />
+                    <CardTitle>
                         Фильтрация TTS
                     </CardTitle>
                     <ChevronDown 
