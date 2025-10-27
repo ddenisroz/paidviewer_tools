@@ -390,19 +390,27 @@ try:
         processed_at = Column(DateTime, nullable=True)
 
     class BotCommand(Base):
-        """Модель команд бота"""
+        """Модель команд бота
+        
+        Типы команд:
+        - 'global': глобальные базовые команды (user_id=NULL), доступны всем
+        - 'override': пользовательские настройки базовой команды (переопределяют global)
+        - 'custom': кастомные команды пользователя (макс 5 на пользователя)
+        """
         __tablename__ = 'bot_commands'
         __table_args__ = {'extend_existing': True}
         id = Column(Integer, primary_key=True, index=True)
-        user_id = Column(Integer, ForeignKey('users.id'), nullable=False)  # Владелец канала
-        channel_name = Column(String, nullable=False, index=True)  # Название канала
+        user_id = Column(Integer, ForeignKey('users.id'), nullable=True)  # NULL для global, user_id для override/custom
+        channel_name = Column(String, nullable=True, index=True)  # Название канала (NULL для global)
         command_name = Column(String, nullable=False, index=True)  # Название команды (без !)
-        command_type = Column(String, nullable=False)  # 'basic' или 'custom'
+        command_type = Column(String, nullable=False, index=True)  # 'global', 'override', 'custom'
+        parent_command_id = Column(Integer, ForeignKey('bot_commands.id'), nullable=True)  # Для override - ссылка на global команду
+        alias = Column(String, nullable=True, index=True)  # Пользовательский алиас (например !song вместо !sr)
         description = Column(String, nullable=True)  # Описание команды
         response_text = Column(String, nullable=True)  # Ответ команды (для кастомных)
         is_enabled = Column(Boolean, default=True)  # Включена ли команда
         platforms = Column(String, nullable=False, default='twitch,vk')  # Платформы через запятую
-        allowed_roles = Column(String, nullable=False, default='all')  # all, broadcaster, moderator, subscriber, vip, founder (twitch) | all, owner, moderator (vk)
+        allowed_roles = Column(String, nullable=False, default='all')  # all, broadcaster, moderator, subscriber, vip (twitch) | all, owner, moderator (vk)
         cooldown_seconds = Column(Integer, default=0)  # Кулдаун в секундах
         last_used = Column(DateTime, nullable=True)  # Последнее использование
         usage_count = Column(Integer, default=0)  # Количество использований
