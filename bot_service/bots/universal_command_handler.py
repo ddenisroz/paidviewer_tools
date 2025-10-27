@@ -283,6 +283,9 @@ class UniversalCommandHandler:
                 await ctx.send(f"@{ctx.author.name} ❌ Канал не найден")
                 return
             
+            # Проверяем настройку объединения категорий
+            combine_categories = user.combine_categories if hasattr(user, 'combine_categories') else False
+            
             # Ищем игру через Twitch API
             from api.twitch_api import TwitchAPI
             from core.connection_manager import get_connection_manager
@@ -310,12 +313,37 @@ class UniversalCommandHandler:
             game_id = game.get('id')
             game_name = game.get('name', args)
             
-            # Обновляем категорию
-            success = await twitch_api.update_stream_category(user.id, game_id)
+            # Обновляем категорию на Twitch
+            success_twitch = await twitch_api.update_stream_category(user.id, game_id)
             
-            if success:
-                await ctx.send(f"@{ctx.author.name} ✅ Игра изменена на: {game_name}")
-                self.logger.info(f"✓ Game changed to {game_name} for {ctx.channel.name}")
+            results = []
+            if success_twitch:
+                results.append("Twitch")
+            
+            # Если включено объединение категорий И есть VK канал - обновляем и VK
+            if combine_categories and user.vk_username:
+                try:
+                    from api.vk_api import VKLiveAPI
+                    vk_api = VKLiveAPI()
+                    
+                    # Ищем категорию на VK используя те же алиасы
+                    vk_categories = None
+                    for search_query in search_queries:
+                        vk_categories = await vk_api.get_categories(search=search_query, user_id=str(user.id))
+                        if vk_categories:
+                            break
+                    
+                    if vk_categories:
+                        success_vk = await vk_api.update_stream_category(str(user.id), vk_categories[0])
+                        if success_vk:
+                            results.append("VK Live")
+                except Exception as e:
+                    self.logger.error(f"Error updating VK category: {e}")
+            
+            if results:
+                platforms_text = " и ".join(results)
+                await ctx.send(f"@{ctx.author.name} ✅ Игра изменена на: {game_name} ({platforms_text})")
+                self.logger.info(f"✓ Game changed to {game_name} for {platforms_text}")
             else:
                 await ctx.send(f"@{ctx.author.name} ❌ Не удалось изменить игру")
             
@@ -341,6 +369,9 @@ class UniversalCommandHandler:
                 await vk_bot.send_message(channel_name, f"@{author_name} ❌ Канал не найден")
                 return
             
+            # Проверяем настройку объединения категорий
+            combine_categories = user.combine_categories if hasattr(user, 'combine_categories') else False
+            
             # Ищем игру через VK API
             from api.vk_api import VKLiveAPI
             from utils.category_search import expand_query_with_aliases
@@ -364,15 +395,43 @@ class UniversalCommandHandler:
             
             # Берём первую найденную игру
             category = categories[0]
+            game_name = category.get('title', args)
             
-            # Обновляем категорию
-            success = await vk_api.update_stream_category(str(user.id), category)
+            # Обновляем категорию на VK
+            success_vk = await vk_api.update_stream_category(str(user.id), category)
             
-            if success:
-                game_name = category.get('title', args)
+            results = []
+            if success_vk:
+                results.append("VK Live")
+            
+            # Если включено объединение категорий И есть Twitch канал - обновляем и Twitch
+            if combine_categories and user.twitch_username:
+                try:
+                    from api.twitch_api import TwitchAPI
+                    from core.connection_manager import get_connection_manager
+                    
+                    connection_manager = get_connection_manager()
+                    twitch_api = TwitchAPI(connection_manager)
+                    
+                    # Ищем игру на Twitch используя те же алиасы
+                    games = None
+                    for search_query in search_queries:
+                        games = await twitch_api.search_categories(search_query)
+                        if games:
+                            break
+                    
+                    if games:
+                        success_twitch = await twitch_api.update_stream_category(user.id, games[0].get('id'))
+                        if success_twitch:
+                            results.append("Twitch")
+                except Exception as e:
+                    self.logger.error(f"Error updating Twitch category: {e}")
+            
+            if results:
+                platforms_text = " и ".join(results)
                 await vk_bot.send_message(channel_name, 
-                    f"@{author_name} ✅ Игра изменена на: {game_name}")
-                self.logger.info(f"✓ Game changed to {game_name} for VK {channel_name}")
+                    f"@{author_name} ✅ Игра изменена на: {game_name} ({platforms_text})")
+                self.logger.info(f"✓ Game changed to {game_name} for {platforms_text}")
             else:
                 await vk_bot.send_message(channel_name, 
                     f"@{author_name} ❌ Не удалось изменить игру")
@@ -630,19 +689,39 @@ class UniversalCommandHandler:
                 await ctx.send(f"@{ctx.author.name} ❌ Канал не найден")
                 return
             
+            # Проверяем настройку объединения названий
+            combine_titles = user.combine_titles if hasattr(user, 'combine_titles') else False
+            
             # Обновляем название через Twitch API
             from api.twitch_api import TwitchAPI
             from core.connection_manager import get_connection_manager
             connection_manager = get_connection_manager()
             twitch_api = TwitchAPI(connection_manager)
             
-            success = await twitch_api.update_stream_title(user.id, args)
+            success_twitch = await twitch_api.update_stream_title(user.id, args)
             
-            if success:
+            results = []
+            if success_twitch:
+                results.append("Twitch")
+            
+            # Если включено объединение названий И есть VK канал - обновляем и VK
+            if combine_titles and user.vk_username:
+                try:
+                    from api.vk_api import VKLiveAPI
+                    vk_api = VKLiveAPI()
+                    
+                    success_vk = await vk_api.update_stream_title(str(user.id), args)
+                    if success_vk:
+                        results.append("VK Live")
+                except Exception as e:
+                    self.logger.error(f"Error updating VK title: {e}")
+            
+            if results:
                 # Обрезаем название для отображения
                 display_title = args[:50] + '...' if len(args) > 50 else args
-                await ctx.send(f"@{ctx.author.name} ✅ Название изменено на: {display_title}")
-                self.logger.info(f"✓ Title changed for {ctx.channel.name}")
+                platforms_text = " и ".join(results)
+                await ctx.send(f"@{ctx.author.name} ✅ Название изменено на: {display_title} ({platforms_text})")
+                self.logger.info(f"✓ Title changed for {platforms_text}")
             else:
                 await ctx.send(f"@{ctx.author.name} ❌ Не удалось изменить название")
             
@@ -668,18 +747,41 @@ class UniversalCommandHandler:
                 await vk_bot.send_message(channel_name, f"@{author_name} ❌ Канал не найден")
                 return
             
+            # Проверяем настройку объединения названий
+            combine_titles = user.combine_titles if hasattr(user, 'combine_titles') else False
+            
             # Обновляем название через VK API
             from api.vk_api import VKLiveAPI
             vk_api = VKLiveAPI()
             
-            success = await vk_api.update_stream_title(str(user.id), args)
+            success_vk = await vk_api.update_stream_title(str(user.id), args)
             
-            if success:
+            results = []
+            if success_vk:
+                results.append("VK Live")
+            
+            # Если включено объединение названий И есть Twitch канал - обновляем и Twitch
+            if combine_titles and user.twitch_username:
+                try:
+                    from api.twitch_api import TwitchAPI
+                    from core.connection_manager import get_connection_manager
+                    
+                    connection_manager = get_connection_manager()
+                    twitch_api = TwitchAPI(connection_manager)
+                    
+                    success_twitch = await twitch_api.update_stream_title(user.id, args)
+                    if success_twitch:
+                        results.append("Twitch")
+                except Exception as e:
+                    self.logger.error(f"Error updating Twitch title: {e}")
+            
+            if results:
                 # Обрезаем название для отображения
                 display_title = args[:50] + '...' if len(args) > 50 else args
+                platforms_text = " и ".join(results)
                 await vk_bot.send_message(channel_name, 
-                    f"@{author_name} ✅ Название изменено на: {display_title}")
-                self.logger.info(f"✓ Title changed for VK {channel_name}")
+                    f"@{author_name} ✅ Название изменено на: {display_title} ({platforms_text})")
+                self.logger.info(f"✓ Title changed for {platforms_text}")
             else:
                 await vk_bot.send_message(channel_name, 
                     f"@{author_name} ❌ Не удалось изменить название")

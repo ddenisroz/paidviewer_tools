@@ -1,6 +1,6 @@
 # 📊 Текущий статус проекта TTS_TTV_0.02
 
-**Последнее обновление:** 27 октября 2025 (Session 8: Commands Architecture & F5-TTS Status Fix)
+**Последнее обновление:** 27 октября 2025 (Session 8: Unified Commands for !game & !title)
 **Версия:** 0.02  
 **Статус:** В активной разработке, готовность к деплою 98%
 
@@ -259,6 +259,35 @@
 6. ✅ **JSONResponse в критических endpoints**
    - Подтверждено: `/api/tts/enable` и `/api/tts/disable` используют JSONResponse
    - CORS ошибки устранены
+
+---
+
+## 🆕 НОВОЕ - 27 ОКТЯБРЯ 2025 (Session 8, часть 2)
+
+### ✅ **Унификация команд !game и !title через настройки объединения**
+
+**Логика:**
+1. Команды `!game` и `!title` теперь поддерживают автоматическое применение к обеим платформам
+2. Если включена настройка `combine_categories` (в `User.combine_categories`), то `!game Just Chatting` применится к Twitch **И** VK Live
+3. Если включена настройка `combine_titles`, то `!title Новое название` применится к обеим платформам
+4. Использует кросс-платформенный маппинг из `utils/category_search.py` для корректного перевода категорий
+
+**Что было изменено:**
+- `bot_service/bots/universal_command_handler.py`:
+  - `_handle_game()` (Twitch) - проверяет `user.combine_categories`, при включении обновляет обе платформы
+  - `_handle_game_vk()` (VK) - проверяет `user.combine_categories`, при включении обновляет обе платформы
+  - `_handle_title()` (Twitch) - проверяет `user.combine_titles`, при включении обновляет обе платформы
+  - `_handle_title_vk()` (VK) - проверяет `user.combine_titles`, при включении обновляет обе платформы
+
+**Пример работы:**
+```
+Пользователь: !game dbd
+Бот: ✅ Игра изменена на: Dead by Daylight (Twitch и VK Live)
+```
+
+**Используемые поля БД:**
+- `User.combine_categories` (Boolean, default=False)
+- `User.combine_titles` (Boolean, default=False)
 
 ---
 
