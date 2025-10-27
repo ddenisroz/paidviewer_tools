@@ -447,7 +447,7 @@ import PageWrapper from '../components/PageWrapper';
                                 <div className="relative">
                                     <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
                                         <PopoverTrigger asChild>
-                                            <Button variant="outline" size="sm" className="h-9">
+                                            <Button variant="outline" size="sm" className="h-9 min-w-[180px]">
                                                 <Filter className="h-4 w-4 mr-2" />
                                                 Фильтр по тегам
                                                 {selectedBasicTags.length > 0 && (
