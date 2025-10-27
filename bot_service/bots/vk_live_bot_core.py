@@ -40,9 +40,13 @@ class VKLiveBotCore:
         from api.tts_api import TTSAPI
         self.tts_api = TTSAPI()
         
-        # Инициализируем обработчик команд
+        # Инициализируем обработчик команд (старая система для обратной совместимости)
         from vk_live_command_handler import VKLiveCommandHandler
         self.command_handler = VKLiveCommandHandler(self)
+        
+        # Новая универсальная система команд
+        from bots.universal_command_handler import UniversalCommandHandler
+        self.universal_command_handler = UniversalCommandHandler()
 
     async def start_bot(self):
         """Запуск VK Live бота"""
@@ -257,9 +261,9 @@ class VKLiveBotCore:
                 )
                 return  # Не обрабатываем TTS для кодов
             
-            # 3. Обрабатываем команды через command_handler
-            if self.command_handler and text.startswith('!'):
-                # Преобразуем формат сообщения для command_handler
+            # 3. Обрабатываем команды через универсальную систему
+            if text.startswith('!'):
+                # Преобразуем формат сообщения для universal_command_handler
                 command_message = {
                     'message': text,
                     'author_nick': user,
@@ -267,7 +271,7 @@ class VKLiveBotCore:
                     'is_moderator': message.get("author", {}).get("is_moderator", False),
                     'is_owner': message.get("author", {}).get("is_owner", False)
                 }
-                await self.command_handler.handle_message(channel_id, command_message)
+                await self.universal_command_handler.handle_vk_command(channel_id, command_message, self)
                 return  # Не обрабатываем TTS для команд
             
             # 4. Обработка TTS для обычных сообщений

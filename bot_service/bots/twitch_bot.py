@@ -9,6 +9,7 @@ from core.connection_manager import ConnectionManager
 from utils.role_checker import RoleChecker
 from .twitch_bot_core import TwitchBotCore
 from .twitch_bot_commands import TwitchBotCommands
+from .universal_command_handler import UniversalCommandHandler
 from api.tts_api import TTSAPI
 from api.youtube_api import YouTubeAPI
 from services.drops_service import DropsService
@@ -27,7 +28,7 @@ class Bot(TwitchBotCore):
         self.role_checker = RoleChecker()
         self.drops_service = None  # Будет инициализирован при подключении к каналу
         
-        # Инициализируем команды
+        # Инициализируем команды (старая система для обратной совместимости)
         self.commands_handler = TwitchBotCommands(
             self, 
             self.tts_api, 
@@ -35,7 +36,10 @@ class Bot(TwitchBotCore):
             self.role_checker
         )
         
-        logger.info("[BOT] Commands handler initialized")
+        # Новая универсальная система команд
+        self.universal_command_handler = UniversalCommandHandler()
+        
+        logger.info("[BOT] Commands handlers initialized (legacy + universal)")
         logger.info("[BOT] Twitch bot initialized with all modules")
 
     # Команды бота - обертки, которые TwitchIO может обнаружить
@@ -92,6 +96,23 @@ class Bot(TwitchBotCore):
                 is_owner=(message.author.name.lower() == message.channel.name.lower()) or message.author.is_broadcaster
             )
             return  # Не обрабатываем TTS для кодов верификации
+        
+        # Проверка команды (универсальная система)
+        if message.content.strip().startswith('!'):
+            # Создаем ctx-совместимый объект для universal_command_handler
+            class SimpleContext:
+                def __init__(self, msg, bot):
+                    self.message = msg
+                    self.author = msg.author
+                    self.channel = msg.channel
+                    self.bot = bot
+                
+                async def send(self, content):
+                    await self.channel.send(content)
+            
+            ctx = SimpleContext(message, self)
+            await self.universal_command_handler.handle_twitch_command(ctx, self)
+            return  # Не обрабатываем TTS для команд
         
         # Обработка TTS для всех сообщений (родитель уже трансляет сообщение)
         await self._handle_tts(message)
