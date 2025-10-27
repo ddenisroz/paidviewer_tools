@@ -34,27 +34,35 @@ const TtsSettings = ({
                 <div className="space-y-3">
                     {/* Настройки смайлов */}
                     <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                        <div className="flex items-center space-x-3">
-                            <Switch
-                                checked={ttsSettings.enable7TV}
-                                onCheckedChange={(checked) => handleSettingChange('enable7TV', checked)}
-                            />
+                        <div className="flex flex-col">
                             <Label htmlFor="enable7TV" className="text-sm font-medium">
                                 7TV смайлы
                             </Label>
+                            <span className="text-xs text-gray-400 mt-1">
+                                Озвучивать текстовые названия 7TV эмоций
+                            </span>
                         </div>
+                        <Switch
+                            id="enable7TV"
+                            checked={ttsSettings.enable7TV}
+                            onCheckedChange={(checked) => handleSettingChange('enable7TV', checked)}
+                        />
                     </div>
                     
                     <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                        <div className="flex items-center space-x-3">
-                            <Switch
-                                checked={ttsSettings.enableTwitch}
-                                onCheckedChange={(checked) => handleSettingChange('enableTwitch', checked)}
-                            />
+                        <div className="flex flex-col">
                             <Label htmlFor="enableTwitch" className="text-sm font-medium">
                                 Twitch смайлы
                             </Label>
+                            <span className="text-xs text-gray-400 mt-1">
+                                Озвучивать текстовые названия Twitch эмоций
+                            </span>
                         </div>
+                        <Switch
+                            id="enableTwitch"
+                            checked={ttsSettings.enableTwitch}
+                            onCheckedChange={(checked) => handleSettingChange('enableTwitch', checked)}
+                        />
                     </div>
                     
                     {/* 🛡️ Фильтры сообщений */}
