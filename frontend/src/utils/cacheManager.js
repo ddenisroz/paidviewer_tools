@@ -10,7 +10,10 @@
  * - Защита от race conditions
  */
 
-import logger from './logger';
+import Logger from './logger';
+
+// Создаём экземпляр логгера для кэша
+const logger = new Logger('CACHE');
 
 // ===== КОНФИГУРАЦИЯ КЭША =====
 export const CACHE_CONFIG = {

@@ -134,7 +134,7 @@ export const TtsHealthProvider = ({ children }) => {
         return checkHealthRef.current();
     }, []);
 
-    // Проверяем health ТОЛЬКО при первой загрузке/обновлении страницы
+    // Проверяем health ТОЛЬКО при первой загрузке/обновлении страницы И ТОЛЬКО на TTS-страницах
     useEffect(() => {
         // Отмечаем что компонент смонтирован
         mountedRef.current = true;
@@ -142,6 +142,16 @@ export const TtsHealthProvider = ({ children }) => {
         // Не проверяем для гостей
         if (isGuest) {
             console.log('TtsHealthContext: Guest user, skipping health check');
+            return;
+        }
+        
+        // 🛡️ Не проверяем TTS на страницах где это не нужно
+        const ttsRelatedPaths = ['/dashboard/tts', '/tts'];
+        const isTtsPage = ttsRelatedPaths.some(path => location.pathname.startsWith(path));
+        
+        if (!isTtsPage) {
+            console.log('TtsHealthContext: Not a TTS page, skipping health check');
+            setIsChecking(false);
             return;
         }
         
@@ -168,7 +178,7 @@ export const TtsHealthProvider = ({ children }) => {
         return () => {
             mountedRef.current = false;
         };
-    }, []); // Убираем все зависимости!
+    }, [location.pathname]); // Добавляем pathname для отслеживания навигации
 
     const value = {
         isHealthy,
