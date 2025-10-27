@@ -35,6 +35,7 @@ botService.interceptors.response.use(
 export const ttsService = axios.create({
     baseURL: TTS_SERVICE_URL,
     withCredentials: true,
+    timeout: 10000, // 10 секунд максимум для всех запросов к TTS
 });
 
 // --- Authentication ---

@@ -72,26 +72,27 @@ export const TtsHealthProvider = ({ children }) => {
         
         console.log('TtsHealthContext: Starting health check...');
         
-        // Дополнительная защита - принудительно завершаем проверку через заданное время
-        const forceCompleteTimeoutMs = parseInt(import.meta.env.VITE_TTS_FORCE_COMPLETE_TIMEOUT || '5000', 10);
+        // Дополнительная защита - принудительно завершаем проверку через 6 секунд (на случай если что-то пойдёт не так)
         const forceCompleteTimeout = setTimeout(() => {
-            if (checkInProgressRef.current) {
-                console.log('TtsHealthContext: Force completing health check due to timeout');
+            if (checkInProgressRef.current && mountedRef.current) {
+                console.warn('TtsHealthContext: Force completing health check due to timeout (6s)');
                 setIsChecking(false);
+                setIsHealthy(false);
+                setLastCheck(new Date());
                 checkInProgressRef.current = false;
                 globalHealthCheckInProgress = false;
             }
-        }, forceCompleteTimeoutMs);
+        }, 6000);
         
         try {
-            // Добавляем таймаут для проверки TTS сервера
-            const healthCheckTimeout = parseInt(import.meta.env.VITE_TTS_HEALTH_CHECK_TIMEOUT || '3000', 10);
+            // Добавляем таймаут для проверки TTS сервера - 5 секунд максимум
+            const healthCheckTimeout = 5000;
             const timeoutPromise = new Promise((_, reject) => 
                 setTimeout(() => reject(new Error('TTS health check timeout')), healthCheckTimeout)
             );
             
             const response = await Promise.race([
-                ttsService.get('/health'),
+                ttsService.get('/health', { timeout: healthCheckTimeout }),
                 timeoutPromise
             ]);
             
@@ -99,17 +100,31 @@ export const TtsHealthProvider = ({ children }) => {
             const isOk = response.status === 200 && data.tts_engine_loaded;
             
             console.log('TtsHealthContext: TTS server response:', { status: response.status, data, isOk });
+            
+            if (!mountedRef.current) {
+                console.log('TtsHealthContext: Component unmounted during health check, aborting');
+                return;
+            }
+            
             setIsHealthy(isOk);
             setLastCheck(new Date());
             
         } catch (error) {
-            console.log('TtsHealthContext: TTS server check failed:', error.message);
+            console.log('TtsHealthContext: TTS server check failed:', error.message || error.code);
+            
+            if (!mountedRef.current) {
+                console.log('TtsHealthContext: Component unmounted during error handling, aborting');
+                return;
+            }
+            
             setIsHealthy(false);
             setLastCheck(new Date());
         } finally {
-            console.log('TtsHealthContext: Health check completed, setting isChecking to false');
-            clearTimeout(forceCompleteTimeout);
-            setIsChecking(false);
+            if (mountedRef.current) {
+                console.log('TtsHealthContext: Health check completed, setting isChecking to false');
+                clearTimeout(forceCompleteTimeout);
+                setIsChecking(false);
+            }
             checkInProgressRef.current = false;
             globalHealthCheckInProgress = false;
         }

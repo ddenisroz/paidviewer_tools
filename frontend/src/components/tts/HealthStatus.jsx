@@ -30,11 +30,6 @@ const HealthStatus = ({ isHealthy, isChecking, checkTtsHealth, isWhitelisted }) 
                         <p className="text-sm text-blue-300">
                             Проверяем доступность TTS сервера... ({checkingDuration}с)
                         </p>
-                        {checkingDuration > 3 && (
-                            <p className="text-xs text-gray-400 mt-1">
-                                TTS сервис может быть недоступен
-                            </p>
-                        )}
                     </div>
                 </div>
             </div>
