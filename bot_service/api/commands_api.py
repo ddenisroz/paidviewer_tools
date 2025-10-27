@@ -32,6 +32,15 @@ class CommandUpdate(BaseModel):
     cooldown_seconds: Optional[int] = None
     response_text: Optional[str] = None
 
+class CommandOverrideCreate(BaseModel):
+    """Создание user override для базовой команды"""
+    command_name: str  # Название глобальной команды для переопределения
+    alias: Optional[str] = None  # Пользовательский алиас (например !song вместо !sr)
+    platforms: Optional[str] = None  # Переопределить платформы
+    allowed_roles: Optional[str] = None  # Переопределить права доступа
+    cooldown_seconds: Optional[int] = None  # Переопределить кулдаун
+    is_enabled: Optional[bool] = True  # Включена ли команда
+
 class CommandResponse(BaseModel):
     """Ответ с информацией о команде"""
     id: int
@@ -265,6 +274,94 @@ async def update_command(
         logger.error(f"Error updating command: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail="Ошибка обновления команды")
+
+@router.post("/override")
+async def create_command_override(
+    override_data: CommandOverrideCreate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Создать user override для глобальной команды"""
+    try:
+        # 1. Проверяем существует ли глобальная команда с таким именем
+        global_command = db.query(BotCommand).filter(
+            BotCommand.command_type == 'global',
+            BotCommand.user_id == None,
+            BotCommand.command_name == override_data.command_name
+        ).first()
+        
+        if not global_command:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Глобальная команда '{override_data.command_name}' не найдена"
+            )
+        
+        # 2. Проверяем нет ли уже override для этой команды
+        existing_override = db.query(BotCommand).filter(
+            BotCommand.command_type == 'override',
+            BotCommand.user_id == current_user["id"],
+            BotCommand.command_name == override_data.command_name
+        ).first()
+        
+        if existing_override:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Override для команды '{override_data.command_name}' уже существует. Используйте PUT для обновления."
+            )
+        
+        # 3. Проверяем что alias не занят
+        if override_data.alias:
+            alias_conflict = db.query(BotCommand).filter(
+                BotCommand.user_id == current_user["id"],
+                BotCommand.alias == override_data.alias
+            ).first()
+            
+            if alias_conflict:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Алиас '{override_data.alias}' уже используется"
+                )
+        
+        # 4. Создаем override
+        new_override = BotCommand(
+            user_id=current_user["id"],
+            channel_name=None,  # Override не привязан к конкретному каналу
+            command_name=override_data.command_name,
+            command_type='override',
+            parent_command_id=global_command.id,
+            alias=override_data.alias,
+            response_text="",  # Override не меняет response_text
+            is_enabled=override_data.is_enabled if override_data.is_enabled is not None else True,
+            platforms=override_data.platforms if override_data.platforms else global_command.platforms,
+            allowed_roles=override_data.allowed_roles if override_data.allowed_roles else global_command.allowed_roles,
+            cooldown_seconds=override_data.cooldown_seconds if override_data.cooldown_seconds is not None else global_command.cooldown_seconds,
+            tags=global_command.tags,
+            description=global_command.description
+        )
+        
+        db.add(new_override)
+        db.commit()
+        db.refresh(new_override)
+        
+        commands_logger.info(f"✓ Created override for command '{override_data.command_name}' by user {current_user['id']}")
+        
+        return {
+            "success": True,
+            "message": f"Override для команды '{override_data.command_name}' создан успешно",
+            "data": {
+                "id": new_override.id,
+                "command_name": new_override.command_name,
+                "alias": new_override.alias,
+                "parent_command_id": new_override.parent_command_id
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating override: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Ошибка создания override")
 
 @router.delete("/{command_id}")
 async def delete_command(
