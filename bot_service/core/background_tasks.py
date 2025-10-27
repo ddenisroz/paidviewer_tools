@@ -15,31 +15,47 @@ class BackgroundTasks:
     def __init__(self):
         self.tasks = []
     
-    async def collect_stream_stats(self):
-        """Сбор статистики стримов для активных пользователей"""
+    async def cleanup_old_chat_messages(self):
+        """
+        Автоматическая очистка старых сообщений чата
+        
+        Лимиты (читаются из .env):
+        - MAX_CHAT_MESSAGES_PER_USER: 3000 сообщений на пользователя
+        - MAX_TOTAL_CHAT_MESSAGES: 100000 сообщений всего
+        - CHAT_MESSAGES_RETENTION_DAYS: 30 дней
+        """
         while True:
-            await asyncio.sleep(60)  # Каждую минуту
+            await asyncio.sleep(3600)  # Проверяем каждый час
+            
             try:
                 db = next(get_db())
-                
-                # Получаем всех пользователей
-                active_users = db.query(User).all()
-                
-                for user in active_users:
-                    try:
-                        # Здесь можно добавить логику сбора статистики
-                        # Например, получение информации о стриме через Twitch API
-                        pass
-                    except Exception as e:
-                        logger.error(f"Error collecting stats for user {user.id}: {e}")
-                
-                db.close()
-                
-            except Exception as e:
-                logger.error(f"Error in collect_stream_stats: {e}")
-            finally:
-                if db:
+                try:
+                    from services.database_cleanup_service import DatabaseCleanupService
+                    
+                    cleanup_service = DatabaseCleanupService(db)
+                    
+                    # Получаем статистику до очистки
+                    stats_before = cleanup_service.get_database_stats()
+                    total_before = stats_before.get('total_chat_messages', 0)
+                    
+                    # Очищаем старые данные
+                    cleanup_stats = cleanup_service.cleanup_old_data()
+                    
+                    deleted_count = cleanup_stats.get('messages_deleted', 0)
+                    
+                    if deleted_count > 0:
+                        logger.info(f"🗑️ [CHAT CLEANUP] Deleted {deleted_count} old messages (total before: {total_before})")
+                    else:
+                        logger.debug("✅ [CHAT CLEANUP] No messages to delete - all within limits")
+                    
+                except Exception as e:
+                    logger.error(f"❌ [CHAT CLEANUP] Error in cleanup_old_chat_messages: {e}")
+                finally:
                     db.close()
+                    
+            except Exception as e:
+                logger.error(f"❌ [CHAT CLEANUP] Critical error in cleanup task: {e}")
+                await asyncio.sleep(300)  # При ошибке повторить через 5 минут
     
     async def cleanup_expired_sessions(self):
         """Очистка истекших сессий"""
@@ -68,16 +84,6 @@ class BackgroundTasks:
             finally:
                 if db:
                     db.close()
-    
-    async def background_cache_updater(self):
-        """Обновление кэша в фоне"""
-        while True:
-            try:
-                # Здесь должна быть логика обновления кэша
-                await asyncio.sleep(300)  # Каждые 5 минут
-            except Exception as e:
-                logger.error(f"Error in background_cache_updater: {e}")
-                await asyncio.sleep(300)
     
     async def refresh_vk_bot_token(self):
         """Автоматическое обновление VK Live bot token каждые 50 минут (до истечения в 60 минут)"""
@@ -208,7 +214,10 @@ class BackgroundTasks:
     async def refresh_user_oauth_tokens(self):
         """
         Проактивное обновление OAuth токенов пользователей
-        Проверяет каждые 30 минут и обновляет токены, которые истекут в течение часа
+        Проверяет каждые 6 часов и обновляет токены, которые истекут в течение 2 часов
+        
+        Twitch токены: живут 4 часа, обновляем за 2 часа до истечения
+        VK токены: живут 24 часа, обновляем за 2 часа до истечения
         """
         from core.database import SessionLocal, UserToken
         from core.datetime_utils import utcnow_naive
@@ -217,14 +226,14 @@ class BackgroundTasks:
         
         while True:
             try:
-                await asyncio.sleep(1800)  # Проверяем каждые 30 минут
+                await asyncio.sleep(21600)  # Проверяем каждые 6 часов (6 * 60 * 60)
                 
                 logger.info("🔄 [TOKEN REFRESH] Checking for expiring user OAuth tokens...")
                 
                 db = SessionLocal()
                 try:
-                    # Находим токены которые истекут в течение следующего часа
-                    threshold = utcnow_naive() + timedelta(hours=1)
+                    # Находим токены которые истекут в течение следующих 2 часов
+                    threshold = utcnow_naive() + timedelta(hours=2)
                     
                     expiring_tokens = db.query(UserToken).filter(
                         UserToken.expires_at.isnot(None),
@@ -277,16 +286,21 @@ class BackgroundTasks:
     async def start_all_tasks(self):
         """Запуск всех фоновых задач"""
         self.tasks = [
-            asyncio.create_task(self.collect_stream_stats()),
-            asyncio.create_task(self.cleanup_expired_sessions()),
-            asyncio.create_task(self.background_cache_updater()),
-            asyncio.create_task(self.refresh_vk_bot_token()),  # Обновление VK bot токена (ClientCredentials)
-            asyncio.create_task(self.refresh_user_oauth_tokens()),  # Обновление OAuth токенов пользователей
-            asyncio.create_task(self.cleanup_task()),
-            asyncio.create_task(self.cleanup_deleted_accounts())  # Окончательное удаление через 30 дней
+            asyncio.create_task(self.cleanup_old_chat_messages()),      # Очистка истории чата (каждый час)
+            asyncio.create_task(self.cleanup_expired_sessions()),       # Очистка истекших сессий (каждые 5 минут)
+            asyncio.create_task(self.refresh_vk_bot_token()),          # Обновление VK bot токена (каждые 50 минут)
+            asyncio.create_task(self.refresh_user_oauth_tokens()),     # Обновление OAuth токенов (каждые 6 часов)
+            asyncio.create_task(self.cleanup_task()),                  # Очистка неактивных каналов (каждую минуту)
+            asyncio.create_task(self.cleanup_deleted_accounts())       # Окончательное удаление аккаунтов (каждые 24 часа)
         ]
         
-        logger.info("Background tasks started (including token refresh and account cleanup)")
+        logger.info("✅ [BACKGROUND] Started 6 background tasks:")
+        logger.info("   - cleanup_old_chat_messages (every 1 hour)")
+        logger.info("   - cleanup_expired_sessions (every 5 minutes)")
+        logger.info("   - refresh_vk_bot_token (every 50 minutes)")
+        logger.info("   - refresh_user_oauth_tokens (every 6 hours)")
+        logger.info("   - cleanup_task (every 1 minute)")
+        logger.info("   - cleanup_deleted_accounts (every 24 hours)")
     
     async def stop_all_tasks(self):
         """Остановка всех фоновых задач"""
