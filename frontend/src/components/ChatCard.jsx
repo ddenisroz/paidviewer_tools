@@ -1270,7 +1270,8 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                 isOpen={showChatBoxModal}
                 onClose={() => setShowChatBoxModal(false)}
                 onSave={() => {
-                    toast.success('Настройки ChatBox сохранены!');
+                    // ✅ Toast уже показывается в ChatBoxSettingsModal.handleSave
+                    // Не дублируем уведомления
                 }}
             />
 

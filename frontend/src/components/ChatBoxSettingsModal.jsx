@@ -621,7 +621,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                         <Button
                             onClick={() => handleSave(false)}
                             disabled={saving}
-                            className="bg-purple-600 hover:bg-purple-700"
+                            className="bg-purple-600 hover:bg-purple-700 min-w-[120px]"
                         >
                             {saving ? 'Сохранение...' : 'Сохранить'}
                         </Button>

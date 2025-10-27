@@ -7,7 +7,6 @@ import { useIntegrations } from '../../context/IntegrationsContext';
 import { generateObsUrl, botService, ttsService } from '../../services/microservices';
 import TtsErrorCard from '../../components/TtsErrorCard';
 import PageWrapper from '../../components/PageWrapper';
-import { useToast } from '../../components/ui/toast';
 import { getTtsWebSocketUrl } from '../../utils/urlUtils';
 import { toast } from 'sonner';
 
@@ -24,7 +23,6 @@ const TtsMainPageContent = () => {
     const { isHealthy, isChecking, lastCheck, checkTtsHealth } = useTtsHealth();
     const { isAuthenticated, user, isGuest } = useAuth();
     const { integrations } = useIntegrations();
-    const { addToast } = useToast();
     
     // Логируем инициализацию компонента
     useEffect(() => {
@@ -270,18 +268,14 @@ const TtsMainPageContent = () => {
                 } catch (error) {
                     console.error('Error generating OBS URL:', error);
                     if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
-                        addToast({
-                            title: 'Ошибка',
-                            description: 'Ошибка генерации OBS URL',
-                            variant: 'destructive'
-                        });
+                        toast.error('Ошибка генерации OBS URL');
                     }
                     setObsUrl('');
                 }
             }
         };
         generateUrl();
-    }, [listeningMode, isAuthenticated, user?.id, addToast]);
+    }, [listeningMode, isAuthenticated, user?.id]);
 
     // Обработчики
     const handlePlatformToggle = useCallback(async (platform) => {
@@ -315,15 +309,11 @@ const TtsMainPageContent = () => {
             console.log(`Platform ${platform} toggled successfully`);
         } catch (error) {
             console.error('Error toggling platform:', error);
-            addToast({
-                title: 'Ошибка',
-                description: 'Не удалось переключить платформу',
-                variant: 'destructive'
-            });
+            toast.error('Не удалось переключить платформу');
         } finally {
             setPlatformLoading(false);
         }
-    }, [platformSettings.enabled_platforms, addToast]);
+    }, [platformSettings.enabled_platforms]);
 
     const handleSaveSettings = useCallback(async () => {
         try {
