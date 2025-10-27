@@ -1,110 +1,186 @@
 # 📚 Документация TTS_TTV_0.02
 
-**Обновлено:** 22 октября 2025
+**Последнее обновление:** 27 октября 2025 (Session 9)  
+**Версия проекта:** 0.9.0
 
 ---
 
-## 🚨 НАЧНИ ОТСЮДА!
+## 🚀 Быстрый старт
 
-### Для AI-агентов (Claude, GPT, и т.д.):
+### Для новых разработчиков:
+1. 📖 **[QUICK_START.md](QUICK_START.md)** - Запуск за 5 минут
+2. 🏗️ **[ARCHITECTURE_GUIDE.md](ARCHITECTURE_GUIDE.md)** - Архитектура системы
+3. 👨‍💻 **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - Паттерны и примеры
 
-1. **ОБЯЗАТЕЛЬНО ЧИТАЙ ПЕРВЫМ:** [CURRENT_STATUS.md](CURRENT_STATUS.md)  
-   ✅ Что работает | ❌ Что сломано | ⛔ Что НЕ ТРОГАТЬ
-
-2. **ОБЯЗАТЕЛЬНО ЧИТАЙ ВТОРЫМ:** [LLM_DEVELOPMENT_RULES.md](LLM_DEVELOPMENT_RULES.md)  
-   🚨 Критические правила чтобы НЕ ЛОМАТЬ рабочие фичи
-
-3. Полный список: [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)
-
-### Для людей-разработчиков:
-
-1. **Быстрый старт:** [QUICK_START.md](QUICK_START.md)
-2. **Архитектура:** [ARCHITECTURE_GUIDE.md](ARCHITECTURE_GUIDE.md)
-3. **Разработка:** [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)
-4. **Текущий статус:** [CURRENT_STATUS.md](CURRENT_STATUS.md)
-
----
-
-## 📊 Текущий статус проекта
-
-### ✅ Работает:
-- Авторизация (Twitch + VK Live)
-- Смена названия стрима
-- Смена категории стрима (раздельный режим)
-- ChatBox (отображение сообщений)
-- TTS базовая озвучка
-- TTS shortcuts (кнопки на главной)
-
-### ❌ Баги:
-- Смена категории в объединенном режиме
-- Сохранение истории Twitch чата (backend не перезапущен!)
-- Позиционирование контекстного меню
-
-### 🔧 В разработке:
-- Кнопка "Настройка" в ChatBox (редактор стилей + экспорт в OBS)
-
-**Детали:** [CURRENT_STATUS.md](CURRENT_STATUS.md)
-
----
-
-## ⚠️ ВАЖНО ДЛЯ AI-АГЕНТОВ
-
-**НЕ НАЧИНАЙ РАБОТУ** без прочтения:
-- [CURRENT_STATUS.md](CURRENT_STATUS.md)
-- [LLM_DEVELOPMENT_RULES.md](LLM_DEVELOPMENT_RULES.md)
-
-**НЕ ТРОГАЙ рабочие фичи!**  
-Лучше не исправить баг, чем сломать 5 работающих фич.
+### Для AI-агентов:
+1. 🚨 **[CURRENT_STATUS.md](CURRENT_STATUS.md)** - ЧТО РАБОТАЕТ/НЕ РАБОТАЕТ
+2. 🤖 **[LLM_DEVELOPMENT_RULES.md](LLM_DEVELOPMENT_RULES.md)** - ПРАВИЛА (обязательно!)
+3. 🔧 **[QUICK_FIX_GUIDE.md](QUICK_FIX_GUIDE.md)** - Типичные баги
 
 ---
 
 ## 📁 Структура документации
 
+### 🔴 КРИТИЧЕСКИЕ (читать обязательно!)
+
+| Файл | Описание |
+|------|----------|
+| **[DO_NOT_TOUCH.md](DO_NOT_TOUCH.md)** | 🚫 НЕЛЬЗЯ ТРОГАТЬ! Категории стримов |
+| **[CURRENT_STATUS.md](CURRENT_STATUS.md)** | ✅ Что работает, ❌ что сломано |
+| **[LLM_DEVELOPMENT_RULES.md](LLM_DEVELOPMENT_RULES.md)** | Правила для AI-агентов |
+
+### 🟢 Основная документация
+
+| Файл | Описание |
+|------|----------|
+| [QUICK_START.md](QUICK_START.md) | Установка и первый запуск |
+| [ARCHITECTURE_GUIDE.md](ARCHITECTURE_GUIDE.md) | Backend, Frontend, Database |
+| [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) | Паттерны, best practices |
+| [CHANGELOG.md](CHANGELOG.md) | История изменений (Session 7-9) |
+
+### 🔵 Специализированные темы
+
+| Файл | Тема |
+|------|------|
+| [TTS_ARCHITECTURE.md](TTS_ARCHITECTURE.md) | 🎙️ Cloud (gTTS) + Local (F5-TTS) |
+| [SHARED_WEBSOCKET.md](SHARED_WEBSOCKET.md) | 🔌 WebSocket Leader Election + Singleton |
+| [CODE_REVIEW_SENIOR_ENGINEER.md](CODE_REVIEW_SENIOR_ENGINEER.md) | 👨‍💼 Senior-level code review |
+| [MEMORY_LEAKS_AUDIT.md](MEMORY_LEAKS_AUDIT.md) | 🧠 Memory leaks audit (EXCELLENT) |
+| [API_CLIENT_MIGRATION.md](API_CLIENT_MIGRATION.md) | 📡 Unified ApiClient guide |
+| [CACHING_SYSTEM.md](CACHING_SYSTEM.md) | 💾 Multi-tab cache sync |
+| [GUEST_MODE_SUPPORT.md](GUEST_MODE_SUPPORT.md) | 👤 Гостевой режим |
+| [TOKEN_SYSTEM_UNIFIED.md](TOKEN_SYSTEM_UNIFIED.md) | 🔐 TokenManager система |
+| [UNIFIED_COMMANDS.md](UNIFIED_COMMANDS.md) | 🎮 Команды !game, !title |
+| [ROLES_REFERENCE.md](ROLES_REFERENCE.md) | 👥 Twitch/VK роли |
+| [CATEGORY_MAPPING_GUIDE.md](CATEGORY_MAPPING_GUIDE.md) | 🗺️ Кросс-платформенные категории |
+| [VK_USERNAME_AND_ADMIN_USERS_EXPLANATION.md](VK_USERNAME_AND_ADMIN_USERS_EXPLANATION.md) | 📝 VK username логика |
+
+### 🟡 Deployment и безопасность
+
+| Файл | Описание |
+|------|----------|
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Деплой на production |
+| [SECURITY_LOGIC.md](SECURITY_LOGIC.md) | Авторизация и безопасность |
+
+### 📂 VK Live API Reference
+
+Документация VK Live API находится в папке `vk/` (19 файлов).
+
+---
+
+## 🎯 Сценарии использования
+
+### 🚀 Я хочу запустить проект
+
+```bash
+# 1. Читай
+📖 QUICK_START.md
+
+# 2. Настраивай
+cp env.example .env
+# Заполни Twitch/VK токены
+
+# 3. Запускай
+npm run dev  # В корне проекта
 ```
-docs/
-├── README.md                          ← ты здесь
-├── DOCUMENTATION_INDEX.md             ← полный индекс
-├── CURRENT_STATUS.md                  ← что работает/не работает
-├── LLM_DEVELOPMENT_RULES.md           ← правила для AI
-├── QUICK_START.md                     ← быстрый старт
-├── ARCHITECTURE_GUIDE.md              ← архитектура
-├── DEVELOPER_GUIDE.md                 ← гайд разработчика
-├── QUICK_FIX_GUIDE.md                 ← частые проблемы
-├── DEPLOYMENT.md                      ← деплой
-├── SECURITY_LOGIC.md                  ← безопасность
-└── vk/                                ← VK Live API docs
-    ├── Методы.Категории.md
-    └── Методы.Канал.md
+
+### 🛠️ Я хочу добавить фичу
+
+```
+1. ⚠️  ОБЯЗАТЕЛЬНО: CURRENT_STATUS.md (проверь что работает)
+2. ⚠️  ОБЯЗАТЕЛЬНО: LLM_DEVELOPMENT_RULES.md (правила)
+3. 📖 ARCHITECTURE_GUIDE.md (архитектура)
+4. 👨‍💻 DEVELOPER_GUIDE.md (примеры кода)
 ```
 
----
+### 🐛 Я хочу исправить баг
 
-## 🔍 Быстрый поиск
+```
+1. ⚠️  CURRENT_STATUS.md (убедись что это баг)
+2. 🔧 QUICK_FIX_GUIDE.md (типичные проблемы)
+3. 🤖 LLM_DEVELOPMENT_RULES.md (как правильно фиксить)
+```
 
-| Вопрос | Документ |
-|--------|----------|
-| Что работает/не работает? | [CURRENT_STATUS.md](CURRENT_STATUS.md) |
-| Как не сломать код? | [LLM_DEVELOPMENT_RULES.md](LLM_DEVELOPMENT_RULES.md) |
-| Как запустить проект? | [QUICK_START.md](QUICK_START.md) |
-| Как устроен проект? | [ARCHITECTURE_GUIDE.md](ARCHITECTURE_GUIDE.md) |
-| Как разрабатывать? | [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) |
-| Типичные баги? | [QUICK_FIX_GUIDE.md](QUICK_FIX_GUIDE.md) |
-| VK Live API? | [vk/Методы.*.md](vk/) |
-| Полный список? | [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md) |
+### 🤖 Я AI-агент
 
----
+```
+🚨 ШАГ 1: CURRENT_STATUS.md (ЧТО РАБОТАЕТ)
+🚨 ШАГ 2: LLM_DEVELOPMENT_RULES.md (ПРАВИЛА)
+📖 ШАГ 3: Если нужно - другие документы
+```
 
-## 📞 Поддержка
-
-**Проблемы?**
-
-1. Проверь [CURRENT_STATUS.md](CURRENT_STATUS.md)
-2. Проверь [QUICK_FIX_GUIDE.md](QUICK_FIX_GUIDE.md)
-3. Читай логи:
-   - Backend: `bot_service/bot_service.log`
-   - Frontend: F12 → Console
+**⚠️ НЕ НАЧИНАЙ РАБОТУ БЕЗ ПРОЧТЕНИЯ ЭТИХ ДВУХ ФАЙЛОВ!**
 
 ---
 
-**Версия:** 2.0 | **Статус:** ✅ Актуально | **Дата:** 22.10.2025
+## 📊 Статус проекта
 
+### ✅ Работает
+- Multi-platform (Twitch, VK Live, DonationAlerts)
+- TTS (Cloud gTTS + Local F5-TTS)
+- ChatBox (OBS overlay)
+- Commands (global, override, custom)
+- Category Mapping (!game, !title)
+- Guest Mode
+- Caching + Multi-tab sync
+- Shared WebSocket (Singleton)
+
+### 🚧 В разработке
+- Миграция на ApiClient (частично)
+- JSDoc для критических функций
+
+### ❌ Известные ограничения
+- YouTube API key (не реализовано)
+- F5-TTS требует GPU для скорости
+
+---
+
+## 🔍 Поиск информации
+
+| Вопрос | Файл |
+|--------|------|
+| Как работает TTS? | TTS_ARCHITECTURE.md |
+| Как работает ChatBox? | CURRENT_STATUS.md → ChatBox |
+| Как работают токены? | TOKEN_SYSTEM_UNIFIED.md |
+| Как работают команды? | UNIFIED_COMMANDS.md |
+| Как работает WebSocket? | SHARED_WEBSOCKET.md |
+| VK API не работает? | vk/Методы.*.md |
+
+---
+
+## 📦 Технический стек
+
+**Backend:** FastAPI, SQLAlchemy, Alembic, WebSocket, TwitchIO, vk-api  
+**Frontend:** React 18, Vite, Tailwind, shadcn/ui, Axios  
+**TTS:** gTTS (cloud), F5-TTS (local, GPU)
+
+---
+
+## 📜 История версий
+
+| Дата | Session | Основные изменения |
+|------|---------|-------------------|
+| 27.10.2025 | Session 9 | WebSocket Singleton, ErrorBoundary, ApiClient |
+| 26.10.2025 | Session 8 | OAuth fixes, Token refresh |
+| 24-25.10.2025 | Session 7 | TokenManager, UX improvements |
+
+**Полная история:** [CHANGELOG.md](CHANGELOG.md)
+
+---
+
+## 🤝 Contributing
+
+**Перед изменением кода:**
+1. Прочитай [LLM_DEVELOPMENT_RULES.md](LLM_DEVELOPMENT_RULES.md)
+2. Проверь [CURRENT_STATUS.md](CURRENT_STATUS.md)
+3. Следуй паттернам из [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)
+
+**После изменений:**
+1. Обнови [CURRENT_STATUS.md](CURRENT_STATUS.md)
+2. Добавь запись в [CHANGELOG.md](CHANGELOG.md)
+
+---
+
+**Версия документации:** 4.0  
+**Статус:** ✅ Актуально  
+**Последнее обновление:** 27 октября 2025 (Session 9)
