@@ -346,9 +346,9 @@ const YoutubeIntegrationPage = () => {
                                         "Показать OBS source для копирования"
                                     }
                                 >
-                                    {!youtubeObsUrl ? '📹 Сгенерировать OBS URL' :
-                                     isObsUrlVisible ? '👁️ Скрыть OBS source' : 
-                                     '👁️ Показать OBS source'}
+                                    {!youtubeObsUrl ? '📹 OBS URL' :
+                                     isObsUrlVisible ? '👁️ Скрыть' : 
+                                     '👁️ Показать'}
                                 </Button>
                                 
                                 {youtubeObsUrl && (
@@ -358,7 +358,7 @@ const YoutubeIntegrationPage = () => {
                                         onClick={regenerateYoutubeObsUrl}
                                         title="Перегенерировать новый OBS URL"
                                     >
-                                        🔄 Перегенерировать
+                                        🔄 Обновить
                                     </Button>
                                 )}
                             </div>
