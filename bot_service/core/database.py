@@ -481,9 +481,13 @@ try:
     class LocalTTSEndpoint(Base):
         """Модель конфигурации локального TTS F5 движка"""
         __tablename__ = 'local_tts_endpoints'
-        __table_args__ = {'extend_existing': True}
+        __table_args__ = (
+            CheckConstraint('(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)', name='check_user_or_session_local_tts'),
+            {'extend_existing': True}
+        )
         id = Column(Integer, primary_key=True, index=True)
-        user_id = Column(Integer, ForeignKey('users.id'), nullable=False, unique=True)
+        user_id = Column(Integer, ForeignKey('users.id'), nullable=True)  # Для авторизованных пользователей
+        session_id = Column(String, nullable=True, index=True)  # Для гостей
         
         # Конфигурация endpoint
         endpoint_url = Column(String, nullable=False)  # URL локального TTS сервиса (например: http://localhost:8001)

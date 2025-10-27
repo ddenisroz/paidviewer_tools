@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Optional
 from core.database import get_db, BotCommand
-from auth.auth import get_current_user
+from auth.auth import get_current_user, get_current_user_optional
 from utils.enhanced_logger import log_api_call, log_request, log_response, commands_logger
 
 logger = logging.getLogger('bot_service')
@@ -58,7 +58,7 @@ class CommandResponse(BaseModel):
 
 @router.get("/")
 async def get_commands(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """Получить все команды"""
@@ -66,35 +66,43 @@ async def get_commands(
 
 @router.get("")
 async def get_commands_no_slash(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """Получить все команды (без слеша)"""
     return await _get_commands_impl(current_user, db)
 
 async def _get_commands_impl(current_user: dict, db: Session):
-    user_id = current_user.get('id')
+    # Для гостей показываем только глобальные команды
+    user_id = current_user.get('id') if current_user else None
+    is_guest = (user_id == -1 or user_id is None)
+    
     log_request("/api/commands", "GET", None, user_id)
-    commands_logger.info(f"Getting commands for user {user_id}")
+    commands_logger.info(f"Getting commands for {'guest' if is_guest else f'user {user_id}'}")
     
     try:
-        # 1. Получаем ГЛОБАЛЬНЫЕ команды (доступны всем)
+        # 1. Получаем ГЛОБАЛЬНЫЕ команды (доступны всем, включая гостей)
         global_commands = db.query(BotCommand).filter(
             BotCommand.command_type == 'global',
             BotCommand.user_id == None
         ).all()
         
-        # 2. Получаем USER OVERRIDES (персональные настройки базовых команд)
-        override_commands = db.query(BotCommand).filter(
-            BotCommand.command_type == 'override',
-            BotCommand.user_id == current_user["id"]
-        ).all()
-        
-        # 3. Получаем КАСТОМНЫЕ команды пользователя
-        custom_commands = db.query(BotCommand).filter(
-            BotCommand.command_type == 'custom',
-            BotCommand.user_id == current_user["id"]
-        ).all()
+        # 2. Для гостей - НЕ ЗАГРУЖАЕМ overrides и custom команды
+        if is_guest:
+            override_commands = []
+            custom_commands = []
+        else:
+            # 2. Получаем USER OVERRIDES (персональные настройки базовых команд)
+            override_commands = db.query(BotCommand).filter(
+                BotCommand.command_type == 'override',
+                BotCommand.user_id == current_user["id"]
+            ).all()
+            
+            # 3. Получаем КАСТОМНЫЕ команды пользователя
+            custom_commands = db.query(BotCommand).filter(
+                BotCommand.command_type == 'custom',
+                BotCommand.user_id == current_user["id"]
+            ).all()
         
         # Преобразуем команды в нужный формат
         def command_to_dict(cmd, command_type_label):

@@ -1297,22 +1297,38 @@ async def upload_user_voice(
 
 @local_tts_router.get("/config")
 async def get_local_tts_config(
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """Получить конфигурацию локального TTS"""
     try:
-        # Проверяем whitelist
-        user_obj = db.query(WhitelistedChannel).filter(
-            (WhitelistedChannel.channel_name == user.get('twitch_name')) |
-            (WhitelistedChannel.channel_name == user.get('vk_username'))
-        ).first()
+        # Определяем тип пользователя
+        is_guest = (not user or user.get('id') == -1)
+        user_id = user.get('id') if user and user.get('id') != -1 else None
+        session_id = user.get('session_id') if is_guest and user else None
         
-        can_manage_voices = user_obj is not None
+        # Для гостей whitelist не проверяем - они могут использовать локальный TTS
+        if is_guest:
+            can_manage_voices = True  # Гости всегда могут управлять своим локальным TTS
+        else:
+            # Проверяем whitelist для авторизованных пользователей
+            user_obj = db.query(WhitelistedChannel).filter(
+                (WhitelistedChannel.channel_name == user.get('twitch_name')) |
+                (WhitelistedChannel.channel_name == user.get('vk_username'))
+            ).first()
+            can_manage_voices = user_obj is not None
         
-        config = db.query(LocalTTSEndpoint).filter(
-            LocalTTSEndpoint.user_id == user['id']
-        ).first()
+        # Ищем конфиг по user_id или session_id
+        if is_guest and session_id:
+            config = db.query(LocalTTSEndpoint).filter(
+                LocalTTSEndpoint.session_id == session_id
+            ).first()
+        elif user_id:
+            config = db.query(LocalTTSEndpoint).filter(
+                LocalTTSEndpoint.user_id == user_id
+            ).first()
+        else:
+            config = None
         
         if not config:
             return {
@@ -1345,26 +1361,40 @@ async def get_local_tts_config(
 @local_tts_router.post("/config")
 async def save_local_tts_config(
     request: LocalTTSConfigRequest,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """Сохранить конфигурацию локального TTS"""
     try:
-        # Проверяем whitelist
-        user_obj = db.query(WhitelistedChannel).filter(
-            (WhitelistedChannel.channel_name == user.get('twitch_name')) |
-            (WhitelistedChannel.channel_name == user.get('vk_username'))
-        ).first()
+        # Определяем тип пользователя
+        is_guest = (not user or user.get('id') == -1)
+        user_id = user.get('id') if user and user.get('id') != -1 else None
+        session_id = user.get('session_id') if is_guest and user else None
         
-        if not user_obj:
-            raise HTTPException(
-                status_code=403, 
-                detail="Доступ к локальному TTS требует whitelist"
-            )
+        if not is_guest:
+            # Проверяем whitelist для авторизованных пользователей
+            user_obj = db.query(WhitelistedChannel).filter(
+                (WhitelistedChannel.channel_name == user.get('twitch_name')) |
+                (WhitelistedChannel.channel_name == user.get('vk_username'))
+            ).first()
+            
+            if not user_obj:
+                raise HTTPException(
+                    status_code=403, 
+                    detail="Доступ к локальному TTS требует whitelist"
+                )
         
-        config = db.query(LocalTTSEndpoint).filter(
-            LocalTTSEndpoint.user_id == user['id']
-        ).first()
+        # Ищем существующий конфиг
+        if is_guest and session_id:
+            config = db.query(LocalTTSEndpoint).filter(
+                LocalTTSEndpoint.session_id == session_id
+            ).first()
+        elif user_id:
+            config = db.query(LocalTTSEndpoint).filter(
+                LocalTTSEndpoint.user_id == user_id
+            ).first()
+        else:
+            raise HTTPException(status_code=400, detail="Не удалось определить пользователя")
         
         if config:
             config.endpoint_url = request.endpoint_url
@@ -1374,7 +1404,8 @@ async def save_local_tts_config(
             message = "Конфигурация обновлена"
         else:
             config = LocalTTSEndpoint(
-                user_id=user['id'],
+                user_id=user_id,
+                session_id=session_id,
                 endpoint_url=request.endpoint_url,
                 api_key=request.api_key,
                 use_local=request.use_local,
@@ -1451,7 +1482,7 @@ async def toggle_local_tts(
 @local_tts_router.post("/test-connection")
 async def test_local_tts_connection(
     request: LocalTTSConfigRequest,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(get_current_user_optional)
 ):
     """Проверить подключение к локальному TTS"""
     try:
