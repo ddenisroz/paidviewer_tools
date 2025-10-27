@@ -244,25 +244,30 @@ async def _create_command_impl(command_data: CommandCreate, current_user: dict, 
         db.rollback()
         raise HTTPException(status_code=500, detail="Ошибка создания команды")
 
-@router.put("/{command_name}")
+@router.put("/{command_id}")
 async def update_command(
-    command_name: str,
+    command_id: int,
     command_data: CommandUpdate,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Обновить команду"""
+    """Обновить команду по ID"""
     try:
-        # Ищем команду
+        # Ищем команду по ID
         command = db.query(BotCommand).filter(
-            BotCommand.command_name == command_name
+            BotCommand.id == command_id
         ).first()
         
         if not command:
             raise HTTPException(status_code=404, detail="Команда не найдена")
         
         # Проверяем права доступа
-        if command.command_type == "custom" and command.user_id != current_user["id"]:
+        # Глобальные команды изменять нельзя
+        if command.command_type == "global":
+            raise HTTPException(status_code=403, detail="Нельзя изменять глобальные команды. Создайте override.")
+        
+        # Кастомные и override команды - только свои
+        if command.user_id != current_user["id"]:
             raise HTTPException(status_code=403, detail="Нет прав для изменения этой команды")
         
         # Обновляем поля

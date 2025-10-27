@@ -195,16 +195,17 @@ import PageWrapper from '../components/PageWrapper';
         }
     };
 
-    const handleUpdateCommand = async (commandName) => {
+    const handleUpdateCommand = async (commandId) => {
         try {
-            await api.put(`/api/commands/${commandName}`, editForm);
+            await api.put(`/api/commands/${commandId}`, editForm);
             toast.success('Команда обновлена!');
             setIsEditDialogOpen(false);
             setEditingCommand(null);
             loadCommands();
         } catch (error) {
             console.error('Error updating command:', error);
-            toast.error('Ошибка обновления команды');
+            const errorMsg = error.response?.data?.detail || 'Ошибка обновления команды';
+            toast.error(errorMsg);
         }
     };
 
@@ -686,7 +687,9 @@ import PageWrapper from '../components/PageWrapper';
                             Настройка команды !{editingCommand?.command_name}
                         </DialogTitle>
                         <DialogDescription>
-                            Настройте параметры команды: платформы, роли и кулдаун
+                            {editingCommand?.command_type === 'global' 
+                                ? '⚠️ Глобальные команды нельзя изменять напрямую. Создайте персональный override.'
+                                : 'Настройте параметры команды: платформы, роли и кулдаун'}
                         </DialogDescription>
                     </DialogHeader>
                     {editingCommand && (
@@ -781,12 +784,14 @@ import PageWrapper from '../components/PageWrapper';
                     )}
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                            Отмена
+                            {editingCommand?.command_type === 'global' ? 'Закрыть' : 'Отмена'}
                         </Button>
-                        <Button onClick={() => handleUpdateCommand(editingCommand?.command_name)}>
-                            <Save className="h-4 w-4 mr-2" />
-                            Сохранить
-                        </Button>
+                        {editingCommand?.command_type !== 'global' && (
+                            <Button onClick={() => handleUpdateCommand(editingCommand?.id)}>
+                                <Save className="h-4 w-4 mr-2" />
+                                Сохранить
+                            </Button>
+                        )}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
