@@ -328,7 +328,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                 <div className="flex items-center justify-between">
                                     <Label className="text-white">Исчезание сообщений</Label>
                                     <span className="text-sm text-gray-400">
-                                        {settings?.message_fade_seconds === 60 ? 'Не исчезают' : `${settings?.message_fade_seconds || 60}с`}
+                                        {settings?.message_fade_seconds === 60 ? 'Никогда' : `${settings?.message_fade_seconds}с`}
                                     </span>
                                 </div>
                                 <input
@@ -343,14 +343,6 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                         background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((settings?.message_fade_seconds - 10) / 50) * 100}%, #374151 ${((settings?.message_fade_seconds - 10) / 50) * 100}%, #374151 100%)`
                                     }}
                                 />
-                                <div className="flex justify-between text-xs text-gray-500">
-                                    <span>10с</span>
-                                    <span>20с</span>
-                                    <span>30с</span>
-                                    <span>40с</span>
-                                    <span>50с</span>
-                                    <span>Никогда</span>
-                                </div>
                             </div>
                             
                             {/* Text Stroke */}

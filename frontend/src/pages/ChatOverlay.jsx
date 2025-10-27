@@ -283,6 +283,7 @@ const ChatOverlay = () => {
                             background_opacity: parseFloat(data.data.background_opacity) ?? prevSettings?.background_opacity ?? 0.5,
                             max_messages: parseInt(data.data.max_messages) || prevSettings?.max_messages || 20,
                             message_spacing: parseInt(data.data.message_spacing) || prevSettings?.message_spacing || 4,
+                            message_fade_seconds: parseInt(data.data.message_fade_seconds) || prevSettings?.message_fade_seconds || 60,
                             animation_duration: parseInt(data.data.animation_duration) || prevSettings?.animation_duration || 300,
                             border_radius: parseInt(data.data.border_radius) || prevSettings?.border_radius || 8
                         };
