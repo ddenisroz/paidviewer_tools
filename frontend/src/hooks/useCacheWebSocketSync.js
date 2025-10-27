@@ -12,13 +12,21 @@ import Logger from '../utils/logger';
 const logger = new Logger('CACHE_WS');
 
 export const useCacheWebSocketSync = () => {
-  const { user, isAuthenticated } = useAuth();
+  const authContext = useAuth();
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
   const MAX_RECONNECT_ATTEMPTS = 5;
 
   useEffect(() => {
+    // Проверяем, что контекст доступен
+    if (!authContext) {
+      logger.debug('[CACHE_WS] AuthContext not yet available, skipping');
+      return;
+    }
+    
+    const { user, isAuthenticated } = authContext;
+    
     // Только для аутентифицированных пользователей
     if (!isAuthenticated || !user?.id) {
       return;
@@ -102,7 +110,7 @@ export const useCacheWebSocketSync = () => {
         wsRef.current = null;
       }
     };
-  }, [isAuthenticated, user?.id]);
+  }, [authContext]);
 
   return null; // Хук не возвращает ничего, только side effects
 };
