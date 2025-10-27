@@ -1,8 +1,8 @@
 # 📊 Текущий статус проекта TTS_TTV_0.02
 
-**Последнее обновление:** 27 октября 2025 (Session 8: TTS Performance & UX Fixes)
+**Последнее обновление:** 27 октября 2025 (Session 8: Commands Architecture & F5-TTS Status Fix)
 **Версия:** 0.02  
-**Статус:** В активной разработке, готовность к деплою 97%
+**Статус:** В активной разработке, готовность к деплою 98%
 
 ---
 
@@ -912,6 +912,196 @@ if (isHealthy && isWhitelisted === false) {
 3. `frontend/src/pages/tts/TtsMainPage.jsx`:
    - Добавлен `space-y-6` к контейнеру
    - Передан `isWhitelisted` в `HealthStatus`
+
+---
+
+## 🎯 SESSION 8 PART 2: Commands Architecture & F5-TTS Status (27.10.2025)
+
+### 🏗️ Новая архитектура команд
+
+Реализована полная система команд с поддержкой:
+- **Глобальные команды** (`user_id=NULL`) - доступны всем пользователям
+- **User overrides** - персональные настройки глобальных команд (алиас, права, кулдаун)
+- **Кастомные команды** - создаются пользователями (лимит: 5 на пользователя)
+
+#### 1. **Миграции базы данных**
+**Файлы:**
+- `bot_service/alembic/versions/7398efb7a962_add_command_override_support.py`
+- `bot_service/alembic/versions/7f15d1d3ff0f_make_user_id_nullable_in_bot_commands.py`
+
+**Изменения:**
+- ✅ `user_id` и `channel_name` стали nullable
+- ✅ Добавлены `parent_command_id` (для override)
+- ✅ Добавлен `alias` (пользовательские алиасы)
+- ✅ Добавлены индексы для производительности
+
+#### 2. **Глобальные команды**
+**Файл:** `bot_service/init_global_commands.py`
+
+**14 базовых команд:**
+- `!help` - справка
+- `!sr` - song request
+- `!skip`, `!next`, `!queue` - управление очередью
+- `!title`, `!category` - информация о стриме
+- `!ttsvolume`, `!ttsspeed`, `!ttspitch` - настройки TTS
+- `!uptime`, `!ping` - статус бота
+- `!rules`, `!socials` - информация о канале
+
+#### 3. **API для команд**
+**Файл:** `bot_service/api/commands_api.py`
+
+**GET /api/commands:**
+```json
+{
+  "global_commands": [...],    // Доступны всем
+  "override_commands": [...],  // User overrides
+  "custom_commands": [...],    // Кастомные команды
+  "basic_commands": [...]      // Backward compatibility
+}
+```
+
+**POST /api/commands/override:**
+```json
+{
+  "command_name": "sr",
+  "alias": "song",
+  "allowed_roles": "vip,moderator,broadcaster",
+  "cooldown_seconds": 30
+}
+```
+
+**Валидация:**
+- ✅ Глобальная команда должна существовать
+- ✅ Override не должен дублироваться
+- ✅ Алиас должен быть уникальным
+- ✅ Лимит 5 кастомных команд на пользователя
+
+#### 4. **Универсальная система исполнения**
+
+**Новые компоненты:**
+
+**a) CommandExecutor** (`bot_service/core/command_executor.py`):
+- Поиск команд с приоритетом: **custom → override → global**
+- Проверка платформы и прав доступа
+- Поддержка алиасов
+
+**b) PlatformRoleChecker** (`bot_service/utils/platform_role_checker.py`):
+- Извлечение ролей для **Twitch**: broadcaster, moderator, vip, subscriber, founder
+- Извлечение ролей для **VK Live**: owner, moderator
+- Универсальные методы проверки доступа
+
+**c) UniversalCommandHandler** (`bot_service/bots/universal_command_handler.py`):
+- Обработка команд для Twitch и VK Live
+- Проверка кулдаунов (broadcaster игнорирует)
+- Динамические handlers для специальных команд
+
+#### 5. **Интеграция в ботов**
+
+**Twitch Bot** (`bot_service/bots/twitch_bot.py`):
+```python
+# Перехват команд в event_message
+if message.content.strip().startswith('!'):
+    ctx = SimpleContext(message, self)
+    await self.universal_command_handler.handle_twitch_command(ctx, self)
+    return  # Не обрабатываем TTS для команд
+```
+
+**VK Live Bot** (`bot_service/bots/vk_live_bot_core.py`):
+```python
+# Замена command_handler на universal_command_handler
+if text.startswith('!'):
+    await self.universal_command_handler.handle_vk_command(channel_id, command_message, self)
+    return
+```
+
+### 🔧 F5-TTS статус - корректное отображение
+
+#### Проблема:
+Приписка "ИИ (F5) (не настроен)" показывалась неправильно:
+- Не учитывала whitelist статус
+- Не различала "не настроен" vs "недоступен"
+
+#### Решение:
+
+**Frontend** (`frontend/src/components/TtsQuickSettings.jsx`):
+```javascript
+// ✅ FIX: aiTtsAvailable = configured AND (healthy OR whitelisted)
+const isConfigured = configResponse.data.configured || false;
+const isHealthy = configResponse.data.healthy !== false;
+const isWhitelisted = configResponse.data.can_manage_voices !== false;
+
+// Доступен = настроен И (здоров ИЛИ в whitelist)
+setAiTtsAvailable(isConfigured && (isHealthy || isWhitelisted));
+```
+
+**Backend** (`bot_service/api/tts_api.py`):
+```python
+@local_tts_router.get("/config")
+async def get_local_tts_config(...):
+    # Проверяем whitelist
+    can_manage_voices = user_obj is not None
+    
+    return {
+        "configured": True,
+        "healthy": config.is_healthy,
+        "can_manage_voices": can_manage_voices,
+        ...
+    }
+```
+
+**Текст изменён:**
+- ❌ Было: `ИИ (F5) (не настроен)`
+- ✅ Стало: `ИИ (F5) (недоступна)`
+
+**Теперь "недоступна" означает:**
+1. Сервис не настроен (configured=false), **ИЛИ**
+2. Сервис настроен, но недоступен (healthy=false), **ИЛИ**
+3. Пользователь не в whitelist (can_manage_voices=false)
+
+### 📊 Архитектура команд - Flow:
+
+```
+Пользователь вводит !sr
+         ↓
+UniversalCommandHandler
+         ↓
+  CommandExecutor.find_command()
+         ↓
+    1. Кастомная команда (!sr от user_id=123)?
+    2. Override команда (!sr с alias для user_id=123)?
+    3. Глобальная команда (!sr с user_id=NULL)?
+         ↓
+  PlatformRoleChecker.check_user_role()
+         ↓
+    Проверка прав (broadcaster, moderator, vip, ...)
+         ↓
+    Проверка кулдауна
+         ↓
+    Выполнение команды
+```
+
+### 🎯 Результаты:
+
+| Компонент | Статус | Файлы |
+|-----------|--------|-------|
+| **Миграции БД** | ✅ | 2 migrations |
+| **Глобальные команды** | ✅ | 14 commands |
+| **API endpoints** | ✅ | GET /commands, POST /override |
+| **CommandExecutor** | ✅ | core/command_executor.py |
+| **RoleChecker** | ✅ | utils/platform_role_checker.py |
+| **UniversalHandler** | ✅ | bots/universal_command_handler.py |
+| **Twitch интеграция** | ✅ | bots/twitch_bot.py |
+| **VK интеграция** | ✅ | bots/vk_live_bot_core.py |
+| **F5-TTS статус** | ✅ | TtsQuickSettings.jsx, tts_api.py |
+
+### 📝 Ключевые улучшения:
+
+1. ✅ **Команды работают одинаково** на Twitch и VK Live
+2. ✅ **Правильная проверка ролей** по платформе
+3. ✅ **Кулдауны для пользователей**, broadcaster игнорирует
+4. ✅ **Алиасы команд** работают корректно
+5. ✅ **Лимит 5 кастомных команд** на пользователя
+6. ✅ **F5-TTS статус** отображается корректно
 
 ---
 

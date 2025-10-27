@@ -1302,6 +1302,14 @@ async def get_local_tts_config(
 ):
     """Получить конфигурацию локального TTS"""
     try:
+        # Проверяем whitelist
+        user_obj = db.query(WhitelistedChannel).filter(
+            (WhitelistedChannel.channel_name == user.get('twitch_name')) |
+            (WhitelistedChannel.channel_name == user.get('vk_username'))
+        ).first()
+        
+        can_manage_voices = user_obj is not None
+        
         config = db.query(LocalTTSEndpoint).filter(
             LocalTTSEndpoint.user_id == user['id']
         ).first()
@@ -1309,12 +1317,18 @@ async def get_local_tts_config(
         if not config:
             return {
                 "success": True,
+                "configured": False,
                 "config": None,
+                "healthy": False,
+                "can_manage_voices": can_manage_voices,
                 "message": "Локальный TTS не настроен"
             }
         
         return {
             "success": True,
+            "configured": True,
+            "healthy": config.is_healthy,
+            "can_manage_voices": can_manage_voices,
             "config": {
                 "id": config.id,
                 "endpoint_url": config.endpoint_url,

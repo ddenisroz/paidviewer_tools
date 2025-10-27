@@ -66,7 +66,15 @@ const TtsQuickSettings = () => {
             // Загружаем начальное состояние TTS из API
             setTtsEnabled(statusResponse.data.enabled || false);
             setAiTtsEnabled(statusResponse.data.engine_type === 'local');
-            setAiTtsAvailable(configResponse.data.configured || false);
+            
+            // ✅ FIX: aiTtsAvailable = configured AND (healthy OR whitelisted)
+            // Если сервис настроен (configured), проверяем доступность
+            const isConfigured = configResponse.data.configured || false;
+            const isHealthy = configResponse.data.healthy !== false; // По умолчанию считаем здоровым если нет явного false
+            const isWhitelisted = configResponse.data.can_manage_voices !== false; // По умолчанию считаем в whitelist
+            
+            // Доступен = настроен И (здоров ИЛИ в whitelist)
+            setAiTtsAvailable(isConfigured && (isHealthy || isWhitelisted));
             
             // Отмечаем что инициализация завершена
             initializedRef.current = true;
@@ -74,7 +82,10 @@ const TtsQuickSettings = () => {
             logger.info('TtsQuickSettings: Loaded initial state', {
                 ttsEnabled: statusResponse.data.enabled,
                 aiTtsEnabled: statusResponse.data.engine_type === 'local',
-                aiTtsAvailable: configResponse.data.configured
+                aiTtsAvailable: isConfigured && (isHealthy || isWhitelisted),
+                isConfigured,
+                isHealthy,
+                isWhitelisted
             });
         } catch (error) {
             console.error('Failed to load TTS settings:', error);
@@ -230,7 +241,7 @@ const TtsQuickSettings = () => {
                             disabled={loading || !ttsEnabled || !aiTtsAvailable}
                         />
                         <span className={`text-xs ${!aiTtsAvailable ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
-                            ИИ (F5){!aiTtsAvailable && ' (не настроен)'}
+                            ИИ (F5){!aiTtsAvailable && ' (недоступна)'}
                         </span>
                     </div>
                 </div>
