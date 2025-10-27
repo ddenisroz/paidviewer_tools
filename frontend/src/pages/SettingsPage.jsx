@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Twitch, Video, Inbox, Settings, Gift, AlertCircle, Trash2 } from 'lucide-react';
+import { Inbox, Settings, Gift, AlertCircle, Trash2 } from 'lucide-react';
+import { TwitchIcon, VKIcon } from '../components/PlatformIcons';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useDonationAlerts } from '../context/DonationAlertsContext';
 import { useAuth } from '../context/AuthContext';
@@ -83,7 +84,7 @@ const SettingsPage = () => {
                     {/* Twitch Integration */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <Twitch className="h-5 w-5 text-purple-500" />
+                            <TwitchIcon width="20" height="20" />
                             <Label htmlFor="twitch-integration" className="text-base font-medium">
                                 Twitch
                             </Label>
@@ -100,15 +101,16 @@ const SettingsPage = () => {
                     {/* VK Integration */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <Video className="h-5 w-5 text-blue-500" />
+                            <VKIcon width="20" height="20" />
                             <Label htmlFor="vk-integration" className="text-base font-medium">
-                                VK Video Live
+                                VK Live
                             </Label>
                         </div>
                         <Switch
                             id="vk-integration"
                             checked={integrations.vk?.enabled || false}
                             onCheckedChange={updateVkIntegration}
+                            style={integrations.vk?.enabled ? { backgroundColor: '#ef4444' } : {}}
                         />
                     </div>
 
@@ -135,6 +137,7 @@ const SettingsPage = () => {
                             checked={daConnected}
                             onCheckedChange={daConnected ? handleDonationAlertsDisconnect : handleDonationAlertsConnect}
                             disabled={daLoading || !hasMainIntegration}
+                            style={daConnected ? { backgroundColor: '#f97316' } : {}}
                         />
                     </div>
                 </CardContent>

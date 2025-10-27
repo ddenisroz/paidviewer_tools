@@ -148,7 +148,7 @@ const Header = () => {
                                         onClick={() => handleIntegrationToggle('vk')}
                                         className={`w-12 h-6 rounded-full transition-colors ${
                                             integrations?.vk?.enabled 
-                                                ? 'bg-blue-500' 
+                                                ? 'bg-red-500' 
                                                 : 'bg-slate-600'
                                         }`}
                                     >
