@@ -48,6 +48,21 @@ python install.py
 python3 install.py
 ```
 
+**💡 Скрипт install.py автоматически:**
+- Установит PyTorch 2.4.0 с CUDA 12.4 (если доступна GPU)
+- Установит F5-TTS и все необходимые библиотеки
+- Создаст необходимые директории
+- Сгенерирует конфигурацию
+
+**⚠️ CUDA 12.4 требуется!** Если у вас другая версия CUDA:
+```bash
+# Для CUDA 11.8:
+pip install torch==2.4.0+cu118 torchaudio==2.4.0+cu118 torchvision==0.19.0+cu118 --extra-index-url https://download.pytorch.org/whl/cu118
+
+# Для CPU (без GPU):
+pip install torch==2.4.0 torchaudio==2.4.0 torchvision==0.19.0
+```
+
 ### Шаг 3: Запустите сервис
 ```bash
 # Windows

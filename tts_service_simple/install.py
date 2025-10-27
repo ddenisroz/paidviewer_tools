@@ -100,6 +100,42 @@ class TTSInstaller:
         """Установка зависимостей"""
         print("\n📦 Установка зависимостей...")
         
+        # Сначала устанавливаем PyTorch с CUDA
+        print("\n🔥 Установка PyTorch с CUDA 12.4...")
+        print("⚠️  Это может занять несколько минут...")
+        
+        try:
+            # Устанавливаем PyTorch с CUDA 12.4
+            pytorch_install = [
+                self.python_exe, "-m", "pip", "install",
+                "torch==2.4.0+cu124",
+                "torchaudio==2.4.0+cu124", 
+                "torchvision==0.19.0+cu124",
+                "--extra-index-url", "https://download.pytorch.org/whl/cu124"
+            ]
+            
+            result = subprocess.run(pytorch_install, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                print("⚠️  Не удалось установить CUDA версию, пробуем CPU версию...")
+                # Fallback на CPU версию
+                cpu_install = [
+                    self.python_exe, "-m", "pip", "install",
+                    "torch==2.4.0",
+                    "torchaudio==2.4.0",
+                    "torchvision==0.19.0"
+                ]
+                subprocess.run(cpu_install, check=True, capture_output=True, text=True)
+                print("✅ PyTorch (CPU версия) установлен")
+            else:
+                print("✅ PyTorch с CUDA 12.4 установлен")
+                
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Ошибка установки PyTorch: {e.stderr}")
+            raise Exception("Не удалось установить PyTorch")
+        
+        # Теперь устанавливаем остальные зависимости
+        print("\n📦 Установка остальных зависимостей...")
         requirements_file = self.install_dir / "requirements.txt"
         if not requirements_file.exists():
             raise Exception("Файл requirements.txt не найден")
@@ -108,7 +144,7 @@ class TTSInstaller:
             subprocess.run([
                 self.python_exe, "-m", "pip", "install", "-r", str(requirements_file)
             ], check=True, capture_output=True, text=True)
-            print("✅ Зависимости установлены")
+            print("✅ Все зависимости установлены")
         except subprocess.CalledProcessError as e:
             print(f"❌ Ошибка установки зависимостей: {e.stderr}")
             raise Exception("Не удалось установить зависимости")
