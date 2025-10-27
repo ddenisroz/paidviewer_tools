@@ -78,11 +78,16 @@ import PageWrapper from '../components/PageWrapper';
         response_text: ''
     });
 
+    // Роли согласно Twitch API и VK API
+    // Twitch: broadcaster, moderator, vip, subscriber, founder
+    // VK: owner (алиас broadcaster), moderator
     const roleOptions = [
-        { value: 'all', label: 'Все', icon: <Users className="h-3 w-3" /> },
-        { value: 'broadcaster', label: 'Стример', icon: <Crown className="h-3 w-3" /> },
-        { value: 'moderator', label: 'Модератор', icon: <ShieldCheck className="h-3 w-3" /> },
-        { value: 'vip', label: 'VIP', icon: <Star className="h-3 w-3" /> }
+        { value: 'all', label: 'Все зрители', icon: <Users className="h-3 w-3" /> },
+        { value: 'broadcaster', label: 'Владелец канала', icon: <Crown className="h-3 w-3" /> },
+        { value: 'moderator,broadcaster', label: 'Модераторы и выше', icon: <ShieldCheck className="h-3 w-3" /> },
+        { value: 'moderator', label: 'Только модераторы', icon: <ShieldCheck className="h-3 w-3" /> },
+        { value: 'vip', label: 'VIP (только Twitch)', icon: <Star className="h-3 w-3" /> },
+        { value: 'subscriber', label: 'Подписчики (только Twitch)', icon: <Star className="h-3 w-3" /> }
     ];
 
 
@@ -257,12 +262,22 @@ import PageWrapper from '../components/PageWrapper';
     };
 
     const getRoleLabel = (role) => {
-        const option = roleOptions.find(opt => opt.value === role);
+        // Нормализуем роль - сортируем для совместимости
+        // "broadcaster,moderator" === "moderator,broadcaster"
+        const normalizedRole = role?.split(',').sort().join(',');
+        const option = roleOptions.find(opt => {
+            const normalizedValue = opt.value?.split(',').sort().join(',');
+            return normalizedValue === normalizedRole;
+        });
         return option ? option.label : role;
     };
 
     const getRoleIcon = (role) => {
-        const option = roleOptions.find(opt => opt.value === role);
+        const normalizedRole = role?.split(',').sort().join(',');
+        const option = roleOptions.find(opt => {
+            const normalizedValue = opt.value?.split(',').sort().join(',');
+            return normalizedValue === normalizedRole;
+        });
         return option ? option.icon : <Users className="h-3 w-3" />;
     };
 
