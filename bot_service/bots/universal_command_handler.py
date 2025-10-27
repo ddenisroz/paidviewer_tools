@@ -362,6 +362,235 @@ class UniversalCommandHandler:
             await vk_bot.send_message(channel_name, 
                 f"@{author_name} ❌ Ошибка изменения игры")
     
+    # === YouTube COMMANDS ===
+    
+    async def _handle_skip(self, ctx, bot, args, platform, db):
+        """Handler для !skip (Twitch)"""
+        try:
+            from services.queue_service import QueueService
+            from core.database import User
+            
+            # Получаем user_id владельца канала
+            user = db.query(User).filter(
+                User.twitch_username == ctx.channel.name.lower()
+            ).first()
+            
+            if not user:
+                await ctx.send(f"@{ctx.author.name} ❌ Канал не найден")
+                return
+            
+            queue_service = QueueService()
+            queue = queue_service.get_queue(user.id, db)
+            
+            if not queue:
+                await ctx.send(f"@{ctx.author.name} ℹ️ Очередь пуста")
+                return
+            
+            # Пропускаем первое видео
+            first_video = queue[0]
+            success = queue_service.remove_from_queue(user.id, first_video['id'], db)
+            
+            if success:
+                await ctx.send(f"@{ctx.author.name} ⏭️ Видео пропущено: {first_video['title']}")
+                self.logger.info(f"✓ Video skipped for {ctx.channel.name}")
+            else:
+                await ctx.send(f"@{ctx.author.name} ❌ Не удалось пропустить видео")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !skip handler: {e}", exc_info=True)
+            await ctx.send(f"@{ctx.author.name} ❌ Ошибка пропуска видео")
+    
+    async def _handle_skip_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
+        """Handler для !skip (VK)"""
+        try:
+            from services.queue_service import QueueService
+            from core.database import User
+            
+            # Получаем user_id владельца канала
+            user = db.query(User).filter(
+                User.vk_username == channel_name.lower()
+            ).first()
+            
+            if not user:
+                await vk_bot.send_message(channel_name, f"@{author_name} ❌ Канал не найден")
+                return
+            
+            queue_service = QueueService()
+            queue = queue_service.get_queue(user.id, db)
+            
+            if not queue:
+                await vk_bot.send_message(channel_name, f"@{author_name} ℹ️ Очередь пуста")
+                return
+            
+            # Пропускаем первое видео
+            first_video = queue[0]
+            success = queue_service.remove_from_queue(user.id, first_video['id'], db)
+            
+            if success:
+                await vk_bot.send_message(channel_name,
+                    f"@{author_name} ⏭️ Видео пропущено: {first_video['title']}")
+                self.logger.info(f"✓ Video skipped for VK {channel_name}")
+            else:
+                await vk_bot.send_message(channel_name, 
+                    f"@{author_name} ❌ Не удалось пропустить видео")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !skip VK handler: {e}", exc_info=True)
+            await vk_bot.send_message(channel_name, 
+                f"@{author_name} ❌ Ошибка пропуска видео")
+    
+    async def _handle_clear(self, ctx, bot, args, platform, db):
+        """Handler для !clear (Twitch)"""
+        try:
+            from services.queue_service import QueueService
+            from core.database import User, YouTubeQueue
+            
+            # Получаем user_id владельца канала
+            user = db.query(User).filter(
+                User.twitch_username == ctx.channel.name.lower()
+            ).first()
+            
+            if not user:
+                await ctx.send(f"@{ctx.author.name} ❌ Канал не найден")
+                return
+            
+            # Очищаем очередь
+            deleted_count = db.query(YouTubeQueue).filter(
+                YouTubeQueue.user_id == user.id,
+                YouTubeQueue.status == 'pending'
+            ).update({YouTubeQueue.status: 'skipped'})
+            
+            db.commit()
+            
+            if deleted_count > 0:
+                await ctx.send(f"@{ctx.author.name} 🗑️ Очередь очищена ({deleted_count} видео)")
+                self.logger.info(f"✓ Queue cleared for {ctx.channel.name}: {deleted_count} videos")
+            else:
+                await ctx.send(f"@{ctx.author.name} ℹ️ Очередь уже пуста")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !clear handler: {e}", exc_info=True)
+            db.rollback()
+            await ctx.send(f"@{ctx.author.name} ❌ Ошибка очистки очереди")
+    
+    async def _handle_clear_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
+        """Handler для !clear (VK)"""
+        try:
+            from core.database import User, YouTubeQueue
+            
+            # Получаем user_id владельца канала
+            user = db.query(User).filter(
+                User.vk_username == channel_name.lower()
+            ).first()
+            
+            if not user:
+                await vk_bot.send_message(channel_name, f"@{author_name} ❌ Канал не найден")
+                return
+            
+            # Очищаем очередь
+            deleted_count = db.query(YouTubeQueue).filter(
+                YouTubeQueue.user_id == user.id,
+                YouTubeQueue.status == 'pending'
+            ).update({YouTubeQueue.status: 'skipped'})
+            
+            db.commit()
+            
+            if deleted_count > 0:
+                await vk_bot.send_message(channel_name,
+                    f"@{author_name} 🗑️ Очередь очищена ({deleted_count} видео)")
+                self.logger.info(f"✓ Queue cleared for VK {channel_name}: {deleted_count} videos")
+            else:
+                await vk_bot.send_message(channel_name, f"@{author_name} ℹ️ Очередь уже пуста")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !clear VK handler: {e}", exc_info=True)
+            db.rollback()
+            await vk_bot.send_message(channel_name, 
+                f"@{author_name} ❌ Ошибка очистки очереди")
+    
+    async def _handle_queue(self, ctx, bot, args, platform, db):
+        """Handler для !queue (Twitch)"""
+        try:
+            from services.queue_service import QueueService
+            from core.database import User
+            
+            # Получаем user_id владельца канала
+            user = db.query(User).filter(
+                User.twitch_username == ctx.channel.name.lower()
+            ).first()
+            
+            if not user:
+                await ctx.send(f"@{ctx.author.name} ❌ Канал не найден")
+                return
+            
+            queue_service = QueueService()
+            queue = queue_service.get_queue(user.id, db)
+            
+            if not queue:
+                await ctx.send(f"@{ctx.author.name} ℹ️ Очередь пуста")
+                return
+            
+            # Показываем первые 5 видео
+            queue_list = []
+            for i, video in enumerate(queue[:5], 1):
+                title = video['title'][:50] + '...' if len(video['title']) > 50 else video['title']
+                queue_list.append(f"{i}. {title}")
+            
+            queue_text = " | ".join(queue_list)
+            total = len(queue)
+            
+            if total > 5:
+                await ctx.send(f"📋 Очередь ({total} видео): {queue_text} и ещё {total - 5}...")
+            else:
+                await ctx.send(f"📋 Очередь ({total} видео): {queue_text}")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !queue handler: {e}", exc_info=True)
+            await ctx.send(f"@{ctx.author.name} ❌ Ошибка получения очереди")
+    
+    async def _handle_queue_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
+        """Handler для !queue (VK)"""
+        try:
+            from services.queue_service import QueueService
+            from core.database import User
+            
+            # Получаем user_id владельца канала
+            user = db.query(User).filter(
+                User.vk_username == channel_name.lower()
+            ).first()
+            
+            if not user:
+                await vk_bot.send_message(channel_name, f"@{author_name} ❌ Канал не найден")
+                return
+            
+            queue_service = QueueService()
+            queue = queue_service.get_queue(user.id, db)
+            
+            if not queue:
+                await vk_bot.send_message(channel_name, f"@{author_name} ℹ️ Очередь пуста")
+                return
+            
+            # Показываем первые 5 видео
+            queue_list = []
+            for i, video in enumerate(queue[:5], 1):
+                title = video['title'][:50] + '...' if len(video['title']) > 50 else video['title']
+                queue_list.append(f"{i}. {title}")
+            
+            queue_text = " | ".join(queue_list)
+            total = len(queue)
+            
+            if total > 5:
+                await vk_bot.send_message(channel_name,
+                    f"📋 Очередь ({total} видео): {queue_text} и ещё {total - 5}...")
+            else:
+                await vk_bot.send_message(channel_name,
+                    f"📋 Очередь ({total} видео): {queue_text}")
+            
+        except Exception as e:
+            self.logger.error(f"Error in !queue VK handler: {e}", exc_info=True)
+            await vk_bot.send_message(channel_name, 
+                f"@{author_name} ❌ Ошибка получения очереди")
+    
     # === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ===
     
     async def _get_channel_owner_id_twitch(self, channel_name: str) -> Optional[int]:
