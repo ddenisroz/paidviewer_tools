@@ -164,6 +164,18 @@ async def update_user_settings(
         user_identifier = UserIdentityService.get_user_identifier(current_user)
         logger.info(f"User {user_identifier} updated settings: {list(update_data.keys())}")
         
+        # 🔄 Отправляем WebSocket событие для инвалидации кэша на фронтенде
+        from services.memory_websocket_manager import memory_websocket_manager
+        
+        cache_invalidation_event = {
+            "type": "cache_invalidate",
+            "cache_key": "cache_user_settings",
+            "reason": "settings_updated"
+        }
+        
+        await memory_websocket_manager.send_to_user(current_user["id"], cache_invalidation_event)
+        logger.debug(f"🔄 [USER_SETTINGS] Sent cache invalidation to user {current_user['id']}")
+        
         return {
             "success": True,
             "message": "Настройки успешно сохранены",

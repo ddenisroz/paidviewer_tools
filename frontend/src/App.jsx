@@ -4,6 +4,7 @@ import { Toaster } from 'sonner';
 
 import AuthGuard from './components/AuthGuard';
 import Layout from './components/Layout';
+import { useCacheWebSocketSync } from './hooks/useCacheWebSocketSync';
 
 // Убираем глобальный прелоадер
 
@@ -41,6 +42,9 @@ const DropsWidget = lazy(() => import('./pages/obs/DropsWidget'));
 
 
 function App() {
+    // Инициализируем WebSocket синхронизацию кэша
+    useCacheWebSocketSync();
+    
     return (
         <>
             <Toaster />

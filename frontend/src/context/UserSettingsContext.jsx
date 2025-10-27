@@ -2,6 +2,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { botService } from '../services/microservices';
+import cacheManager, { CACHE_CONFIG } from '../utils/cacheManager';
+import logger from '../utils/logger';
 
 const UserSettingsContext = createContext();
 
@@ -14,52 +16,85 @@ export const useUserSettings = () => {
 };
 
 export const UserSettingsProvider = ({ children }) => {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, user } = useAuth();
     const [settings, setSettings] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    // Загрузка всех настроек с сервера
+    // Загрузка всех настроек с сервера (с кэшированием)
     const loadSettings = useCallback(async () => {
         if (!isAuthenticated) {
             setSettings(null);
+            cacheManager.invalidate(CACHE_CONFIG.USER_SETTINGS);
             return;
         }
 
         try {
             setIsLoading(true);
-            const response = await botService.get('/api/user-settings/');
-            if (response.data?.success) {
-                setSettings(response.data.settings);
-            }
+            
+            // Используем cache-aside pattern с защитой от race conditions
+            const data = await cacheManager.getOrFetch(
+                CACHE_CONFIG.USER_SETTINGS,
+                async () => {
+                    logger.debug('[USER_SETTINGS] Fetching from API...');
+                    const response = await botService.get('/api/user-settings/');
+                    if (response.data?.success) {
+                        return response.data.settings;
+                    }
+                    throw new Error('Failed to load user settings');
+                },
+                { userId: user?.id }
+            );
+            
+            setSettings(data);
+            logger.debug('[USER_SETTINGS] Loaded successfully (from cache or API)');
         } catch (error) {
-            console.error('Error loading user settings:', error);
+            logger.error('[USER_SETTINGS] Error loading settings:', error);
             setSettings(null);
         } finally {
             setIsLoading(false);
         }
-    }, [isAuthenticated]);
+    }, [isAuthenticated, user?.id]);
 
-    // Сохранение настроек на сервер
+    // Сохранение настроек на сервер (с optimistic update)
     const saveSettings = useCallback(async (newSettings) => {
         if (!isAuthenticated) return false;
 
         try {
             setIsSaving(true);
-            const response = await botService.post('/api/user-settings/', newSettings);
             
-            if (response.data?.success) {
-                setSettings(prev => ({ ...prev, ...newSettings }));
-                return true;
-            }
-            return false;
+            // Optimistic update: сначала обновляем UI и кэш
+            const updatedSettings = { ...settings, ...newSettings };
+            
+            await cacheManager.optimisticUpdate(
+                CACHE_CONFIG.USER_SETTINGS,
+                async (data) => {
+                    logger.debug('[USER_SETTINGS] Saving to API...', newSettings);
+                    const response = await botService.post('/api/user-settings/', newSettings);
+                    
+                    if (!response.data?.success) {
+                        throw new Error('Failed to save settings');
+                    }
+                    
+                    return data; // Возвращаем обновлённые данные
+                },
+                updatedSettings,
+                { userId: user?.id }
+            );
+            
+            // Обновляем state только после успешного сохранения
+            setSettings(updatedSettings);
+            logger.info('[USER_SETTINGS] Saved successfully');
+            return true;
         } catch (error) {
-            console.error('Error saving user settings:', error);
+            logger.error('[USER_SETTINGS] Error saving settings:', error);
+            // При ошибке кэш автоматически откатится, перезагружаем state
+            await loadSettings();
             return false;
         } finally {
             setIsSaving(false);
         }
-    }, [isAuthenticated]);
+    }, [isAuthenticated, settings, user?.id, loadSettings]);
 
     // Обновление конкретной настройки
     const updateSetting = useCallback(async (key, value) => {
@@ -136,6 +171,25 @@ export const UserSettingsProvider = ({ children }) => {
     // Загружаем настройки при изменении авторизации
     useEffect(() => {
         loadSettings();
+    }, [loadSettings]);
+
+    // Подписываемся на изменения из других вкладок (multi-tab sync)
+    useEffect(() => {
+        const unsubscribe = cacheManager.subscribe(
+            CACHE_CONFIG.USER_SETTINGS.key,
+            (updatedData) => {
+                if (updatedData) {
+                    logger.debug('[USER_SETTINGS] Multi-tab update received');
+                    setSettings(updatedData);
+                } else {
+                    // Кэш инвалидирован, перезагружаем
+                    logger.debug('[USER_SETTINGS] Cache invalidated from another tab');
+                    loadSettings();
+                }
+            }
+        );
+
+        return unsubscribe;
     }, [loadSettings]);
 
     const value = {

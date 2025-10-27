@@ -254,6 +254,19 @@ const ChatOverlay = () => {
             try {
                 const data = JSON.parse(event.data);
                 
+                // 🔄 Обработка инвалидации кэша (для синхронизации с бэком)
+                if (data.type === 'cache_invalidate') {
+                    console.log('🔄 [CACHE] Received cache invalidation:', data.cache_key);
+                    // В ChatOverlay мы не используем cacheManager напрямую,
+                    // но можем перезагрузить настройки если это касается chatbox_settings
+                    if (data.cache_key === 'cache_chatbox_settings') {
+                        console.log('🔄 [CHATBOX] Reloading settings due to backend update...');
+                        // Перезагружаем настройки с сервера
+                        loadSettingsByToken();
+                    }
+                    return;
+                }
+                
                 // 🔄 Обработка обновления настроек ChatBox
                 if (data.type === 'chatbox_settings_updated') {
                     console.log('🔄 [CHATBOX] Received settings update event, reloading...');

@@ -141,9 +141,19 @@ export const AuthProvider = ({ children }) => {
 
     const logout = async () => {
         try {
+            const userId = user?.id;
+            
             await botService.post('/api/auth/logout');
             setIsAuthenticated(false);
             setUser(null);
+            
+            // Очищаем кэш пользователя
+            if (userId) {
+                const cacheManager = await import('../utils/cacheManager');
+                cacheManager.default.invalidateUser(userId);
+                logger.info('[AUTH] User cache cleared on logout');
+            }
+            
             toast.success('Вы успешно вышли из системы.');
         } catch (error) {
             logger.error('Logout failed:', error);
