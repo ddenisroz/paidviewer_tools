@@ -488,6 +488,63 @@ async def get_chat_history(
             "error": str(e)
         }, status_code=500)
 
+@router.post("/admin/permanently-delete-user/{user_id}")
+async def permanently_delete_user(
+    user_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    [ADMIN ONLY] Окончательное удаление пользователя из базы данных
+    
+    ⚠️ ВНИМАНИЕ: Это действие НЕОБРАТИМО!
+    
+    Удаляет пользователя ФИЗИЧЕСКИ из БД (hard delete).
+    Используйте только для:
+    - GDPR compliance (право на забвение)
+    - Удаление тестовых аккаунтов
+    - Окончательное удаление спустя 30 дней
+    """
+    try:
+        # Проверка прав администратора
+        if not current_user.get('is_admin', False):
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        from core.database import User
+        
+        target_user = db.query(User).filter(User.id == user_id).first()
+        if not target_user:
+            raise HTTPException(status_code=404, detail=f"User {user_id} not found")
+        
+        username = target_user.twitch_username or target_user.vk_username or f"user_{user_id}"
+        is_blocked = target_user.is_blocked
+        blocked_reason = target_user.blocked_reason
+        
+        # ОКОНЧАТЕЛЬНОЕ удаление
+        db.delete(target_user)
+        db.commit()
+        
+        logger.info(f"🗑️ [ADMIN DELETE] User {user_id} ({username}) permanently deleted by admin {current_user.get('id')}")
+        logger.info(f"📊 [ADMIN DELETE] User status: is_blocked={is_blocked}, reason={blocked_reason}")
+        
+        return JSONResponse(content={
+            "success": True,
+            "message": f"User {user_id} permanently deleted",
+            "user_data": {
+                "id": user_id,
+                "username": username,
+                "was_blocked": is_blocked,
+                "blocked_reason": blocked_reason
+            }
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ [ADMIN DELETE] Error permanently deleting user: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error deleting user: {str(e)}")
+
 @router.post("/user/delete-account")
 async def delete_user_account(
     request: Request,

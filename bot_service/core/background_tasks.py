@@ -152,6 +152,59 @@ class BackgroundTasks:
             except Exception as e:
                 logger.error(f"Error in cleanup task: {e}")
     
+    async def cleanup_deleted_accounts(self):
+        """
+        Окончательное удаление аккаунтов через 30 дней после soft delete
+        
+        GDPR compliance: "right to be forgotten" - окончательное удаление через 30 дней
+        """
+        while True:
+            await asyncio.sleep(86400)  # Проверяем раз в день (24 часа)
+            
+            try:
+                db = next(get_db())
+                try:
+                    from datetime import datetime, timedelta
+                    
+                    # Находим пользователей удалённых более 30 дней назад
+                    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+                    
+                    deleted_users = db.query(User).filter(
+                        User.is_blocked == True,
+                        User.blocked_reason == "account_deleted",
+                        User.blocked_at < thirty_days_ago
+                    ).all()
+                    
+                    if deleted_users:
+                        logger.info(f"🗑️ [CLEANUP] Found {len(deleted_users)} accounts to permanently delete (>30 days)")
+                        
+                        for user in deleted_users:
+                            try:
+                                user_id = user.id
+                                username = user.twitch_username or user.vk_username or f"user_{user_id}"
+                                blocked_date = user.blocked_at
+                                
+                                # ОКОНЧАТЕЛЬНОЕ удаление (hard delete)
+                                db.delete(user)
+                                db.commit()
+                                
+                                logger.info(f"✅ [CLEANUP] Permanently deleted user {user_id} ({username}) - deleted on {blocked_date}")
+                                
+                            except Exception as e:
+                                logger.error(f"❌ [CLEANUP] Error deleting user {user.id}: {e}")
+                                db.rollback()
+                    else:
+                        logger.debug("🗑️ [CLEANUP] No accounts to permanently delete")
+                        
+                except Exception as e:
+                    logger.error(f"❌ [CLEANUP] Error in cleanup_deleted_accounts: {e}")
+                finally:
+                    db.close()
+                    
+            except Exception as e:
+                logger.error(f"❌ [CLEANUP] Critical error in cleanup task: {e}")
+                await asyncio.sleep(3600)  # При ошибке повторить через час
+    
     async def refresh_user_oauth_tokens(self):
         """
         Проактивное обновление OAuth токенов пользователей
@@ -229,10 +282,11 @@ class BackgroundTasks:
             asyncio.create_task(self.background_cache_updater()),
             asyncio.create_task(self.refresh_vk_bot_token()),  # Обновление VK bot токена (ClientCredentials)
             asyncio.create_task(self.refresh_user_oauth_tokens()),  # Обновление OAuth токенов пользователей
-            asyncio.create_task(self.cleanup_task())
+            asyncio.create_task(self.cleanup_task()),
+            asyncio.create_task(self.cleanup_deleted_accounts())  # Окончательное удаление через 30 дней
         ]
         
-        logger.info("Background tasks started (including token refresh)")
+        logger.info("Background tasks started (including token refresh and account cleanup)")
     
     async def stop_all_tasks(self):
         """Остановка всех фоновых задач"""
