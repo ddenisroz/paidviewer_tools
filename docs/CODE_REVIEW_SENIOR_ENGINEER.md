@@ -261,65 +261,103 @@ const data = { type: 'message', content: text };
 // Нужно найти ВСЕ использования вручную 😱
 ```
 
-**Решение: Постепенная миграция на TypeScript**
+**⚠️ РЕАЛЬНАЯ ОЦЕНКА: Миграция на TypeScript = HIGH RISK**
 
-**Шаг 1: Добавить типы для критических частей**
-```typescript
-// types/api.ts
-export interface User {
-  id: number;
-  username: string;
-  twitch_username?: string;
-  vk_username?: string;
-  isAuthenticated: boolean;
-}
+**Почему НЕ стоит мигрировать сейчас:**
 
-export interface ChatMessage {
-  id: string;
-  type: 'message' | 'chat_message';
-  author: string;
-  content: string;
-  platform: 'twitch' | 'vk';
-  timestamp: number;
-  badges?: string[];
-  role?: string;
-}
+1. **Размер кодовой базы:**
+   - 184 JSX файлов во frontend
+   - 100+ компонентов
+   - 15+ Context providers
+   - 40+ API endpoints
+   - **Оценка:** 2-3 месяца работы для 2 разработчиков
 
-export interface WebSocketMessage {
-  type: 'message' | 'chat_history' | 'bot_status' | 'tts_audio';
-  data?: any;
-  messages?: ChatMessage[];
-}
+2. **Риск поломки:**
+   - TypeScript найдёт 200+ мест с неявными типами
+   - Многие места потребуют рефакторинга логики
+   - Возможны breaking changes в существующих компонентах
+   - **Риск:** Высокий, приложение может "лечь"
+
+3. **Dependency Hell:**
+   - Нужны @types для всех библиотек
+   - Некоторые библиотеки могут не иметь типов
+   - Конфликты версий
+   - **Сложность:** Высокая
+
+4. **Learning Curve:**
+   - Команда должна знать TypeScript
+   - Новые patterns (generics, utility types, etc.)
+   - Время на обучение
+   - **Время:** +1 месяц
+
+**Альтернативное решение: JSDoc + PropTypes**
+
+```javascript
+/**
+ * @typedef {Object} ChatMessage
+ * @property {string} id
+ * @property {'message'|'chat_message'} type
+ * @property {string} author
+ * @property {string} content
+ * @property {'twitch'|'vk'} platform
+ * @property {number} timestamp
+ */
+
+/**
+ * Sends a message to chat
+ * @param {string} message - Message text
+ * @param {Array<'twitch'|'vk'>} platforms - Target platforms
+ * @returns {Promise<void>}
+ */
+const sendMessage = useCallback((message, platforms = []) => {
+    // IDE теперь знает типы!
+    // TypeScript в VSCode использует JSDoc для подсказок
+}, [isConnected, wsSendMessage]);
 ```
 
-**Шаг 2: Конвертировать критические файлы**
-```typescript
-// hooks/useSharedWebSocket.ts
-import { WebSocketMessage } from '../types/api';
+**Преимущества JSDoc:**
+- ✅ Нет breaking changes
+- ✅ Работает с существующим JS кодом
+- ✅ IDE подсказки (как TypeScript)
+- ✅ Можно добавлять постепенно
+- ✅ Не нужна компиляция
+- ✅ Нулевой риск
 
-export const useSharedWebSocket = (
-  userId: number | string | null,
-  onMessage: (data: WebSocketMessage) => void
-): { send: (data: any) => void } => {
-  // TypeScript проверит что userId не undefined
-  // И что onMessage получает правильный тип
+**PropTypes для React компонентов:**
+```javascript
+import PropTypes from 'prop-types';
+
+function ChatMessage({ message, author, platform }) {
+  // ...
+}
+
+ChatMessage.propTypes = {
+  message: PropTypes.string.isRequired,
+  author: PropTypes.string.isRequired,
+  platform: PropTypes.oneOf(['twitch', 'vk']).isRequired,
 };
 ```
 
-**Преимущества:**
-- ✅ **Refactoring Safety:** Переименовал поле → TypeScript покажет ВСЕ места
-- ✅ **Autocomplete:** IDE подсказывает доступные поля
-- ✅ **Documentation:** Типы = живая документация
-- ✅ **Меньше багов:** 80% типичных ошибок ловятся на этапе компиляции
+**Рекомендация:**
 
-**Action Items:**
-- [ ] Установить TypeScript (`npm install -D typescript @types/react @types/node`)
-- [ ] Создать `tsconfig.json` с `allowJs: true` (постепенная миграция)
-- [ ] Конвертировать критические типы (User, Message, API responses)
-- [ ] Конвертировать hooks и utils (10-20 файлов)
-- [ ] Постепенно мигрировать остальные файлы
+1. **Сейчас (0 риска):**
+   - [ ] Добавить JSDoc для критических функций
+   - [ ] Добавить PropTypes для сложных компонентов
+   - [ ] Включить `checkJs: true` в jsconfig.json
 
-**Приоритет:** 🟡 MEDIUM (но начать ASAP, 1-2 месяца на полную миграцию)
+2. **Через 6-12 месяцев (если очень нужно):**
+   - [ ] TypeScript только для новых файлов (allowJs: true)
+   - [ ] Постепенная миграция (1-2 файла в неделю)
+   - [ ] Не трогать рабочие критичные части
+
+3. **Никогда (слишком рискованно):**
+   - ❌ Полная миграция всего кода за раз
+   - ❌ Миграция Context providers (может всё сломать)
+   - ❌ Миграция перед важным релизом
+
+**Приоритет:** 🟢 LOW (JSDoc сейчас, TypeScript через 6+ месяцев, если вообще)
+**Риск миграции:** 🔴 HIGH (приложение может "лечь")
+**Рекомендация:** Использовать JSDoc + PropTypes вместо полной миграции
 
 ---
 

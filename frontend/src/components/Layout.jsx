@@ -5,7 +5,6 @@ import CookieConsent from './CookieConsent';
 import GlobalPlayer from './GlobalPlayer';
 import { composeProviders } from '../utils/composeProviders';
 import { TtsHealthProvider } from '../context/TtsHealthContext';
-import { TtsCardProvider } from '../context/TtsCardContext';
 import { TtsProvider } from '../context/TtsContext';
 import { DataProvider } from '../context/DataContext';
 import { PlayerProvider } from '../context/PlayerContext';
@@ -15,7 +14,6 @@ import { DonationAlertsProvider } from '../context/DonationAlertsContext';
 // Эти контексты нужны только внутри dashboard layout
 const LayoutProviders = composeProviders(
   TtsHealthProvider,
-  TtsCardProvider,
   TtsProvider,
   DataProvider,
   PlayerProvider,
