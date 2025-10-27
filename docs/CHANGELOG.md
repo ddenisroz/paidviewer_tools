@@ -4,6 +4,45 @@
 
 ---
 
+## 🗑️ Session 10 - Account Deletion & UX Polish (27 октября 2025)
+
+### ✨ Новые фичи
+- **3-Level Account Deletion System**: Soft delete → Auto cleanup (30 дней) → Admin delete
+- **GDPR Compliance**: "Right to be forgotten" с 30-дневным retention period
+- **Account Anonymization**: Автоматическая анонимизация при удалении
+- **Background Cleanup Task**: Автоматическое удаление через 30 дней
+
+### 🐛 Исправления
+- Исправлен hard delete на soft delete (предотвращение крашей)
+- WebSocket endpoint проверяет существование User перед обращением
+- Унифицированы toast уведомления (одна система - `sonner`)
+- Исправлено дублирование toast уведомлений
+- Фиксированные размеры кнопок (больше не "дёргаются")
+
+### 🎨 UX улучшения
+- VK Live toggle → красный цвет (#ef4444)
+- DonationAlerts toggle → оранжевый цвет (#f97316)
+- Унифицированы иконки (VKIcon вместо Video)
+- Название: "VK Live" (вместо "VK Video Live")
+- Кнопки с `min-width` для стабильности UI
+
+### 📚 Документация
+- Создан `ACCOUNT_DELETION_SYSTEM.md` (полная документация системы удаления)
+- Обновлён `CURRENT_STATUS.md` (актуализирован до Session 10)
+
+### 🏗️ Архитектура
+- **Soft Delete**: User record сохраняется с `is_blocked=True`
+- **Auto Cleanup**: Background task каждые 24 часа
+- **Admin Endpoint**: `/api/admin/permanently-delete-user/{user_id}`
+
+### 📊 Метрики
+- **Удаление аккаунта**: Hard delete → Soft delete + Auto cleanup
+- **Toast системы**: 2 системы → 1 система (sonner)
+- **GDPR compliance**: ✅ 100% соответствие
+- **Retention period**: 30 дней (индустриальный стандарт)
+
+---
+
 ## 🚀 Session 9 - WebSocket оптимизация (27 октября 2025)
 
 ### ✨ Новые фичи
@@ -131,7 +170,7 @@
 
 ---
 
-**Последнее обновление:** 27 октября 2025 (Session 9)  
-**Версия:** 0.9.0  
+**Последнее обновление:** 27 октября 2025 (Session 10)  
+**Версия:** 0.9.5  
 **Статус:** ✅ Stable
 

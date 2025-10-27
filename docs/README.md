@@ -1,7 +1,7 @@
 # 📚 Документация TTS_TTV_0.02
 
-**Последнее обновление:** 27 октября 2025 (Session 9)  
-**Версия проекта:** 0.9.0
+**Последнее обновление:** 27 октября 2025 (Session 10)  
+**Версия проекта:** 0.9.5
 
 ---
 
@@ -36,7 +36,7 @@
 | [QUICK_START.md](QUICK_START.md) | Установка и первый запуск |
 | [ARCHITECTURE_GUIDE.md](ARCHITECTURE_GUIDE.md) | Backend, Frontend, Database |
 | [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) | Паттерны, best practices |
-| [CHANGELOG.md](CHANGELOG.md) | История изменений (Session 7-9) |
+| [CHANGELOG.md](CHANGELOG.md) | История изменений (Session 7-10) |
 
 ### 🔵 Специализированные темы
 
@@ -48,6 +48,7 @@
 | [MEMORY_LEAKS_AUDIT.md](MEMORY_LEAKS_AUDIT.md) | 🧠 Memory leaks audit (EXCELLENT) |
 | [API_CLIENT_MIGRATION.md](API_CLIENT_MIGRATION.md) | 📡 Unified ApiClient guide |
 | [CACHING_SYSTEM.md](CACHING_SYSTEM.md) | 💾 Multi-tab cache sync |
+| [ACCOUNT_DELETION_SYSTEM.md](ACCOUNT_DELETION_SYSTEM.md) | 🗑️ 3-Level deletion system + GDPR |
 | [GUEST_MODE_SUPPORT.md](GUEST_MODE_SUPPORT.md) | 👤 Гостевой режим |
 | [TOKEN_SYSTEM_UNIFIED.md](TOKEN_SYSTEM_UNIFIED.md) | 🔐 TokenManager система |
 | [UNIFIED_COMMANDS.md](UNIFIED_COMMANDS.md) | 🎮 Команды !game, !title |

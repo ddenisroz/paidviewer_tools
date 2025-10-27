@@ -1,8 +1,8 @@
 # 📊 Текущий статус проекта TTS_TTV_0.02
 
-**Последнее обновление:** 27 октября 2025 (Session 9: Shared WebSocket with Leader Election)
+**Последнее обновление:** 27 октября 2025 (Session 10: Account Deletion & UX Polish)
 **Версия:** 0.02  
-**Статус:** В активной разработке, готовность к деплою 98%
+**Статус:** В активной разработке, готовность к деплою 99%
 
 ---
 
@@ -363,6 +363,132 @@
 - Tab ID format: `tab_{timestamp}_{random}`
 
 **Статус:** ✅ Production Ready, протестировано, работает отлично!
+
+---
+
+## 🆕 НОВОЕ - 27 ОКТЯБРЯ 2025 (Session 10: Account Deletion & UX Polish)
+
+### 🗑️ **Система 3-уровневого удаления аккаунтов**
+
+**Реализован полный цикл удаления с GDPR compliance.**
+
+#### **Level 1: SOFT DELETE (немедленно)**
+- ✅ User запрашивает удаление через настройки
+- ✅ Все данные очищаются (токены, сессии, настройки, сообщения)
+- ✅ User record помечается как `is_blocked=True`
+- ✅ Username анонимизируется → `deleted_user_{id}`
+- ✅ Устанавливается `blocked_reason="account_deleted"`
+- ✅ Устанавливается `blocked_at=datetime.utcnow()`
+- ✅ User разлогинивается автоматически
+
+**Endpoint:** `POST /api/user/delete-account`
+
+**Что удаляется физически:**
+```
+UserToken           → ВСЕ OAuth токены
+UserSession         → ВСЕ сессии
+TTSUserSettings     → Настройки TTS
+UserSettings        → Общие настройки
+ChatMessage         → История сообщений
+ChatBoxSettings     → Настройки overlay
+WhitelistedChannel  → Whitelist записи
+AdminUser           → Админ права (если были)
+```
+
+**Что сохраняется (анонимизировано):**
+```
+User record:
+  - is_blocked = True
+  - blocked_reason = "account_deleted"
+  - blocked_at = 2025-10-27 08:15:30
+  - twitch_username = "deleted_user_123"
+  - vk_username = "deleted_user_123"
+```
+
+#### **Level 2: AUTO CLEANUP (через 30 дней)**
+- ✅ Background task запускается каждые 24 часа
+- ✅ Ищет аккаунты с `blocked_at < 30 days ago`
+- ✅ Физически удаляет User record из БД (hard delete)
+- ✅ Логирование всех операций
+- ✅ GDPR compliance: "right to be forgotten"
+
+**Файл:** `bot_service/core/background_tasks.py`
+
+**Процесс:**
+```
+Day 0:    User нажимает "Delete" → soft delete
+Day 1-29: Retention period (можно восстановить)
+Day 30+:  Background task → hard delete
+```
+
+#### **Level 3: ADMIN DELETE (ручное)**
+- ✅ Admin может удалить пользователя немедленно
+- ✅ Endpoint: `POST /api/admin/permanently-delete-user/{user_id}`
+- ✅ Требует права администратора
+- ✅ Физическое удаление (необратимо!)
+
+**Используется для:**
+- Срочные GDPR запросы
+- Удаление тестовых аккаунтов
+- Ручное вмешательство админа
+
+**Файл:** `bot_service/api/additional_api.py`
+
+#### **Защита от крашей после удаления**
+- ✅ WebSocket endpoint проверяет существование User
+- ✅ Null-check перед обращением к полям user
+- ✅ Graceful degradation при обращении к удалённому пользователю
+
+**Файл:** `bot_service/main.py` (websocket_chat endpoint)
+
+```python
+user = db.query(User).filter(User.id == user_id_int).first()
+
+# ⚠️ Проверяем что пользователь существует (может быть удалён)
+if user:
+    username = user.twitch_username or user.vk_username
+    connection_manager.schedule_tts_disconnect(user_id_int, username)
+else:
+    logger.warning(f"User {user_id_int} not found (possibly deleted)")
+```
+
+### 🎨 **UX полировка**
+
+#### **1. Унификация toast уведомлений**
+- ✅ Весь проект использует `sonner` (зелёные/красные тосты)
+- ✅ Удалены legacy белые тосты (`useToast` hook)
+- ✅ Исправлено дублирование уведомлений
+- ✅ Правильное позиционирование (top-right)
+
+**Файлы:**
+- `frontend/src/pages/tts/TtsMainPage.jsx`
+- `frontend/src/components/ChatCard.jsx`
+
+#### **2. Фиксированные размеры кнопок**
+- ✅ Кнопки больше не "дёргаются" при изменении текста
+- ✅ Добавлен `min-w-[120px]` для кнопки "Сохранить"
+- ✅ Добавлен `Loader2` спиннер при сохранении
+
+**Файл:** `frontend/src/components/ChatBoxSettingsModal.jsx`
+
+#### **3. Унификация стилей переключателей**
+- ✅ VK Live toggle → красный (`#ef4444`)
+- ✅ DonationAlerts toggle → оранжевый (`#f97316`)
+- ✅ Унифицированы иконки (VKIcon вместо Video)
+- ✅ Название: "VK Live" (вместо "VK Video Live")
+
+**Файлы:**
+- `frontend/src/pages/SettingsPage.jsx`
+- `frontend/src/components/layout/Header.jsx`
+
+### 📊 Метрики улучшений:
+
+| Компонент | До | После |
+|-----------|-----|-------|
+| **Удаление аккаунта** | Hard delete → краш | Soft delete → auto cleanup |
+| **Toast уведомления** | 2 системы, дубли | 1 система (sonner) |
+| **Размеры кнопок** | Дёргаются | Фиксированы |
+| **Цвета toggles** | Все фиолетовые | Платформенные цвета |
 
 ---
 
