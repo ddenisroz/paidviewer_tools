@@ -151,9 +151,15 @@ const VoiceManagementPageContent = () => {
     const loadVoices = useCallback(async () => {
         if (!user) return;
         
+        // Ждём пока whitelistStatus загрузится
+        if (whitelistStatus === null) {
+            console.log('Waiting for whitelist status to load...');
+            return;
+        }
+        
         // Проверяем whitelist статус перед загрузкой голосов
         // Для гостей и OAuth пользователей без whitelist - не загружаем голоса
-        if (whitelistStatus && !whitelistStatus.can_manage_voices) {
+        if (!whitelistStatus.can_manage_voices) {
             console.log(`${user.isGuest ? 'Guest' : 'User'} not in whitelist - F5-TTS not available`);
             setVoices([]);
             setLoading(false);
@@ -194,10 +200,20 @@ const VoiceManagementPageContent = () => {
     }, [user, addToast, whitelistStatus]);
 
     useEffect(() => {
-        // Загружаем голоса и проверяем whitelist независимо от TTS сервиса
-        // TTS нужен только для тестирования/создания голосов, не для просмотра
-        loadVoices();
+        // Сначала проверяем whitelist статус
         checkWhitelistStatus();
+    }, [checkWhitelistStatus]);
+
+    useEffect(() => {
+        // Загружаем голоса ПОСЛЕ того как whitelistStatus загрузился
+        if (whitelistStatus !== null) {
+            loadVoices();
+        }
+    }, [whitelistStatus, loadVoices]);
+
+    useEffect(() => {
+        // Остальная логика
+        // TTS нужен только для тестирования/создания голосов, не для просмотра
         
         // Обработчик для сворачивания/разворачивания вкладки
         const handleVisibilityChange = () => {
