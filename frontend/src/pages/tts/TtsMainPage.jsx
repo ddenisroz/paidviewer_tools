@@ -16,8 +16,7 @@ import TtsControlPanel from '../../components/tts/TtsControlPanel';
 import AudioSettings from '../../components/tts/AudioSettings';
 import TtsSettings from '../../components/tts/TtsSettings';
 import HealthStatus from '../../components/tts/HealthStatus';
-import BlacklistManager from '../../components/tts/BlacklistManager';
-import WordFilterManager from '../../components/tts/WordFilterManager';
+import TtsFilterManager from '../../components/tts/TtsFilterManager';
 import { ttsLogger } from '../../utils/logger';
 
 const TtsMainPageContent = () => {
@@ -503,7 +502,7 @@ const TtsMainPageContent = () => {
         <PageWrapper 
             title="Озвучка сообщений"
         >
-            <div className="relative">
+            <div className="relative space-y-6">
                 {/* CSS для слайдера */}
                 <style>
                     {`
@@ -528,7 +527,12 @@ const TtsMainPageContent = () => {
                 </style>
                 
                 {/* Статус здоровья TTS */}
-                <HealthStatus isHealthy={isHealthy} isChecking={isChecking} />
+                <HealthStatus 
+                    isHealthy={isHealthy} 
+                    isChecking={isChecking} 
+                    checkTtsHealth={checkTtsHealth}
+                    isWhitelisted={isWhitelisted}
+                />
                 
                 {/* Выбор движка TTS - ВСЕГДА показываем */}
                 <div className="mb-6 p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-blue-500/20">
@@ -642,11 +646,8 @@ const TtsMainPageContent = () => {
                     onSaveSettings={saveTtsSettings}
                 />
                 
-                {/* Управление черным списком */}
-                <BlacklistManager />
-                
-                {/* Управление словарем фильтра */}
-                <WordFilterManager />
+                {/* Фильтрация TTS */}
+                <TtsFilterManager />
             </div>
         </PageWrapper>
     );

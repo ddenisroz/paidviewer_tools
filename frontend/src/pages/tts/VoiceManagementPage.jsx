@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -100,6 +100,10 @@ const VoiceManagementPageContent = () => {
         initializeTts();
     }, [initializeTts]);
 
+    // Ref для предотвращения множественных проверок
+    const whitelistCheckInProgressRef = useRef(false);
+    const whitelistCheckTimeRef = useRef(0);
+    
     // Проверяем whitelist статус пользователя (включая гостей)
     const checkWhitelistStatus = useCallback(async () => {
         if (!user) {
@@ -110,6 +114,23 @@ const VoiceManagementPageContent = () => {
             });
             return;
         }
+        
+        // Предотвращаем множественные одновременные запросы
+        if (whitelistCheckInProgressRef.current) {
+            console.log('Whitelist check already in progress, skipping...');
+            return;
+        }
+        
+        // Кэширование - не проверяем чаще чем раз в 30 секунд
+        const now = Date.now();
+        const cacheTime = 30000; // 30 секунд
+        if (now - whitelistCheckTimeRef.current < cacheTime && whitelistStatus) {
+            console.log('Using cached whitelist status');
+            return;
+        }
+        
+        whitelistCheckInProgressRef.current = true;
+        whitelistCheckTimeRef.current = now;
         
         try {
             // API проверяет whitelist для всех: OAuth пользователей и гостей
@@ -122,8 +143,10 @@ const VoiceManagementPageContent = () => {
                 can_manage_voices: false,
                 message: "Ошибка проверки статуса доступа"
             });
+        } finally {
+            whitelistCheckInProgressRef.current = false;
         }
-    }, [user]);
+    }, [user, whitelistStatus]);
 
     const loadVoices = useCallback(async () => {
         if (!user) return;

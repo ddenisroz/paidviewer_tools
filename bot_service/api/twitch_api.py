@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from core.connection_manager import ConnectionManager
 from core.token_utils import get_user_token_from_db
 from core.database import User
+from core.session_manager import session_manager
 
 # Загружаем .env файл
 # Получаем путь к директории bot_service
@@ -411,7 +412,6 @@ class TwitchAPI:
                             user_id=user_id,
                             platform="twitch",
                             platform_user_id=tokens.get("platform_user_id", ""),
-                            username=tokens.get("username"),
                             avatar_url=tokens.get("avatar_url"),
                             access_token=new_access_token,
                             refresh_token=new_refresh_token,

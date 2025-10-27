@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,14 +8,38 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Trash2, AlertCircle, ChevronDown } from 'lucide-react';
 import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
+import { useIntegrations } from '../../context/IntegrationsContext';
 
-const WordFilterManager = () => {
+const WordFilterManager = React.memo(() => {
     const [words, setWords] = useState([]);
     const [loading, setLoading] = useState(false);
     const [newWord, setNewWord] = useState('');
     const [selectedPlatform, setSelectedPlatform] = useState('all');
     const [isAdding, setIsAdding] = useState(false);
-    const [isExpanded, setIsExpanded] = useState(false);
+    const [isWordFilterExpanded, setIsWordFilterExpanded] = useState(false);
+    
+    // Используем useCallback для стабильной ссылки на функцию
+    const toggleWordFilterExpanded = useCallback(() => {
+        setIsWordFilterExpanded(prev => !prev);
+    }, []);
+    
+    const { integrations } = useIntegrations();
+
+    // Получаем доступные платформы из интеграций
+    const getAvailablePlatforms = () => {
+        const platforms = [];
+        if (integrations?.twitch?.enabled) platforms.push('twitch');
+        if (integrations?.vk?.enabled) platforms.push('vk');
+        return platforms;
+    };
+
+    // Получаем иконку для платформы
+    const getPlatformIcon = (platform) => {
+        if (platform === 'twitch') return '🟣';
+        if (platform === 'vk') return '🔵';
+        if (platform === 'all') return '🌐';
+        return '❓';
+    };
 
     // Загрузка списка слов
     const loadWords = async () => {
@@ -100,10 +124,10 @@ const WordFilterManager = () => {
     // Получение лейбла для платформы
     const getPlatformLabel = (platform) => {
         switch (platform) {
-            case 'twitch': return 'Twitch';
-            case 'vk': return 'VK Live';
-            case 'all': return 'Все';
-            default: return 'Неизвестно';
+            case 'twitch': return '🟣 Twitch';
+            case 'vk': return '🔵 VK Live';
+            case 'all': return '🌐 Все';
+            default: return '❓ Неизвестно';
         }
     };
 
@@ -112,10 +136,11 @@ const WordFilterManager = () => {
     }, []);
 
     return (
-        <Card>
+        <Card data-testid="word-filter-card">
             <CardHeader 
-                className="cursor-pointer hover:bg-gray-800/50 transition-colors"
-                onClick={() => setIsExpanded(!isExpanded)}
+                className="cursor-pointer hover:bg-gray-800/50 transition-colors pb-4"
+                onClick={toggleWordFilterExpanded}
+                data-testid="word-filter-header"
             >
                 <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
@@ -123,12 +148,12 @@ const WordFilterManager = () => {
                         Управление словарем фильтра
                     </CardTitle>
                     <ChevronDown 
-                        className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+                        className={`w-4 h-4 transition-transform ${isWordFilterExpanded ? 'rotate-180' : ''}`} 
                     />
                 </div>
             </CardHeader>
-            {isExpanded && (
-                <CardContent className="space-y-6">
+            {isWordFilterExpanded && (
+                <CardContent className="space-y-6 pt-4">
                     {/* Добавление нового слова */}
                     <div className="space-y-3">
                         <div className="flex flex-col sm:flex-row gap-3">
@@ -140,16 +165,21 @@ const WordFilterManager = () => {
                                 disabled={isAdding}
                                 className="flex-grow bg-gray-800/50 border-gray-700/50 text-white placeholder-gray-500"
                             />
-                            <Select value={selectedPlatform} onValueChange={setSelectedPlatform}>
-                                <SelectTrigger className="w-full sm:w-[180px] bg-gray-800/50 border-gray-700/50 text-white">
-                                    <SelectValue placeholder="Платформа" />
-                                </SelectTrigger>
-                                <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                                    <SelectItem value="all">Все платформы</SelectItem>
-                                    <SelectItem value="twitch">Twitch</SelectItem>
-                                    <SelectItem value="vk">VK Live</SelectItem>
-                                </SelectContent>
-                            </Select>
+                            {getAvailablePlatforms().length > 0 && (
+                                <Select value={selectedPlatform} onValueChange={setSelectedPlatform}>
+                                    <SelectTrigger className="w-full sm:w-[180px] bg-gray-800/50 border-gray-700/50 text-white">
+                                        <SelectValue placeholder="Платформа" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                                        <SelectItem value="all">{getPlatformIcon('all')} Все платформы</SelectItem>
+                                        {getAvailablePlatforms().map(platform => (
+                                            <SelectItem key={platform} value={platform}>
+                                                {getPlatformIcon(platform)} {platform === 'twitch' ? 'Twitch' : 'VK Live'}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )}
                             <Button 
                                 onClick={addWord} 
                                 disabled={isAdding || !newWord.trim()}
@@ -159,6 +189,12 @@ const WordFilterManager = () => {
                                 {isAdding ? 'Добавление...' : 'Добавить'}
                             </Button>
                         </div>
+                        
+                        {getAvailablePlatforms().length === 0 && (
+                            <p className="text-sm text-gray-400">
+                                Подключите хотя бы одну платформу (Twitch или VK Live) чтобы фильтровать слова
+                            </p>
+                        )}
                     </div>
 
                     {/* Список слов */}
@@ -202,6 +238,8 @@ const WordFilterManager = () => {
             )}
         </Card>
     );
-};
+});
+
+WordFilterManager.displayName = 'WordFilterManager';
 
 export default WordFilterManager;
