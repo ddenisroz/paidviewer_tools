@@ -46,14 +46,9 @@ const TtsSettings = ({
                 <div className="space-y-3">
                     {/* Настройки смайлов */}
                     <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                        <div className="flex flex-col">
-                            <Label htmlFor="enable7TV" className="text-sm font-medium">
-                                7TV смайлы
-                            </Label>
-                            <span className="text-xs text-gray-400 mt-1">
-                                Озвучивать текстовые названия 7TV эмоций
-                            </span>
-                        </div>
+                        <Label htmlFor="enable7TV" className="text-sm font-medium">
+                            7TV смайлы
+                        </Label>
                         <Switch
                             id="enable7TV"
                             checked={ttsSettings.enable7TV}
@@ -62,14 +57,9 @@ const TtsSettings = ({
                     </div>
                     
                     <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                        <div className="flex flex-col">
-                            <Label htmlFor="enableTwitch" className="text-sm font-medium">
-                                Twitch смайлы
-                            </Label>
-                            <span className="text-xs text-gray-400 mt-1">
-                                Озвучивать текстовые названия Twitch эмоций
-                            </span>
-                        </div>
+                        <Label htmlFor="enableTwitch" className="text-sm font-medium">
+                            Twitch смайлы
+                        </Label>
                         <Switch
                             id="enableTwitch"
                             checked={ttsSettings.enableTwitch}
@@ -82,14 +72,9 @@ const TtsSettings = ({
                         <h3 className="text-sm font-semibold text-gray-300 mb-3">Фильтры сообщений</h3>
                         
                         <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                            <div className="flex flex-col">
-                                <Label htmlFor="filterReplies" className="text-sm font-medium">
-                                    Игнорировать ответы
-                                </Label>
-                                <span className="text-xs text-gray-400 mt-1">
-                                    Не озвучивать сообщения-ответы (reply)
-                                </span>
-                            </div>
+                            <Label htmlFor="filterReplies" className="text-sm font-medium">
+                                Игнорировать ответы
+                            </Label>
                             <Switch
                                 id="filterReplies"
                                 checked={ttsSettings.filterReplies || false}
@@ -98,14 +83,9 @@ const TtsSettings = ({
                         </div>
                         
                         <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg mt-3">
-                            <div className="flex flex-col">
-                                <Label htmlFor="filterMentions" className="text-sm font-medium">
-                                    Игнорировать упоминания
-                                </Label>
-                                <span className="text-xs text-gray-400 mt-1">
-                                    Не озвучивать сообщения с @упоминаниями
-                                </span>
-                            </div>
+                            <Label htmlFor="filterMentions" className="text-sm font-medium">
+                                Игнорировать упоминания
+                            </Label>
                             <Switch
                                 id="filterMentions"
                                 checked={ttsSettings.filterMentions || false}
