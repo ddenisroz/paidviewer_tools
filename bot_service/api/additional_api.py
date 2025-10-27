@@ -580,14 +580,24 @@ async def delete_user_account(
             ])
         ).delete()
         
-        # 9. Удаляем самого пользователя
-        db.delete(db_user)
+        # 9. ⚠️ SOFT DELETE: Помечаем пользователя как удалённого (НЕ удаляем физически!)
+        # Это позволяет сохранить историю и предотвратить конфликты при повторной регистрации
+        from datetime import datetime
+        db_user.is_blocked = True
+        db_user.blocked_reason = "account_deleted"
+        db_user.blocked_at = datetime.utcnow()
+        
+        # Анонимизируем данные для GDPR compliance
+        db_user.twitch_username = f"deleted_user_{user_id}"
+        db_user.vk_username = f"deleted_user_{user_id}"
+        db_user.vk_channel_name = None
         
         # Коммитим все изменения
         db.commit()
         
-        logger.info(f"✅ [DELETE ACCOUNT] Successfully deleted user {user_id}")
+        logger.info(f"✅ [DELETE ACCOUNT] Successfully soft-deleted user {user_id}")
         logger.info(f"📊 [DELETE ACCOUNT] Deleted counts: {deleted_counts}")
+        logger.info(f"🔒 [DELETE ACCOUNT] User marked as blocked with reason: account_deleted")
         
         # Очищаем cookie сессии
         response = JSONResponse(content={

@@ -750,10 +750,15 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
             db = next(get_db())
             try:
                 user = db.query(User).filter(User.id == user_id_int).first()
-                username = user.twitch_username or user.vk_username or f"user_{user_id_int}"
                 
-                # Запускаем таймер на отключение TTS
-                conn_mgr.schedule_tts_disconnect(user_id_int, username)
+                # ⚠️ Проверяем что пользователь существует (может быть удалён)
+                if user:
+                    username = user.twitch_username or user.vk_username or f"user_{user_id_int}"
+                    
+                    # Запускаем таймер на отключение TTS
+                    conn_mgr.schedule_tts_disconnect(user_id_int, username)
+                else:
+                    logger.warning(f"⚠️ User {user_id_int} not found (possibly deleted), skipping TTS disconnect")
             finally:
                 db.close()
 
