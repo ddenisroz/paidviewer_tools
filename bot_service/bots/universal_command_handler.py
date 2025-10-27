@@ -286,11 +286,21 @@ class UniversalCommandHandler:
             # Ищем игру через Twitch API
             from api.twitch_api import TwitchAPI
             from core.connection_manager import get_connection_manager
+            from utils.category_search import expand_query_with_aliases
+            
             connection_manager = get_connection_manager()
             twitch_api = TwitchAPI(connection_manager)
             
-            # Поиск игры
-            games = await twitch_api.search_categories(args)
+            # Расширяем запрос с учётом алиасов (dbd -> Dead by Daylight)
+            search_queries = expand_query_with_aliases(args)
+            
+            # Пробуем поиск по всем вариантам запроса
+            games = None
+            for search_query in search_queries:
+                games = await twitch_api.search_categories(search_query)
+                if games:
+                    break
+            
             if not games:
                 await ctx.send(f"@{ctx.author.name} ❌ Игра '{args}' не найдена")
                 return
@@ -333,10 +343,20 @@ class UniversalCommandHandler:
             
             # Ищем игру через VK API
             from api.vk_api import VKLiveAPI
+            from utils.category_search import expand_query_with_aliases
+            
             vk_api = VKLiveAPI()
             
-            # Поиск игры
-            categories = await vk_api.get_categories(search=args, user_id=str(user.id))
+            # Расширяем запрос с учётом алиасов (dbd -> Dead by Daylight)
+            search_queries = expand_query_with_aliases(args)
+            
+            # Пробуем поиск по всем вариантам запроса
+            categories = None
+            for search_query in search_queries:
+                categories = await vk_api.get_categories(search=search_query, user_id=str(user.id))
+                if categories:
+                    break
+            
             if not categories:
                 await vk_bot.send_message(channel_name, 
                     f"@{author_name} ❌ Игра '{args}' не найдена")
