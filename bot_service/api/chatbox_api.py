@@ -43,6 +43,7 @@ class ChatBoxSettingsCreate(BaseModel):
     animation_duration: int = Field(default=300, ge=0, le=2000)
     animation_type: str = Field(default='fade')  # fade, slide-right, slide-left, scale, bounce
     chat_direction: str = Field(default='vertical')  # vertical или horizontal
+    message_fade_seconds: int = Field(default=60, ge=10, le=60)  # 10-60 сек, 60 = не исчезают
 
 
 class ChatBoxSettingsResponse(ChatBoxSettingsCreate):
@@ -108,7 +109,8 @@ async def get_chatbox_settings(
         border_radius=settings.border_radius,
         animation_duration=settings.animation_duration,
         animation_type=settings.animation_type,
-        chat_direction=settings.chat_direction
+        chat_direction=settings.chat_direction,
+        message_fade_seconds=settings.message_fade_seconds
     )
     
     logger.info(f"📦 [CHATBOX] Settings retrieved for user {user_id}")
@@ -184,7 +186,8 @@ async def save_chatbox_settings(
         border_radius=settings.border_radius,
         animation_duration=settings.animation_duration,
         animation_type=settings.animation_type,
-        chat_direction=settings.chat_direction
+        chat_direction=settings.chat_direction,
+        message_fade_seconds=settings.message_fade_seconds
     )
     
     logger.info(f"📦 [CHATBOX] Settings saved for user {user_id}")
@@ -213,7 +216,8 @@ async def save_chatbox_settings(
             "border_radius": settings.border_radius,
             "animation_duration": settings.animation_duration,
             "animation_type": settings.animation_type,
-            "chat_direction": settings.chat_direction
+            "chat_direction": settings.chat_direction,
+            "message_fade_seconds": settings.message_fade_seconds
         }
     }
     

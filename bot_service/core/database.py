@@ -925,6 +925,7 @@ class ChatBoxSettings(Base):
     border_radius = Column(Integer, default=8)  # Скругление углов в px
     animation_duration = Column(Integer, default=300)  # Длительность анимации появления в ms
     animation_type = Column(String, default='fade')  # Тип анимации: fade, slide-right, slide-left, scale, bounce
+    message_fade_seconds = Column(Integer, default=60)  # Время до исчезания сообщения (10-60 сек, 60 = не исчезают)
     
     created_at = Column(DateTime, default=utcnow_naive)
     updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
