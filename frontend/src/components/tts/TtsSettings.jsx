@@ -1,14 +1,17 @@
 // src/components/tts/TtsSettings.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { ChevronDown } from 'lucide-react';
 
 const TtsSettings = ({
     ttsSettings,
     setTtsSettings,
     onSaveSettings
 }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    
     const handleSettingChange = (key, value) => {
         const newSettings = {
             ...ttsSettings,
@@ -27,10 +30,19 @@ const TtsSettings = ({
 
     return (
         <Card className="mt-6">
-            <CardHeader>
-                <CardTitle>Дополнительные настройки TTS</CardTitle>
+            <CardHeader 
+                className="cursor-pointer hover:bg-gray-800/30 transition-colors"
+                onClick={() => setIsExpanded(!isExpanded)}
+            >
+                <div className="flex items-center justify-between">
+                    <CardTitle>Дополнительные настройки TTS</CardTitle>
+                    <ChevronDown 
+                        className={`h-5 w-5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                    />
+                </div>
             </CardHeader>
-            <CardContent>
+            {isExpanded && (
+            <CardContent className="pt-4">
                 <div className="space-y-3">
                     {/* Настройки смайлов */}
                     <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
@@ -103,6 +115,7 @@ const TtsSettings = ({
                     </div>
                 </div>
             </CardContent>
+            )}
         </Card>
     );
 };
