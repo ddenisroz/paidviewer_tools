@@ -89,7 +89,8 @@ export const UserSettingsProvider = ({ children }) => {
             show_platform: settings.chat_show_platform ?? true,
             show_user_roles: settings.chat_show_user_roles ?? true,
             animation_duration: settings.chat_animation_duration ?? 500,
-            animation_type: settings.chat_animation_type ?? 'slide'
+            animation_type: settings.chat_animation_type ?? 'slide',
+            message_fade_seconds: settings.chat_message_fade_seconds ?? 60
         };
     }, [settings]);
 

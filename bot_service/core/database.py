@@ -86,6 +86,7 @@ try:
         chat_show_user_roles = Column(Boolean, default=True)
         chat_animation_duration = Column(Integer, default=500)
         chat_animation_type = Column(String, default="slide")
+        chat_message_fade_seconds = Column(Integer, default=60)  # Время до исчезания сообщения (10-60 сек, 60 = не исчезают)
         
         # Каналы платформ для бота
         channel_name = Column(String, nullable=True)  # Twitch канал

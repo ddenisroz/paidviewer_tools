@@ -421,6 +421,37 @@ const ChatOverlay = () => {
         };
     }, []);
     
+    // Автоматическое исчезание сообщений
+    useEffect(() => {
+        const fadeSeconds = settings?.message_fade_seconds;
+        
+        // Если настройка = 60 (максимум), сообщения не исчезают
+        if (!fadeSeconds || fadeSeconds >= 60 || messages.length === 0) {
+            return;
+        }
+        
+        // Проверяем каждую секунду, есть ли сообщения старше fadeSeconds
+        const interval = setInterval(() => {
+            const now = Date.now();
+            
+            setMessages(prev => {
+                const filtered = prev.filter(msg => {
+                    const messageAge = (now - msg.timestamp) / 1000; // в секундах
+                    return messageAge < fadeSeconds;
+                });
+                
+                // Логируем только если что-то удалено
+                if (filtered.length < prev.length) {
+                    console.log(`🗑️ [FADE] Removed ${prev.length - filtered.length} old messages (>${fadeSeconds}s)`);
+                }
+                
+                return filtered;
+            });
+        }, 1000); // Проверяем каждую секунду
+        
+        return () => clearInterval(interval);
+    }, [settings?.message_fade_seconds, messages.length]);
+    
     // Закрытие контекстного меню при клике вне его
     useEffect(() => {
         const handleClickOutside = () => setContextMenu(null);

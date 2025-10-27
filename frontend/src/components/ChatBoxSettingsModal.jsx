@@ -72,7 +72,8 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                 background_opacity: parseFloat(response.data.background_opacity) ?? 0.5,
                 max_messages: parseInt(response.data.max_messages) || 20,
                 message_spacing: parseInt(response.data.message_spacing) || 4,
-                animation_type: response.data.animation_type || 'fade'
+                animation_type: response.data.animation_type || 'fade',
+                message_fade_seconds: parseInt(response.data.message_fade_seconds) || 60
             };
             
             setSettings(normalizedSettings);
@@ -98,6 +99,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                 text_stroke_width: parseInt(response.data.text_stroke_width) || 0,
                 background_opacity: parseFloat(response.data.background_opacity) ?? 0.5,
                 max_messages: parseInt(response.data.max_messages) || 20,
+                message_fade_seconds: parseInt(response.data.message_fade_seconds) || 60,
                 message_spacing: parseInt(response.data.message_spacing) || 4,
                 animation_type: response.data.animation_type || 'fade'
             };
@@ -319,6 +321,36 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                     <option value="scale">Увеличение</option>
                                     <option value="bounce">Подпрыгивание</option>
                                 </select>
+                            </div>
+                            
+                            {/* Message Fade Duration */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-white">Исчезание сообщений</Label>
+                                    <span className="text-sm text-gray-400">
+                                        {settings?.message_fade_seconds === 60 ? 'Не исчезают' : `${settings?.message_fade_seconds || 60}с`}
+                                    </span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="10"
+                                    max="60"
+                                    step="10"
+                                    value={settings?.message_fade_seconds || 60}
+                                    onChange={(e) => handleChange('message_fade_seconds', parseInt(e.target.value))}
+                                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                    style={{
+                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((settings?.message_fade_seconds - 10) / 50) * 100}%, #374151 ${((settings?.message_fade_seconds - 10) / 50) * 100}%, #374151 100%)`
+                                    }}
+                                />
+                                <div className="flex justify-between text-xs text-gray-500">
+                                    <span>10с</span>
+                                    <span>20с</span>
+                                    <span>30с</span>
+                                    <span>40с</span>
+                                    <span>50с</span>
+                                    <span>Никогда</span>
+                                </div>
                             </div>
                             
                             {/* Text Stroke */}
