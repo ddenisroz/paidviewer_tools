@@ -82,16 +82,11 @@ const SettingsPage = () => {
                 <CardContent className="space-y-6 pt-6">
                     {/* Twitch Integration */}
                     <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                                <Twitch className="h-5 w-5 text-purple-500" />
-                                <Label htmlFor="twitch-integration" className="text-base font-medium">
-                                    Twitch
-                                </Label>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                                Подключение бота для работы с трансляцией
-                            </p>
+                        <div className="flex items-center gap-2">
+                            <Twitch className="h-5 w-5 text-purple-500" />
+                            <Label htmlFor="twitch-integration" className="text-base font-medium">
+                                Twitch
+                            </Label>
                         </div>
                         <Switch
                             id="twitch-integration"
@@ -104,16 +99,11 @@ const SettingsPage = () => {
 
                     {/* VK Integration */}
                     <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                                <Video className="h-5 w-5 text-blue-500" />
-                                <Label htmlFor="vk-integration" className="text-base font-medium">
-                                    VK Video Live
-                                </Label>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                                Подключение бота для работы с трансляцией
-                            </p>
+                        <div className="flex items-center gap-2">
+                            <Video className="h-5 w-5 text-blue-500" />
+                            <Label htmlFor="vk-integration" className="text-base font-medium">
+                                VK Video Live
+                            </Label>
                         </div>
                         <Switch
                             id="vk-integration"
@@ -126,25 +116,20 @@ const SettingsPage = () => {
 
                     {/* DonationAlerts Integration */}
                     <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                                <img 
-                                    src="/src/images/logos/DA_Alert_Color.svg" 
-                                    alt="DonationAlerts" 
-                                    className="h-5 w-5"
-                                    onError={(e) => {
-                                        e.target.style.display = 'none';
-                                        e.target.nextSibling.style.display = 'block';
-                                    }}
-                                />
-                                <Gift className="h-5 w-5 text-orange-500" style={{display: 'none'}} />
-                                <Label className="text-base font-medium">
-                                    DonationAlerts
-                                </Label>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                                {daConnected ? 'Подключен' : 'Подключение для получения донатов'}
-                            </p>
+                        <div className="flex items-center gap-2">
+                            <img 
+                                src="/src/images/logos/DA_Alert_Color.svg" 
+                                alt="DonationAlerts" 
+                                className="h-5 w-5"
+                                onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    e.target.nextSibling.style.display = 'block';
+                                }}
+                            />
+                            <Gift className="h-5 w-5 text-orange-500" style={{display: 'none'}} />
+                            <Label className="text-base font-medium">
+                                DonationAlerts
+                            </Label>
                         </div>
                         <Switch
                             checked={daConnected}
