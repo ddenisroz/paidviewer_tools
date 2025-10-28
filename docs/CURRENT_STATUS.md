@@ -1,6 +1,6 @@
 # 📊 Текущий статус проекта TTS_TTV_0.02
 
-**Последнее обновление:** 27 октября 2025 (Session 10: Account Deletion & UX Polish)
+**Последнее обновление:** 28 октября 2025 (Session 11: VK Channel Points, UI Polish & Easter Eggs)
 **Версия:** 0.02  
 **Статус:** В активной разработке, готовность к деплою 99%
 
@@ -66,6 +66,22 @@
   - Поддержка кириллицы (русский, украинский, белорусский)
   - Кэширование шрифтов для производительности
 
+### 🎁 Channel Points (Баллы канала)
+- ✅ **Twitch Channel Points** - полная поддержка
+  - Создание/редактирование/удаление наград
+  - Получение списка redemptions
+  - Обработка redemptions (approve/reject)
+- ✅ **VK Live Channel Points** - полная поддержка (Session 11) 🆕
+  - Создание/редактирование/удаление наград
+  - Получение списка demands
+  - Обработка demands (accept/reject)
+  - Включение/отключение наград
+- ✅ **RESTful API** для обеих платформ
+- ✅ **Шифрование токенов** (Fernet AES-128)
+- ✅ **Универсальная страница управления** (`/dashboard/points`)
+  - Переключение между платформами (Twitch/VK)
+  - Единый интерфейс для управления наградами
+
 ### 🎙️ TTS (Озвучка)
 - ✅ **Базовая озвучка** (gTTS) - работает корректно
 - ✅ **TTS отключен по умолчанию** для новых пользователей (исправлено Session 7)
@@ -77,6 +93,29 @@
 - ✅ Синхронизация toggles между главной и настройками
 - ✅ WebSocket broadcast audio
 - ✅ Блокировка пользователей от TTS
+
+### 📺 YouTube Queue (Очередь видео)
+- ✅ Команды: `!sr`, `!skip`, `!queue`, `!clear`
+- ✅ Глобальный плеер (GlobalPlayer)
+- ✅ **Улучшенный layout** (Session 11) 🆕
+  - Обычный режим: очередь СНИЗУ плеера (вертикально)
+  - Fullscreen режим: очередь СПРАВА от плеера (горизонтально)
+  - Центрирование контента с `max-w-6xl`
+- ✅ **Пагинация** (Session 11) 🆕
+  - 5 элементов на страницу в обычном режиме
+  - Кнопки навигации: Назад/Вперед
+  - Счетчик страниц (1/3)
+  - Fullscreen показывает всю очередь
+- ✅ **Чистый UI** (Session 11) 🆕
+  - Убраны эмодзи с кнопок
+  - Кнопки на одном уровне
+
+### 🎭 Easter Eggs
+- ✅ **Приветственные сообщения ботов** (Session 11) 🆕
+  - Twitch бот: `🤖 Бот подключен! IP: 192.168.1.42 | Используйте !commands`
+  - VK Live бот: `🤖 Бот VK Live подключен! IP: 172.217.5.99 | Используйте !commands`
+  - Случайный фейковый IP (100-255.x.x.x) для "пранка" 😄
+  - Отправляется автоматически при подключении к каналу
 
 ### 🗄️ База данных
 - ✅ Case-insensitive поиск по никнеймам
@@ -140,6 +179,101 @@
 2. ✅ **WebSocket ping loop**
    - Исправлено: `dict changed size during iteration`
    - Файл: `bot_service/services/memory_websocket_manager.py`
+
+---
+
+## ✅ ИСПРАВЛЕНО 28 ОКТЯБРЯ 2025 (Session 11: VK Channel Points, UI Polish & Easter Eggs)
+
+### 🎁 VK Live Channel Points (Баллы канала)
+1. ✅ **Полная поддержка VK Live Channel Points**
+   - GET `/api/points/rewards/vk` - получение списка наград
+   - POST `/api/points/rewards/vk/create` - создание награды
+   - PATCH `/api/points/rewards/vk/{id}` - обновление награды
+   - DELETE `/api/points/rewards/vk/{id}` - удаление награды
+   - GET `/api/points/rewards/vk/demands` - получение запросов (redemptions)
+   - POST `/api/points/rewards/vk/demands/process` - обработка запросов
+   - Файл: `bot_service/api/points_api_endpoints.py`
+
+2. ✅ **Исправлена система токенов**
+   - Токены теперь **шифруются** при сохранении (Fernet AES-128)
+   - Токены **расшифровываются** перед отправкой в API
+   - Helper функции: `_decrypt_access_token()`, `_get_vk_channel_name()`
+   - Проактивное обновление токенов (каждые 2 часа)
+   - Фикс: VK API возвращал пустой `scope` - добавлен fallback
+
+3. ✅ **Правильное использование VK channel name**
+   - VK API требует `username` (yourchy), а не `user_id` (20416992)
+   - Исправлен источник: `User.vk_channel_name` вместо `UserSettings`
+   - URL формат: `yourchy` вместо `https://live.vkvideo.ru/yourchy`
+
+4. ✅ **RESTful endpoints для Channel Points**
+   - **Twitch**: 
+     - `/rewards/twitch/{id}` (PATCH) - обновление
+     - `/rewards/twitch/{id}` (DELETE) - удаление
+   - **VK Live**:
+     - `/rewards/vk/{id}` (PATCH) - обновление
+     - `/rewards/vk/{id}` (DELETE) - удаление
+   - Убраны `/update` и `/delete` суффиксы
+
+5. ✅ **Frontend исправления**
+   - Изменен формат запроса создания награды: FormData → JSON
+   - Поля: `title`, `description`, `cost`, `background_color`, `is_enabled`
+   - Файл: `frontend/src/pages/PointsManagementPage.jsx`
+
+### 🎨 UI/UX Improvements
+1. ✅ **VK Live брендинг**
+   - Иконка VK Live изменена на красный цвет (`text-red-500`)
+   - Card border/background: `border-red-500/20`, `bg-red-500/5`
+   - Соответствует официальному цвету бренда VK
+   - Файл: `frontend/src/components/StreamStatus.jsx`
+
+2. ✅ **Стандартный прелоадер на Points странице**
+   - Заменен кастомный CSS спиннер на `Loader2` из `lucide-react`
+   - Добавлен текст "Загрузка наград..."
+   - Единообразие со всем проектом
+   - Файл: `frontend/src/pages/PointsManagementPage.jsx`
+
+3. ✅ **YouTube очередь - улучшенный layout**
+   - **Обычный режим**: очередь СНИЗУ плеера (вертикальный layout)
+   - **Fullscreen режим**: очередь СПРАВА от плеера (горизонтальный layout)
+   - Центрирование контента: `max-w-6xl` container
+   - Файл: `frontend/src/pages/media/YoutubeIntegrationPage.jsx`
+
+4. ✅ **Пагинация для YouTube очереди**
+   - 5 элементов на страницу в обычном режиме
+   - Кнопки навигации: `ChevronLeft` / `ChevronRight`
+   - Счетчик страниц: "1 / 3"
+   - Fullscreen показывает всю очередь без пагинации
+   - Авто-сброс на страницу 1 при изменении очереди
+
+5. ✅ **YouTube интеграция - кнопки**
+   - Убрана иконка камеры (📹) с кнопки "OBS URL"
+   - Кнопки на одном уровне: "Полноэкранный режим" | "OBS URL"
+   - Чистый текст без эмодзи
+
+### 🎭 Easter Eggs
+1. ✅ **Приветственные сообщения ботов с фейковым IP**
+   - **Twitch**: `🤖 Бот подключен! IP: 192.168.1.42 | Используйте !commands`
+   - **VK Live**: `🤖 Бот VK Live подключен! IP: 172.217.5.99 | Используйте !commands`
+   - IP генерируется случайно (100-255.x.x.x)
+   - Отправляется при подключении бота к каналу
+   - Файлы: `bot_service/bots/twitch_bot.py`, `bot_service/bots/vk_live_bot.py`
+
+### 🔐 Безопасность и токены
+1. ✅ **Все Twitch API вызовы используют расшифрованные токены**
+   - Helper: `_decrypt_access_token()` применен ко всем endpoints
+   - Предотвращение 401 ошибок из-за зашифрованных токенов
+
+2. ✅ **VK OAuth scopes**
+   - Константа `VK_OAUTH_SCOPES` в `vk_api.py`
+   - Все необходимые scopes для Channel Points
+   - Fallback при пустом `scope` от VK API
+
+### 🐛 Исправленные баги
+1. ✅ **405 Method Not Allowed** - исправлен DELETE endpoint для VK rewards
+2. ✅ **422 Unprocessable Entity** - исправлен формат данных (FormData → JSON)
+3. ✅ **401 Unauthorized** - исправлена расшифровка токенов
+4. ✅ **404 Channel Not Found** - исправлено использование `vk_channel_name`
 
 ---
 
