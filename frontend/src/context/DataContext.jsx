@@ -240,8 +240,22 @@ export const DataProvider = ({ children }) => {
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     // --- DATA LOADING ---
+    // 🚀 КЭШИРОВАНИЕ: Храним время последней загрузки
+    const [lastLoadTime, setLastLoadTime] = useState({
+        streamData: 0,
+        history: 0
+    });
+    const CACHE_TTL = 30000; // 30 секунд кэш
+    
     const loadStreamHistory = useCallback(async () => {
         if (!isAuthenticated) {
+            return;
+        }
+        
+        // Проверяем кэш
+        const now = Date.now();
+        if (now - lastLoadTime.history < CACHE_TTL) {
+            console.log('📦 [DataContext] Using cached history data');
             return;
         }
         
@@ -249,15 +263,25 @@ export const DataProvider = ({ children }) => {
             setLoading(prev => ({ ...prev, history: true }));
             const response = await botService.get('/api/stream/history');
             setStreamHistory(response.data);
+            setLastLoadTime(prev => ({ ...prev, history: now }));
         } finally {
             setLoading(prev => ({ ...prev, history: false }));
         }
-    }, [isAuthenticated]);
+    }, [isAuthenticated, lastLoadTime.history]);
 
     const loadStreamData = useCallback(async (force = false) => {
         if (!isAuthenticated) {
             // Not authenticated, skipping
             return;
+        }
+        
+        // Проверяем кэш (если не force reload)
+        if (!force) {
+            const now = Date.now();
+            if (now - lastLoadTime.streamData < CACHE_TTL) {
+                console.log('📦 [DataContext] Using cached stream data');
+                return;
+            }
         }
         
         // Loading stream data
@@ -318,6 +342,9 @@ export const DataProvider = ({ children }) => {
             // Final data processed
             setInitialData(data);
             setCurrentData(data);
+            
+            // Обновляем timestamp кэша
+            setLastLoadTime(prev => ({ ...prev, streamData: Date.now() }));
             
             // Принудительно обновляем компоненты
             setRefreshTrigger(prev => prev + 1);
