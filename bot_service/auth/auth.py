@@ -61,7 +61,10 @@ def create_jwt_token(user_id: int, token_type: str = "obs") -> str:
     Returns:
         str: JWT токен
     """
-    return security_manager.create_jwt_token(user_id, token_type)
+    from datetime import timedelta
+    data = {"user_id": user_id, "type": token_type}
+    expires_delta = timedelta(days=365)  # Долгоживущий токен для OBS/виджетов
+    return security_manager.create_access_token(data, expires_delta)
 
 
 def verify_jwt_token(token: str, expected_type: Optional[str] = None) -> Dict[str, Any]:
