@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Switch } from '@/components/ui/switch';
 import { TwitchIcon, VKIcon } from '../PlatformIcons';
 import { toast } from 'sonner';
+import TtsChannelPointsMode from './TtsChannelPointsMode';
 
 const TtsControlPanel = ({
     basicTtsEnabled,
@@ -211,6 +212,13 @@ const TtsControlPanel = ({
                                     />
                                 </div>
                             </div>
+                        </div>
+                    )}
+                    
+                    {/* Режим озвучки (все сообщения / за баллы) */}
+                    {isAuthenticated && (
+                        <div className="border-t border-gray-700 pt-4">
+                            <TtsChannelPointsMode asSection={true} />
                         </div>
                     )}
                 </div>

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,13 +6,14 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { toast } from 'sonner';
 import { TwitchIcon, VKIcon } from '../PlatformIcons';
 import { useAuth } from '../../context/AuthContext';
-import { Loader2, Gift, Trash2 } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 
 /**
  * Компонент для управления режимом TTS (все сообщения / за баллы канала)
+ * Теперь используется внутри TtsControlPanel
  */
-const TtsChannelPointsMode = () => {
+const TtsChannelPointsMode = ({ asSection = false }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [ttsMode, setTtsMode] = useState('all_messages'); // 'all_messages' или 'channel_points'
@@ -129,16 +129,9 @@ const TtsChannelPointsMode = () => {
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Режим озвучки</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-primary" />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </div>
     );
   }
 
@@ -147,43 +140,38 @@ const TtsChannelPointsMode = () => {
   if (user?.integrations?.vk?.connected) connectedPlatforms.push('vk');
 
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Gift className="w-5 h-5" />
-            Режим озвучки
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Выбор режима - компактный */}
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => handleModeChange('all_messages')}
-              disabled={saving}
-              className={`p-4 rounded-lg border-2 transition-all text-left ${
-                ttsMode === 'all_messages'
-                  ? 'border-primary bg-primary/10'
-                  : 'border-border hover:border-primary/50'
-              }`}
-            >
-              <div className="font-semibold mb-1">💬 Все сообщения</div>
-              <div className="text-xs text-muted-foreground">Стандартный режим</div>
-            </button>
+    <div className="space-y-4">
+      {/* Выбор режима - компактный БЕЗ эмодзи */}
+      <div>
+        <h4 className="text-sm font-medium text-gray-300 mb-3">Режим озвучки</h4>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => handleModeChange('all_messages')}
+            disabled={saving}
+            className={`p-3 rounded-lg border-2 transition-all text-left ${
+              ttsMode === 'all_messages'
+                ? 'border-primary bg-primary/10'
+                : 'border-border hover:border-primary/50'
+            }`}
+          >
+            <div className="font-semibold mb-1">Все сообщения</div>
+            <div className="text-xs text-muted-foreground">Стандартный режим</div>
+          </button>
 
-            <button
-              onClick={() => handleModeChange('channel_points')}
-              disabled={saving}
-              className={`p-4 rounded-lg border-2 transition-all text-left ${
-                ttsMode === 'channel_points'
-                  ? 'border-primary bg-primary/10'
-                  : 'border-border hover:border-primary/50'
-              }`}
-            >
-              <div className="font-semibold mb-1">🎁 За баллы канала</div>
-              <div className="text-xs text-muted-foreground">Только с наградой</div>
-            </button>
-          </div>
+          <button
+            onClick={() => handleModeChange('channel_points')}
+            disabled={saving}
+            className={`p-3 rounded-lg border-2 transition-all text-left ${
+              ttsMode === 'channel_points'
+                ? 'border-primary bg-primary/10'
+                : 'border-border hover:border-primary/50'
+            }`}
+          >
+            <div className="font-semibold mb-1">За баллы канала</div>
+            <div className="text-xs text-muted-foreground">Только с наградой</div>
+          </button>
+        </div>
+      </div>
 
           {/* Настройка наград (показываем только если выбран режим channel_points) */}
           {ttsMode === 'channel_points' && (
@@ -250,14 +238,12 @@ const TtsChannelPointsMode = () => {
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
 
       {/* Диалог создания награды */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>TTS награда {selectedPlatform === 'twitch' ? '🟣 Twitch' : '🔵 VK Live'}</DialogTitle>
+            <DialogTitle>TTS награда для {selectedPlatform === 'twitch' ? 'Twitch' : 'VK Live'}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
@@ -303,13 +289,13 @@ const TtsChannelPointsMode = () => {
               Отмена
             </Button>
             <Button onClick={handleCreateReward} disabled={saving}>
-              {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Gift className="w-4 h-4 mr-2" />}
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Создать
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 };
 
