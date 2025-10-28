@@ -60,6 +60,17 @@ class CreateRewardRequest(BaseModel):
     prompt: Optional[str] = None
     reward_type: Optional[str] = "custom"
     
+    # VK Live специфичные поля (приоритет над generic полями)
+    repair_timeout: Optional[int] = None
+    max_uses_count: Optional[int] = None
+    max_uses_count_per_user: Optional[int] = None
+    is_message_required: Optional[bool] = None
+    
+    # Twitch специфичные поля
+    global_cooldown_seconds: Optional[int] = None
+    is_enabled: Optional[bool] = True
+    should_redemptions_skip_request_queue: Optional[bool] = False
+    
     @validator('title')
     def sanitize_title(cls, v):
         """Санитизация названия награды"""
@@ -126,9 +137,9 @@ async def get_twitch_rewards(
             logger.warning(f"❌ [TWITCH REWARDS] Token not found for user {user['id']}")
             raise HTTPException(status_code=404, detail="Твич токен не найден. Пожалуйста, авторизуйтесь")
         
-        # Получаем Twitch user ID
-        db_user = db.query(User).filter(User.id == user["id"]).first()
-        if not db_user or not db_user.twitch_user_id:
+        # Получаем Twitch user ID из UserToken
+        twitch_user_id = user_token.platform_user_id
+        if not twitch_user_id:
             logger.warning(f"❌ [TWITCH REWARDS] Twitch ID not found for user {user['id']}")
             raise HTTPException(status_code=404, detail="Twitch user ID не найден")
         
@@ -140,7 +151,7 @@ async def get_twitch_rewards(
         decrypted_token = _decrypt_access_token(user_token.access_token)
         
         rewards = await twitch_api.get_custom_rewards(
-            db_user.twitch_user_id,
+            twitch_user_id,
             decrypted_token,
             only_manageable=True
         )
@@ -160,7 +171,16 @@ async def get_twitch_rewards(
     except HTTPException:
         raise
     except Exception as e:
+        error_msg = str(e).lower()
         logger.error(f"❌ [TWITCH REWARDS] Error: {e}")
+        
+        # Проверяем на ошибку "partner or affiliate status"
+        if "partner or affiliate" in error_msg or ("403" in error_msg and "forbidden" in error_msg):
+            raise HTTPException(
+                status_code=403, 
+                detail="Награды Twitch доступны только для партнёров и аффилейтов"
+            )
+        
         raise HTTPException(status_code=500, detail=f"Ошибка получения наград Twitch: {str(e)}")
 
 @points_router.get("/rewards/vk")
@@ -185,7 +205,7 @@ async def get_vk_rewards(
             logger.warning(f"❌ [VK REWARDS] VK token not found for user {user['id']}")
             raise HTTPException(status_code=404, detail="VK Live не подключен. Авторизуйтесь через настройки")
         
-        # Получаем имя VK канала (VK API ожидает только имя, а не полный URL!)
+        # Получаем имя VK канала
         channel_name = _get_vk_channel_name(user["id"], db)
         logger.info(f"📺 [VK REWARDS] Using channel name: {channel_name}")
         
@@ -203,11 +223,25 @@ async def get_vk_rewards(
             raise HTTPException(status_code=400, detail="Не удалось получить награды от VK")
         
         logger.info(f"✅ [VK REWARDS] Fetched {len(rewards)} rewards for user {user['id']}")
+        
+        # Преобразуем VK формат в универсальный (добавляем cost и is_enabled)
+        normalized_rewards = []
+        for reward in rewards:
+            # VK использует is_disabled (инвертируем для is_enabled)
+            is_enabled = not reward.get('is_disabled', False)
+            
+            normalized_reward = {
+                **reward,
+                'cost': reward.get('price', 0),  # VK использует 'price', мы - 'cost'
+                'is_enabled': is_enabled  # Добавляем is_enabled
+            }
+            normalized_rewards.append(normalized_reward)
+        
         from fastapi.responses import JSONResponse
         return JSONResponse(content={
             "success": True,
             "platform": "vk",
-            "rewards": rewards
+            "rewards": normalized_rewards
         })
         
     except HTTPException:
@@ -237,37 +271,54 @@ async def create_twitch_reward(
         if not user_token:
             raise HTTPException(status_code=404, detail="Твич токен не найден. Пожалуйста, авторизуйтесь")
         
-        # Получаем Twitch user ID
-        db_user = db.query(User).filter(User.id == user["id"]).first()
-        if not db_user or not db_user.twitch_username:
-            raise HTTPException(status_code=404, detail="Twitch username не найден")
+        # Получаем Twitch broadcaster ID из токена
+        broadcaster_id = user_token.platform_user_id
+        if not broadcaster_id:
+            raise HTTPException(status_code=404, detail="Twitch broadcaster ID не найден")
         
         # Используем Twitch API для создания награды
         connection_manager = get_connection_manager()
         twitch_api = TwitchAPI(connection_manager)
         
+        # Формируем данные награды для Twitch API
+        twitch_reward_data = {
+            "title": reward_data.title,
+            "prompt": reward_data.description,  # Twitch использует 'prompt' вместо 'description'
+            "cost": reward_data.cost,
+            "is_enabled": reward_data.is_enabled if reward_data.is_enabled is not None else True,
+            "background_color": reward_data.background_color or "#9147FF",
+            "is_user_input_required": reward_data.is_user_input_required or False,
+            "should_redemptions_skip_request_queue": reward_data.should_redemptions_skip_request_queue or False
+        }
+        
+        # Добавляем лимиты за стрим (если указаны)
+        if reward_data.max_per_stream is not None and reward_data.max_per_stream > 0:
+            twitch_reward_data["is_max_per_stream_enabled"] = True
+            twitch_reward_data["max_per_stream"] = reward_data.max_per_stream
+        
+        if reward_data.max_per_user_per_stream is not None and reward_data.max_per_user_per_stream > 0:
+            twitch_reward_data["is_max_per_user_per_stream_enabled"] = True
+            twitch_reward_data["max_per_user_per_stream"] = reward_data.max_per_user_per_stream
+        
+        # Добавляем глобальный кулдаун (если указан)
+        if reward_data.global_cooldown_seconds is not None and reward_data.global_cooldown_seconds > 0:
+            twitch_reward_data["is_global_cooldown_enabled"] = True
+            twitch_reward_data["global_cooldown_seconds"] = reward_data.global_cooldown_seconds
+        
         result = await twitch_api.create_custom_reward(
-            user_id=user["id"],
+            broadcaster_id=broadcaster_id,
             access_token=_decrypt_access_token(user_token.access_token),
-            title=reward_data.title,
-            description=reward_data.description,
-            cost=reward_data.cost,
-            icon_url=reward_data.icon_url,
-            background_color=reward_data.background_color,
-            is_user_input_required=reward_data.is_user_input_required,
-            max_per_stream=reward_data.max_per_stream,
-            max_per_user_per_stream=reward_data.max_per_user_per_stream,
-            prompt=reward_data.prompt
+            reward_data=twitch_reward_data
         )
         
-        if result.get("success"):
+        if result:
             return {
                 "success": True,
                 "platform": "twitch",
-                "reward": result.get("reward")
+                "reward": result
             }
         else:
-            raise HTTPException(status_code=400, detail=result.get("error", "Ошибка создания награды"))
+            raise HTTPException(status_code=400, detail="Ошибка создания награды на Twitch")
             
     except HTTPException:
         raise
@@ -298,20 +349,25 @@ async def create_vk_reward(
         # Получаем имя VK канала
         channel_name = _get_vk_channel_name(user["id"], db)
         
-        # Prepare reward data structure for VK API
-        reward_data = {
+        # Prepare reward data structure for VK API (НЕ используем background_color - VK API не поддерживает!)
+        vk_reward_data = {
             "name": reward_data.title,
             "description": reward_data.description,
-            "cost": reward_data.cost,
-            "icon_url": reward_data.icon_url,
-            "background_color": reward_data.background_color
+            "price": reward_data.cost,
+            # VK специфичные поля (с приоритетом над generic)
+            "is_message_required": reward_data.is_message_required if reward_data.is_message_required is not None else (reward_data.is_user_input_required or False),
+            "max_uses_count": reward_data.max_uses_count if reward_data.max_uses_count is not None else (reward_data.max_per_stream or 0),
+            "max_uses_count_per_user": reward_data.max_uses_count_per_user if reward_data.max_uses_count_per_user is not None else (reward_data.max_per_user_per_stream or 0),
+            "repair_timeout": reward_data.repair_timeout if reward_data.repair_timeout is not None else 0
         }
+        
+        logger.info(f"📝 [VK CREATE] Sending to VK API: channel={channel_name}, reward_data={vk_reward_data}")
         
         # Используем VK API для создания награды
         result = await vk_api.create_channel_reward(
             channel_url=channel_name,
             access_token=_decrypt_access_token(user_token.access_token),
-            reward_data=reward_data
+            reward_data=vk_reward_data
         )
         
         if result:
@@ -351,27 +407,51 @@ async def update_twitch_reward(
         if not user_token:
             raise HTTPException(status_code=404, detail="Твич токен не найден")
         
-        # Получаем Twitch user ID
-        db_user = db.query(User).filter(User.id == user["id"]).first()
-        if not db_user or not db_user.twitch_user_id:
-            raise HTTPException(status_code=404, detail="Twitch user ID не найден")
+        # Получаем Twitch broadcaster ID
+        broadcaster_id = user_token.platform_user_id
+        if not broadcaster_id:
+            raise HTTPException(status_code=404, detail="Twitch broadcaster ID не найден")
         
         # Используем Twitch API для обновления награды
         connection_manager = get_connection_manager()
         twitch_api = TwitchAPI(connection_manager)
         
+        # Формируем данные награды для Twitch API
+        twitch_reward_data = {
+            "title": reward_data.title,
+            "prompt": reward_data.description,  # Twitch использует 'prompt' вместо 'description'
+            "cost": reward_data.cost,
+            "is_enabled": reward_data.is_enabled if reward_data.is_enabled is not None else True,
+            "background_color": reward_data.background_color or "#9147FF",
+            "is_user_input_required": reward_data.is_user_input_required or False,
+            "should_redemptions_skip_request_queue": reward_data.should_redemptions_skip_request_queue or False
+        }
+        
+        # Добавляем лимиты за стрим (если указаны)
+        if reward_data.max_per_stream is not None and reward_data.max_per_stream > 0:
+            twitch_reward_data["is_max_per_stream_enabled"] = True
+            twitch_reward_data["max_per_stream"] = reward_data.max_per_stream
+        else:
+            twitch_reward_data["is_max_per_stream_enabled"] = False
+        
+        if reward_data.max_per_user_per_stream is not None and reward_data.max_per_user_per_stream > 0:
+            twitch_reward_data["is_max_per_user_per_stream_enabled"] = True
+            twitch_reward_data["max_per_user_per_stream"] = reward_data.max_per_user_per_stream
+        else:
+            twitch_reward_data["is_max_per_user_per_stream_enabled"] = False
+        
+        # Добавляем глобальный кулдаун (если указан)
+        if reward_data.global_cooldown_seconds is not None and reward_data.global_cooldown_seconds > 0:
+            twitch_reward_data["is_global_cooldown_enabled"] = True
+            twitch_reward_data["global_cooldown_seconds"] = reward_data.global_cooldown_seconds
+        else:
+            twitch_reward_data["is_global_cooldown_enabled"] = False
+        
         result = await twitch_api.update_custom_reward(
-            broadcaster_id=str(db_user.twitch_user_id),
+            broadcaster_id=broadcaster_id,
             reward_id=reward_id,
             access_token=_decrypt_access_token(user_token.access_token),
-            title=reward_data.title,
-            description=reward_data.description,
-            cost=reward_data.cost,
-            background_color=reward_data.background_color,
-            is_user_input_required=reward_data.is_user_input_required,
-            max_per_stream=reward_data.max_per_stream,
-            max_per_user_per_stream=reward_data.max_per_user_per_stream,
-            prompt=reward_data.prompt
+            reward_data=twitch_reward_data
         )
         
         if result:
@@ -411,17 +491,17 @@ async def delete_twitch_reward(
         if not user_token:
             raise HTTPException(status_code=404, detail="Твич токен не найден")
         
-        # Получаем Twitch user ID
-        db_user = db.query(User).filter(User.id == user["id"]).first()
-        if not db_user or not db_user.twitch_user_id:
-            raise HTTPException(status_code=404, detail="Twitch user ID не найден")
+        # Получаем Twitch broadcaster ID
+        broadcaster_id = user_token.platform_user_id
+        if not broadcaster_id:
+            raise HTTPException(status_code=404, detail="Twitch broadcaster ID не найден")
         
         # Используем Twitch API для удаления награды
         connection_manager = get_connection_manager()
         twitch_api = TwitchAPI(connection_manager)
         
         result = await twitch_api.delete_custom_reward(
-            broadcaster_id=str(db_user.twitch_user_id),
+            broadcaster_id=broadcaster_id,
             reward_id=reward_id,
             access_token=_decrypt_access_token(user_token.access_token)
         )
@@ -466,15 +546,20 @@ async def update_vk_reward(
         # Получаем имя VK канала
         channel_name = _get_vk_channel_name(user["id"], db)
         
-        # Prepare reward data structure for VK API
+        # Prepare reward data structure for VK API (НЕ используем background_color!)
         vk_reward_data = {
             "name": reward_data.title,
             "description": reward_data.description,
-            "cost": reward_data.cost,
+            "price": reward_data.cost,
+            # VK специфичные поля (с приоритетом над generic)
+            "is_message_required": reward_data.is_message_required if reward_data.is_message_required is not None else (reward_data.is_user_input_required or False),
+            "max_uses_count": reward_data.max_uses_count if reward_data.max_uses_count is not None else (reward_data.max_per_stream or 0),
+            "max_uses_count_per_user": reward_data.max_uses_count_per_user if reward_data.max_uses_count_per_user is not None else (reward_data.max_per_user_per_stream or 0),
+            "repair_timeout": reward_data.repair_timeout if reward_data.repair_timeout is not None else 0
         }
         
         # Используем VK API для обновления награды
-        result = await vk_api.update_channel_reward(
+        result = await vk_api.edit_channel_reward(
             channel_url=channel_name,
             reward_id=reward_id,
             access_token=_decrypt_access_token(user_token.access_token),
@@ -586,6 +671,7 @@ async def toggle_vk_reward(
         
         if result:
             from fastapi.responses import JSONResponse
+            logger.info(f"✅ [VK TOGGLE] Reward {'enabled' if request.is_enabled else 'disabled'}: {reward_id}")
             return JSONResponse(content={
                 "success": True,
                 "platform": "vk",
@@ -646,12 +732,12 @@ async def get_vk_reward_demands(
         raise HTTPException(status_code=500, detail=f"Ошибка получения запросов наград VK: {str(e)}")
 
 class ProcessVKDemandsRequest(BaseModel):
-    demand_ids: List[int]
+    demand_ids: List[int]  # VK demand IDs are integers
     action: str  # 'accept' or 'reject'
 
 @points_router.post("/rewards/vk/demands/process")
 async def process_vk_reward_demands(
-    request: ProcessVKDemandsRequest,
+    request_data: ProcessVKDemandsRequest,
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -673,17 +759,17 @@ async def process_vk_reward_demands(
         channel_name = _get_vk_channel_name(user["id"], db)
         
         # Обрабатываем запросы
-        if request.action == 'accept':
+        if request_data.action == 'accept':
             result = await vk_api.accept_reward_demands(
                 channel_url=channel_name,
                 access_token=_decrypt_access_token(user_token.access_token),
-                demand_ids=request.demand_ids
+                demand_ids=request_data.demand_ids
             )
-        elif request.action == 'reject':
+        elif request_data.action == 'reject':
             result = await vk_api.reject_reward_demands(
                 channel_url=channel_name,
                 access_token=_decrypt_access_token(user_token.access_token),
-                demand_ids=request.demand_ids
+                demand_ids=request_data.demand_ids
             )
         else:
             raise HTTPException(status_code=400, detail="Неверное действие (action)")
@@ -693,9 +779,9 @@ async def process_vk_reward_demands(
             return JSONResponse(content={
                 "success": True,
                 "platform": "vk",
-                "action": request.action,
-                "processed_count": len(request.demand_ids),
-                "message": f"Запросы {'приняты' if request.action == 'accept' else 'отклонены'}"
+                "action": request_data.action,
+                "processed_count": len(request_data.demand_ids),
+                "message": f"Запросы {'приняты' if request_data.action == 'accept' else 'отклонены'}"
             })
         else:
             raise HTTPException(status_code=400, detail="Ошибка обработки запросов наград")
@@ -828,14 +914,13 @@ async def get_platform_rewards(
         
         rewards = None
         if platform.lower() == "twitch":
-            # Получаем Twitch broadcaster_id
-            from core.database import User
-            db_user = db.query(User).filter(User.id == user["id"]).first()
-            if not db_user or not db_user.twitch_user_id:
-                raise HTTPException(status_code=404, detail="Twitch user ID не найден")
+            # Получаем Twitch broadcaster_id из токена
+            broadcaster_id = user_token.platform_user_id
+            if not broadcaster_id:
+                raise HTTPException(status_code=404, detail="Twitch broadcaster ID не найден")
             
             rewards = await twitch_api.get_custom_rewards(
-                db_user.twitch_user_id,
+                broadcaster_id,
                 user_token.access_token,
                 only_manageable=True
             )
@@ -888,13 +973,12 @@ async def create_platform_reward(
         
         result = None
         if platform.lower() == "twitch":
-            from core.database import User
-            db_user = db.query(User).filter(User.id == user["id"]).first()
-            if not db_user or not db_user.twitch_user_id:
-                raise HTTPException(status_code=404, detail="Twitch user ID не найден")
+            broadcaster_id = user_token.platform_user_id
+            if not broadcaster_id:
+                raise HTTPException(status_code=404, detail="Twitch broadcaster ID не найден")
             
             result = await twitch_api.create_custom_reward(
-                db_user.twitch_user_id,
+                broadcaster_id,
                 user_token.access_token,
                 reward_data
             )
@@ -947,13 +1031,12 @@ async def delete_platform_reward(
         
         success = False
         if platform.lower() == "twitch":
-            from core.database import User
-            db_user = db.query(User).filter(User.id == user["id"]).first()
-            if not db_user or not db_user.twitch_user_id:
-                raise HTTPException(status_code=404, detail="Twitch user ID не найден")
+            broadcaster_id = user_token.platform_user_id
+            if not broadcaster_id:
+                raise HTTPException(status_code=404, detail="Twitch broadcaster ID не найден")
             
             success = await twitch_api.delete_custom_reward(
-                db_user.twitch_user_id,
+                broadcaster_id,
                 reward_id,
                 user_token.access_token
             )
@@ -1006,13 +1089,12 @@ async def get_platform_redemptions(
         
         redemptions = None
         if platform.lower() == "twitch":
-            from core.database import User
-            db_user = db.query(User).filter(User.id == user["id"]).first()
-            if not db_user or not db_user.twitch_user_id:
-                raise HTTPException(status_code=404, detail="Twitch user ID не найден")
+            broadcaster_id = user_token.platform_user_id
+            if not broadcaster_id:
+                raise HTTPException(status_code=404, detail="Twitch broadcaster ID не найден")
             
             redemptions = await twitch_api.get_custom_reward_redemptions(
-                db_user.twitch_user_id,
+                broadcaster_id,
                 reward_id,
                 user_token.access_token,
                 status=status
@@ -1067,13 +1149,12 @@ async def update_platform_redemption(
         
         success = False
         if platform.lower() == "twitch":
-            from core.database import User
-            db_user = db.query(User).filter(User.id == user["id"]).first()
-            if not db_user or not db_user.twitch_user_id:
-                raise HTTPException(status_code=404, detail="Twitch user ID не найден")
+            broadcaster_id = user_token.platform_user_id
+            if not broadcaster_id:
+                raise HTTPException(status_code=404, detail="Twitch broadcaster ID не найден")
             
             success = await twitch_api.update_redemption_status(
-                db_user.twitch_user_id,
+                broadcaster_id,
                 reward_id,
                 redemption_id,
                 user_token.access_token,

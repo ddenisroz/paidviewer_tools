@@ -263,19 +263,18 @@ async def disconnect_integration(platform: str, user: dict = Depends(get_current
                     logger.error(traceback.format_exc())
                     raise HTTPException(status_code=500, detail=f"Failed to disconnect VK bot: {str(e)}")
         
-        # Устанавливаем is_active=False для токена (но НЕ удаляем!)
+        # УДАЛЯЕМ токен полностью при disconnect (чтобы при переподключении создать новый с правильными scopes)
         token = db.query(UserToken).filter(
             UserToken.user_id == user_id,
             UserToken.platform == platform
         ).first()
         
         if token:
-            if hasattr(token, 'is_active'):
-                token.is_active = False
+            db.delete(token)
             db.commit()
-            logger.info(f"✅ Marked {platform} token as inactive for user {user_id}")
+            logger.info(f"✅ Deleted {platform} token for user {user_id}")
         
-        logger.info(f"✅ Integration {platform} disconnected for user {user_id} (tokens preserved)")
+        logger.info(f"✅ Integration {platform} disconnected for user {user_id} (token deleted)")
         return JSONResponse(content={"success": True, "message": f"{platform} bot disconnected (tokens saved for quick reconnect)"})
         
     finally:

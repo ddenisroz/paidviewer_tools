@@ -1805,6 +1805,251 @@ async def serve_tts_audio(filename: str):
         raise HTTPException(status_code=500, detail="Error serving audio")
 
 # ============================================================================
+# TTS CHANNEL POINTS MODE ENDPOINTS (NEW!)
+# ============================================================================
+
+@tts_router.get("/mode-settings")
+async def get_tts_mode_settings(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить настройки режима TTS (все сообщения / за баллы)"""
+    try:
+        from core.database import TTSUserSettings
+        
+        # Получаем настройки пользователя
+        settings = db.query(TTSUserSettings).filter(
+            TTSUserSettings.user_id == user['id']
+        ).first()
+        
+        if not settings:
+            # Создаем дефолтные настройки
+            settings = TTSUserSettings(
+                user_id=user['id'],
+                tts_mode='all_messages',
+                tts_reward_ids={}
+            )
+            db.add(settings)
+            db.commit()
+            db.refresh(settings)
+        
+        return {
+            "success": True,
+            "tts_mode": settings.tts_mode,
+            "tts_reward_ids": settings.tts_reward_ids or {}
+        }
+    except Exception as e:
+        logger.error(f"Error getting TTS mode settings: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка получения настроек TTS режима")
+
+class UpdateTtsModeRequest(BaseModel):
+    tts_mode: str
+
+@tts_router.post("/mode-settings")
+async def update_tts_mode_settings(
+    request: UpdateTtsModeRequest,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Обновить режим TTS"""
+    try:
+        from core.database import TTSUserSettings
+        
+        tts_mode = request.tts_mode
+        
+        if tts_mode not in ['all_messages', 'channel_points']:
+            raise HTTPException(status_code=400, detail="Неверный режим TTS. Допустимые: all_messages, channel_points")
+        
+        settings = db.query(TTSUserSettings).filter(
+            TTSUserSettings.user_id == user['id']
+        ).first()
+        
+        if not settings:
+            settings = TTSUserSettings(
+                user_id=user['id'],
+                tts_mode=tts_mode,
+                tts_reward_ids={}
+            )
+            db.add(settings)
+        else:
+            settings.tts_mode = tts_mode
+            
+            # Если переключаемся на all_messages - очищаем награды
+            if tts_mode == 'all_messages':
+                settings.tts_reward_ids = {}
+        
+        db.commit()
+        db.refresh(settings)
+        
+        logger.info(f"✅ User {user['id']} changed TTS mode to: {tts_mode}")
+        
+        return {
+            "success": True,
+            "tts_mode": settings.tts_mode,
+            "message": f"Режим TTS изменен на: {'Озвучивать все сообщения' if tts_mode == 'all_messages' else 'Озвучивать за баллы канала'}"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating TTS mode: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Ошибка обновления режима TTS")
+
+class CreateTtsRewardRequest(BaseModel):
+    platform: str
+    title: str
+    cost: int
+    cooldown: int = 0
+
+@tts_router.post("/create-reward")
+async def create_tts_reward(
+    request: CreateTtsRewardRequest,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Создать награду TTS для платформы
+    
+    Эта награда будет использоваться для озвучки сообщений через Channel Points
+    """
+    try:
+        from core.database import TTSUserSettings
+        from api.points_api_endpoints import pointsApi
+        
+        # Проверяем что пользователь в режиме channel_points
+        settings = db.query(TTSUserSettings).filter(
+            TTSUserSettings.user_id == user['id']
+        ).first()
+        
+        if not settings or settings.tts_mode != 'channel_points':
+            raise HTTPException(
+                status_code=400, 
+                detail="Для создания TTS награды сначала переключите режим на 'Озвучивать за баллы канала'"
+            )
+        
+        platform = request.platform
+        title = request.title
+        cost = request.cost
+        cooldown = request.cooldown
+        
+        # Формируем данные для награды
+        reward_data = {
+            'platform': platform,
+            'channel_name': '',
+            'title': title or f'TTS Озвучка ({platform.upper()})',
+            'description': 'Ваше сообщение будет озвучено голосовым синтезатором!',
+            'cost': cost,
+            'is_user_input_required': True  # Обязательно требуем сообщение!
+        }
+        
+        # Добавляем платформо-специфичные поля
+        if platform == 'vk':
+            reward_data.update({
+                'repair_timeout': cooldown,
+                'max_uses_count': 0,
+                'max_uses_count_per_user': 0,
+                'is_message_required': True
+            })
+        elif platform == 'twitch':
+            reward_data.update({
+                'global_cooldown_seconds': cooldown,
+                'max_per_stream': 0,
+                'max_per_user_per_stream': 0,
+                'should_redemptions_skip_request_queue': True  # Автовыполнение для TTS
+            })
+        
+        # Создаем награду через существующий API
+        from api.points_api_endpoints import create_vk_reward, create_twitch_reward
+        
+        if platform == 'vk':
+            from pydantic import BaseModel
+            from api.points_api_endpoints import CreateRewardRequest
+            
+            reward_request = CreateRewardRequest(**reward_data)
+            result = await create_vk_reward(reward_request, user, db)
+        elif platform == 'twitch':
+            from api.points_api_endpoints import CreateRewardRequest
+            
+            reward_request = CreateRewardRequest(**reward_data)
+            result = await create_twitch_reward(reward_request, user, db)
+        else:
+            raise HTTPException(status_code=400, detail="Неподдерживаемая платформа")
+        
+        # Сохраняем ID награды в настройках
+        if result.get('success'):
+            reward_id = result['reward'].get('id')
+            
+            if not settings.tts_reward_ids:
+                settings.tts_reward_ids = {}
+            
+            settings.tts_reward_ids[platform] = reward_id
+            db.commit()
+            
+            logger.info(f"✅ Created TTS reward for {platform}: {reward_id}")
+            
+            return {
+                "success": True,
+                "reward_id": reward_id,
+                "platform": platform,
+                "message": f"TTS награда создана для {platform.upper()}"
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Не удалось создать награду")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating TTS reward: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Ошибка создания TTS награды: {str(e)}")
+
+@tts_router.delete("/reward/{platform}")
+async def delete_tts_reward(
+    platform: str,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Удалить TTS награду для платформы"""
+    try:
+        from core.database import TTSUserSettings
+        
+        settings = db.query(TTSUserSettings).filter(
+            TTSUserSettings.user_id == user['id']
+        ).first()
+        
+        if not settings or not settings.tts_reward_ids or platform not in settings.tts_reward_ids:
+            raise HTTPException(status_code=404, detail=f"TTS награда для {platform} не найдена")
+        
+        reward_id = settings.tts_reward_ids[platform]
+        
+        # Удаляем награду через существующий API
+        from api.points_api_endpoints import delete_vk_reward, delete_twitch_reward
+        
+        if platform == 'vk':
+            await delete_vk_reward(reward_id, user, db)
+        elif platform == 'twitch':
+            await delete_twitch_reward(reward_id, user, db)
+        
+        # Удаляем из настроек
+        del settings.tts_reward_ids[platform]
+        db.commit()
+        
+        logger.info(f"✅ Deleted TTS reward for {platform}: {reward_id}")
+        
+        return {
+            "success": True,
+            "message": f"TTS награда для {platform.upper()} удалена"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting TTS reward: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Ошибка удаления TTS награды")
+
+# ============================================================================
 # EXPORT TTS API INSTANCE
 # ============================================================================
 

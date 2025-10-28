@@ -143,7 +143,8 @@ async def handle_tts_for_message(
     connection_manager,
     skip_if_command: bool = True,
     is_reply: bool = False,
-    mentioned_users: list = None
+    mentioned_users: list = None,
+    reward_id: str = None  # NEW! ID награды если сообщение с наградой
 ) -> Dict[str, Any]:
     """
     Обработать TTS для сообщения
@@ -158,6 +159,7 @@ async def handle_tts_for_message(
         skip_if_command: Пропустить команды (начинаются с !)
         is_reply: Является ли сообщение ответом (reply)
         mentioned_users: Список упомянутых пользователей (@username)
+        reward_id: ID награды если сообщение отправлено с наградой Channel Points
     
     Returns:
         Dict с результатом: {"success": bool, "error": str|None, "tts_type": str|None}
@@ -239,10 +241,36 @@ async def handle_tts_for_message(
                     user_id=user_id,
                     engine='gtts',
                     voice='female_1',
-                    listening_mode='website'
+                    listening_mode='website',
+                    tts_mode='all_messages',
+                    tts_reward_ids={}
                 )
                 db.add(tts_user_settings)
                 db.commit()
+            
+            # ✅ НОВАЯ ЛОГИКА: Проверяем режим TTS (все сообщения / за баллы)
+            if tts_user_settings.tts_mode == 'channel_points':
+                logger.info(f"🎁 [{platform.upper()} TTS] Channel Points mode enabled")
+                
+                # Проверяем есть ли награда TTS для этой платформы
+                tts_reward_ids = tts_user_settings.tts_reward_ids or {}
+                if platform not in tts_reward_ids:
+                    logger.warning(f"❌ [{platform.upper()} TTS] No TTS reward configured for {platform}")
+                    return {"success": False, "error": f"TTS reward not configured for {platform}"}
+                
+                expected_reward_id = tts_reward_ids[platform]
+                logger.info(f"💎 [{platform.upper()} TTS] Expected reward ID: {expected_reward_id}")
+                
+                # Проверяем что сообщение пришло с правильной наградой
+                if not reward_id:
+                    logger.warning(f"❌ [{platform.upper()} TTS] Message not from reward redemption, skipping")
+                    return {"success": False, "error": "Message not from TTS reward"}
+                
+                if reward_id != expected_reward_id:
+                    logger.warning(f"❌ [{platform.upper()} TTS] Wrong reward ID: {reward_id} != {expected_reward_id}")
+                    return {"success": False, "error": "Message from different reward"}
+                
+                logger.info(f"✅ [{platform.upper()} TTS] Message from correct TTS reward! Processing...")
             
             # Определяем использовать AI TTS или базовую
             use_ai_tts = (tts_user_settings.engine == 'f5tts')

@@ -240,6 +240,7 @@ class VKLiveBotCore:
             
             # 1. Отправляем сообщение в WebSocket для отображения в chatbox
             from utils.websocket_helper import broadcast_chat_message
+            logger.info(f"🔄 [VK MSG] About to broadcast message...")
             await broadcast_chat_message(
                 username=user,
                 content=text,
@@ -248,6 +249,7 @@ class VKLiveBotCore:
                 role=role,
                 badges=None  # VK Live не предоставляет badges через API
             )
+            logger.info(f"✅ [VK MSG] Broadcast completed, processing command checks...")
             
             # 2. Проверка гостевого кода (если это 6 цифр)
             if text.strip().isdigit() and len(text.strip()) == 6:
@@ -263,6 +265,7 @@ class VKLiveBotCore:
             
             # 3. Обрабатываем команды через универсальную систему
             if text.startswith('!'):
+                logger.info(f"🎮 [VK CMD] Detected command: {text[:50]}")
                 # Преобразуем формат сообщения для universal_command_handler
                 command_message = {
                     'message': text,
@@ -271,7 +274,9 @@ class VKLiveBotCore:
                     'is_moderator': message.get("author", {}).get("is_moderator", False),
                     'is_owner': message.get("author", {}).get("is_owner", False)
                 }
+                logger.info(f"🎮 [VK CMD] Calling handler for channel: {channel_id}, message: {command_message}")
                 await self.universal_command_handler.handle_vk_command(channel_id, command_message, self)
+                logger.info(f"🎮 [VK CMD] Handler completed for: {text[:50]}")
                 return  # Не обрабатываем TTS для команд
             
             # 4. Обработка TTS для обычных сообщений

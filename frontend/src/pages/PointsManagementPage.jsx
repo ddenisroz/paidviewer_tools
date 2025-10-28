@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Gift, Plus, Edit, Trash2, Loader2, Power, PowerOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -16,7 +16,8 @@ import { PLATFORM_COLORS } from '../constants/uiConstants';
 
 const PointsManagementPage = () => {
   const { user } = useAuth();
-  const [selectedPlatform, setSelectedPlatform] = useState('vk'); // vk или twitch
+  const [selectedPlatform, setSelectedPlatform] = useState('twitch'); // vk или twitch
+  const [activeTab, setActiveTab] = useState('rewards'); // rewards или queue
   const [rewards, setRewards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -27,11 +28,20 @@ const PointsManagementPage = () => {
     try {
       setLoading(true);
       const data = await pointsApi.getRewards(selectedPlatform);
-        setRewards(data.rewards || []);
+      
+      // Сортируем: активные впереди, неактивные сзади
+      const sortedRewards = (data.rewards || []).sort((a, b) => {
+        if (a.is_enabled === b.is_enabled) return 0;
+        return a.is_enabled ? -1 : 1; // активные (true) впереди
+      });
+      
+      setRewards(sortedRewards);
     } catch (err) {
       console.error('Error loading rewards:', err);
       if (err.message.includes('404')) {
         toast.error(`${selectedPlatform === 'twitch' ? 'Twitch' : 'VK Live'} не подключен. Авторизуйтесь на платформе.`);
+      } else if (err.message.includes('партнёров и аффилейтов') || err.message.includes('partner or affiliate')) {
+        toast.error('⚠️ Награды Twitch доступны только для партнёров и аффилейтов', { duration: 6000 });
       } else {
         toast.error(err.message || 'Не удалось загрузить награды');
       }
@@ -55,62 +65,101 @@ const PointsManagementPage = () => {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      {/* Компактный header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Баллы канала</h1>
-        
-        {/* Переключатель платформ - компактно */}
-            <div className="flex bg-muted rounded-lg p-1">
-          <Button
-            variant={selectedPlatform === 'twitch' ? 'default' : 'ghost'}
-            size="sm"
-                onClick={() => setSelectedPlatform('twitch')}
-            className="gap-2"
-              >
-                <TwitchIcon className="w-4 h-4" />
-                Twitch
-          </Button>
-          <Button
-            variant={selectedPlatform === 'vk' ? 'default' : 'ghost'}
-            size="sm"
-                onClick={() => setSelectedPlatform('vk')}
-            className="gap-2"
-              >
-                <VKIcon className="w-4 h-4" />
-                VK Live
-          </Button>
+    <div className="container mx-auto p-4 sm:p-6 max-w-5xl">
+      {/* Header */}
+      <div className="flex flex-col gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Награды за баллы</h1>
+          </div>
+          
+          {/* Переключатель платформ */}
+          <div className="flex bg-muted rounded-lg p-1">
+            <Button
+              variant={selectedPlatform === 'twitch' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setSelectedPlatform('twitch')}
+              className="gap-1.5 h-8"
+            >
+              <TwitchIcon className="w-3.5 h-3.5" />
+              Twitch
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedPlatform('vk')}
+              className={`gap-1.5 h-8 ${
+                selectedPlatform === 'vk' 
+                  ? 'bg-red-600 text-white hover:bg-red-700' 
+                  : 'hover:bg-muted'
+              }`}
+            >
+              <VKIcon className="w-3.5 h-3.5" />
+              VK Live
+            </Button>
           </div>
         </div>
 
-      {/* Список наград */}
-      <div className="space-y-4">
-        {/* Кнопка создания */}
-        <Button onClick={() => setShowCreateDialog(true)} className="w-full" variant="outline">
-          <Plus className="w-4 h-4 mr-2" />
-          Создать награду
-        </Button>
+        {/* Вкладки */}
+        <div className="flex border-b border-border">
+          <button
+            onClick={() => setActiveTab('rewards')}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === 'rewards'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Награды
+          </button>
+          <button
+            onClick={() => setActiveTab('queue')}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === 'queue'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Очередь запросов
+          </button>
+        </div>
+      </div>
 
-        {/* Награды */}
-        {rewards.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Gift className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">Нет наград. Создайте первую награду!</p>
-            </CardContent>
-          </Card>
-        ) : (
-          rewards.map((reward) => (
-            <RewardCard
-              key={reward.id}
-              reward={reward}
-              platform={selectedPlatform}
-              onEdit={() => setEditingReward(reward)}
-              onRefresh={loadRewards}
-            />
-          ))
-        )}
-          </div>
+      {/* Контент вкладок */}
+      {activeTab === 'rewards' ? (
+        <div>
+          {/* Кнопка создания */}
+          <Button onClick={() => setShowCreateDialog(true)} className="w-full h-10 mb-6" variant="outline">
+            <Plus className="w-4 h-4 mr-2" />
+            Создать награду
+          </Button>
+
+          {/* Награды в grid layout */}
+          {rewards.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Gift className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
+                <p className="text-sm text-muted-foreground font-medium">Нет наград</p>
+                <p className="text-xs text-muted-foreground mt-1">Создайте первую награду для зрителей!</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {rewards.map((reward) => (
+                <RewardCard
+                  key={reward.id}
+                  reward={reward}
+                  platform={selectedPlatform}
+                  onEdit={() => setEditingReward(reward)}
+                  onRefresh={loadRewards}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <RedemptionQueue platform={selectedPlatform} />
+      )}
 
       {/* Диалог создания/редактирования */}
       <RewardDialog
@@ -120,7 +169,7 @@ const PointsManagementPage = () => {
           setEditingReward(null);
         }}
         reward={editingReward}
-                platform={selectedPlatform}
+        platform={selectedPlatform}
         onSuccess={() => {
           setShowCreateDialog(false);
           setEditingReward(null);
@@ -148,9 +197,16 @@ const RewardCard = ({ reward, platform, onEdit, onRefresh }) => {
     
     setDeleting(true);
     try {
-      // Для VK: сначала отключаем награду, потом удаляем
-      if (platform === 'vk' && reward.is_enabled) {
-        await pointsApi.toggleReward(reward.id, false);
+      // Для VK: ВСЕГДА отключаем награду перед удалением (VK API требование)
+      if (platform === 'vk') {
+        try {
+          await pointsApi.toggleReward(platform, reward.id, false);
+          // Небольшая задержка чтобы VK API обработал
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (toggleErr) {
+          // Ignore toggle error, награда может быть уже отключена
+          console.log('Toggle before delete:', toggleErr.message);
+        }
       }
 
       await pointsApi.deleteReward(platform, reward.id);
@@ -176,10 +232,12 @@ const RewardCard = ({ reward, platform, onEdit, onRefresh }) => {
     if (platform !== 'vk') return; // Toggle только для VK
 
     setToggling(true);
+    const newState = !reward.is_enabled;
+    
     try {
-      await pointsApi.toggleReward(reward.id, !reward.is_enabled);
-      toast.success(reward.is_enabled ? 'Награда отключена' : 'Награда включена');
-      onRefresh();
+      await pointsApi.toggleReward(platform, reward.id, newState);
+      toast.success(newState ? 'Награда включена' : 'Награда отключена');
+      await onRefresh();
     } catch (err) {
       console.error('Error toggling reward:', err);
       toast.error(err.message || 'Не удалось переключить награду');
@@ -192,81 +250,80 @@ const RewardCard = ({ reward, platform, onEdit, onRefresh }) => {
   const bgColor = reward.background_color || (platform === 'vk' ? PLATFORM_COLORS.VK_LIVE : PLATFORM_COLORS.TWITCH);
 
   return (
-    <Card className="overflow-hidden border-l-4" style={{ borderLeftColor: bgColor }}>
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between gap-4">
-          {/* Левая часть: иконка и информация */}
-          <div className="flex gap-4 flex-1 min-w-0">
-            {/* Цветная иконка */}
-            <div 
-              className="w-16 h-16 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: bgColor + '20' }}
-            >
-              <Gift className="w-8 h-8" style={{ color: bgColor }} />
-            </div>
-            
-            {/* Информация */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="text-lg font-semibold truncate">{reward.title}</h3>
-                {platform === 'vk' && (
-                  <Badge variant={reward.is_enabled ? 'default' : 'secondary'} className="flex-shrink-0">
-                    {reward.is_enabled ? '✓ Активна' : '⊗ Выключена'}
-                  </Badge>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground line-clamp-2">
-                {reward.description || 'Нет описания'}
-              </p>
-              <div className="flex items-center gap-2 mt-2">
-                <Badge variant="outline" className="font-mono" style={{ borderColor: bgColor, color: bgColor }}>
-                  {reward.cost} {platform === 'twitch' ? 'points' : 'баллов'}
-                </Badge>
-              </div>
-            </div>
-          </div>
-
-          {/* Правая часть: кнопки управления */}
-          <div className="flex flex-col gap-2 flex-shrink-0">
-            <Button variant="outline" size="sm" onClick={onEdit} className="w-32">
-              <Edit className="w-4 h-4 mr-2" />
-              Изменить
-            </Button>
-            
+    <Card className="transition-all hover:ring-2 hover:ring-primary">
+      <CardContent className="p-5">
+        {/* Header с названием и статусом */}
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-lg font-semibold mb-1 line-clamp-2">{reward.title}</h3>
             {platform === 'vk' && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleToggle}
-                disabled={toggling}
-                className="w-32"
-              >
-                {toggling ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : reward.is_enabled ? (
-                  <PowerOff className="w-4 h-4 mr-2" />
-                ) : (
-                  <Power className="w-4 h-4 mr-2" />
-                )}
-                {reward.is_enabled ? 'Выключить' : 'Включить'}
-              </Button>
+              <Badge variant={reward.is_enabled ? 'default' : 'secondary'} className="text-xs">
+                {reward.is_enabled ? '✓ Активна' : '○ Выключена'}
+              </Badge>
             )}
-            
-            <Button 
-              variant="destructive" 
-              size="sm" 
-              onClick={handleDelete}
-              disabled={deleting}
-              className="w-32"
-            >
-              {deleting ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Trash2 className="w-4 h-4 mr-2" />
-              )}
-              Удалить
-            </Button>
           </div>
+          <div 
+            className="font-mono text-xl font-extrabold flex-shrink-0 px-4 py-2 rounded-lg"
+            style={{ 
+              backgroundColor: `${bgColor}25`,
+              color: bgColor,
+            }}
+          >
+            {reward.cost || reward.price || 0}
+          </div>
+        </div>
+
+        {/* Описание */}
+        {reward.description && (
+          <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+            {reward.description}
+          </p>
+        )}
+
+        {/* Кнопки управления */}
+        <div className="flex gap-2 pt-3 border-t border-border">
+          <Button variant="outline" size="sm" onClick={onEdit} className="flex-1 h-9">
+            <Edit className="w-4 h-4 mr-2" />
+            Изменить
+          </Button>
+          
+          {platform === 'vk' && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleToggle}
+              disabled={toggling}
+              className="flex-1 h-9"
+            >
+              {toggling ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : reward.is_enabled ? (
+                <>
+                  <PowerOff className="w-4 h-4 mr-2" />
+                  Выкл
+                </>
+              ) : (
+                <>
+                  <Power className="w-4 h-4 mr-2" />
+                  Вкл
+                </>
+              )}
+            </Button>
+          )}
+          
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleDelete}
+            disabled={deleting}
+            className="flex-shrink-0 h-9 px-3 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+          >
+            {deleting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Trash2 className="w-4 h-4" />
+            )}
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -300,21 +357,53 @@ const RewardDialog = ({ open, onClose, reward, platform, onSuccess }) => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    cost: 100
+    cost: 100,
+    // VK Live специфичные поля
+    repair_timeout: 0,
+    max_uses_count: 0,
+    max_uses_count_per_user: 0,
+    is_message_required: false,
+    // Twitch специфичные поля
+    global_cooldown_seconds: 0,
+    max_per_stream: 0,
+    max_per_user_per_stream: 0,
+    should_redemptions_skip_request_queue: false
   });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (reward) {
       setFormData({
-        title: reward.title || '',
-        description: reward.description || '',
-        cost: reward.cost || 100
+        title: reward.title || reward.name || '',
+        description: reward.description || reward.prompt || '',
+        cost: reward.cost || reward.price || 100,
+        // VK Live специфичные поля
+        repair_timeout: reward.repair_timeout || 0,
+        max_uses_count: reward.max_uses_count || 0,
+        max_uses_count_per_user: reward.max_uses_count_per_user || 0,
+        is_message_required: reward.is_message_required || false,
+        // Twitch специфичные поля
+        global_cooldown_seconds: reward.global_cooldown?.seconds || reward.global_cooldown_seconds || 0,
+        max_per_stream: reward.max_per_stream || 0,
+        max_per_user_per_stream: reward.max_per_user_per_stream || 0,
+        should_redemptions_skip_request_queue: reward.should_redemptions_skip_request_queue || false
       });
     } else {
-      setFormData({ title: '', description: '', cost: 100 });
+      setFormData({ 
+        title: '', 
+        description: '', 
+        cost: 100,
+        repair_timeout: 0,
+        max_uses_count: 0,
+        max_uses_count_per_user: 0,
+        is_message_required: false,
+        global_cooldown_seconds: 0,
+        max_per_stream: 0,
+        max_per_user_per_stream: 0,
+        should_redemptions_skip_request_queue: false
+      });
     }
-  }, [reward]);
+  }, [reward, platform]);
 
   const handleSubmit = async () => {
     if (!formData.title.trim()) {
@@ -324,13 +413,38 @@ const RewardDialog = ({ open, onClose, reward, platform, onSuccess }) => {
 
     setSaving(true);
     try {
-      const rewardData = {
+      // Общие поля для обеих платформ
+      let rewardData = {
         title: formData.title,
         description: formData.description,
         cost: parseInt(formData.cost),
-        background_color: platform === 'vk' ? PLATFORM_COLORS.VK_LIVE : PLATFORM_COLORS.TWITCH,
-        is_enabled: true
+        is_user_input_required: formData.is_message_required,
+        platform: platform,
+        channel_name: ''
       };
+
+      // Для VK добавляем специфичные поля
+      if (platform === 'vk') {
+        rewardData = {
+          ...rewardData,
+          repair_timeout: parseInt(formData.repair_timeout) || 0,
+          max_uses_count: parseInt(formData.max_uses_count) || 0,
+          max_uses_count_per_user: parseInt(formData.max_uses_count_per_user) || 0,
+          is_message_required: formData.is_message_required
+        };
+      }
+      
+      // Для Twitch добавляем специфичные поля
+      if (platform === 'twitch') {
+        rewardData = {
+          ...rewardData,
+          global_cooldown_seconds: parseInt(formData.global_cooldown_seconds) || 0,
+          max_per_stream: parseInt(formData.max_per_stream) || 0,
+          max_per_user_per_stream: parseInt(formData.max_per_user_per_stream) || 0,
+          should_redemptions_skip_request_queue: formData.should_redemptions_skip_request_queue,
+          is_enabled: true
+        };
+      }
 
       if (reward) {
         await pointsApi.updateReward(platform, reward.id, rewardData);
@@ -360,38 +474,180 @@ const RewardDialog = ({ open, onClose, reward, platform, onSuccess }) => {
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-            <div>
-            <Label htmlFor="title">Название</Label>
+          <div>
+            <Label htmlFor="title" className="text-sm">Название</Label>
             <Input
               id="title"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               placeholder="Например: Приветствие"
-              />
-            </div>
-            
-            <div>
-            <Label htmlFor="description">Описание</Label>
+              className="h-9"
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="description" className="text-sm">Описание (опционально)</Label>
             <Textarea
               id="description"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Что получит зритель за эту награду?"
-              rows={3}
-                />
-              </div>
-              
-              <div>
-            <Label htmlFor="cost">Стоимость ({platform === 'twitch' ? 'поинты' : 'баллы'})</Label>
+              rows={2}
+              className="text-sm resize-none"
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="cost" className="text-sm">Стоимость</Label>
             <Input
               id="cost"
               type="number"
               min="1"
               value={formData.cost}
               onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+              className="h-9"
             />
-            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {platform === 'twitch' ? 'Channel Points' : 'Баллы VK Live'}
+            </p>
           </div>
+
+          {/* VK Live специфичные настройки */}
+          {platform === 'vk' && (
+            <>
+              <div>
+                <Label htmlFor="repair_timeout" className="text-sm">Кулдаун (секунды)</Label>
+                <Input
+                  id="repair_timeout"
+                  type="number"
+                  min="0"
+                  value={formData.repair_timeout}
+                  onChange={(e) => setFormData({ ...formData, repair_timeout: e.target.value })}
+                  className="h-9"
+                  placeholder="0 = без кулдауна"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Время восстановления награды (0 = без ограничений)
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="max_uses_count" className="text-sm">Макс. использований</Label>
+                  <Input
+                    id="max_uses_count"
+                    type="number"
+                    min="0"
+                    value={formData.max_uses_count}
+                    onChange={(e) => setFormData({ ...formData, max_uses_count: e.target.value })}
+                    className="h-9"
+                    placeholder="0 = без лимита"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Всего (0 = ∞)
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="max_uses_count_per_user" className="text-sm">Макс. на юзера</Label>
+                  <Input
+                    id="max_uses_count_per_user"
+                    type="number"
+                    min="0"
+                    value={formData.max_uses_count_per_user}
+                    onChange={(e) => setFormData({ ...formData, max_uses_count_per_user: e.target.value })}
+                    className="h-9"
+                    placeholder="0 = без лимита"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    На 1 человека (0 = ∞)
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  id="is_message_required"
+                  type="checkbox"
+                  checked={formData.is_message_required}
+                  onChange={(e) => setFormData({ ...formData, is_message_required: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <Label htmlFor="is_message_required" className="text-sm cursor-pointer">
+                  Требовать сообщение от зрителя
+                </Label>
+              </div>
+            </>
+          )}
+
+          {/* Twitch специфичные настройки */}
+          {platform === 'twitch' && (
+            <>
+              <div>
+                <Label htmlFor="global_cooldown_seconds" className="text-sm">Глобальный кулдаун (секунды)</Label>
+                <Input
+                  id="global_cooldown_seconds"
+                  type="number"
+                  min="0"
+                  value={formData.global_cooldown_seconds}
+                  onChange={(e) => setFormData({ ...formData, global_cooldown_seconds: e.target.value })}
+                  className="h-9"
+                  placeholder="0 = без кулдауна"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Время ожидания между активациями (0 = без ограничений)
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="max_per_stream" className="text-sm">Макс. за стрим</Label>
+                  <Input
+                    id="max_per_stream"
+                    type="number"
+                    min="0"
+                    value={formData.max_per_stream}
+                    onChange={(e) => setFormData({ ...formData, max_per_stream: e.target.value })}
+                    className="h-9"
+                    placeholder="0 = без лимита"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Всего за стрим (0 = ∞)
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="max_per_user_per_stream" className="text-sm">Макс. на юзера за стрим</Label>
+                  <Input
+                    id="max_per_user_per_stream"
+                    type="number"
+                    min="0"
+                    value={formData.max_per_user_per_stream}
+                    onChange={(e) => setFormData({ ...formData, max_per_user_per_stream: e.target.value })}
+                    className="h-9"
+                    placeholder="0 = без лимита"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    На 1 человека за стрим (0 = ∞)
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  id="should_redemptions_skip_request_queue"
+                  type="checkbox"
+                  checked={formData.should_redemptions_skip_request_queue}
+                  onChange={(e) => setFormData({ ...formData, should_redemptions_skip_request_queue: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <Label htmlFor="should_redemptions_skip_request_queue" className="text-sm cursor-pointer">
+                  Автоматическое выполнение (без очереди)
+                </Label>
+              </div>
+            </>
+          )}
+        </div>
           
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
@@ -418,6 +674,211 @@ RewardDialog.propTypes = {
   }),
   platform: PropTypes.oneOf(['twitch', 'vk']).isRequired,
   onSuccess: PropTypes.func.isRequired
+};
+
+/**
+ * Компонент для отображения и управления очередью запросов на награды
+ */
+const RedemptionQueue = ({ platform }) => {
+  const [redemptions, setRedemptions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(new Set());
+  const [rewardsMap, setRewardsMap] = useState(new Map());
+
+  // Загрузка очереди
+  const loadRedemptions = useCallback(async () => {
+    try {
+      setLoading(true);
+      if (platform === 'vk') {
+        // Сначала загружаем награды для получения названий
+        const rewardsData = await pointsApi.getRewards('vk');
+        const map = new Map();
+        if (rewardsData.rewards) {
+          rewardsData.rewards.forEach(reward => {
+            map.set(reward.id, reward);
+          });
+        }
+        setRewardsMap(map);
+
+        // Затем загружаем demands
+        const data = await pointsApi.getVKDemands();
+        
+        // Парсим demands в зависимости от структуры
+        let demands = [];
+        if (Array.isArray(data.demands)) {
+          demands = data.demands;
+        } else if (data.demands && typeof data.demands === 'object') {
+          // Если это объект, конвертируем в массив
+          if (data.demands.items && Array.isArray(data.demands.items)) {
+            // Структура { items: [...], count: N }
+            demands = data.demands.items;
+          } else if (data.demands.demands && Array.isArray(data.demands.demands)) {
+            // Структура { demands: [...] }
+            demands = data.demands.demands;
+          } else {
+            // Преобразуем объект в массив значений { "id1": {...}, "id2": {...} }
+            const values = Object.values(data.demands);
+            // Если первый элемент - это массив, значит неправильно распарсили
+            if (values.length === 1 && Array.isArray(values[0])) {
+              demands = values[0];
+            } else {
+              demands = values;
+            }
+          }
+        }
+        
+        setRedemptions(demands);
+      } else {
+        // Twitch пока не поддерживается (требует партнерство)
+        setRedemptions([]);
+      }
+    } catch (err) {
+      console.error('Error loading redemptions:', err);
+      toast.error('Не удалось загрузить очередь запросов');
+      setRedemptions([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [platform]);
+
+  useEffect(() => {
+    loadRedemptions();
+  }, [loadRedemptions]);
+
+  const handleAccept = async (redemptionId) => {
+    setProcessing(prev => new Set(prev).add(redemptionId));
+    try {
+      await pointsApi.processVKDemands('accept', [redemptionId]);
+      toast.success('Запрос принят');
+      loadRedemptions();
+    } catch (err) {
+      console.error('Error accepting redemption:', err);
+      toast.error('Не удалось принять запрос');
+    } finally {
+      setProcessing(prev => {
+        const next = new Set(prev);
+        next.delete(redemptionId);
+        return next;
+      });
+    }
+  };
+
+  const handleReject = async (redemptionId) => {
+    setProcessing(prev => new Set(prev).add(redemptionId));
+    try {
+      await pointsApi.processVKDemands('reject', [redemptionId]);
+      toast.success('Запрос отклонён');
+      loadRedemptions();
+    } catch (err) {
+      console.error('Error rejecting redemption:', err);
+      toast.error('Не удалось отклонить запрос');
+    } finally {
+      setProcessing(prev => {
+        const next = new Set(prev);
+        next.delete(redemptionId);
+        return next;
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (redemptions.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <Gift className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
+          <p className="text-sm text-muted-foreground">
+            Нет ожидающих запросов
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Когда зрители активируют награды, они появятся здесь
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {Array.isArray(redemptions) && redemptions.map((demand, index) => {
+        const rewardData = rewardsMap.get(demand.reward?.id);
+        const rewardTitle = rewardData?.name || rewardData?.title || 'Неизвестная награда';
+        const rewardCost = rewardData?.price || rewardData?.cost || 0;
+        
+        // Собираем сообщение из message_parts (если это массив)
+        let message = '';
+        if (Array.isArray(demand.message_parts) && demand.message_parts.length > 0) {
+          message = demand.message_parts.join(' ');
+        } else if (typeof demand.message === 'string') {
+          message = demand.message;
+        }
+        
+        return (
+          <Card key={demand.id || index}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className="font-medium">{demand.user?.nick || demand.user?.name || 'Пользователь'}</span>
+                    <Badge variant="outline" className="text-xs">
+                      {rewardTitle}
+                    </Badge>
+                    <Badge variant="secondary" className="text-xs font-mono">
+                      {rewardCost} баллов
+                    </Badge>
+                  </div>
+                  {message && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      💬 {message}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    🕐 {demand.created_at ? new Date(demand.created_at * 1000).toLocaleString('ru-RU') : 'Неизвестно'}
+                  </p>
+                </div>
+
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={() => handleAccept(demand.id)}
+                  disabled={processing.has(demand.id)}
+                  className="h-8"
+                >
+                  {processing.has(demand.id) ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    'Принять'
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => handleReject(demand.id)}
+                  disabled={processing.has(demand.id)}
+                  className="h-8"
+                >
+                  Отклонить
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        );
+      })}
+    </div>
+  );
+};
+
+RedemptionQueue.propTypes = {
+  platform: PropTypes.string.isRequired,
 };
 
 export default PointsManagementPage;

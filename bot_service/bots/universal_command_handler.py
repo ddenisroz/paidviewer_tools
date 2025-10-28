@@ -105,18 +105,22 @@ class UniversalCommandHandler:
         """
         try:
             message = message_data.get('message', '').strip()
+            self.logger.info(f"🔍 [VK CMD HANDLER] Processing: {message}")
             
             # Проверяем что это команда
             if not message.startswith('!'):
+                self.logger.warning(f"🔍 [VK CMD HANDLER] Not a command: {message}")
                 return
             
             # Парсим команду
             parts = message[1:].split(maxsplit=1)
             if not parts:
+                self.logger.warning(f"🔍 [VK CMD HANDLER] Empty command")
                 return
             
             command_name = parts[0].lower()
             command_args = parts[1] if len(parts) > 1 else ""
+            self.logger.info(f"🔍 [VK CMD HANDLER] Command: !{command_name}, Args: '{command_args}'")
             
             # Получаем роли пользователя
             author_data = {

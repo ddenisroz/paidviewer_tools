@@ -39,8 +39,8 @@ async def login_twitch(request: Request):
             logger.error("TWITCH_CLIENT_ID not configured")
             raise HTTPException(status_code=500, detail="Twitch integration is not configured")
         
-        # Параметры для авторизации
-        scopes = "user:read:email channel:read:stream_key channel:manage:broadcast"
+        # Параметры для авторизации (добавлен channel:manage:redemptions для наград)
+        scopes = "user:read:email channel:read:stream_key channel:manage:broadcast channel:manage:redemptions"
         redirect_uri = f"{BACKEND_URL}/auth/twitch/callback"
         
         auth_url = (

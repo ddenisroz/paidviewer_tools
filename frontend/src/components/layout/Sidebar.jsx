@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Mic, Youtube, Coins, Headphones, Settings, Shield, MessageSquare, Command, Sparkles, Monitor, Menu, X } from 'lucide-react';
+import { Home, Mic, Youtube, Coins, Headphones, Settings, Shield, MessageSquare, Command, Sparkles, Monitor, Menu, X, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getAdminList, botService } from '../../services/microservices';
 
@@ -50,21 +50,19 @@ const SidebarNavItem = ({ item, openSection, setOpenSection, onMobileMenuClose }
         })
         : location.pathname === item.to;
 
-    // Меню открыто если: 1) наведена мышь ИЛИ 2) активна одна из страниц submenu
-    const isOpen = openSection === item.label || isParentActive;
+    // Меню открыто только при hover
+    const isOpen = openSection === item.label;
 
-    // Функции для управления dropdown при наведении
+    // Функция для открытия dropdown при наведении
     const handleMouseEnter = () => {
         if (hasSubmenu) {
             setOpenSection(item.label);
         }
     };
 
+    // Функция для закрытия
     const handleMouseLeave = () => {
-        if (hasSubmenu && !isParentActive) {
-            // Закрываем только если НЕ активна страница из submenu
-            setOpenSection(null);
-        }
+        setOpenSection(null);
     };
 
     // Keyboard navigation для accessibility
@@ -78,13 +76,17 @@ const SidebarNavItem = ({ item, openSection, setOpenSection, onMobileMenuClose }
     if (hasSubmenu) {
         return (
             <div 
-                className="relative"
+                className="relative group"
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
             >
                 <div 
-                    className={`rounded-lg px-4 py-2.5 text-lg font-semibold cursor-pointer transition-colors ${
-                        isParentActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                    className={`rounded-lg px-4 py-2.5 text-lg font-semibold cursor-pointer transition-all relative ${
+                        isOpen 
+                            ? 'bg-primary/20 text-primary' 
+                            : isParentActive 
+                                ? 'bg-primary/10 text-primary' 
+                                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                     }`}
                     onClick={() => setOpenSection(isOpen ? null : item.label)}
                     onKeyDown={handleKeyDown}
@@ -93,35 +95,49 @@ const SidebarNavItem = ({ item, openSection, setOpenSection, onMobileMenuClose }
                     aria-expanded={isOpen}
                     aria-label={`${item.label} ${isOpen ? 'свернуть' : 'развернуть'}`}
                 >
-                    <div className="flex items-center gap-4">
-                        <item.icon className="h-6 w-6" />
-                        {item.label}
+                    {/* Индикатор активной подстраницы */}
+                    {isParentActive && !isOpen && (
+                        <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-full pointer-events-none" />
+                    )}
+                    <div className="flex items-center justify-between gap-4 pointer-events-none">
+                        <div className="flex items-center gap-4">
+                            <item.icon className="h-6 w-6" />
+                            {item.label}
+                        </div>
+                        <ChevronRight className={`h-5 w-5 transition-transform ${isOpen ? 'rotate-0 opacity-100' : 'opacity-0'}`} />
                     </div>
                 </div>
-                <div 
-                    className={`ml-4 mt-1 space-y-1 border-l-2 border-primary/20 pl-4 overflow-hidden transition-all duration-200 ease-in-out ${
-                        isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-                    }`}
-                >
-                    {item.submenu.map((subItem) => (
-                        <NavLink
-                            key={subItem.to}
-                            to={subItem.to}
-                            end
-                            onClick={onMobileMenuClose}
-                            className={({ isActive }) =>
-                                `flex items-center gap-3 rounded-md px-4 py-2 text-base font-medium transition-colors ${
-                                    isActive
-                                        ? 'bg-primary/10 text-primary'
-                                        : 'text-muted-foreground hover:bg-muted/30 hover:text-foreground/80'
-                                }`
-                            }
-                        >
-                            {subItem.icon && <subItem.icon className="h-4 w-4" />}
-                            {subItem.label}
-                        </NavLink>
-                    ))}
-                </div>
+                
+                {/* Submenu появляется СПРАВА от родителя (GitHub-style, без gap) */}
+                {isOpen && (
+                    <div 
+                        className="absolute left-full top-0 w-64 bg-background border border-border rounded-lg shadow-lg z-50 py-2 animate-in fade-in slide-in-from-left-2 duration-200"
+                        onMouseEnter={handleMouseEnter}
+                        onMouseLeave={handleMouseLeave}
+                    >
+                        {item.submenu.map((subItem) => (
+                            <NavLink
+                                key={subItem.to}
+                                to={subItem.to}
+                                end
+                                onClick={() => {
+                                    setOpenSection(null); // Закрываем submenu при клике
+                                    onMobileMenuClose();
+                                }}
+                                className={({ isActive }) =>
+                                    `flex items-center gap-3 px-4 py-2.5 text-base font-medium transition-colors ${
+                                        isActive
+                                            ? 'bg-primary/10 text-primary'
+                                            : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                                    }`
+                                }
+                            >
+                                {subItem.icon && <subItem.icon className="h-5 w-5" />}
+                                {subItem.label}
+                            </NavLink>
+                        ))}
+                    </div>
+                )}
             </div>
         );
     }
@@ -253,7 +269,7 @@ const Sidebar = () => {
                     <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
                         {navItems.map((item) => (
                             <SidebarNavItem 
-                                key={item.to} 
+                                key={item.to || item.label} 
                                 item={item} 
                                 openSection={openSection}
                                 setOpenSection={setOpenSection}

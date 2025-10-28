@@ -29,7 +29,7 @@ export const UI_SIZES = {
 // Цвета платформ
 export const PLATFORM_COLORS = {
   TWITCH: '#9147FF',
-  VK_LIVE: '#FF0000',
+  VK_LIVE: '#0077FF',
   YOUTUBE: '#FF0000',
   DEFAULT: '#9147ff'
 };

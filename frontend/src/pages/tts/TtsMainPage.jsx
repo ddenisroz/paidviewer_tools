@@ -16,6 +16,7 @@ import AudioSettings from '../../components/tts/AudioSettings';
 import TtsSettings from '../../components/tts/TtsSettings';
 import HealthStatus from '../../components/tts/HealthStatus';
 import TtsFilterManager from '../../components/tts/TtsFilterManager';
+import TtsChannelPointsMode from '../../components/tts/TtsChannelPointsMode';
 import { ttsLogger } from '../../utils/logger';
 
 const TtsMainPageContent = () => {
@@ -621,6 +622,9 @@ const TtsMainPageContent = () => {
                     user={user}
                     isGuest={isGuest}
                 />
+                
+                {/* Режим TTS (все сообщения / за баллы) - NEW! */}
+                <TtsChannelPointsMode />
                 
                 {/* Громкость */}
                 <AudioSettings

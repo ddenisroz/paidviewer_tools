@@ -1,6 +1,6 @@
 # 📊 Текущий статус проекта TTS_TTV_0.02
 
-**Последнее обновление:** 28 октября 2025 (Session 12: Code Quality & Security Hardening)
+**Последнее обновление:** 28 октября 2025 (Session 13: TTS Channel Points Mode)
 **Версия:** 0.02  
 **Статус:** Production Ready - готовность к деплою 100% ✅
 
@@ -76,11 +76,20 @@
   - Получение списка demands
   - Обработка demands (accept/reject)
   - Включение/отключение наград
+  - **🔧 Исправлено 28.10.2025:**
+    - ✅ Метод toggle (PATCH вместо POST)
+    - ✅ Создание наград (правильная структура VK API)
+    - ✅ Формат channel_url во всех endpoints
 - ✅ **RESTful API** для обеих платформ
 - ✅ **Шифрование токенов** (Fernet AES-128)
 - ✅ **Универсальная страница управления** (`/dashboard/points`)
   - Переключение между платформами (Twitch/VK)
   - Единый интерфейс для управления наградами
+  - **🎨 Обновлен UI (28.10.2025):**
+    - ✅ Компактный дизайн карточек
+    - ✅ Единообразные размеры кнопок
+    - ✅ Убрана избыточная информация
+    - ✅ Улучшена читаемость
 
 ### 🎙️ TTS (Озвучка)
 - ✅ **Базовая озвучка** (gTTS) - работает корректно
@@ -93,6 +102,13 @@
 - ✅ Синхронизация toggles между главной и настройками
 - ✅ WebSocket broadcast audio
 - ✅ Блокировка пользователей от TTS
+- ✅ **TTS за баллы канала (Channel Points Mode)** - **Session 13 (28.10.2025)** 🆕
+  - Два режима: "Озвучивать все сообщения" / "Озвучивать за баллы канала"
+  - Создание TTS наград для Twitch и VK Live
+  - Настройка стоимости и кулдауна
+  - Автоматическая фильтрация сообщений по наградам
+  - UI компонент в TTS настройках
+  - 📖 **Документация:** `docs/TTS_CHANNEL_POINTS_MODE.md`
 
 ### 📺 YouTube Queue (Очередь видео)
 - ✅ Команды: `!sr`, `!skip`, `!queue`, `!clear`
@@ -179,6 +195,75 @@
 2. ✅ **WebSocket ping loop**
    - Исправлено: `dict changed size during iteration`
    - Файл: `bot_service/services/memory_websocket_manager.py`
+
+---
+
+## ✅ ИСПРАВЛЕНО 28 ОКТЯБРЯ 2025 (Session 12: Channel Points & UX Fixes)
+
+### 🔧 Критические исправления Channel Points
+
+1. ✅ **405 Method Not Allowed - Toggle Endpoint**
+   - **Проблема:** Frontend отправлял POST, backend ожидал PATCH
+   - **Исправлено:** `frontend/src/services/pointsApi.js` - метод изменен на PATCH
+   - Endpoint: `/api/points/rewards/vk/{reward_id}/toggle`
+
+2. ✅ **422 Unprocessable Entity - Create Reward**
+   - **Проблема:** 
+     - Переопределение переменной `reward_data`
+     - Использование `cost` вместо `price` для VK API
+     - Отсутствие обязательных полей согласно VK API spec
+   - **Исправлено:** `bot_service/api/points_api_endpoints.py`
+     - Переименована переменная в `vk_reward_data`
+     - Добавлены все обязательные поля (`price`, `background_color`, `is_message_required`, `max_uses_count`, `max_uses_count_per_user`, `repair_timeout`)
+   - Endpoint: `/api/points/rewards/vk/create`
+
+3. ✅ **Неправильный формат channel_url во всех VK endpoints**
+   - **Проблема:** Передавался только `{channel_name}`
+   - **Требуется:** `https://live.vkvideo.ru/{channel_name}`
+   - **Исправлено в файле** `bot_service/api/points_api_endpoints.py`:
+     - `get_vk_rewards` - GET /rewards/vk
+     - `create_vk_reward` - POST /rewards/vk/create
+     - `update_vk_reward` - PATCH /rewards/vk/{id}
+     - `delete_vk_reward` - DELETE /rewards/vk/{id}
+     - `toggle_vk_reward` - PATCH /rewards/vk/{id}/toggle
+
+4. ✅ **UI/UX страницы /dashboard/points**
+   - **Проблемы:**
+     - Кнопки разного размера (w-32 vs default)
+     - Избыточная информация (большая иконка 16x16)
+     - Неэффективное использование пространства
+   - **Исправлено в** `frontend/src/pages/PointsManagementPage.jsx`:
+     - Единообразные размеры кнопок (h-8 px-3)
+     - Убрана большая декоративная иконка
+     - Компактные отступы (p-4 вместо p-6)
+     - Иконки без текста на кнопках
+     - Меньший max-width контейнера (max-w-4xl вместо max-w-7xl)
+     - Hover эффекты для лучшего UX
+     - Компактный header с подзаголовком
+
+5. ✅ **Документация**
+   - Создан новый файл: `docs/CHANNEL_POINTS_FIXES_2025_10_28.md`
+   - Обновлен: `docs/VK_CHANNEL_POINTS_IMPLEMENTATION.md`
+   - Обновлен: `docs/CURRENT_STATUS.md`
+
+6. ✅ **UX улучшения - Sidebar меню (GitHub-style)**
+   - **Проблема:** Вертикальный dropdown блокировал навигацию между элементами
+   - **Решение:** GitHub-style horizontal submenu
+     - Submenu появляется **справа** от родителя
+     - Не блокирует другие элементы меню
+     - Мгновенная реакция (0мс)
+     - Автоматическое закрытие (стандартное hover поведение)
+   - **Файл:** `frontend/src/components/layout/Sidebar.jsx`
+   - **Преимущества:**
+     - ✅ Чистый код - нет таймеров и сложной логики
+     - ✅ Мгновенная реакция
+     - ✅ Не блокирует навигацию
+     - ✅ Индустриальный стандарт (GitHub, Vercel, Linear, Stripe)
+   - См. подробности: [`SIDEBAR_GITHUB_STYLE.md`](./SIDEBAR_GITHUB_STYLE.md)
+
+**Статус:** ✅ **ВСЕ ПРОБЛЕМЫ ИСПРАВЛЕНЫ. ГОТОВО К ТЕСТИРОВАНИЮ.**
+
+См. подробности: [`CHANNEL_POINTS_FIXES_2025_10_28.md`](./CHANNEL_POINTS_FIXES_2025_10_28.md)
 
 ---
 

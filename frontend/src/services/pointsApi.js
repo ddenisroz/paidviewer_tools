@@ -96,9 +96,9 @@ class PointsAPI {
      * @param {boolean} isEnabled - New enabled status
      * @returns {Promise<Object>} Toggle result
      */
-    async toggleReward(rewardId, isEnabled) {
-        const response = await fetch(`${API_BASE_URL}/api/points/rewards/vk/${rewardId}/toggle`, {
-            method: 'POST',
+    async toggleReward(platform, rewardId, isEnabled) {
+        const response = await fetch(`${API_BASE_URL}/api/points/rewards/${platform}/${rewardId}/toggle`, {
+            method: 'PATCH',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ is_enabled: isEnabled })
@@ -113,42 +113,40 @@ class PointsAPI {
     }
 
     /**
-     * Get pending redemptions for a platform
-     * @param {'twitch'|'vk'} platform - Platform identifier
-     * @returns {Promise<Object>} Redemptions list
+     * Get pending demands/redemptions for VK Live
+     * @returns {Promise<Object>} Demands list
      */
-    async getRedemptions(platform) {
-        const response = await fetch(`${API_BASE_URL}/api/points/rewards/${platform}/redemptions`, {
+    async getVKDemands() {
+        const response = await fetch(`${API_BASE_URL}/api/points/rewards/vk/demands`, {
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' }
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(errorText || `Failed to load ${platform} redemptions`);
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Failed to load VK demands');
         }
 
         return response.json();
     }
 
     /**
-     * Process a redemption (approve/reject)
-     * @param {'twitch'|'vk'} platform - Platform identifier
-     * @param {string} redemptionId - Redemption ID
-     * @param {'FULFILLED'|'CANCELED'} status - New status
+     * Process VK demands (accept/reject multiple)
+     * @param {'accept'|'reject'} action - Action to perform
+     * @param {Array<string>} demandIds - Array of demand IDs
      * @returns {Promise<Object>} Processing result
      */
-    async processRedemption(platform, redemptionId, status) {
-        const response = await fetch(`${API_BASE_URL}/api/points/rewards/${platform}/redemptions/${redemptionId}/process`, {
+    async processVKDemands(action, demandIds) {
+        const response = await fetch(`${API_BASE_URL}/api/points/rewards/vk/demands/process`, {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status })
+            body: JSON.stringify({ action, demand_ids: demandIds })
         });
 
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.detail || 'Failed to process redemption');
+            throw new Error(errorData.detail || 'Failed to process demands');
         }
 
         return response.json();
