@@ -8,17 +8,23 @@ const getNavItems = (isYourchy) => {
     const baseItems = [
         { to: '/dashboard', label: 'Главная', icon: Home },
         { 
-            to: '/dashboard/tts', 
             label: 'TTS ИИ озвучка', 
             icon: Mic,
             submenu: [
+                { to: '/dashboard/tts', label: 'Основные настройки', icon: Settings },
                 { to: '/dashboard/tts/voices', label: 'Управление голосами', icon: Headphones },
                 { to: '/dashboard/tts/local', label: 'Локальный движок', icon: Monitor },
             ]
         },
-        { to: '/dashboard/youtube', label: 'YouTube заказы', icon: Youtube },
-        { to: '/dashboard/points', label: 'Баллы канала', icon: Coins },
-        { to: '/dashboard/drops', label: 'Drops система', icon: Sparkles },
+        { 
+            label: 'Медиа интерактивность', 
+            icon: Sparkles,
+            submenu: [
+                { to: '/dashboard/youtube', label: 'YouTube заказы', icon: Youtube },
+                { to: '/dashboard/points', label: 'Баллы канала', icon: Coins },
+                { to: '/dashboard/drops', label: 'Drops система', icon: Sparkles },
+            ]
+        },
         { to: '/dashboard/chat-analysis', label: 'Анализ и модерация чата', icon: MessageSquare },
         { to: '/dashboard/commands', label: 'Команды', icon: Command },
         { to: '/dashboard/settings', label: 'Настройки', icon: Settings },
@@ -36,35 +42,43 @@ const SidebarNavItem = ({ item, openSection, setOpenSection, onMobileMenuClose }
     const location = useLocation();
     const hasSubmenu = item.submenu && item.submenu.length > 0;
 
+    // Проверяем активен ли какой-то из подпунктов
     const isParentActive = hasSubmenu 
-        ? location.pathname.startsWith(item.to)
+        ? item.submenu.some(sub => location.pathname === sub.to || location.pathname.startsWith(sub.to))
         : location.pathname === item.to;
 
-    const isOpen = openSection === item.to;
+    const isOpen = openSection === item.label;
 
-    // Автоматически открываем меню при переходе на активную страницу
-    useEffect(() => {
-        if (isParentActive && !isOpen) {
-            setOpenSection(item.to);
+    // Функции для управления dropdown при наведении
+    const handleMouseEnter = () => {
+        if (hasSubmenu) {
+            setOpenSection(item.label);
         }
-    }, [isParentActive, item.to, setOpenSection, isOpen]);
+    };
+
+    const handleMouseLeave = () => {
+        if (hasSubmenu) {
+            setOpenSection(null);
+        }
+    };
 
     if (hasSubmenu) {
         return (
-            <div>
-                <div className='rounded-lg px-4 py-2.5 text-lg font-semibold'>
-                    <NavLink 
-                        to={item.to} 
-                        end 
-                        onClick={onMobileMenuClose}
-                        className={({isActive}) => `flex items-center gap-4 transition-colors ${isActive || isParentActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
+            <div 
+                className="relative"
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
+            >
+                <div className={`rounded-lg px-4 py-2.5 text-lg font-semibold cursor-pointer transition-colors ${
+                    isParentActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                }`}>
+                    <div className="flex items-center gap-4">
                         <item.icon className="h-6 w-6" />
                         {item.label}
-                    </NavLink>
+                    </div>
                 </div>
                 {isOpen && (
-                    <div className="pl-8 pt-2 flex flex-col gap-1">
+                    <div className="ml-4 mt-1 space-y-1 border-l-2 border-primary/20 pl-4">
                         {item.submenu.map((subItem) => (
                             <NavLink
                                 key={subItem.to}
@@ -73,8 +87,8 @@ const SidebarNavItem = ({ item, openSection, setOpenSection, onMobileMenuClose }
                                 className={({ isActive }) =>
                                     `flex items-center gap-3 rounded-md px-4 py-2 text-base font-medium transition-colors ${
                                         isActive
-                                            ? 'text-primary'
-                                            : 'text-muted-foreground hover:text-foreground/80'
+                                            ? 'bg-primary/10 text-primary'
+                                            : 'text-muted-foreground hover:bg-muted/30 hover:text-foreground/80'
                                     }`
                                 }
                             >
