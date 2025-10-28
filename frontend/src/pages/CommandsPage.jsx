@@ -30,7 +30,12 @@ import {
     Twitch,
     Star,
     Filter,
-    ChevronDown
+    ChevronDown,
+    Info,
+    Play,
+    Mic,
+    Radio,
+    Tag
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useIntegrations } from '../context/IntegrationsContext';
@@ -58,6 +63,7 @@ import PageWrapper from '../components/PageWrapper';
     const [selectedBasicTags, setSelectedBasicTags] = useState([]);
     const [basicTags, setBasicTags] = useState([]);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
+    const [tagSearchTerm, setTagSearchTerm] = useState('');
     
     
     // Состояния для создания/редактирования команд
@@ -101,6 +107,18 @@ import PageWrapper from '../components/PageWrapper';
         { value: 'twitch', label: 'Только Twitch', enabled: integrations?.twitch?.enabled },
         { value: 'vk', label: 'Только VK Live', enabled: integrations?.vk?.enabled }
     ];
+
+    // Конфигурация тегов (категорий) с иконками и цветами
+    const tagConfig = {
+        'Общее': { icon: Info, color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
+        'Медиа и интерактивность': { icon: Play, color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
+        'TTS ИИ озвучка': { icon: Mic, color: 'bg-green-500/10 text-green-600 border-green-500/20' },
+        'Управление трансляцией': { icon: Radio, color: 'bg-orange-500/10 text-orange-600 border-orange-500/20' }
+    };
+
+    const getTagConfig = (tag) => {
+        return tagConfig[tag] || { icon: Tag, color: 'bg-gray-500/10 text-gray-600 border-gray-500/20' };
+    };
 
     // Получаем доступные платформы
     const availablePlatforms = platformOptions.filter(opt => opt.enabled);
@@ -363,14 +381,23 @@ import PageWrapper from '../components/PageWrapper';
                     </div>
                 </div>
 
-                {/* Теги */}
+                {/* Теги с иконками и цветами */}
                 {command.tags && Array.isArray(command.tags) && command.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                        {command.tags.map(tag => (
-                            <Badge key={tag} variant="secondary" className="text-xs">
-                                {tag}
-                            </Badge>
-                        ))}
+                    <div className="flex flex-wrap gap-1.5">
+                        {command.tags.map(tag => {
+                            const config = getTagConfig(tag);
+                            const IconComponent = config.icon;
+                            return (
+                                <Badge 
+                                    key={tag} 
+                                    variant="outline" 
+                                    className={`text-xs px-2 py-0.5 flex items-center gap-1 ${config.color}`}
+                                >
+                                    <IconComponent className="h-3 w-3" />
+                                    {tag}
+                                </Badge>
+                            );
+                        })}
                     </div>
                 )}
 
@@ -500,24 +527,38 @@ import PageWrapper from '../components/PageWrapper';
                                                 </div>
                                                 <Input
                                                     placeholder="Поиск тегов..."
+                                                    value={tagSearchTerm}
+                                                    onChange={(e) => setTagSearchTerm(e.target.value)}
                                                     className="h-8 text-xs"
                                                 />
                                             </div>
-                                            <div className="max-h-48 overflow-y-auto">
+                                            <div className="max-h-64 overflow-y-auto">
                                                 {basicTags.length > 0 ? (
-                                                    basicTags.map(tag => (
-                                                        <div
-                                                            key={tag}
-                                                            className="flex items-center space-x-2 p-2 hover:bg-muted/50 cursor-pointer"
-                                                            onClick={() => toggleTag(tag)}
-                                                        >
-                                                            <Checkbox
-                                                                checked={selectedBasicTags.includes(tag)}
-                                                                onChange={() => toggleTag(tag)}
-                                                            />
-                                                            <span className="text-sm flex-1">{tag}</span>
-                                                        </div>
-                                                    ))
+                                                    basicTags
+                                                        .filter(tag => tag.toLowerCase().includes(tagSearchTerm.toLowerCase()))
+                                                        .map(tag => {
+                                                        const config = getTagConfig(tag);
+                                                        const IconComponent = config.icon;
+                                                        const isSelected = selectedBasicTags.includes(tag);
+                                                        return (
+                                                            <div
+                                                                key={tag}
+                                                                className={`flex items-center space-x-3 p-2.5 hover:bg-muted/70 cursor-pointer rounded-md transition-colors ${
+                                                                    isSelected ? 'bg-muted/50' : ''
+                                                                }`}
+                                                                onClick={() => toggleTag(tag)}
+                                                            >
+                                                                <Checkbox
+                                                                    checked={isSelected}
+                                                                    onChange={() => toggleTag(tag)}
+                                                                />
+                                                                <div className={`p-1.5 rounded-md ${config.color}`}>
+                                                                    <IconComponent className="h-3.5 w-3.5" />
+                                                                </div>
+                                                                <span className="text-sm flex-1 font-medium">{tag}</span>
+                                                            </div>
+                                                        );
+                                                    })
                                                 ) : (
                                                     <div className="p-3 text-sm text-muted-foreground text-center">
                                                         Нет тегов

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, SkipForward, Volume2, VolumeX, Plus, X, Maximize, Minimize, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Pause, SkipForward, Volume2, VolumeX, Plus, X, Maximize, Minimize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,18 +37,11 @@ const YoutubeIntegrationPage = () => {
     const [isObsUrlVisible, setIsObsUrlVisible] = useState(false);
     const { lastJsonMessage } = useChat();
     
-    // Пагинация для очереди
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 5;
-    const totalPages = Math.ceil(queue.length / itemsPerPage);
-    const paginatedQueue = queue.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-    
-    // Сброс на первую страницу при изменении длины очереди
-    useEffect(() => {
-        if (currentPage > totalPages && totalPages > 0) {
-            setCurrentPage(1);
-        }
-    }, [queue.length, currentPage, totalPages]);
+    // Пагинация больше не нужна - очередь теперь на всю высоту
+    // const [currentPage, setCurrentPage] = useState(1);
+    // const itemsPerPage = 5;
+    // const totalPages = Math.ceil(queue.length / itemsPerPage);
+    // const paginatedQueue = queue.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
     // Обработчик готовности плеера с установкой ссылки
     const handlePlayerReadyWithRef = (event) => {
@@ -214,41 +207,41 @@ const YoutubeIntegrationPage = () => {
 
     return (
         <div 
-            className={`transition-all duration-300 ${isTheaterMode ? 'fixed inset-0 bg-black z-50 p-2' : 'container mx-auto px-4 py-6 max-w-6xl'}`}
+            className={`transition-all duration-300 ${isTheaterMode ? 'fixed inset-0 bg-black z-50 p-2' : 'container mx-auto px-4 py-6 max-w-6xl h-[calc(100vh-8rem)]'}`}
             onClick={handleBackdropClick}
             style={isTheaterMode ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999 } : {}}
         >
             <div className={`w-full h-full ${isTheaterMode ? '' : ''}`}>
-                <Card className={`transition-all duration-300 w-full ${isTheaterMode ? 'bg-black border-none h-full' : ''}`}>
-                    <CardContent className={`${isTheaterMode ? 'grid grid-cols-5 gap-6 h-full' : 'flex flex-col gap-6'} p-6`}>
+                <Card className={`transition-all duration-300 w-full ${isTheaterMode ? 'bg-black border-none h-full' : 'h-full flex flex-col'}`}>
+                    <CardContent className={`${isTheaterMode ? 'grid grid-cols-5 gap-6 h-full' : 'flex flex-col gap-6 h-full'} p-6`}>
                         <div className={`space-y-4 ${isTheaterMode ? 'col-span-4' : 'w-full'}`}>
-                            {/* Информация о текущем видео */}
+                            {/* Информация о текущем видео - УМЕНЬШЕНО В 3 РАЗА */}
                             {playbackMode === 'browser' ? (
-                                <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                                <div className="relative bg-black rounded-lg overflow-hidden" style={{ height: '200px' }}>
                                     {currentVideo ? (
                                         <div className="w-full h-full flex items-center justify-center bg-muted">
                                             <div className="text-center">
-                                                <p className="text-muted-foreground text-lg mb-2">Видео воспроизводится в глобальном плеере</p>
-                                                <p className="text-sm text-muted-foreground">Управление доступно в мини-плеере внизу страницы</p>
+                                                <p className="text-muted-foreground text-sm mb-1">Видео воспроизводится в глобальном плеере</p>
+                                                <p className="text-xs text-muted-foreground">Управление доступно в мини-плеере внизу страницы</p>
                                             </div>
                                         </div>
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center bg-muted">
-                                            <p className="text-muted-foreground">Нет видео для воспроизведения.</p>
+                                            <p className="text-muted-foreground text-sm">Нет видео для воспроизведения.</p>
                                         </div>
                                     )}
                                 </div>
                             ) : (
-                                <div className="relative aspect-video bg-gray-800 rounded-lg overflow-hidden border-2 border-purple-500">
-                                    <div className="w-full h-full flex flex-col items-center justify-center text-center p-6">
-                                        <div className="text-6xl mb-4">📹</div>
-                                        <h3 className="text-xl font-medium text-purple-300 mb-2">Режим OBS Studio</h3>
-                                        <p className="text-gray-300 mb-4">
+                                <div className="relative bg-gray-800 rounded-lg overflow-hidden border-2 border-purple-500" style={{ height: '200px' }}>
+                                    <div className="w-full h-full flex flex-col items-center justify-center text-center p-4">
+                                        <div className="text-4xl mb-2">📹</div>
+                                        <h3 className="text-base font-medium text-purple-300 mb-1">Режим OBS Studio</h3>
+                                        <p className="text-gray-300 text-xs mb-2">
                                             Видео воспроизводятся в OBS Studio.<br/>
                                             Управление происходит через кнопки ниже.
                                         </p>
                                         {currentVideo && (
-                                            <div className="text-sm text-gray-400 bg-gray-700 p-3 rounded-lg">
+                                            <div className="text-xs text-gray-400 bg-gray-700 p-2 rounded-lg">
                                                 <strong>Сейчас играет:</strong> {currentVideo.title}
                                             </div>
                                         )}
@@ -401,37 +394,12 @@ const YoutubeIntegrationPage = () => {
                             )}
                         </div>
 
-                        <div className={`flex flex-col ${isTheaterMode ? 'col-span-1 h-full' : 'w-full'}`}>
-                            <Card className={isTheaterMode ? 'flex-1 flex flex-col' : ''}>
+                        <div className={`flex flex-col ${isTheaterMode ? 'col-span-1 h-full' : 'w-full flex-1'}`}>
+                            <Card className={isTheaterMode ? 'flex-1 flex flex-col' : 'flex-1 flex flex-col h-full'}>
                                 <CardHeader className="pb-3">
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle>Очередь ({queue.length})</CardTitle>
-                                        {!isTheaterMode && totalPages > 1 && (
-                                            <div className="flex items-center gap-2">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                                                    disabled={currentPage === 1}
-                                                >
-                                                    <ChevronLeft className="h-4 w-4" />
-                                                </Button>
-                                                <span className="text-sm text-muted-foreground">
-                                                    {currentPage} / {totalPages}
-                                                </span>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                                                    disabled={currentPage === totalPages}
-                                                >
-                                                    <ChevronRight className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </div>
+                                    <CardTitle>Очередь ({queue.length})</CardTitle>
                                 </CardHeader>
-                                <CardContent className={`p-0 ${isTheaterMode ? 'flex-1 overflow-y-auto' : ''}`}>
+                                <CardContent className={`p-0 flex-1 overflow-y-auto`}>
                                     {currentVideo && (
                                         <div className="p-4 border-b bg-muted/20">
                                             <p className="text-xs text-muted-foreground mb-2">Сейчас играет:</p>
@@ -447,12 +415,11 @@ const YoutubeIntegrationPage = () => {
                                     
                                     {queue.length > 0 ? (
                                         <div className="p-4 space-y-3">
-                                            {(isTheaterMode ? queue : paginatedQueue).map((video, index) => {
-                                                const displayIndex = isTheaterMode ? index : (currentPage - 1) * itemsPerPage + index;
+                                            {queue.map((video, index) => {
                                                 return (
                                                     <div key={video.id} className="flex gap-3 p-2 border rounded-lg hover:bg-muted/50 cursor-pointer">
                                                         <div className="flex-shrink-0 w-6 h-6 bg-muted rounded-full flex items-center justify-center text-xs font-medium">
-                                                            {displayIndex + 1}
+                                                            {index + 1}
                                                         </div>
                                                         <img src={video.thumbnail_url} alt={video.title} className="w-20 h-12 object-cover rounded"/>
                                                         <div className="flex-1 min-w-0">
