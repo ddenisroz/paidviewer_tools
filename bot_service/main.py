@@ -465,7 +465,13 @@ async def lifespan(app: FastAPI):
                             
                             if vk_token_record:
                                 logger.info(f"📺 [VK] Found VK token record for user_id: {vk_token_record.user_id}")
+                                
+                                # Расшифровываем токен перед использованием
+                                from core.token_encryption import decrypt_token, is_token_encrypted
                                 vk_access_token = vk_token_record.access_token
+                                if is_token_encrypted(vk_access_token):
+                                    vk_access_token = decrypt_token(vk_access_token)
+                                    logger.info(f"🔓 [VK] Token decrypted for validation")
                                 
                                 # Проверяем валидность токена через VK Live API
                                 import requests
