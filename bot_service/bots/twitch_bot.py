@@ -74,6 +74,17 @@ class Bot(TwitchBotCore):
         """Вызывается когда бот готов к работе"""
         await super().event_ready()
         logger.info("[BOT] All modules loaded and ready!")
+        
+        # Отправляем приветственное сообщение с фейковым IP (шутка)
+        import random
+        fake_ip = f"{random.randint(100, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}"
+        
+        for channel in self.connected_channels:
+            try:
+                await channel.send(f"🤖 Бот подключен! IP: {fake_ip} | Используйте !commands для списка команд")
+                logger.info(f"✅ [BOT] Welcome message sent to {channel.name} with fake IP: {fake_ip}")
+            except Exception as e:
+                logger.error(f"❌ [BOT] Failed to send welcome message to {channel.name}: {e}")
 
     async def event_message(self, message):
         """Обработка входящих сообщений"""

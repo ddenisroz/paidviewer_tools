@@ -36,6 +36,15 @@ class VKLiveBot(VKLiveBotCore):
                 f"vk_{channel_id}",
                 "vk"
             )
+            
+            # Отправляем приветственное сообщение с фейковым IP (шутка)
+            try:
+                import random
+                fake_ip = f"{random.randint(100, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}"
+                await self.send_message(channel_id, f"🤖 Бот VK Live подключен! IP: {fake_ip} | Используйте !commands для списка команд")
+                logger.info(f"✅ [VK BOT] Welcome message sent to {channel_id} with fake IP: {fake_ip}")
+            except Exception as e:
+                logger.error(f"❌ [VK BOT] Failed to send welcome message to {channel_id}: {e}")
         
         return success
 

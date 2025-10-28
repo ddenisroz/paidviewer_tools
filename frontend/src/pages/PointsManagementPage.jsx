@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../constants';
-import { Gift, Plus, Edit, Trash2, Upload } from 'lucide-react';
+import { Gift, Plus, Edit, Trash2, Upload, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { TwitchIcon, VKIcon } from '../components/PlatformIcons';
 
@@ -54,8 +54,9 @@ const PointsManagementPage = () => {
 
   if (loading && activeTab === 'rewards') {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Загрузка наград...</p>
       </div>
     );
   }

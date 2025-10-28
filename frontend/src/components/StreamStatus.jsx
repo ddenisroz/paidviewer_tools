@@ -97,11 +97,11 @@ const StreamStatus = ({ integrations, streamData, isLoading = false }) => {
             </Card>
             
             {/* VK Live статус */}
-            <Card className={`${vkEnabled ? 'border-blue-500/20 bg-blue-500/5' : 'border-muted-foreground/20 bg-muted/5'}`}>
+            <Card className={`${vkEnabled ? 'border-red-500/20 bg-red-500/5' : 'border-muted-foreground/20 bg-muted/5'}`}>
                 <CardContent className="p-4">
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
-                            <VKIcon className="h-6 w-6 text-blue-500" />
+                            <VKIcon className="h-6 w-6 text-red-500" />
                             <div className="font-medium text-sm">VK Live</div>
                         </div>
                         <div className="flex items-center gap-3">
