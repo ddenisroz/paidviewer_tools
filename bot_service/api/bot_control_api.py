@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from auth.auth import get_current_user
 from core.token_manager import token_manager
 from core.connection_manager import get_connection_manager
-from core.database import UserToken, get_db
+from core.database import UserToken, User, get_db
 from sqlalchemy.orm import Session
 import logging
 
@@ -20,6 +20,11 @@ async def get_bot_status(user: dict = Depends(get_current_user), db: Session = D
         # Получаем токены пользователя (без проверки session - это статус бота)
         twitch_token = token_manager.get_user_token_data(user_id, "twitch", require_session_check=False)
         vk_token = token_manager.get_user_token_data(user_id, "vk", require_session_check=False)
+        
+        # Получаем usernames из таблицы User
+        user_record = db.query(User).filter(User.id == user_id).first()
+        if not user_record:
+            raise HTTPException(status_code=404, detail="User not found")
         
         bot_status = {
             "connected": False,
@@ -41,9 +46,9 @@ async def get_bot_status(user: dict = Depends(get_current_user), db: Session = D
         
         # Проверяем Twitch бота (bot_instance теперь глобальная переменная из main.py)
         from main import bot_instance
-        if bot_instance and twitch_token:
-            channel_name = twitch_token.get("platform_username")
-            if channel_name and connection_manager.is_channel_active(channel_name):
+        if bot_instance and twitch_token and user_record.twitch_username:
+            channel_name = user_record.twitch_username
+            if connection_manager.is_channel_active(channel_name):
                 bot_status["twitch"]["connected"] = True
                 bot_status["twitch"]["channel"] = channel_name
                 bot_status["connected"] = True
@@ -52,9 +57,9 @@ async def get_bot_status(user: dict = Depends(get_current_user), db: Session = D
         
         # Проверяем VK бота (vk_live_bot_instance теперь глобальная переменная из main.py)
         from main import vk_live_bot_instance
-        if vk_live_bot_instance and vk_token:
-            channel_name = vk_token.get("platform_username")
-            if channel_name and connection_manager.is_channel_active(channel_name):
+        if vk_live_bot_instance and vk_token and user_record.vk_channel_name:
+            channel_name = user_record.vk_channel_name
+            if connection_manager.is_channel_active(channel_name):
                 bot_status["vk"]["connected"] = True
                 bot_status["vk"]["channel"] = channel_name
                 if not bot_status["connected"]:
@@ -68,7 +73,7 @@ async def get_bot_status(user: dict = Depends(get_current_user), db: Session = D
         return {"connected": False, "error": str(e)}
 
 @router.post("/chat/connect")
-async def connect_chat(user: dict = Depends(get_current_user)):
+async def connect_chat(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Подключить чат-бота"""
     try:
         user_id = user.get("id")
@@ -81,17 +86,24 @@ async def connect_chat(user: dict = Depends(get_current_user)):
         if not twitch_token and not vk_token:
             return {"success": False, "error": "Нет подключенных платформ. Подключите Twitch или VK Live"}
         
+        # Получаем usernames из таблицы User
+        user_record = db.query(User).filter(User.id == user_id).first()
+        if not user_record:
+            raise HTTPException(status_code=404, detail="User not found")
+        
         # Боты уже запущены глобально и автоматически подключаются к каналам
         # при наличии токенов. Проверяем статус подключения
+        connection_manager = get_connection_manager()
+        from main import bot_instance, vk_live_bot_instance
         connected_platforms = []
         
-        if twitch_token:
-            channel_name = twitch_token.get("platform_username")
+        if twitch_token and user_record.twitch_username:
+            channel_name = user_record.twitch_username
             if bot_instance and connection_manager.is_channel_active(channel_name):
                 connected_platforms.append("Twitch")
         
-        if vk_token:
-            channel_name = vk_token.get("platform_username")
+        if vk_token and user_record.vk_channel_name:
+            channel_name = user_record.vk_channel_name
             if vk_live_bot_instance and connection_manager.is_channel_active(channel_name):
                 connected_platforms.append("VK Live")
         
@@ -110,25 +122,32 @@ async def connect_chat(user: dict = Depends(get_current_user)):
         return {"success": False, "error": str(e)}
 
 @router.post("/chat/disconnect")
-async def disconnect_chat(user: dict = Depends(get_current_user)):
+async def disconnect_chat(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Отключить чат-бота"""
     try:
         user_id = user.get("id")
         logger.info(f"Chat disconnect requested by user {user_id}")
         
         # Получаем токены и удаляем активные сессии
+        from core.token_utils import get_user_token_from_db
         twitch_token = get_user_token_from_db(user_id, "twitch")
         vk_token = get_user_token_from_db(user_id, "vk")
         
+        # Получаем usernames из таблицы User
+        user_record = db.query(User).filter(User.id == user_id).first()
+        if not user_record:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        connection_manager = get_connection_manager()
         disconnected = []
         
-        if twitch_token:
-            channel_name = twitch_token.get("platform_username")
+        if twitch_token and user_record.twitch_username:
+            channel_name = user_record.twitch_username
             if connection_manager.remove_active_session(channel_name, "manual_disconnect"):
                 disconnected.append("Twitch")
         
-        if vk_token:
-            channel_name = vk_token.get("platform_username")
+        if vk_token and user_record.vk_channel_name:
+            channel_name = user_record.vk_channel_name
             if connection_manager.remove_active_session(channel_name, "manual_disconnect"):
                 disconnected.append("VK Live")
         
@@ -147,7 +166,7 @@ async def disconnect_chat(user: dict = Depends(get_current_user)):
         return {"success": False, "error": str(e)}
 
 @router.get("/chat/status")
-async def get_chat_status(user: dict = Depends(get_current_user)):
+async def get_chat_status(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Получить статус чата"""
     try:
         user_id = user.get("id")
@@ -155,6 +174,11 @@ async def get_chat_status(user: dict = Depends(get_current_user)):
         # Используем TokenManager (не требует session check для bot status)
         twitch_token = token_manager.get_user_token_data(user_id, "twitch", require_session_check=False)
         vk_token = token_manager.get_user_token_data(user_id, "vk", require_session_check=False)
+        
+        # Получаем usernames из таблицы User
+        user_record = db.query(User).filter(User.id == user_id).first()
+        if not user_record:
+            raise HTTPException(status_code=404, detail="User not found")
         
         chat_status = {
             "connected": False,
@@ -168,17 +192,17 @@ async def get_chat_status(user: dict = Depends(get_current_user)):
         from main import bot_instance, vk_live_bot_instance
         
         # Проверяем подключение к чатам
-        if bot_instance and twitch_token:
-            channel_name = twitch_token.get("platform_username")
-            if channel_name and connection_manager.is_channel_active(channel_name):
+        if bot_instance and twitch_token and user_record.twitch_username:
+            channel_name = user_record.twitch_username
+            if connection_manager.is_channel_active(channel_name):
                 chat_status["connected"] = True
                 chat_status["channel"] = channel_name
                 chat_status["platform"] = "twitch"
                 return chat_status
         
-        if vk_live_bot_instance and vk_token:
-            channel_name = vk_token.get("platform_username")
-            if channel_name and connection_manager.is_channel_active(channel_name):
+        if vk_live_bot_instance and vk_token and user_record.vk_channel_name:
+            channel_name = user_record.vk_channel_name
+            if connection_manager.is_channel_active(channel_name):
                 chat_status["connected"] = True
                 chat_status["channel"] = channel_name
                 chat_status["platform"] = "vk"
@@ -190,7 +214,7 @@ async def get_chat_status(user: dict = Depends(get_current_user)):
         return {"connected": False, "error": str(e)}
 
 @router.post("/chat/reconnect")
-async def reconnect_chat(user: dict = Depends(get_current_user)):
+async def reconnect_chat(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Переподключить чат-бота"""
     try:
         user_id = user.get("id")
@@ -203,19 +227,25 @@ async def reconnect_chat(user: dict = Depends(get_current_user)):
         if not twitch_token and not vk_token:
             return {"success": False, "error": "Нет подключенных платформ"}
         
+        # Получаем usernames из таблицы User
+        user_record = db.query(User).filter(User.id == user_id).first()
+        if not user_record:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        connection_manager = get_connection_manager()
         reconnected = []
         
         # Переподключаем Twitch
-        if twitch_token:
-            channel_name = twitch_token.get("platform_username")
+        if twitch_token and user_record.twitch_username:
+            channel_name = user_record.twitch_username
             # Удаляем старую сессию если есть
             connection_manager.remove_active_session(channel_name, "reconnect")
             # Бот автоматически переподключится
             reconnected.append("Twitch")
         
         # Переподключаем VK
-        if vk_token:
-            channel_name = vk_token.get("platform_username")
+        if vk_token and user_record.vk_channel_name:
+            channel_name = user_record.vk_channel_name
             # Удаляем старую сессию если есть
             connection_manager.remove_active_session(channel_name, "reconnect")
             # Бот автоматически переподключится

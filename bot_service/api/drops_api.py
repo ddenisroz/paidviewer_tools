@@ -815,6 +815,15 @@ async def donationalerts_webhook(
             logger.warning(f"No user found for DonationAlerts ID: {data.get('user_id')}")
             return {"success": False, "message": "User not found"}
         
+        # Получаем username пользователя для channel_name
+        user = db.query(User).filter(User.id == user_token.user_id).first()
+        if not user:
+            logger.warning(f"User not found for user_id: {user_token.user_id}")
+            return {"success": False, "message": "User record not found"}
+        
+        # Используем username того канала который подключен (twitch или vk)
+        channel_name = user.twitch_username or user.vk_channel_name or 'default'
+        
         # === СОХРАНЯЕМ ДОНАТ В БД ===
         try:
             # Проверяем, не обработан ли этот донат уже
@@ -826,7 +835,7 @@ async def donationalerts_webhook(
                 # Создаем новую запись о донате
                 donation_record = DonationAlert(
                     user_id=user_token.user_id,
-                    channel_name=user_token.platform_username or 'default',
+                    channel_name=channel_name,
                     amount=float(donation_amount),
                     currency=data.get('currency', 'RUB'),
                     message=message,
@@ -847,7 +856,7 @@ async def donationalerts_webhook(
         # Обрабатываем донат Drops
         result = drops_service.process_donation_drops(
             user_id=user_token.user_id,
-            channel_name=user_token.platform_username or 'default',
+            channel_name=channel_name,
             platform='donationalerts',
             viewer_id=donor_id,
             viewer_name=donor_name,

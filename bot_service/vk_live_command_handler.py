@@ -29,19 +29,17 @@ class VKLiveCommandHandler:
             
             db = next(get_db())
             try:
-                # Ищем токен VK Live для этого канала
-                user_token = db.query(UserToken).filter(
-                    UserToken.platform == "vk",
-                    UserToken.platform_username == channel.lower()
+                # Ищем пользователя по vk_channel_name (правильное поле!)
+                vk_user = db.query(User).filter(
+                    User.vk_channel_name == channel.lower()
                 ).first()
                 
-                if user_token:
-                    return user_token.user_id
+                if vk_user:
+                    return vk_user.id
                 
-                # Если не нашли по username, пробуем найти первого активного VK пользователя
-                # (для обратной совместимости)
+                # Fallback: ищем по vk_username для обратной совместимости
                 vk_user = db.query(User).filter(
-                    User.vk_username.isnot(None)
+                    User.vk_username == channel.lower()
                 ).first()
                 
                 return vk_user.id if vk_user else None
