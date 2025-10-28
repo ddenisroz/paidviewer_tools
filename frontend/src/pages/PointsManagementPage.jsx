@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE_URL } from '../constants';
+import PropTypes from 'prop-types';
 import { Gift, Plus, Edit, Trash2, Loader2, Power, PowerOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { TwitchIcon, VKIcon } from '../components/PlatformIcons';
@@ -11,6 +11,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import pointsApi from '../services/pointsApi';
+import { PLATFORM_COLORS } from '../constants/uiConstants';
 
 const PointsManagementPage = () => {
   const { user } = useAuth();
@@ -24,27 +26,15 @@ const PointsManagementPage = () => {
   const loadRewards = async () => {
     try {
       setLoading(true);
-      
-      const response = await fetch(`${API_BASE_URL}/api/points/rewards/${selectedPlatform}`, {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
+      const data = await pointsApi.getRewards(selectedPlatform);
         setRewards(data.rewards || []);
-      } else {
-        const errorText = await response.text();
-        console.error('Failed to load rewards:', response.status, errorText);
-        toast.error(`Ошибка загрузки наград: ${errorText}`);
-        setRewards([]);
-      }
-
     } catch (err) {
       console.error('Error loading rewards:', err);
-      toast.error('Не удалось загрузить награды');
+      if (err.message.includes('404')) {
+        toast.error(`${selectedPlatform === 'twitch' ? 'Twitch' : 'VK Live'} не подключен. Авторизуйтесь на платформе.`);
+      } else {
+        toast.error(err.message || 'Не удалось загрузить награды');
+      }
       setRewards([]);
     } finally {
       setLoading(false);
@@ -71,27 +61,27 @@ const PointsManagementPage = () => {
         <h1 className="text-3xl font-bold">Баллы канала</h1>
         
         {/* Переключатель платформ - компактно */}
-        <div className="flex bg-muted rounded-lg p-1">
+            <div className="flex bg-muted rounded-lg p-1">
           <Button
             variant={selectedPlatform === 'twitch' ? 'default' : 'ghost'}
             size="sm"
-            onClick={() => setSelectedPlatform('twitch')}
+                onClick={() => setSelectedPlatform('twitch')}
             className="gap-2"
-          >
-            <TwitchIcon className="w-4 h-4" />
-            Twitch
+              >
+                <TwitchIcon className="w-4 h-4" />
+                Twitch
           </Button>
           <Button
             variant={selectedPlatform === 'vk' ? 'default' : 'ghost'}
             size="sm"
-            onClick={() => setSelectedPlatform('vk')}
+                onClick={() => setSelectedPlatform('vk')}
             className="gap-2"
-          >
-            <VKIcon className="w-4 h-4" />
-            VK Live
+              >
+                <VKIcon className="w-4 h-4" />
+                VK Live
           </Button>
+          </div>
         </div>
-      </div>
 
       {/* Список наград */}
       <div className="space-y-4">
@@ -120,7 +110,7 @@ const PointsManagementPage = () => {
             />
           ))
         )}
-      </div>
+          </div>
 
       {/* Диалог создания/редактирования */}
       <RewardDialog
@@ -130,7 +120,7 @@ const PointsManagementPage = () => {
           setEditingReward(null);
         }}
         reward={editingReward}
-        platform={selectedPlatform}
+                platform={selectedPlatform}
         onSuccess={() => {
           setShowCreateDialog(false);
           setEditingReward(null);
@@ -141,7 +131,14 @@ const PointsManagementPage = () => {
   );
 };
 
-// Карточка награды
+/**
+ * Displays a reward card with title, description, cost, and action buttons
+ * @param {Object} props
+ * @param {Object} props.reward - Reward object from API
+ * @param {'twitch'|'vk'} props.platform - Platform identifier
+ * @param {Function} props.onEdit - Callback when edit button clicked
+ * @param {Function} props.onRefresh - Callback to refresh rewards list
+ */
 const RewardCard = ({ reward, platform, onEdit, onRefresh }) => {
   const [deleting, setDeleting] = useState(false);
   const [toggling, setToggling] = useState(false);
@@ -153,34 +150,23 @@ const RewardCard = ({ reward, platform, onEdit, onRefresh }) => {
     try {
       // Для VK: сначала отключаем награду, потом удаляем
       if (platform === 'vk' && reward.is_enabled) {
-        const toggleResponse = await fetch(`${API_BASE_URL}/api/points/rewards/vk/${reward.id}/toggle`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ is_enabled: false })
-        });
-        
-        if (!toggleResponse.ok) {
-          toast.error('Не удалось отключить награду перед удалением');
-          return;
-        }
+        await pointsApi.toggleReward(reward.id, false);
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/points/rewards/${platform}/${reward.id}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        toast.success('Награда удалена');
-        onRefresh();
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.detail || 'Ошибка удаления награды');
-      }
+      await pointsApi.deleteReward(platform, reward.id);
+      toast.success('Награда удалена');
+      onRefresh();
     } catch (err) {
       console.error('Error deleting reward:', err);
-      toast.error('Не удалось удалить награду');
+      
+      // Детализированная обработка ошибок
+      if (err.message.includes('401')) {
+        toast.error('Сессия истекла. Войдите заново.');
+      } else if (err.message.includes('Network')) {
+        toast.error('Проверьте подключение к интернету');
+      } else {
+        toast.error(err.message || 'Не удалось удалить награду');
+      }
     } finally {
       setDeleting(false);
     }
@@ -191,29 +177,19 @@ const RewardCard = ({ reward, platform, onEdit, onRefresh }) => {
 
     setToggling(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/points/rewards/vk/${reward.id}/toggle`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_enabled: !reward.is_enabled })
-      });
-
-      if (response.ok) {
-        toast.success(reward.is_enabled ? 'Награда отключена' : 'Награда включена');
-        onRefresh();
-      } else {
-        toast.error('Ошибка переключения награды');
-      }
+      await pointsApi.toggleReward(reward.id, !reward.is_enabled);
+      toast.success(reward.is_enabled ? 'Награда отключена' : 'Награда включена');
+      onRefresh();
     } catch (err) {
       console.error('Error toggling reward:', err);
-      toast.error('Не удалось переключить награду');
+      toast.error(err.message || 'Не удалось переключить награду');
     } finally {
       setToggling(false);
     }
   };
 
   // Цвет для бейджа стоимости
-  const bgColor = reward.background_color || (platform === 'vk' ? '#FF0000' : '#9147FF');
+  const bgColor = reward.background_color || (platform === 'vk' ? PLATFORM_COLORS.VK_LIVE : PLATFORM_COLORS.TWITCH);
 
   return (
     <Card className="overflow-hidden border-l-4" style={{ borderLeftColor: bgColor }}>
@@ -297,7 +273,29 @@ const RewardCard = ({ reward, platform, onEdit, onRefresh }) => {
   );
 };
 
-// Диалог создания/редактирования награды
+RewardCard.propTypes = {
+  reward: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    title: PropTypes.string.isRequired,
+    description: PropTypes.string,
+    cost: PropTypes.number.isRequired,
+    is_enabled: PropTypes.bool,
+    background_color: PropTypes.string
+  }).isRequired,
+  platform: PropTypes.oneOf(['twitch', 'vk']).isRequired,
+  onEdit: PropTypes.func.isRequired,
+  onRefresh: PropTypes.func.isRequired
+};
+
+/**
+ * Dialog for creating or editing a reward
+ * @param {Object} props
+ * @param {boolean} props.open - Whether dialog is open
+ * @param {Function} props.onClose - Close dialog callback
+ * @param {Object} props.reward - Reward to edit (null for create)
+ * @param {'twitch'|'vk'} props.platform - Platform identifier
+ * @param {Function} props.onSuccess - Success callback
+ */
 const RewardDialog = ({ open, onClose, reward, platform, onSuccess }) => {
   const [formData, setFormData] = useState({
     title: '',
@@ -326,35 +324,26 @@ const RewardDialog = ({ open, onClose, reward, platform, onSuccess }) => {
 
     setSaving(true);
     try {
-      const url = reward
-        ? `${API_BASE_URL}/api/points/rewards/${platform}/${reward.id}`
-        : `${API_BASE_URL}/api/points/rewards/${platform}/create`;
-      
-      const method = reward ? 'PATCH' : 'POST';
+      const rewardData = {
+        title: formData.title,
+        description: formData.description,
+        cost: parseInt(formData.cost),
+        background_color: platform === 'vk' ? PLATFORM_COLORS.VK_LIVE : PLATFORM_COLORS.TWITCH,
+        is_enabled: true
+      };
 
-      const response = await fetch(url, {
-        method,
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: formData.title,
-          description: formData.description,
-          cost: parseInt(formData.cost),
-          background_color: '#9147ff',
-          is_enabled: true
-        })
-      });
-
-      if (response.ok) {
-        toast.success(reward ? 'Награда обновлена' : 'Награда создана');
-        onSuccess();
+      if (reward) {
+        await pointsApi.updateReward(platform, reward.id, rewardData);
+        toast.success('Награда обновлена');
       } else {
-        const errorData = await response.json();
-        toast.error(errorData.detail || 'Ошибка сохранения награды');
+        await pointsApi.createReward(platform, rewardData);
+        toast.success('Награда создана');
       }
+      
+      onSuccess();
     } catch (err) {
       console.error('Error saving reward:', err);
-      toast.error('Не удалось сохранить награду');
+      toast.error(err.message || 'Не удалось сохранить награду');
     } finally {
       setSaving(false);
     }
@@ -371,17 +360,17 @@ const RewardDialog = ({ open, onClose, reward, platform, onSuccess }) => {
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          <div>
+            <div>
             <Label htmlFor="title">Название</Label>
             <Input
               id="title"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               placeholder="Например: Приветствие"
-            />
-          </div>
-
-          <div>
+              />
+            </div>
+            
+            <div>
             <Label htmlFor="description">Описание</Label>
             <Textarea
               id="description"
@@ -389,10 +378,10 @@ const RewardDialog = ({ open, onClose, reward, platform, onSuccess }) => {
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Что получит зритель за эту награду?"
               rows={3}
-            />
-          </div>
-
-          <div>
+                />
+              </div>
+              
+              <div>
             <Label htmlFor="cost">Стоимость ({platform === 'twitch' ? 'поинты' : 'баллы'})</Label>
             <Input
               id="cost"
@@ -401,12 +390,12 @@ const RewardDialog = ({ open, onClose, reward, platform, onSuccess }) => {
               value={formData.cost}
               onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
             />
+            </div>
           </div>
-        </div>
-
+          
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Отмена
+              Отмена
           </Button>
           <Button onClick={handleSubmit} disabled={saving}>
             {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
@@ -416,6 +405,19 @@ const RewardDialog = ({ open, onClose, reward, platform, onSuccess }) => {
       </DialogContent>
     </Dialog>
   );
+};
+
+RewardDialog.propTypes = {
+  open: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  reward: PropTypes.shape({
+    id: PropTypes.string,
+    title: PropTypes.string,
+    description: PropTypes.string,
+    cost: PropTypes.number
+  }),
+  platform: PropTypes.oneOf(['twitch', 'vk']).isRequired,
+  onSuccess: PropTypes.func.isRequired
 };
 
 export default PointsManagementPage;

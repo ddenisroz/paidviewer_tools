@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Home, Mic, Youtube, Coins, Headphones, Settings, Shield, MessageSquare, Command, Sparkles, Monitor, Menu, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -67,6 +67,14 @@ const SidebarNavItem = ({ item, openSection, setOpenSection, onMobileMenuClose }
         }
     };
 
+    // Keyboard navigation для accessibility
+    const handleKeyDown = (e) => {
+        if (hasSubmenu && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            setOpenSection(isOpen ? null : item.label);
+        }
+    };
+
     if (hasSubmenu) {
         return (
             <div 
@@ -74,9 +82,17 @@ const SidebarNavItem = ({ item, openSection, setOpenSection, onMobileMenuClose }
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
             >
-                <div className={`rounded-lg px-4 py-2.5 text-lg font-semibold cursor-pointer transition-colors ${
-                    isParentActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                }`}>
+                <div 
+                    className={`rounded-lg px-4 py-2.5 text-lg font-semibold cursor-pointer transition-colors ${
+                        isParentActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                    }`}
+                    onClick={() => setOpenSection(isOpen ? null : item.label)}
+                    onKeyDown={handleKeyDown}
+                    tabIndex={0}
+                    role="button"
+                    aria-expanded={isOpen}
+                    aria-label={`${item.label} ${isOpen ? 'свернуть' : 'развернуть'}`}
+                >
                     <div className="flex items-center gap-4">
                         <item.icon className="h-6 w-6" />
                         {item.label}
@@ -166,7 +182,8 @@ const Sidebar = () => {
         }
     }, [isAuthenticated, user, adminUsers]);
     
-    const navItems = getNavItems(isAdmin);
+    // Мемоизируем navItems чтобы избежать пересоздания при каждом рендере
+    const navItems = useMemo(() => getNavItems(isAdmin), [isAdmin]);
     const location = useLocation();
     
     // Состояние для управления открытыми разделами
