@@ -3,11 +3,12 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import List, Optional
 from core.database import get_db, BotCommand
 from auth.auth import get_current_user, get_current_user_optional
 from utils.enhanced_logger import log_api_call, log_request, log_response, commands_logger
+from validators.input_validators import sanitize_input
 
 logger = logging.getLogger('bot_service')
 
@@ -23,6 +24,18 @@ class CommandCreate(BaseModel):
     allowed_roles: str = "all"    # comma-separated
     cooldown_seconds: int = 0
     is_enabled: bool = True
+    
+    @validator('command_name')
+    def sanitize_command_name(cls, v):
+        """Санитизация имени команды"""
+        if not v or not v.strip():
+            raise ValueError('Command name cannot be empty')
+        return sanitize_input(v, max_length=20)
+    
+    @validator('response_text')
+    def sanitize_response_text(cls, v):
+        """Санитизация текста ответа"""
+        return sanitize_input(v, max_length=500)
 
 class CommandUpdate(BaseModel):
     """Обновление команды"""
@@ -31,6 +44,13 @@ class CommandUpdate(BaseModel):
     allowed_roles: Optional[str] = None
     cooldown_seconds: Optional[int] = None
     response_text: Optional[str] = None
+    
+    @validator('response_text')
+    def sanitize_response_text(cls, v):
+        """Санитизация текста ответа при обновлении"""
+        if v is not None:
+            return sanitize_input(v, max_length=500)
+        return v
 
 class CommandOverrideCreate(BaseModel):
     """Создание user override для базовой команды"""

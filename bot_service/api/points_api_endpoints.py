@@ -2,11 +2,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 import logging
 
 from core.database import get_db
 from services.points_service import PointsService
+from validators.input_validators import sanitize_input
 
 logger = logging.getLogger('bot_service')
 
@@ -58,6 +59,23 @@ class CreateRewardRequest(BaseModel):
     max_per_user_per_stream: Optional[int] = None
     prompt: Optional[str] = None
     reward_type: Optional[str] = "custom"
+    
+    @validator('title')
+    def sanitize_title(cls, v):
+        """Санитизация названия награды"""
+        return sanitize_input(v, max_length=45)
+    
+    @validator('description')
+    def sanitize_description(cls, v):
+        """Санитизация описания награды"""
+        return sanitize_input(v, max_length=200)
+    
+    @validator('prompt')
+    def sanitize_prompt(cls, v):
+        """Санитизация подсказки"""
+        if v is not None:
+            return sanitize_input(v, max_length=100)
+        return v
 
 class RedeemRewardRequest(BaseModel):
     reward_id: int
