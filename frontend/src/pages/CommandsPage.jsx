@@ -49,6 +49,10 @@ import PageWrapper from '../components/PageWrapper';
     const [customCommands, setCustomCommands] = useState([]);
     const [loading, setLoading] = useState(true);
     
+    // 🚀 КЭШИРОВАНИЕ: Храним время последней загрузки
+    const [lastLoadTime, setLastLoadTime] = useState(0);
+    const CACHE_TTL = 30000; // 30 секунд кэш
+    
     // Состояния для фильтрации базовых команд (как в Excel)
     const [basicSearchTerm, setBasicSearchTerm] = useState('');
     const [selectedBasicTags, setSelectedBasicTags] = useState([]);
@@ -110,7 +114,16 @@ import PageWrapper from '../components/PageWrapper';
         }
     }, [isAuthenticated]);
 
-    const loadCommands = async () => {
+    const loadCommands = async (force = false) => {
+        // Проверяем кэш (если не force reload)
+        if (!force) {
+            const now = Date.now();
+            if (now - lastLoadTime < CACHE_TTL) {
+                console.log('📦 [CommandsPage] Using cached commands data');
+                return;
+            }
+        }
+        
         try {
             setLoading(true);
             const response = await api.get('/api/commands');
@@ -126,6 +139,9 @@ import PageWrapper from '../components/PageWrapper';
             }))];
             
             setBasicTags(tags);
+            
+            // Обновляем timestamp кэша
+            setLastLoadTime(Date.now());
             
         } catch (error) {
             console.error('Error loading commands:', error);

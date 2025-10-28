@@ -42,6 +42,10 @@ const HomePage = () => {
     // Дополнительные данные для VK Live
     const [vkStreamInfo, setVkStreamInfo] = useState(null);
     
+    // 🚀 КЭШИРОВАНИЕ: Храним время последней загрузки VK stream info
+    const [lastVkLoadTime, setLastVkLoadTime] = useState(0);
+    const CACHE_TTL = 30000; // 30 секунд кэш
+    
     // Общее состояние загрузки для всех карточек
     const [contentLoaded, setContentLoaded] = useState(false);
     
@@ -55,9 +59,17 @@ const HomePage = () => {
     useEffect(() => {
         const loadVkStreamInfo = async () => {
             if (integrations?.vk?.enabled && isAuthenticated) {
+                // Проверяем кэш
+                const now = Date.now();
+                if (now - lastVkLoadTime < CACHE_TTL) {
+                    console.log('📦 [HomePage] Using cached VK stream info');
+                    return;
+                }
+                
                 try {
                     const response = await botService.get('/api/vk/stream-info');
                     setVkStreamInfo(response.data);
+                    setLastVkLoadTime(now);
                 } catch (error) {
                     console.error('Error loading VK stream info:', error);
                     setVkStreamInfo(null);
@@ -70,7 +82,7 @@ const HomePage = () => {
         // Обновляем каждые 30 секунд
         const interval = setInterval(loadVkStreamInfo, 30000);
         return () => clearInterval(interval);
-    }, [integrations?.vk?.enabled, isAuthenticated]);
+    }, [integrations?.vk?.enabled, isAuthenticated, lastVkLoadTime]);
 
     // Удален неиспользуемый preparedStreamHistory
 
