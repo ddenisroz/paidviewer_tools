@@ -5,6 +5,7 @@ import aiohttp
 import asyncio
 import logging
 import time
+import httpx
 
 # Глобальный timeout для VK API запросов (10 секунд)
 VK_API_TIMEOUT = aiohttp.ClientTimeout(total=10)
@@ -19,6 +20,14 @@ from constants import DEFAULT_BACKEND_URL
 
 logger = logging.getLogger(__name__)
 
+# Полный список scopes для VK Live OAuth
+VK_OAUTH_SCOPES = [
+    "channel:stream:settings",          # Управление настройками трансляции
+    "channel:points:rewards",           # Управление наградами за баллы
+    "channel:points:rewards:demands",   # Управление запросами на награды
+    "channel:roles"                     # Управление ролями канала (VIP, модераторы)
+]
+
 @dataclass
 class RateLimiter:
     """Класс для контроля rate limiting"""
@@ -27,7 +36,7 @@ class RateLimiter:
 
 class VKLiveAPI:
     def __init__(self):
-        self.live_base_url = "https://apidev.live.vkvideo.ru"
+        self.live_base_url = "https://apidev.live.vkvideo.ru"  # VK Live API
         self.rate_limiter = RateLimiter()
         
     async def _wait_for_rate_limit(self) -> None:
@@ -692,7 +701,7 @@ class VKLiveAPI:
     async def get_channel_points_balance(self, channel_url: str, access_token: str) -> Optional[Dict[str, Any]]:
         """Получить баланс баллов канала"""
         try:
-            url = f"{self.base_url}/v1/channel_point"
+            url = f"{self.live_base_url}/v1/channel_point"
             headers = {
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json"
@@ -717,7 +726,7 @@ class VKLiveAPI:
     async def get_channel_rewards(self, channel_url: str, access_token: str) -> Optional[List[Dict[str, Any]]]:
         """Получить список наград канала"""
         try:
-            url = f"{self.base_url}/v1/channel_point/rewards"
+            url = f"{self.live_base_url}/v1/channel_point/rewards"
             headers = {
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json"
@@ -741,7 +750,7 @@ class VKLiveAPI:
     async def create_channel_reward(self, channel_url: str, access_token: str, reward_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Создать награду канала"""
         try:
-            url = f"{self.base_url}/v1/channel_point/reward/create"
+            url = f"{self.live_base_url}/v1/channel_point/reward/create"
             headers = {
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json"
@@ -765,10 +774,35 @@ class VKLiveAPI:
             logger.error(f"Error creating VK channel reward: {e}")
             return None
     
+    async def get_rewards_manage_info(self, channel_url: str, access_token: str) -> Optional[List[Dict[str, Any]]]:
+        """Получить список наград для управления (для владельца канала)"""
+        try:
+            url = f"{self.live_base_url}/v1/channel_point/rewards/manage_info"
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
+            params = {"channel_url": channel_url}
+            
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+                response = await client.get(url, headers=headers, params=params, timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    logger.info(f"Got VK manage rewards for channel {channel_url}")
+                    return data.get("data", {}).get("rewards", [])
+                else:
+                    logger.error(f"VK rewards manage_info error: {response.status_code} - {response.text}")
+                    return None
+                    
+        except Exception as e:
+            logger.error(f"Error getting VK rewards manage info: {e}")
+            return None
+    
     async def get_reward_demands(self, channel_url: str, access_token: str, limit: int = 20, offset: int = 0) -> Optional[Dict[str, Any]]:
         """Получить список запросов наград"""
         try:
-            url = f"{self.base_url}/v1/channel_point/reward/demands"
+            url = f"{self.live_base_url}/v1/channel_point/reward/demands"
             headers = {
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json"
@@ -796,7 +830,7 @@ class VKLiveAPI:
     async def accept_reward_demands(self, channel_url: str, access_token: str, demand_ids: List[int]) -> bool:
         """Принять запросы наград"""
         try:
-            url = f"{self.base_url}/v1/channel_point/reward/demand/accept"
+            url = f"{self.live_base_url}/v1/channel_point/reward/demand/accept"
             headers = {
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json"
@@ -822,7 +856,7 @@ class VKLiveAPI:
     async def reject_reward_demands(self, channel_url: str, access_token: str, demand_ids: List[int]) -> bool:
         """Отклонить запросы наград"""
         try:
-            url = f"{self.base_url}/v1/channel_point/reward/demand/reject"
+            url = f"{self.live_base_url}/v1/channel_point/reward/demand/reject"
             headers = {
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json"
@@ -848,7 +882,7 @@ class VKLiveAPI:
     async def delete_channel_reward(self, channel_url: str, reward_id: str, access_token: str) -> bool:
         """Удалить награду канала"""
         try:
-            url = f"{self.base_url}/v1/channel_point/reward/delete"
+            url = f"{self.live_base_url}/v1/channel_point/reward/delete"
             headers = {
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json"
@@ -875,7 +909,7 @@ class VKLiveAPI:
     async def update_channel_reward(self, channel_url: str, reward_id: str, access_token: str, reward_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Редактировать награду канала"""
         try:
-            url = f"{self.base_url}/v1/channel_point/reward/edit"
+            url = f"{self.live_base_url}/v1/channel_point/reward/edit"
             headers = {
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json"
@@ -905,7 +939,7 @@ class VKLiveAPI:
     async def enable_channel_reward(self, channel_url: str, reward_id: str, access_token: str) -> bool:
         """Включить награду канала"""
         try:
-            url = f"{self.base_url}/v1/channel_point/reward/enable"
+            url = f"{self.live_base_url}/v1/channel_point/reward/enable"
             headers = {
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json"
@@ -932,7 +966,7 @@ class VKLiveAPI:
     async def disable_channel_reward(self, channel_url: str, reward_id: str, access_token: str) -> bool:
         """Отключить награду канала"""
         try:
-            url = f"{self.base_url}/v1/channel_point/reward/disable"
+            url = f"{self.live_base_url}/v1/channel_point/reward/disable"
             headers = {
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json"

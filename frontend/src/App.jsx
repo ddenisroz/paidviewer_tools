@@ -22,10 +22,8 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const TtsMainPage = lazy(() => import('./pages/tts/TtsMainPage'));
 const VoiceManagementPage = lazy(() => import('./pages/tts/VoiceManagementPage'));
 const LocalTTSSettingsPage = lazy(() => import('./pages/tts/LocalTTSSettingsPage'));
-const MediaMainPage = lazy(() => import('./pages/media/MediaMainPage'));
 const PointsManagementPage = lazy(() => import('./pages/PointsManagementPage'));
 const YoutubeIntegrationPage = lazy(() => import('./pages/media/YoutubeIntegrationPage'));
-const YoutubeSettingsPage = lazy(() => import('./pages/media/YoutubeSettingsPage'));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 const CommandsPage = lazy(() => import('./pages/CommandsPage'));
 const ObsTtsPage = lazy(() => import('./pages/tts/ObsTtsPage'));
@@ -72,12 +70,9 @@ function App() {
                                 <Route path="dashboard/tts/voices" element={<VoiceManagementPage />} />
                                 <Route path="dashboard/tts/local" element={<LocalTTSSettingsPage />} />
                                 <Route path="dashboard/settings" element={<SettingsPage />} />
-                                <Route path="dashboard/media" element={<MediaMainPage />} />
+                                <Route path="dashboard/youtube" element={<YoutubeIntegrationPage />} />
                                 <Route path="dashboard/points" element={<PointsManagementPage />} />
                                 <Route path="dashboard/drops" element={<DropsMainPage />} />
-                                {/* Убираем бесполезную вкладку drops/rewards */}
-                                <Route path="dashboard/media/youtube" element={<YoutubeIntegrationPage />} />
-                                <Route path="youtube-settings" element={<YoutubeSettingsPage />} />
                                 <Route path="dashboard/chat-analysis" element={<AnalyticsPage />} />
                                 <Route path="dashboard/commands" element={<CommandsPage />} />
                                 

@@ -13,6 +13,21 @@ logger = logging.getLogger('bot_service')
 # Создаем роутер для Points API
 points_router = APIRouter(prefix="/api/points", tags=["points"])
 
+# Вспомогательная функция для получения имени VK канала
+def _get_vk_channel_name(user_id: int, db: Session) -> str:
+    """Получить имя VK канала из таблицы User (не UserSettings!)"""
+    from core.database import User
+    user_record = db.query(User).filter(User.id == user_id).first()
+    if not user_record or not user_record.vk_channel_name:
+        raise HTTPException(status_code=404, detail="VK канал не настроен")
+    return user_record.vk_channel_name
+
+# Вспомогательная функция для расшифровки токена
+def _decrypt_access_token(encrypted_token: str) -> str:
+    """Расшифровать access_token перед отправкой в API"""
+    from core.token_encryption import decrypt_token
+    return decrypt_token(encrypted_token)
+
 # Pydantic модели для API
 class AddPointsRequest(BaseModel):
     viewer_id: str
@@ -103,9 +118,12 @@ async def get_twitch_rewards(
         connection_manager = get_connection_manager()
         twitch_api = TwitchAPI(connection_manager)
         
+        # Расшифровываем токен перед использованием
+        decrypted_token = _decrypt_access_token(user_token.access_token)
+        
         rewards = await twitch_api.get_custom_rewards(
             db_user.twitch_user_id,
-            user_token.access_token,
+            decrypted_token,
             only_manageable=True
         )
         
@@ -135,24 +153,31 @@ async def get_vk_rewards(
     """Получить награды VK канала"""
     try:
         from api.vk_api import vk_api
-        from core.database import UserSettings
+        from core.database import User, UserToken
         
         logger.info(f"📺 [VK REWARDS] Fetching rewards for user {user['id']}")
         
-        # Получаем VK канал
-        settings = db.query(UserSettings).filter(UserSettings.user_id == user["id"]).first()
-        if not settings or not settings.vk_channel_name:
-            logger.warning(f"❌ [VK REWARDS] VK channel not found for user {user['id']}")
-            raise HTTPException(status_code=404, detail="VK канал не настроен")
+        # Сначала проверяем наличие VK токена (обязательно для управления наградами)
+        user_token = db.query(UserToken).filter(
+            UserToken.user_id == user["id"],
+            UserToken.platform == "vk"
+        ).first()
         
-        # Construct proper channel URL from channel name
-        channel_url = f"https://vkvideo.ru/{settings.vk_channel_name}"
-        logger.info(f"📺 [VK REWARDS] Using channel URL: {channel_url}")
+        if not user_token:
+            logger.warning(f"❌ [VK REWARDS] VK token not found for user {user['id']}")
+            raise HTTPException(status_code=404, detail="VK Live не подключен. Авторизуйтесь через настройки")
         
-        # Get channel rewards from VK Live API
-        rewards = await vk_api.get_channel_rewards(
-            channel_url,
-            user['id']
+        # Получаем имя VK канала (VK API ожидает только имя, а не полный URL!)
+        channel_name = _get_vk_channel_name(user["id"], db)
+        logger.info(f"📺 [VK REWARDS] Using channel name: {channel_name}")
+        
+        # Расшифровываем токен перед использованием
+        decrypted_token = _decrypt_access_token(user_token.access_token)
+        
+        # Получаем список наград для управления
+        rewards = await vk_api.get_rewards_manage_info(
+            channel_name,
+            decrypted_token
         )
         
         if rewards is None:
@@ -205,7 +230,7 @@ async def create_twitch_reward(
         
         result = await twitch_api.create_custom_reward(
             user_id=user["id"],
-            access_token=user_token.access_token,
+            access_token=_decrypt_access_token(user_token.access_token),
             title=reward_data.title,
             description=reward_data.description,
             cost=reward_data.cost,
@@ -241,7 +266,7 @@ async def create_vk_reward(
     """Создать награду на VK Live"""
     try:
         from api.vk_api import vk_api
-        from core.database import UserToken, UserSettings
+        from core.database import UserToken
         
         # Получаем токены пользователя
         user_token = db.query(UserToken).filter(
@@ -252,13 +277,8 @@ async def create_vk_reward(
         if not user_token:
             raise HTTPException(status_code=404, detail="VK Live токен не найден. Пожалуйста, авторизуйтесь")
         
-        # Получаем VK канал
-        settings = db.query(UserSettings).filter(UserSettings.user_id == user["id"]).first()
-        if not settings or not settings.vk_channel_name:
-            raise HTTPException(status_code=404, detail="VK канал не настроен")
-        
-        # Construct proper channel URL from channel name
-        channel_url = f"https://vkvideo.ru/{settings.vk_channel_name}"
+        # Получаем имя VK канала
+        channel_name = _get_vk_channel_name(user["id"], db)
         
         # Prepare reward data structure for VK API
         reward_data = {
@@ -271,8 +291,8 @@ async def create_vk_reward(
         
         # Используем VK API для создания награды
         result = await vk_api.create_channel_reward(
-            channel_url=channel_url,
-            access_token=user_token.access_token,
+            channel_url=channel_name,
+            access_token=_decrypt_access_token(user_token.access_token),
             reward_data=reward_data
         )
         
@@ -325,7 +345,7 @@ async def update_twitch_reward(
         result = await twitch_api.update_custom_reward(
             broadcaster_id=str(db_user.twitch_user_id),
             reward_id=reward_id,
-            access_token=user_token.access_token,
+            access_token=_decrypt_access_token(user_token.access_token),
             title=reward_data.title,
             description=reward_data.description,
             cost=reward_data.cost,
@@ -385,7 +405,7 @@ async def delete_twitch_reward(
         result = await twitch_api.delete_custom_reward(
             broadcaster_id=str(db_user.twitch_user_id),
             reward_id=reward_id,
-            access_token=user_token.access_token
+            access_token=_decrypt_access_token(user_token.access_token)
         )
         
         if result:
@@ -414,7 +434,7 @@ async def update_vk_reward(
     """Обновить награду на VK Live"""
     try:
         from api.vk_api import vk_api
-        from core.database import UserToken, UserSettings
+        from core.database import UserToken
         
         # Получаем токены пользователя
         user_token = db.query(UserToken).filter(
@@ -425,12 +445,8 @@ async def update_vk_reward(
         if not user_token:
             raise HTTPException(status_code=404, detail="VK Live токен не найден")
         
-        # Получаем VK канал
-        settings = db.query(UserSettings).filter(UserSettings.user_id == user["id"]).first()
-        if not settings or not settings.vk_channel_name:
-            raise HTTPException(status_code=404, detail="VK канал не настроен")
-        
-        channel_url = f"https://vkvideo.ru/{settings.vk_channel_name}"
+        # Получаем имя VK канала
+        channel_name = _get_vk_channel_name(user["id"], db)
         
         # Prepare reward data structure for VK API
         vk_reward_data = {
@@ -441,9 +457,9 @@ async def update_vk_reward(
         
         # Используем VK API для обновления награды
         result = await vk_api.update_channel_reward(
-            channel_url=channel_url,
+            channel_url=channel_name,
             reward_id=reward_id,
-            access_token=user_token.access_token,
+            access_token=_decrypt_access_token(user_token.access_token),
             reward_data=vk_reward_data
         )
         
@@ -472,7 +488,7 @@ async def delete_vk_reward(
     """Удалить награду на VK Live"""
     try:
         from api.vk_api import vk_api
-        from core.database import UserToken, UserSettings
+        from core.database import UserToken
         
         # Получаем токены пользователя
         user_token = db.query(UserToken).filter(
@@ -483,18 +499,14 @@ async def delete_vk_reward(
         if not user_token:
             raise HTTPException(status_code=404, detail="VK Live токен не найден")
         
-        # Получаем VK канал
-        settings = db.query(UserSettings).filter(UserSettings.user_id == user["id"]).first()
-        if not settings or not settings.vk_channel_name:
-            raise HTTPException(status_code=404, detail="VK канал не настроен")
-        
-        channel_url = f"https://vkvideo.ru/{settings.vk_channel_name}"
+        # Получаем имя VK канала
+        channel_name = _get_vk_channel_name(user["id"], db)
         
         # Используем VK API для удаления награды
         result = await vk_api.delete_channel_reward(
-            channel_url=channel_url,
+            channel_url=channel_name,
             reward_id=reward_id,
-            access_token=user_token.access_token
+            access_token=_decrypt_access_token(user_token.access_token)
         )
         
         if result:
@@ -526,7 +538,7 @@ async def toggle_vk_reward(
     """Включить/выключить награду на VK Live"""
     try:
         from api.vk_api import vk_api
-        from core.database import UserToken, UserSettings
+        from core.database import UserToken
         
         # Получаем токены пользователя
         user_token = db.query(UserToken).filter(
@@ -537,25 +549,21 @@ async def toggle_vk_reward(
         if not user_token:
             raise HTTPException(status_code=404, detail="VK Live токен не найден")
         
-        # Получаем VK канал
-        settings = db.query(UserSettings).filter(UserSettings.user_id == user["id"]).first()
-        if not settings or not settings.vk_channel_name:
-            raise HTTPException(status_code=404, detail="VK канал не настроен")
-        
-        channel_url = f"https://vkvideo.ru/{settings.vk_channel_name}"
+        # Получаем имя VK канала
+        channel_name = _get_vk_channel_name(user["id"], db)
         
         # Используем VK API для включения/выключения награды
         if request.is_enabled:
             result = await vk_api.enable_channel_reward(
-                channel_url=channel_url,
+                channel_url=channel_name,
                 reward_id=reward_id,
-                access_token=user_token.access_token
+                access_token=_decrypt_access_token(user_token.access_token)
             )
         else:
             result = await vk_api.disable_channel_reward(
-                channel_url=channel_url,
+                channel_url=channel_name,
                 reward_id=reward_id,
-                access_token=user_token.access_token
+                access_token=_decrypt_access_token(user_token.access_token)
             )
         
         if result:
@@ -583,7 +591,7 @@ async def get_vk_reward_demands(
     """Получить список запросов наград VK Live"""
     try:
         from api.vk_api import vk_api
-        from core.database import UserToken, UserSettings
+        from core.database import UserToken
         
         # Получаем токены пользователя
         user_token = db.query(UserToken).filter(
@@ -594,17 +602,13 @@ async def get_vk_reward_demands(
         if not user_token:
             raise HTTPException(status_code=404, detail="VK Live токен не найден")
         
-        # Получаем VK канал
-        settings = db.query(UserSettings).filter(UserSettings.user_id == user["id"]).first()
-        if not settings or not settings.vk_channel_name:
-            raise HTTPException(status_code=404, detail="VK канал не настроен")
-        
-        channel_url = f"https://vkvideo.ru/{settings.vk_channel_name}"
+        # Получаем имя VK канала
+        channel_name = _get_vk_channel_name(user["id"], db)
         
         # Получаем запросы наград
         demands = await vk_api.get_reward_demands(
-            channel_url=channel_url,
-            access_token=user_token.access_token
+            channel_url=channel_name,
+            access_token=_decrypt_access_token(user_token.access_token)
         )
         
         if demands is not None:
@@ -636,7 +640,7 @@ async def process_vk_reward_demands(
     """Обработать запросы наград VK Live (принять/отклонить)"""
     try:
         from api.vk_api import vk_api
-        from core.database import UserToken, UserSettings
+        from core.database import UserToken
         
         # Получаем токены пользователя
         user_token = db.query(UserToken).filter(
@@ -647,24 +651,20 @@ async def process_vk_reward_demands(
         if not user_token:
             raise HTTPException(status_code=404, detail="VK Live токен не найден")
         
-        # Получаем VK канал
-        settings = db.query(UserSettings).filter(UserSettings.user_id == user["id"]).first()
-        if not settings or not settings.vk_channel_name:
-            raise HTTPException(status_code=404, detail="VK канал не настроен")
-        
-        channel_url = f"https://vkvideo.ru/{settings.vk_channel_name}"
+        # Получаем имя VK канала
+        channel_name = _get_vk_channel_name(user["id"], db)
         
         # Обрабатываем запросы
         if request.action == 'accept':
             result = await vk_api.accept_reward_demands(
-                channel_url=channel_url,
-                access_token=user_token.access_token,
+                channel_url=channel_name,
+                access_token=_decrypt_access_token(user_token.access_token),
                 demand_ids=request.demand_ids
             )
         elif request.action == 'reject':
             result = await vk_api.reject_reward_demands(
-                channel_url=channel_url,
-                access_token=user_token.access_token,
+                channel_url=channel_name,
+                access_token=_decrypt_access_token(user_token.access_token),
                 demand_ids=request.demand_ids
             )
         else:
@@ -823,18 +823,12 @@ async def get_platform_rewards(
             )
         
         elif platform.lower() == "vk":
-            # Получаем VK канал
-            from core.database import UserSettings
-            settings = db.query(UserSettings).filter(UserSettings.user_id == user["id"]).first()
-            if not settings or not settings.vk_channel_name:
-                raise HTTPException(status_code=404, detail="VK канал не настроен")
-            
-            # Construct proper channel URL from channel name
-            channel_url = f"https://vkvideo.ru/{settings.vk_channel_name}"
+            # Получаем имя VK канала
+            channel_name = _get_vk_channel_name(user["id"], db)
             
             # Get channel rewards from VK Live API
             rewards = await vk_api.get_channel_rewards(
-                channel_url,
+                channel_name,
                 user_token.access_token
             )
         
@@ -888,13 +882,11 @@ async def create_platform_reward(
             )
         
         elif platform.lower() == "vk":
-            from core.database import UserSettings
-            settings = db.query(UserSettings).filter(UserSettings.user_id == user["id"]).first()
-            if not settings or not settings.vk_channel_name:
-                raise HTTPException(status_code=404, detail="VK channel URL не найден")
+            # Получаем имя VK канала
+            channel_name = _get_vk_channel_name(user["id"], db)
             
             result = await vk_api.create_channel_reward(
-                settings.vk_channel_name,
+                channel_name,
                 user_token.access_token,
                 reward_data
             )
@@ -949,13 +941,11 @@ async def delete_platform_reward(
             )
         
         elif platform.lower() == "vk":
-            from core.database import UserSettings
-            settings = db.query(UserSettings).filter(UserSettings.user_id == user["id"]).first()
-            if not settings or not settings.vk_channel_name:
-                raise HTTPException(status_code=404, detail="VK channel URL не найден")
+            # Получаем имя VK канала
+            channel_name = _get_vk_channel_name(user["id"], db)
             
             success = await vk_api.delete_channel_reward(
-                settings.vk_channel_name,
+                channel_name,
                 reward_id,
                 user_token.access_token
             )
@@ -1011,13 +1001,11 @@ async def get_platform_redemptions(
             )
         
         elif platform.lower() == "vk":
-            from core.database import UserSettings
-            settings = db.query(UserSettings).filter(UserSettings.user_id == user["id"]).first()
-            if not settings or not settings.vk_channel_name:
-                raise HTTPException(status_code=404, detail="VK channel URL не найден")
+            # Получаем имя VK канала
+            channel_name = _get_vk_channel_name(user["id"], db)
             
             redemptions = await vk_api.get_reward_demands(
-                settings.vk_channel_name,
+                channel_name,
                 user_token.access_token
             )
         
@@ -1075,22 +1063,20 @@ async def update_platform_redemption(
             )
         
         elif platform.lower() == "vk":
-            from core.database import UserSettings
-            settings = db.query(UserSettings).filter(UserSettings.user_id == user["id"]).first()
-            if not settings or not settings.vk_channel_name:
-                raise HTTPException(status_code=404, detail="VK channel URL не найден")
+            # Получаем имя VK канала
+            channel_name = _get_vk_channel_name(user["id"], db)
             
             # VK использует demand_ids (массив)
             demand_ids = [int(redemption_id)]
             if status.lower() == "fulfilled":
                 success = await vk_api.accept_reward_demands(
-                    settings.vk_channel_name,
+                    channel_name,
                     user_token.access_token,
                     demand_ids
                 )
             elif status.lower() == "canceled":
                 success = await vk_api.reject_reward_demands(
-                    settings.vk_channel_name,
+                    channel_name,
                     user_token.access_token,
                     demand_ids
                 )

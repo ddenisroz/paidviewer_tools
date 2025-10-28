@@ -49,12 +49,15 @@ async def vk_auth(request: Request):
         raise HTTPException(status_code=500, detail="VK_CLIENT_ID not configured")
     
     state = secrets.token_urlsafe(16)
+    # Импортируем полный список scopes из vk_api
+    from api.vk_api import VK_OAUTH_SCOPES
+    scopes = ",".join(VK_OAUTH_SCOPES)
     auth_url = (
         f"{VK_AUTH_BASE_URL}?"
         f"client_id={VK_CLIENT_ID}&"
         f"redirect_uri={BACKEND_URL}/auth/vk/callback&"
         f"response_type=code&"
-        f"scope=channel:stream:settings&"
+        f"scope={scopes}&"
         f"state={state}"
     )
     
@@ -72,12 +75,15 @@ async def login_vk(request: Request):
     state = secrets.token_urlsafe(16)
     redirect_uri = f"{BACKEND_URL}/auth/vk/callback"
     
+    # Импортируем полный список scopes из vk_api
+    from api.vk_api import VK_OAUTH_SCOPES
+    scopes = ",".join(VK_OAUTH_SCOPES)
     auth_url = (
         f"{VK_AUTH_BASE_URL}?"
         f"client_id={VK_CLIENT_ID}&"
         f"redirect_uri={redirect_uri}&"
         f"response_type=code&"
-        f"scope=channel:stream:settings&"
+        f"scope={scopes}&"
         f"state={state}"
     )
     
@@ -165,12 +171,29 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
                 )
             
             token_data = token_response.json()
+            
+            # 🔍 ДИАГНОСТИКА: Логируем весь ответ от VK
+            logger.info(f"🔍 [VK TOKEN] Full response: {token_data}")
+            
             access_token = token_data["access_token"]
             refresh_token = token_data.get("refresh_token")
             expires_in = token_data.get("expires_in", 3600)
             from core.datetime_utils import utcnow_naive
             expires_at = utcnow_naive() + timedelta(seconds=expires_in)
-            scopes = token_data.get("scope", "").split(",")
+            
+            # Получаем scopes из ответа
+            scope_string = token_data.get("scope", "")
+            logger.info(f"🔍 [VK SCOPES] Raw scope string from API: '{scope_string}'")
+            
+            # Если scope пустой, используем scopes из запроса
+            if not scope_string or scope_string == "":
+                logger.warning(f"⚠️ [VK SCOPES] VK API returned empty scope! Using requested scopes as fallback")
+                from api.vk_api import VK_OAUTH_SCOPES
+                scopes = VK_OAUTH_SCOPES
+                logger.info(f"🔍 [VK SCOPES] Using fallback scopes: {scopes}")
+            else:
+                scopes = scope_string.split(",")
+                logger.info(f"🔍 [VK SCOPES] Parsed scopes: {scopes}")
             
             # Логируем реальное время жизни токена
             logger.info(f"🔐 [VK AUTH] Token expires_in: {expires_in} seconds ({expires_in / 3600:.1f} hours)")

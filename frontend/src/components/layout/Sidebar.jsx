@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Mic, Clapperboard, AreaChart, Terminal, Youtube, Coins, Headphones, Settings, Shield, MessageSquare, Command, Gift, Sparkles, Monitor, Menu, X } from 'lucide-react';
+import { Home, Mic, Youtube, Coins, Headphones, Settings, Shield, MessageSquare, Command, Sparkles, Monitor, Menu, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getAdminList, botService } from '../../services/microservices';
 
@@ -16,15 +16,8 @@ const getNavItems = (isYourchy) => {
                 { to: '/dashboard/tts/local', label: 'Локальный движок', icon: Monitor },
             ]
         },
-        { 
-            to: '/dashboard/media', 
-            label: 'Медиа интерактивность', 
-            icon: Clapperboard,
-            submenu: [
-                { to: '/dashboard/media/youtube', label: 'YouTube заказы', icon: Youtube },
-                { to: '/dashboard/points', label: 'Баллы канала', icon: Coins },
-            ]
-        },
+        { to: '/dashboard/youtube', label: 'YouTube заказы', icon: Youtube },
+        { to: '/dashboard/points', label: 'Баллы канала', icon: Coins },
         { to: '/dashboard/drops', label: 'Drops система', icon: Sparkles },
         { to: '/dashboard/chat-analysis', label: 'Анализ и модерация чата', icon: MessageSquare },
         { to: '/dashboard/commands', label: 'Команды', icon: Command },

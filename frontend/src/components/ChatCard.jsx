@@ -339,7 +339,11 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
 
     // Автоскролл к последнему сообщению
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        const container = messagesContainerRef.current;
+        if (container) {
+            // Используем scrollTop вместо scrollIntoView - НЕ скроллит страницу!
+            container.scrollTop = container.scrollHeight;
+        }
     };
 
     // Проверка: пользователь внизу контейнера?
@@ -364,8 +368,12 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
         if (chatMessages.length > 0 && !hasScrolledOnLoad.current) {
             // При первой загрузке ВСЕГДА скроллим вниз (мгновенно)
             setTimeout(() => {
-                messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
-                console.log('⬇️ Auto-scrolled to bottom on initial load');
+                const container = messagesContainerRef.current;
+                if (container) {
+                    // Используем scrollTop - НЕ вызывает скролл страницы!
+                    container.scrollTop = container.scrollHeight;
+                    console.log('⬇️ Auto-scrolled to bottom on initial load');
+                }
             }, 100);
             hasScrolledOnLoad.current = true;
         }

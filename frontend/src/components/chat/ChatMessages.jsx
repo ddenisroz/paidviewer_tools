@@ -24,7 +24,12 @@ const ChatMessages = ({
     // Автоскролл к последнему сообщению
     useEffect(() => {
         if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+            // Используем scrollIntoView с block: 'nearest' для скролла ТОЛЬКО внутри родителя
+            messagesEndRef.current.scrollIntoView({ 
+                behavior: 'smooth',
+                block: 'nearest',
+                inline: 'nearest'
+            });
         }
     }, [messages]);
 
