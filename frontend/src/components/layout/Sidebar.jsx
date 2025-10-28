@@ -44,10 +44,14 @@ const SidebarNavItem = ({ item, openSection, setOpenSection, onMobileMenuClose }
 
     // Проверяем активен ли какой-то из подпунктов
     const isParentActive = hasSubmenu 
-        ? item.submenu.some(sub => location.pathname === sub.to || location.pathname.startsWith(sub.to))
+        ? item.submenu.some(sub => {
+            // Точное совпадение или путь начинается с sub.to + '/'
+            return location.pathname === sub.to || location.pathname.startsWith(sub.to + '/');
+        })
         : location.pathname === item.to;
 
-    const isOpen = openSection === item.label;
+    // Меню открыто если: 1) наведена мышь ИЛИ 2) активна одна из страниц submenu
+    const isOpen = openSection === item.label || isParentActive;
 
     // Функции для управления dropdown при наведении
     const handleMouseEnter = () => {
@@ -57,7 +61,8 @@ const SidebarNavItem = ({ item, openSection, setOpenSection, onMobileMenuClose }
     };
 
     const handleMouseLeave = () => {
-        if (hasSubmenu) {
+        if (hasSubmenu && !isParentActive) {
+            // Закрываем только если НЕ активна страница из submenu
             setOpenSection(null);
         }
     };
@@ -77,27 +82,30 @@ const SidebarNavItem = ({ item, openSection, setOpenSection, onMobileMenuClose }
                         {item.label}
                     </div>
                 </div>
-                {isOpen && (
-                    <div className="ml-4 mt-1 space-y-1 border-l-2 border-primary/20 pl-4">
-                        {item.submenu.map((subItem) => (
-                            <NavLink
-                                key={subItem.to}
-                                to={subItem.to}
-                                onClick={onMobileMenuClose}
-                                className={({ isActive }) =>
-                                    `flex items-center gap-3 rounded-md px-4 py-2 text-base font-medium transition-colors ${
-                                        isActive
-                                            ? 'bg-primary/10 text-primary'
-                                            : 'text-muted-foreground hover:bg-muted/30 hover:text-foreground/80'
-                                    }`
-                                }
-                            >
-                                {subItem.icon && <subItem.icon className="h-4 w-4" />}
-                                {subItem.label}
-                            </NavLink>
-                        ))}
-                    </div>
-                )}
+                <div 
+                    className={`ml-4 mt-1 space-y-1 border-l-2 border-primary/20 pl-4 overflow-hidden transition-all duration-200 ease-in-out ${
+                        isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                    }`}
+                >
+                    {item.submenu.map((subItem) => (
+                        <NavLink
+                            key={subItem.to}
+                            to={subItem.to}
+                            end
+                            onClick={onMobileMenuClose}
+                            className={({ isActive }) =>
+                                `flex items-center gap-3 rounded-md px-4 py-2 text-base font-medium transition-colors ${
+                                    isActive
+                                        ? 'bg-primary/10 text-primary'
+                                        : 'text-muted-foreground hover:bg-muted/30 hover:text-foreground/80'
+                                }`
+                            }
+                        >
+                            {subItem.icon && <subItem.icon className="h-4 w-4" />}
+                            {subItem.label}
+                        </NavLink>
+                    ))}
+                </div>
             </div>
         );
     }
@@ -159,9 +167,25 @@ const Sidebar = () => {
     }, [isAuthenticated, user, adminUsers]);
     
     const navItems = getNavItems(isAdmin);
+    const location = useLocation();
     
     // Состояние для управления открытыми разделами
     const [openSection, setOpenSection] = useState(null);
+    
+    // Сброс openSection при переходе на страницу, которая НЕ в submenu
+    useEffect(() => {
+        // Проверяем, находимся ли мы на странице из какого-либо submenu
+        const isInAnySubmenu = navItems.some(item => 
+            item.submenu?.some(sub => 
+                location.pathname === sub.to || location.pathname.startsWith(sub.to + '/')
+            )
+        );
+        
+        // Если мы НЕ на странице из submenu, сбрасываем openSection
+        if (!isInAnySubmenu) {
+            setOpenSection(null);
+        }
+    }, [location.pathname, navItems]);
     
     // Состояние для мобильного меню
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, SkipForward, Volume2, VolumeX, Plus, X, Maximize, Minimize } from 'lucide-react';
+import { Play, Pause, SkipForward, Volume2, VolumeX, Plus, X, Maximize, Minimize, Monitor, Trash2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { toast } from 'sonner';
 import YouTube from 'react-youtube';
@@ -275,88 +276,103 @@ const YoutubeIntegrationPage = () => {
                                         </div>
                                     </div>
 
-                                    {/* Группа 2: Действия - компактные кнопки */}
-                                    <div className="bg-muted/30 rounded-lg p-3">
-                                        <div className="flex gap-2">
-                                            {/* Очистить */}
-                                            <Dialog open={isClearDialogOpen} onOpenChange={setIsClearDialogOpen}>
-                                                <DialogTrigger asChild>
-                                                    <Button variant="outline" size="sm" className="h-9" title="Очистить очередь">
-                                                        <X className="h-4 w-4 mr-1.5" />
-                                                        <span className="text-sm">Очистить</span>
-                                                    </Button>
-                                                </DialogTrigger>
-                                                <DialogContent>
-                                                    <DialogHeader>
-                                                        <DialogTitle>Подтверждение</DialogTitle>
-                                                        <DialogDescription>Вы уверены, что хотите полностью очистить очередь?</DialogDescription>
-                                                    </DialogHeader>
-                                                    <DialogFooter>
-                                                        <Button variant="outline" onClick={() => setIsClearDialogOpen(false)}>Отмена</Button>
-                                                        <Button variant="destructive" onClick={handleClearQueue}>Очистить</Button>
-                                                    </DialogFooter>
-                                                </DialogContent>
-                                            </Dialog>
+                                    {/* Группа 2: Действия - крупные кнопки */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {/* Очистить очередь */}
+                                        <Dialog open={isClearDialogOpen} onOpenChange={setIsClearDialogOpen}>
+                                            <DialogTrigger asChild>
+                                                <Button variant="outline" className="h-12 w-full" title="Очистить очередь">
+                                                    <Trash2 className="h-4 w-4 mr-2" />
+                                                    Очистить
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>Подтверждение</DialogTitle>
+                                                    <DialogDescription>Вы уверены, что хотите полностью очистить очередь?</DialogDescription>
+                                                </DialogHeader>
+                                                <DialogFooter>
+                                                    <Button variant="outline" onClick={() => setIsClearDialogOpen(false)}>Отмена</Button>
+                                                    <Button variant="destructive" onClick={handleClearQueue}>Очистить</Button>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
 
-                                            {/* OBS URL */}
-                                            <Button variant="outline" size="sm" className="h-9" onClick={() => {
-                                                if (!youtubeObsUrl) generateYoutubeObsUrl();
-                                                else if (isObsUrlVisible) hideObsUrl();
-                                                else setIsObsUrlVisible(true);
-                                            }} title={!youtubeObsUrl ? "Сгенерировать OBS URL" : isObsUrlVisible ? "Скрыть URL" : "Показать URL"}>
-                                                <span className="text-sm">{!youtubeObsUrl ? "OBS URL" : isObsUrlVisible ? "Скрыть" : "Показать"}</span>
-                                            </Button>
+                                        {/* OBS Integration - Popover с управлением */}
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button variant="outline" className="h-12 w-full" title="OBS интеграция">
+                                                    <Monitor className="h-4 w-4 mr-2" />
+                                                    OBS
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-96" align="end">
+                                                <div className="space-y-3">
+                                                    <h4 className="font-semibold text-sm">OBS Browser Source</h4>
+                                                    
+                                                    {!youtubeObsUrl ? (
+                                                        <Button 
+                                                            onClick={generateYoutubeObsUrl} 
+                                                            className="w-full"
+                                                            variant="default"
+                                                        >
+                                                            <Plus className="h-4 w-4 mr-2" />
+                                                            Сгенерировать URL
+                                                        </Button>
+                                                    ) : (
+                                                        <>
+                                                            <div className="space-y-2">
+                                                                <p className="text-xs text-muted-foreground">URL для OBS:</p>
+                                                                <div className="bg-muted rounded p-2">
+                                                                    <p className="text-xs font-mono break-all">{youtubeObsUrl}</p>
+                                                                </div>
+                                                                <div className="flex gap-2">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        onClick={() => {
+                                                                            navigator.clipboard.writeText(youtubeObsUrl);
+                                                                            toast.success('URL скопирован!');
+                                                                        }}
+                                                                        className="flex-1"
+                                                                    >
+                                                                        Копировать
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        onClick={regenerateYoutubeObsUrl}
+                                                                        className="flex-1"
+                                                                        title="Перегенерировать URL"
+                                                                    >
+                                                                        <RefreshCw className="h-3 w-3 mr-1" />
+                                                                        Обновить
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </PopoverContent>
+                                        </Popover>
 
-                                            {/* Fullscreen */}
-                                            <Button variant="outline" size="sm" className="h-9" onClick={() => {
+                                        {/* Fullscreen */}
+                                        <Button 
+                                            variant="outline" 
+                                            className="h-12 w-full col-span-2" 
+                                            onClick={() => {
                                                 const newTheaterMode = !isTheaterMode;
                                                 setIsTheaterMode(newTheaterMode);
                                                 window.dispatchEvent(new CustomEvent('youtube_event', {
                                                     detail: { event: 'theater_mode_changed', data: { isTheaterMode: newTheaterMode } }
                                                 }));
-                                            }} title="Полноэкранный режим">
-                                                <Maximize className="h-4 w-4 mr-1.5" />
-                                                <span className="text-sm">Полный экран</span>
-                                            </Button>
-                                        </div>
+                                            }} 
+                                            title="Полноэкранный режим"
+                                        >
+                                            {isTheaterMode ? <Minimize className="h-4 w-4 mr-2" /> : <Maximize className="h-4 w-4 mr-2" />}
+                                            {isTheaterMode ? 'Выйти из полного экрана' : 'Полноэкранный режим'}
+                                        </Button>
                                     </div>
-                            
-                                    {/* Кнопка обновления URL (если URL существует) */}
-                                    {youtubeObsUrl && (
-                                        <div>
-                                            <Button 
-                                                variant="outline" 
-                                                size="sm" 
-                                                onClick={regenerateYoutubeObsUrl}
-                                                title="Перегенерировать новый OBS URL"
-                                            >
-                                                🔄 Обновить URL
-                                            </Button>
-                                        </div>
-                                    )}
-                                    
-                                    {/* OBS URL (если сгенерирован и видим) */}
-                                    {youtubeObsUrl && isObsUrlVisible && (
-                                        <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-sm text-gray-400 mb-1">OBS Browser Source URL:</p>
-                                                    <p className="text-xs text-gray-300 font-mono break-all">{youtubeObsUrl}</p>
-                                                </div>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => {
-                                                        navigator.clipboard.writeText(youtubeObsUrl);
-                                                        toast.success('URL скопирован!');
-                                                    }}
-                                                    className="flex-shrink-0"
-                                                >
-                                                    📋 Копировать
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         )}
@@ -364,6 +380,22 @@ const YoutubeIntegrationPage = () => {
                         {/* Fullscreen mode layout */}
                         {isTheaterMode && (
                             <div className="col-span-4 space-y-4">
+                                {/* Кнопка выхода из театрального режима */}
+                                <div className="flex justify-end">
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={() => {
+                                            setIsTheaterMode(false);
+                                            window.dispatchEvent(new CustomEvent('youtube_event', {
+                                                detail: { event: 'theater_mode_changed', data: { isTheaterMode: false } }
+                                            }));
+                                        }}
+                                    >
+                                        <Minimize className="h-4 w-4 mr-2" />
+                                        Выйти из полного экрана
+                                    </Button>
+                                </div>
                                 {/* Fullscreen player content */}
                                 <div className="aspect-video bg-black rounded-lg"></div>
                             </div>
