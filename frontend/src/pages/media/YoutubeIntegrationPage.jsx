@@ -213,96 +213,76 @@ const YoutubeIntegrationPage = () => {
         >
             <div className={`w-full h-full ${isTheaterMode ? '' : ''}`}>
                 <Card className={`transition-all duration-300 w-full ${isTheaterMode ? 'bg-black border-none h-full' : 'h-full flex flex-col'}`}>
-                    <CardContent className={`${isTheaterMode ? 'grid grid-cols-5 gap-6 h-full' : 'flex flex-col gap-6 h-full'} p-6`}>
-                        <div className={`space-y-4 ${isTheaterMode ? 'col-span-4' : 'w-full'}`}>
-                            {/* Информация о текущем видео - УМЕНЬШЕНО В 3 РАЗА */}
-                            {playbackMode === 'browser' ? (
-                                <div className="relative bg-black rounded-lg overflow-hidden" style={{ height: '200px' }}>
-                                    {currentVideo ? (
-                                        <div className="w-full h-full flex items-center justify-center bg-muted">
-                                            <div className="text-center">
-                                                <p className="text-muted-foreground text-sm mb-1">Видео воспроизводится в глобальном плеере</p>
-                                                <p className="text-xs text-muted-foreground">Управление доступно в мини-плеере внизу страницы</p>
+                    <CardContent className={`${isTheaterMode ? 'grid grid-cols-5 gap-6 h-full' : 'flex flex-col gap-4 h-full'} p-6`}>
+                        {/* Компактный блок управления (только для обычного режима) */}
+                        {!isTheaterMode && (
+                            <div className="space-y-3">
+                                {/* Информация о текущем видео - КОМПАКТНО */}
+                                {playbackMode === 'browser' ? (
+                                    <div className="relative bg-black rounded-lg overflow-hidden h-[150px]">
+                                        {currentVideo ? (
+                                            <div className="w-full h-full flex items-center justify-center bg-muted">
+                                                <div className="text-center px-4">
+                                                    <p className="text-muted-foreground text-xs mb-1">Видео воспроизводится в глобальном плеере</p>
+                                                    <p className="text-xs text-muted-foreground/70">Управление доступно в мини-плеере внизу страницы</p>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center bg-muted">
-                                            <p className="text-muted-foreground text-sm">Нет видео для воспроизведения.</p>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="relative bg-gray-800 rounded-lg overflow-hidden border-2 border-purple-500" style={{ height: '200px' }}>
-                                    <div className="w-full h-full flex flex-col items-center justify-center text-center p-4">
-                                        <div className="text-4xl mb-2">📹</div>
-                                        <h3 className="text-base font-medium text-purple-300 mb-1">Режим OBS Studio</h3>
-                                        <p className="text-gray-300 text-xs mb-2">
-                                            Видео воспроизводятся в OBS Studio.<br/>
-                                            Управление происходит через кнопки ниже.
-                                        </p>
-                                        {currentVideo && (
-                                            <div className="text-xs text-gray-400 bg-gray-700 p-2 rounded-lg">
-                                                <strong>Сейчас играет:</strong> {currentVideo.title}
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-muted">
+                                                <p className="text-muted-foreground text-xs">Нет видео для воспроизведения.</p>
                                             </div>
                                         )}
                                     </div>
-                                </div>
-                            )}
+                                ) : (
+                                    <div className="relative bg-gray-800 rounded-lg overflow-hidden border-2 border-purple-500 h-[150px]">
+                                        <div className="w-full h-full flex flex-col items-center justify-center text-center p-3">
+                                            <div className="text-3xl mb-1">📹</div>
+                                            <h3 className="text-sm font-medium text-purple-300 mb-1">Режим OBS Studio</h3>
+                                            <p className="text-gray-300 text-xs">
+                                                Видео воспроизводятся в OBS Studio
+                                            </p>
+                                            {currentVideo && (
+                                                <div className="text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded mt-1 max-w-full truncate">
+                                                    <strong>Играет:</strong> {currentVideo.title}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
 
-                            {/* Элементы управления */}
-                            <div className="flex items-center justify-between bg-muted/30 rounded-lg p-4">
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={togglePlayPause}
-                                        disabled={!currentVideo}
-                                    >
-                                        {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={nextVideo}
-                                    >
-                                        <SkipForward className="h-4 w-4" />
-                                    </Button>
-                                </div>
+                            {/* Компактная панель управления */}
+                            <div className="flex flex-wrap items-center gap-2 bg-muted/30 rounded-lg p-2">
+                                {/* Play/Pause & Skip */}
+                                <Button variant="ghost" size="sm" onClick={togglePlayPause} disabled={!currentVideo} className="h-8 w-8 p-0" title={isPlaying ? "Пауза" : "Воспроизвести"}>
+                                    {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={nextVideo} disabled={!currentVideo} className="h-8 w-8 p-0" title="Пропустить">
+                                    <SkipForward className="h-4 w-4" />
+                                </Button>
 
-                                {/* Регулятор громкости */}
-                                <div className="flex items-center gap-3 min-w-[200px]">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={toggleMute}
-                                        title={isMuted ? "Включить звук" : "Отключить звук"}
-                                    >
-                                        {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                                    </Button>
-                                    <Slider
-                                        value={[volume]}
-                                        onValueChange={handleVolumeChange}
-                                        max={100}
-                                        step={1}
-                                        className="w-32"
-                                    />
-                                    <span className="text-sm text-muted-foreground w-10 text-right">{volume}%</span>
-                                </div>
+                                <div className="h-5 w-px bg-border mx-1" />
 
-                                {/* Очистить очередь */}
+                                {/* Громкость */}
+                                <Button variant="ghost" size="sm" onClick={toggleMute} className="h-8 w-8 p-0" title={isMuted ? "Включить звук" : "Выключить звук"}>
+                                    {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                                </Button>
+                                <Slider value={[volume]} onValueChange={handleVolumeChange} max={100} step={1} className="w-16" />
+                                <span className="text-xs text-muted-foreground w-8 text-right">{volume}%</span>
+
+                                <div className="h-5 w-px bg-border mx-1" />
+
+                                {/* Очистить */}
                                 <Dialog open={isClearDialogOpen} onOpenChange={setIsClearDialogOpen}>
                                     <DialogTrigger asChild>
-                                        <Button variant="destructive" size="sm">
-                                            <X className="h-4 w-4 mr-2" />
-                                            Очистить
+                                        <Button variant="ghost" size="sm" className="h-8" title="Очистить очередь">
+                                            <X className="h-4 w-4 mr-1" />
+                                            <span className="text-xs">Очистить</span>
                                         </Button>
                                     </DialogTrigger>
                                     <DialogContent>
                                         <DialogHeader>
                                             <DialogTitle>Подтверждение</DialogTitle>
-                                            <DialogDescription>
-                                                Вы уверены, что хотите полностью очистить очередь? Это действие необратимо.
-                                            </DialogDescription>
+                                            <DialogDescription>Вы уверены, что хотите полностью очистить очередь?</DialogDescription>
                                         </DialogHeader>
                                         <DialogFooter>
                                             <Button variant="outline" onClick={() => setIsClearDialogOpen(false)}>Отмена</Button>
@@ -310,49 +290,28 @@ const YoutubeIntegrationPage = () => {
                                         </DialogFooter>
                                     </DialogContent>
                                 </Dialog>
-                            </div>
-                            
-                            {/* Кнопки управления */}
-                            <div className="flex justify-end items-center mt-4">
-                                <Button variant="ghost" size="sm" onClick={() => {
-                                    const newTheaterMode = !isTheaterMode;
-                                    // Уведомляем GlobalPlayer о изменении театрального режима
-                                    window.dispatchEvent(new CustomEvent('youtube_event', {
-                                        detail: {
-                                            event: 'theater_mode_changed',
-                                            data: { isTheaterMode: newTheaterMode }
-                                        }
-                                    }));
-                                }}>
-                                    {isTheaterMode ? <Minimize className="h-4 w-4 mr-2" /> : <Maximize className="h-4 w-4 mr-2" />}
-                                    {isTheaterMode ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
+
+                                <div className="h-5 w-px bg-border mx-1" />
+
+                                {/* OBS URL */}
+                                <Button variant="ghost" size="sm" className="h-8" onClick={() => {
+                                    if (!youtubeObsUrl) generateYoutubeObsUrl();
+                                    else if (isObsUrlVisible) hideObsUrl();
+                                    else setIsObsUrlVisible(true);
+                                }} title={!youtubeObsUrl ? "OBS URL" : isObsUrlVisible ? "Скрыть" : "Показать"}>
+                                    <span className="text-xs">OBS URL</span>
                                 </Button>
-                                
-                                {/* Кнопка OBS - на одном уровне с полноэкранным режимом */}
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    onClick={() => {
-                                        if (!youtubeObsUrl) {
-                                            // Если нет URL, генерируем новый
-                                            generateYoutubeObsUrl();
-                                        } else if (isObsUrlVisible) {
-                                            // Если URL виден, скрываем
-                                            hideObsUrl();
-                                        } else {
-                                            // Если URL скрыт, показываем
-                                            setIsObsUrlVisible(true);
-                                        }
-                                    }}
-                                    title={
-                                        !youtubeObsUrl ? "Сгенерировать OBS URL" :
-                                        isObsUrlVisible ? "Скрыть OBS source" : 
-                                        "Показать OBS source для копирования"
-                                    }
-                                >
-                                    {!youtubeObsUrl ? 'OBS URL' :
-                                     isObsUrlVisible ? 'Скрыть' : 
-                                     'Показать'}
+
+                                {/* Fullscreen */}
+                                <Button variant="ghost" size="sm" className="h-8" onClick={() => {
+                                    const newTheaterMode = !isTheaterMode;
+                                    setIsTheaterMode(newTheaterMode);
+                                    window.dispatchEvent(new CustomEvent('youtube_event', {
+                                        detail: { event: 'theater_mode_changed', data: { isTheaterMode: newTheaterMode } }
+                                    }));
+                                }} title="Полноэкранный режим">
+                                    <Maximize className="h-4 w-4 mr-1" />
+                                    <span className="text-xs">Полноэкранный</span>
                                 </Button>
                             </div>
                             
@@ -392,7 +351,16 @@ const YoutubeIntegrationPage = () => {
                                     </div>
                                 </div>
                             )}
-                        </div>
+                            </div>
+                        )}
+
+                        {/* Fullscreen mode layout */}
+                        {isTheaterMode && (
+                            <div className="col-span-4 space-y-4">
+                                {/* Fullscreen player content */}
+                                <div className="aspect-video bg-black rounded-lg"></div>
+                            </div>
+                        )}
 
                         <div className={`flex flex-col ${isTheaterMode ? 'col-span-1 h-full' : 'w-full flex-1'}`}>
                             <Card className={isTheaterMode ? 'flex-1 flex flex-col' : 'flex-1 flex flex-col h-full'}>
