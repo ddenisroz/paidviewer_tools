@@ -321,10 +321,8 @@ const YoutubeIntegrationPage = () => {
                                     {isTheaterMode ? <Minimize className="h-4 w-4 mr-2" /> : <Maximize className="h-4 w-4 mr-2" />}
                                     {isTheaterMode ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
                                 </Button>
-                            </div>
-                            
-                            {/* Кнопка OBS */}
-                            <div className="flex gap-2 mt-4">
+                                
+                                {/* Кнопка OBS - на одном уровне с полноэкранным режимом */}
                                 <Button 
                                     variant="outline" 
                                     size="sm" 
@@ -346,22 +344,25 @@ const YoutubeIntegrationPage = () => {
                                         "Показать OBS source для копирования"
                                     }
                                 >
-                                    {!youtubeObsUrl ? '📹 OBS URL' :
-                                     isObsUrlVisible ? '👁️ Скрыть' : 
-                                     '👁️ Показать'}
+                                    {!youtubeObsUrl ? 'OBS URL' :
+                                     isObsUrlVisible ? 'Скрыть' : 
+                                     'Показать'}
                                 </Button>
-                                
-                                {youtubeObsUrl && (
+                            </div>
+                            
+                            {/* Кнопка обновления URL (если URL существует) */}
+                            {youtubeObsUrl && (
+                                <div className="mt-2">
                                     <Button 
                                         variant="outline" 
                                         size="sm" 
                                         onClick={regenerateYoutubeObsUrl}
                                         title="Перегенерировать новый OBS URL"
                                     >
-                                        🔄 Обновить
+                                        🔄 Обновить URL
                                     </Button>
-                                )}
-                            </div>
+                                </div>
+                            )}
                             
                             {/* OBS URL (если сгенерирован и видим) */}
                             {youtubeObsUrl && isObsUrlVisible && (

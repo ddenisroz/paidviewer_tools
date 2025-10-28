@@ -311,7 +311,7 @@ async def create_vk_reward(
         logger.error(f"Error creating VK reward: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка создания награды VK: {str(e)}")
 
-@points_router.patch("/rewards/twitch/{reward_id}/update")
+@points_router.patch("/rewards/twitch/{reward_id}")
 async def update_twitch_reward(
     reward_id: str,
     reward_data: CreateRewardRequest,
@@ -372,7 +372,7 @@ async def update_twitch_reward(
         logger.error(f"Error updating Twitch reward: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка обновления награды Twitch: {str(e)}")
 
-@points_router.delete("/rewards/twitch/{reward_id}/delete")
+@points_router.delete("/rewards/twitch/{reward_id}")
 async def delete_twitch_reward(
     reward_id: str,
     user: dict = Depends(get_current_user),
@@ -424,7 +424,7 @@ async def delete_twitch_reward(
         logger.error(f"Error deleting Twitch reward: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка удаления награды Twitch: {str(e)}")
 
-@points_router.patch("/rewards/vk/{reward_id}/update")
+@points_router.patch("/rewards/vk/{reward_id}")
 async def update_vk_reward(
     reward_id: str,
     reward_data: CreateRewardRequest,
