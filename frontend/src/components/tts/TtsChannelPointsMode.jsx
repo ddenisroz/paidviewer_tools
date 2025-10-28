@@ -37,10 +37,10 @@ const TtsChannelPointsMode = () => {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/api/tts/mode-settings');
+      const data = await apiClient.get('/api/tts/mode-settings');
       
-      setTtsMode(response.data.tts_mode);
-      setTtsRewardIds(response.data.tts_reward_ids || {});
+      setTtsMode(data.tts_mode);
+      setTtsRewardIds(data.tts_reward_ids || {});
     } catch (error) {
       console.error('Error loading TTS mode settings:', error);
       toast.error('Не удалось загрузить настройки режима TTS');
@@ -104,7 +104,7 @@ const TtsChannelPointsMode = () => {
       await loadSettings();
     } catch (error) {
       console.error('Error creating TTS reward:', error);
-      toast.error(error.response?.data?.detail || 'Не удалось создать TTS награду');
+      toast.error(error.message || 'Не удалось создать TTS награду');
     } finally {
       setSaving(false);
     }
