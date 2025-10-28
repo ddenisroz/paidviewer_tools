@@ -27,7 +27,8 @@ const YoutubeIntegrationPage = () => {
         handlePlayerReady,
         handlePlayerStateChange,
         handlePlayerError,
-        setPlayerRef
+        setPlayerRef,
+        setIsTheaterMode
     } = usePlayer();
     
     const [newVideoUrl, setNewVideoUrl] = useState('');
@@ -217,8 +218,8 @@ const YoutubeIntegrationPage = () => {
                         {/* Компактный блок управления (только для обычного режима) */}
                         {!isTheaterMode && (
                             <div className="flex gap-4">
-                                {/* Плеер слева (компактный) */}
-                                <div className="w-64 flex-shrink-0">
+                                {/* Плеер слева (оптимальный размер) */}
+                                <div className="w-[360px] flex-shrink-0">
                                     {playbackMode === 'browser' ? (
                                         <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
                                             {currentVideo ? (
@@ -253,70 +254,71 @@ const YoutubeIntegrationPage = () => {
                                 </div>
 
                                 {/* Панель управления справа */}
-                                <div className="flex-1 flex flex-col gap-3">
-                                    {/* Компактная панель управления */}
-                                    <div className="flex flex-wrap items-center gap-2 bg-muted/30 rounded-lg p-3">
-                                        {/* Play/Pause & Skip */}
-                                        <Button variant="ghost" size="sm" onClick={togglePlayPause} disabled={!currentVideo} className="h-8 w-8 p-0" title={isPlaying ? "Пауза" : "Воспроизвести"}>
-                                            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                                        </Button>
-                                        <Button variant="ghost" size="sm" onClick={nextVideo} disabled={!currentVideo} className="h-8 w-8 p-0" title="Пропустить">
-                                            <SkipForward className="h-4 w-4" />
-                                        </Button>
+                                <div className="flex-1 space-y-3">
+                                    {/* Группа 1: Воспроизведение и громкость */}
+                                    <div className="bg-muted/30 rounded-lg p-3">
+                                        <div className="flex items-center gap-2">
+                                            <Button variant="ghost" size="sm" onClick={togglePlayPause} disabled={!currentVideo} className="h-10 w-10 p-0" title={isPlaying ? "Пауза" : "Воспроизвести"}>
+                                                {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                                            </Button>
+                                            <Button variant="ghost" size="sm" onClick={nextVideo} disabled={!currentVideo} className="h-10 w-10 p-0" title="Пропустить">
+                                                <SkipForward className="h-5 w-5" />
+                                            </Button>
+                                            <div className="h-6 w-px bg-border mx-2" />
+                                            <Button variant="ghost" size="sm" onClick={toggleMute} className="h-10 w-10 p-0" title={isMuted ? "Включить звук" : "Выключить звук"}>
+                                                {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                                            </Button>
+                                            <div className="flex-1 flex items-center gap-2 mx-2">
+                                                <Slider value={[volume]} onValueChange={handleVolumeChange} max={100} step={1} className="flex-1" />
+                                                <span className="text-xs text-muted-foreground w-12 text-right">{volume}%</span>
+                                            </div>
+                                        </div>
+                                    </div>
 
-                                        <div className="h-5 w-px bg-border mx-1" />
+                                    {/* Группа 2: Действия - компактные кнопки */}
+                                    <div className="bg-muted/30 rounded-lg p-3">
+                                        <div className="flex gap-2">
+                                            {/* Очистить */}
+                                            <Dialog open={isClearDialogOpen} onOpenChange={setIsClearDialogOpen}>
+                                                <DialogTrigger asChild>
+                                                    <Button variant="outline" size="sm" className="h-9" title="Очистить очередь">
+                                                        <X className="h-4 w-4 mr-1.5" />
+                                                        <span className="text-sm">Очистить</span>
+                                                    </Button>
+                                                </DialogTrigger>
+                                                <DialogContent>
+                                                    <DialogHeader>
+                                                        <DialogTitle>Подтверждение</DialogTitle>
+                                                        <DialogDescription>Вы уверены, что хотите полностью очистить очередь?</DialogDescription>
+                                                    </DialogHeader>
+                                                    <DialogFooter>
+                                                        <Button variant="outline" onClick={() => setIsClearDialogOpen(false)}>Отмена</Button>
+                                                        <Button variant="destructive" onClick={handleClearQueue}>Очистить</Button>
+                                                    </DialogFooter>
+                                                </DialogContent>
+                                            </Dialog>
 
-                                        {/* Громкость */}
-                                        <Button variant="ghost" size="sm" onClick={toggleMute} className="h-8 w-8 p-0" title={isMuted ? "Включить звук" : "Выключить звук"}>
-                                            {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                                        </Button>
-                                        <Slider value={[volume]} onValueChange={handleVolumeChange} max={100} step={1} className="w-16" />
-                                        <span className="text-xs text-muted-foreground w-8 text-right">{volume}%</span>
+                                            {/* OBS URL */}
+                                            <Button variant="outline" size="sm" className="h-9" onClick={() => {
+                                                if (!youtubeObsUrl) generateYoutubeObsUrl();
+                                                else if (isObsUrlVisible) hideObsUrl();
+                                                else setIsObsUrlVisible(true);
+                                            }} title={!youtubeObsUrl ? "Сгенерировать OBS URL" : isObsUrlVisible ? "Скрыть URL" : "Показать URL"}>
+                                                <span className="text-sm">{!youtubeObsUrl ? "OBS URL" : isObsUrlVisible ? "Скрыть" : "Показать"}</span>
+                                            </Button>
 
-                                        <div className="h-5 w-px bg-border mx-1" />
-
-                                        {/* Очистить */}
-                                        <Dialog open={isClearDialogOpen} onOpenChange={setIsClearDialogOpen}>
-                                            <DialogTrigger asChild>
-                                                <Button variant="ghost" size="sm" className="h-8" title="Очистить очередь">
-                                                    <X className="h-4 w-4 mr-1" />
-                                                    <span className="text-xs">Очистить</span>
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                    <DialogTitle>Подтверждение</DialogTitle>
-                                                    <DialogDescription>Вы уверены, что хотите полностью очистить очередь?</DialogDescription>
-                                                </DialogHeader>
-                                                <DialogFooter>
-                                                    <Button variant="outline" onClick={() => setIsClearDialogOpen(false)}>Отмена</Button>
-                                                    <Button variant="destructive" onClick={handleClearQueue}>Очистить</Button>
-                                                </DialogFooter>
-                                            </DialogContent>
-                                        </Dialog>
-
-                                        <div className="h-5 w-px bg-border mx-1" />
-
-                                        {/* OBS URL */}
-                                        <Button variant="ghost" size="sm" className="h-8" onClick={() => {
-                                            if (!youtubeObsUrl) generateYoutubeObsUrl();
-                                            else if (isObsUrlVisible) hideObsUrl();
-                                            else setIsObsUrlVisible(true);
-                                        }} title={!youtubeObsUrl ? "OBS URL" : isObsUrlVisible ? "Скрыть" : "Показать"}>
-                                            <span className="text-xs">OBS URL</span>
-                                        </Button>
-
-                                        {/* Fullscreen */}
-                                        <Button variant="ghost" size="sm" className="h-8" onClick={() => {
-                                            const newTheaterMode = !isTheaterMode;
-                                            setIsTheaterMode(newTheaterMode);
-                                            window.dispatchEvent(new CustomEvent('youtube_event', {
-                                                detail: { event: 'theater_mode_changed', data: { isTheaterMode: newTheaterMode } }
-                                            }));
-                                        }} title="Полноэкранный режим">
-                                            <Maximize className="h-4 w-4 mr-1" />
-                                            <span className="text-xs">Полноэкранный</span>
-                                        </Button>
+                                            {/* Fullscreen */}
+                                            <Button variant="outline" size="sm" className="h-9" onClick={() => {
+                                                const newTheaterMode = !isTheaterMode;
+                                                setIsTheaterMode(newTheaterMode);
+                                                window.dispatchEvent(new CustomEvent('youtube_event', {
+                                                    detail: { event: 'theater_mode_changed', data: { isTheaterMode: newTheaterMode } }
+                                                }));
+                                            }} title="Полноэкранный режим">
+                                                <Maximize className="h-4 w-4 mr-1.5" />
+                                                <span className="text-sm">Полный экран</span>
+                                            </Button>
+                                        </div>
                                     </div>
                             
                                     {/* Кнопка обновления URL (если URL существует) */}

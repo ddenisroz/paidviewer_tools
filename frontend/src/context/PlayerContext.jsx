@@ -413,6 +413,11 @@ export const PlayerProvider = ({ children }) => {
         };
     }, []);
 
+    // Управление театральным режимом
+    const setIsTheaterMode = (value) => {
+        dispatch({ type: playerActions.SET_THEATER_MODE, payload: value });
+    };
+
     const value = {
         ...state,
         loadQueue,
@@ -425,7 +430,8 @@ export const PlayerProvider = ({ children }) => {
         handlePlayerStateChange,
         handlePlayerError,
         closePlayer,
-        updateTime
+        updateTime,
+        setIsTheaterMode
     };
 
     return (
