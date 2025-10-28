@@ -155,21 +155,22 @@ const RewardsTab = ({ rewards, platform, onRewardCreated, showCreate, setShowCre
 
   const createReward = async () => {
     try {
-
-      const formData = new FormData();
-      formData.append('name', newReward.name);
-      formData.append('description', newReward.description);
-      formData.append('price', newReward.price);
-      formData.append('platform', platform);
-      
-      if (newReward.soundFile) {
-        formData.append('sound', newReward.soundFile);
-      }
+      // Подготовка данных в формате JSON (как ожидает бэкенд)
+      const rewardData = {
+        title: newReward.name,
+        description: newReward.description,
+        cost: parseInt(newReward.price),
+        background_color: '#9147ff', // Default purple
+        is_enabled: true
+      };
 
       const response = await fetch(`${API_BASE_URL}/api/points/rewards/${platform}/create`, {
         method: 'POST',
         credentials: 'include',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(rewardData)
       });
 
       // Create reward response status:', response.status);

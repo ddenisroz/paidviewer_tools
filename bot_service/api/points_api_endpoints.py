@@ -479,7 +479,7 @@ async def update_vk_reward(
         logger.error(f"Error updating VK reward: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка обновления награды VK: {str(e)}")
 
-@points_router.delete("/rewards/vk/{reward_id}/delete")
+@points_router.delete("/rewards/vk/{reward_id}")
 async def delete_vk_reward(
     reward_id: str,
     user: dict = Depends(get_current_user),
