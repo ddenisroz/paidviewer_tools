@@ -280,17 +280,50 @@ const UserManagementPage = () => {
     };
 
     const handleAddToWhitelist = async () => {
+        if (!whitelistForm.channel_name.trim()) {
+            toast.error('Введите название канала');
+            return;
+        }
+        
         try {
             await botService.post('/api/admin/whitelist/add', {
-                channel_name: whitelistForm.channel_name
+                username: whitelistForm.channel_name.trim(),
+                platform: 'twitch' // По умолчанию Twitch, backend поддерживает оба
             });
-            toast.success('Канал добавлен в whitelist');
+            toast.success(`Канал ${whitelistForm.channel_name} добавлен в whitelist`);
             setWhitelistDialogOpen(false);
             setWhitelistForm({ channel_name: '' });
             loadUsers(); // Перезагружаем для обновления статуса whitelist
         } catch (error) {
             console.error('Error adding to whitelist:', error);
-            toast.error('Ошибка добавления в whitelist');
+            // Ошибка уже обрабатывается в apiClient
+        }
+    };
+
+    const handleToggleWhitelist = async (user) => {
+        const channelName = user.twitch_username || user.vk_username;
+        if (!channelName) {
+            toast.error('У пользователя нет ника на платформах');
+            return;
+        }
+
+        try {
+            if (user.is_whitelisted) {
+                // Удаляем из whitelist
+                await botService.delete(`/api/admin/whitelist/${channelName}`);
+                toast.success(`${channelName} удален из whitelist`);
+            } else {
+                // Добавляем в whitelist
+                await botService.post('/api/admin/whitelist/add', {
+                    username: channelName,
+                    platform: user.twitch_username ? 'twitch' : 'vk'
+                });
+                toast.success(`${channelName} добавлен в whitelist`);
+            }
+            loadUsers(); // Обновляем список
+        } catch (error) {
+            console.error('Error toggling whitelist:', error);
+            // Ошибка уже обрабатывается в apiClient
         }
     };
 
@@ -602,14 +635,28 @@ const UserManagementPage = () => {
                                                             size="sm"
                                                             variant="outline"
                                                         onClick={() => openEditDialog(user)}
+                                                        title="Редактировать"
                                                         >
                                                         <Edit className="w-3 h-3" />
                                                         </Button>
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
+                                                            onClick={() => handleToggleWhitelist(user)}
+                                                        className={user.is_whitelisted 
+                                                            ? "border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
+                                                            : "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                                                        }
+                                                        title={user.is_whitelisted ? "Удалить из whitelist" : "Добавить в whitelist"}
+                                                        >
+                                                        {user.is_whitelisted ? <UserX className="w-3 h-3" /> : <UserCheck className="w-3 h-3" />}
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
                                                             onClick={() => openBlockDialog(user)}
-                                                        className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+                                                        className="border-orange-600 text-orange-600 hover:bg-orange-600 hover:text-white"
+                                                        title={user.is_blocked ? "Разблокировать" : "Заблокировать"}
                                                         >
                                                         <Ban className="w-3 h-3" />
                                                         </Button>
@@ -618,6 +665,7 @@ const UserManagementPage = () => {
                                                         variant="outline"
                                                         onClick={() => handleDeleteUser(user.id)}
                                                         className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+                                                        title="Удалить пользователя"
                                                     >
                                                         <Trash2 className="w-3 h-3" />
                                                     </Button>
