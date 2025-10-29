@@ -93,13 +93,18 @@ const playerReducer = (state, action) => {
                 isVisible: true
             };
         case playerActions.TOGGLE_PLAY_PAUSE:
-            return { ...state, isPlaying: !state.isPlaying };
+            return { 
+                ...state, 
+                isPlaying: !state.isPlaying,
+                // Если запускаем воспроизведение - показываем плеер
+                isVisible: !state.isPlaying ? true : state.isVisible
+            };
         case playerActions.CLOSE_PLAYER:
             return { 
                 ...state, 
                 isVisible: false, 
-                isPlaying: false,
-                currentVideo: null
+                isPlaying: false
+                // НЕ удаляем currentVideo - оставляем в очереди
             };
         default:
             return state;
@@ -287,7 +292,9 @@ export const PlayerProvider = ({ children }) => {
         
         if (playerState === 1) { // Воспроизведение
             dispatch({ type: playerActions.SET_PLAYING, payload: true });
-            logger.debug('▶️ [YOUTUBE] Playing');
+            // Автоматически показываем мини-плеер при воспроизведении
+            dispatch({ type: playerActions.SET_VISIBLE, payload: true });
+            logger.debug('▶️ [YOUTUBE] Playing, mini-player visible');
         } else if (playerState === 2) { // Пауза
             dispatch({ type: playerActions.SET_PLAYING, payload: false });
             logger.debug('⏸️ [YOUTUBE] Paused');
