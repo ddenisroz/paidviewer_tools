@@ -31,7 +31,7 @@ def get_frontend_root() -> Path:
 
 def get_temp_dir() -> Path:
     """Получить директорию для временных файлов"""
-    return get_project_root() / "temp"
+    return get_bot_service_root() / "temp"
 
 def get_data_dir() -> Path:
     """Получить директорию для данных приложения"""
