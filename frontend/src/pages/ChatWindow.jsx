@@ -85,7 +85,7 @@ const ChatWindow = () => {
         }}>
             {/* Заголовок окна */}
             <div style={{
-                padding: '16px',
+                padding: '10px 12px',
                 borderBottom: '1px solid #333',
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -122,7 +122,7 @@ const ChatWindow = () => {
             <div style={{
                 flex: 1,
                 overflowY: 'auto',
-                padding: '16px',
+                padding: '8px 12px',
                 display: 'flex',
                 flexDirection: 'column'
             }}>
@@ -150,10 +150,10 @@ const ChatWindow = () => {
                             <div 
                                 key={msg.id || `${msg.platform}-${msg.timestamp}-${msg.author_name || msg.author}`}
                                 style={{
-                                    marginTop: index > 0 ? '8px' : '0',
-                                    padding: '8px 12px',
+                                    marginTop: index > 0 ? '4px' : '0',
+                                    padding: '6px 10px',
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                                    borderRadius: '6px',
+                                    borderRadius: '4px',
                                     wordBreak: 'break-word',
                                     display: 'flex',
                                     alignItems: 'baseline',
@@ -249,10 +249,10 @@ const ChatWindow = () => {
             
             {/* Подсказка внизу */}
             <div style={{
-                padding: '12px 16px',
+                padding: '8px 12px',
                 borderTop: '1px solid #333',
                 backgroundColor: '#111',
-                fontSize: '12px',
+                fontSize: '11px',
                 opacity: 0.6,
                 textAlign: 'center'
             }}>
