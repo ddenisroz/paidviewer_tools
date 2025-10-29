@@ -24,7 +24,9 @@ const MonitoringPage = () => {
     const fetchMetrics = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/metrics');
+            const response = await fetch('/api/admin/monitoring/metrics', {
+                credentials: 'include'
+            });
             if (!response.ok) {
                 throw new Error('Failed to fetch metrics');
             }
@@ -108,162 +110,106 @@ const MonitoringPage = () => {
                 </div>
             </div>
 
-            {/* Системные метрики */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* CPU */}
-                <Card className="bg-gray-800 border-gray-700">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-300">CPU</CardTitle>
-                        <Cpu className="h-4 w-4 text-gray-400" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-white">
-                            {metrics?.system?.cpu_percent?.toFixed(1) || 0}%
-                        </div>
-                        <div className="flex items-center justify-between mt-2">
-                            <Progress 
-                                value={metrics?.system?.cpu_percent || 0} 
-                                className="flex-1 mr-2"
-                            />
-                            {getStatusBadge(metrics?.system?.cpu_percent || 0)}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Memory */}
-                <Card className="bg-gray-800 border-gray-700">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-300">RAM</CardTitle>
-                        <MemoryStick className="h-4 w-4 text-gray-400" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-white">
-                            {metrics?.system?.memory_percent?.toFixed(1) || 0}%
-                        </div>
-                        <div className="flex items-center justify-between mt-2">
-                            <Progress 
-                                value={metrics?.system?.memory_percent || 0} 
-                                className="flex-1 mr-2"
-                            />
-                            {getStatusBadge(metrics?.system?.memory_percent || 0)}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Disk */}
-                <Card className="bg-gray-800 border-gray-700">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-300">Диск</CardTitle>
-                        <HardDrive className="h-4 w-4 text-gray-400" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-white">
-                            {metrics?.system?.disk_percent?.toFixed(1) || 0}%
-                        </div>
-                        <div className="flex items-center justify-between mt-2">
-                            <Progress 
-                                value={metrics?.system?.disk_percent || 0} 
-                                className="flex-1 mr-2"
-                            />
-                            {getStatusBadge(metrics?.system?.disk_percent || 0)}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Load Average */}
-                <Card className="bg-gray-800 border-gray-700">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-300">Нагрузка</CardTitle>
-                        <Activity className="h-4 w-4 text-gray-400" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-white">
-                            {metrics?.system?.load_average?.toFixed(2) || 'N/A'}
-                        </div>
-                        <p className="text-xs text-gray-400 mt-1">
-                            {metrics?.system?.load_average ? '1-минутная средняя' : 'Недоступно'}
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
-
             {/* Метрики приложения */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Активные соединения */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Всего пользователей */}
                 <Card className="bg-gray-800 border-gray-700">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-300">Соединения</CardTitle>
+                        <CardTitle className="text-sm font-medium text-gray-300">Всего пользователей</CardTitle>
                         <Users className="h-4 w-4 text-gray-400" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-white">
-                            {metrics?.app?.active_connections || 0}
+                            {metrics?.users?.total || 0}
                         </div>
-                        <p className="text-xs text-gray-400 mt-1">Активные WebSocket</p>
+                        <p className="text-xs text-gray-400 mt-1">Зарегистрировано</p>
                     </CardContent>
                 </Card>
 
-                {/* Активные каналы */}
+                {/* Активные пользователи */}
                 <Card className="bg-gray-800 border-gray-700">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-300">Каналы</CardTitle>
-                        <MessageCircle className="h-4 w-4 text-gray-400" />
+                        <CardTitle className="text-sm font-medium text-gray-300">Активные</CardTitle>
+                        <Users className="h-4 w-4 text-green-400" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-white">
-                            {metrics?.app?.active_channels || 0}
+                        <div className="text-2xl font-bold text-green-400">
+                            {metrics?.users?.active || 0}
                         </div>
-                        <p className="text-xs text-gray-400 mt-1">Активные каналы</p>
+                        <p className="text-xs text-gray-400 mt-1">Активных пользователей</p>
                     </CardContent>
                 </Card>
 
-                {/* TTS запросы */}
+                {/* Заблокированные */}
                 <Card className="bg-gray-800 border-gray-700">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-300">TTS запросы</CardTitle>
-                        <Mic className="h-4 w-4 text-gray-400" />
+                        <CardTitle className="text-sm font-medium text-gray-300">Заблокированные</CardTitle>
+                        <AlertTriangle className="h-4 w-4 text-red-400" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-white">
-                            {metrics?.app?.tts_requests_total || 0}
+                        <div className="text-2xl font-bold text-red-400">
+                            {metrics?.users?.blocked || 0}
                         </div>
-                        <p className="text-xs text-gray-400 mt-1">Всего запросов</p>
+                        <p className="text-xs text-gray-400 mt-1">Заблокировано</p>
+                    </CardContent>
+                </Card>
+
+                {/* Активные сессии */}
+                <Card className="bg-gray-800 border-gray-700">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-gray-300">Сессии</CardTitle>
+                        <Activity className="h-4 w-4 text-blue-400" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-blue-400">
+                            {metrics?.sessions?.active || 0}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">Активные сессии</p>
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Статус мониторинга */}
+            {/* Статистика сообщений */}
+            <div className="grid grid-cols-1 gap-4">
+                {/* Сообщения за 24 часа */}
+                <Card className="bg-gray-800 border-gray-700">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-gray-300">Сообщения за 24 часа</CardTitle>
+                        <MessageCircle className="h-4 w-4 text-gray-400" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-white">
+                            {metrics?.messages?.last_24h || 0}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">Сообщений обработано</p>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Информация о системе */}
             <Card className="bg-gray-800 border-gray-700">
                 <CardHeader>
                     <CardTitle className="text-lg font-semibold text-white flex items-center">
                         <Activity className="h-5 w-5 mr-2" />
-                        Статус мониторинга
+                        Информация о системе
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <p className="text-sm text-gray-400">Статус</p>
-                            <Badge variant={metrics?.monitoring?.running ? "default" : "destructive"}>
-                                {metrics?.monitoring?.running ? "Работает" : "Остановлен"}
-                            </Badge>
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-400">Порт Prometheus</p>
-                            <p className="text-white">{metrics?.monitoring?.port || 8000}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-400">Время работы</p>
+                            <p className="text-sm text-gray-400">Последнее обновление</p>
                             <p className="text-white">
-                                {metrics?.monitoring?.uptime_seconds 
-                                    ? `${Math.floor(metrics.monitoring.uptime_seconds / 60)} мин`
+                                {metrics?.timestamp 
+                                    ? new Date(metrics.timestamp).toLocaleString('ru-RU')
                                     : 'Неизвестно'
                                 }
                             </p>
                         </div>
                         <div>
-                            <p className="text-sm text-gray-400">Ошибки</p>
-                            <p className="text-white">{metrics?.app?.errors_total || 0}</p>
+                            <p className="text-sm text-gray-400">Статус</p>
+                            <Badge variant="default" className="bg-green-600">
+                                Работает
+                            </Badge>
                         </div>
                     </div>
                 </CardContent>

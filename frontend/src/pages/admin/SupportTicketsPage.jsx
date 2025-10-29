@@ -52,7 +52,7 @@ const SupportTicketsPage = () => {
 
   const loadTicketResponses = async (ticketId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/support/tickets/${ticketId}/responses`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/support/tickets/${ticketId}`, {
         credentials: 'include'
       });
 
@@ -73,13 +73,12 @@ const SupportTicketsPage = () => {
 
     setIsSubmittingResponse(true);
     try {
-      const formData = new FormData();
-      formData.append('message', newResponse);
-
-      const response = await fetch(`${API_BASE_URL}/api/admin/support/tickets/${selectedTicket.id}/respond`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/support/tickets/${selectedTicket.id}/responses?message=${encodeURIComponent(newResponse)}`, {
         method: 'POST',
         credentials: 'include',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
 
       if (response.ok) {
@@ -102,16 +101,18 @@ const SupportTicketsPage = () => {
     if (!selectedTicket) return;
 
     try {
-      const formData = new FormData();
-      formData.append('status', newStatus);
+      const params = new URLSearchParams();
+      params.append('status', newStatus);
       if (adminNotes) {
-        formData.append('admin_notes', adminNotes);
+        params.append('admin_notes', adminNotes);
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/admin/support/tickets/${selectedTicket.id}`, {
-        method: 'PUT',
+      const response = await fetch(`${API_BASE_URL}/api/admin/support/tickets/${selectedTicket.id}/status?${params.toString()}`, {
+        method: 'PATCH',
         credentials: 'include',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
 
       if (response.ok) {
@@ -131,8 +132,8 @@ const SupportTicketsPage = () => {
 
   const handleArchiveTicket = async (ticketId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/support/tickets/${ticketId}/archive`, {
-        method: 'PUT',
+      const response = await fetch(`${API_BASE_URL}/api/admin/support/tickets/${ticketId}`, {
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -144,6 +145,7 @@ const SupportTicketsPage = () => {
           ticket.id === ticketId ? { ...ticket, is_archived: true } : ticket
         ));
         toast.success('Тикет архивирован');
+        loadTickets(); // Перезагружаем список
       } else {
         toast.error('Ошибка архивирования тикета');
       }

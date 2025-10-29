@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict
 from pydantic import BaseModel
 import logging
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -1141,3 +1142,176 @@ async def get_analytics(
         import traceback
         logger.error(f"❌ [ANALYTICS] Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Ошибка получения аналитики: {str(e)}")
+
+# === SERVICE RESTART ENDPOINTS ===
+@router.post("/bot-service/restart")
+async def restart_bot_service(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Перезапустить Bot Service (только для админов)"""
+    try:
+        if not user.get('is_admin', False):
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        logger.info(f"🔄 [ADMIN] Bot service restart requested by user {user.get('id')}")
+        
+        # Получаем доступ к ботам из main
+        from main import bot_instance, vk_live_bot_instance
+        
+        restart_results = {
+            "twitch": {"status": "not_available", "message": "Бот не активен"},
+            "vk": {"status": "not_available", "message": "Бот не активен"}
+        }
+        
+        # Перезапуск Twitch бота
+        if bot_instance:
+            try:
+                logger.info("🔄 [ADMIN] Restarting Twitch bot...")
+                channels = list(bot_instance.connected_channels) if bot_instance.connected_channels else []
+                
+                # Отключаем текущие каналы
+                for channel in channels:
+                    try:
+                        await bot_instance.part_channels([channel.name])
+                    except Exception as e:
+                        logger.error(f"Error parting channel {channel.name}: {e}")
+                
+                # Переподключаем через небольшую задержку
+                await asyncio.sleep(2)
+                
+                # Получаем активных пользователей с Twitch
+                active_twitch_users = db.query(User).filter(
+                    User.twitch_access_token.isnot(None),
+                    User.is_active == True
+                ).all()
+                
+                reconnected = 0
+                for user_record in active_twitch_users:
+                    if user_record.twitch_username:
+                        try:
+                            success = await bot_instance.join_channel(user_record.twitch_username)
+                            if success:
+                                reconnected += 1
+                        except Exception as e:
+                            logger.error(f"Error rejoining {user_record.twitch_username}: {e}")
+                
+                restart_results["twitch"] = {
+                    "status": "restarted",
+                    "message": f"Переподключено к {reconnected} каналам",
+                    "reconnected_channels": reconnected
+                }
+                logger.info(f"✅ [ADMIN] Twitch bot restarted, reconnected to {reconnected} channels")
+                
+            except Exception as e:
+                logger.error(f"Error restarting Twitch bot: {e}")
+                restart_results["twitch"] = {
+                    "status": "error",
+                    "message": f"Ошибка перезапуска: {str(e)}"
+                }
+        
+        # Перезапуск VK бота
+        if vk_live_bot_instance:
+            try:
+                logger.info("🔄 [ADMIN] Restarting VK bot...")
+                
+                # Получаем активных пользователей с VK
+                active_vk_users = db.query(User).filter(
+                    User.vk_access_token.isnot(None),
+                    User.is_active == True
+                ).all()
+                
+                # Переподключаем каналы
+                reconnected = 0
+                for user_record in active_vk_users:
+                    if user_record.vk_channel_name:
+                        try:
+                            await vk_live_bot_instance.disconnect_from_channel(user_record.vk_channel_name)
+                            await asyncio.sleep(1)
+                            success = await vk_live_bot_instance.connect_to_channel(
+                                user_record.vk_channel_name,
+                                user_record.vk_access_token
+                            )
+                            if success:
+                                reconnected += 1
+                        except Exception as e:
+                            logger.error(f"Error reconnecting VK channel {user_record.vk_channel_name}: {e}")
+                
+                restart_results["vk"] = {
+                    "status": "restarted",
+                    "message": f"Переподключено к {reconnected} каналам",
+                    "reconnected_channels": reconnected
+                }
+                logger.info(f"✅ [ADMIN] VK bot restarted, reconnected to {reconnected} channels")
+                
+            except Exception as e:
+                logger.error(f"Error restarting VK bot: {e}")
+                restart_results["vk"] = {
+                    "status": "error",
+                    "message": f"Ошибка перезапуска: {str(e)}"
+                }
+        
+        return {
+            "success": True,
+            "message": "Перезапуск завершен",
+            "results": restart_results
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error restarting bot service: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка перезапуска: {str(e)}")
+
+@router.post("/tts/restart")
+async def restart_tts_engine(
+    user: dict = Depends(get_current_user)
+):
+    """Перезапустить TTS движок (только для админов)"""
+    try:
+        if not user.get('is_admin', False):
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        logger.info(f"🔄 [ADMIN] TTS engine restart requested by user {user.get('id')}")
+        
+        # TTS сервис - это отдельный микросервис, мы можем только проверить его статус
+        # Реальный перезапуск должен быть выполнен через Docker или системный менеджер
+        
+        from constants import TTS_SERVICE_URL
+        import httpx
+        
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                # Проверяем health endpoint
+                response = await client.get(f"{TTS_SERVICE_URL}/health")
+                
+                if response.status_code == 200:
+                    return {
+                        "success": True,
+                        "message": "TTS сервис работает нормально",
+                        "status": "healthy",
+                        "note": "Для полного перезапуска используйте Docker: docker-compose restart tts_service"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": "TTS сервис недоступен",
+                        "status": "unhealthy",
+                        "status_code": response.status_code
+                    }
+                    
+        except httpx.RequestError as e:
+            logger.error(f"Error checking TTS service: {e}")
+            return {
+                "success": False,
+                "message": "TTS сервис недоступен",
+                "status": "offline",
+                "error": str(e),
+                "note": "Запустите TTS сервис через: docker-compose up -d tts_service"
+            }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error restarting TTS engine: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка проверки TTS: {str(e)}")
