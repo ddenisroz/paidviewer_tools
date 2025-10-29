@@ -1914,7 +1914,6 @@ async def create_tts_reward(
     """
     try:
         from core.database import TTSUserSettings
-        from api.points_api_endpoints import pointsApi
         
         # Проверяем что пользователь в режиме channel_points
         settings = db.query(TTSUserSettings).filter(
@@ -1977,15 +1976,36 @@ async def create_tts_reward(
         
         # Сохраняем ID награды в настройках
         if result.get('success'):
-            reward_id = result['reward'].get('id')
+            logger.info(f"🔍 [TTS REWARD] Result from create_{platform}_reward: {result}")
+            reward_data_obj = result.get('reward')
+            logger.info(f"🔍 [TTS REWARD] reward_data_obj: {reward_data_obj}")
             
-            if not settings.tts_reward_ids:
-                settings.tts_reward_ids = {}
+            # Извлекаем ID награды из разных возможных структур
+            reward_id = None
+            if reward_data_obj:
+                # Для VK: {'reward': {'id': '...'}} 
+                if isinstance(reward_data_obj, dict) and 'reward' in reward_data_obj:
+                    nested_reward = reward_data_obj.get('reward')
+                    if isinstance(nested_reward, dict):
+                        reward_id = nested_reward.get('id')
+                # Для Twitch: {'id': '...'}
+                else:
+                    reward_id = reward_data_obj.get('id') or reward_data_obj.get('reward_id')
             
-            settings.tts_reward_ids[platform] = reward_id
+            # Обновляем reward_ids (создаем новый dict чтобы SQLAlchemy увидел изменения)
+            current_reward_ids = settings.tts_reward_ids or {}
+            current_reward_ids[platform] = reward_id
+            settings.tts_reward_ids = current_reward_ids
+            
+            # Помечаем поле как измененное для SQLAlchemy
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(settings, 'tts_reward_ids')
+            
             db.commit()
+            db.refresh(settings)
             
             logger.info(f"✅ Created TTS reward for {platform}: {reward_id}")
+            logger.info(f"✅ Current tts_reward_ids in DB: {settings.tts_reward_ids}")
             
             return {
                 "success": True,
@@ -2032,11 +2052,21 @@ async def delete_tts_reward(
         elif platform == 'twitch':
             await delete_twitch_reward(reward_id, user, db)
         
-        # Удаляем из настроек
-        del settings.tts_reward_ids[platform]
+        # Удаляем из настроек (создаем новый dict чтобы SQLAlchemy увидел изменения)
+        current_reward_ids = dict(settings.tts_reward_ids or {})
+        if platform in current_reward_ids:
+            del current_reward_ids[platform]
+        settings.tts_reward_ids = current_reward_ids
+        
+        # Помечаем поле как измененное для SQLAlchemy
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(settings, 'tts_reward_ids')
+        
         db.commit()
+        db.refresh(settings)
         
         logger.info(f"✅ Deleted TTS reward for {platform}: {reward_id}")
+        logger.info(f"✅ Current tts_reward_ids in DB: {settings.tts_reward_ids}")
         
         return {
             "success": True,

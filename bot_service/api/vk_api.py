@@ -36,8 +36,15 @@ class RateLimiter:
 
 class VKLiveAPI:
     def __init__(self):
-        self.live_base_url = "https://apidev.live.vkvideo.ru"  # VK Live API
+        # VK Live API (только dev доступен)
+        self.live_base_url = "https://apidev.live.vkvideo.ru"
         self.rate_limiter = RateLimiter()
+        
+        # SSL context для aiohttp - отключаем верификацию для dev API
+        import ssl
+        self.ssl_context = ssl.create_default_context()
+        self.ssl_context.check_hostname = False
+        self.ssl_context.verify_mode = ssl.CERT_NONE
         
     async def _wait_for_rate_limit(self) -> None:
         """Ожидание для соблюдения rate limiting"""
@@ -764,6 +771,7 @@ class VKLiveAPI:
                 
                 if response.status_code == 200:
                     data = response.json()
+                    logger.info(f"✅ VK API Response for create reward: {data}")
                     logger.info(f"Created VK channel reward: {reward_data.get('name')}")
                     return data.get("data")
                 else:

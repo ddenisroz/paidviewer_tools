@@ -146,7 +146,13 @@ class VKLiveBotCore:
                 "channel_url": channel_url
             }
             
-            async with aiohttp.ClientSession() as session:
+            # SSL context с отключенной верификацией для dev API
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
                 async with session.get(url, headers=headers, params=params) as response:
                     if response.status == 200:
                         data = await response.json()
@@ -279,26 +285,73 @@ class VKLiveBotCore:
                 logger.info(f"🎮 [VK CMD] Handler completed for: {text[:50]}")
                 return  # Не обрабатываем TTS для команд
             
-            # 4. Обработка TTS для обычных сообщений
-            await self._handle_vk_tts(message, channel_id, user, text)
+            # 4. Извлекаем reward_id из сообщения
+            reward_id = None
+            reward_title = None
+            
+            # VK Live не передает reward_id напрямую, но ChatBot отправляет сообщения о наградах
+            # Паттерн: "получает награду: [название награды] за [стоимость]"
+            if user.lower() == 'chatbot':
+                import re
+                reward_pattern = r'получает награду:\s*([^\n]+?)\s*за\s*\d+'
+                match = re.search(reward_pattern, text)
+                if match:
+                    reward_title = match.group(1).strip()
+                    logger.info(f"🎁 [VK MSG] Detected reward from ChatBot: '{reward_title}'")
+                    
+                    # Ищем reward_id TTS награды из настроек пользователя
+                    from core.database import SessionLocal, User, TTSUserSettings
+                    db = SessionLocal()
+                    try:
+                        from sqlalchemy import func
+                        channel_owner = db.query(User).filter(
+                            func.lower(User.vk_channel_name) == channel_id.lower()
+                        ).first()
+                        
+                        if channel_owner:
+                            tts_settings = db.query(TTSUserSettings).filter(
+                                TTSUserSettings.user_id == channel_owner.id
+                            ).first()
+                            
+                            # Если название награды содержит "TTS" - считаем что это TTS награда
+                            if tts_settings and tts_settings.tts_reward_ids and 'tts' in reward_title.lower():
+                                stored_reward_id = tts_settings.tts_reward_ids.get('vk')
+                                if stored_reward_id:
+                                    reward_id = stored_reward_id
+                                    logger.info(f"✅ [VK MSG] Matched TTS reward_id: {reward_id}")
+                    finally:
+                        db.close()
+            
+            # 5. Обработка TTS для обычных сообщений
+            await self._handle_vk_tts(message, channel_id, user, text, reward_id, reward_title)
                 
         except Exception as e:
             logger.error(f"Error handling VK Live message: {e}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
 
-    async def _handle_vk_tts(self, message: Dict[str, Any], channel_id: str, username: str, text: str):
+    async def _handle_vk_tts(self, message: Dict[str, Any], channel_id: str, username: str, text: str, reward_id: str = None, reward_title: str = None):
         """Обработка TTS для VK сообщений"""
         from utils.websocket_helper import handle_tts_for_message
         
+        # Если это сообщение с наградой от ChatBot - извлекаем чистый текст
+        cleaned_text = text
+        if username.lower() == 'chatbot' and reward_title:
+            import re
+            # Удаляем служебное сообщение "получает награду: [название] за [стоимость]"
+            reward_pattern = r'^получает награду:\s*[^\n]+?\s*за\s*\d+\s*\n*'
+            cleaned_text = re.sub(reward_pattern, '', text, flags=re.MULTILINE).strip()
+            logger.info(f"🧹 [VK TTS] Cleaned text from reward message: '{cleaned_text[:50]}...'")
+        
         await handle_tts_for_message(
-            text=text,
+            text=cleaned_text,
             username=username.lower(),
             channel_identifier=channel_id,
             platform='vk',
             tts_api=self.tts_api,
             connection_manager=self.connection_manager,
-            skip_if_command=False  # Команды уже отфильтрованы в _handle_message
+            skip_if_command=False,  # Команды уже отфильтрованы в _handle_message
+            reward_id=reward_id  # Передаем reward_id если есть
         )
     
     def get_connected_channels(self) -> List[str]:

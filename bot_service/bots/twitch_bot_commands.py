@@ -166,7 +166,12 @@ class TwitchBotCommands:
                 return
             
             # Получаем информацию о видео и добавляем в очередь
-            result = await self.youtube_api.add_to_queue(url, ctx.author.name)
+            result = await self.youtube_api.add_to_queue(
+                url=url, 
+                requester_name=ctx.author.name,
+                channel_name=ctx.channel.name,
+                platform='twitch'
+            )
             
             if result.get('success'):
                 video_title = result.get('title', 'Video')
@@ -180,3 +185,52 @@ class TwitchBotCommands:
         except Exception as e:
             logger.error(f'Error in sr command: {e}')
             await ctx.send('❌ Произошла ошибка при добавлении видео')
+    
+    async def clearqueue_command(self, ctx):
+        """Команда для очистки YouTube очереди (только модераторы/админы)"""
+        try:
+            # Проверяем права доступа
+            if not (ctx.author.is_mod or ctx.author.is_broadcaster):
+                await ctx.send('❌ Только модераторы могут очищать очередь')
+                return
+            
+            from services.queue_service import QueueService
+            from core.database import get_db, User
+            from sqlalchemy import func
+            
+            db = next(get_db())
+            
+            # Определяем user_id по имени канала
+            user = db.query(User).filter(func.lower(User.twitch_username) == ctx.channel.name.lower()).first()
+            user_id = user.id if user else 1
+            
+            queue_service = QueueService()
+            cleared_count = queue_service.clear_queue(user_id, db)
+            
+            # Отправляем WebSocket уведомление
+            try:
+                from core.connection_manager import get_connection_manager
+                import asyncio
+                
+                connection_manager = get_connection_manager()
+                queue_items = queue_service.get_queue(user_id, db)
+                
+                asyncio.create_task(
+                    connection_manager.send_to_user(
+                        str(user_id),
+                        {
+                            "type": "youtube_queue_update",
+                            "queue": queue_items,
+                            "timestamp": __import__('time').time()
+                        }
+                    )
+                )
+            except Exception as ws_error:
+                logger.error(f"Error sending websocket notification: {ws_error}")
+            
+            await ctx.send(f'✅ Очередь очищена! Удалено видео: {cleared_count}')
+            logger.info(f'[CLEARQUEUE] Moderator {ctx.author.name} cleared queue ({cleared_count} videos)')
+            
+        except Exception as e:
+            logger.error(f'Error in clearqueue command: {e}')
+            await ctx.send('❌ Произошла ошибка при очистке очереди')

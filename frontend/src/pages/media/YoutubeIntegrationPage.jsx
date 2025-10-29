@@ -173,7 +173,8 @@ const YoutubeIntegrationPage = () => {
         if (lastJsonMessage) {
             if (lastJsonMessage.type === 'youtube_queue_update') {
                 // Received youtube_queue_update from WebSocket, reloading queue
-                toast.info("Очередь видео обновлена!");
+                // Молча обновляем - не спамим уведомлениями
+                console.log('📺 [YouTube] Queue updated via WebSocket');
             }
         }
     }, [lastJsonMessage]);

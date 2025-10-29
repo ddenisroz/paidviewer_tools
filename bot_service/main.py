@@ -477,10 +477,11 @@ async def lifespan(app: FastAPI):
                                 import requests
                                 try:
                                     logger.info(f"📺 [VK] Testing VK OAuth token validity...")
-                                    # Используем VK Live API для проверки токена
+                                    # Используем dev API (только он доступен, SSL verification отключена)
                                     test_response = requests.get(f'https://apidev.live.vkvideo.ru/v1/current_user', 
                                                                headers={'Authorization': f'Bearer {vk_access_token}'}, 
-                                                               timeout=5)
+                                                               timeout=5,
+                                                               verify=False)
                                     logger.info(f"📺 [VK] Token validation response: status={test_response.status_code}")
                                     if test_response.status_code == 401:
                                         logger.info("🔄 VK Live OAuth token expired, refreshing automatically...")
@@ -494,10 +495,11 @@ async def lifespan(app: FastAPI):
                                         if new_access_token:
                                             logger.info("✅ VK token successfully refreshed!")
                                             vk_access_token = new_access_token
-                                            # Повторяем валидацию с новым токеном
+                                            # Повторяем валидацию с новым токеном (используем dev API)
                                             test_response = requests.get(f'https://apidev.live.vkvideo.ru/v1/current_user', 
                                                                        headers={'Authorization': f'Bearer {vk_access_token}'}, 
-                                                                       timeout=5)
+                                                                       timeout=5,
+                                                                       verify=False)
                                             logger.info(f"📺 [VK] Token validation after refresh: status={test_response.status_code}")
                                             
                                             if test_response.status_code != 200:

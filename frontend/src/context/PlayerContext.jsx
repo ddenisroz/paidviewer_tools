@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect, useRef } from 
 import { botService } from '../services/microservices';
 import { youtubeLogger as logger } from '../utils/logger';
 import { useAuth } from './AuthContext';
+import { useChat } from './ChatContext';
 
 // Контекст для глобального состояния плеера
 const PlayerContext = createContext();
@@ -110,6 +111,7 @@ export const PlayerProvider = ({ children }) => {
     const [state, dispatch] = useReducer(playerReducer, initialState);
     const lastUpdateTimeRef = useRef(0);
     const { isAuthenticated, isGuest } = useAuth();
+    const { lastJsonMessage } = useChat();
     
     // WebSocket для синхронизации YouTube плеера
     // ОТКЛЮЧЕНО: backend не отправляет youtube_state, используем HTTP polling вместо WebSocket
@@ -372,6 +374,14 @@ export const PlayerProvider = ({ children }) => {
             clearInterval(timeInterval);
         };
     }, [isAuthenticated]);
+
+    // Обработка WebSocket сообщений
+    useEffect(() => {
+        if (lastJsonMessage && lastJsonMessage.type === 'youtube_queue_update') {
+            logger.debug('📺 [YouTube] Queue updated via WebSocket, reloading...');
+            loadQueue();
+        }
+    }, [lastJsonMessage, loadQueue]);
 
     // Обработка событий YouTube
     useEffect(() => {

@@ -54,10 +54,9 @@ class VKLiveWebSocketClient:
     async def _get_websocket_token(self) -> Optional[str]:
         """Получение JWT токена для WebSocket подключения"""
         try:
-            # Пробуем разные API endpoints
+            # Используем dev API (только он доступен)
             endpoints = [
                 "https://apidev.live.vkvideo.ru/v1/websocket/token",
-                "https://api.live.vkvideo.ru/v1/websocket/token", 
                 "https://api.vk.com/method/streaming.getServerUrl"
             ]
             
@@ -66,7 +65,13 @@ class VKLiveWebSocketClient:
                 "Content-Type": "application/json"
             }
             
-            async with aiohttp.ClientSession() as session:
+            # SSL context с отключенной верификацией для dev API
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
                 for url in endpoints:
                     try:
                         logger.info(f"Trying VK API endpoint: {url}")
@@ -153,6 +158,7 @@ class VKLiveWebSocketClient:
         """Получить subscription token для приватного канала"""
         try:
             import aiohttp
+            import ssl
             
             url = "https://apidev.live.vkvideo.ru/v1/websocket/subscription_token"
             headers = {
@@ -165,7 +171,12 @@ class VKLiveWebSocketClient:
             
             logger.info(f"🔑 Requesting subscription token for: {channel_name}")
             
-            async with aiohttp.ClientSession() as session:
+            # SSL context с отключенной верификацией для dev API
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
                 async with session.get(url, headers=headers, params=params) as response:
                     if response.status == 200:
                         data = await response.json()

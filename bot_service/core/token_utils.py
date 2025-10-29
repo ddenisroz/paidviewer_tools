@@ -174,8 +174,9 @@ async def validate_platform_token(token) -> bool:
         elif token.platform == 'vk':
             logger.info(f"🔍 Validating VK Live token via API...")
             
-            async with httpx.AsyncClient(timeout=TOKEN_VALIDATION_TIMEOUT) as client:
+            async with httpx.AsyncClient(timeout=TOKEN_VALIDATION_TIMEOUT, verify=False) as client:
                 try:
+                    # Используем dev API (только он доступен, SSL verification отключена)
                     response = await client.get(
                         "https://apidev.live.vkvideo.ru/v1/current_user",
                         headers={"Authorization": f"Bearer {access_token}"}

@@ -257,6 +257,38 @@ class AuthHandlers:
         user_id = current_user.get("id")
         
         if user_id:
+            # Отключаем бота от каналов пользователя ПЕРЕД удалением токенов
+            if user_type == UserType.AUTHENTICATED and user_id > 0:
+                logger.info(f"🔌 Logout: Disconnecting bot from user {user_id} channels")
+                from core.database import get_db, User
+                db = next(get_db())
+                try:
+                    user = db.query(User).filter(User.id == user_id).first()
+                    if user:
+                        # Отключаем Twitch бота
+                        if user.twitch_username:
+                            logger.info(f"🔌 Disconnecting Twitch bot from channel: {user.twitch_username}")
+                            try:
+                                from main import bot_instance
+                                if bot_instance:
+                                    await bot_instance.part_channels([user.twitch_username])
+                                    logger.info(f"✅ Twitch bot disconnected from {user.twitch_username}")
+                            except Exception as e:
+                                logger.error(f"❌ Error disconnecting Twitch bot: {e}")
+                        
+                        # Отключаем VK Live бота
+                        if user.vk_channel_name:
+                            logger.info(f"🔌 Disconnecting VK Live bot from channel: {user.vk_channel_name}")
+                            try:
+                                from main import vk_live_bot_instance
+                                if vk_live_bot_instance:
+                                    await vk_live_bot_instance.disconnect_from_channel(user.vk_channel_name)
+                                    logger.info(f"✅ VK Live bot disconnected from {user.vk_channel_name}")
+                            except Exception as e:
+                                logger.error(f"❌ Error disconnecting VK Live bot: {e}")
+                finally:
+                    db.close()
+            
             # Для авторизованных пользователей - удаляем ВСЕ токены
             if user_type == UserType.AUTHENTICATED and user_id > 0:
                 logger.info(f"🗑️ Logout: Deleting ALL tokens for user {user_id}")

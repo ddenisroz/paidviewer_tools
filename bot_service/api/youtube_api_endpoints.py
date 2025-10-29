@@ -11,6 +11,7 @@ from core.database import get_db
 from services.queue_service import QueueService
 from services.youtube_service import YouTubeService
 from utils.enhanced_logger import log_request, log_response, api_logger
+from core.connection_manager import get_connection_manager
 
 # Получим функции аутентификации из main.py
 import sys
@@ -53,6 +54,25 @@ youtube_service = YouTubeService()
 # Импортируем правильную аутентификацию
 from auth.auth import get_current_user
 
+# Вспомогательная функция для отправки WebSocket уведомлений
+async def notify_queue_update(user_id: int, db: Session):
+    """Отправляет WebSocket уведомление об обновлении очереди"""
+    try:
+        connection_manager = get_connection_manager()
+        queue_items = queue_service.get_queue(user_id, db)
+        
+        await connection_manager.send_to_user(
+            str(user_id),
+            {
+                "type": "youtube_queue_update",
+                "queue": queue_items,
+                "timestamp": time.time()
+            }
+        )
+        logger.debug(f"📺 Sent youtube_queue_update to user {user_id}")
+    except Exception as e:
+        logger.error(f"Error sending youtube_queue_update: {e}")
+
 @youtube_router.post("/queue/add")
 async def add_video_to_queue(
     request: AddVideoRequest,
@@ -78,6 +98,9 @@ async def add_video_to_queue(
         )
         
         if result["success"]:
+            # Отправляем WebSocket уведомление об обновлении очереди
+            await notify_queue_update(user["id"], db)
+            
             response = {
                 "success": True,
                 "message": "Видео добавлено в очередь",
@@ -142,6 +165,9 @@ async def remove_from_queue(
         success = queue_service.remove_from_queue(user["id"], queue_id, db)
         
         if success:
+            # Отправляем WebSocket уведомление об обновлении очереди
+            await notify_queue_update(user["id"], db)
+            
             return {
                 "success": True,
                 "message": "Видео удалено из очереди"
@@ -163,6 +189,9 @@ async def clear_queue(
     try:
         cleared_count = queue_service.clear_queue(user["id"], db)
         
+        # Отправляем WebSocket уведомление об обновлении очереди
+        await notify_queue_update(user["id"], db)
+        
         return {
             "success": True,
             "message": f"Очередь очищена ({cleared_count} видео удалено)"
@@ -183,6 +212,9 @@ async def mark_as_played(
         success = queue_service.mark_as_played(user["id"], queue_id, db)
         
         if success:
+            # Отправляем WebSocket уведомление об обновлении очереди
+            await notify_queue_update(user["id"], db)
+            
             return {
                 "success": True,
                 "message": "Видео отмечено как проигранное"

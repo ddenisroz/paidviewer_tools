@@ -184,10 +184,10 @@ export const AuthProvider = ({ children }) => {
                 logger.error('[AUTH] Failed to cleanup WebSocket:', error);
             }
             
-            toast.success('Вы успешно вышли из системы.');
+            // Молча выходим - редирект на логин уже показывает что пользователь вышел
         } catch (error) {
             logger.error('Logout failed:', error);
-            toast.error('Ошибка при выходе из системы.');
+            // apiClient.js уже показывает toast при ошибках
         }
     };
 

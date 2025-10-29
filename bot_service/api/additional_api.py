@@ -235,9 +235,12 @@ async def disconnect_integration(platform: str, user: dict = Depends(get_current
                 try:
                     from main import bot_instance
                     if bot_instance:
-                        # TwitchIO не имеет метода part, но мы можем отключить TTS
+                        # Бот покидает канал
+                        await bot_instance.part_channels([channel_name])
+                        logger.info(f"✅ Twitch bot left channel: {channel_name}")
+                        # Отключаем TTS
                         connection_manager.disable_tts_for_channel(channel_name.lower())
-                        logger.info(f"✅ Disconnected Twitch bot from {channel_name}")
+                        logger.info(f"✅ TTS disabled for {channel_name}")
                 except Exception as e:
                     logger.error(f"Error disconnecting Twitch bot: {e}")
                     raise HTTPException(status_code=500, detail=f"Failed to disconnect Twitch bot: {str(e)}")
@@ -310,6 +313,13 @@ async def remove_integration(platform: str, user: dict = Depends(get_current_use
             if platform == "twitch":
                 channel_name = db_user.twitch_username
                 if channel_name:
+                    try:
+                        from main import bot_instance
+                        if bot_instance:
+                            await bot_instance.part_channels([channel_name])
+                            logger.info(f"✅ Twitch bot left channel: {channel_name}")
+                    except Exception as e:
+                        logger.error(f"Error disconnecting Twitch bot: {e}")
                     connection_manager.disable_tts_for_channel(channel_name.lower())
                     
             elif platform == "vk":

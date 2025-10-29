@@ -12,8 +12,25 @@ class YouTubeAPI:
     def __init__(self):
         pass
 
+    def clean_url(self, url: str) -> str:
+        """Очистить URL от невидимых символов и лишних параметров"""
+        # Удаляем невидимые символы и пробелы
+        url = url.strip()
+        # Удаляем все невидимые Unicode символы
+        url = ''.join(char for char in url if char.isprintable())
+        
+        # Извлекаем только video_id и создаем чистый URL
+        video_id = self.extract_video_id(url)
+        if video_id:
+            return f"https://www.youtube.com/watch?v={video_id}"
+        
+        return url
+    
     def extract_video_id(self, url: str) -> Optional[str]:
         """Извлечь ID видео из YouTube URL"""
+        # Сначала очищаем от невидимых символов
+        url = ''.join(char for char in url if char.isprintable()).strip()
+        
         patterns = [
             r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([a-zA-Z0-9_-]{11})',
             r'youtube\.com/watch\?.*v=([a-zA-Z0-9_-]{11})',
@@ -82,6 +99,10 @@ class YouTubeAPI:
     async def add_to_queue(self, url: str, requester_name: str, channel_name: str = "twitch", platform: str = "twitch") -> Dict[str, Any]:
         """Добавить видео в очередь (для команды !sr)"""
         try:
+            # Очищаем URL от невидимых символов и лишних параметров
+            url = self.clean_url(url)
+            logger.info(f"🧹 Cleaned URL: {url}")
+            
             # Проверяем валидность URL
             if not self.validate_url(url):
                 return {"success": False, "error": "Неверный YouTube URL"}
@@ -130,6 +151,30 @@ class YouTubeAPI:
             )
             
             if result.get("success"):
+                # Отправляем WebSocket уведомление об обновлении очереди
+                try:
+                    from core.connection_manager import get_connection_manager
+                    from services.queue_service import QueueService
+                    import asyncio
+                    
+                    connection_manager = get_connection_manager()
+                    queue_service_instance = QueueService()
+                    queue_items = queue_service_instance.get_queue(user_id, db)
+                    
+                    asyncio.create_task(
+                        connection_manager.send_to_user(
+                            str(user_id),
+                            {
+                                "type": "youtube_queue_update",
+                                "queue": queue_items,
+                                "timestamp": __import__('time').time()
+                            }
+                        )
+                    )
+                    logger.debug(f"📺 Sent youtube_queue_update to user {user_id} (from command)")
+                except Exception as ws_error:
+                    logger.error(f"Error sending websocket notification: {ws_error}")
+                
                 queue_item = result.get("queue_item", {})
                 return {
                     "success": True,

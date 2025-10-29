@@ -37,79 +37,80 @@ const TtsControlPanel = ({
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="space-y-6">
-                    {/* Базовая озвучка - доступна всегда */}
-                    <div className="flex items-center justify-between p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                        <div className="flex items-center space-x-3">
+                <div className="space-y-5">
+                    {/* Типы озвучки */}
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* Базовая озвучка */}
+                        <div className="flex items-center space-x-4 p-4 bg-blue-500/10 border-2 border-blue-500/30 rounded-xl hover:border-blue-500/50 transition-all">
                             <Switch
                                 checked={basicTtsEnabled}
                                 onCheckedChange={(checked) => setBasicTtsEnabled(checked)}
                                 disabled={!isAuthenticated || !isConnected}
+                                className="scale-125"
                             />
-                            <div>
-                                <h3 className="text-sm font-medium text-white">Базовая озвучка</h3>
+                            <div className="flex-1">
+                                <h3 className="text-lg font-bold text-white">Базовая озвучка</h3>
+                                <p className="text-sm text-gray-400 mt-0.5">Google TTS</p>
                                 {(!isAuthenticated || !isConnected) && (
-                                    <p className="text-xs text-gray-400">Требуется подключение к каналу</p>
+                                    <p className="text-xs text-yellow-500 mt-1">⚠ Требуется канал</p>
                                 )}
                             </div>
                         </div>
-                        
-                    </div>
 
-                    {/* ИИ озвучка F5-TTS - требует подтверждения */}
-                    <div className={`flex items-center justify-between p-4 rounded-lg transition-all ${
-                        isHealthy 
-                            ? 'bg-purple-500/10 border border-purple-500/30' 
-                            : 'bg-gray-500/10 border border-gray-500/30'
-                    }`}>
-                        <div className="flex items-center space-x-3">
+                        {/* ИИ озвучка F5-TTS */}
+                        <div className={`flex items-center space-x-4 p-4 rounded-xl border-2 transition-all ${
+                            isHealthy 
+                                ? 'bg-purple-500/10 border-purple-500/30 hover:border-purple-500/50' 
+                                : 'bg-gray-500/10 border-gray-500/30'
+                        }`}>
                             <Switch
                                 checked={aiTtsEnabled}
                                 onCheckedChange={(checked) => setAiTtsEnabled(checked)}
                                 disabled={!isHealthy || !isAuthenticated || !isConnected}
+                                className="scale-125"
                             />
-                            <div>
-                                <h3 className="text-sm font-medium text-white">ИИ озвучка (F5-TTS)</h3>
+                            <div className="flex-1">
+                                <h3 className="text-lg font-bold text-white">ИИ озвучка</h3>
+                                <p className="text-sm text-gray-400 mt-0.5">F5-TTS</p>
                                 {(!isAuthenticated || !isConnected) && (
-                                    <p className="text-xs text-gray-400">Требуется подключение к каналу</p>
+                                    <p className="text-xs text-yellow-500 mt-1">⚠ Требуется канал</p>
                                 )}
                             </div>
                         </div>
-                        
                     </div>
                     
                     {/* Способ озвучки */}
                     {isAuthenticated && (
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-3">
-                                <span className="text-sm text-gray-400">Способ озвучки:</span>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => setListeningMode('website')}
-                                        className={`px-4 py-2 text-sm rounded-lg transition-colors font-medium ${
-                                            listeningMode === 'website'
-                                                ? 'bg-blue-600 text-white shadow-lg'
-                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                        }`}
-                                    >
-                                        Сайт
-                                    </button>
-                                    <button
-                                        onClick={() => setListeningMode('obs')}
-                                        className={`px-4 py-2 text-sm rounded-lg transition-colors font-medium ${
-                                            listeningMode === 'obs'
-                                                ? 'bg-blue-600 text-white shadow-lg'
-                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                        }`}
-                                    >
-                                        OBS
-                                    </button>
-                                </div>
+                        <div className="border-t border-gray-700/50 pt-5">
+                            <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    onClick={() => setListeningMode('website')}
+                                    className={`p-2.5 rounded-lg border-2 transition-all text-left ${
+                                        listeningMode === 'website'
+                                            ? 'border-primary bg-primary/10'
+                                            : 'border-border hover:border-primary/50'
+                                    }`}
+                                >
+                                    <div className="font-semibold text-sm mb-0.5">Сайт</div>
+                                    <div className="text-xs text-muted-foreground">Источник воспроизведения веб-страница</div>
+                                </button>
+                                <button
+                                    onClick={() => setListeningMode('obs')}
+                                    className={`p-2.5 rounded-lg border-2 transition-all text-left ${
+                                        listeningMode === 'obs'
+                                            ? 'border-primary bg-primary/10'
+                                            : 'border-border hover:border-primary/50'
+                                    }`}
+                                >
+                                    <div className="font-semibold text-sm mb-0.5">OBS</div>
+                                    <div className="text-xs text-muted-foreground">Browser Source</div>
+                                </button>
                             </div>
                             
                             {/* URL для OBS - под кнопками */}
                             {listeningMode === 'obs' && (
-                                <div className="p-4 bg-gray-800/50 rounded-lg border border-gray-700 space-y-3">
+                                <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700 space-y-2">
                                     <div className="flex items-center justify-between">
                                         <span className="text-sm text-gray-400">URL для OBS:</span>
                                         {obsUrl && typeof obsUrl === 'string' ? (
@@ -128,7 +129,7 @@ const TtsControlPanel = ({
                                                     onClick={() => {
                                                         if (onRegenerateObsUrl) {
                                                             onRegenerateObsUrl();
-                                                            toast.success('URL перегенерирован');
+                                                            // handleRegenerateObsUrl в TtsMainPage.jsx уже показывает toast
                                                         }
                                                     }}
                                                     className="text-yellow-400 hover:text-yellow-300 px-3 py-1.5 rounded bg-yellow-900/20 text-xs font-medium transition-colors"
@@ -150,22 +151,23 @@ const TtsControlPanel = ({
                                     )}
                                 </div>
                             )}
+                            </div>
                         </div>
                     )}
                     
                     {/* Выбор платформ */}
                     {isAuthenticated && (
-                        <div className="border-t border-gray-700 pt-4">
-                            <h4 className="text-sm font-medium text-gray-300 mb-3">Выбор платформ</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="border-t border-gray-700/50 pt-5">
+                            <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-2">
                                 {/* Twitch */}
-                                <div className={`flex items-center justify-between p-3 rounded-lg border ${
+                                <div className={`flex items-center justify-between p-2.5 rounded-lg border ${
                                     isTwitchConnected 
                                         ? 'bg-gray-800 border-gray-700' 
                                         : 'bg-gray-900 border-gray-800'
                                 }`}>
-                                    <div className="flex items-center space-x-3">
-                                        <TwitchIcon className={`w-5 h-5 ${
+                                    <div className="flex items-center space-x-2">
+                                        <TwitchIcon className={`w-4 h-4 ${
                                             isTwitchConnected ? 'text-white' : 'text-gray-500'
                                         }`} />
                                         <div>
@@ -186,13 +188,13 @@ const TtsControlPanel = ({
                                 </div>
                                 
                                 {/* VK Live */}
-                                <div className={`flex items-center justify-between p-3 rounded-lg border ${
+                                <div className={`flex items-center justify-between p-2.5 rounded-lg border ${
                                     isVkConnected 
                                         ? 'bg-gray-800 border-gray-700' 
                                         : 'bg-gray-900 border-gray-800'
                                 }`}>
-                                    <div className="flex items-center space-x-3">
-                                        <VKIcon className={`w-5 h-5 ${
+                                    <div className="flex items-center space-x-2">
+                                        <VKIcon className={`w-4 h-4 ${
                                             isVkConnected ? 'text-white' : 'text-gray-500'
                                         }`} />
                                         <div>
@@ -212,12 +214,13 @@ const TtsControlPanel = ({
                                     />
                                 </div>
                             </div>
+                            </div>
                         </div>
                     )}
                     
                     {/* Режим озвучки (все сообщения / за баллы) */}
                     {isAuthenticated && (
-                        <div className="border-t border-gray-700 pt-4">
+                        <div className="border-t border-gray-700/50 pt-5">
                             <TtsChannelPointsMode asSection={true} />
                         </div>
                     )}

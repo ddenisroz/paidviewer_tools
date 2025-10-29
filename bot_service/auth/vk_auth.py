@@ -202,11 +202,11 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
             logger.info(f"Attempting to get user info with token...")
             
             user_info = None
-            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
-                # Пробуем основной API endpoint
-                endpoint = "https://api.live.vkvideo.ru/v1/current_user"
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0, verify=False) as client:
+                # Используем dev API (только он доступен)
+                endpoint = "https://apidev.live.vkvideo.ru/v1/current_user"
                 try:
-                    logger.info(f"Trying production API: {endpoint}")
+                    logger.info(f"Fetching VK user info from dev API: {endpoint}")
                     user_info_response = await client.get(
                         endpoint,
                         headers={"Authorization": f"Bearer {access_token}"}
@@ -222,19 +222,6 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
                             logger.info(f"Successfully got user info: user_id={user_info.get('id')}")
                     else:
                         logger.error(f"Failed to get user info, status: {user_info_response.status_code}")
-                        # Пробуем dev API
-                        dev_endpoint = "https://apidev.live.vkvideo.ru/v1/current_user"
-                        logger.info(f"Trying dev API: {dev_endpoint}")
-                        dev_response = await client.get(
-                            dev_endpoint,
-                            headers={"Authorization": f"Bearer {access_token}"}
-                        )
-                        if dev_response.status_code == 200:
-                            data = dev_response.json()
-                            if isinstance(data, dict) and "data" in data and "user" in data["data"]:
-                                user_info = data["data"]["user"]
-                                user_info['channel_url'] = data["data"].get("channel", {}).get("url")
-                                logger.info(f"Successfully got user info from dev API")
                 except Exception as e:
                     logger.error(f"Error getting user info: {e}", exc_info=True)
 

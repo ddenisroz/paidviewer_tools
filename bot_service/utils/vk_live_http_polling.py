@@ -83,7 +83,13 @@ class VKLiveHTTPPolling:
                 "limit": 20  # Получаем последние 20 сообщений
             }
             
-            async with aiohttp.ClientSession() as session:
+            # Создаем SSL context с отключенной верификацией для dev API
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
                 async with session.get(url, headers=headers, params=params) as response:
                     if response.status == 200:
                         data = await response.json()
@@ -196,7 +202,13 @@ class VKLiveHTTPPolling:
                 ]
             }
             
-            async with aiohttp.ClientSession() as session:
+            # Создаем SSL context с отключенной верификацией для dev API
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
                 async with session.post(url, headers=headers, params=params, json=body) as response:
                     if response.status == 200:
                         logger.info(f"✅ VK message sent: {text}")

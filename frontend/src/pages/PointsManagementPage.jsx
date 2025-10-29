@@ -39,11 +39,11 @@ const PointsManagementPage = () => {
     } catch (err) {
       console.error('Error loading rewards:', err);
       if (err.message.includes('404')) {
-        toast.error(`${selectedPlatform === 'twitch' ? 'Twitch' : 'VK Live'} не подключен. Авторизуйтесь на платформе.`);
+        toast.error(`Платформа не подключена`);
       } else if (err.message.includes('партнёров и аффилейтов') || err.message.includes('partner or affiliate')) {
-        toast.error('⚠️ Награды Twitch доступны только для партнёров и аффилейтов', { duration: 6000 });
+        toast.error('Награды Twitch доступны только для партнёров и аффилейтов', { duration: 5000 });
       } else {
-        toast.error(err.message || 'Не удалось загрузить награды');
+        // apiClient.js уже показывает toast при других ошибках
       }
       setRewards([]);
     } finally {
@@ -214,15 +214,7 @@ const RewardCard = ({ reward, platform, onEdit, onRefresh }) => {
       onRefresh();
     } catch (err) {
       console.error('Error deleting reward:', err);
-      
-      // Детализированная обработка ошибок
-      if (err.message.includes('401')) {
-        toast.error('Сессия истекла. Войдите заново.');
-      } else if (err.message.includes('Network')) {
-        toast.error('Проверьте подключение к интернету');
-      } else {
-        toast.error(err.message || 'Не удалось удалить награду');
-      }
+      // apiClient.js уже показывает toast при ошибках
     } finally {
       setDeleting(false);
     }
@@ -236,11 +228,11 @@ const RewardCard = ({ reward, platform, onEdit, onRefresh }) => {
     
     try {
       await pointsApi.toggleReward(platform, reward.id, newState);
-      toast.success(newState ? 'Награда включена' : 'Награда отключена');
+      // Молча обновляем - не спамим уведомлениями
       await onRefresh();
     } catch (err) {
       console.error('Error toggling reward:', err);
-      toast.error(err.message || 'Не удалось переключить награду');
+      // apiClient.js уже показывает toast при ошибках
     } finally {
       setToggling(false);
     }
@@ -457,7 +449,7 @@ const RewardDialog = ({ open, onClose, reward, platform, onSuccess }) => {
       onSuccess();
     } catch (err) {
       console.error('Error saving reward:', err);
-      toast.error(err.message || 'Не удалось сохранить награду');
+      // apiClient.js уже показывает toast при ошибках
     } finally {
       setSaving(false);
     }
@@ -749,11 +741,11 @@ const RedemptionQueue = ({ platform }) => {
     setProcessing(prev => new Set(prev).add(redemptionId));
     try {
       await pointsApi.processVKDemands('accept', [redemptionId]);
-      toast.success('Запрос принят');
+      // Молча обновляем - не спамим уведомлениями
       loadRedemptions();
     } catch (err) {
       console.error('Error accepting redemption:', err);
-      toast.error('Не удалось принять запрос');
+      // apiClient.js уже показывает toast при ошибках
     } finally {
       setProcessing(prev => {
         const next = new Set(prev);
@@ -767,11 +759,11 @@ const RedemptionQueue = ({ platform }) => {
     setProcessing(prev => new Set(prev).add(redemptionId));
     try {
       await pointsApi.processVKDemands('reject', [redemptionId]);
-      toast.success('Запрос отклонён');
+      // Молча обновляем - не спамим уведомлениями
       loadRedemptions();
     } catch (err) {
       console.error('Error rejecting redemption:', err);
-      toast.error('Не удалось отклонить запрос');
+      // apiClient.js уже показывает toast при ошибках
     } finally {
       setProcessing(prev => {
         const next = new Set(prev);

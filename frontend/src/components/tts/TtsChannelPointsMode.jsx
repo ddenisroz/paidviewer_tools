@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { TwitchIcon, VKIcon } from '../PlatformIcons';
 import { useAuth } from '../../context/AuthContext';
@@ -15,7 +16,6 @@ import apiClient from '../../services/apiClient';
  */
 const TtsChannelPointsMode = ({ asSection = false }) => {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
   const [ttsMode, setTtsMode] = useState('all_messages'); // 'all_messages' или 'channel_points'
   const [ttsRewardIds, setTtsRewardIds] = useState({});
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -36,16 +36,13 @@ const TtsChannelPointsMode = ({ asSection = false }) => {
 
   const loadSettings = async () => {
     try {
-      setLoading(true);
       const data = await apiClient.get('/api/tts/mode-settings');
       
       setTtsMode(data.tts_mode);
       setTtsRewardIds(data.tts_reward_ids || {});
     } catch (error) {
       console.error('Error loading TTS mode settings:', error);
-      toast.error('Не удалось загрузить настройки режима TTS');
-    } finally {
-      setLoading(false);
+      // Не показываем toast при первой загрузке - данные по умолчанию уже корректны
     }
   };
 
@@ -58,14 +55,14 @@ const TtsChannelPointsMode = ({ asSection = false }) => {
       
       setTtsMode(newMode);
       toast.success(newMode === 'all_messages' 
-        ? '💬 Озвучиваются все сообщения' 
-        : '🎁 Озвучивается только за баллы'
+        ? 'Режим: все сообщения' 
+        : 'Режим: за баллы канала'
       );
       
       await loadSettings();
     } catch (error) {
       console.error('Error changing TTS mode:', error);
-      toast.error('Не удалось изменить режим TTS');
+      // apiClient.js уже показывает toast при ошибках
     } finally {
       setSaving(false);
     }
@@ -99,12 +96,12 @@ const TtsChannelPointsMode = ({ asSection = false }) => {
         cooldown: rewardForm.cooldown
       });
       
-      toast.success(`🎁 TTS награда создана для ${selectedPlatform === 'twitch' ? 'Twitch' : 'VK Live'}`);
+      toast.success('Награда создана');
       setShowCreateDialog(false);
       await loadSettings();
     } catch (error) {
       console.error('Error creating TTS reward:', error);
-      toast.error(error.message || 'Не удалось создать TTS награду');
+      // apiClient.js уже показывает toast при ошибках
     } finally {
       setSaving(false);
     }
@@ -119,108 +116,98 @@ const TtsChannelPointsMode = ({ asSection = false }) => {
     try {
       await apiClient.delete(`/api/tts/reward/${platform}`);
       
-      toast.success(`TTS награда для ${platform.toUpperCase()} удалена`);
+      toast.success('Награда удалена');
       await loadSettings();
     } catch (error) {
       console.error('Error deleting TTS reward:', error);
-      toast.error('Не удалось удалить TTS награду');
+      // apiClient.js уже показывает toast при ошибках
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   const connectedPlatforms = [];
   if (user?.integrations?.twitch?.connected) connectedPlatforms.push('twitch');
   if (user?.integrations?.vk?.connected) connectedPlatforms.push('vk');
 
-  return (
-    <div className="space-y-4">
-      {/* Выбор режима - компактный БЕЗ эмодзи */}
-      <div>
-        <h4 className="text-sm font-medium text-gray-300 mb-3">Режим озвучки</h4>
-        <div className="grid grid-cols-2 gap-3">
+    return (
+        <div className="space-y-3">
+            {/* Выбор режима - компактный БЕЗ эмодзи */}
+            <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => handleModeChange('all_messages')}
             disabled={saving}
-            className={`p-3 rounded-lg border-2 transition-all text-left ${
+            className={`p-2.5 rounded-lg border-2 transition-all text-left ${
               ttsMode === 'all_messages'
                 ? 'border-primary bg-primary/10'
                 : 'border-border hover:border-primary/50'
             }`}
           >
-            <div className="font-semibold mb-1">Все сообщения</div>
+            <div className="font-semibold text-sm mb-0.5">Все сообщения</div>
             <div className="text-xs text-muted-foreground">Стандартный режим</div>
           </button>
 
           <button
             onClick={() => handleModeChange('channel_points')}
             disabled={saving}
-            className={`p-3 rounded-lg border-2 transition-all text-left ${
+            className={`p-2.5 rounded-lg border-2 transition-all text-left ${
               ttsMode === 'channel_points'
                 ? 'border-primary bg-primary/10'
                 : 'border-border hover:border-primary/50'
             }`}
           >
-            <div className="font-semibold mb-1">За баллы канала</div>
+            <div className="font-semibold text-sm mb-0.5">За баллы канала</div>
             <div className="text-xs text-muted-foreground">Только с наградой</div>
           </button>
         </div>
-      </div>
 
           {/* Настройка наград (показываем только если выбран режим channel_points) */}
           {ttsMode === 'channel_points' && (
-            <div className="space-y-3 pt-4 border-t">
+            <div className="space-y-2 pt-3 border-t border-gray-700/30">
 
-              <div className="grid gap-3">
+              <div className="grid grid-cols-2 gap-2">
                 {connectedPlatforms.map(platform => (
                   <Card key={platform} className="border-2">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                    <CardContent className="p-3">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
                           {platform === 'twitch' ? (
-                            <TwitchIcon className="w-5 h-5" />
+                            <TwitchIcon className="w-4 h-4" />
                           ) : (
-                            <VKIcon className="w-5 h-5" />
+                            <VKIcon className="w-4 h-4" />
                           )}
-                          <div>
-                            <div className="font-semibold">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-sm truncate">
                               {platform === 'twitch' ? 'Twitch' : 'VK Live'}
                             </div>
                             {ttsRewardIds[platform] ? (
                               <div className="text-xs text-muted-foreground">
-                                Награда создана
+                                Создана
                               </div>
                             ) : (
                               <div className="text-xs text-yellow-600">
-                                Награда не создана
+                                Не создана
                               </div>
                             )}
                           </div>
                         </div>
 
-                        <div className="flex gap-2">
+                        <div className="flex justify-end">
                           {ttsRewardIds[platform] ? (
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleDeleteReward(platform)}
-                              className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                              className="text-destructive hover:bg-destructive hover:text-destructive-foreground w-full"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Удалить
                             </Button>
                           ) : (
                             <Button
                               variant="default"
                               size="sm"
                               onClick={() => openCreateDialog(platform)}
+                              className="w-full"
                             >
-                              <Gift className="w-4 h-4 mr-2" />
                               Создать
                             </Button>
                           )}

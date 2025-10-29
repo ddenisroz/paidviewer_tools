@@ -59,6 +59,15 @@ class Bot(TwitchBotCore):
             logger.error(f"❌ [SR COMMAND] Error: {e}")
             import traceback
             logger.error(f"❌ [SR COMMAND] Traceback: {traceback.format_exc()}")
+    
+    @commands.command(name='clearqueue')
+    async def clearqueue_command(self, ctx):
+        """Команда для очистки YouTube очереди"""
+        logger.info(f"🗑️ [CLEARQUEUE] Called by {ctx.author.name}")
+        try:
+            await self.commands_handler.clearqueue_command(ctx)
+        except Exception as e:
+            logger.error(f"❌ [CLEARQUEUE] Error: {e}")
 
     @commands.command(name='addcommand')
     async def addcommand(self, ctx, command_name: str = None, *, response: str = None):
@@ -74,18 +83,96 @@ class Bot(TwitchBotCore):
         """Вызывается когда бот готов к работе"""
         await super().event_ready()
         logger.info("[BOT] All modules loaded and ready!")
+    
+    async def event_join(self, channel, user):
+        """Вызывается когда кто-то присоединяется к каналу (включая самого бота)"""
+        # Вызываем родительский метод
+        await super().event_join(channel, user)
         
-        # Отправляем приветственное сообщение с фейковым IP (шутка)
-        import random
-        fake_ip = f"{random.randint(100, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}"
-        
-        for channel in self.connected_channels:
+        # Отправляем приветственное сообщение только когда сам бот присоединяется
+        if user.name.lower() == self.nick.lower():
+            import random
             try:
-                await channel.send(f"🤖 Бот подключен! IP: {fake_ip} | Используйте !commands для списка команд")
+                fake_ip = f"{random.randint(100, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}"
+                await channel.send(f"Подключено к {channel.name}. streamer IP: {fake_ip} | Используйте !help для списка команд")
                 logger.info(f"✅ [BOT] Welcome message sent to {channel.name} with fake IP: {fake_ip}")
             except Exception as e:
                 logger.error(f"❌ [BOT] Failed to send welcome message to {channel.name}: {e}")
+                # Проверяем если это ошибка бана/таймаута
+                await self._handle_ban_error(channel.name, e)
+    
+    async def _handle_ban_error(self, channel_name: str, error: Exception):
+        """Обработка ошибок, связанных с баном бота"""
+        error_str = str(error).lower()
+        
+        # Проверяем признаки бана
+        ban_indicators = ['banned', 'timed out', 'msg_banned', 'msg_timeout', 'forbidden', '403']
+        is_banned = any(indicator in error_str for indicator in ban_indicators)
+        
+        if is_banned:
+            logger.warning(f"🚫 [BOT BAN] Bot appears to be banned/timed out in channel: {channel_name}")
+            await self._disconnect_and_cleanup(channel_name, "ban_detected")
+    
+    async def _disconnect_and_cleanup(self, channel_name: str, reason: str = "ban"):
+        """Отключиться от канала и удалить токены"""
+        try:
+            logger.warning(f"🔌 [DISCONNECT] Disconnecting from {channel_name} due to: {reason}")
+            
+            # Получаем user_id из БД по имени канала
+            from core.database import SessionLocal, User
+            db = SessionLocal()
+            try:
+                user = db.query(User).filter(
+                    User.twitch_username == channel_name.lower()
+                ).first()
+                
+                if user:
+                    logger.info(f"🗑️ [CLEANUP] Found user {user.id} for channel {channel_name}")
+                    
+                    # Удаляем токены
+                    from core.session_manager import session_manager
+                    session_manager.remove_platform_token(user.id, 'twitch')
+                    logger.info(f"✅ [CLEANUP] Twitch tokens removed for user {user.id}")
+                    
+                    # Отключаем TTS
+                    self.connection_manager.disable_tts_for_channel(channel_name.lower())
+                    logger.info(f"✅ [CLEANUP] TTS disabled for {channel_name}")
+                    
+                    # Завершаем сессии с причиной бана
+                    session_manager.terminate_user_sessions(user.id, f"bot_{reason}", db)
+                    logger.info(f"✅ [CLEANUP] Sessions terminated for user {user.id}")
+                else:
+                    logger.warning(f"⚠️ [CLEANUP] User not found for channel {channel_name}")
+            finally:
+                db.close()
+            
+            # Покидаем канал
+            try:
+                await self.part_channels([channel_name])
+                logger.info(f"✅ [DISCONNECT] Bot left channel: {channel_name}")
+            except Exception as e:
+                logger.error(f"❌ [DISCONNECT] Error leaving channel {channel_name}: {e}")
+                
+        except Exception as e:
+            logger.error(f"❌ [CLEANUP] Error during disconnect and cleanup for {channel_name}: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
+    async def event_raw_data(self, data: str):
+        """Обработка raw IRC данных для отлова банов"""
+        try:
+            # Отлавливаем CLEARCHAT для бана бота
+            if 'CLEARCHAT' in data:
+                parts = data.split(' ')
+                if len(parts) >= 4:
+                    channel = parts[3].replace('#', '').strip()
+                    # Проверяем если забанен именно наш бот
+                    if f':{self.nick}' in data.lower():
+                        logger.warning(f"🚫 [BOT BAN] Bot banned/timed out in channel: {channel}")
+                        await self._disconnect_and_cleanup(channel, "ban_detected")
+        except Exception as e:
+            logger.error(f"Error processing raw data for ban detection: {e}")
+    
     async def event_message(self, message):
         """Обработка входящих сообщений"""
         # Вызываем родительский класс для базовой обработки
@@ -141,6 +228,13 @@ class Bot(TwitchBotCore):
         """Обработка TTS для сообщений из Twitch"""
         from utils.websocket_helper import handle_tts_for_message
         
+        # Извлекаем reward_id из IRC tags если сообщение отправлено с наградой
+        reward_id = None
+        if hasattr(message, 'tags') and message.tags:
+            reward_id = message.tags.get('custom-reward-id')
+            if reward_id:
+                logger.info(f"🎁 [TWITCH MSG] Message from Channel Points reward: {reward_id}")
+        
         await handle_tts_for_message(
             text=message.content,
             username=message.author.name.lower(),
@@ -148,7 +242,8 @@ class Bot(TwitchBotCore):
             platform='twitch',
             tts_api=self.tts_api,
             connection_manager=self.connection_manager,
-            skip_if_command=True
+            skip_if_command=True,
+            reward_id=reward_id
         )
 
     async def _handle_drops(self, message):

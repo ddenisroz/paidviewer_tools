@@ -55,10 +55,10 @@ const TtsFilterManager = React.memo(() => {
 
     // Получаем иконку для платформы
     const getPlatformIcon = (platform) => {
-        if (platform === 'twitch') return '🟣';
-        if (platform === 'vk') return '🔵';
-        if (platform === 'all') return '🌐';
-        return '❓';
+        if (platform === 'twitch') return '';
+        if (platform === 'vk') return '';
+        if (platform === 'all') return '';
+        return '';
     };
 
     // Получение цвета для платформы
@@ -74,10 +74,10 @@ const TtsFilterManager = React.memo(() => {
     // Получение лейбла для платформы
     const getPlatformLabel = (platform) => {
         switch (platform) {
-            case 'twitch': return '🟣 Twitch';
-            case 'vk': return '🔵 VK Live';
-            case 'all': return '🌐 Все';
-            default: return '❓ Неизвестно';
+            case 'twitch': return 'Twitch';
+            case 'vk': return 'VK Live';
+            case 'all': return 'Все';
+            default: return 'Неизвестно';
         }
     };
 
@@ -243,9 +243,9 @@ const TtsFilterManager = React.memo(() => {
     const availablePlatforms = getAvailablePlatforms();
 
     return (
-        <Card data-testid="tts-filter-card">
+        <Card className="mt-6" data-testid="tts-filter-card">
             <CardHeader 
-                className="cursor-pointer hover:bg-gray-800/50 transition-colors pb-4"
+                className="cursor-pointer hover:bg-gray-800/30 transition-colors"
                 onClick={toggleExpanded}
                 data-testid="tts-filter-header"
             >
@@ -254,7 +254,7 @@ const TtsFilterManager = React.memo(() => {
                         Фильтрация TTS
                     </CardTitle>
                     <ChevronDown 
-                        className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+                        className={`h-5 w-5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} 
                     />
                 </div>
             </CardHeader>
