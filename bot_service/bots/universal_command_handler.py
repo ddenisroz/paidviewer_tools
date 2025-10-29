@@ -1238,7 +1238,7 @@ class UniversalCommandHandler:
     # === OTHER COMMANDS ===
     
     async def _handle_help(self, ctx, bot, args, platform, db):
-        """Handler для !help (Twitch)"""
+        """Handler для !help (Twitch) - показывает только основные команды"""
         try:
             # Получаем user_id владельца канала
             from core.database import User, BotCommand
@@ -1254,6 +1254,9 @@ class UniversalCommandHandler:
             from core.database import BotCommand
             from sqlalchemy import or_
             
+            # Основные команды для отображения (по порядку важности)
+            core_command_names = ['sr', 'voice', 'queue', 'title', 'game', 'ttsvolume']
+            
             # Получаем все команды (global + override + custom для этого пользователя)
             all_commands = db.query(BotCommand).filter(
                 or_(
@@ -1267,28 +1270,30 @@ class UniversalCommandHandler:
                 )
             ).filter(
                 BotCommand.is_enabled == True
-            ).order_by(BotCommand.command_name).all()
+            ).all()
             
-            # Убираем дубликаты по имени команды (сохраняем первое вхождение)
-            seen_commands = set()
-            unique_commands = []
-            for cmd in all_commands:
-                if cmd.command_name not in seen_commands:
-                    seen_commands.add(cmd.command_name)
-                    unique_commands.append(cmd)
+            # Убираем дубликаты по имени команды (override > global)
+            # Сначала добавляем override, потом global
+            commands_by_name = {}
+            for cmd in sorted(all_commands, key=lambda x: (x.command_type == 'global', x.command_name)):
+                if cmd.command_name not in commands_by_name:
+                    commands_by_name[cmd.command_name] = cmd
             
-            # Формируем список команд
+            # Фильтруем только основные команды в заданном порядке
+            featured_commands = []
+            for core_name in core_command_names:
+                if core_name in commands_by_name:
+                    featured_commands.append(commands_by_name[core_name])
+            
+            # Формируем список команд с описаниями
             cmd_list = []
-            for cmd in unique_commands[:10]:  # Первые 10 уникальных команд
+            for cmd in featured_commands:
+                # Формат: !имя - описание
                 cmd_list.append(f"!{cmd.command_name}")
             
             if cmd_list:
                 commands_text = ", ".join(cmd_list)
-                total = len(unique_commands)  # Считаем уникальные команды
-                if total > 10:
-                    await ctx.send(f"📋 Доступные команды: {commands_text}... (всего: {total})")
-                else:
-                    await ctx.send(f"📋 Доступные команды: {commands_text}")
+                await ctx.send(f"📋 Основные команды: {commands_text}")
             else:
                 await ctx.send(f"@{ctx.author.name} ℹ️ Команды не найдены")
             
@@ -1297,7 +1302,7 @@ class UniversalCommandHandler:
             await ctx.send(f"@{ctx.author.name} ❌ Ошибка получения списка команд")
     
     async def _handle_help_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
-        """Handler для !help (VK)"""
+        """Handler для !help (VK) - показывает только основные команды"""
         try:
             # Получаем user_id владельца канала
             from core.database import User, BotCommand
@@ -1313,6 +1318,9 @@ class UniversalCommandHandler:
             from core.database import BotCommand
             from sqlalchemy import or_
             
+            # Основные команды для отображения (по порядку важности)
+            core_command_names = ['sr', 'voice', 'queue', 'title', 'game', 'ttsvolume']
+            
             # Получаем все команды (global + override + custom для этого пользователя)
             all_commands = db.query(BotCommand).filter(
                 or_(
@@ -1326,30 +1334,30 @@ class UniversalCommandHandler:
                 )
             ).filter(
                 BotCommand.is_enabled == True
-            ).order_by(BotCommand.command_name).all()
+            ).all()
             
-            # Убираем дубликаты по имени команды (сохраняем первое вхождение)
-            seen_commands = set()
-            unique_commands = []
-            for cmd in all_commands:
-                if cmd.command_name not in seen_commands:
-                    seen_commands.add(cmd.command_name)
-                    unique_commands.append(cmd)
+            # Убираем дубликаты по имени команды (override > global)
+            # Сначала добавляем override, потом global
+            commands_by_name = {}
+            for cmd in sorted(all_commands, key=lambda x: (x.command_type == 'global', x.command_name)):
+                if cmd.command_name not in commands_by_name:
+                    commands_by_name[cmd.command_name] = cmd
             
-            # Формируем список команд
+            # Фильтруем только основные команды в заданном порядке
+            featured_commands = []
+            for core_name in core_command_names:
+                if core_name in commands_by_name:
+                    featured_commands.append(commands_by_name[core_name])
+            
+            # Формируем список команд с описаниями
             cmd_list = []
-            for cmd in unique_commands[:10]:  # Первые 10 уникальных команд
+            for cmd in featured_commands:
+                # Формат: !имя - описание
                 cmd_list.append(f"!{cmd.command_name}")
             
             if cmd_list:
                 commands_text = ", ".join(cmd_list)
-                total = len(unique_commands)  # Считаем уникальные команды
-                if total > 10:
-                    await vk_bot.send_message(channel_name,
-                        f"📋 Доступные команды: {commands_text}... (всего: {total})")
-                else:
-                    await vk_bot.send_message(channel_name,
-                        f"📋 Доступные команды: {commands_text}")
+                await vk_bot.send_message(channel_name, f"📋 Основные команды: {commands_text}")
             else:
                 await vk_bot.send_message(channel_name, f"@{author_name} ℹ️ Команды не найдены")
             

@@ -70,10 +70,10 @@ const GlobalPlayer = () => {
     // ✅ ВАЖНО: Вычисляем все переменные ДО условных return
     // Проверяем текущий путь, чтобы не показывать UI на странице YouTube
     const currentPath = window.location.pathname;
-    const isOnYoutubePage = currentPath.includes('/dashboard/media/youtube');
+    const isOnYoutubePage = currentPath.includes('/dashboard/youtube');
     
-    // Плеер работает всегда, UI показываем на всех страницах
-    // На YouTube странице показываем видео, на других - только управление
+    // Плеер работает всегда, UI показываем на всех страницах КРОМЕ YouTube
+    // На YouTube странице - ничего не показываем (там свой встроенный плеер)
     const showUI = isVisible && !isTheaterMode && !isOnYoutubePage;
 
     // ✅ ТЕПЕРЬ проверяем если нет видео, не показываем плеер
@@ -83,45 +83,8 @@ const GlobalPlayer = () => {
 
     return (
         <>
-            {/* Основной YouTube плеер - показываем на YouTube странице */}
-            {currentVideo && isOnYoutubePage && (
-                <div className="w-full flex justify-center mt-4">
-                    <div className="w-full max-w-4xl">
-                        <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-                            <YouTube
-                                videoId={currentVideo.video_id}
-                                onReady={handlePlayerReadyWithRef}
-                                onStateChange={handlePlayerStateChange}
-                                onError={handlePlayerError}
-                                opts={{
-                                    width: '100%',
-                                    height: '100%',
-                                    playerVars: {
-                                        autoplay: 1,  // ✅ Включаем автоплей
-                                        controls: 1,
-                                        disablekb: 0,
-                                        enablejsapi: 1,
-                                        fs: 1,
-                                        iv_load_policy: 3,
-                                        modestbranding: 0,
-                                        playsinline: 1,
-                                        rel: 0,
-                                        showinfo: 1,
-                                        cc_load_policy: 0,
-                                        hl: 'ru',
-                                        origin: window.location.origin,
-                                        widget_referrer: window.location.origin
-                                    }
-                                }}
-                                key={`main-player-${currentVideo.video_id}-${Date.now()}`}
-                                className="w-full h-full"
-                            />
-                        </div>
-                    </div>
-                </div>
-            )}
-            
-            {/* Скрытый плеер для других страниц - воспроизводит только звук */}
+            {/* Скрытый плеер - воспроизводит только звук */}
+            {/* НА СТРАНИЦЕ /dashboard/youtube используется встроенный плеер из YoutubeIntegrationPage */}
             {currentVideo && !isOnYoutubePage && (
                 <div className="hidden">
                     <YouTube
