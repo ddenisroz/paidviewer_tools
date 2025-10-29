@@ -8,7 +8,6 @@ from twitchio.ext import commands
 from core.connection_manager import ConnectionManager
 from utils.role_checker import RoleChecker
 from .twitch_bot_core import TwitchBotCore
-from .twitch_bot_commands import TwitchBotCommands
 from .universal_command_handler import UniversalCommandHandler
 from api.tts_api import TTSAPI
 from api.youtube_api import YouTubeAPI
@@ -28,56 +27,11 @@ class Bot(TwitchBotCore):
         self.role_checker = RoleChecker()
         self.drops_service = None  # Будет инициализирован при подключении к каналу
         
-        # Инициализируем команды (старая система для обратной совместимости)
-        self.commands_handler = TwitchBotCommands(
-            self, 
-            self.tts_api, 
-            self.youtube_api, 
-            self.role_checker
-        )
-        
-        # Новая универсальная система команд
+        # Универсальная система команд (для всех платформ)
         self.universal_command_handler = UniversalCommandHandler()
         
-        logger.info("[BOT] Commands handlers initialized (legacy + universal)")
+        logger.info("[BOT] Universal command handler initialized")
         logger.info("[BOT] Twitch bot initialized with all modules")
-
-    # Команды бота - обертки, которые TwitchIO может обнаружить
-    @commands.command(name='tts')
-    async def tts_command(self, ctx, *, text: str = None):
-        """Команда TTS синтеза"""
-        await self.commands_handler.tts_command(ctx, text=text)
-
-    @commands.command(name='sr')
-    async def song_request_command(self, ctx, *, url: str = None):
-        """Команда Song Request"""
-        logger.info(f"🎵 [SR COMMAND] Called for user {ctx.author.name} with URL: {url}")
-        try:
-            # ✅ Вызываем обычный метод из commands_handler (без повторного декоратора)
-            await self.commands_handler.song_request_command(ctx, url=url)
-        except Exception as e:
-            logger.error(f"❌ [SR COMMAND] Error: {e}")
-            import traceback
-            logger.error(f"❌ [SR COMMAND] Traceback: {traceback.format_exc()}")
-    
-    @commands.command(name='clearqueue')
-    async def clearqueue_command(self, ctx):
-        """Команда для очистки YouTube очереди"""
-        logger.info(f"🗑️ [CLEARQUEUE] Called by {ctx.author.name}")
-        try:
-            await self.commands_handler.clearqueue_command(ctx)
-        except Exception as e:
-            logger.error(f"❌ [CLEARQUEUE] Error: {e}")
-
-    @commands.command(name='addcommand')
-    async def addcommand(self, ctx, command_name: str = None, *, response: str = None):
-        """Добавить кастомную команду"""
-        await self.commands_handler.addcommand(ctx, command_name, response=response)
-
-    @commands.command(name='delcommand')
-    async def del_command(self, ctx, command_name: str = None):
-        """Удалить кастомную команду"""
-        await self.commands_handler.del_command(ctx, command_name)
 
     async def event_ready(self):
         """Вызывается когда бот готов к работе"""

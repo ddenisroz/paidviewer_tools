@@ -1,6 +1,6 @@
 # 📊 Текущий статус проекта TTS_TTV_0.02
 
-**Последнее обновление:** 29 октября 2025 (Session 23: Blocked Bots Fix)
+**Последнее обновление:** 29 октября 2025 (Session 24: Uvicorn Reload & Legacy Cleanup)
 **Версия:** 0.02  
 **Статус:** Production Ready - готовность к деплою 100% ✅
 
@@ -3152,6 +3152,197 @@ python bot_service/scripts/init_blocked_bots.py
 ✅ **VK ChatBot не спамит наградами**  
 ✅ **Admin API полностью функционален**  
 ✅ **Документация создана**
+
+---
+
+## 🧹 Session 24: Uvicorn Reload & Legacy Cleanup (29.10.2025)
+
+### 🎯 Цель:
+Устранить проблемы, обнаруженные в логах запуска сервисов:
+1. **Множественные перезапуски Bot Service** из-за `uvicorn reload=True`
+2. **Мёртвый код legacy команд**, который инициализируется, но не используется
+
+### 🐛 Обнаруженные проблемы:
+
+#### 1. Uvicorn с `reload=True` в production
+
+**Логи Bot Service показывали:**
+```
+2025-10-29 17:28:21 - INFO - === BOT SERVICE STARTED ===
+2025-10-29 17:28:21 - INFO - === BOT SERVICE STARTED ===  ← Дубль
+2025-10-29 17:28:22 - INFO - === BOT SERVICE STARTED ===  ← Дубль
+2025-10-29 17:28:23 - INFO - === BOT SERVICE STARTED ===  ← Дубль x3
+INFO:     Will watch for changes in these directories: ['H:\\...\\bot_service']
+INFO:     Started reloader process [29200] using StatReload
+```
+
+**Проблема:**
+- Uvicorn запускался с `reload=True` **всегда**, даже в production
+- Создавал **процесс-наблюдатель** (reloader) + **рабочий процесс** (worker)
+- При любом изменении файлов - **перезапускал** сервис
+- **Множественные логи** startup-событий
+- **Нестабильное поведение** при деплое
+
+**Код до исправления:**
+```python
+# bot_service/main.py
+uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+#                                                     ↑ всегда True
+```
+
+#### 2. Legacy Commands - мёртвый код
+
+**Логи показывали:**
+```
+2025-10-29 17:28:24 - INFO - [BOT] Commands handlers initialized (legacy + universal)
+```
+
+**Проблема:**
+- Инициализировались **ДВА** обработчика команд:
+  - `TwitchBotCommands` (legacy)
+  - `UniversalCommandHandler` (новый)
+- Но в `event_message` использовался **только Universal**
+- Legacy команды-обертки (`@commands.command`) **не вызывались** из-за переопределенного `handle_commands`
+- **Лишняя инициализация**, нагрузка на систему, путаница в коде
+
+**Код до исправления:**
+```python
+# bot_service/bots/twitch_bot.py
+self.commands_handler = TwitchBotCommands(...)      # ← инициализируется
+self.universal_command_handler = UniversalCommandHandler()
+
+@commands.command(name='sr')                        # ← не работает
+async def song_request_command(self, ctx, ...):
+    await self.commands_handler.song_request_command(ctx, ...)
+
+async def handle_commands(self, message):
+    pass  # ← TwitchIO команды отключены!
+```
+
+### 🔧 Реализованные исправления:
+
+#### 1. Uvicorn Reload - только для dev
+
+**Файл:** `bot_service/main.py`
+
+```python
+if __name__ == "__main__":
+    import uvicorn
+    import os
+    
+    # reload включается только в dev-режиме через переменную окружения
+    is_dev = os.getenv('ENVIRONMENT', 'production') == 'development'
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=is_dev)
+```
+
+**Использование:**
+```bash
+# Production (по умолчанию - reload=False)
+python bot_service/main.py
+
+# Development (reload=True)
+set ENVIRONMENT=development && python bot_service/main.py
+```
+
+**Результат:**
+- ✅ Production: **нет лишних перезапусков**
+- ✅ Development: **hot-reload доступен** при необходимости
+- ✅ **Стабильный запуск** при деплое
+- ✅ **Чистые логи** без дублей
+
+#### 2. Удаление Legacy Commands
+
+**Файл:** `bot_service/bots/twitch_bot.py`
+
+**Изменения:**
+
+1. **Удалён импорт:**
+```python
+# ДО
+from .twitch_bot_commands import TwitchBotCommands
+from .universal_command_handler import UniversalCommandHandler
+
+# ПОСЛЕ
+from .universal_command_handler import UniversalCommandHandler
+```
+
+2. **Удалена legacy инициализация:**
+```python
+# ДО
+self.commands_handler = TwitchBotCommands(...)
+self.universal_command_handler = UniversalCommandHandler()
+logger.info("[BOT] Commands handlers initialized (legacy + universal)")
+
+# ПОСЛЕ
+self.universal_command_handler = UniversalCommandHandler()
+logger.info("[BOT] Universal command handler initialized")
+```
+
+3. **Удалены мёртвые команды-обертки:**
+```python
+# ДО (40+ строк мёртвого кода)
+@commands.command(name='tts')
+async def tts_command(self, ctx, *, text: str = None):
+    await self.commands_handler.tts_command(ctx, text=text)
+
+@commands.command(name='sr')
+async def song_request_command(self, ctx, *, url: str = None):
+    await self.commands_handler.song_request_command(ctx, url=url)
+# ... ещё 3 команды
+
+# ПОСЛЕ
+# Удалено - всё обрабатывается через universal_command_handler
+```
+
+4. **Архивирован файл:**
+```bash
+bot_service/bots/twitch_bot_commands.py
+→ bot_service/scripts/archive/twitch_bot_commands.py.legacy
+```
+
+**Результат:**
+- ✅ **Только один** обработчик команд (Universal)
+- ✅ **-200 строк** мёртвого кода
+- ✅ **Меньше нагрузки** на инициализацию
+- ✅ **Чистая архитектура** без legacy baggage
+
+### 📊 Сравнение:
+
+| Аспект | До | После |
+|--------|----|----|
+| Bot Service перезапуски | ❌ Множественные (reloader) | ✅ Один раз (стабильно) |
+| Uvicorn reload | ❌ Всегда `True` | ✅ Только в dev-режиме |
+| Обработчики команд | ⚠️ 2 (Legacy + Universal) | ✅ 1 (Universal) |
+| Мёртвый код | ❌ ~200 строк | ✅ 0 (архивирован) |
+| Логи startup | ❌ `"legacy + universal"` | ✅ `"Universal command handler"` |
+| Инициализация бота | ⚠️ Лишние объекты | ✅ Минималистично |
+
+### 📂 Измененные файлы:
+
+1. **`bot_service/main.py`**
+   - Добавлена переменная `ENVIRONMENT` для переключения режима
+   - `reload=is_dev` вместо `reload=True`
+   
+2. **`bot_service/bots/twitch_bot.py`**
+   - Удалён импорт `TwitchBotCommands`
+   - Удалена инициализация `self.commands_handler`
+   - Удалены 5 команд-оберток (`@commands.command`)
+   - Обновлён лог инициализации
+   
+3. **`bot_service/scripts/archive/twitch_bot_commands.py.legacy`**
+   - Перемещён legacy код для истории
+   
+4. **`docs/CURRENT_STATUS.md`**
+   - Добавлена Session 24
+
+### ✅ Статус:
+
+✅ **Uvicorn reload настроен для production**  
+✅ **Мёртвый legacy код удалён**  
+✅ **Единая система команд (Universal)**  
+✅ **Чистые логи без дублирования**  
+✅ **-200 строк кода**  
+✅ **Стабильность запуска улучшена**
 
 ---
 

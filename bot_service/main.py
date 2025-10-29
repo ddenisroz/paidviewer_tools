@@ -1030,5 +1030,8 @@ if __name__ == "__main__":
     #     logger.warning(f"Failed to start scheduled cleanup: {e}")
     
     import uvicorn
-    # reload=True для автоматической перезагрузки при изменении кода
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    # reload=True для автоматической перезагрузки при изменении кода (только для dev!)
+    # Для production используйте reload=False
+    import os
+    is_dev = os.getenv('ENVIRONMENT', 'production') == 'development'
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=is_dev)
