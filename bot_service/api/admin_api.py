@@ -210,7 +210,12 @@ async def block_user(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Заблокировать пользователя"""
+    """
+    Комплексная блокировка пользователя:
+    1. Блокирует доступ через OAuth (User.is_blocked)
+    2. Блокирует все его каналы в гостевом режиме (BlockedChannel)
+    3. Отключает бота от всех каналов пользователя
+    """
     try:
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
@@ -219,12 +224,83 @@ async def block_user(
         if not target_user:
             raise HTTPException(status_code=404, detail="User not found")
         
+        blocked_channels = []
+        
+        # 1. Блокируем пользователя (OAuth доступ)
         target_user.is_blocked = True
-        target_user.blocked_reason = reason
+        target_user.blocked_reason = reason or "Blocked by administrator"
         target_user.blocked_at = datetime.utcnow()
+        logger.info(f"🚫 [ADMIN BLOCK] User {user_id} blocked via OAuth")
+        
+        # 2. Блокируем все каналы пользователя (гостевой доступ)
+        from core.database import BlockedChannel
+        
+        if target_user.twitch_username:
+            twitch_channel = db.query(BlockedChannel).filter(
+                BlockedChannel.channel_name == target_user.twitch_username.lower()
+            ).first()
+            
+            if not twitch_channel:
+                twitch_channel = BlockedChannel(
+                    channel_name=target_user.twitch_username.lower(),
+                    reason=f"Owner blocked: {target_user.blocked_reason}"
+                )
+                db.add(twitch_channel)
+                blocked_channels.append(f"twitch.tv/{target_user.twitch_username}")
+                logger.info(f"🚫 [ADMIN BLOCK] Blocked Twitch channel: {target_user.twitch_username}")
+        
+        if target_user.vk_username:
+            vk_channel = db.query(BlockedChannel).filter(
+                BlockedChannel.channel_name == target_user.vk_username.lower()
+            ).first()
+            
+            if not vk_channel:
+                vk_channel = BlockedChannel(
+                    channel_name=target_user.vk_username.lower(),
+                    reason=f"Owner blocked: {target_user.blocked_reason}"
+                )
+                db.add(vk_channel)
+                blocked_channels.append(f"vk.com/{target_user.vk_username}")
+                logger.info(f"🚫 [ADMIN BLOCK] Blocked VK channel: {target_user.vk_username}")
+        
+        # Сохраняем изменения в БД
         db.commit()
         
-        return JSONResponse(content={"success": True, "message": f"User {user_id} blocked"})
+        # 3. Отключаем бота от всех каналов пользователя
+        from main import bot_instance, vk_live_bot_instance
+        
+        disconnected = []
+        
+        if target_user.twitch_username and bot_instance:
+            try:
+                await bot_instance.part_channels([target_user.twitch_username])
+                disconnected.append(f"Twitch: {target_user.twitch_username}")
+                logger.info(f"🤖 [ADMIN BLOCK] Disconnected Twitch bot from {target_user.twitch_username}")
+            except Exception as e:
+                logger.error(f"Error disconnecting Twitch bot: {e}")
+        
+        if target_user.vk_channel_name and vk_live_bot_instance:
+            try:
+                await vk_live_bot_instance.disconnect_from_channel(target_user.vk_channel_name)
+                disconnected.append(f"VK: {target_user.vk_channel_name}")
+                logger.info(f"🤖 [ADMIN BLOCK] Disconnected VK bot from {target_user.vk_channel_name}")
+            except Exception as e:
+                logger.error(f"Error disconnecting VK bot: {e}")
+        
+        logger.info(f"✅ [ADMIN BLOCK] User {user_id} fully blocked. Channels: {blocked_channels}, Bots disconnected: {disconnected}")
+        
+        return JSONResponse(content={
+            "success": True,
+            "message": f"User {user_id} fully blocked",
+            "details": {
+                "oauth_blocked": True,
+                "channels_blocked": blocked_channels,
+                "bots_disconnected": disconnected,
+                "reason": target_user.blocked_reason
+            }
+        })
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error blocking user: {e}")
         db.rollback()
@@ -236,7 +312,11 @@ async def unblock_user(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Разблокировать пользователя"""
+    """
+    Комплексная разблокировка пользователя:
+    1. Разблокирует доступ через OAuth (User.is_blocked)
+    2. Удаляет его каналы из BlockedChannel (восстанавливает гостевой доступ)
+    """
     try:
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
@@ -245,12 +325,52 @@ async def unblock_user(
         if not target_user:
             raise HTTPException(status_code=404, detail="User not found")
         
+        unblocked_channels = []
+        
+        # 1. Разблокируем пользователя (OAuth доступ)
         target_user.is_blocked = False
         target_user.blocked_reason = None
         target_user.blocked_at = None
+        logger.info(f"✅ [ADMIN UNBLOCK] User {user_id} unblocked via OAuth")
+        
+        # 2. Удаляем каналы из BlockedChannel (восстанавливаем гостевой доступ)
+        from core.database import BlockedChannel
+        
+        if target_user.twitch_username:
+            twitch_channel = db.query(BlockedChannel).filter(
+                BlockedChannel.channel_name == target_user.twitch_username.lower()
+            ).first()
+            
+            if twitch_channel:
+                db.delete(twitch_channel)
+                unblocked_channels.append(f"twitch.tv/{target_user.twitch_username}")
+                logger.info(f"✅ [ADMIN UNBLOCK] Unblocked Twitch channel: {target_user.twitch_username}")
+        
+        if target_user.vk_username:
+            vk_channel = db.query(BlockedChannel).filter(
+                BlockedChannel.channel_name == target_user.vk_username.lower()
+            ).first()
+            
+            if vk_channel:
+                db.delete(vk_channel)
+                unblocked_channels.append(f"vk.com/{target_user.vk_username}")
+                logger.info(f"✅ [ADMIN UNBLOCK] Unblocked VK channel: {target_user.vk_username}")
+        
+        # Сохраняем изменения в БД
         db.commit()
         
-        return JSONResponse(content={"success": True, "message": f"User {user_id} unblocked"})
+        logger.info(f"✅ [ADMIN UNBLOCK] User {user_id} fully unblocked. Channels: {unblocked_channels}")
+        
+        return JSONResponse(content={
+            "success": True,
+            "message": f"User {user_id} fully unblocked",
+            "details": {
+                "oauth_unblocked": True,
+                "channels_unblocked": unblocked_channels
+            }
+        })
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error unblocking user: {e}")
         db.rollback()
