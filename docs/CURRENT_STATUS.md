@@ -1,6 +1,6 @@
 # 📊 Текущий статус проекта TTS_TTV_0.02
 
-**Последнее обновление:** 29 октября 2025 (Session 18: !help Command Duplicates Fix)
+**Последнее обновление:** 29 октября 2025 (Session 19: YouTube Player Auto-Load Fix)
 **Версия:** 0.02  
 **Статус:** Production Ready - готовность к деплою 100% ✅
 
@@ -2228,6 +2228,82 @@ all_commands = db.query(BotCommand).filter(
 ✅ **Команда !help работает для Twitch и VK**  
 ✅ **Нет утечек подключений**  
 ✅ **Логирование всех действий**
+
+---
+
+## 🎬 Session 19: YouTube Player Auto-Load Fix (29.10.2025)
+
+### 🐛 Проблема
+Видео добавлялось в очередь, но не загружалось в плеер автоматически:
+```javascript
+🔍 [YOUTUBE] Queue loaded: [{id: 1, video_id: '...', title: '...'}]
+// Но плеер не показывался
+```
+
+### 🔍 Причина
+1. **Backend:** Эндпоинт `/api/youtube/queue` возвращал только массив видео
+2. **Frontend:** Ожидал структуру `{queue, current_video, is_playing}`
+3. **Результат:** `current_video = null` → плеер не показывался
+
+### ✅ Решение
+
+#### Backend (`bot_service/api/youtube_api_endpoints.py`)
+Изменена структура ответа `/api/youtube/queue`:
+
+**Было:**
+```python
+@youtube_router.get("/queue", response_model=List[QueueResponse])
+async def get_queue(...):
+    queue_items = queue_service.get_queue(user["id"], db)
+    return queue_items  # Просто массив
+```
+
+**Стало:**
+```python
+@youtube_router.get("/queue")
+async def get_queue(...):
+    queue_items = queue_service.get_queue(user["id"], db)
+    
+    # Первое видео из очереди = текущее
+    current_video = queue_items[0] if queue_items else None
+    
+    return {
+        "queue": queue_items,
+        "current_video": current_video,  # ← Автоматически устанавливается
+        "is_playing": current_video is not None
+    }
+```
+
+#### Frontend (`frontend/src/context/PlayerContext.jsx`)
+Упрощена логика `loadQueue()`:
+
+**Было:**
+```javascript
+// Много проверок и попыток определить current_video
+```
+
+**Стало:**
+```javascript
+const data = response.data;
+dispatch({ 
+    type: playerActions.LOAD_QUEUE, 
+    payload: {
+        queue: data.queue || [],
+        current_video: data.current_video || null,  // ← Приходит с бэкенда
+        is_playing: data.is_playing || false
+    }
+});
+```
+
+### 📊 Результат
+✅ Видео автоматически загружается в плеер при добавлении в очередь  
+✅ Плеер становится видимым при наличии видео  
+✅ Корректная синхронизация между фронтендом и бэкендом  
+✅ Упрощена логика определения текущего видео
+
+### 📁 Измененные файлы
+- `bot_service/api/youtube_api_endpoints.py` - изменена структура ответа `/queue`
+- `frontend/src/context/PlayerContext.jsx` - упрощена логика `loadQueue()`
 
 ---
 
