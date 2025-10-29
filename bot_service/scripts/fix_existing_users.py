@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
 """
-Скрипт для исправления существующих пользователей:
-- Создание UserSettings
-- Инициализация команд
+⚠️ ЧАСТИЧНО УСТАРЕВШИЙ СКРИПТ ⚠️
+
+Функция fix_user_settings() - ✅ АКТУАЛЬНА
+Функция init_commands_for_user() - ❌ УСТАРЕЛА (создает дублирующиеся 'basic' команды)
+
+Используйте только для создания UserSettings:
+    from scripts.fix_existing_users import fix_user_settings
+    fix_user_settings()
+
+Для команд используйте:
+    python init_global_commands.py
 """
 import sys
 import os
@@ -53,7 +61,23 @@ def fix_user_settings():
         db.close()
 
 def init_commands_for_user(user_id: int):
-    """Инициализировать команды для конкретного пользователя"""
+    """
+    ⚠️ УСТАРЕВШАЯ ФУНКЦИЯ - НЕ ИСПОЛЬЗОВАТЬ!
+    
+    Создание команд типа 'basic' для каждого пользователя приводит к дубликатам.
+    Теперь используются только глобальные команды из init_global_commands.py
+    """
+    print("=" * 70)
+    print("⚠️  ФУНКЦИЯ УСТАРЕЛА И НЕ ДОЛЖНА ИСПОЛЬЗОВАТЬСЯ!")
+    print("=" * 70)
+    print()
+    print(f"❌ Создание команд типа 'basic' для user {user_id} приводит к дубликатам.")
+    print("✅ Глобальные команды уже доступны всем пользователям.")
+    print("   Запустите: python init_global_commands.py")
+    print()
+    print("=" * 70)
+    return
+    
     db = next(get_db())
     
     try:
@@ -147,12 +171,7 @@ if __name__ == "__main__":
     print("\n1. Creating UserSettings...")
     fix_user_settings()
     
-    print("\n2. Initializing commands...")
-    db = next(get_db())
-    users = db.query(User).all()
-    for user in users:
-        init_commands_for_user(user.id)
-    db.close()
-    
+    print("\n⚠️  Skipping commands initialization (use init_global_commands.py instead)")
     print("\n✅ Done!")
+    print("\n💡 Tip: Run 'python init_global_commands.py' to ensure global commands exist")
 

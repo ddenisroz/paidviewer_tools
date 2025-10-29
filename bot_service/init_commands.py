@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """
-Скрипт для инициализации базовых команд бота
+⚠️ УСТАРЕВШИЙ СКРИПТ - НЕ ИСПОЛЬЗОВАТЬ! ⚠️
+
+Этот скрипт создавал дублирующиеся команды типа 'basic' для каждого пользователя.
+Теперь используются только глобальные команды из init_global_commands.py
+
+Используйте вместо этого:
+    python init_global_commands.py
 """
 
 import sys
@@ -11,7 +17,23 @@ from core.database import get_db, BotCommand, User, UserToken
 from datetime import datetime
 
 def init_basic_commands():
-    """Инициализировать базовые команды для всех пользователей"""
+    """
+    ⚠️ УСТАРЕВШАЯ ФУНКЦИЯ - НЕ ИСПОЛЬЗОВАТЬ!
+    Используйте init_global_commands.py вместо этого
+    """
+    print("=" * 70)
+    print("⚠️  ЭТОТ СКРИПТ УСТАРЕЛ И НЕ ДОЛЖЕН ИСПОЛЬЗОВАТЬСЯ!")
+    print("=" * 70)
+    print()
+    print("❌ Создание команд типа 'basic' приводит к дубликатам в БД.")
+    print("✅ Используйте вместо этого: python init_global_commands.py")
+    print()
+    print("   Глобальные команды автоматически доступны всем пользователям")
+    print("   и не создают дубликаты.")
+    print()
+    print("=" * 70)
+    return
+    
     db = next(get_db())
     
     try:

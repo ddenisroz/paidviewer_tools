@@ -1250,21 +1250,41 @@ class UniversalCommandHandler:
                 await ctx.send(f"@{ctx.author.name} ❌ Канал не найден")
                 return
             
-            # Получаем доступные команды
-            from core.command_executor import CommandExecutor
-            executor = CommandExecutor()
+            # Получаем доступные команды напрямую из БД
+            from core.database import BotCommand
+            from sqlalchemy import or_
             
-            # Получаем все команды (global + override + custom)
-            all_commands = executor.find_command(None, user.id, 'twitch', db, get_all=True)
+            # Получаем все команды (global + override + custom для этого пользователя)
+            all_commands = db.query(BotCommand).filter(
+                or_(
+                    BotCommand.command_type == 'global',
+                    BotCommand.user_id == user.id
+                )
+            ).filter(
+                or_(
+                    BotCommand.platforms.like('%twitch%'),
+                    BotCommand.platforms.like('%all%')
+                )
+            ).filter(
+                BotCommand.is_enabled == True
+            ).order_by(BotCommand.command_name).all()
+            
+            # Убираем дубликаты по имени команды (сохраняем первое вхождение)
+            seen_commands = set()
+            unique_commands = []
+            for cmd in all_commands:
+                if cmd.command_name not in seen_commands:
+                    seen_commands.add(cmd.command_name)
+                    unique_commands.append(cmd)
             
             # Формируем список команд
             cmd_list = []
-            for cmd in all_commands[:10]:  # Первые 10 команд
+            for cmd in unique_commands[:10]:  # Первые 10 уникальных команд
                 cmd_list.append(f"!{cmd.command_name}")
             
             if cmd_list:
                 commands_text = ", ".join(cmd_list)
-                total = len(all_commands)
+                total = len(unique_commands)  # Считаем уникальные команды
                 if total > 10:
                     await ctx.send(f"📋 Доступные команды: {commands_text}... (всего: {total})")
                 else:
@@ -1289,21 +1309,41 @@ class UniversalCommandHandler:
                 await vk_bot.send_message(channel_name, f"@{author_name} ❌ Канал не найден")
                 return
             
-            # Получаем доступные команды
-            from core.command_executor import CommandExecutor
-            executor = CommandExecutor()
+            # Получаем доступные команды напрямую из БД
+            from core.database import BotCommand
+            from sqlalchemy import or_
             
-            # Получаем все команды (global + override + custom)
-            all_commands = executor.find_command(None, user.id, 'vk', db, get_all=True)
+            # Получаем все команды (global + override + custom для этого пользователя)
+            all_commands = db.query(BotCommand).filter(
+                or_(
+                    BotCommand.command_type == 'global',
+                    BotCommand.user_id == user.id
+                )
+            ).filter(
+                or_(
+                    BotCommand.platforms.like('%vk%'),
+                    BotCommand.platforms.like('%all%')
+                )
+            ).filter(
+                BotCommand.is_enabled == True
+            ).order_by(BotCommand.command_name).all()
+            
+            # Убираем дубликаты по имени команды (сохраняем первое вхождение)
+            seen_commands = set()
+            unique_commands = []
+            for cmd in all_commands:
+                if cmd.command_name not in seen_commands:
+                    seen_commands.add(cmd.command_name)
+                    unique_commands.append(cmd)
             
             # Формируем список команд
             cmd_list = []
-            for cmd in all_commands[:10]:  # Первые 10 команд
+            for cmd in unique_commands[:10]:  # Первые 10 уникальных команд
                 cmd_list.append(f"!{cmd.command_name}")
             
             if cmd_list:
                 commands_text = ", ".join(cmd_list)
-                total = len(all_commands)
+                total = len(unique_commands)  # Считаем уникальные команды
                 if total > 10:
                     await vk_bot.send_message(channel_name,
                         f"📋 Доступные команды: {commands_text}... (всего: {total})")
