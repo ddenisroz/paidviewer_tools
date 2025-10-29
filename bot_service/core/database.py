@@ -142,14 +142,6 @@ try:
         platform = Column(String, index=True, nullable=False)  # 'twitch' или 'vk'
         created_at = Column(DateTime, default=utcnow_naive)
 
-    class MutedUser(Base):
-        """Модель заглушенных пользователей в чате"""
-        __tablename__ = "muted_users"
-        __table_args__ = {'extend_existing': True}
-        id = Column(Integer, primary_key=True, index=True)
-        channel_name = Column(String, index=True, nullable=False)
-        username = Column(String, index=True, nullable=False)
-
     class TTSBlockedUser(Base):
         """Модель пользователей, заблокированных от TTS"""
         __tablename__ = "tts_blocked_users"
@@ -198,20 +190,6 @@ try:
         repetition_penalty = Column(Float, default=1.0)
         length_penalty = Column(Float, default=1.0)
         early_stopping = Column(Boolean, default=False)
-
-    class GuestVerification(Base):
-        """
-        Модель для гостевой верификации каналов.
-        При входе в гостевой режим для канала создается запись с кодом.
-        """
-        __tablename__ = 'guest_verifications'
-        __table_args__ = {'extend_existing': True}
-        id = Column(Integer, primary_key=True, index=True)
-        channel_name = Column(String, unique=True, index=True, nullable=False)
-        verification_code = Column(String, nullable=False)
-        is_verified = Column(Boolean, default=False)
-        created_at = Column(DateTime, default=utcnow_naive)
-        verified_at = Column(DateTime, nullable=True)
 
     class BlockedChannel(Base):
         """Модель для заблокированных каналов"""
@@ -417,19 +395,6 @@ try:
         last_used = Column(DateTime, nullable=True)  # Последнее использование
         usage_count = Column(Integer, default=0)  # Количество использований
         tags = Column(String, nullable=True, default='')  # Теги команды через запятую
-        created_at = Column(DateTime, default=utcnow_naive)
-        updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
-
-    class TTSSettings(Base):
-        """Модель настроек TTS для каналов"""
-        __tablename__ = 'tts_settings'
-        __table_args__ = {'extend_existing': True}
-        id = Column(Integer, primary_key=True, index=True)
-        user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-        channel_name = Column(String, nullable=False, index=True)
-        enabled_platforms = Column(JSON, nullable=False, default=lambda: ['twitch', 'vk'])  # Список платформ
-        voice_settings = Column(JSON, nullable=True)  # Настройки голоса
-        filters = Column(JSON, nullable=True)  # Фильтры сообщений
         created_at = Column(DateTime, default=utcnow_naive)
         updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
