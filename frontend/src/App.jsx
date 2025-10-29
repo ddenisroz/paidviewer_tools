@@ -29,6 +29,7 @@ const CommandsPage = lazy(() => import('./pages/CommandsPage'));
 const ObsTtsPage = lazy(() => import('./pages/tts/ObsTtsPage'));
 const ObsYoutubePage = lazy(() => import('./pages/tts/ObsYoutubePage'));
 const ChatOverlay = lazy(() => import('./pages/ChatOverlay'));
+const ChatWindow = lazy(() => import('./pages/ChatWindow'));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
 const UserManagementPage = lazy(() => import('./pages/admin/UserManagementPage'));
 const BotManagementPage = lazy(() => import('./pages/admin/BotManagementPage'));
@@ -60,6 +61,7 @@ function App() {
                         <Route path="/youtube-obs/:token" element={<ObsYoutubePage />} />
                         <Route path="/drops-widget/:token" element={<DropsWidget />} />
                         <Route path="/chat-overlay" element={<ChatOverlay />} />
+                        <Route path="/chat-window" element={<ChatWindow />} />
 
                         {/* Protected Routes with Layout */}
                         <Route path="/" element={<AuthGuard />}>

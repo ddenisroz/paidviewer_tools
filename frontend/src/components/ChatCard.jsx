@@ -17,7 +17,8 @@ import {
     RefreshCw,
     ArrowDown,
     Eye,
-    EyeOff
+    EyeOff,
+    ExternalLink
 } from 'lucide-react';
 import { TwitchIcon, VKIcon } from './PlatformIcons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -1082,6 +1083,26 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                             className="h-8 w-20 px-3 transition-all border-gray-400 text-gray-300 hover:border-blue-400 hover:text-blue-400 hover:bg-blue-400/10"
                         >
                             OBS
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                const width = 600;
+                                const height = 800;
+                                const left = (window.screen.width / 2) - (width / 2);
+                                const top = (window.screen.height / 2) - (height / 2);
+                                window.open(
+                                    '/chat-window',
+                                    'ChatWindow',
+                                    `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=no`
+                                );
+                            }}
+                            title="Открыть чат в отдельном окне"
+                            className="h-8 px-3 transition-all border-gray-400 text-gray-300 hover:border-green-400 hover:text-green-400 hover:bg-green-400/10"
+                        >
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            В окне
                         </Button>
                         <Button
                             variant="outline"
