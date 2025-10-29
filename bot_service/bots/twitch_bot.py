@@ -28,9 +28,6 @@ class Bot(TwitchBotCore):
         self.role_checker = RoleChecker()
         self.drops_service = None  # Будет инициализирован при подключении к каналу
         
-        # Список каналов, куда уже отправили приветственное сообщение
-        self._welcomed_channels = set()
-        
         # Инициализируем команды (старая система для обратной совместимости)
         self.commands_handler = TwitchBotCommands(
             self, 
@@ -87,18 +84,6 @@ class Bot(TwitchBotCore):
         await super().event_ready()
         logger.info("[BOT] All modules loaded and ready!")
     
-    async def part_channels(self, channels: List[str]):
-        """Покинуть каналы и очистить список приветствованных"""
-        # Очищаем список приветствованных каналов
-        for channel in channels:
-            channel_lower = channel.lower()
-            if channel_lower in self._welcomed_channels:
-                self._welcomed_channels.remove(channel_lower)
-                logger.debug(f"🗑️ [BOT] Removed {channel_lower} from welcomed channels list")
-        
-        # Вызываем родительский метод
-        await super().part_channels(channels)
-    
     async def event_join(self, channel, user):
         """Вызывается когда кто-то присоединяется к каналу (включая самого бота)"""
         # Вызываем родительский метод
@@ -108,23 +93,42 @@ class Bot(TwitchBotCore):
         if user.name.lower() == self.nick.lower():
             channel_name = channel.name.lower()
             
-            # Проверяем, не отправляли ли уже приветствие в этот канал
-            if channel_name in self._welcomed_channels:
-                logger.debug(f"🔇 [BOT] Welcome message already sent to {channel.name}, skipping")
-                return
+            # Проверяем в БД, не отправляли ли приветствие недавно
+            from core.database import SessionLocal, UserSettings
+            from datetime import datetime, timedelta
             
-            import random
+            db = SessionLocal()
             try:
+                # Ищем настройки для этого канала
+                settings = db.query(UserSettings).filter(
+                    UserSettings.channel_name == channel_name
+                ).first()
+                
+                if settings and settings.bot_last_welcome_at:
+                    # Если приветствие было менее 5 минут назад - пропускаем
+                    time_diff = datetime.utcnow() - settings.bot_last_welcome_at
+                    if time_diff < timedelta(minutes=5):
+                        logger.debug(f"🔇 [BOT] Welcome message sent {int(time_diff.total_seconds())}s ago to {channel.name}, skipping")
+                        return
+                
+                # Отправляем приветственное сообщение
+                import random
                 fake_ip = f"{random.randint(100, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}"
                 await channel.send(f"Подключено к {channel.name}. streamer IP: {fake_ip} | Используйте !help для списка команд")
                 
-                # Добавляем канал в список приветствованных
-                self._welcomed_channels.add(channel_name)
+                # Обновляем время последнего приветствия
+                if settings:
+                    settings.bot_last_welcome_at = datetime.utcnow()
+                    db.commit()
+                
                 logger.info(f"✅ [BOT] Welcome message sent to {channel.name} with fake IP: {fake_ip}")
+                
             except Exception as e:
                 logger.error(f"❌ [BOT] Failed to send welcome message to {channel.name}: {e}")
                 # Проверяем если это ошибка бана/таймаута
                 await self._handle_ban_error(channel.name, e)
+            finally:
+                db.close()
     
     async def _handle_ban_error(self, channel_name: str, error: Exception):
         """Обработка ошибок, связанных с баном бота"""
@@ -142,12 +146,6 @@ class Bot(TwitchBotCore):
         """Отключиться от канала и удалить токены"""
         try:
             logger.warning(f"🔌 [DISCONNECT] Disconnecting from {channel_name} due to: {reason}")
-            
-            # Очищаем список приветствованных каналов
-            channel_lower = channel_name.lower()
-            if channel_lower in self._welcomed_channels:
-                self._welcomed_channels.remove(channel_lower)
-                logger.debug(f"🗑️ [CLEANUP] Removed {channel_lower} from welcomed channels list")
             
             # Получаем user_id из БД по имени канала
             from core.database import SessionLocal, User

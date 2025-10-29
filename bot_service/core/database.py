@@ -122,6 +122,7 @@ try:
         # Метаданные
         created_at = Column(DateTime, default=utcnow_naive)
         updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
+        bot_last_welcome_at = Column(DateTime, nullable=True)  # Последнее приветственное сообщение бота
         
         # Ограничение: должен быть заполнен либо user_id, либо session_id
         __table_args__ = (
