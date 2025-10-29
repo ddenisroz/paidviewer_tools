@@ -536,7 +536,7 @@ class OAuthHandler:
             # Не прерываем авторизацию из-за ошибки бота
     
     async def _connect_twitch_bot(self, channel_name: str) -> None:
-        """Подключение Twitch бота"""
+        """Подключение Twitch бота после OAuth авторизации"""
         try:
             # Импортируем глобальные переменные
             from main import bot_instance
@@ -546,6 +546,11 @@ class OAuthHandler:
                 success = await bot_instance.join_channel(channel_name)
                 if success:
                     logger.info(f"✅ Twitch bot successfully connected to {channel_name} via OAuth")
+                    
+                    # Отправляем приветственное сообщение (только после OAuth!)
+                    import asyncio
+                    await asyncio.sleep(2)  # Даем время боту полностью подключиться
+                    await bot_instance.send_welcome_message(channel_name)
                 else:
                     logger.warning(f"❌ Failed to connect Twitch bot to {channel_name} via OAuth")
             else:

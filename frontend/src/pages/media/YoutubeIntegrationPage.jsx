@@ -214,11 +214,12 @@ const YoutubeIntegrationPage = () => {
             onClick={handleBackdropClick}
             style={isTheaterMode ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999 } : {}}
         >
-            <div className={`w-full h-full ${isTheaterMode ? '' : ''}`}>
-                <Card className={`transition-all duration-300 w-full ${isTheaterMode ? 'bg-black border-none h-full' : 'h-full flex flex-col'}`}>
-                    <CardContent className={`${isTheaterMode ? 'grid grid-cols-5 gap-6 h-full' : 'flex flex-col gap-4 h-full'} p-6`}>
-                        {/* Компактный блок управления (только для обычного режима) */}
-                        {!isTheaterMode && (
+            {/* Обычный режим - две отдельные карточки */}
+            {!isTheaterMode ? (
+                <div className="flex flex-col gap-4 h-full">
+                    {/* Карточка 1: Плеер и управление */}
+                    <Card>
+                        <CardContent className="p-6">
                             <div className="flex gap-4">
                                 {/* Плеер слева (оптимальный размер) */}
                                 <div className="w-[360px] flex-shrink-0">
@@ -376,38 +377,88 @@ const YoutubeIntegrationPage = () => {
                                     </div>
                                 </div>
                             </div>
-                        )}
+                        </CardContent>
+                    </Card>
 
-                        {/* Fullscreen mode layout */}
-                        {isTheaterMode && (
-                            <div className="col-span-4 space-y-4">
-                                {/* Кнопка выхода из театрального режима */}
-                                <div className="flex justify-end">
-                                    <Button 
-                                        variant="outline" 
-                                        size="sm"
-                                        onClick={() => {
-                                            setIsTheaterMode(false);
-                                            window.dispatchEvent(new CustomEvent('youtube_event', {
-                                                detail: { event: 'theater_mode_changed', data: { isTheaterMode: false } }
-                                            }));
-                                        }}
-                                    >
-                                        <Minimize className="h-4 w-4 mr-2" />
-                                        Выйти из полного экрана
-                                    </Button>
+                    {/* Карточка 2: Очередь */}
+                    <Card className="flex-1 flex flex-col overflow-hidden">
+                        <CardHeader className="pb-3">
+                            <CardTitle>Очередь ({queue.length})</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0 flex-1 overflow-y-auto">
+                            {currentVideo && (
+                                <div className="p-4 border-b bg-muted/20">
+                                    <p className="text-xs text-muted-foreground mb-2">Сейчас играет:</p>
+                                    <div className="flex gap-3 p-2 rounded-lg">
+                                        <img src={currentVideo.thumbnail_url} alt={currentVideo.title} className="w-20 h-12 object-cover rounded"/>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="font-medium text-sm line-clamp-2">{currentVideo.title}</h4>
+                                            <p className="text-xs text-muted-foreground">от {currentVideo.requester_name || currentVideo.user_id || 'Unknown'}</p>
+                                        </div>
+                                    </div>
                                 </div>
-                                {/* Fullscreen player content */}
-                                <div className="aspect-video bg-black rounded-lg"></div>
+                            )}
+                            
+                            {queue.length > 0 ? (
+                                <div className="p-4 space-y-3">
+                                    {queue.map((video, index) => {
+                                        return (
+                                            <div key={video.id} className="flex gap-3 p-2 border rounded-lg hover:bg-muted/50 cursor-pointer">
+                                                <div className="flex-shrink-0 w-6 h-6 bg-muted rounded-full flex items-center justify-center text-xs font-medium">
+                                                    {index + 1}
+                                                </div>
+                                                <img src={video.thumbnail_url} alt={video.title} className="w-20 h-12 object-cover rounded"/>
+                                                <div className="flex-1 min-w-0">
+                                                    <h4 className="font-medium text-sm line-clamp-2">{video.title}</h4>
+                                                    <p className="text-xs text-muted-foreground">заказал: {video.requester_name || video.user_id || 'Unknown'}</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="text-center py-8 text-muted-foreground p-4">
+                                    <div className="text-4xl mb-4">🎵</div>
+                                    <p className="font-medium text-base mb-2">Очередь пуста</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Очередь пуста. Зрители могут добавлять видео командой !sr
+                                    </p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            ) : (
+                /* Fullscreen mode layout */
+                <Card className="transition-all duration-300 w-full bg-black border-none h-full">
+                    <CardContent className="grid grid-cols-5 gap-6 h-full p-6">
+                        <div className="col-span-4 space-y-4">
+                            {/* Кнопка выхода из театрального режима */}
+                            <div className="flex justify-end">
+                                <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => {
+                                        setIsTheaterMode(false);
+                                        window.dispatchEvent(new CustomEvent('youtube_event', {
+                                            detail: { event: 'theater_mode_changed', data: { isTheaterMode: false } }
+                                        }));
+                                    }}
+                                >
+                                    <Minimize className="h-4 w-4 mr-2" />
+                                    Выйти из полного экрана
+                                </Button>
                             </div>
-                        )}
+                            {/* Fullscreen player content */}
+                            <div className="aspect-video bg-black rounded-lg"></div>
+                        </div>
 
-                        <div className={`flex flex-col ${isTheaterMode ? 'col-span-1 h-full' : 'w-full flex-1'}`}>
-                            <Card className={isTheaterMode ? 'flex-1 flex flex-col' : 'flex-1 flex flex-col h-full'}>
+                        <div className="col-span-1 h-full">
+                            <Card className="flex-1 flex flex-col h-full">
                                 <CardHeader className="pb-3">
                                     <CardTitle>Очередь ({queue.length})</CardTitle>
                                 </CardHeader>
-                                <CardContent className={`p-0 flex-1 overflow-y-auto`}>
+                                <CardContent className="p-0 flex-1 overflow-y-auto">
                                     {currentVideo && (
                                         <div className="p-4 border-b bg-muted/20">
                                             <p className="text-xs text-muted-foreground mb-2">Сейчас играет:</p>
@@ -452,7 +503,7 @@ const YoutubeIntegrationPage = () => {
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            )}
         </div>
     );
 };

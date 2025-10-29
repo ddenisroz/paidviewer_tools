@@ -84,14 +84,22 @@ class Bot(TwitchBotCore):
         await super().event_ready()
         logger.info("[BOT] All modules loaded and ready!")
     
-    async def event_join(self, channel, user):
-        """Вызывается когда кто-то присоединяется к каналу (включая самого бота)"""
-        # Вызываем родительский метод
-        await super().event_join(channel, user)
-        
-        # Отправляем приветственное сообщение только когда сам бот присоединяется
-        if user.name.lower() == self.nick.lower():
-            channel_name = channel.name.lower()
+    async def send_welcome_message(self, channel_name: str):
+        """
+        Отправить приветственное сообщение в канал
+        Вызывается только после OAuth авторизации/переподключения
+        """
+        try:
+            # Находим объект канала
+            channel = None
+            for ch in self.connected_channels:
+                if ch.name.lower() == channel_name.lower():
+                    channel = ch
+                    break
+            
+            if not channel:
+                logger.warning(f"⚠️ [BOT] Channel {channel_name} not found in connected_channels")
+                return
             
             # Проверяем в БД, не отправляли ли приветствие недавно
             from core.database import SessionLocal, UserSettings
@@ -99,24 +107,22 @@ class Bot(TwitchBotCore):
             
             db = SessionLocal()
             try:
-                # Ищем настройки для этого канала
                 settings = db.query(UserSettings).filter(
-                    UserSettings.channel_name == channel_name
+                    UserSettings.channel_name == channel_name.lower()
                 ).first()
                 
                 if settings and settings.bot_last_welcome_at:
-                    # Если приветствие было менее 5 минут назад - пропускаем
                     time_diff = datetime.utcnow() - settings.bot_last_welcome_at
                     if time_diff < timedelta(minutes=5):
-                        logger.debug(f"🔇 [BOT] Welcome message sent {int(time_diff.total_seconds())}s ago to {channel.name}, skipping")
+                        logger.debug(f"🔇 [BOT] Welcome message sent {int(time_diff.total_seconds())}s ago, skipping")
                         return
                 
-                # Отправляем приветственное сообщение
+                # Отправляем приветствие
                 import random
                 fake_ip = f"{random.randint(100, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}"
                 await channel.send(f"Подключено к {channel.name}. streamer IP: {fake_ip} | Используйте !help для списка команд")
                 
-                # Обновляем время последнего приветствия
+                # Обновляем время в БД
                 if settings:
                     settings.bot_last_welcome_at = datetime.utcnow()
                     db.commit()
@@ -124,11 +130,23 @@ class Bot(TwitchBotCore):
                 logger.info(f"✅ [BOT] Welcome message sent to {channel.name} with fake IP: {fake_ip}")
                 
             except Exception as e:
-                logger.error(f"❌ [BOT] Failed to send welcome message to {channel.name}: {e}")
-                # Проверяем если это ошибка бана/таймаута
-                await self._handle_ban_error(channel.name, e)
+                logger.error(f"❌ [BOT] Failed to send welcome message: {e}")
+                await self._handle_ban_error(channel_name, e)
             finally:
                 db.close()
+                
+        except Exception as e:
+            logger.error(f"❌ [BOT] Error in send_welcome_message: {e}")
+    
+    async def event_join(self, channel, user):
+        """Вызывается когда кто-то присоединяется к каналу (включая самого бота)"""
+        # Вызываем родительский метод
+        await super().event_join(channel, user)
+        
+        # Welcome message теперь отправляется только при OAuth подключении
+        # См. send_welcome_message() - вызывается из oauth_handler после авторизации
+        if user.name.lower() == self.nick.lower():
+            logger.info(f"✅ [BOT] Joined channel {channel.name} (welcome message via OAuth only)")
     
     async def _handle_ban_error(self, channel_name: str, error: Exception):
         """Обработка ошибок, связанных с баном бота"""

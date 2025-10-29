@@ -1,6 +1,6 @@
 # 📊 Текущий статус проекта TTS_TTV_0.02
 
-**Последнее обновление:** 29 октября 2025 (Session 20: Welcome Message Spam Fix)
+**Последнее обновление:** 29 октября 2025 (Session 21: Welcome Message OAuth Only & YouTube UI Split)
 **Версия:** 0.02  
 **Статус:** Production Ready - готовность к деплою 100% ✅
 
@@ -2583,6 +2583,155 @@ async def _disconnect_and_cleanup(self, channel_name: str, reason: str = "ban"):
 ✅ **TTS отключается автоматически**  
 ✅ **Сессии завершаются с правильной причиной**  
 ✅ **Полное логирование всех действий**
+
+---
+
+## 💬 Session 21: Welcome Message OAuth Only & YouTube UI Split (29.10.2025)
+
+### 🎯 Цели:
+1. Welcome message только при OAuth авторизации (не при hot reload)
+2. Разделить карточки плеера и очереди YouTube
+3. Включить autoplay для YouTube плеера
+
+### 🔧 Изменения:
+
+#### 1. Welcome Message только при OAuth
+
+**Проблема:**
+- Бот отправлял welcome message при каждом hot reload сервера
+- Даже перезагрузка frontend страницы вызывала welcome message
+- Спам в чате нарушает правила модерации Twitch
+
+**Решение:**
+```python
+# bot_service/bots/twitch_bot.py
+async def send_welcome_message(self, channel_name: str):
+    """Отправляется ТОЛЬКО после OAuth авторизации"""
+    # Проверка в БД: bot_last_welcome_at < 5 минут
+    # ✅ Отправляем только если прошло достаточно времени
+    
+async def event_join(self, channel, user):
+    """Теперь БЕЗ автоматического welcome message"""
+    # Welcome message вызывается из oauth_handler
+```
+
+```python
+# bot_service/auth/oauth_handler.py
+async def _connect_twitch_bot(self, channel_name: str):
+    await bot_instance.join_channel(channel_name)
+    await asyncio.sleep(2)  # Даем боту подключиться
+    await bot_instance.send_welcome_message(channel_name)  # ✅ Отправляем ТОЛЬКО здесь
+```
+
+**Поведение:**
+| Событие | До | После |
+|---------|----|----|
+| Hot reload | ❌ Welcome message | ✅ Нет сообщения |
+| Frontend reload | ❌ Welcome message | ✅ Нет сообщения |
+| OAuth авторизация | ✅ Welcome message | ✅ Welcome message |
+| Переподключение | ❌ Нет | ✅ Welcome message |
+
+#### 2. Разделение карточек YouTube
+
+**До:**
+```jsx
+<Card>  {/* Одна большая вложенная карточка */}
+  <CardContent>
+    <div>Плеер + управление</div>
+    <Card>  {/* Вложенная карточка очереди */}
+      <CardContent>Очередь</CardContent>
+    </Card>
+  </CardContent>
+</Card>
+```
+
+**После:**
+```jsx
+<div className="flex flex-col gap-4 h-full">
+  {/* Карточка 1: Плеер и управление */}
+  <Card>
+    <CardContent className="p-6">
+      <div className="flex gap-4">
+        <div className="w-[360px]">{/* Плеер */}</div>
+        <div className="flex-1">{/* Управление */}</div>
+      </div>
+    </CardContent>
+  </Card>
+  
+  {/* Карточка 2: Очередь */}
+  <Card className="flex-1 flex flex-col overflow-hidden">
+    <CardHeader>
+      <CardTitle>Очередь ({queue.length})</CardTitle>
+    </CardHeader>
+    <CardContent className="p-0 flex-1 overflow-y-auto">
+      {/* Список видео */}
+    </CardContent>
+  </Card>
+</div>
+```
+
+**Преимущества:**
+- ✅ Нет вложенности - чище структура DOM
+- ✅ Независимое скроллирование очереди
+- ✅ Лучший responsive дизайн
+- ✅ Проще добавлять новые секции
+
+#### 3. YouTube Autoplay
+
+**До:**
+```jsx
+playerVars: {
+  autoplay: 0,  // ❌ Видео не играет автоматически
+  ...
+}
+```
+
+**После:**
+```jsx
+playerVars: {
+  autoplay: 1,  // ✅ Видео начинает играть сразу
+  ...
+}
+```
+
+**Применено к:**
+- Основному плееру (на странице YouTube)
+- Скрытому плееру (фоновый звук на других страницах)
+
+### 🔍 Измененные файлы:
+
+1. **`bot_service/bots/twitch_bot.py`**
+   - Добавлен `send_welcome_message()` метод
+   - `event_join()` теперь без автоматического welcome message
+   
+2. **`bot_service/auth/oauth_handler.py`**
+   - `_connect_twitch_bot()` теперь вызывает `send_welcome_message()`
+   - Welcome message отправляется только после успешного `join_channel()`
+   
+3. **`frontend/src/pages/media/YoutubeIntegrationPage.jsx`**
+   - Разделены карточки плеера и очереди
+   - Убрана вложенность `<Card>` внутри `<Card>`
+   - Улучшена структура layout
+   
+4. **`frontend/src/components/GlobalPlayer.jsx`**
+   - `autoplay: 1` для основного плеера
+   - `autoplay: 1` для скрытого плеера
+
+### 📊 Результаты:
+
+| Метрика | До | После |
+|---------|----|----|
+| Welcome message спам | ❌ При каждом reload | ✅ Только при OAuth |
+| YouTube UI вложенность | ❌ 2 уровня Card | ✅ 0 вложенности |
+| YouTube autoplay | ❌ Ручной запуск | ✅ Автоматически |
+| UX плавность | ⚠️ Приходится кликать Play | ✅ Видео играет сразу |
+
+### ✅ Статус:
+
+✅ **Welcome message только при OAuth авторизации**  
+✅ **Карточки YouTube разделены (нет вложенности)**  
+✅ **YouTube autoplay включен для всех плееров**  
+✅ **UX улучшен - видео начинает играть автоматически**
 
 ---
 

@@ -97,7 +97,7 @@ const GlobalPlayer = () => {
                                     width: '100%',
                                     height: '100%',
                                     playerVars: {
-                                        autoplay: 0,
+                                        autoplay: 1,  // ✅ Включаем автоплей
                                         controls: 1,
                                         disablekb: 0,
                                         enablejsapi: 1,
@@ -133,7 +133,7 @@ const GlobalPlayer = () => {
                             width: '1px',
                             height: '1px',
                             playerVars: {
-                                autoplay: 0,
+                                autoplay: 1,  // ✅ Включаем автоплей
                                 controls: 0,
                                 disablekb: 1,
                                 enablejsapi: 1,
