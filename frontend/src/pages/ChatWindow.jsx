@@ -150,89 +150,96 @@ const ChatWindow = () => {
                             <div 
                                 key={msg.id || `${msg.platform}-${msg.timestamp}-${msg.author_name || msg.author}`}
                                 style={{
-                                    marginTop: index > 0 ? '12px' : '0',
-                                    padding: '12px',
+                                    marginTop: index > 0 ? '8px' : '0',
+                                    padding: '8px 12px',
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                                    borderRadius: '8px',
-                                    wordBreak: 'break-word'
+                                    borderRadius: '6px',
+                                    wordBreak: 'break-word',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    flexWrap: 'wrap'
                                 }}
                             >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                                    {/* Platform Icon */}
-                                    {settings.show_platform_icons && (
-                                        msg.platform === 'twitch' ? (
-                                            <TwitchIcon 
-                                                style={{ 
-                                                    color: '#9147FF',
-                                                    width: '16px',
-                                                    height: '16px'
-                                                }} 
-                                            />
-                                        ) : (
-                                            <VKIcon 
-                                                style={{ 
-                                                    color: '#EF4444',
-                                                    width: '14px',
-                                                    height: '14px'
-                                                }} 
-                                            />
-                                        )
-                                    )}
-                                    
-                                    {/* Badges */}
-                                    {settings.show_badges && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (
-                                        <>
-                                            {msg.badges.map((badge, idx) => {
-                                                const [badgeId, version] = badge.split('/');
-                                                const badgeUrl = twitchBadgesService.getBadgeUrl(badgeId, version, '1x');
-                                                
-                                                if (!badgeUrl) return null;
-                                                
-                                                return (
-                                                    <img 
-                                                        key={idx} 
-                                                        src={badgeUrl}
-                                                        alt={badgeId}
-                                                        title={badge}
-                                                        style={{ 
-                                                            width: '18px', 
-                                                            height: '18px'
-                                                        }}
-                                                        onError={(e) => {
-                                                            e.target.style.display = 'none';
-                                                        }}
-                                                    />
-                                                );
-                                            })}
-                                        </>
-                                    )}
-                                    
-                                    {/* Avatar */}
-                                    {settings.show_avatars && msg.avatar_url && (
-                                        <img
-                                            src={msg.avatar_url}
-                                            alt={msg.author_name || msg.author}
-                                            style={{
-                                                width: '24px',
-                                                height: '24px',
-                                                borderRadius: '50%'
-                                            }}
+                                {/* Platform Icon */}
+                                {settings.show_platform_icons && (
+                                    msg.platform === 'twitch' ? (
+                                        <TwitchIcon 
+                                            style={{ 
+                                                color: '#9147FF',
+                                                width: '16px',
+                                                height: '16px',
+                                                flexShrink: 0
+                                            }} 
                                         />
-                                    )}
-                                    
-                                    {/* Username */}
-                                    <span style={{ 
-                                        color: msg.platform === 'twitch' ? '#9146FF' : '#FF0000',
-                                        fontWeight: '600'
-                                    }}>
-                                        {msg.author_name || msg.author}
-                                    </span>
-                                </div>
+                                    ) : (
+                                        <VKIcon 
+                                            style={{ 
+                                                color: '#EF4444',
+                                                width: '14px',
+                                                height: '14px',
+                                                flexShrink: 0
+                                            }} 
+                                        />
+                                    )
+                                )}
+                                
+                                {/* Badges */}
+                                {settings.show_badges && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (
+                                    <>
+                                        {msg.badges.map((badge, idx) => {
+                                            const [badgeId, version] = badge.split('/');
+                                            const badgeUrl = twitchBadgesService.getBadgeUrl(badgeId, version, '1x');
+                                            
+                                            if (!badgeUrl) return null;
+                                            
+                                            return (
+                                                <img 
+                                                    key={idx} 
+                                                    src={badgeUrl}
+                                                    alt={badgeId}
+                                                    title={badge}
+                                                    style={{ 
+                                                        width: '18px', 
+                                                        height: '18px',
+                                                        flexShrink: 0
+                                                    }}
+                                                    onError={(e) => {
+                                                        e.target.style.display = 'none';
+                                                    }}
+                                                />
+                                            );
+                                        })}
+                                    </>
+                                )}
+                                
+                                {/* Avatar */}
+                                {settings.show_avatars && msg.avatar_url && (
+                                    <img
+                                        src={msg.avatar_url}
+                                        alt={msg.author_name || msg.author}
+                                        style={{
+                                            width: '20px',
+                                            height: '20px',
+                                            borderRadius: '50%',
+                                            flexShrink: 0
+                                        }}
+                                    />
+                                )}
+                                
+                                {/* Username */}
+                                <span style={{ 
+                                    color: msg.platform === 'twitch' ? '#9146FF' : '#FF0000',
+                                    fontWeight: '600',
+                                    flexShrink: 0
+                                }}>
+                                    {msg.author_name || msg.author}:
+                                </span>
                                 
                                 {/* Message Content */}
-                                <div style={{ color: settings.text_color, paddingLeft: '28px' }}>
+                                <span style={{ color: settings.text_color, flex: 1 }}>
                                     <MessageContent message={msg.message} emotes={{}} />
-                                </div>
+                                </span>
                             </div>
                         ))}
                         <div ref={messagesEndRef} />
