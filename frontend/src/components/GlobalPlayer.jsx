@@ -118,9 +118,9 @@ const GlobalPlayer = () => {
                 </div>
             )}
             
-            {/* UI плеера фиксирован внизу экрана */}
+            {/* UI плеера фиксирован внизу экрана с отступом */}
             {showUI && (
-                <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center p-4 pointer-events-none">
+                <div className="fixed bottom-4 left-0 right-0 z-40 flex justify-center px-4 pointer-events-none">
                     <div className="w-full max-w-4xl pointer-events-auto">
                     <div className="bg-gray-900/95 backdrop-blur-md border border-gray-700 rounded-xl shadow-2xl">
                         {/* Убрали тайм-бар для снижения нагрузки */}

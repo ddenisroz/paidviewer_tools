@@ -80,8 +80,9 @@ const playerReducer = (state, action) => {
                 ...state, 
                 queue: action.payload.queue || [],
                 currentVideo: action.payload.current_video || null,
-                isPlaying: action.payload.is_playing || false,
-                isVisible: !!(action.payload.current_video),
+                // НЕ автоматически запускаем при загрузке очереди
+                isPlaying: false,
+                isVisible: false,
                 isLoading: false,
                 error: null
             };
@@ -140,8 +141,8 @@ export const PlayerProvider = ({ children }) => {
                 type: playerActions.LOAD_QUEUE, 
                 payload: {
                     queue: data.queue || [],
-                    current_video: data.current_video || null,
-                    is_playing: data.is_playing || false
+                    current_video: data.current_video || null
+                    // is_playing НЕ передаём - плеер НЕ должен автоматически запускаться
                 }
             });
             
