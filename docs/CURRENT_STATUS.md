@@ -1,6 +1,6 @@
 # 📊 Текущий статус проекта TTS_TTV_0.02
 
-**Последнее обновление:** 29 октября 2025 (Session 19: YouTube Player Auto-Load Fix)
+**Последнее обновление:** 29 октября 2025 (Session 20: Welcome Message Spam Fix)
 **Версия:** 0.02  
 **Статус:** Production Ready - готовность к деплою 100% ✅
 
@@ -2228,6 +2228,102 @@ all_commands = db.query(BotCommand).filter(
 ✅ **Команда !help работает для Twitch и VK**  
 ✅ **Нет утечек подключений**  
 ✅ **Логирование всех действий**
+
+---
+
+## 🔇 Session 20: Welcome Message Spam Fix (29.10.2025)
+
+### 🐛 Проблема
+При каждом hot reload (изменение файлов) или перезагрузке страницы бот отправлял welcome message повторно:
+```
+payedviewer: Подключено к yourchy. streamer IP: 135.40.78.141 | Используйте !help для списка команд
+payedviewer: Подключено к yourchy. streamer IP: 145.240.214.63 | Используйте !help для списка команд
+payedviewer: Подключено к yourchy. streamer IP: 124.102.210.4 | Используйте !help для списка команд
+```
+
+### 🔍 Причина
+1. **Hot reload** - Uvicorn перезапускает сервер при изменении файлов
+2. **Bot reconnect** - Бот заново подключается к каналам
+3. **event_join** - Срабатывает при каждом подключении бота
+4. **Нет защиты** - Приветственное сообщение отправлялось каждый раз
+
+### ✅ Решение
+
+#### Архитектура защиты
+Добавлен механизм отслеживания приветствованных каналов:
+
+```python
+class Bot(TwitchBotCore):
+    def __init__(self, ...):
+        # Список каналов, куда уже отправили приветственное сообщение
+        self._welcomed_channels = set()
+```
+
+#### 1. Проверка перед отправкой (`event_join`)
+```python
+async def event_join(self, channel, user):
+    if user.name.lower() == self.nick.lower():
+        channel_name = channel.name.lower()
+        
+        # Проверяем, не отправляли ли уже приветствие
+        if channel_name in self._welcomed_channels:
+            logger.debug(f"🔇 [BOT] Welcome message already sent to {channel.name}, skipping")
+            return
+        
+        # Отправляем сообщение
+        await channel.send(f"Подключено к {channel.name}. streamer IP: {fake_ip} | Используйте !help для списка команд")
+        
+        # Добавляем в список приветствованных
+        self._welcomed_channels.add(channel_name)
+```
+
+#### 2. Очистка при покидании (`part_channels`)
+```python
+async def part_channels(self, channels: List[str]):
+    # Очищаем список приветствованных каналов
+    for channel in channels:
+        channel_lower = channel.lower()
+        if channel_lower in self._welcomed_channels:
+            self._welcomed_channels.remove(channel_lower)
+    
+    await super().part_channels(channels)
+```
+
+#### 3. Очистка при отключении (`_disconnect_and_cleanup`)
+```python
+async def _disconnect_and_cleanup(self, channel_name: str, reason: str = "ban"):
+    # Очищаем список приветствованных каналов
+    channel_lower = channel_name.lower()
+    if channel_lower in self._welcomed_channels:
+        self._welcomed_channels.remove(channel_lower)
+    
+    # ... остальная логика cleanup
+```
+
+### 📊 Результат
+
+**Было (при hot reload):**
+```
+[10:03:34] payedviewer: Подключено к yourchy...
+[10:06:19] payedviewer: Подключено к yourchy...  ← Повторно!
+[10:08:45] payedviewer: Подключено к yourchy...  ← Повторно!
+```
+
+**Стало:**
+```
+[10:03:34] payedviewer: Подключено к yourchy...
+[10:06:19] 🔇 [BOT] Welcome message already sent, skipping
+[10:08:45] 🔇 [BOT] Welcome message already sent, skipping
+```
+
+### ✅ Защита работает:
+- ✅ При **hot reload** - сообщение не дублируется
+- ✅ При **первом подключении** - сообщение отправляется
+- ✅ При **переподключении** (part → join) - сообщение отправляется заново
+- ✅ При **ban/disconnect** - список очищается корректно
+
+### 📁 Измененные файлы
+- `bot_service/bots/twitch_bot.py` - добавлен механизм защиты от дубликатов
 
 ---
 
