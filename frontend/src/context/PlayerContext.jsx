@@ -271,47 +271,14 @@ export const PlayerProvider = ({ children }) => {
     const handlePlayerReady = (event) => {
         const player = event.target;
         setPlayerRef(player);
-        logger.debug('YouTube player ready');
+        logger.debug('✅ [YOUTUBE] Player ready - autoplay handled by iframe params');
         
-        // Пытаемся настроить плеер с множественными попытками
-        // Это помогает при работе через прокси или с блокировщиками рекламы
-        const setupPlayer = (attempt = 1) => {
-            if (attempt > 5) {
-                logger.warn('Failed to setup player after 5 attempts');
-                return;
-            }
-            
-            try {
-                // Просто пытаемся вызвать методы без проверок
-                // Если API не готов - try-catch перехватит
-                
-                // 1. Настраиваем громкость
-                if (player.setVolume) {
-                    player.setVolume(state.volume);
-                }
-                if (state.isMuted && player.mute) {
-                    player.mute();
-                } else if (!state.isMuted && player.unMute) {
-                    player.unMute();
-                }
-                
-                // 2. Загружаем видео если есть
-                if (state.currentVideo && player.loadVideoById) {
-                    player.loadVideoById({
-                        videoId: state.currentVideo.video_id,
-                        startSeconds: 0
-                    });
-                    logger.debug(`✅ [YOUTUBE] Player setup complete (attempt ${attempt})`);
-                }
-            } catch (error) {
-                // Если не получилось - пробуем еще раз через 1 сек
-                logger.debug(`Retry setup (attempt ${attempt}):`, error.message);
-                setTimeout(() => setupPlayer(attempt + 1), 1000);
-            }
-        };
-        
-        // Первая попытка через 1.5 сек
-        setTimeout(() => setupPlayer(), 1500);
+        // НЕ ВЫЗЫВАЕМ методы YouTube API напрямую!
+        // При работе через прокси/блокировщики они выбрасывают ошибки
+        // Полагаемся на:
+        // 1. autoplay: 1 в параметрах iframe (GlobalPlayer.jsx)
+        // 2. Автозапуск в handlePlayerStateChange при state=5 (cued)
+        // 3. Пользователь может вручную нажать Play если нужно
     };
 
     const handlePlayerStateChange = (event) => {
@@ -320,20 +287,24 @@ export const PlayerProvider = ({ children }) => {
         
         if (playerState === 1) { // Воспроизведение
             dispatch({ type: playerActions.SET_PLAYING, payload: true });
-            logger.debug('Video playing');
+            logger.debug('▶️ [YOUTUBE] Playing');
         } else if (playerState === 2) { // Пауза
             dispatch({ type: playerActions.SET_PLAYING, payload: false });
-            logger.debug('Video paused');
+            logger.debug('⏸️ [YOUTUBE] Paused');
         } else if (playerState === 0) { // Окончание видео
-            logger.debug('Video ended, switching to next');
+            logger.debug('⏭️ [YOUTUBE] Video ended, switching to next');
             nextVideo();
         } else if (playerState === 5) { // Видео загружено (cued)
             // Автоматически запускаем воспроизведение
+            // Обернуто в try-catch для работы с прокси/блокировщиками
             try {
-                player.playVideo();
-                logger.debug('▶️ [YOUTUBE] Auto-started playback (video cued)');
+                if (player && player.playVideo) {
+                    player.playVideo();
+                    logger.debug('▶️ [YOUTUBE] Auto-play triggered (video cued)');
+                }
             } catch (error) {
-                logger.debug('Could not auto-start:', error.message);
+                // Тихо игнорируем - пользователь может нажать Play вручную
+                logger.debug('Auto-play skipped:', error.message);
             }
         }
     };
