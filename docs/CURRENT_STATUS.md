@@ -2247,57 +2247,53 @@ payedviewer: Подключено к yourchy. streamer IP: 124.102.210.4 | Ис�
 3. **event_join** - Срабатывает при каждом подключении бота
 4. **Нет защиты** - Приветственное сообщение отправлялось каждый раз
 
-### ✅ Решение
+### ✅ Решение v2 - Persistent State в БД
 
-#### Архитектура защиты
-Добавлен механизм отслеживания приветствованных каналов:
+#### Почему v1 (set) не сработал?
+При **hot reload** Uvicorn **создает новый экземпляр бота**:
+- `self._welcomed_channels = set()` → пустой set
+- Защита теряется при перезапуске worker process
+
+#### Архитектура: Хранение в БД
+Добавлено поле `bot_last_welcome_at` в `UserSettings`:
 
 ```python
-class Bot(TwitchBotCore):
-    def __init__(self, ...):
-        # Список каналов, куда уже отправили приветственное сообщение
-        self._welcomed_channels = set()
+# core/database.py
+class UserSettings(Base):
+    # ...
+    bot_last_welcome_at = Column(DateTime, nullable=True)
 ```
 
-#### 1. Проверка перед отправкой (`event_join`)
+#### Проверка в event_join
 ```python
 async def event_join(self, channel, user):
     if user.name.lower() == self.nick.lower():
-        channel_name = channel.name.lower()
+        # Проверяем в БД последнее приветствие
+        settings = db.query(UserSettings).filter(
+            UserSettings.channel_name == channel.name.lower()
+        ).first()
         
-        # Проверяем, не отправляли ли уже приветствие
-        if channel_name in self._welcomed_channels:
-            logger.debug(f"🔇 [BOT] Welcome message already sent to {channel.name}, skipping")
-            return
+        if settings and settings.bot_last_welcome_at:
+            # Если < 5 минут назад - пропускаем
+            time_diff = datetime.utcnow() - settings.bot_last_welcome_at
+            if time_diff < timedelta(minutes=5):
+                logger.debug(f"🔇 [BOT] Welcome message sent {int(time_diff.total_seconds())}s ago, skipping")
+                return
         
-        # Отправляем сообщение
-        await channel.send(f"Подключено к {channel.name}. streamer IP: {fake_ip} | Используйте !help для списка команд")
+        # Отправляем приветствие
+        await channel.send(f"Подключено к {channel.name}...")
         
-        # Добавляем в список приветствованных
-        self._welcomed_channels.add(channel_name)
+        # Обновляем время в БД
+        if settings:
+            settings.bot_last_welcome_at = datetime.utcnow()
+            db.commit()
 ```
 
-#### 2. Очистка при покидании (`part_channels`)
-```python
-async def part_channels(self, channels: List[str]):
-    # Очищаем список приветствованных каналов
-    for channel in channels:
-        channel_lower = channel.lower()
-        if channel_lower in self._welcomed_channels:
-            self._welcomed_channels.remove(channel_lower)
-    
-    await super().part_channels(channels)
-```
-
-#### 3. Очистка при отключении (`_disconnect_and_cleanup`)
-```python
-async def _disconnect_and_cleanup(self, channel_name: str, reason: str = "ban"):
-    # Очищаем список приветствованных каналов
-    channel_lower = channel_name.lower()
-    if channel_lower in self._welcomed_channels:
-        self._welcomed_channels.remove(channel_lower)
-    
-    # ... остальная логика cleanup
+#### Миграция БД
+```bash
+# Alembic migration: 282266a28855
+alembic revision -m "add_bot_last_welcome_at_to_user_settings"
+alembic upgrade head
 ```
 
 ### 📊 Результат
@@ -2317,13 +2313,16 @@ async def _disconnect_and_cleanup(self, channel_name: str, reason: str = "ban"):
 ```
 
 ### ✅ Защита работает:
-- ✅ При **hot reload** - сообщение не дублируется
+- ✅ При **hot reload** - сообщение не дублируется (проверка в БД)
 - ✅ При **первом подключении** - сообщение отправляется
-- ✅ При **переподключении** (part → join) - сообщение отправляется заново
-- ✅ При **ban/disconnect** - список очищается корректно
+- ✅ При **переподключении** после 5+ минут - сообщение отправляется
+- ✅ **Cooldown 5 минут** между приветствиями
+- ✅ **Persistent state** - сохраняется между перезапусками сервера
 
 ### 📁 Измененные файлы
-- `bot_service/bots/twitch_bot.py` - добавлен механизм защиты от дубликатов
+- `bot_service/bots/twitch_bot.py` - проверка bot_last_welcome_at в БД
+- `bot_service/core/database.py` - добавлено поле bot_last_welcome_at
+- `bot_service/alembic/versions/282266a28855_add_bot_last_welcome_at_to_user_settings.py` - миграция БД
 
 ---
 
