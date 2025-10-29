@@ -273,39 +273,45 @@ export const PlayerProvider = ({ children }) => {
         setPlayerRef(player);
         logger.debug('YouTube player ready');
         
-        // Настраиваем громкость И запускаем воспроизведение через 2 секунды
-        // Это дает YouTube API время полностью инициализироваться
-        setTimeout(() => {
+        // Пытаемся настроить плеер с множественными попытками
+        // Это помогает при работе через прокси или с блокировщиками рекламы
+        const setupPlayer = (attempt = 1) => {
+            if (attempt > 5) {
+                logger.warn('Failed to setup player after 5 attempts');
+                return;
+            }
+            
             try {
-                // Проверяем что плеер полностью инициализирован
-                if (player && typeof player.getPlayerState === 'function') {
-                    const playerState = player.getPlayerState();
-                    
-                    // Плеер готов если состояние не undefined
-                    if (playerState !== undefined) {
-                        // 1. Сначала настраиваем громкость
-                        player.setVolume(state.volume);
-                        if (state.isMuted) {
-                            player.mute();
-                        } else {
-                            player.unMute();
-                        }
-                        logger.debug(`✅ [YOUTUBE] Volume set to ${state.volume}, muted: ${state.isMuted}`);
-                        
-                        // 2. Загружаем видео если есть
-                        if (state.currentVideo) {
-                            player.loadVideoById({
-                                videoId: state.currentVideo.video_id,
-                                startSeconds: 0
-                            });
-                            logger.debug(`▶️ [YOUTUBE] Loading video: ${state.currentVideo.video_id}`);
-                        }
-                    }
+                // Просто пытаемся вызвать методы без проверок
+                // Если API не готов - try-catch перехватит
+                
+                // 1. Настраиваем громкость
+                if (player.setVolume) {
+                    player.setVolume(state.volume);
+                }
+                if (state.isMuted && player.mute) {
+                    player.mute();
+                } else if (!state.isMuted && player.unMute) {
+                    player.unMute();
+                }
+                
+                // 2. Загружаем видео если есть
+                if (state.currentVideo && player.loadVideoById) {
+                    player.loadVideoById({
+                        videoId: state.currentVideo.video_id,
+                        startSeconds: 0
+                    });
+                    logger.debug(`✅ [YOUTUBE] Player setup complete (attempt ${attempt})`);
                 }
             } catch (error) {
-                logger.debug('Player setup skipped (not ready):', error.message);
+                // Если не получилось - пробуем еще раз через 1 сек
+                logger.debug(`Retry setup (attempt ${attempt}):`, error.message);
+                setTimeout(() => setupPlayer(attempt + 1), 1000);
             }
-        }, 2000); // 2 секунды для полной инициализации
+        };
+        
+        // Первая попытка через 1.5 сек
+        setTimeout(() => setupPlayer(), 1500);
     };
 
     const handlePlayerStateChange = (event) => {
