@@ -1285,15 +1285,26 @@ class UniversalCommandHandler:
                 if core_name in commands_by_name:
                     featured_commands.append(commands_by_name[core_name])
             
-            # Формируем список команд с описаниями
+            # Определяем название команды voice (может быть переименована пользователем)
+            voice_cmd_name = 'voice'  # Дефолтное значение
+            if 'voice' in commands_by_name:
+                voice_cmd_name = commands_by_name['voice'].command_name
+            
+            # Формируем список команд
             cmd_list = []
             for cmd in featured_commands:
-                # Формат: !имя - описание
                 cmd_list.append(f"!{cmd.command_name}")
             
             if cmd_list:
+                # Основной список команд
                 commands_text = ", ".join(cmd_list)
                 await ctx.send(f"📋 Основные команды: {commands_text}")
+                
+                # Детальное описание для !voice
+                await ctx.send(f"🎤 !{voice_cmd_name} <имя> - выбрать голос TTS. Примеры: !{voice_cmd_name} Алёна, !{voice_cmd_name} Дмитрий, !{voice_cmd_name} random (случайный)")
+                
+                # Информация как включить TTS
+                await ctx.send(f"🔊 Озвучка включается в дашборде (yourchy.site) → TTS → выбрать платформу Twitch/VK → включить тумблер. Громкость: !ttsvolume <0-100>")
             else:
                 await ctx.send(f"@{ctx.author.name} ℹ️ Команды не найдены")
             
@@ -1349,15 +1360,28 @@ class UniversalCommandHandler:
                 if core_name in commands_by_name:
                     featured_commands.append(commands_by_name[core_name])
             
-            # Формируем список команд с описаниями
+            # Определяем название команды voice (может быть переименована пользователем)
+            voice_cmd_name = 'voice'  # Дефолтное значение
+            if 'voice' in commands_by_name:
+                voice_cmd_name = commands_by_name['voice'].command_name
+            
+            # Формируем список команд
             cmd_list = []
             for cmd in featured_commands:
-                # Формат: !имя - описание
                 cmd_list.append(f"!{cmd.command_name}")
             
             if cmd_list:
+                # Основной список команд
                 commands_text = ", ".join(cmd_list)
                 await vk_bot.send_message(channel_name, f"📋 Основные команды: {commands_text}")
+                
+                # Детальное описание для !voice
+                await vk_bot.send_message(channel_name, 
+                    f"🎤 !{voice_cmd_name} <имя> - выбрать голос TTS. Примеры: !{voice_cmd_name} Алёна, !{voice_cmd_name} Дмитрий, !{voice_cmd_name} random (случайный)")
+                
+                # Информация как включить TTS
+                await vk_bot.send_message(channel_name, 
+                    f"🔊 Озвучка включается в дашборде (yourchy.site) → TTS → выбрать платформу Twitch/VK → включить тумблер. Громкость: !ttsvolume <0-100>")
             else:
                 await vk_bot.send_message(channel_name, f"@{author_name} ℹ️ Команды не найдены")
             
