@@ -140,7 +140,7 @@ export const PlayerProvider = ({ children }) => {
                 }
             });
             
-            logger.debug('Queue loaded:', data);
+            logger.debug('🔍 [YOUTUBE] Queue loaded:', data);
         } catch (error) {
             logger.error('Error loading queue:', error);
             

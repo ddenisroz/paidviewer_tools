@@ -116,15 +116,25 @@ async def add_video_to_queue(
         logger.error(f"Error adding video to queue via API: {e}")
         raise HTTPException(status_code=500, detail="Ошибка добавления видео")
 
-@youtube_router.get("/queue", response_model=List[QueueResponse])
+@youtube_router.get("/queue")
 async def get_queue(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получение очереди видео"""
+    """Получение очереди видео с текущим воспроизводящимся видео"""
     try:
         queue_items = queue_service.get_queue(user["id"], db)
-        return queue_items
+        
+        # Текущее видео - первое в очереди (все уже отфильтрованы по status='pending')
+        current_video = queue_items[0] if queue_items and len(queue_items) > 0 else None
+        
+        logger.debug(f"📺 [Queue] User {user['id']}: {len(queue_items)} videos, current: {current_video['title'] if current_video else 'None'}")
+        
+        return {
+            "queue": queue_items,
+            "current_video": current_video,
+            "is_playing": current_video is not None
+        }
         
     except Exception as e:
         logger.error(f"Error getting queue via API: {e}")
