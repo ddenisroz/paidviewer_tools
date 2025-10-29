@@ -188,6 +188,21 @@ async def handle_tts_for_message(
             logger.warning(f"⛔ User {username} is blocked from TTS in {platform} channel {channel_identifier}")
             return {"success": False, "error": "User is blocked from TTS"}
         
+        # Проверяем заблокированных ботов (Nightbot, StreamElements, наш бот и т.д.)
+        from core.database import SessionLocal, User, UserToken, BlockedBot
+        from sqlalchemy import func
+        db_blocked = SessionLocal()
+        try:
+            is_blocked_bot = db_blocked.query(BlockedBot).filter(
+                func.lower(BlockedBot.bot_name) == username.lower()
+            ).first()
+            
+            if is_blocked_bot:
+                logger.debug(f"🤖 Bot {username} is in blocked list, skipping TTS")
+                return {"success": False, "error": "Bot is blocked from TTS"}
+        finally:
+            db_blocked.close()
+        
         # Получаем настройки пользователя для канала
         from core.database import SessionLocal, User, UserToken
         db = SessionLocal()

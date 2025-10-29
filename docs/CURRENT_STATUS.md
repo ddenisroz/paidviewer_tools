@@ -1,6 +1,6 @@
 # 📊 Текущий статус проекта TTS_TTV_0.02
 
-**Последнее обновление:** 29 октября 2025 (Session 22: YouTube Proxy Fix & UX Improvements)
+**Последнее обновление:** 29 октября 2025 (Session 23: Blocked Bots Fix)
 **Версия:** 0.02  
 **Статус:** Production Ready - готовность к деплою 100% ✅
 
@@ -2947,6 +2947,211 @@ const AnalyticsPage = () => {
 ✅ **Команда !help показывает только основные команды**  
 ✅ **Страница Аналитики заменена на заглушку**  
 ✅ **UX улучшен - нет визуального мусора и ошибок**
+
+---
+
+## 🤖 Session 23: Blocked Bots Fix (29.10.2025)
+
+### 🎯 Цель:
+Исправить критический баг: таблица `blocked_bots` существовала в БД, но **нигде не использовалась** для фильтрации TTS. В результате **наш бот и другие сервисные боты озвучивались** через TTS, создавая спам.
+
+### 🐛 Обнаруженная проблема:
+
+**Пользователь спросил:** "можешь сказать за что отвечает таблица blocked_bots в базе данных?"
+
+**При анализе выяснилось:**
+- ✅ Таблица `blocked_bots` существует в БД (`bot_service/core/database.py`)
+- ✅ Admin API для управления списком работает (`bot_service/services/admin_service.py`)
+- ✅ Константа `DEFAULT_BLOCKED_BOTS` определена (`bot_service/constants.py`)
+- ❌ **НО! Проверка на заблокированных ботов НИГДЕ НЕ ИСПОЛЬЗУЕТСЯ в TTS**
+- ❌ **Наш бот `payedviewer` озвучивался через TTS!**
+
+```python
+# bot_service/utils/websocket_helper.py
+# ДО: проверка на blocked_bots ОТСУТСТВОВАЛА ❌
+# Сообщения от payedviewer, nightbot, streamelements ОЗВУЧИВАЛИСЬ!
+```
+
+### 🔧 Реализованные исправления:
+
+#### 1. Добавлена проверка в TTS Pipeline
+
+**Файл:** `bot_service/utils/websocket_helper.py`
+
+```python
+async def handle_tts_for_message(...):
+    # Проверяем блокировку пользователя
+    from api.moderation_api import is_user_blocked_from_tts
+    if is_user_blocked_from_tts(channel_identifier, platform, username.lower()):
+        logger.warning(f"⛔ User {username} is blocked from TTS")
+        return {"success": False, "error": "User is blocked from TTS"}
+    
+    # ✅ НОВОЕ: Проверяем заблокированных ботов
+    from core.database import SessionLocal, BlockedBot
+    from sqlalchemy import func
+    db_blocked = SessionLocal()
+    try:
+        is_blocked_bot = db_blocked.query(BlockedBot).filter(
+            func.lower(BlockedBot.bot_name) == username.lower()
+        ).first()
+        
+        if is_blocked_bot:
+            logger.debug(f"🤖 Bot {username} is in blocked list, skipping TTS")
+            return {"success": False, "error": "Bot is blocked from TTS"}
+    finally:
+        db_blocked.close()
+    
+    # Продолжаем обработку TTS для обычных пользователей...
+```
+
+**Особенности:**
+- ✅ **Case-insensitive** проверка (`func.lower()`)
+- ✅ **Отдельная сессия БД** для изоляции
+- ✅ **Debug логирование** (не спамит консоль)
+- ✅ **Раннее прерывание** - экономит ресурсы
+
+#### 2. Создан скрипт инициализации
+
+**Файл:** `bot_service/scripts/init_blocked_bots.py`
+
+```python
+def init_blocked_bots():
+    """Инициализация списка заблокированных ботов"""
+    bots_to_block = [
+        "payedviewer",      # ⭐ НАШ БОТ
+        "streamelements",   # Алерты
+        "nightbot",         # Модерация
+        "streamlabs",       # Донаты
+        "moobot",           # Модерация
+        "fossabot",         # Модерация
+        "wizebot",          # Модерация
+        "chatbot",          # VK Live системный бот
+        # ... и еще 11 популярных ботов
+    ]
+    
+    for bot_name in bots_to_block:
+        # Проверяем дубликаты
+        # Добавляем в БД
+        # ...
+```
+
+**Результат выполнения:**
+```bash
+python bot_service/scripts/init_blocked_bots.py
+
+✅ Blocked bots initialization complete!
+   Added: 9
+   Skipped (already exists): 10
+   Total blocked bots: 19
+
+📋 Current blocked bots list:
+   🤖 ankhbot
+   🤖 botrix
+   🤖 chatbot (VK Live)
+   ⭐ payedviewer (НАШ БОТ)
+   🤖 nightbot
+   🤖 streamelements
+   ... (всего 19 ботов)
+```
+
+#### 3. Создана документация
+
+**Файл:** `bot_service/BLOCKED_BOTS_SYSTEM.md`
+
+Подробная документация о системе блокировки ботов:
+- 📋 Назначение и структура БД
+- 🤖 Список всех заблокированных ботов
+- ⚙️ Как работает проверка
+- 🛠️ Admin API для управления
+- 🔍 Логирование
+- 📊 Статистика
+
+### 📊 Заблокированные боты (19 штук):
+
+#### ⭐ Наш бот:
+- **payedviewer** - основной бот приложения
+
+#### 📺 Twitch боты (15 шт):
+- streamelements, nightbot, streamlabs, moobot
+- fossabot, wizebot, botrix, coebot
+- ankhbot, deepbot, xanbot, vivbot
+- ohbot, scorpstradamus, twirapp
+
+#### 🎥 VK Live боты (2 шт):
+- chatbot (системный бот VK Live для наград)
+- sery_bot (модерация)
+
+### 🔍 Порядок проверок TTS (обновленный):
+
+```
+1. ✅ TTS включен для канала?
+2. ✅ TTS режим (все / за баллы)?
+3. ✅ Пользователь заблокирован? (TTSBlockedUser)
+4. ✅ Бот заблокирован? (BlockedBot) ⬅️ НОВОЕ
+5. ✅ Настройки фильтров (emoji, ответы)
+6. ✅ → Отправка на озвучивание
+```
+
+### 📂 Измененные файлы:
+
+1. **`bot_service/utils/websocket_helper.py`**
+   - Добавлена проверка `BlockedBot` перед TTS
+   - Case-insensitive фильтрация
+   
+2. **`bot_service/scripts/init_blocked_bots.py`** (новый)
+   - Инициализация списка ботов
+   - Добавление 19 популярных ботов
+   
+3. **`bot_service/BLOCKED_BOTS_SYSTEM.md`** (новый)
+   - Полная документация системы
+   
+4. **`docs/CURRENT_STATUS.md`**
+   - Обновлена секция текущего статуса
+
+### 📈 Результаты:
+
+| Аспект | До | После |
+|--------|----|----|
+| Таблица `blocked_bots` | ⚠️ Существует, но не используется | ✅ Активно используется |
+| Наш бот озвучивается? | ❌ **ДА** (спам!) | ✅ **НЕТ** |
+| StreamElements/Nightbot озвучиваются? | ❌ **ДА** (спам!) | ✅ **НЕТ** |
+| VK ChatBot озвучивается? | ❌ **ДА** (награды спамят) | ✅ **НЕТ** |
+| Количество заблокированных ботов | 10 (в таблице) | 19 (активно фильтруется) |
+| Admin API работает? | ✅ Да (но бесполезно) | ✅ Да + реально фильтрует |
+| Case-sensitivity | - | ✅ Case-insensitive |
+
+### 🎯 Важные детали:
+
+1. **Автоматическое определение имени бота**
+   - Имя бота (payedviewer) извлекается из `TWITCH_BOT_TOKEN`
+   - Логи: `[INFO] Bot logged in as: payedviewer`
+   
+2. **Проверка case-insensitive**
+   ```python
+   func.lower(BlockedBot.bot_name) == username.lower()
+   # PAYEDVIEWER = payedviewer = PayedViewer
+   ```
+
+3. **VK ChatBot**
+   - Системный бот VK Live для уведомлений о наградах
+   - Раньше его сообщения `"получает награду: TTS за 500"` озвучивались
+   - Теперь заблокирован
+
+4. **Управление через Admin API**
+   ```bash
+   POST   /api/admin/blocked-bots        # Добавить бота
+   DELETE /api/admin/blocked-bots/{name} # Удалить бота
+   GET    /api/admin/blocked-bots        # Список ботов
+   ```
+
+### ✅ Статус:
+
+✅ **Таблица `blocked_bots` теперь используется для фильтрации TTS**  
+✅ **Наш бот `payedviewer` НЕ озвучивается**  
+✅ **19 популярных ботов заблокированы**  
+✅ **VK ChatBot не спамит наградами**  
+✅ **Admin API полностью функционален**  
+✅ **Документация создана**
 
 ---
 
