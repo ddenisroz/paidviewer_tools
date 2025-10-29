@@ -156,7 +156,7 @@ const ChatWindow = () => {
                                     borderRadius: '6px',
                                     wordBreak: 'break-word',
                                     display: 'flex',
-                                    alignItems: 'center',
+                                    alignItems: 'baseline',
                                     gap: '6px',
                                     flexWrap: 'wrap'
                                 }}
