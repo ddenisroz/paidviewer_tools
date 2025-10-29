@@ -273,37 +273,17 @@ export const PlayerProvider = ({ children }) => {
         setPlayerRef(player);
         logger.debug('YouTube player ready');
         
-        // Пытаемся запустить воспроизведение
-        if (state.currentVideo) {
-            try {
-                // Загружаем и сразу запускаем видео
-                player.loadVideoById({
-                    videoId: state.currentVideo.video_id,
-                    startSeconds: 0
-                });
-                
-                // Даем время на загрузку метаданных, затем запускаем
-                setTimeout(() => {
-                    try {
-                        player.playVideo();
-                        logger.debug('▶️ [YOUTUBE] Started playback via playVideo()');
-                    } catch (e) {
-                        logger.warn('Could not start playback:', e.message);
-                    }
-                }, 500);
-            } catch (error) {
-                logger.warn('Error loading video:', error);
-            }
-        }
-        
-        // Настраиваем громкость с надежной проверкой
+        // Настраиваем громкость И запускаем воспроизведение через 2 секунды
+        // Это дает YouTube API время полностью инициализироваться
         setTimeout(() => {
             try {
                 // Проверяем что плеер полностью инициализирован
                 if (player && typeof player.getPlayerState === 'function') {
                     const playerState = player.getPlayerState();
+                    
                     // Плеер готов если состояние не undefined
                     if (playerState !== undefined) {
+                        // 1. Сначала настраиваем громкость
                         player.setVolume(state.volume);
                         if (state.isMuted) {
                             player.mute();
@@ -311,17 +291,26 @@ export const PlayerProvider = ({ children }) => {
                             player.unMute();
                         }
                         logger.debug(`✅ [YOUTUBE] Volume set to ${state.volume}, muted: ${state.isMuted}`);
+                        
+                        // 2. Загружаем видео если есть
+                        if (state.currentVideo) {
+                            player.loadVideoById({
+                                videoId: state.currentVideo.video_id,
+                                startSeconds: 0
+                            });
+                            logger.debug(`▶️ [YOUTUBE] Loading video: ${state.currentVideo.video_id}`);
+                        }
                     }
                 }
             } catch (error) {
-                // Тихо игнорируем ошибки установки громкости - не критично
-                logger.debug('Volume setup skipped (player not ready):', error.message);
+                logger.debug('Player setup skipped (not ready):', error.message);
             }
-        }, 1500); // Увеличили задержку до 1.5 сек
+        }, 2000); // 2 секунды для полной инициализации
     };
 
     const handlePlayerStateChange = (event) => {
         const playerState = event.data;
+        const player = event.target;
         
         if (playerState === 1) { // Воспроизведение
             dispatch({ type: playerActions.SET_PLAYING, payload: true });
@@ -332,6 +321,14 @@ export const PlayerProvider = ({ children }) => {
         } else if (playerState === 0) { // Окончание видео
             logger.debug('Video ended, switching to next');
             nextVideo();
+        } else if (playerState === 5) { // Видео загружено (cued)
+            // Автоматически запускаем воспроизведение
+            try {
+                player.playVideo();
+                logger.debug('▶️ [YOUTUBE] Auto-started playback (video cued)');
+            } catch (error) {
+                logger.debug('Could not auto-start:', error.message);
+            }
         }
     };
 
