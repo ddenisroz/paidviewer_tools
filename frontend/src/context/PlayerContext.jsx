@@ -273,23 +273,51 @@ export const PlayerProvider = ({ children }) => {
         setPlayerRef(player);
         logger.debug('YouTube player ready');
         
+        // Пытаемся запустить воспроизведение
         if (state.currentVideo) {
-            player.loadVideoById(state.currentVideo.video_id);
+            try {
+                // Загружаем и сразу запускаем видео
+                player.loadVideoById({
+                    videoId: state.currentVideo.video_id,
+                    startSeconds: 0
+                });
+                
+                // Даем время на загрузку метаданных, затем запускаем
+                setTimeout(() => {
+                    try {
+                        player.playVideo();
+                        logger.debug('▶️ [YOUTUBE] Started playback via playVideo()');
+                    } catch (e) {
+                        logger.warn('Could not start playback:', e.message);
+                    }
+                }, 500);
+            } catch (error) {
+                logger.warn('Error loading video:', error);
+            }
         }
         
-        // Настраиваем громкость
+        // Настраиваем громкость с надежной проверкой
         setTimeout(() => {
-            if (player) {
-                try {
-                    player.setVolume(state.volume);
-                    if (state.isMuted) {
-                        player.mute();
+            try {
+                // Проверяем что плеер полностью инициализирован
+                if (player && typeof player.getPlayerState === 'function') {
+                    const playerState = player.getPlayerState();
+                    // Плеер готов если состояние не undefined
+                    if (playerState !== undefined) {
+                        player.setVolume(state.volume);
+                        if (state.isMuted) {
+                            player.mute();
+                        } else {
+                            player.unMute();
+                        }
+                        logger.debug(`✅ [YOUTUBE] Volume set to ${state.volume}, muted: ${state.isMuted}`);
                     }
-                } catch (error) {
-                    logger.warn('Error setting initial volume:', error);
                 }
+            } catch (error) {
+                // Тихо игнорируем ошибки установки громкости - не критично
+                logger.debug('Volume setup skipped (player not ready):', error.message);
             }
-        }, 1000);
+        }, 1500); // Увеличили задержку до 1.5 сек
     };
 
     const handlePlayerStateChange = (event) => {
