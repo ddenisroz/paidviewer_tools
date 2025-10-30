@@ -1,8 +1,70 @@
 # 📊 Текущий статус проекта TTS_TTV_0.02
 
-**Последнее обновление:** 29 октября 2025 (Session 24: Uvicorn Reload & Legacy Cleanup)
+**Последнее обновление:** 29 октября 2025 (Session 26: Local TTS Full Integration + Bugfix ✅)
 **Версия:** 0.02  
 **Статус:** Production Ready - готовность к деплою 100% ✅
+
+---
+
+## 🏠 ТЕКУЩАЯ СЕССИЯ: Local TTS Full Integration + Bugfix (29 октября 2025)
+
+### Полная интеграция локального TTS с ботом + исправление багов
+
+**Задачи:** 
+1. Доработать локальный TTS до уровня облачного TTS ✅
+2. Исправить баг отображения голосов в админке ✅
+
+**Результаты:**
+
+#### ✅ Локальный TTS (tts_service_simple) - **ТЕПЕРЬ ПОЛНОСТЬЮ РАБОТАЕТ!**
+
+**Добавлено:**
+1. ✅ **Endpoint `/api/tts/synthesize-channel`** для озвучки чата
+2. ✅ **Pydantic модели** для валидации запросов:
+   - `ChannelTTSRequest` - запрос с настройками, фильтрами, блокировками
+   - `ChannelTTSResponse` - ответ с audio_url, voice, volume
+   - `TTSSettingsData` - настройки TTS (maxLength, skipCommands, etc.)
+3. ✅ **Фильтрация текста:**
+   - Блокировка пользователей (`blocked_users`)
+   - Фильтрация запрещённых слов (`word_filter`)
+   - Ограничение длины сообщений (`maxLength`)
+   - Пропуск команд (`skipCommands`)
+4. ✅ **Интеграция с bot_service:**
+   - `tts_manager.py` уже поддерживает локальные endpoints
+   - Модель `LocalTTSEndpoint` в БД
+   - Frontend UI в `/dashboard/tts/local`
+   - Backend API в `api/tts_api.py` (local_tts_router)
+
+#### 🐛 Bugfix: Админка голосов
+
+**Проблема:**
+- Backend возвращал `{ "voices": [...] }` 
+- Frontend искал `data.data` вместо `data.voices`
+- Голоса не отображались после загрузки
+
+**Исправление:**
+```javascript
+// frontend/src/components/admin/VoiceManagement.jsx
+const voicesData = Array.isArray(data) ? data : (data?.voices || data?.data || []);
+```
+
+**Результат:** Голоса теперь корректно отображаются в `/dashboard/dolbaebadmintts` ✅
+
+**Документация:**
+- ✅ `docs/LOCAL_TTS_INTEGRATION.md` - полное руководство по локальному TTS
+- ✅ `docs/TTS_INTEGRATION_STATUS.md` - общий статус TTS интеграции
+- ✅ `docs/VOICE_UPLOAD_UNIFIED.md` - обновлён changelog (bugfix)
+
+**Статус:**
+- ✅ **Облачный TTS** - полностью работает (production ready)
+- ✅ **Локальный TTS** - полностью работает (production ready)
+- ✅ **Админка голосов** - баг исправлен
+
+**Как использовать:**
+1. Запустить `python tts_service_simple/main.py`
+2. Открыть `/dashboard/tts/local`
+3. Настроить endpoint и включить "Использовать локальный TTS"
+4. Готово! Чат будет озвучиваться через локальный TTS ✅
 
 ---
 

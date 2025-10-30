@@ -22,9 +22,10 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/ca
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
+import { Textarea } from '../../components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Badge } from '../../components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '../../components/ui/dialog';
 import { toast } from 'sonner';
 import { botService } from '../../services/microservices';
 import axios from 'axios';
@@ -196,28 +197,57 @@ const LocalTTSSettingsPage = () => {
         }
     };
 
-    const uploadSample = async (voiceId, file, sampleText) => {
+    const [sampleDialogOpen, setSampleDialogOpen] = useState(false);
+    const [currentSampleVoiceId, setCurrentSampleVoiceId] = useState(null);
+    const [sampleText, setSampleText] = useState('');
+    const [sampleFile, setSampleFile] = useState(null);
+    const [isTranscribing, setIsTranscribing] = useState(false);
+
+    const uploadSample = async (voiceId, file, text) => {
         try {
             setUploadingFile(true);
             const formData = new FormData();
             formData.append('file', file);
-            if (sampleText) {
-                formData.append('sample_text', sampleText);
+            if (text) {
+                formData.append('sample_text', text);
             }
 
-            await axios.post(
+            const response = await axios.post(
                 `${config.endpoint_url}/api/voices/${voiceId}/upload`,
                 formData
             );
 
-            toast.success('✅ Сэмпл загружен');
+            toast.success(
+                response.data.transcription 
+                    ? '✅ Сэмпл загружен и транскрибирован'
+                    : '✅ Сэмпл загружен'
+            );
+            
             loadVoices();
+            setSampleDialogOpen(false);
+            setSampleText('');
+            setSampleFile(null);
         } catch (error) {
             console.error('Error uploading sample:', error);
             toast.error(error.response?.data?.detail || 'Ошибка загрузки сэмпла');
         } finally {
             setUploadingFile(false);
         }
+    };
+
+    const openSampleDialog = (voiceId) => {
+        setCurrentSampleVoiceId(voiceId);
+        setSampleText('');
+        setSampleFile(null);
+        setSampleDialogOpen(true);
+    };
+
+    const handleSampleUpload = () => {
+        if (!sampleFile) {
+            toast.error('Выберите файл');
+            return;
+        }
+        uploadSample(currentSampleVoiceId, sampleFile, sampleText);
     };
 
     const deleteVoice = async (voiceId) => {
@@ -684,24 +714,15 @@ const LocalTTSSettingsPage = () => {
                                                                 Сэмплов: {voice.samples_count || 0}
                                                             </span>
                                                         </div>
-                                                        <div className="space-y-2">
-                                                            <Label className="text-xs">Загрузить аудио сэмпл</Label>
-                                                            <Input
-                                                                type="file"
-                                                                accept=".wav,.mp3,.flac"
-                                                                onChange={(e) => {
-                                                                    const file = e.target.files?.[0];
-                                                                    if (file) {
-                                                                        uploadSample(voice.id, file);
-                                                                    }
-                                                                }}
-                                                                disabled={uploadingFile}
-                                                                className="text-sm"
-                                                            />
-                                                            <p className="text-xs text-muted-foreground">
-                                                                WAV, MP3, FLAC (3-10 сек, рекомендуется 5+ сэмплов)
-                                                            </p>
-                                                        </div>
+                                                        <Button
+                                                            onClick={() => openSampleDialog(voice.id)}
+                                                            variant="outline"
+                                                            className="w-full"
+                                                            disabled={uploadingFile}
+                                                        >
+                                                            <Upload className="h-4 w-4 mr-2" />
+                                                            Загрузить сэмпл
+                                                        </Button>
                                                     </>
                                                 )}
                                                 {voice.type === 'base' && (
@@ -735,6 +756,74 @@ const LocalTTSSettingsPage = () => {
                     </Card>
                 </TabsContent>
             </Tabs>
+
+            {/* Диалог настройки сэмпла */}
+            <Dialog open={sampleDialogOpen} onOpenChange={setSampleDialogOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Загрузить аудио сэмпл</DialogTitle>
+                        <DialogDescription>
+                            Загрузите аудио файл с референсным текстом для клонирования голоса
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div>
+                            <Label htmlFor="sample-text">Референсный текст (опционально)</Label>
+                            <Textarea
+                                id="sample-text"
+                                value={sampleText}
+                                onChange={(e) => setSampleText(e.target.value)}
+                                placeholder="Что произносится в аудио? (если не указать, будет автотранскрибировано)"
+                                className="mt-1"
+                                rows={3}
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                                💡 Если оставить пустым, текст будет извлечён автоматически через Whisper
+                            </p>
+                        </div>
+
+                        <div>
+                            <Label>Аудио файл</Label>
+                            <Input
+                                type="file"
+                                accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,.wma,.aiff,.au"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                        setSampleFile(file);
+                                    }
+                                }}
+                                className="mt-1"
+                            />
+                            {sampleFile && (
+                                <p className="text-xs text-green-400 mt-1">
+                                    ✓ Выбран: {sampleFile.name}
+                                </p>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Поддерживаемые форматы: WAV, MP3, FLAC, OGG, M4A, AAC, WMA, AIFF, AU
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                                Будет автоматически конвертировано в WAV 48kHz Mono 16-bit
+                            </p>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setSampleDialogOpen(false)}
+                        >
+                            Отмена
+                        </Button>
+                        <Button
+                            onClick={handleSampleUpload}
+                            disabled={!sampleFile || uploadingFile}
+                        >
+                            {uploadingFile ? 'Загрузка...' : 'Загрузить'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

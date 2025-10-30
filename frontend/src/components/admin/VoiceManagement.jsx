@@ -72,8 +72,9 @@ const VoiceManagement = () => {
             setLoading(true);
             const data = await getAdminVoices();
             // Убеждаемся, что data является массивом
-            const voicesData = Array.isArray(data) ? data : (data?.data || []);
+            const voicesData = Array.isArray(data) ? data : (data?.voices || data?.data || []);
             setVoices(voicesData);
+            console.log('✅ Loaded voices:', voicesData);
         } catch (error) {
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось загрузить голоса.' });
             console.error('Error loading voices:', error);

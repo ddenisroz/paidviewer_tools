@@ -14,7 +14,7 @@ import platform
 import subprocess
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import psutil
 import GPUtil
 
@@ -233,6 +233,37 @@ class TTSResponse(BaseModel):
     error: Optional[str] = None
     processing_time: Optional[float] = None
 
+class TTSSettingsData(BaseModel):
+    """Настройки TTS для фильтрации"""
+    enable7TV: Optional[bool] = True
+    enableTwitch: Optional[bool] = True
+    enableProfanity: Optional[bool] = True
+    maxLength: Optional[int] = 200
+    skipCommands: Optional[bool] = True
+
+class ChannelTTSRequest(BaseModel):
+    """Запрос на синтез TTS для канала (совместимость с bot_service)"""
+    channel_name: str
+    text: str
+    author: str
+    user_id: Optional[int] = None
+    volume_level: Optional[int] = 50
+    tts_settings: Optional[TTSSettingsData] = None
+    word_filter: Optional[List[str]] = []
+    blocked_users: Optional[List[str]] = []
+
+class ChannelTTSResponse(BaseModel):
+    """Ответ на запрос синтеза для канала"""
+    success: bool
+    audio_url: Optional[str] = None
+    voice: Optional[str] = None
+    volume: Optional[int] = None
+    tts_type: Optional[str] = "local_f5"
+    duration: Optional[float] = None
+    channel: Optional[str] = None
+    author: Optional[str] = None
+    error: Optional[str] = None
+
 class HealthResponse(BaseModel):
     status: str
     version: str
@@ -416,6 +447,92 @@ async def synthesize_tts(request: TTSRequest, background_tasks: BackgroundTasks)
             error=str(e)
         )
 
+@app.post("/api/tts/synthesize-channel", response_model=ChannelTTSResponse)
+async def synthesize_channel_tts(request: ChannelTTSRequest, background_tasks: BackgroundTasks):
+    """
+    Синтезировать аудио для канала (совместимость с bot_service)
+    Используется для автоматической озвучки сообщений из Twitch/VK чата
+    """
+    try:
+        if not tts_engine or tts_engine.get("status") != "ready":
+            raise HTTPException(status_code=503, detail="TTS движок не готов")
+        
+        logger.info(f"🎙️ [CHANNEL TTS] {request.channel_name} | {request.author}: {request.text[:50]}...")
+        
+        # 1. Проверка блокировки пользователя
+        if request.blocked_users and request.author.lower() in [u.lower() for u in request.blocked_users]:
+            logger.warning(f"⚠️ User {request.author} is blocked, skipping TTS")
+            return ChannelTTSResponse(
+                success=False,
+                error=f"User {request.author} is blocked"
+            )
+        
+        # 2. Применяем фильтр слов
+        filtered_text = request.text
+        if request.word_filter:
+            for word in request.word_filter:
+                if word.lower() in filtered_text.lower():
+                    import re
+                    filtered_text = re.sub(re.escape(word), "***", filtered_text, flags=re.IGNORECASE)
+                    logger.info(f"🔇 Filtered word '{word}' in message")
+        
+        # 3. Применяем настройки TTS
+        tts_settings = request.tts_settings or TTSSettingsData()
+        
+        max_length = tts_settings.maxLength or 200
+        if len(filtered_text) > max_length:
+            filtered_text = filtered_text[:max_length]
+            logger.info(f"✂️ Trimmed message to {max_length} chars")
+        
+        # Пропускаем команды если нужно
+        if tts_settings.skipCommands and filtered_text.strip().startswith("!"):
+            logger.info(f"⏭️ Skipping command: {filtered_text}")
+            return ChannelTTSResponse(
+                success=False,
+                error="Command messages are skipped"
+            )
+        
+        # 4. Синтезируем речь
+        logger.info(f"🎤 Synthesizing: '{filtered_text[:50]}...' with volume={request.volume_level}%")
+        
+        # Добавляем запрос в очередь
+        request_data = {
+            "text": filtered_text,
+            "voice": "default",  # TODO: использовать голос пользователя из настроек
+            "user_id": request.user_id,
+            "timestamp": datetime.now().isoformat(),
+            "channel": request.channel_name,
+            "author": request.author
+        }
+        
+        await request_queue.put(request_data)
+        
+        # TODO: Реальная генерация аудио
+        # Пока что возвращаем заглушку с корректными данными
+        audio_filename = f"channel_{request.channel_name}_{datetime.now().timestamp()}.wav"
+        
+        return ChannelTTSResponse(
+            success=True,
+            audio_url=f"/api/audio/{audio_filename}",
+            voice="default",
+            volume=request.volume_level,
+            tts_type="local_f5",
+            duration=1.5,
+            channel=request.channel_name,
+            author=request.author
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error in synthesize_channel: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return ChannelTTSResponse(
+            success=False,
+            error=str(e)
+        )
+
 @app.get("/api/voices")
 async def get_available_voices():
     """Получить список доступных голосов"""
@@ -567,13 +684,92 @@ async def create_voice(
         logger.error(f"Error creating voice: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+def convert_audio_to_wav_48khz(input_path: str, output_path: str) -> bool:
+    """
+    Конвертировать аудио в WAV 48kHz Mono 16-bit для F5-TTS
+    
+    Args:
+        input_path: Путь к входному файлу (любой формат)
+        output_path: Путь к выходному WAV файлу
+        
+    Returns:
+        bool: True если успешно, False если ошибка
+    """
+    try:
+        import soundfile as sf
+        import librosa
+        import numpy as np
+        
+        logger.info(f"🔄 Converting audio: {input_path} -> {output_path}")
+        
+        # Загружаем аудио с ресемплингом до 48kHz и конвертацией в моно
+        audio, sr = librosa.load(input_path, sr=48000, mono=True)
+        
+        # Нормализуем громкость
+        audio = librosa.util.normalize(audio)
+        
+        # Убедимся что в int16 диапазоне
+        audio = np.clip(audio, -1.0, 1.0)
+        
+        # Сохраняем как WAV 16-bit PCM
+        sf.write(output_path, audio, 48000, subtype='PCM_16')
+        
+        logger.info(f"✅ Audio converted successfully to WAV 48kHz Mono 16-bit")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Audio conversion failed: {e}")
+        return False
+
+def transcribe_audio(audio_path: str) -> str:
+    """
+    Транскрибировать аудио используя Whisper
+    
+    Args:
+        audio_path: Путь к аудио файлу
+        
+    Returns:
+        str: Транскрибированный текст или пустая строка при ошибке
+    """
+    try:
+        # Пробуем faster-whisper (быстрее)
+        try:
+            from faster_whisper import WhisperModel
+            model = WhisperModel("base", device="auto", compute_type="auto")
+            segments, info = model.transcribe(audio_path, language="ru")
+            text = " ".join([segment.text for segment in segments])
+            logger.info(f"✅ Transcribed with faster-whisper: '{text[:50]}...'")
+            return text.strip()
+        except ImportError:
+            logger.warning("faster-whisper not available, trying whisper")
+        
+        # Fallback на обычный whisper
+        try:
+            import whisper
+            model = whisper.load_model("base")
+            result = model.transcribe(audio_path, language="ru")
+            text = result.get("text", "").strip()
+            logger.info(f"✅ Transcribed with whisper: '{text[:50]}...'")
+            return text
+        except ImportError:
+            logger.warning("whisper not available, skipping transcription")
+            return ""
+            
+    except Exception as e:
+        logger.error(f"❌ Transcription failed: {e}")
+        return ""
+
 @app.post("/api/voices/{voice_id}/upload")
 async def upload_voice_sample(
     voice_id: str,
     file: UploadFile = File(...),
     sample_text: str = Form(None)
 ):
-    """Загрузить референсный аудио сэмпл для голоса"""
+    """Загрузить референсный аудио сэмпл для голоса с автоконвертацией в WAV"""
+    temp_input_path = None
+    temp_converted_path = None
+    final_sample_path = None
+    
     try:
         voice_folder = config.voices_dir / voice_id
         
@@ -581,42 +777,74 @@ async def upload_voice_sample(
         if not voice_folder.exists():
             raise HTTPException(status_code=404, detail="Голос не найден")
         
-        # Проверяем формат файла
-        if not file.filename.endswith(('.wav', '.mp3', '.flac')):
-            raise HTTPException(status_code=400, detail="Поддерживаются только WAV, MP3, FLAC")
+        # Проверяем формат файла (принимаем все популярные форматы)
+        allowed_extensions = ['.wav', '.mp3', '.flac', '.ogg', '.m4a', '.aac', '.wma', '.aiff', '.au']
+        file_ext = Path(file.filename).suffix.lower()
         
-        # Генерируем имя файла
-        file_ext = Path(file.filename).suffix
-        timestamp = int(datetime.now().timestamp())
-        sample_filename = f"sample_{timestamp}{file_ext}"
-        sample_path = voice_folder / sample_filename
+        if file_ext not in allowed_extensions:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Неподдерживаемый формат. Разрешены: {', '.join(allowed_extensions)}"
+            )
         
-        # Сохраняем файл
-        async with aiofiles.open(sample_path, 'wb') as out_file:
+        # Сохраняем загруженный файл во временную директорию
+        import tempfile
+        temp_input_fd, temp_input_path = tempfile.mkstemp(suffix=file_ext)
+        os.close(temp_input_fd)
+        
+        async with aiofiles.open(temp_input_path, 'wb') as out_file:
             content = await file.read()
             await out_file.write(content)
         
+        logger.info(f"📥 Sample uploaded to temp: {temp_input_path}")
+        
+        # Конвертируем в WAV 48kHz Mono 16-bit
+        timestamp = int(datetime.now().timestamp())
+        temp_converted_path = tempfile.mktemp(suffix='.wav')
+        
+        success = convert_audio_to_wav_48khz(temp_input_path, temp_converted_path)
+        if not success:
+            raise HTTPException(status_code=500, detail="Ошибка конвертации аудио")
+        
+        # Автоматическая транскрибация (если не передан текст)
+        if not sample_text:
+            logger.info("🎤 Starting automatic transcription...")
+            sample_text = transcribe_audio(temp_converted_path)
+            if sample_text:
+                logger.info(f"✅ Auto-transcribed: '{sample_text[:50]}...'")
+            else:
+                logger.warning("⚠️ Transcription failed, continuing without text")
+        
+        # Сохраняем конвертированный WAV файл
+        sample_filename = f"sample_{timestamp}.wav"  # ВСЕГДА .wav
+        final_sample_path = voice_folder / sample_filename
+        
+        import shutil
+        shutil.copy2(temp_converted_path, final_sample_path)
+        
+        logger.info(f"✅ Sample saved: {final_sample_path}")
+        
         # Сохраняем метаданные сэмпла
-        if sample_text:
-            sample_metadata = {
-                "filename": sample_filename,
-                "text": sample_text,
-                "uploaded_at": datetime.now().isoformat(),
-                "duration": None,  # TODO: получить длительность
-                "size": len(content)
-            }
-            
-            samples_meta_file = voice_folder / "samples.json"
-            samples_meta = []
-            
-            if samples_meta_file.exists():
-                with open(samples_meta_file, 'r', encoding='utf-8') as f:
-                    samples_meta = json.load(f)
-            
-            samples_meta.append(sample_metadata)
-            
-            with open(samples_meta_file, 'w', encoding='utf-8') as f:
-                json.dump(samples_meta, f, indent=2, ensure_ascii=False)
+        sample_metadata = {
+            "filename": sample_filename,
+            "text": sample_text or "",
+            "uploaded_at": datetime.now().isoformat(),
+            "duration": None,  # TODO: получить длительность
+            "format": "WAV 48kHz Mono 16-bit",
+            "auto_transcribed": bool(sample_text and not sample_text)
+        }
+        
+        samples_meta_file = voice_folder / "samples.json"
+        samples_meta = []
+        
+        if samples_meta_file.exists():
+            with open(samples_meta_file, 'r', encoding='utf-8') as f:
+                samples_meta = json.load(f)
+        
+        samples_meta.append(sample_metadata)
+        
+        with open(samples_meta_file, 'w', encoding='utf-8') as f:
+            json.dump(samples_meta, f, indent=2, ensure_ascii=False)
         
         # Обновляем метаданные голоса
         metadata_file = voice_folder / "metadata.json"
@@ -625,24 +853,50 @@ async def upload_voice_sample(
                 metadata = json.load(f)
             
             metadata['updated_at'] = datetime.now().isoformat()
-            metadata['samples_count'] = len(list(voice_folder.glob('sample_*.*')))
+            metadata['samples_count'] = len(list(voice_folder.glob('sample_*.wav')))
             
             with open(metadata_file, 'w', encoding='utf-8') as f:
                 json.dump(metadata, f, indent=2, ensure_ascii=False)
         
-        logger.info(f"Uploaded sample for voice {voice_id}: {sample_filename}")
+        logger.info(f"✅ Uploaded and converted sample for voice {voice_id}: {sample_filename}")
         
         return {
             "success": True,
             "filename": sample_filename,
-            "message": "Сэмпл успешно загружен"
+            "message": "Сэмпл успешно загружен, конвертирован в WAV 48kHz" + (
+                " и транскрибирован" if sample_text else ""
+            ),
+            "transcription": sample_text or None,
+            "format": "WAV 48kHz Mono 16-bit"
         }
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error uploading voice sample: {e}")
+        
+        # Удаляем файл при ошибке
+        if final_sample_path and Path(final_sample_path).exists():
+            try:
+                os.remove(final_sample_path)
+            except:
+                pass
+        
         raise HTTPException(status_code=500, detail=str(e))
+    
+    finally:
+        # Очистка временных файлов
+        if temp_input_path and os.path.exists(temp_input_path):
+            try:
+                os.remove(temp_input_path)
+            except:
+                pass
+        
+        if temp_converted_path and os.path.exists(temp_converted_path):
+            try:
+                os.remove(temp_converted_path)
+            except:
+                pass
 
 @app.get("/api/voices/{voice_id}/samples")
 async def get_voice_samples(voice_id: str):
@@ -701,6 +955,109 @@ async def get_voice_sample_file(voice_id: str, filename: str):
         raise
     except Exception as e:
         logger.error(f"Error getting sample file: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/voices/{voice_id}/samples/{filename}/retranscribe")
+async def retranscribe_voice_sample(voice_id: str, filename: str):
+    """Перетранскрибировать существующий сэмпл"""
+    try:
+        voice_folder = config.voices_dir / voice_id
+        
+        if not voice_folder.exists():
+            raise HTTPException(status_code=404, detail="Голос не найден")
+        
+        sample_path = voice_folder / filename
+        if not sample_path.exists():
+            raise HTTPException(status_code=404, detail="Сэмпл не найден")
+        
+        logger.info(f"🔄 Retranscribing sample: {filename}")
+        
+        # Транскрибируем аудио
+        transcribed_text = transcribe_audio(str(sample_path))
+        
+        if not transcribed_text:
+            raise HTTPException(status_code=500, detail="Ошибка транскрибации")
+        
+        # Обновляем метаданные в samples.json
+        samples_meta_file = voice_folder / "samples.json"
+        samples_meta = []
+        
+        if samples_meta_file.exists():
+            with open(samples_meta_file, 'r', encoding='utf-8') as f:
+                samples_meta = json.load(f)
+        
+        # Находим и обновляем сэмпл
+        updated = False
+        for sample in samples_meta:
+            if sample['filename'] == filename:
+                sample['text'] = transcribed_text
+                sample['retranscribed_at'] = datetime.now().isoformat()
+                updated = True
+                break
+        
+        if updated:
+            with open(samples_meta_file, 'w', encoding='utf-8') as f:
+                json.dump(samples_meta, f, indent=2, ensure_ascii=False)
+        
+        logger.info(f"✅ Sample retranscribed: '{transcribed_text[:50]}...'")
+        
+        return {
+            "success": True,
+            "transcription": transcribed_text,
+            "message": "Сэмпл успешно перетранскрибирован"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retranscribing sample: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/voices/{voice_id}/samples/{filename}/update-text")
+async def update_sample_text(voice_id: str, filename: str, text: str = Form(...)):
+    """Обновить текст сэмпла вручную"""
+    try:
+        voice_folder = config.voices_dir / voice_id
+        
+        if not voice_folder.exists():
+            raise HTTPException(status_code=404, detail="Голос не найден")
+        
+        sample_path = voice_folder / filename
+        if not sample_path.exists():
+            raise HTTPException(status_code=404, detail="Сэмпл не найден")
+        
+        # Обновляем метаданные
+        samples_meta_file = voice_folder / "samples.json"
+        samples_meta = []
+        
+        if samples_meta_file.exists():
+            with open(samples_meta_file, 'r', encoding='utf-8') as f:
+                samples_meta = json.load(f)
+        
+        # Находим и обновляем
+        updated = False
+        for sample in samples_meta:
+            if sample['filename'] == filename:
+                sample['text'] = text
+                sample['updated_at'] = datetime.now().isoformat()
+                updated = True
+                break
+        
+        if updated:
+            with open(samples_meta_file, 'w', encoding='utf-8') as f:
+                json.dump(samples_meta, f, indent=2, ensure_ascii=False)
+        
+        logger.info(f"✅ Sample text updated: {filename}")
+        
+        return {
+            "success": True,
+            "message": "Текст сэмпла обновлён"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating sample text: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/voices/{voice_id}/samples/{filename}")

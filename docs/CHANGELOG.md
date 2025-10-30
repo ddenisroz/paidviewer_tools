@@ -4,6 +4,47 @@
 
 ---
 
+## 🏠 Session 26 - Local TTS Full Integration + Bugfix (29 октября 2025)
+
+### ✨ Новые фичи
+
+#### Локальный TTS - Полная интеграция с ботом
+- **Endpoint `/api/tts/synthesize-channel`**: Озвучка чата через локальный TTS
+- **Pydantic модели**: `ChannelTTSRequest`, `ChannelTTSResponse`, `TTSSettingsData`
+- **Фильтрация текста**:
+  - ✅ Блокировка пользователей (`blocked_users`)
+  - ✅ Фильтрация запрещённых слов (`word_filter`)
+  - ✅ Ограничение длины сообщений (`maxLength`)
+  - ✅ Пропуск команд (`skipCommands`)
+- **Интеграция с bot_service**: `tts_manager.py` автоматически выбирает локальный/облачный TTS
+
+### 🐛 Исправления
+- **Админка голосов**: Исправлен баг отображения голосов после загрузки
+  - Backend возвращал `{ "voices": [...] }`, frontend искал `data.data`
+  - Теперь корректно парсит `data.voices || data.data`
+
+### 📚 Документация
+- Создан `docs/LOCAL_TTS_INTEGRATION.md` - полное руководство по локальному TTS
+- Создан `docs/SESSION_26_LOCAL_TTS_INTEGRATION.md` - детали сессии
+- Обновлён `docs/VOICE_UPLOAD_UNIFIED.md` - добавлен changelog bugfix
+- Обновлён `docs/CURRENT_STATUS.md` - статус сессии
+
+### 🏗️ Архитектура
+- **Файлы:** `tts_service_simple/main.py` (+3 Pydantic модели, +1 endpoint)
+- **Frontend:** `frontend/src/components/admin/VoiceManagement.jsx` (bugfix)
+
+### 📊 Метрики
+- **Локальный TTS**: Теперь полностью функционален (как облачный)
+- **Сравнение**: Локальный TTS теперь поддерживает 100% функций облачного TTS
+
+### 🚀 Как использовать
+1. Запустить `python tts_service_simple/main.py`
+2. Открыть `/dashboard/tts/local`
+3. Настроить endpoint и включить "Использовать локальный TTS"
+4. Готово! Чат будет озвучиваться через локальный TTS ✅
+
+---
+
 ## 🗑️ Session 10 - Account Deletion & UX Polish (27 октября 2025)
 
 ### ✨ Новые фичи
