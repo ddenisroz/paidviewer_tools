@@ -434,22 +434,25 @@ async def add_to_whitelist(
         try:
             body = await request.json()
             username = body.get('username') or body.get('channel_name')
-            platform = body.get('platform', 'twitch')
+            platform = (body.get('platform') or 'twitch').lower().strip()
         except:
             # Если не JSON, пробуем query параметры
             username = request.query_params.get('username') or request.query_params.get('channel_name')
-            platform = request.query_params.get('platform', 'twitch')
+            platform = (request.query_params.get('platform') or 'twitch').lower().strip()
         
         if not username:
             raise HTTPException(status_code=400, detail="Username or channel_name is required")
         
-        # Нормализуем имя пользователя
+        # Нормализуем имя пользователя и платформу
         username = username.lower().strip()
+        if platform not in ("twitch", "vk"):
+            platform = "twitch"
         
         # Проверяем, не добавлен ли уже
         from core.database import WhitelistedChannel
         existing = db.query(WhitelistedChannel).filter(
-            WhitelistedChannel.channel_name == username
+            WhitelistedChannel.channel_name == username,
+            WhitelistedChannel.platform == platform
         ).first()
         
         if existing:
@@ -458,7 +461,8 @@ async def add_to_whitelist(
         
         # Добавляем в whitelist
         whitelist_user = WhitelistedChannel(
-            channel_name=username
+            channel_name=username,
+            platform=platform
         )
         db.add(whitelist_user)
         db.commit()
