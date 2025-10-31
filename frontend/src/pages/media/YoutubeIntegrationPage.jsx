@@ -29,7 +29,8 @@ const YoutubeIntegrationPage = () => {
         handlePlayerStateChange,
         handlePlayerError,
         setPlayerRef,
-        setIsTheaterMode
+        setIsTheaterMode,
+        loadQueue
     } = usePlayer();
     
     const [newVideoUrl, setNewVideoUrl] = useState('');
