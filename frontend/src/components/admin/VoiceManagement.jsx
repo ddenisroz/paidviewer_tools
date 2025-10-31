@@ -71,10 +71,13 @@ const VoiceManagement = () => {
         try {
             setLoading(true);
             const data = await getAdminVoices();
-            // Убеждаемся, что data является массивом
-            const voicesData = Array.isArray(data) ? data : (data?.voices || data?.data || []);
-            setVoices(voicesData);
-            console.log('✅ Loaded voices:', voicesData);
+            // Axios возвращает { data: { status, voices: [...] } }
+            const payload = (data && data.data) ? data.data : data;
+            const voicesArray = Array.isArray(payload)
+                ? payload
+                : (Array.isArray(payload?.voices) ? payload.voices : []);
+            setVoices(voicesArray);
+            console.log('✅ Loaded voices:', voicesArray);
         } catch (error) {
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось загрузить голоса.' });
             console.error('Error loading voices:', error);
