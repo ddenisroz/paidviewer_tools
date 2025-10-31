@@ -63,8 +63,8 @@ const VoiceManagement = () => {
     };
 
     const loadVoices = useCallback(async () => {
-        // Предотвращаем множественные одновременные вызовы
-        if (loading || loadingRef.current) {
+        // Предотвращаем множественные одновременные вызовы (используем только ref)
+        if (loadingRef.current) {
             return;
         }
         
@@ -120,18 +120,13 @@ const VoiceManagement = () => {
     }, [addToast, usersLoading]);
 
     useEffect(() => {
-        if (!hasLoaded && !loadingRef.current) {
+        if (!hasLoaded) {
             loadingRef.current = true;
             setHasLoaded(true);
             loadVoices();
             loadUsers();
-            
-            // Сбрасываем флаг после загрузки
-            setTimeout(() => {
-                loadingRef.current = false;
-            }, 1000);
         }
-    }, []); // Убираем все зависимости!
+    }, [hasLoaded, loadVoices, loadUsers]);
 
     const handleFileUpload = (event) => {
         const file = event.target.files[0];
