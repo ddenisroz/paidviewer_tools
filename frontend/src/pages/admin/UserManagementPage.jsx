@@ -492,195 +492,200 @@ const UserManagementPage = () => {
                         <CardTitle>
                             Пользователи ({filteredAndSortedUsers.length})
                         </CardTitle>
-                        <div className="flex gap-2 text-sm text-slate-400">
-                            <span>Сортировка: {sortField} ({sortDirection})</span>
-                        </div>
+                        <Button variant="outline" size="sm" onClick={loadUsers} disabled={loading}>
+                            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                        </Button>
                     </div>
                 </CardHeader>
                 <CardContent>
                     <div className="overflow-x-auto">
-                        <table className="w-full">
+                        <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b border-slate-700">
-                                    <th className="text-left p-3">
+                                <tr className="border-b-2 border-slate-600 bg-slate-900/50">
+                                    <th className="text-left p-2 whitespace-nowrap">
                                         <button 
                                             onClick={() => handleSort('id')}
-                                            className="flex items-center gap-2 hover:text-purple-400 transition-colors"
+                                            className="flex items-center gap-1 hover:text-purple-400 font-semibold"
                                         >
                                             ID {getSortIcon('id')}
                                         </button>
                                     </th>
-                                    <th className="text-left p-3">Пользователь</th>
-                                    <th className="text-left p-3">
+                                    <th className="text-left p-2">
                                         <button 
                                             onClick={() => handleSort('total_integrations')}
-                                            className="flex items-center gap-2 hover:text-purple-400 transition-colors"
+                                            className="flex items-center gap-1 hover:text-purple-400 font-semibold"
                                         >
-                                            Интеграции {getSortIcon('total_integrations')}
+                                            Стримеры {getSortIcon('total_integrations')}
                                         </button>
                                     </th>
-                                    <th className="text-left p-3">Whitelist</th>
-                                    <th className="text-left p-3">Роль</th>
-                                    <th className="text-left p-3">Статус</th>
-                                    <th className="text-left p-3">
+                                    <th className="text-left p-2 whitespace-nowrap">
+                                        <Select value={whitelistFilter} onValueChange={setWhitelistFilter}>
+                                            <SelectTrigger className="h-8 bg-slate-700 border-slate-600">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">Whitelist: Все</SelectItem>
+                                                <SelectItem value="whitelisted">✓ В whitelist</SelectItem>
+                                                <SelectItem value="not_whitelisted">✗ Не в whitelist</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </th>
+                                    <th className="text-left p-2 whitespace-nowrap">
+                                        <Select value={roleFilter} onValueChange={setRoleFilter}>
+                                            <SelectTrigger className="h-8 bg-slate-700 border-slate-600">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">Роль: Все</SelectItem>
+                                                <SelectItem value="admin">👑 Админ</SelectItem>
+                                                <SelectItem value="user">👤 Пользователь</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </th>
+                                    <th className="text-left p-2 whitespace-nowrap">
+                                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                                            <SelectTrigger className="h-8 bg-slate-700 border-slate-600">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">Статус: Все</SelectItem>
+                                                <SelectItem value="active">🟢 Активный</SelectItem>
+                                                <SelectItem value="blocked">🔴 Заблокирован</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </th>
+                                    <th className="text-left p-2 whitespace-nowrap">
                                         <button 
                                             onClick={() => handleSort('created_at')}
-                                            className="flex items-center gap-2 hover:text-purple-400 transition-colors"
+                                            className="flex items-center gap-1 hover:text-purple-400 font-semibold"
                                         >
                                             Создан {getSortIcon('created_at')}
                                         </button>
                                     </th>
-                                    <th className="text-left p-3">Действия</th>
+                                    <th className="text-left p-2">Действия</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {filteredAndSortedUsers.map((user) => {
                                     const sessionsArray = Array.isArray(sessions) ? sessions : [];
                                     const hasActiveSession = sessionsArray.some(session => 
-                                session.user_id === user.id && 
-                                session.session_type === 'active_user'
-                            );
-                            
-                            return (
-                                        <tr key={user.id} className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors">
-                                            <td className="p-3">
-                                                <span className="font-mono text-sm">#{user.id}</span>
-                                            </td>
-                                            <td className="p-3">
-                                                <div className="flex items-center gap-3">
-                                                <div className="flex-shrink-0">
-                                                        <Shield className="w-5 h-5 text-purple-400" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="font-semibold">User_{user.id}</div>
-                                                        <div className="text-sm text-slate-400">
-                                                            {user.twitch_username && `@${user.twitch_username}`}
-                                                            {user.twitch_username && user.vk_username && ' • '}
-                                                            {user.vk_username && `@${user.vk_username}`}
-                                                        </div>
-                                                    </div>
+                                        session.user_id === user.id && 
+                                        session.session_type === 'active_user'
+                                    );
+                                    
+                                    return (
+                                        <tr key={user.id} className="border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors">
+                                            <td className="p-2">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="font-mono text-xs">#{user.id}</span>
+                                                    {hasActiveSession && <Wifi className="w-3 h-3 text-blue-400" />}
                                                 </div>
                                             </td>
-                                            <td className="p-3">
-                                                <div className="flex items-center gap-2">
+                                            <td className="p-2">
+                                                <div className="flex flex-wrap gap-1">
                                                     {user.integrations?.twitch?.connected && (
-                                                        <div className="flex items-center gap-1" title="Twitch подключен">
-                                                            <Twitch className="w-4 h-4 text-purple-400" />
-                                                        </div>
+                                                        <Badge className="bg-purple-900/50 text-purple-200 text-xs">
+                                                            <Twitch className="w-2.5 h-2.5 mr-1" />
+                                                            {user.integrations.twitch.username || 'N/A'}
+                                                        </Badge>
                                                     )}
                                                     {user.integrations?.vk?.connected && (
-                                                        <div className="flex items-center gap-1" title="VK Live подключен">
-                                                            <MessageCircle className="w-4 h-4 text-blue-400" />
-                                                        </div>
+                                                        <Badge className="bg-blue-900/50 text-blue-200 text-xs">
+                                                            <MessageCircle className="w-2.5 h-2.5 mr-1" />
+                                                            {user.integrations.vk.username || 'N/A'}
+                                                        </Badge>
                                                     )}
                                                     {user.total_integrations === 0 && (
-                                                        <span className="text-slate-500 text-sm">Нет подключений</span>
+                                                        <span className="text-xs text-slate-500">-</span>
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="p-3">
+                                            <td className="p-2">
                                                 {user.is_whitelisted ? (
-                                                    <Badge variant="outline" className="text-green-600 border-green-600">
+                                                    <Badge className="bg-green-900/50 text-green-200 text-xs">
                                                         <CheckCircle className="w-3 h-3 mr-1" />
-                                                        В whitelist
+                                                        Да
                                                     </Badge>
                                                 ) : (
-                                                    <Badge variant="outline" className="text-slate-500 border-slate-500">
-                                                        <XCircle className="w-3 h-3 mr-1" />
-                                                        Не в whitelist
-                                                    </Badge>
+                                                    <span className="text-xs text-slate-500">Нет</span>
                                                 )}
                                             </td>
-                                            <td className="p-3">
+                                            <td className="p-2">
                                                 {user.is_admin ? (
-                                                    <Badge variant="outline" className="text-purple-600 border-purple-600">
+                                                    <Badge className="bg-purple-900/50 text-purple-200 text-xs">
                                                         <Shield className="w-3 h-3 mr-1" />
                                                         Админ
                                                     </Badge>
                                                 ) : (
-                                                    <Badge variant="outline" className="text-slate-500 border-slate-500">
-                                                        Пользователь
-                                                    </Badge>
+                                                    <span className="text-xs text-slate-400">Пользователь</span>
                                                 )}
                                             </td>
-                                            <td className="p-3">
-                                                <div className="flex items-center gap-2">
+                                            <td className="p-2">
+                                                <div className="flex items-center gap-1">
                                                     {user.is_blocked ? (
-                                                        <Badge variant="outline" className="text-red-600 border-red-600">
+                                                        <Badge className="bg-red-900/50 text-red-200 text-xs">
                                                             <Ban className="w-3 h-3 mr-1" />
-                                                            Заблокирован
+                                                            Блок
                                                         </Badge>
                                                     ) : (
-                                                        <Badge variant="outline" className="text-green-600 border-green-600">
+                                                        <Badge className="bg-green-900/50 text-green-200 text-xs">
                                                             <CheckCircle className="w-3 h-3 mr-1" />
-                                                                    Активен
-                                                                </Badge>
-                                                            )}
-                                                    {hasActiveSession && (
-                                                        <Badge variant="outline" className="text-blue-600 border-blue-600">
-                                                            <Wifi className="w-3 h-3 mr-1" />
-                                                            Онлайн
+                                                            Актив
                                                         </Badge>
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="p-3">
-                                                <span className="text-sm text-slate-400">
-                                                    {formatDate(user.created_at)}
-                                                </span>
+                                            <td className="p-2 whitespace-nowrap text-xs text-slate-400">
+                                                {formatDate(user.created_at)}
                                             </td>
-                                            <td className="p-3">
-                                                <div className="flex items-center gap-2">
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                        onClick={() => openEditDialog(user)}
-                                                        title="Редактировать"
-                                                        >
-                                                        <Edit className="w-3 h-3" />
-                                                        </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => handleToggleWhitelist(user)}
-                                                        className={user.is_whitelisted 
-                                                            ? "border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
-                                                            : "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
-                                                        }
-                                                        title={user.is_whitelisted ? "Удалить из whitelist" : "Добавить в whitelist"}
-                                                        >
-                                                        {user.is_whitelisted ? <UserX className="w-3 h-3" /> : <UserCheck className="w-3 h-3" />}
-                                                        </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => openBlockDialog(user)}
-                                                        className="border-orange-600 text-orange-600 hover:bg-orange-600 hover:text-white"
-                                                        title={user.is_blocked ? "Разблокировать" : "Заблокировать"}
-                                                        >
-                                                        <Ban className="w-3 h-3" />
-                                                        </Button>
+                                            <td className="p-2">
+                                                <div className="flex items-center gap-1">
                                                     <Button
                                                         size="sm"
-                                                        variant="outline"
-                                                        onClick={() => handleDeleteUser(user.id)}
-                                                        className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
-                                                        title="Удалить пользователя"
+                                                        variant="ghost"
+                                                        className="h-7 w-7 p-0"
+                                                        onClick={() => openEditDialog(user)}
+                                                        title="Редактировать"
                                                     >
-                                                        <Trash2 className="w-3 h-3" />
+                                                        <Edit className="w-3 h-3" />
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-7 w-7 p-0"
+                                                        onClick={() => handleToggleWhitelist(user)}
+                                                        title={user.is_whitelisted ? "Удалить из whitelist" : "Добавить в whitelist"}
+                                                    >
+                                                        {user.is_whitelisted ? <UserX className="w-3 h-3 text-red-400" /> : <UserCheck className="w-3 h-3 text-green-400" />}
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-7 w-7 p-0"
+                                                        onClick={() => openBlockDialog(user)}
+                                                        title={user.is_blocked ? "Разблокировать" : "Заблокировать"}
+                                                    >
+                                                        {user.is_blocked ? <CheckCircle className="w-3 h-3 text-green-400" /> : <Ban className="w-3 h-3 text-red-400" />}
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-7 w-7 p-0"
+                                                        onClick={() => handleDeleteUser(user.id)}
+                                                        title="Удалить"
+                                                    >
+                                                        <Trash2 className="w-3 h-3 text-red-500" />
                                                     </Button>
                                                 </div>
                                             </td>
                                         </tr>
-                            );
-                        })}
+                                    );
+                                })}
                             </tbody>
                         </table>
-                        
                         {filteredAndSortedUsers.length === 0 && (
-                            <div className="text-center py-8">
-                                <Users className="w-12 h-12 mx-auto mb-4 text-slate-500" />
-                                <p className="text-slate-400">Пользователи не найдены</p>
+                            <div className="text-center py-8 text-slate-400">
+                                Пользователи не найдены
                             </div>
                         )}
                     </div>

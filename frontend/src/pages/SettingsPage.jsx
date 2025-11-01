@@ -141,31 +141,6 @@ const SettingsPage = () => {
                 </CardContent>
             </Card>
 
-            {/* Дополнительная информация для DonationAlerts */}
-            {(daConnected && !hasMainIntegration) || daError ? (
-                <Card>
-                    <CardContent className="space-y-4">
-                        {daConnected && !hasMainIntegration && (
-                            <div className="flex items-center space-x-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-md">
-                                <AlertCircle className="w-4 h-4 text-yellow-600" />
-                                <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                                    Сначала подключите основную платформу (Twitch или VK Live)
-                                </p>
-                            </div>
-                        )}
-                        
-                        {daError && (
-                            <div className="flex items-center space-x-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-md">
-                                <AlertCircle className="w-4 h-4 text-red-600" />
-                                <p className="text-sm text-red-700 dark:text-red-300">
-                                    {daError}
-                                </p>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            ) : null}
-
             {/* User Info */}
             <Card>
                 <CardHeader>
@@ -174,7 +149,7 @@ const SettingsPage = () => {
                 <CardContent>
                     <div className="space-y-2">
                         <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">ID личного кабинета:</span>
+                            <span className="text-sm text-muted-foreground">ID:</span>
                             <span className="text-sm font-medium">{user?.id}</span>
                         </div>
                     </div>
@@ -188,29 +163,17 @@ const SettingsPage = () => {
                         <Trash2 className="h-5 w-5" />
                         Опасная зона
                     </CardTitle>
-                    <CardDescription>
-                        Необратимые действия с вашим аккаунтом
-                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
-                        <div>
-                            <h3 className="text-sm font-medium text-white mb-2">
-                                Удалить аккаунт навсегда
-                            </h3>
-                            <p className="text-sm text-gray-400 mb-4">
-                                После удаления все ваши данные будут безвозвратно уничтожены. 
-                                Это действие нельзя отменить.
-                            </p>
-                            <Button
-                                variant="destructive"
-                                onClick={() => setShowDeleteModal(true)}
-                                className="bg-red-600 hover:bg-red-700"
-                            >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Удалить аккаунт
-                            </Button>
-                        </div>
+                        <Button
+                            variant="destructive"
+                            onClick={() => setShowDeleteModal(true)}
+                            className="bg-red-600 hover:bg-red-700"
+                        >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Удалить аккаунт
+                        </Button>
                     </div>
                 </CardContent>
             </Card>

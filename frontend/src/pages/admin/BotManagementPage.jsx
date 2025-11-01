@@ -6,7 +6,9 @@ import {
     Bot, 
     RefreshCw,
     CheckCircle,
-    Square
+    Square,
+    AlertCircle,
+    Clock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { botService } from '../../services/microservices';
@@ -26,14 +28,39 @@ const BotManagementPage = () => {
             const response = await botService.get('/api/admin/bots/status');
             // Преобразуем объект ботов в массив
             const botsData = response.data?.bots || {};
-            const botsArray = Object.entries(botsData).map(([name, data]) => ({
-                name,
-                ...data
-            }));
+            const botsArray = [];
+            
+            // Обрабатываем Twitch бота
+            if (botsData.twitch) {
+                botsArray.push({
+                    name: 'twitch_bot',
+                    platform: 'twitch',
+                    status: botsData.twitch.connected && botsData.twitch.is_ready ? 'running' : 
+                           botsData.twitch.connected ? 'error' : 'stopped',
+                    connected: botsData.twitch.connected,
+                    connected_channels: botsData.twitch.channels || 0,
+                    is_ready: botsData.twitch.is_ready || false
+                });
+            }
+            
+            // Обрабатываем VK бота
+            if (botsData.vk) {
+                botsArray.push({
+                    name: 'vk_live_bot',
+                    platform: 'vk_live',
+                    status: botsData.vk.connected && botsData.vk.is_running ? 'running' : 
+                           botsData.vk.connected ? 'error' : 'stopped',
+                    connected: botsData.vk.connected,
+                    connected_channels: botsData.vk.channels || 0,
+                    is_running: botsData.vk.is_running || false
+                });
+            }
+            
             setBots(botsArray);
         } catch (error) {
             console.error('Error loading bots status:', error);
             toast.error('Ошибка загрузки статуса ботов');
+            setBots([]);
         } finally {
             setLoading(false);
         }
@@ -142,14 +169,14 @@ const BotManagementPage = () => {
         const twitchBot = botsArray.find(bot => bot.platform === 'twitch');
         const vkBot = botsArray.find(bot => bot.platform === 'vk_live');
         
-        const twitchStatus = twitchBot ? twitchBot.status : 'stopped';
-        const vkStatus = vkBot ? vkBot.status : 'stopped';
+        const twitchStatus = twitchBot ? (twitchBot.status === 'running' ? 'работает' : 
+                                          twitchBot.status === 'error' ? 'ошибка' : 'остановлен') : 'не найден';
+        const vkStatus = vkBot ? (vkBot.status === 'running' ? 'работает' : 
+                                  vkBot.status === 'error' ? 'ошибка' : 'остановлен') : 'не найден';
         const twitchChannels = twitchBot ? twitchBot.connected_channels || 0 : 0;
         const vkChannels = vkBot ? vkBot.connected_channels || 0 : 0;
         
-        const lastActivity = botsArray.length > 0 ? new Date(botsArray[0].last_activity).toLocaleString('ru-RU') : 'Неизвестно';
-        
-        return `Twitch: ${twitchStatus} (${twitchChannels} каналов) • VK: ${vkStatus} (${vkChannels} каналов) • ${lastActivity}`;
+        return `Twitch: ${twitchStatus} (${twitchChannels} каналов) • VK Live: ${vkStatus} (${vkChannels} каналов)`;
     };
 
 

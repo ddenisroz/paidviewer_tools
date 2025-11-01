@@ -27,8 +27,7 @@ try:
 except ImportError:
     from config import config
 
-# Настройка логирования
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Настройка логирования (basicConfig уже настроен в app_factory или main)
 logger = logging.getLogger(__name__)
 
 # Константы для модели F5-TTS (поддерживает русский и английский)
@@ -476,7 +475,7 @@ class RussianTTS:
             logger.warning("Текст пустой после предобработки")
             return None
 
-        # Определяем язык и выбираем модель
+        # Определяем язык и выбираем модель (язык уже определен в preprocess_text_for_tts)
         language = self.detect_language(processed_text)
         
         # Используем настройки из конфигурации

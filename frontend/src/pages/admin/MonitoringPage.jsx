@@ -12,7 +12,9 @@ import {
     MessageCircle, 
     AlertTriangle,
     RefreshCw,
-    ExternalLink
+    ExternalLink,
+    Tv,
+    Volume2
 } from 'lucide-react';
 import { botService } from '@/services/microservices';
 
@@ -164,19 +166,95 @@ const MonitoringPage = () => {
                 </Card>
             </div>
 
-            {/* Статистика сообщений */}
-            <div className="grid grid-cols-1 gap-4">
+            {/* Статистика активности */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Сообщения за 24 часа */}
                 <Card className="bg-gray-800 border-gray-700">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-300">Сообщения за 24 часа</CardTitle>
-                        <MessageCircle className="h-4 w-4 text-gray-400" />
+                        <CardTitle className="text-sm font-medium text-gray-300">Сообщения за 24ч</CardTitle>
+                        <MessageCircle className="h-4 w-4 text-blue-400" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-white">
+                        <div className="text-2xl font-bold text-blue-400">
                             {metrics?.messages?.last_24h || 0}
                         </div>
-                        <p className="text-xs text-gray-400 mt-1">Сообщений обработано</p>
+                        <p className="text-xs text-gray-400 mt-1">Обработано сообщений</p>
+                    </CardContent>
+                </Card>
+
+                {/* Сообщения за час */}
+                <Card className="bg-gray-800 border-gray-700">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-gray-300">Сообщения за час</CardTitle>
+                        <Activity className="h-4 w-4 text-green-400" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-green-400">
+                            {metrics?.messages?.last_1h || 0}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">Активность в чате</p>
+                    </CardContent>
+                </Card>
+
+                {/* Интеграции */}
+                <Card className="bg-gray-800 border-gray-700">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-gray-300">Активные интеграции</CardTitle>
+                        <Users className="h-4 w-4 text-purple-400" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-purple-400">
+                            {metrics?.integrations?.active || 0}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">Подключений Twitch/VK</p>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Статистика каналов */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Подключенные каналы */}
+                <Card className="bg-gray-800 border-gray-700">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-gray-300">Активные каналы</CardTitle>
+                        <Tv className="h-4 w-4 text-cyan-400" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-cyan-400">
+                            {metrics?.channels?.active || 0}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">Каналов с активным ботом</p>
+                        <div className="mt-2 space-y-1">
+                            <div className="flex justify-between text-xs">
+                                <span className="text-gray-400">Twitch:</span>
+                                <span className="text-purple-400">{metrics?.channels?.twitch || 0}</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                                <span className="text-gray-400">VK Live:</span>
+                                <span className="text-blue-400">{metrics?.channels?.vk || 0}</span>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* TTS статистика */}
+                <Card className="bg-gray-800 border-gray-700">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-gray-300">TTS запросы за 24ч</CardTitle>
+                        <Volume2 className="h-4 w-4 text-yellow-400" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-yellow-400">
+                            {metrics?.tts?.requests_24h || 0}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">Запросов синтеза речи</p>
+                        {metrics?.tts?.enabled_channels && (
+                            <div className="mt-2">
+                                <span className="text-xs text-gray-400">
+                                    Активных каналов с TTS: <span className="text-yellow-400">{metrics.tts.enabled_channels}</span>
+                                </span>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>

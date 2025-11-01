@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Upload, Trash2, Settings, TestTube2, Globe, User, Edit, Lock, AlertCircle } from 'lucide-react';
 import { Slider } from "@/components/ui/slider";
 import { useToast } from '../../components/ui/toast';
@@ -52,7 +51,6 @@ const VoiceManagementPageContent = () => {
     const [isTestingVoice, setIsTestingVoice] = useState(false);
     const [voiceVolumes, setVoiceVolumes] = useState({}); // {voice_name: volume_level}
     const [whitelistStatus, setWhitelistStatus] = useState(null); // Статус whitelist пользователя
-    const [activeTab, setActiveTab] = useState('all'); // 'all', 'global', 'user'
     const fileInputRef = React.useRef(null);
     const voiceVolumeSaveTimeout = React.useRef({});
     
@@ -577,8 +575,98 @@ const VoiceManagementPageContent = () => {
                         ? whitelistStatus.message
                         : ""
             }
-            actions={
-                whitelistStatus?.can_manage_voices && !user?.isGuest ? (
+        >
+            {/* Скрытый input для загрузки файлов - вынесен наружу чтобы не терялся при перерисовке диалога */}
+            <input 
+                    ref={(el) => {
+                        fileInputRef.current = el;
+                        if (el) {
+                            // Добавляем слушатель напрямую к элементу
+                            el.onchange = (e) => {
+                                handleFileUpload(e);
+                            };
+                        }
+                    }}
+                    type="file" 
+                    accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,.wma,.aiff,.au"
+                    style={{ display: 'none', pointerEvents: 'auto' }}
+                />
+
+            {/* Уведомление для пользователей без whitelist */}
+            {!user?.isGuest && whitelistStatus && !whitelistStatus.can_manage_voices && (
+                <div className="mb-6 bg-orange-900/20 border border-orange-500/50 rounded-lg p-4 flex items-start gap-3">
+                    <Lock className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                        <h3 className="text-orange-300 font-semibold mb-1">Доступ к F5-TTS ограничен</h3>
+                        <p className="text-orange-200/80 text-sm">
+                            Вы не находитесь в белом списке (whitelist) и не можете использовать F5-TTS для AI озвучки. 
+                            Для получения доступа обратитесь к администратору системы.
+                        </p>
+                        <p className="text-orange-200/60 text-xs mt-2">
+                            💡 Вам доступна только базовая озвучка (gTTS) через основные настройки TTS.
+                        </p>
+                    </div>
+                </div>
+            )}
+            
+            {/* Уведомление для гостевого режима */}
+            {user?.isGuest && whitelistStatus && !whitelistStatus.can_manage_voices && (
+                <div className="mb-6 bg-blue-900/20 border border-blue-500/50 rounded-lg p-4 flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                        <h3 className="text-blue-300 font-semibold mb-1">Гостевой режим - Канал не в whitelist</h3>
+                        <p className="text-blue-200/80 text-sm">
+                            Канал, к которому вы подключились, не находится в whitelist. F5-TTS (AI озвучка) недоступен.
+                        </p>
+                        <p className="text-blue-200/60 text-xs mt-2">
+                            💡 Вам доступна только базовая озвучка (gTTS) через основные настройки TTS.
+                        </p>
+                        <p className="text-blue-200/60 text-xs mt-1">
+                            💡 Для получения доступа к F5-TTS обратитесь к администратору для добавления канала в whitelist.
+                        </p>
+                    </div>
+                </div>
+            )}
+
+                 {loading ? (
+                <div className="col-span-full text-center py-12">
+                    <p className="text-slate-400">Загрузка голосов...</p>
+                </div>
+            ) : (globalVoices.length === 0 && userVoices.length === 0) ? (
+                     <div className="col-span-full text-center py-12">
+                         <div className="text-slate-400 text-lg mb-4">
+                             {whitelistStatus && !whitelistStatus.can_manage_voices ? (
+                                 <>
+                                     <Lock className="h-12 w-12 mx-auto mb-4 text-orange-500" />
+                                     <p>F5-TTS недоступен без whitelist</p>
+                                     <p className="text-sm text-slate-500 mt-2">
+                                         {user?.isGuest 
+                                             ? 'Канал не в whitelist. Используйте базовую озвучку (gTTS)'
+                                             : 'Используйте базовую озвучку (gTTS)'}
+                                     </p>
+                                 </>
+                             ) : (
+                                 <>
+                                     <User className="h-12 w-12 mx-auto mb-4 text-slate-500" />
+                                     <p>{user?.isGuest ? 'Голоса доступны для использования' : 'Загрузите свой первый голос'}</p>
+                                 </>
+                             )}
+                         </div>
+                     </div>
+            ) : (
+                <div className="space-y-8">
+                    {/* Пользовательские голоса (верхняя секция) */}
+                    {whitelistStatus?.can_manage_voices && (
+                        <div>
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <User className="h-5 w-5 text-green-400" />
+                                    <h3 className="text-lg font-semibold text-white">{user?.isGuest ? 'Гостевые голоса' : 'Мои голоса'}</h3>
+                                    <Badge variant="outline" className="text-green-400 border-green-400">
+                                        {userVoices.length}
+                                    </Badge>
+                                </div>
+                                {!user?.isGuest && (
                 <Dialog open={uploadDialogOpen} onOpenChange={(open) => {
                     setUploadDialogOpen(open);
                     if (!open) {
@@ -672,266 +760,13 @@ const VoiceManagementPageContent = () => {
                         </DialogFooter>
                    </DialogContent>
                </Dialog>
-                ) : null
-            }
-        >
-            {/* Скрытый input для загрузки файлов - вынесен наружу чтобы не терялся при перерисовке диалога */}
-            <input 
-                    ref={(el) => {
-                        fileInputRef.current = el;
-                        if (el) {
-                            // Добавляем слушатель напрямую к элементу
-                            el.onchange = (e) => {
-                                handleFileUpload(e);
-                            };
-                        }
-                    }}
-                    type="file" 
-                    accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,.wma,.aiff,.au"
-                    style={{ display: 'none', pointerEvents: 'auto' }}
-                />
-
-            {/* Уведомление для пользователей без whitelist */}
-            {!user?.isGuest && whitelistStatus && !whitelistStatus.can_manage_voices && (
-                <div className="mb-6 bg-orange-900/20 border border-orange-500/50 rounded-lg p-4 flex items-start gap-3">
-                    <Lock className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                        <h3 className="text-orange-300 font-semibold mb-1">Доступ к F5-TTS ограничен</h3>
-                        <p className="text-orange-200/80 text-sm">
-                            Вы не находитесь в белом списке (whitelist) и не можете использовать F5-TTS для AI озвучки. 
-                            Для получения доступа обратитесь к администратору системы.
-                        </p>
-                        <p className="text-orange-200/60 text-xs mt-2">
-                            💡 Вам доступна только базовая озвучка (gTTS) через основные настройки TTS.
-                        </p>
-                    </div>
-                </div>
-            )}
-            
-            {/* Уведомление для гостевого режима */}
-            {user?.isGuest && whitelistStatus && !whitelistStatus.can_manage_voices && (
-                <div className="mb-6 bg-blue-900/20 border border-blue-500/50 rounded-lg p-4 flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                        <h3 className="text-blue-300 font-semibold mb-1">Гостевой режим - Канал не в whitelist</h3>
-                        <p className="text-blue-200/80 text-sm">
-                            Канал, к которому вы подключились, не находится в whitelist. F5-TTS (AI озвучка) недоступен.
-                        </p>
-                        <p className="text-blue-200/60 text-xs mt-2">
-                            💡 Вам доступна только базовая озвучка (gTTS) через основные настройки TTS.
-                        </p>
-                        <p className="text-blue-200/60 text-xs mt-1">
-                            💡 Для получения доступа к F5-TTS обратитесь к администратору для добавления канала в whitelist.
-                        </p>
-                    </div>
-                </div>
-            )}
-
-                 {loading ? (
-                <div className="col-span-full text-center py-12">
-                    <p className="text-slate-400">Загрузка голосов...</p>
-                </div>
-            ) : (globalVoices.length === 0 && userVoices.length === 0) ? (
-                     <div className="col-span-full text-center py-12">
-                         <div className="text-slate-400 text-lg mb-4">
-                             {whitelistStatus && !whitelistStatus.can_manage_voices ? (
-                                 <>
-                                     <Lock className="h-12 w-12 mx-auto mb-4 text-orange-500" />
-                                     <p>F5-TTS недоступен без whitelist</p>
-                                     <p className="text-sm text-slate-500 mt-2">
-                                         {user?.isGuest 
-                                             ? 'Канал не в whitelist. Используйте базовую озвучку (gTTS)'
-                                             : 'Используйте базовую озвучку (gTTS)'}
-                                     </p>
-                                 </>
-                             ) : (
-                                 <>
-                                     <User className="h-12 w-12 mx-auto mb-4 text-slate-500" />
-                                     <p>{user?.isGuest ? 'Голоса доступны для использования' : 'Загрузите свой первый голос'}</p>
-                                 </>
-                             )}
-                         </div>
-                     </div>
-            ) : (
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-3 mb-6">
-                        <TabsTrigger value="all" className="flex items-center gap-2">
-                            <Settings className="h-4 w-4" />
-                            Все голоса
-                            <Badge variant="outline" className="ml-2">
-                                {globalVoices.length + (user?.isGuest ? 0 : userVoices.length)}
-                            </Badge>
-                        </TabsTrigger>
-                        <TabsTrigger value="global" className="flex items-center gap-2">
-                            <Globe className="h-4 w-4" />
-                            Глобальные
-                            <Badge variant="outline" className="ml-2 text-blue-400 border-blue-400">
-                                {globalVoices.length}
-                            </Badge>
-                        </TabsTrigger>
-                        {whitelistStatus?.can_manage_voices && (
-                            <TabsTrigger value="user" className="flex items-center gap-2">
-                                <User className="h-4 w-4" />
-                                {user?.isGuest ? 'Гостевые голоса' : 'Мои голоса'}
-                                <Badge variant="outline" className="ml-2 text-green-400 border-green-400">
-                                    {userVoices.length}
-                                </Badge>
-                            </TabsTrigger>
-                        )}
-                    </TabsList>
-
-                    {/* Все голоса */}
-                    <TabsContent value="all" className="space-y-6 mt-0">
-                        {/* Глобальные голоса */}
-                        {globalVoices.length > 0 && (
-                            <div>
-                                <div className="flex items-center gap-2 mb-4">
-                                    <Globe className="h-5 w-5 text-blue-400" />
-                                    <h3 className="text-lg font-semibold text-white">Глобальные голоса</h3>
-                                    <Badge variant="outline" className="text-blue-400 border-blue-400">
-                                        {globalVoices.length}
-                                    </Badge>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                                    {globalVoices.map((voice) => (
-                                        <Card key={voice.id} className="bg-slate-800 border-slate-700 flex flex-col">
-                                            <CardHeader className="pb-3">
-                                                <div className="flex items-center justify-between">
-                                                    <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
-                                                        <Globe className="h-4 w-4 text-blue-400"/>
-                                                        {voice.name}
-                                                    </CardTitle>
-                                                </div>
-                                            </CardHeader>
-                                            <CardContent className="flex-grow flex flex-col justify-end pt-0">
-                                                <Button 
-                                                    className="w-full" 
-                                                    variant="outline" 
-                                                    size="sm" 
-                                                    onClick={() => handleEdit(voice)}
-                                                >
-                                                    <Settings className="h-4 w-4 mr-1"/>
-                                                    Настроить
-                                                </Button>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Пользовательские голоса */}
-                        {whitelistStatus?.can_manage_voices && (
-                            <div>
-                                <div className="flex items-center gap-2 mb-4">
-                                    <User className="h-5 w-5 text-green-400" />
-                                    <h3 className="text-lg font-semibold text-white">{user?.isGuest ? 'Гостевые голоса' : 'Мои голоса'}</h3>
-                                    <Badge variant="outline" className="text-green-400 border-green-400">
-                                        {userVoices.length}
-                                    </Badge>
-                                </div>
-                                {userVoices.length === 0 ? (
-                                    <div className="text-center py-8 bg-slate-800/50 rounded-lg border border-slate-700 border-dashed">
-                                        <User className="h-10 w-10 mx-auto mb-3 text-slate-600" />
-                                        <p className="text-slate-400 mb-2">У вас пока нет личных голосов</p>
-                                        <p className="text-sm text-slate-500">Загрузите свой первый голос, чтобы начать</p>
-                                    </div>
-                                ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                                        {userVoices.map((voice) => (
-                                            <Card key={voice.id} className="bg-slate-800 border-slate-700 flex flex-col">
-                                                <CardHeader className="pb-3">
-                                                    <div className="flex items-center justify-between">
-                                                        <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
-                                                            <User className="h-4 w-4 text-green-400"/>
-                                                            {voice.name}
-                                                        </CardTitle>
-                                                    </div>
-                                                </CardHeader>
-                                                <CardContent className="flex-grow flex flex-col justify-end pt-0">
-                                                    <div className="flex gap-2">
-                                                        <Button 
-                                                            className="flex-1" 
-                                                            variant="outline" 
-                                                            size="sm" 
-                                                            onClick={() => handleEdit(voice)}
-                                                        >
-                                                            <Settings className="h-4 w-4 mr-1"/>
-                                                            Настроить
-                                                        </Button>
-                                                        {whitelistStatus?.can_manage_voices && (
-                                                            <Button 
-                                                                variant="destructive" 
-                                                                size="icon" 
-                                                                onClick={() => handleDelete(voice.id, voice.voice_type)}
-                                                            >
-                                                                <Trash2 className="h-4 w-4"/>
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        ))}
-                                    </div>
                                 )}
                             </div>
-                        )}
-                    </TabsContent>
-
-                    {/* Глобальные голоса */}
-                    <TabsContent value="global" className="mt-0">
-                        {globalVoices.length === 0 ? (
-                            <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700 border-dashed">
-                                <Globe className="h-16 w-16 mx-auto mb-4 text-slate-600" />
-                                <p className="text-slate-400 text-lg mb-2">Глобальных голосов пока нет</p>
-                                <p className="text-sm text-slate-500">Глобальные голоса доступны всем пользователям</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                                {globalVoices.map((voice) => (
-                                    <Card key={voice.id} className="bg-slate-800 border-slate-700 flex flex-col">
-                                        <CardHeader className="pb-3">
-                                            <div className="flex items-center justify-between">
-                                                <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
-                                                    <Globe className="h-4 w-4 text-blue-400"/>
-                                                    {voice.name}
-                                                </CardTitle>
-                                            </div>
-                                        </CardHeader>
-                                        <CardContent className="flex-grow flex flex-col justify-end pt-0">
-                                            <Button 
-                                                className="w-full" 
-                                                variant="outline" 
-                                                size="sm" 
-                                                onClick={() => handleEdit(voice)}
-                                            >
-                                                <Settings className="h-4 w-4 mr-1"/>
-                                                Настроить
-                                            </Button>
-                                        </CardContent>
-                                    </Card>
-                                ))}
-                            </div>
-                        )}
-                    </TabsContent>
-
-                    {/* Мои голоса */}
-                    {whitelistStatus?.can_manage_voices && (
-                        <TabsContent value="user" className="mt-0">
                             {userVoices.length === 0 ? (
-                                <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700 border-dashed">
-                                    <User className="h-16 w-16 mx-auto mb-4 text-slate-600" />
-                                    <p className="text-slate-400 text-lg mb-2">У вас пока нет личных голосов</p>
-                                    <p className="text-sm text-slate-500 mb-4">Загрузите свой первый голос, чтобы начать</p>
-                                    {whitelistStatus?.can_manage_voices && (
-                                        <Button 
-                                            onClick={() => setUploadDialogOpen(true)}
-                                            className="bg-purple-600 hover:bg-purple-700"
-                                        >
-                                            <Upload className="h-4 w-4 mr-2" />
-                                            Загрузить голос
-                                        </Button>
-                                    )}
+                                <div className="text-center py-8 bg-slate-800/50 rounded-lg border border-slate-700 border-dashed">
+                                    <User className="h-10 w-10 mx-auto mb-3 text-slate-600" />
+                                    <p className="text-slate-400 mb-2">У вас пока нет личных голосов</p>
+                                    <p className="text-sm text-slate-500">Загрузите свой первый голос, чтобы начать</p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -971,9 +806,58 @@ const VoiceManagementPageContent = () => {
                                     ))}
                                 </div>
                             )}
-                        </TabsContent>
+                        </div>
                     )}
-                </Tabs>
+
+                    {/* Разделитель между секциями */}
+                    {whitelistStatus?.can_manage_voices && userVoices.length > 0 && globalVoices.length > 0 && (
+                        <hr className="border-slate-700" />
+                    )}
+
+                    {/* Глобальные голоса (нижняя секция) */}
+                    <div>
+                        <div className="flex items-center gap-2 mb-4">
+                            <Globe className="h-5 w-5 text-blue-400" />
+                            <h3 className="text-lg font-semibold text-white">Глобальные голоса</h3>
+                            <Badge variant="outline" className="text-blue-400 border-blue-400">
+                                {globalVoices.length}
+                            </Badge>
+                        </div>
+                        {globalVoices.length === 0 ? (
+                            <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700 border-dashed">
+                                <Globe className="h-16 w-16 mx-auto mb-4 text-slate-600" />
+                                <p className="text-slate-400 text-lg mb-2">Глобальных голосов пока нет</p>
+                                <p className="text-sm text-slate-500">Глобальные голоса доступны всем пользователям</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                                {globalVoices.map((voice) => (
+                                    <Card key={voice.id} className="bg-slate-800 border-slate-700 flex flex-col">
+                                        <CardHeader className="pb-3">
+                                            <div className="flex items-center justify-between">
+                                                <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
+                                                    <Globe className="h-4 w-4 text-blue-400"/>
+                                                    {voice.name}
+                                                </CardTitle>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent className="flex-grow flex flex-col justify-end pt-0">
+                                            <Button 
+                                                className="w-full" 
+                                                variant="outline" 
+                                                size="sm" 
+                                                onClick={() => handleEdit(voice)}
+                                            >
+                                                <Settings className="h-4 w-4 mr-1"/>
+                                                Настроить
+                                            </Button>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
             )}
 
              {/* Диалог редактирования голоса */}

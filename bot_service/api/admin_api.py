@@ -547,10 +547,15 @@ async def get_bots_status(
         
         from main import bot_instance, vk_live_bot_instance
         
+        # Проверяем готовность Twitch бота через наличие user_id (это устанавливается при event_ready)
+        twitch_is_ready = False
+        if bot_instance:
+            twitch_is_ready = hasattr(bot_instance, 'user_id') and bot_instance.user_id is not None
+        
         twitch_status = {
             "connected": bot_instance is not None,
             "channels": len(bot_instance.connected_channels) if bot_instance else 0,
-            "is_ready": hasattr(bot_instance, 'is_ready') and bot_instance.is_ready if bot_instance else False
+            "is_ready": twitch_is_ready
         }
         
         vk_status = {
@@ -1113,16 +1118,44 @@ async def get_monitoring_metrics(
         active_users = db.query(User).filter(User.is_active == True).count()
         blocked_users = db.query(User).filter(User.is_blocked == True).count()
         
-        # Сообщения за последние 24 часа
+        # Сообщения за последние 24 часа и час
         day_ago = datetime.utcnow() - timedelta(days=1)
+        hour_ago = datetime.utcnow() - timedelta(hours=1)
         messages_24h = db.query(ChatMessage).filter(
             ChatMessage.timestamp >= day_ago
+        ).count()
+        messages_1h = db.query(ChatMessage).filter(
+            ChatMessage.timestamp >= hour_ago
         ).count()
         
         # Активные сессии
         active_sessions = db.query(UserSession).filter(
             UserSession.is_active == True
         ).count()
+        
+        # Подсчет активных интеграций
+        from core.database import UserToken
+        twitch_tokens = db.query(UserToken).filter(
+            UserToken.platform == 'twitch',
+            UserToken.is_active == True
+        ).count()
+        vk_tokens = db.query(UserToken).filter(
+            UserToken.platform == 'vk',
+            UserToken.is_active == True
+        ).count()
+        active_integrations = twitch_tokens + vk_tokens
+        
+        # Активные каналы через ConnectionManager
+        from core.connection_manager import get_connection_manager
+        connection_manager = get_connection_manager()
+        active_channels = connection_manager.get_active_channels() if hasattr(connection_manager, 'get_active_channels') else []
+        twitch_channels = [ch for ch in active_channels if not ch.isdigit()]
+        vk_channels = [ch for ch in active_channels if ch.isdigit()]
+        
+        # TTS статистика
+        tts_enabled_users = db.query(User).filter(User.tts_enabled == True).count()
+        # Подсчитываем TTS-каналы из connection_manager
+        tts_enabled_channels = len(connection_manager.tts_enabled_channels) if hasattr(connection_manager, 'tts_enabled_channels') else 0
         
         return {
             "success": True,
@@ -1133,10 +1166,25 @@ async def get_monitoring_metrics(
                     "blocked": blocked_users
                 },
                 "messages": {
-                    "last_24h": messages_24h
+                    "last_24h": messages_24h,
+                    "last_1h": messages_1h
                 },
                 "sessions": {
                     "active": active_sessions
+                },
+                "integrations": {
+                    "active": active_integrations,
+                    "twitch": twitch_tokens,
+                    "vk": vk_tokens
+                },
+                "channels": {
+                    "active": len(active_channels),
+                    "twitch": len(twitch_channels),
+                    "vk": len(vk_channels)
+                },
+                "tts": {
+                    "enabled_channels": tts_enabled_channels,
+                    "requests_24h": 0  # TODO: Добавить подсчет TTS запросов если есть таблица
                 },
                 "timestamp": datetime.utcnow().isoformat()
             }

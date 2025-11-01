@@ -17,7 +17,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '20251029_remove_unused'
-down_revision: Union[str, None] = None  # Укажите последнюю ревизию вручную
+down_revision: Union[str, None] = '7aa889f11a11'  # add_description_to_bot_commands (последняя миграция перед 29 октября)
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

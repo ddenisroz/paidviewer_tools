@@ -7,8 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Upload, Trash2, Edit, Users, Globe, Settings, TestTube2, Mic, ChevronDown, ChevronRight, Loader2, RefreshCw, Volume2, X } from 'lucide-react';
+import { Upload, Trash2, Edit, Users, Globe, Settings, TestTube2, Mic, ChevronDown, ChevronRight, Loader2, RefreshCw, Volume2, X, User } from 'lucide-react';
 import { Slider } from "@/components/ui/slider"
 import { getAdminVoices, uploadVoice, deleteVoice, updateVoiceSettings, transcribeVoice, retranscribeVoice, testVoice, getUsers, renameVoice } from '../../services/unified-api';
 import { useAuth } from '../../context/AuthContext';
@@ -34,7 +33,6 @@ const VoiceManagement = () => {
     const [testSpeedPreset, setTestSpeedPreset] = useState('normal');
     
     // Состояние для фильтрации
-    const [filterType, setFilterType] = useState('all'); // 'all', 'global', 'user'
     const [selectedUserFilter, setSelectedUserFilter] = useState('all'); // 'all' или ID пользователя
     
     // Состояние для загрузки
@@ -55,25 +53,6 @@ const VoiceManagement = () => {
     let audioContext = null;
     let audioSource = null;
 
-    // Функция для фильтрации голосов
-    const getFilteredVoices = () => {
-        let filtered = voices;
-        
-        // Фильтр по типу
-        if (filterType === 'global') {
-            filtered = filtered.filter(voice => voice.voice_type === 'global');
-        } else if (filterType === 'user') {
-            filtered = filtered.filter(voice => voice.voice_type === 'user');
-            // Дополнительный фильтр по пользователю
-            if (selectedUserFilter !== 'all') {
-                filtered = filtered.filter(voice => voice.owner_id === parseInt(selectedUserFilter));
-            }
-        }
-        
-        return filtered;
-    };
-    
-    const filteredVoices = getFilteredVoices();
 
     const loadVoices = useCallback(async () => {
         // Предотвращаем множественные одновременные вызовы (используем только ref)
@@ -618,136 +597,161 @@ const VoiceManagement = () => {
                             Всего: {voices.length}
                         </Badge>
                     </div>
-                    {/* Фильтры */}
-                    <div className="flex items-center gap-4 pt-2">
-                        <Tabs value={filterType} onValueChange={setFilterType} className="w-full">
-                            <TabsList className="grid w-auto grid-cols-3">
-                                <TabsTrigger value="all" className="flex items-center gap-2">
-                                    <Settings className="h-4 w-4" />
-                                    Все
-                                    <Badge variant="outline" className="ml-2">
-                                        {voices.length}
-                                    </Badge>
-                                </TabsTrigger>
-                                <TabsTrigger value="global" className="flex items-center gap-2">
-                                    <Globe className="h-4 w-4" />
-                                    Глобальные
-                                    <Badge variant="outline" className="ml-2 text-blue-400 border-blue-400">
-                                        {voices.filter(v => v.voice_type === 'global').length}
-                                    </Badge>
-                                </TabsTrigger>
-                                <TabsTrigger value="user" className="flex items-center gap-2">
-                                    <Users className="h-4 w-4" />
-                                    Пользовательские
-                                    <Badge variant="outline" className="ml-2 text-green-400 border-green-400">
-                                        {voices.filter(v => v.voice_type === 'user').length}
-                                    </Badge>
-                                </TabsTrigger>
-                            </TabsList>
-                        </Tabs>
-                        {/* Фильтр по пользователю (только для пользовательских голосов) */}
-                        {filterType === 'user' && users.length > 0 && (
-                            <Select value={selectedUserFilter} onValueChange={setSelectedUserFilter}>
-                                <SelectTrigger className="w-[200px]">
-                                    <SelectValue placeholder="Все пользователи" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Все пользователи</SelectItem>
-                                    {users.map(u => (
-                                        <SelectItem key={u.id} value={u.id.toString()}>
-                                            {u.username || `User_${u.id}`}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        )}
-                    </div>
                  </CardHeader>
                  <CardContent>
-                    <div className="space-y-4">
+                    <div className="space-y-8">
                          {loading ? (
                              <div className="flex items-center justify-center py-12">
                                  <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
                                  <span className="ml-3 text-gray-400">Загрузка голосов...</span>
                              </div>
-                         ) : filteredVoices.length === 0 ? (
-                            <div className="text-center py-12 bg-gray-800/30 rounded-lg border border-gray-700 border-dashed">
-                                <Mic className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-                                <p className="text-gray-400 text-lg mb-2">
-                                    {filterType === 'all' ? 'Голосов пока нет' :
-                                     filterType === 'global' ? 'Глобальных голосов пока нет' :
-                                     selectedUserFilter !== 'all' ? 'У выбранного пользователя нет голосов' :
-                                     'Пользовательских голосов пока нет'}
-                                </p>
-                                {filterType === 'all' && (
-                                    <p className="text-gray-500 text-sm mb-4">Загрузите первый голос через кнопку "Загрузить голос"</p>
-                                )}
-                                {filterType === 'all' && (
-                                    <Button 
-                                        onClick={() => setUploadDialogOpen(true)}
-                                        className="bg-purple-600 hover:bg-purple-700"
-                                    >
-                                        <Upload className="h-4 w-4 mr-2" />
-                                        Загрузить голос
-                                    </Button>
-                                )}
-                             </div>
                          ) : (
-                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                 {filteredVoices.map((voice) => (
-                                     <Card key={voice.id} className="bg-slate-800 border-slate-700 flex flex-col h-full transition-all hover:border-slate-600 hover:shadow-lg">
-                                         <CardHeader className="pb-3">
-                                             <div className="flex items-center justify-between">
-                                                 <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
-                                                     {voice.voice_type === 'global' ? (
-                                                         <Globe className="h-4 w-4 text-blue-400 flex-shrink-0"/>
-                                                     ) : (
-                                                         <Users className="h-4 w-4 text-green-400 flex-shrink-0"/>
-                                                     )}
-                                                     <span className="truncate">{voice.name}</span>
-                                                 </CardTitle>
+                             <>
+                                 {/* Секция пользовательских голосов */}
+                                 <div>
+                                     <div className="flex items-center justify-between mb-4">
+                                         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                                             <Users className="h-5 w-5 text-green-400" />
+                                             Пользовательские голоса
+                                             <Badge variant="outline" className="ml-2 text-green-400 border-green-400">
+                                                 {voices.filter(v => v.voice_type === 'user').length}
+                                             </Badge>
+                                         </h3>
+                                         {/* Фильтр по пользователю */}
+                                         {users.length > 0 && (
+                                             <Select value={selectedUserFilter} onValueChange={setSelectedUserFilter}>
+                                                 <SelectTrigger className="w-[200px]">
+                                                     <SelectValue placeholder="Все пользователи" />
+                                                 </SelectTrigger>
+                                                 <SelectContent>
+                                                     <SelectItem value="all">Все пользователи</SelectItem>
+                                                     {users.map(u => (
+                                                         <SelectItem key={u.id} value={u.id.toString()}>
+                                                             {u.username || `User_${u.id}`}
+                                                         </SelectItem>
+                                                     ))}
+                                                 </SelectContent>
+                                             </Select>
+                                         )}
+                                     </div>
+                                     {(() => {
+                                         const userVoices = voices.filter(v => 
+                                             v.voice_type === 'user' && 
+                                             (selectedUserFilter === 'all' || v.owner_id === parseInt(selectedUserFilter))
+                                         );
+                                         return userVoices.length === 0 ? (
+                                             <div className="text-center py-12 bg-gray-800/30 rounded-lg border border-gray-700 border-dashed">
+                                                 <Users className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                                                 <p className="text-gray-400 text-lg mb-2">
+                                                     {selectedUserFilter !== 'all' ? 'У выбранного пользователя нет голосов' : 'Пользовательских голосов пока нет'}
+                                                 </p>
                                              </div>
-                                             {voice.voice_type === 'user' && (
-                                                 <div className="text-xs text-gray-400 truncate mt-2">
-                                                     {(() => {
-                                                         const owner = users.find(u => u.id === voice.owner_id);
-                                                         return owner ? (
-                                                             <span className="truncate flex items-center gap-1">
-                                                                 <User className="h-3 w-3" />
-                                                                 {owner.username || `User_${owner.id}`}
-                                                             </span>
-                                                         ) : (
-                                                             <span>Owner ID: {voice.owner_id}</span>
-                                                         );
-                                                     })()}
-                                                 </div>
-                                             )}
-                                         </CardHeader>
-                                         <CardContent className="flex-grow flex flex-col justify-end pt-0">
-                                             <div className="flex gap-2">
-                                                 <Button 
-                                                     onClick={() => handleEdit(voice)} 
-                                                     className="flex-1" 
-                                                     variant="outline"
-                                                     size="sm"
-                                                 >
-                                                     <Settings className="h-4 w-4 mr-1"/>
-                                                     Настроить
-                                                 </Button>
-                                                 {voice.voice_type === 'user' && (
-                                                     <Button 
-                                                         onClick={(e) => handleDelete(voice.id, voice.name)} 
-                                                         variant="destructive"
-                                                         size="sm"
-                                                     >
-                                                         <Trash2 className="h-4 w-4"/>
-                                                     </Button>
-                                                 )}
+                                         ) : (
+                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                                 {userVoices.map((voice) => (
+                                                     <Card key={voice.id} className="bg-slate-800 border-slate-700 flex flex-col h-full transition-all hover:border-slate-600 hover:shadow-lg">
+                                                         <CardHeader className="pb-3">
+                                                             <div className="flex items-center justify-between">
+                                                                 <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
+                                                                     <Users className="h-4 w-4 text-green-400 flex-shrink-0"/>
+                                                                     <span className="truncate">{voice.name}</span>
+                                                                 </CardTitle>
+                                                             </div>
+                                                             <div className="text-xs text-gray-400 truncate mt-2">
+                                                                 {(() => {
+                                                                     const owner = users.find(u => u.id === voice.owner_id);
+                                                                     return owner ? (
+                                                                         <span className="truncate flex items-center gap-1">
+                                                                             <User className="h-3 w-3" />
+                                                                             {owner.username || `User_${owner.id}`}
+                                                                         </span>
+                                                                     ) : (
+                                                                         <span>Owner ID: {voice.owner_id}</span>
+                                                                     );
+                                                                 })()}
+                                                             </div>
+                                                         </CardHeader>
+                                                         <CardContent className="flex-grow flex flex-col justify-end pt-0">
+                                                             <div className="flex gap-2">
+                                                                 <Button 
+                                                                     onClick={() => handleEdit(voice)} 
+                                                                     className="flex-1" 
+                                                                     variant="outline"
+                                                                     size="sm"
+                                                                 >
+                                                                     <Settings className="h-4 w-4 mr-1"/>
+                                                                     Настроить
+                                                                 </Button>
+                                                                 <Button 
+                                                                     onClick={(e) => handleDelete(voice.id, e)} 
+                                                                     variant="destructive"
+                                                                     size="sm"
+                                                                 >
+                                                                     <Trash2 className="h-4 w-4"/>
+                                                                 </Button>
+                                                             </div>
+                                                         </CardContent>
+                                                     </Card>
+                                                 ))}
                                              </div>
-                                         </CardContent>
-                                     </Card>
-                                 ))}
-                             </div>
+                                         );
+                                     })()}
+                                 </div>
+
+                                 {/* Разделитель */}
+                                 <div className="border-t border-gray-700"></div>
+
+                                 {/* Секция глобальных голосов */}
+                                 <div>
+                                     <div className="flex items-center justify-between mb-4">
+                                         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                                             <Globe className="h-5 w-5 text-blue-400" />
+                                             Глобальные голоса
+                                             <Badge variant="outline" className="ml-2 text-blue-400 border-blue-400">
+                                                 {voices.filter(v => v.voice_type === 'global').length}
+                                             </Badge>
+                                         </h3>
+                                     </div>
+                                     {(() => {
+                                         const globalVoices = voices.filter(v => v.voice_type === 'global');
+                                         return globalVoices.length === 0 ? (
+                                             <div className="text-center py-12 bg-gray-800/30 rounded-lg border border-gray-700 border-dashed">
+                                                 <Globe className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                                                 <p className="text-gray-400 text-lg mb-2">Глобальных голосов пока нет</p>
+                                                <p className="text-gray-500 text-sm mb-4">Загрузите первый голос через кнопку "Загрузить голос" вверху страницы</p>
+                                             </div>
+                                         ) : (
+                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                                 {globalVoices.map((voice) => (
+                                                     <Card key={voice.id} className="bg-slate-800 border-slate-700 flex flex-col h-full transition-all hover:border-slate-600 hover:shadow-lg">
+                                                         <CardHeader className="pb-3">
+                                                             <div className="flex items-center justify-between">
+                                                                 <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
+                                                                     <Globe className="h-4 w-4 text-blue-400 flex-shrink-0"/>
+                                                                     <span className="truncate">{voice.name}</span>
+                                                                 </CardTitle>
+                                                             </div>
+                                                         </CardHeader>
+                                                         <CardContent className="flex-grow flex flex-col justify-end pt-0">
+                                                             <div className="flex gap-2">
+                                                                 <Button 
+                                                                     onClick={() => handleEdit(voice)} 
+                                                                     className="flex-1" 
+                                                                     variant="outline"
+                                                                     size="sm"
+                                                                 >
+                                                                     <Settings className="h-4 w-4 mr-1"/>
+                                                                     Настроить
+                                                                 </Button>
+                                                             </div>
+                                                         </CardContent>
+                                                     </Card>
+                                                 ))}
+                                             </div>
+                                         );
+                                     })()}
+                                 </div>
+                             </>
                          )}
                      </div>
                  </CardContent>

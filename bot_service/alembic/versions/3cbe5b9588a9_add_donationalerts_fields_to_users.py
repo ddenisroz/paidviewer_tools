@@ -1,7 +1,7 @@
 """add_donationalerts_fields_to_users
 
 Revision ID: 3cbe5b9588a9
-Revises: ef43e0597ce7
+Revises: 78ee312b0e78
 Create Date: 2025-10-09 00:52:44.177073
 
 """

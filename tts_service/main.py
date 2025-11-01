@@ -41,7 +41,9 @@ def main():
             host=host,
             port=port,
             log_level=uvicorn_log_level,
-            access_log=True
+            access_log=True,
+            use_colors=False,
+            log_config=None  # Отключаем стандартную конфигурацию логирования uvicorn
         )
         
     except Exception as e:

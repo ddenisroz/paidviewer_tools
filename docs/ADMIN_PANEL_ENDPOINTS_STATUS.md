@@ -1,7 +1,8 @@
 # Статус Endpoint'ов Админ-Панели
 
 **Дата:** 29.10.2025  
-**Версия:** 1.0  
+**Обновлено:** 2025-01-09  
+**Версия:** 1.1  
 
 ---
 
@@ -68,7 +69,7 @@
 
 | Endpoint | Метод | Статус | Файл |
 |----------|-------|--------|------|
-| `/api/admin/bots/status` | GET | ✅ Есть | `bot_service/api/admin_api.py:534` |
+| `/api/admin/bots/status` | GET | ✅ Есть + Исправлена структура ответа | `bot_service/api/admin_api.py:539` |
 | `/api/admin/bot-service/restart` | POST | ✅ Есть | `bot_service/api/admin_api.py:1267` |
 | `/api/admin/tts/status` | GET | ✅ Есть | `bot_service/api/admin_api.py:568` |
 | `/api/admin/tts/restart` | POST | ✅ Есть | `bot_service/api/admin_api.py:1386` |
@@ -81,7 +82,16 @@
 
 | Endpoint | Метод | Статус | Файл |
 |----------|-------|--------|------|
-| `/api/admin/monitoring/metrics` | GET | ✅ Есть | `bot_service/api/admin_api.py:1096` |
+| `/api/admin/monitoring/metrics` | GET | ✅ Есть + Расширенные метрики | `bot_service/api/admin_api.py:1101` |
+
+**Метрики включают:**
+- Пользователи: общее количество, активные, заблокированные
+- Сообщения: за 24 часа и за последний час
+- Активные сессии
+- **Интеграции:** активные подключения Twitch/VK
+- **Каналы:** активные каналы с разбивкой по платформам (Twitch/VK)
+- **TTS:** активные каналы с TTS, статистика запросов
+
 | `/api/admin/analytics` | GET | ✅ Есть | `bot_service/api/admin_api.py:1144` |
 | `/api/admin/list` | GET | ✅ Есть | `bot_service/api/admin_api.py:19` |
 | `/api/admin/sessions` | GET | ✅ Есть | `bot_service/api/admin_api.py:379` |
@@ -105,14 +115,16 @@
 
 ## 🚫 Заблокированные Каналы (Blocked Channels)
 
+**Примечание:** Отдельной вкладки "Блокировки" в админ-панели больше нет. Блокировка выполняется через управление пользователями (см. `ADMIN_BLOCKING_AND_WHITELIST.md`). API endpoints остаются для програмmatic доступа.
+
 ### Bot Service
 
 | Endpoint | Метод | Статус | Файл |
 |----------|-------|--------|------|
-| `/api/admin/blocked-channels` | GET | ✅ Есть | `bot_service/api/admin_api.py:913` |
-| `/api/admin/blocked-channels` | POST | ✅ Есть | `bot_service/api/admin_api.py:968` |
-| `/api/admin/blocked-channels/{id}` | PATCH | ✅ Есть | `bot_service/api/admin_api.py:1024` |
-| `/api/admin/blocked-channels/{id}` | DELETE | ✅ Есть | `bot_service/api/admin_api.py:1061` |
+| `/api/admin/blocked-channels` | GET | ✅ Есть | `bot_service/api/admin_api.py:918` |
+| `/api/admin/blocked-channels` | POST | ✅ Есть | `bot_service/api/admin_api.py:973` |
+| `/api/admin/blocked-channels/{id}` | PATCH | ✅ Есть | `bot_service/api/admin_api.py:1029` |
+| `/api/admin/blocked-channels/{id}` | DELETE | ✅ Есть | `bot_service/api/admin_api.py:1066` |
 
 ---
 

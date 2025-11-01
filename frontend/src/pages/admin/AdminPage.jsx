@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Shield, Users, Settings, Mic, MessageCircle, BarChart3, Ban } from 'lucide-react';
+import { Shield, Users, Settings, Mic, MessageCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import VoiceManagement from '../../components/admin/VoiceManagement';
 import UserManagementPage from './UserManagementPage';
 import BotManagementPage from './BotManagementPage';
-import MonitoringPage from './MonitoringPage';
 import SupportTicketsPage from './SupportTicketsPage';
-import BlockedChannelsPage from './BlockedChannelsPage';
 
 const AdminPage = () => {
     const navigate = useNavigate();
@@ -92,24 +90,6 @@ const AdminPage = () => {
                                <span className="hidden sm:inline">Тикеты</span>
                                <span className="sm:hidden">Тикеты</span>
                            </Button>
-                           <Button
-                               variant={activeTab === 'monitoring' ? 'default' : 'ghost'}
-                               onClick={() => setActiveTab('monitoring')}
-                               className={`flex-1 ${activeTab === 'monitoring' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
-                           >
-                               <BarChart3 className="h-4 w-4 mr-1 sm:mr-2" />
-                               <span className="hidden sm:inline">Мониторинг</span>
-                               <span className="sm:hidden">Мониторинг</span>
-                           </Button>
-                           <Button
-                               variant={activeTab === 'blocked' ? 'default' : 'ghost'}
-                               onClick={() => setActiveTab('blocked')}
-                               className={`flex-1 ${activeTab === 'blocked' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
-                           >
-                               <Ban className="h-4 w-4 mr-1 sm:mr-2" />
-                               <span className="hidden sm:inline">Блокировки</span>
-                               <span className="sm:hidden">Блокировки</span>
-                           </Button>
                        </div>
 
                 {/* Контент по табам - lazy loading + кеширование компонентов */}
@@ -131,16 +111,6 @@ const AdminPage = () => {
                 {loadedTabs.tickets && (
                     <div style={{ display: activeTab === 'tickets' ? 'block' : 'none' }}>
                         <SupportTicketsPage />
-                    </div>
-                )}
-                {loadedTabs.monitoring && (
-                    <div style={{ display: activeTab === 'monitoring' ? 'block' : 'none' }}>
-                        <MonitoringPage />
-                    </div>
-                )}
-                {loadedTabs.blocked && (
-                    <div style={{ display: activeTab === 'blocked' ? 'block' : 'none' }}>
-                        <BlockedChannelsPage />
                     </div>
                 )}
             </div>
