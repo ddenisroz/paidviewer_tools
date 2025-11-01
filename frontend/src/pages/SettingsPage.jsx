@@ -80,65 +80,63 @@ const SettingsPage = () => {
             {activeTab === 'settings' && (
             <>
             <Card>
-                <CardContent className="space-y-6 pt-6">
-                    {/* Twitch Integration */}
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <TwitchIcon width="20" height="20" />
-                            <Label htmlFor="twitch-integration" className="text-base font-medium">
-                                Twitch
-                            </Label>
-                        </div>
-                        <Switch
-                            id="twitch-integration"
-                            checked={integrations.twitch?.enabled || false}
-                            onCheckedChange={updateTwitchIntegration}
-                        />
-                    </div>
-
-                    <Separator />
-
-                    {/* VK Integration */}
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <VKIcon width="20" height="20" />
-                            <Label htmlFor="vk-integration" className="text-base font-medium">
-                                VK Live
-                            </Label>
-                        </div>
-                        <Switch
-                            id="vk-integration"
-                            checked={integrations.vk?.enabled || false}
-                            onCheckedChange={updateVkIntegration}
-                            style={integrations.vk?.enabled ? { backgroundColor: '#ef4444' } : {}}
-                        />
-                    </div>
-
-                    <Separator />
-
-                    {/* DonationAlerts Integration */}
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <img 
-                                src="/src/images/logos/DA_Alert_Color.svg" 
-                                alt="DonationAlerts" 
-                                className="h-5 w-5"
-                                onError={(e) => {
-                                    e.target.style.display = 'none';
-                                    e.target.nextSibling.style.display = 'block';
-                                }}
+                <CardContent className="pt-6">
+                    <div className="grid grid-cols-3 gap-4">
+                        {/* Twitch Integration */}
+                        <div className="flex flex-col items-center justify-between gap-3 p-4 rounded-lg border border-gray-700 bg-gray-800/50">
+                            <div className="flex items-center gap-2">
+                                <TwitchIcon width="20" height="20" />
+                                <Label htmlFor="twitch-integration" className="text-base font-medium">
+                                    Twitch
+                                </Label>
+                            </div>
+                            <Switch
+                                id="twitch-integration"
+                                checked={integrations.twitch?.enabled || false}
+                                onCheckedChange={updateTwitchIntegration}
                             />
-                            <Gift className="h-5 w-5 text-orange-500" style={{display: 'none'}} />
-                            <Label className="text-base font-medium">
-                                DonationAlerts
-                            </Label>
                         </div>
-                        <Switch
-                            checked={daConnected}
-                            onCheckedChange={daConnected ? handleDonationAlertsDisconnect : handleDonationAlertsConnect}
-                            disabled={daLoading || !hasMainIntegration}
-                            style={daConnected ? { backgroundColor: '#f97316' } : {}}
-                        />
+
+                        {/* VK Integration */}
+                        <div className="flex flex-col items-center justify-between gap-3 p-4 rounded-lg border border-gray-700 bg-gray-800/50">
+                            <div className="flex items-center gap-2">
+                                <VKIcon width="20" height="20" />
+                                <Label htmlFor="vk-integration" className="text-base font-medium">
+                                    VK Live
+                                </Label>
+                            </div>
+                            <Switch
+                                id="vk-integration"
+                                checked={integrations.vk?.enabled || false}
+                                onCheckedChange={updateVkIntegration}
+                                style={integrations.vk?.enabled ? { backgroundColor: '#ef4444' } : {}}
+                            />
+                        </div>
+
+                        {/* DonationAlerts Integration */}
+                        <div className="flex flex-col items-center justify-between gap-3 p-4 rounded-lg border border-gray-700 bg-gray-800/50">
+                            <div className="flex items-center gap-2">
+                                <img 
+                                    src="/src/images/logos/DA_Alert_Color.svg" 
+                                    alt="DonationAlerts" 
+                                    className="h-5 w-5"
+                                    onError={(e) => {
+                                        e.target.style.display = 'none';
+                                        e.target.nextSibling.style.display = 'block';
+                                    }}
+                                />
+                                <Gift className="h-5 w-5 text-orange-500" style={{display: 'none'}} />
+                                <Label className="text-base font-medium">
+                                    DonationAlerts
+                                </Label>
+                            </div>
+                            <Switch
+                                checked={daConnected}
+                                onCheckedChange={daConnected ? handleDonationAlertsDisconnect : handleDonationAlertsConnect}
+                                disabled={daLoading || !hasMainIntegration}
+                                style={daConnected ? { backgroundColor: '#f97316' } : {}}
+                            />
+                        </div>
                     </div>
                 </CardContent>
             </Card>

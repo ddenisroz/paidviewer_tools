@@ -244,7 +244,7 @@ async def handle_tts_for_message(
                 return {"success": False, "error": "TTS is disabled for this user"}
             
             # Загружаем настройки TTS пользователя из БД
-            from core.database import TTSUserSettings, AudioSettings, LocalTTSEndpoint
+            from core.database import TTSUserSettings, AudioSettings, LocalTTSEndpoint, UserVoiceSettings
             tts_user_settings = db.query(TTSUserSettings).filter(TTSUserSettings.user_id == user_id).first()
             audio_settings = db.query(AudioSettings).filter(AudioSettings.user_id == user_id).first()
             local_tts = db.query(LocalTTSEndpoint).filter(LocalTTSEndpoint.user_id == user_id).first()
@@ -398,6 +398,25 @@ async def handle_tts_for_message(
             # Используем отфильтрованный текст для TTS
             text_for_tts = filtered_text
             
+            # Загружаем персональные настройки голоса пользователя (если есть)
+            voice_settings_override = None
+            if use_ai_tts and tts_user_settings.voice:
+                # Получаем voice_id из TTS Service по имени голоса
+                # NOTE: Для полной интеграции нужно запрашивать voice_id из tts_service
+                # Пока передаем имя голоса и настройки напрямую
+                user_voice_config = db.query(UserVoiceSettings).filter(
+                    UserVoiceSettings.user_id == user_id,
+                    UserVoiceSettings.voice_name == tts_user_settings.voice
+                ).first()
+                
+                if user_voice_config:
+                    voice_settings_override = {
+                        "cfg_strength": user_voice_config.cfg_strength,
+                        "speed_preset": user_voice_config.speed_preset,
+                        "volume": user_voice_config.volume
+                    }
+                    logger.info(f"🎛️ [{platform.upper()} TTS] Using personal voice settings: {voice_settings_override}")
+            
             # Отправляем запрос на TTS с настройками пользователя
             logger.info(f"🎙️ [{platform.upper()} TTS] Processing: {username}: {text[:50]}... (engine={tts_user_settings.engine}, volume={volume_level}%)")
             
@@ -415,7 +434,9 @@ async def handle_tts_for_message(
                     "enableTwitch": tts_user_settings.enable_twitch,
                     "enableProfanity": tts_user_settings.enable_lexicon_filter,
                     "maxLength": tts_user_settings.max_message_length,
-                    "skipCommands": tts_user_settings.skip_commands
+                    "skipCommands": tts_user_settings.skip_commands,
+                    "voice": tts_user_settings.voice,  # ✅ Передаем голос пользователя
+                    "voice_settings": voice_settings_override  # ✅ Добавляем персональные настройки голоса
                 }
             )
             

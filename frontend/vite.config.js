@@ -31,7 +31,7 @@ export default defineConfig({
             './src/context/TtsHealthContext.jsx',
             './src/context/PlayerContext.jsx',
             './src/context/ChatContext.jsx',
-            './src/context/TtsCardContext.jsx',
+            './src/context/UserSettingsContext.jsx',
             './src/context/DonationAlertsContext.jsx'
           ],
           

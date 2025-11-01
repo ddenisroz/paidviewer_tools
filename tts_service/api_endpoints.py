@@ -5,7 +5,7 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -605,10 +605,14 @@ async def synthesize_channel(request: dict):
         
         logger.info(f"🎙️ [CHANNEL TTS] {channel_name} | {author}: {text[:50]}...")
         
+        # ✅ Извлекаем голос из tts_settings, если указан
+        voice = tts_settings.get("voice", "female_1") if tts_settings else "female_1"
+        logger.info(f"🎤 [CHANNEL TTS] Using voice: {voice} (from tts_settings)")
+        
         # Используем tts_engine_manager для синтеза
         result = await tts_engine_manager.synthesize_speech_async(
             text=text,
-            voice="default",
+            voice=voice,  # ✅ Используем голос из tts_settings
             user_id=user_id,
             channel_name=channel_name,
             author=author,
@@ -696,6 +700,29 @@ async def get_gpu_task_result(task_id: str):
     """Получить результат GPU задачи"""
     return await tts_api_endpoints.get_gpu_task_result(task_id)
 
+@tts_api.get("/voices/global")
+async def get_global_voices_endpoint(db: Session = Depends(get_db)):
+    """Получить глобальные голоса (доступные всем)"""
+    from tts_service.database import Voice as VoiceModel
+    try:
+        voices = db.query(VoiceModel).filter(VoiceModel.voice_type == 'global').all()
+        return [
+            {
+                "id": voice.id,
+                "name": voice.name,
+                "voice_type": voice.voice_type,
+                "file_path": voice.file_path,
+                "reference_text": voice.reference_text,
+                "cfg_strength": voice.cfg_strength,
+                "speed_preset": voice.speed_preset,
+                "created_at": voice.created_at.isoformat() if voice.created_at else None
+            }
+            for voice in voices
+        ]
+    except Exception as e:
+        logger.error(f"Error getting global voices: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @tts_api.get("/user/voices/{user_id}")
 async def get_user_voices_endpoint(user_id: int, db: Session = Depends(get_db)):
     """Получить голоса пользователя"""
@@ -771,7 +798,9 @@ async def upload_user_voice_endpoint(
             logger.warning(f"⚠️ Transcription failed: {e}, continuing without reference text")
         
         # Сохраняем в финальную директорию
-        voices_dir = Path("audio/voices/user") / str(user_id)
+        # ✅ Используем абсолютный путь из config для надежности
+        from tts_service.config import config
+        voices_dir = config.user_voices_path / str(user_id)
         voices_dir.mkdir(parents=True, exist_ok=True)
         
         # ВСЕГДА сохраняем как WAV
@@ -873,7 +902,12 @@ async def delete_user_voice_endpoint(voice_id: int, user_id: int, db: Session = 
         raise HTTPException(status_code=500, detail=str(e))
 
 @tts_api.put("/user/voices/{voice_id}/rename")
-async def rename_user_voice_endpoint(voice_id: int, user_id: int, new_name: str, db: Session = Depends(get_db)):
+async def rename_user_voice_endpoint(
+    voice_id: int, 
+    user_id: int = Query(..., description="User ID"),
+    new_name: str = Form(...), 
+    db: Session = Depends(get_db)
+):
     """Переименовать пользовательский голос"""
     try:
         voice = db.query(VoiceModel).filter(
@@ -904,7 +938,7 @@ async def rename_user_voice_endpoint(voice_id: int, user_id: int, new_name: str,
         logger.error(f"Rename voice error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@tts_api.post("/tts/user/voices/{voice_id}/transcribe")
+@tts_api.post("/user/voices/{voice_id}/transcribe")
 async def transcribe_user_voice_endpoint(voice_id: int, user_id: int, db: Session = Depends(get_db)):
     """Транскрибировать пользовательский голос"""
     try:
@@ -951,7 +985,7 @@ async def transcribe_user_voice_endpoint(voice_id: int, user_id: int, db: Sessio
         logger.error(f"Transcribe voice error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@tts_api.post("/tts/user/voices/{voice_id}/retranscribe")
+@tts_api.post("/user/voices/{voice_id}/retranscribe")
 async def retranscribe_user_voice_endpoint(voice_id: int, user_id: int, db: Session = Depends(get_db)):
     """Перетранскрибировать пользовательский голос"""
     try:
@@ -998,7 +1032,7 @@ async def retranscribe_user_voice_endpoint(voice_id: int, user_id: int, db: Sess
         logger.error(f"Retranscribe voice error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@tts_api.put("/tts/user/voices/{voice_id}/settings")
+@tts_api.put("/user/voices/{voice_id}/settings")
 async def update_user_voice_settings_endpoint(
     voice_id: int,
     user_id: int,

@@ -2,11 +2,14 @@
 Менеджер сессий для мультиплатформенной авторизации
 """
 import uuid
+import shutil
+from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
 from core.database import User, UserToken, UserSession
 from core.database import get_db
+from core.project_paths import PROJECT_ROOT
 import logging
 
 logger = logging.getLogger(__name__)
@@ -143,7 +146,7 @@ class SessionManager:
                 new_user.vk_username = username
             
             # Переносим настройки от гостя (ищем по session_id)
-            guest_settings = db.query(UserSettings).filter(UserSettings.session_id == session_id).first()
+            guest_settings = db.query(UserSettings).filter(UserSettings.session_id == guest_session_id).first()
             if guest_settings:
                 new_settings = UserSettings(
                     user_id=new_user.id,
@@ -176,7 +179,7 @@ class SessionManager:
                 db.add(new_settings)
             
             # Переносим TTS настройки от гостя (ищем по session_id)
-            guest_tts_settings = db.query(TTSUserSettings).filter(TTSUserSettings.session_id == session_id).first()
+            guest_tts_settings = db.query(TTSUserSettings).filter(TTSUserSettings.session_id == guest_session_id).first()
             if guest_tts_settings:
                 new_tts_settings = TTSUserSettings(
                     user_id=new_user.id,
@@ -187,18 +190,68 @@ class SessionManager:
                 )
                 db.add(new_tts_settings)
             
-                # Завершаем ВСЕ гостевые сессии для этого канала
-                channel_name = platform_user_id.lower()
-                self.terminate_guest_sessions_for_channel(channel_name, "converted_to_authenticated")
-                
-                # Обновляем текущую сессию - меняем user_id с -1 на новый ID
-                guest_session.user_id = new_user.id
-                guest_session.device_info = {
-                    **guest_session.device_info,
-                    "converted_from_guest": True,
-                    "conversion_platform": platform,
-                    "conversion_timestamp": datetime.utcnow().isoformat()
-                }
+            # ⚠️ Голоса гостей НЕ переносятся - гости теперь не могут загружать голоса
+            # Все их данные ограничиваются индивидуальными настройками через session_id
+            
+            # ✅ Переносим LocalTTSEndpoint с session_id
+            try:
+                from core.database import LocalTTSEndpoint
+                local_tts = db.query(LocalTTSEndpoint).filter(LocalTTSEndpoint.session_id == guest_session_id).first()
+                if local_tts:
+                    local_tts.user_id = new_user.id
+                    local_tts.session_id = None
+                    logger.info(f"✅ Transferred local TTS endpoint config")
+            except Exception as e:
+                logger.warning(f"Could not transfer local TTS config: {e}")
+            
+            # ✅ Переносим FilteredWord с session_id
+            try:
+                from core.database import FilteredWord
+                filtered_words = db.query(FilteredWord).filter(FilteredWord.session_id == guest_session_id).all()
+                for word in filtered_words:
+                    word.user_id = new_user.id
+                    word.session_id = None
+                if filtered_words:
+                    logger.info(f"✅ Transferred {len(filtered_words)} filtered words")
+            except Exception as e:
+                logger.warning(f"Could not transfer filtered words: {e}")
+            
+            # ✅ Переносим TTSBlockedUser с session_id
+            try:
+                from core.database import TTSBlockedUser
+                blocked_users = db.query(TTSBlockedUser).filter(TTSBlockedUser.session_id == guest_session_id).all()
+                for blocked in blocked_users:
+                    blocked.user_id = new_user.id
+                    blocked.session_id = None
+                if blocked_users:
+                    logger.info(f"✅ Transferred {len(blocked_users)} blocked users")
+            except Exception as e:
+                logger.warning(f"Could not transfer blocked users: {e}")
+            
+            # ✅ Переносим YouTubeQueue с session_id
+            try:
+                from core.database import YouTubeQueue
+                queue_items = db.query(YouTubeQueue).filter(YouTubeQueue.session_id == guest_session_id).all()
+                for item in queue_items:
+                    item.user_id = new_user.id
+                    item.session_id = None
+                if queue_items:
+                    logger.info(f"✅ Transferred {len(queue_items)} YouTube queue items")
+            except Exception as e:
+                logger.warning(f"Could not transfer YouTube queue: {e}")
+            
+            # Завершаем ВСЕ гостевые сессии для этого канала
+            channel_name = platform_user_id.lower()
+            self.terminate_guest_sessions_for_channel(channel_name, "converted_to_authenticated")
+            
+            # Обновляем текущую сессию - меняем user_id с -1 на новый ID
+            guest_session.user_id = new_user.id
+            guest_session.device_info = {
+                **guest_session.device_info,
+                "converted_from_guest": True,
+                "conversion_platform": platform,
+                "conversion_timestamp": datetime.utcnow().isoformat()
+            }
             
             db.commit()
             

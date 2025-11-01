@@ -56,7 +56,8 @@ class PointsService:
             should_close = False
         
         try:
-            # Находим или создаем запись баллов
+            # ✅ Используем pessimistic locking для защиты от race condition
+            # Находим или создаем запись баллов с блокировкой
             points_record = db.query(ChannelPoints).filter(
                 and_(
                     ChannelPoints.user_id == user_id,
@@ -64,7 +65,7 @@ class PointsService:
                     ChannelPoints.platform == platform,
                     ChannelPoints.channel_name == channel_name
                 )
-            ).first()
+            ).with_for_update().first()  # ✅ Lock для атомарности операции
             
             if not points_record:
                 points_record = ChannelPoints(
@@ -79,12 +80,12 @@ class PointsService:
                 )
                 db.add(points_record)
             
-            # Добавляем баллы
+            # ✅ Внутри транзакции добавляем баллы (атомарная операция)
             points_record.points += amount
             points_record.total_earned += amount
             points_record.last_activity = datetime.utcnow()
             
-            # Создаем транзакцию
+            # ✅ Создаем транзакцию для истории
             transaction = PointsTransaction(
                 user_id=user_id,
                 viewer_id=viewer_id,
@@ -97,14 +98,14 @@ class PointsService:
             )
             
             db.add(transaction)
-            db.commit()
+            db.commit()  # ✅ Атомарный commit всех изменений
             
             logger.info(f"Added {amount} points to {viewer_name}: {reason}")
             return True
             
         except Exception as e:
-            db.rollback()
-            logger.error(f"Error adding points: {e}")
+            db.rollback()  # ✅ Rollback при любой ошибке
+            logger.error(f"Error adding points: {e}", exc_info=True)
             return False
         finally:
             if should_close:
@@ -130,6 +131,8 @@ class PointsService:
             should_close = False
         
         try:
+            # ✅ Используем pessimistic locking для защиты от race condition
+            # ✅ Lock записи для других транзакций - предотвращает одновременное списание
             points_record = db.query(ChannelPoints).filter(
                 and_(
                     ChannelPoints.user_id == user_id,
@@ -137,20 +140,21 @@ class PointsService:
                     ChannelPoints.platform == platform,
                     ChannelPoints.channel_name == channel_name
                 )
-            ).first()
+            ).with_for_update().first()  # ✅ Блокируем запись
             
             if not points_record or points_record.points < amount:
+                db.rollback()
                 return {
                     'success': False,
                     'error': f'Недостаточно баллов. Нужно: {amount}, есть: {points_record.points if points_record else 0}'
                 }
             
-            # Списываем баллы
+            # ✅ Внутри транзакции списываем баллы (атомарная операция)
             points_record.points -= amount
             points_record.total_spent += amount
             points_record.last_activity = datetime.utcnow()
             
-            # Создаем транзакцию
+            # ✅ Создаем транзакцию для истории
             transaction = PointsTransaction(
                 user_id=user_id,
                 viewer_id=viewer_id,
@@ -163,14 +167,14 @@ class PointsService:
             )
             
             db.add(transaction)
-            db.commit()
+            db.commit()  # ✅ Атомарный commit всех изменений
             
             logger.info(f"Deducted {amount} points from {viewer_name}: {reason}")
             return {'success': True}
             
         except Exception as e:
-            db.rollback()
-            logger.error(f"Error deducting points: {e}")
+            db.rollback()  # ✅ Rollback при любой ошибке
+            logger.error(f"Error deducting points: {e}", exc_info=True)
             return {'success': False, 'error': 'Ошибка списания баллов'}
         finally:
             if should_close:
@@ -403,12 +407,20 @@ class PointsService:
             if status:
                 query = query.filter(RewardQueue.status == status)
             
+            # ✅ Оптимизация: избегаем N+1 queries - загружаем все rewards за один запрос
             queue_items = query.order_by(desc(RewardQueue.created_at)).all()
+            
+            # ✅ Batch loading: получаем все уникальные reward_id и загружаем rewards за один запрос
+            reward_ids = [item.reward_id for item in queue_items if item.reward_id]
+            rewards_dict = {}
+            if reward_ids:
+                rewards = db.query(ChannelReward).filter(ChannelReward.id.in_(reward_ids)).all()
+                rewards_dict = {reward.id: reward for reward in rewards}
             
             result = []
             for item in queue_items:
-                # Получаем информацию о награде
-                reward = db.query(ChannelReward).filter(ChannelReward.id == item.reward_id).first()
+                # ✅ Reward уже загружен через batch query, нет дополнительных запросов
+                reward = rewards_dict.get(item.reward_id) if item.reward_id else None
                 
                 result.append({
                     'id': item.id,

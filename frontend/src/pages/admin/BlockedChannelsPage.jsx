@@ -12,6 +12,7 @@ const BlockedChannelsPage = () => {
   const [loading, setLoading] = useState(true);
   const [newChannel, setNewChannel] = useState('');
   const [addingChannel, setAddingChannel] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const loadBlockedChannels = async () => {
     try {
@@ -84,13 +85,14 @@ const BlockedChannelsPage = () => {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-6 text-foreground flex items-center">
+          <h1 className="text-3xl font-bold mb-2 text-foreground flex items-center">
             <Shield className="w-8 h-8 mr-3 text-red-500" />
             Заблокированные каналы
           </h1>
-          <p className="text-muted-foreground mt-2">
-            Управление списком заблокированных каналов
-          </p>
+          <div className="text-muted-foreground mt-2 space-y-1">
+            <p>📌 <strong>Назначение:</strong> Отключение бота от каналов, где он забанен или не нужен</p>
+            <p>🔴 Бот автоматически покинет заблокированный канал и больше не подключится</p>
+          </div>
         </div>
         
         <Badge variant="secondary" className="text-lg px-4 py-2">

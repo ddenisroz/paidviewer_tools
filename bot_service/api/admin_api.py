@@ -1,6 +1,6 @@
 # bot_service/api/admin_api.py
 """API для админ-панели"""
-from fastapi import APIRouter, Depends, HTTPException, Request, Body
+from fastapi import APIRouter, Depends, HTTPException, Request, Body, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -11,6 +11,7 @@ from typing import Optional, Dict
 from pydantic import BaseModel
 import logging
 import asyncio
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -549,7 +550,7 @@ async def get_bots_status(
         twitch_status = {
             "connected": bot_instance is not None,
             "channels": len(bot_instance.connected_channels) if bot_instance else 0,
-            "is_ready": bot_instance.is_ready() if bot_instance else False
+            "is_ready": hasattr(bot_instance, 'is_ready') and bot_instance.is_ready if bot_instance else False
         }
         
         vk_status = {
@@ -578,10 +579,10 @@ async def get_tts_status(
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
+        from constants import DEFAULT_TTS_SERVICE_URL
         import httpx
-        import os
         
-        tts_service_url = os.getenv("TTS_SERVICE_URL", "http://localhost:8001")
+        tts_service_url = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
         
         try:
             async with httpx.AsyncClient() as client:
@@ -1401,7 +1402,8 @@ async def restart_tts_engine(
         # TTS сервис - это отдельный микросервис, мы можем только проверить его статус
         # Реальный перезапуск должен быть выполнен через Docker или системный менеджер
         
-        from constants import TTS_SERVICE_URL
+        from constants import DEFAULT_TTS_SERVICE_URL
+        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
         import httpx
         
         try:
@@ -1439,3 +1441,541 @@ async def restart_tts_engine(
     except Exception as e:
         logger.error(f"Error restarting TTS engine: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка проверки TTS: {str(e)}")
+
+@router.put("/voices/{voice_id}/settings")
+async def update_voice_settings(
+    voice_id: int,
+    settings: dict = Body(...),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Обновить настройки голоса
+    
+    Для глобальных голосов: обновляет настройки самого голоса в TTS Service (reference_text, cfg_strength, speed_preset)
+    Для пользовательских голосов: обновляет настройки в TTS Service
+    Также создаёт/обновляет персональные настройки пользователя в bot_service (UserVoiceSettings)
+    """
+    try:
+        # Проверяем права доступа (только админ может обновлять дефолты)
+        if not user.get('is_admin', False):
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        from core.database import UserVoiceSettings
+        from constants import DEFAULT_TTS_SERVICE_URL
+        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        import httpx
+        
+        user_id = user['id']
+        
+        # Для глобальных голосов: обновляем сам голос в TTS Service (reference_text, cfg_strength, speed_preset)
+        # Отправляем запрос в TTS Service для обновления настроек голоса
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.put(
+                    f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/settings",
+                    json=settings
+                )
+                if response.status_code == 200:
+                    logger.info(f"✅ Voice {voice_id} settings updated in TTS Service")
+                else:
+                    logger.warning(f"⚠️ Failed to update voice {voice_id} in TTS Service: {response.status_code}")
+        except Exception as e:
+            logger.error(f"❌ Error updating voice in TTS Service: {e}")
+        
+        # Создаём/обновляем персональные настройки пользователя в bot_service
+        voice_settings = db.query(UserVoiceSettings).filter(
+            UserVoiceSettings.user_id == user_id,
+            UserVoiceSettings.voice_id == voice_id
+        ).first()
+        
+        if voice_settings:
+            # Обновляем существующие настройки
+            if 'cfg_strength' in settings:
+                voice_settings.cfg_strength = settings['cfg_strength']
+            if 'speed_preset' in settings:
+                voice_settings.speed_preset = settings['speed_preset']
+            if 'volume' in settings:
+                voice_settings.volume = settings['volume']
+            voice_settings.updated_at = datetime.utcnow()
+        else:
+            # Создаём новые настройки
+            voice_settings = UserVoiceSettings(
+                user_id=user_id,
+                voice_id=voice_id,
+                voice_name=settings.get('voice_name'),
+                cfg_strength=settings.get('cfg_strength'),
+                speed_preset=settings.get('speed_preset'),
+                volume=settings.get('volume')
+            )
+            db.add(voice_settings)
+        
+        db.commit()
+        db.refresh(voice_settings)
+        
+        logger.info(f"✅ Voice settings updated for user {user_id}, voice {voice_id}: {settings}")
+        
+        return {
+            "status": "success",
+            "message": "Настройки голоса обновлены",
+            "settings": {
+                "voice_id": voice_settings.voice_id,
+                "cfg_strength": voice_settings.cfg_strength,
+                "speed_preset": voice_settings.speed_preset,
+                "volume": voice_settings.volume
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update voice settings error: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Ошибка обновления настроек: {str(e)}")
+
+@router.post("/voices/test")
+async def test_voice(
+    voice_name: str = Body(...),
+    user_id: int = Body(...),
+    test_text: str = Body(...),
+    cfg_strength: Optional[float] = Body(None),
+    speed_preset: Optional[str] = Body(None),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Тестировать голос с заданным текстом и настройками (прокси к TTS Service с проверкой прав)"""
+    try:
+        # Проверяем права доступа - только админы могут тестировать голоса
+        if not user.get('is_admin', False):
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        # Проверяем, что user_id соответствует текущему пользователю
+        if user.get('id') != user_id:
+            raise HTTPException(status_code=403, detail="User ID mismatch")
+        
+        from constants import DEFAULT_TTS_SERVICE_URL
+        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        import httpx
+        
+        # Подготавливаем данные для FormData в TTS Service
+        data = {
+            'voice_name': voice_name,
+            'user_id': str(user_id),
+            'test_text': test_text,
+        }
+        if cfg_strength is not None:
+            data['cfg_strength'] = str(cfg_strength)
+        if speed_preset is not None:
+            data['speed_preset'] = speed_preset
+        
+        # Проксируем запрос в TTS Service
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{TTS_SERVICE_URL}/api/admin/voices/test",
+                data=data
+            )
+            
+            if response.status_code != 200:
+                error_detail = response.text
+                try:
+                    error_json = response.json()
+                    error_detail = error_json.get('detail', error_detail)
+                except:
+                    pass
+                raise HTTPException(status_code=response.status_code, detail=error_detail)
+            
+            return response.json()
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Test voice error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Test failed: {str(e)}")
+
+@router.get("/voices")
+async def get_admin_voices(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить список всех голосов (прокси к TTS Service с проверкой прав)"""
+    try:
+        # Проверяем права доступа - только админы могут просматривать все голоса
+        if not user.get('is_admin', False):
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        from constants import DEFAULT_TTS_SERVICE_URL
+        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        import httpx
+        
+        # Проксируем запрос в TTS Service
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{TTS_SERVICE_URL}/api/admin/voices")
+            
+            if response.status_code != 200:
+                error_detail = response.text
+                try:
+                    error_json = response.json()
+                    error_detail = error_json.get('detail', error_detail)
+                except:
+                    pass
+                raise HTTPException(status_code=response.status_code, detail=error_detail)
+            
+            return response.json()
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get admin voices error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get voices: {str(e)}")
+
+@router.post("/voices/upload")
+async def upload_voice_proxy(
+    file: UploadFile = File(...),
+    name: Optional[str] = Form(None),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Загрузить голос (прокси к TTS Service с проверкой прав)"""
+    try:
+        # Проверяем права доступа - только админы могут загружать голоса
+        if not user.get('is_admin', False):
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        from constants import DEFAULT_TTS_SERVICE_URL
+        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        import httpx
+        
+        # Читаем файл
+        file_content = await file.read()
+        file.seek(0)
+        
+        # Проксируем запрос в TTS Service
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            files = {
+                'file': (file.filename, file_content, file.content_type)
+            }
+            data = {}
+            if name:
+                data['name'] = name
+            
+            response = await client.post(
+                f"{TTS_SERVICE_URL}/api/admin/voices/upload",
+                files=files,
+                data=data
+            )
+            
+            if response.status_code != 200:
+                error_detail = response.text
+                try:
+                    error_json = response.json()
+                    error_detail = error_json.get('detail', error_detail)
+                except:
+                    pass
+                raise HTTPException(status_code=response.status_code, detail=error_detail)
+            
+            return response.json()
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Upload voice error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to upload voice: {str(e)}")
+
+@router.delete("/voices/{voice_id}")
+async def delete_voice_proxy(
+    voice_id: int,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Удалить голос (прокси к TTS Service с проверкой прав)"""
+    try:
+        # Проверяем права доступа - только админы могут удалять голоса
+        if not user.get('is_admin', False):
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        from constants import DEFAULT_TTS_SERVICE_URL
+        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        import httpx
+        
+        # Проксируем запрос в TTS Service
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.delete(f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}")
+            
+            if response.status_code != 200:
+                error_detail = response.text
+                try:
+                    error_json = response.json()
+                    error_detail = error_json.get('detail', error_detail)
+                except:
+                    pass
+                raise HTTPException(status_code=response.status_code, detail=error_detail)
+            
+            return response.json()
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete voice error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to delete voice: {str(e)}")
+
+@router.put("/voices/{voice_id}/rename")
+async def rename_voice_proxy(
+    voice_id: int,
+    new_name: str = Body(...),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Переименовать голос (прокси к TTS Service с проверкой прав)"""
+    try:
+        # Проверяем права доступа - только админы могут переименовывать голоса
+        if not user.get('is_admin', False):
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        from constants import DEFAULT_TTS_SERVICE_URL
+        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        import httpx
+        
+        # Проксируем запрос в TTS Service (используем FormData как в оригинале)
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.put(
+                f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/rename",
+                data={'new_name': new_name}
+            )
+            
+            if response.status_code != 200:
+                error_detail = response.text
+                try:
+                    error_json = response.json()
+                    error_detail = error_json.get('detail', error_detail)
+                except:
+                    pass
+                raise HTTPException(status_code=response.status_code, detail=error_detail)
+            
+            return response.json()
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Rename voice error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to rename voice: {str(e)}")
+
+@router.post("/voices/{voice_id}/transcribe")
+async def transcribe_voice_proxy(
+    voice_id: int,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Транскрибировать голос (прокси к TTS Service с проверкой прав)"""
+    try:
+        # Проверяем права доступа - только админы могут транскрибировать голоса
+        if not user.get('is_admin', False):
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        from constants import DEFAULT_TTS_SERVICE_URL
+        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        import httpx
+        
+        # Проксируем запрос в TTS Service
+        # Проверяем, есть ли такой endpoint в TTS Service
+        # Если нет, используем retranscribe, который делает то же самое
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            # Попробуем найти endpoint для транскрибации в TTS Service
+            # Если его нет, используем retranscribe
+            response = await client.post(f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/retranscribe")
+            
+            if response.status_code != 200:
+                error_detail = response.text
+                try:
+                    error_json = response.json()
+                    error_detail = error_json.get('detail', error_detail)
+                except:
+                    pass
+                raise HTTPException(status_code=response.status_code, detail=error_detail)
+            
+            return response.json()
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Transcribe voice error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to transcribe voice: {str(e)}")
+
+@router.post("/voices/{voice_id}/retranscribe")
+async def retranscribe_voice_proxy(
+    voice_id: int,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Перетранскрибировать голос (прокси к TTS Service с проверкой прав)"""
+    try:
+        # Проверяем права доступа - только админы могут перетранскрибировать голоса
+        if not user.get('is_admin', False):
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        from constants import DEFAULT_TTS_SERVICE_URL
+        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        import httpx
+        
+        # Проксируем запрос в TTS Service
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/retranscribe")
+            
+            if response.status_code != 200:
+                error_detail = response.text
+                try:
+                    error_json = response.json()
+                    error_detail = error_json.get('detail', error_detail)
+                except:
+                    pass
+                raise HTTPException(status_code=response.status_code, detail=error_detail)
+            
+            return response.json()
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Retranscribe voice error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to retranscribe voice: {str(e)}")
+
+@router.post("/voices/{voice_id}/toggle")
+async def toggle_voice_proxy(
+    voice_id: int,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Включить/выключить голос (прокси к TTS Service с проверкой прав)"""
+    try:
+        # Проверяем права доступа - только админы могут включать/выключать голоса
+        if not user.get('is_admin', False):
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        from constants import DEFAULT_TTS_SERVICE_URL
+        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        import httpx
+        
+        # Проксируем запрос в TTS Service
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/toggle")
+            
+            if response.status_code != 200:
+                error_detail = response.text
+                try:
+                    error_json = response.json()
+                    error_detail = error_json.get('detail', error_detail)
+                except:
+                    pass
+                raise HTTPException(status_code=response.status_code, detail=error_detail)
+            
+            return response.json()
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Toggle voice error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to toggle voice: {str(e)}")
+
+@router.get("/tts/stats")
+async def get_tts_stats(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить статистику TTS Service (прокси к TTS Service с проверкой прав)"""
+    try:
+        # Проверяем права доступа - только админы могут просматривать статистику
+        if not user.get('is_admin', False):
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        from constants import DEFAULT_TTS_SERVICE_URL
+        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        import httpx
+        
+        # Проксируем запрос в TTS Service
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{TTS_SERVICE_URL}/api/admin/stats")
+            
+            if response.status_code != 200:
+                error_detail = response.text
+                try:
+                    error_json = response.json()
+                    error_detail = error_json.get('detail', error_detail)
+                except:
+                    pass
+                raise HTTPException(status_code=response.status_code, detail=error_detail)
+            
+            return response.json()
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get TTS stats error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get TTS stats: {str(e)}")
+
+@router.get("/tts/system/status")
+async def get_tts_system_status(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить статус системы TTS Service (прокси к TTS Service с проверкой прав)"""
+    try:
+        # Проверяем права доступа - только админы могут просматривать статус системы
+        if not user.get('is_admin', False):
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        from constants import DEFAULT_TTS_SERVICE_URL
+        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        import httpx
+        
+        # Проксируем запрос в TTS Service
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{TTS_SERVICE_URL}/api/admin/system/status")
+            
+            if response.status_code != 200:
+                error_detail = response.text
+                try:
+                    error_json = response.json()
+                    error_detail = error_json.get('detail', error_detail)
+                except:
+                    pass
+                raise HTTPException(status_code=response.status_code, detail=error_detail)
+            
+            return response.json()
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get TTS system status error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get TTS system status: {str(e)}")
+
+@router.post("/tts/system/restart")
+async def restart_tts_system(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Перезапустить TTS Service (прокси к TTS Service с проверкой прав)"""
+    try:
+        # Проверяем права доступа - только админы могут перезапускать систему
+        if not user.get('is_admin', False):
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        from constants import DEFAULT_TTS_SERVICE_URL
+        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        import httpx
+        
+        # Проксируем запрос в TTS Service
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(f"{TTS_SERVICE_URL}/api/admin/system/restart")
+            
+            if response.status_code != 200:
+                error_detail = response.text
+                try:
+                    error_json = response.json()
+                    error_detail = error_json.get('detail', error_detail)
+                except:
+                    pass
+                raise HTTPException(status_code=response.status_code, detail=error_detail)
+            
+            return response.json()
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Restart TTS system error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to restart TTS system: {str(e)}")

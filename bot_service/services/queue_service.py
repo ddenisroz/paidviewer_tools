@@ -20,12 +20,13 @@ class QueueService:
     
     async def add_video_to_queue(
         self, 
-        user_id: int, 
-        video_url: str, 
-        channel_name: str, 
-        platform: str, 
-        requester_name: str, 
-        requester_id: str,
+        user_id: int = None, 
+        session_id: str = None,
+        video_url: str = None, 
+        channel_name: str = None, 
+        platform: str = None, 
+        requester_name: str = None, 
+        requester_id: str = None,
         is_paid: bool = False,
         points_cost: int = None,
         db: Session = None
@@ -39,6 +40,13 @@ class QueueService:
             should_close = False
         
         try:
+            # Проверяем, что указан либо user_id, либо session_id
+            if not user_id and not session_id:
+                return {
+                    'success': False, 
+                    'error': 'Необходимо указать user_id или session_id'
+                }
+            
             # Проверяем валидность URL
             if not self.youtube_service.is_valid_youtube_url(video_url):
                 return {
@@ -54,14 +62,17 @@ class QueueService:
                     'error': 'Видео недоступно или удалено. Проверьте ссылку и попробуйте снова'
                 }
             
-            # Проверяем, нет ли уже этого видео в очереди
-            existing = db.query(YouTubeQueue).filter(
-                and_(
-                    YouTubeQueue.video_id == video_info['video_id'],
-                    YouTubeQueue.user_id == user_id,
-                    YouTubeQueue.status == 'pending'
-                )
-            ).first()
+            # Проверяем, нет ли уже этого видео в очереди (по user_id или session_id)
+            existing_filter = and_(
+                YouTubeQueue.video_id == video_info['video_id'],
+                YouTubeQueue.status == 'pending'
+            )
+            if user_id:
+                existing_filter = and_(existing_filter, YouTubeQueue.user_id == user_id)
+            if session_id:
+                existing_filter = and_(existing_filter, YouTubeQueue.session_id == session_id)
+            
+            existing = db.query(YouTubeQueue).filter(existing_filter).first()
             
             if existing:
                 return {
@@ -69,13 +80,14 @@ class QueueService:
                     'error': 'Это видео уже есть в очереди! Выберите другое видео'
                 }
             
-            # Получаем следующую позицию в очереди
-            max_position = db.query(YouTubeQueue).filter(
-                and_(
-                    YouTubeQueue.user_id == user_id,
-                    YouTubeQueue.status == 'pending'
-                )
-            ).count()
+            # Получаем следующую позицию в очереди (по user_id или session_id)
+            position_filter = and_(YouTubeQueue.status == 'pending')
+            if user_id:
+                position_filter = and_(position_filter, YouTubeQueue.user_id == user_id)
+            if session_id:
+                position_filter = and_(position_filter, YouTubeQueue.session_id == session_id)
+            
+            max_position = db.query(YouTubeQueue).filter(position_filter).count()
             
             # Если заказ за баллы, проверяем и списываем баллы
             if is_paid and points_cost:
@@ -90,6 +102,7 @@ class QueueService:
             # Создаем запись в очереди
             queue_item = YouTubeQueue(
                 user_id=user_id,
+                session_id=session_id,
                 video_url=video_url,
                 video_id=video_info['video_id'],
                 title=video_info['title'],
@@ -173,9 +186,9 @@ class QueueService:
         reason: str, 
         db: Session
     ) -> Dict[str, Any]:
-        """Списание баллов за заказ"""
+        """Списание баллов за заказ с защитой от race condition"""
         try:
-            # Находим или создаем запись баллов пользователя
+            # ✅ Pessimistic lock - блокируем запись для других транзакций
             points_record = db.query(ChannelPoints).filter(
                 and_(
                     ChannelPoints.user_id == user_id,
@@ -183,20 +196,21 @@ class QueueService:
                     ChannelPoints.platform == platform,
                     ChannelPoints.channel_name == channel_name
                 )
-            ).first()
+            ).with_for_update().first()  # ✅ Lock для предотвращения race condition
             
             if not points_record or points_record.points < cost:
+                db.rollback()
                 return {
                     'success': False,
                     'error': f'Недостаточно баллов. Нужно: {cost}, есть: {points_record.points if points_record else 0}'
                 }
             
-            # Списываем баллы
+            # ✅ Внутри транзакции списываем баллы
             points_record.points -= cost
             points_record.total_spent += cost
             points_record.last_activity = datetime.utcnow()
             
-            # Создаем транзакцию
+            # ✅ Создаем транзакцию для истории
             transaction = PointsTransaction(
                 user_id=user_id,
                 viewer_id=viewer_id,
@@ -209,17 +223,20 @@ class QueueService:
             )
             
             db.add(transaction)
+            db.commit()  # ✅ Явный commit для сохранения изменений
             
+            logger.info(f"Deducted {cost} points from {viewer_name} for {reason}")
             return {'success': True}
             
         except Exception as e:
-            logger.error(f"Error deducting points: {e}")
+            db.rollback()  # ✅ Rollback при ошибке
+            logger.error(f"Error deducting points: {e}", exc_info=True)
             return {
                 'success': False,
                 'error': 'Ошибка списания баллов'
             }
     
-    def get_queue(self, user_id: int, db: Session = None) -> List[Dict[str, Any]]:
+    def get_queue(self, user_id: int = None, session_id: str = None, db: Session = None) -> List[Dict[str, Any]]:
         """Получение очереди видео"""
         
         if db is None:
@@ -229,12 +246,14 @@ class QueueService:
             should_close = False
         
         try:
-            queue_items = db.query(YouTubeQueue).filter(
-                and_(
-                    YouTubeQueue.user_id == user_id,
-                    YouTubeQueue.status == 'pending'
-                )
-            ).order_by(asc(YouTubeQueue.position)).all()
+            # Фильтр по user_id или session_id
+            queue_filter = and_(YouTubeQueue.status == 'pending')
+            if user_id:
+                queue_filter = and_(queue_filter, YouTubeQueue.user_id == user_id)
+            if session_id:
+                queue_filter = and_(queue_filter, YouTubeQueue.session_id == session_id)
+            
+            queue_items = db.query(YouTubeQueue).filter(queue_filter).order_by(asc(YouTubeQueue.position)).all()
             
             result = []
             for item in queue_items:

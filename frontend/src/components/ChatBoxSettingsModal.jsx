@@ -12,20 +12,51 @@ import { toast } from 'sonner';
 import { twitchBadgesService } from '../services/twitchBadges';
 
 const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
-    const [settings, setSettings] = useState(null);
-    const [loading, setLoading] = useState(true);
+    // ✅ Устанавливаем начальные значения по умолчанию для предотвращения визуальных скачков
+    const [settings, setSettings] = useState({
+        font_family: 'Inter',
+        font_size: 16,
+        text_stroke_width: 0,
+        background_opacity: 0.5,
+        max_messages: 20,
+        message_spacing: 4,
+        animation_type: 'fade',
+        message_fade_seconds: 60,
+        chat_direction: 'vertical',
+        show_platform_icons: true,
+        show_badges: true,
+        widget_url: ''
+    });
+    const [loading, setLoading] = useState(false); // ✅ Начальное состояние false - не показываем loading при первом рендере
     const [saving, setSaving] = useState(false);
     const [copied, setCopied] = useState(false);
     
     // Загрузка настроек при открытии
     useEffect(() => {
         if (isOpen) {
+            // ✅ Загружаем данные только когда окно открыто
             loadSettings();
             // Блокируем скролл body
             document.body.style.overflow = 'hidden';
         } else {
             // Восстанавливаем скролл body
             document.body.style.overflow = '';
+            // ✅ Сбрасываем состояние при закрытии, чтобы при следующем открытии заново загружались данные
+            setSettings({
+                font_family: 'Inter',
+                font_size: 16,
+                text_stroke_width: 0,
+                background_opacity: 0.5,
+                max_messages: 20,
+                message_spacing: 4,
+                animation_type: 'fade',
+                message_fade_seconds: 60,
+                chat_direction: 'vertical',
+                show_platform_icons: true,
+                show_badges: true,
+                widget_url: ''
+            });
+            setLoading(false);
         }
         
         // Cleanup при размонтировании
@@ -143,6 +174,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
     
     if (!isOpen) return null;
     
+    // ✅ Показываем loading экран только во время загрузки данных
     if (loading) {
         const loadingContent = (
             <>
@@ -247,7 +279,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                 <Label className="text-white font-semibold">Ссылка для OBS</Label>
                                 <div className="flex gap-2">
                                     <Input
-                                        value={settings?.widget_url || ''}
+                                        value={settings.widget_url || ''}
                                         readOnly
                                         className="bg-gray-800 text-white border-gray-600 font-mono text-xs flex-1"
                                     />
@@ -278,7 +310,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                             <div className="space-y-2">
                                 <Label className="text-white">Шрифт</Label>
                                 <select
-                                    value={settings?.font_family || 'Inter'}
+                                    value={settings.font_family || 'Inter'}
                                     onChange={(e) => handleChange('font_family', e.target.value)}
                                     className="w-full bg-gray-800 text-white border-gray-600 rounded-lg p-2"
                                 >
@@ -292,17 +324,17 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
                                     <Label className="text-white">Размер шрифта</Label>
-                                    <span className="text-sm text-gray-400">{settings?.font_size}px</span>
+                                    <span className="text-sm text-gray-400">{settings.font_size}px</span>
                                 </div>
                                 <input
                                     type="range"
                                     min="8"
                                     max="32"
-                                    value={settings?.font_size || 16}
+                                    value={settings.font_size}
                                     onChange={(e) => handleChange('font_size', parseInt(e.target.value))}
                                     className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                                     style={{
-                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((settings?.font_size - 8) / 24) * 100}%, #374151 ${((settings?.font_size - 8) / 24) * 100}%, #374151 100%)`
+                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((settings.font_size - 8) / 24) * 100}%, #374151 ${((settings.font_size - 8) / 24) * 100}%, #374151 100%)`
                                     }}
                                 />
                             </div>
@@ -311,7 +343,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                             <div className="space-y-2">
                                 <Label className="text-white">Анимация сообщений</Label>
                                 <select
-                                    value={settings?.animation_type || 'fade'}
+                                    value={settings.animation_type || 'fade'}
                                     onChange={(e) => handleChange('animation_type', e.target.value)}
                                     className="w-full bg-gray-800 text-white border-gray-600 rounded-lg p-2"
                                 >
@@ -328,7 +360,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                 <div className="flex items-center justify-between">
                                     <Label className="text-white">Исчезание сообщений</Label>
                                     <span className="text-sm text-gray-400">
-                                        {settings?.message_fade_seconds === 60 ? 'Никогда' : `${settings?.message_fade_seconds}с`}
+                                        {settings.message_fade_seconds === 60 ? 'Никогда' : `${settings.message_fade_seconds}с`}
                                     </span>
                                 </div>
                                 <input
@@ -336,11 +368,11 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                     min="10"
                                     max="60"
                                     step="10"
-                                    value={settings?.message_fade_seconds || 60}
+                                    value={settings.message_fade_seconds}
                                     onChange={(e) => handleChange('message_fade_seconds', parseInt(e.target.value))}
                                     className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                                     style={{
-                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((settings?.message_fade_seconds - 10) / 50) * 100}%, #374151 ${((settings?.message_fade_seconds - 10) / 50) * 100}%, #374151 100%)`
+                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((settings.message_fade_seconds - 10) / 50) * 100}%, #374151 ${((settings.message_fade_seconds - 10) / 50) * 100}%, #374151 100%)`
                                     }}
                                 />
                             </div>
@@ -350,7 +382,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                 <div className="flex items-center justify-between">
                                     <Label className="text-white">Обводка букв (читаемость)</Label>
                                     <span className="text-sm text-gray-400">
-                                        {settings?.text_stroke_width === 0 ? 'Выкл' : `${settings?.text_stroke_width || 0}px`}
+                                        {settings.text_stroke_width === 0 ? 'Выкл' : `${settings.text_stroke_width}px`}
                                     </span>
                                 </div>
                                 <input
@@ -358,11 +390,11 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                     min="0"
                                     max="3"
                                     step="0.5"
-                                    value={settings?.text_stroke_width || 0}
+                                    value={settings.text_stroke_width}
                                     onChange={(e) => handleChange('text_stroke_width', parseFloat(e.target.value))}
                                     className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                                     style={{
-                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((settings?.text_stroke_width || 0) / 3) * 100}%, #374151 ${((settings?.text_stroke_width || 0) / 3) * 100}%, #374151 100%)`
+                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((settings.text_stroke_width) / 3) * 100}%, #374151 ${((settings.text_stroke_width) / 3) * 100}%, #374151 100%)`
                                     }}
                                 />
                             </div>
@@ -371,18 +403,18 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
                                     <Label className="text-white">Непрозрачность фона</Label>
-                                    <span className="text-sm text-gray-400">{Math.round((settings?.background_opacity ?? 0.8) * 100)}%</span>
+                                    <span className="text-sm text-gray-400">{Math.round(settings.background_opacity * 100)}%</span>
                                 </div>
                                 <input
                                     type="range"
                                     min="0"
                                     max="100"
                                     step="1"
-                                    value={Math.round((settings?.background_opacity ?? 0.8) * 100)}
+                                    value={Math.round(settings.background_opacity * 100)}
                                     onChange={(e) => handleChange('background_opacity', parseFloat(e.target.value) / 100)}
                                     className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                                     style={{
-                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${Math.round((settings?.background_opacity ?? 0.8) * 100)}%, #374151 ${Math.round((settings?.background_opacity ?? 0.8) * 100)}%, #374151 100%)`
+                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${Math.round(settings.background_opacity * 100)}%, #374151 ${Math.round(settings.background_opacity * 100)}%, #374151 100%)`
                                     }}
                                 />
                             </div>
@@ -391,17 +423,17 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
                                     <Label className="text-white">Количество сообщений</Label>
-                                    <span className="text-sm text-gray-400">{settings?.max_messages}</span>
+                                    <span className="text-sm text-gray-400">{settings.max_messages}</span>
                                 </div>
                                 <input
                                     type="range"
                                     min="1"
                                     max="50"
-                                    value={settings?.max_messages || 20}
+                                    value={settings.max_messages}
                                     onChange={(e) => handleChange('max_messages', parseInt(e.target.value))}
                                     className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                                     style={{
-                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((settings?.max_messages - 1) / 49) * 100}%, #374151 ${((settings?.max_messages - 1) / 49) * 100}%, #374151 100%)`
+                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((settings.max_messages - 1) / 49) * 100}%, #374151 ${((settings.max_messages - 1) / 49) * 100}%, #374151 100%)`
                                     }}
                                 />
                             </div>
@@ -412,7 +444,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                 <div className="flex gap-2">
                                     <Button
                                         onClick={() => handleChange('chat_direction', 'vertical')}
-                                        variant={settings?.chat_direction === 'vertical' ? 'default' : 'outline'}
+                                        variant={settings.chat_direction === 'vertical' ? 'default' : 'outline'}
                                         size="sm"
                                         className="flex-1"
                                     >
@@ -420,7 +452,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                     </Button>
                                     <Button
                                         onClick={() => handleChange('chat_direction', 'horizontal')}
-                                        variant={settings?.chat_direction === 'horizontal' ? 'default' : 'outline'}
+                                        variant={settings.chat_direction === 'horizontal' ? 'default' : 'outline'}
                                         size="sm"
                                         className="flex-1"
                                     >
@@ -434,7 +466,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                 <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800">
                                     <Label className="text-white cursor-pointer">Показывать иконки платформ</Label>
                                     <Switch
-                                        checked={settings?.show_platform_icons ?? true}
+                                        checked={settings.show_platform_icons ?? true}
                                         onCheckedChange={(checked) => handleChange('show_platform_icons', checked)}
                                     />
                                 </div>
@@ -442,7 +474,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                 <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800">
                                     <Label className="text-white cursor-pointer">Показывать значки</Label>
                                     <Switch
-                                        checked={settings?.show_badges ?? true}
+                                        checked={settings.show_badges ?? true}
                                         onCheckedChange={(checked) => handleChange('show_badges', checked)}
                                     />
                                 </div>

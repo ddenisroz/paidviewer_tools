@@ -14,6 +14,7 @@ import {
     RefreshCw,
     ExternalLink
 } from 'lucide-react';
+import { botService } from '@/services/microservices';
 
 const MonitoringPage = () => {
     const [metrics, setMetrics] = useState(null);
@@ -24,14 +25,8 @@ const MonitoringPage = () => {
     const fetchMetrics = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/admin/monitoring/metrics', {
-                credentials: 'include'
-            });
-            if (!response.ok) {
-                throw new Error('Failed to fetch metrics');
-            }
-            const data = await response.json();
-            setMetrics(data.metrics);
+            const response = await botService.get('/api/admin/monitoring/metrics');
+            setMetrics(response.data.metrics);
             setLastUpdate(new Date());
             setError(null);
         } catch (err) {

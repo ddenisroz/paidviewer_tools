@@ -15,9 +15,19 @@ tables_to_clear = [
     'audio_settings'
 ]
 
+# ✅ Whitelist для безопасности (предотвращает SQL Injection)
+ALLOWED_TABLES = set(tables_to_clear)
+
 for table in tables_to_clear:
     try:
-        cursor.execute(f'DELETE FROM {table}')
+        # ✅ Проверка whitelist перед выполнением
+        if table not in ALLOWED_TABLES:
+            print(f"  ⚠️  Table {table} not in whitelist, skipping")
+            continue
+        
+        # ✅ Безопасный запрос с параметризацией (SQLite не поддерживает ? для имен таблиц, 
+        # но мы защищены whitelist проверкой)
+        cursor.execute(f'DELETE FROM "{table}"')  # Имена таблиц в кавычках для безопасности
         count = cursor.rowcount
         print(f"  ✅ Cleared {table}: {count} rows deleted")
     except Exception as e:

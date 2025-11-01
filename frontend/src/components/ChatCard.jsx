@@ -52,8 +52,16 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
     // Показывать кнопку прокрутки вниз
     const [showScrollButton, setShowScrollButton] = useState(false);
     
-    // Видимость чата (для кнопки "Скрыть чат")
-    const [chatMessagesVisible, setChatMessagesVisible] = useState(true);
+    // Видимость чата (для кнопки "Скрыть чат") - сохраняется в localStorage
+    const [chatMessagesVisible, setChatMessagesVisible] = useState(() => {
+        const saved = localStorage.getItem('chatMessagesVisible');
+        return saved !== null ? JSON.parse(saved) : true;
+    });
+    
+    // Сохраняем состояние видимости чата в localStorage при изменении
+    useEffect(() => {
+        localStorage.setItem('chatMessagesVisible', JSON.stringify(chatMessagesVisible));
+    }, [chatMessagesVisible]);
     
     // State для отслеживания загрузки badges
     const [badgesLoaded, setBadgesLoaded] = useState(false);

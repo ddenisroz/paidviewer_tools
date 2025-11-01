@@ -24,10 +24,6 @@ const AdminPage = () => {
         }
     }, [activeTab, loadedTabs]);
 
-    const logout = () => {
-        navigate('/login');
-    };
-
     // Проверяем права администратора
     if (!user?.is_admin) {
         return (
@@ -56,9 +52,6 @@ const AdminPage = () => {
                                    <span className="sm:hidden">Админка</span>
                                </h1>
                            </div>
-                           <Button onClick={logout} variant="outline" className="text-white border-gray-600 w-full sm:w-auto">
-                               Выйти
-                           </Button>
                        </div>
 
                        {/* Табы */}

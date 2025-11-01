@@ -37,7 +37,7 @@ export const uploadVoice = (formData) => uploadVoiceApi(formData);
 export const deleteVoice = (voiceId) => deleteVoiceApi(voiceId);
 export const updateVoiceSettings = (voiceId, settings) => updateVoiceSettingsApi(voiceId, settings);
 export const transcribeVoice = (voiceId) => transcribeVoiceApi(voiceId);
-export const retranscribeVoice = (voiceId, referenceText) => retranscribeVoiceApi(voiceId, referenceText);
+export const retranscribeVoice = (voiceId) => retranscribeVoiceApi(voiceId);
 export const renameVoice = (voiceId, newName) => renameVoiceApi(voiceId, newName);
 export const getUsers = () => getUsersApi();
 

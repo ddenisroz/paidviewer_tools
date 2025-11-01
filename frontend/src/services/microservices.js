@@ -105,16 +105,18 @@ export const generateObsUrl = async () => {
 
 // Admin
 export const getAdminVoices = async () => {
-    return await ttsService.get('/api/admin/voices');
+    // ✅ Используем botService для проверки прав доступа
+    return await botService.get('/api/admin/voices');
 };
 
 // Global voices
 export const getGlobalVoices = async () => {
-    return await ttsService.get('/api/voices/global');
+    return await ttsService.get('/api/tts/voices/global');
 };
 
 export const uploadVoice = async (formData) => {
-    return await ttsService.post('/api/admin/voices/upload', formData, {
+    // ✅ Используем botService для проверки прав доступа
+    return await botService.post('/api/admin/voices/upload', formData, {
         headers: {
             'Content-Type': 'multipart/form-data',
         },
@@ -122,11 +124,12 @@ export const uploadVoice = async (formData) => {
 };
 
 export const deleteVoice = async (voiceId) => {
-    return await ttsService.delete(`/api/admin/voices/${voiceId}`);
+    // ✅ Используем botService для проверки прав доступа
+    return await botService.delete(`/api/admin/voices/${voiceId}`);
 };
 
 export const updateVoiceSettings = async (voiceId, settings) => {
-    return await botService.put(`/api/voices/${voiceId}/settings`, settings);
+    return await botService.put(`/api/admin/voices/${voiceId}/settings`, settings);
 };
 
 export const updateUserVoiceSettings = async (voiceId, userId, settings) => {
@@ -137,14 +140,10 @@ export const transcribeVoice = async (voiceId) => {
     return await botService.post(`/api/admin/voices/${voiceId}/transcribe`);
 };
 
-export const retranscribeVoice = async (voiceId, referenceText) => {
-    const formData = new FormData();
-    formData.append('reference_text', referenceText);
-    return await ttsService.post(`/api/voices/${voiceId}/retranscribe`, formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data',
-        },
-    });
+export const retranscribeVoice = async (voiceId) => {
+    // ✅ Используем botService для проверки прав доступа
+    // retranscribeVoice извлекает reference_text из аудиофайла автоматически
+    return await botService.post(`/api/admin/voices/${voiceId}/retranscribe`);
 };
 
 export const retranscribeUserVoice = async (voiceId, userId, referenceText) => {
@@ -163,9 +162,10 @@ export const transcribeUserVoice = async (voiceId, userId) => {
 
 // Rename voice functions
 export const renameVoice = async (voiceId, newName) => {
+    // ✅ Используем botService для проверки прав доступа
     const formData = new FormData();
     formData.append('new_name', newName);
-    return await ttsService.put(`/api/admin/voices/${voiceId}/rename`, formData, {
+    return await botService.put(`/api/admin/voices/${voiceId}/rename`, formData, {
         headers: {
             'Content-Type': 'multipart/form-data',
         },
@@ -208,29 +208,21 @@ export const deleteUserVoice = async (voiceId, userId) => {
 export const testVoice = async (voiceName, userId, testText = "Ну так я гетеро, че мне пидоров бояться!", cfgStrength = null, speedPreset = null) => {
     // 📤 testVoice called with:', { voiceName, userId, cfgStrength, speedPreset });
     
-    const formData = new FormData();
-    formData.append('voice_name', voiceName);
-    formData.append('user_id', userId);
-    formData.append('test_text', testText);
+    // ✅ Используем botService для проверки прав доступа (только админы)
+    const payload = {
+        voice_name: voiceName,
+        user_id: userId,
+        test_text: testText,
+    };
     if (cfgStrength !== null) {
-        formData.append('cfg_strength', cfgStrength);
-        //   ✅ Added cfg_strength to FormData:', cfgStrength);
+        payload.cfg_strength = cfgStrength;
     }
     if (speedPreset !== null) {
-        formData.append('speed_preset', speedPreset);
-        //   ✅ Added speed_preset to FormData:', speedPreset);
+        payload.speed_preset = speedPreset;
     }
     
-    // Логируем содержимое FormData
-    for (let [key, value] of formData.entries()) {
-        // FormData entry
-    }
-    
-    return await botService.post('/api/voices/test', formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data',
-        },
-    });
+    // ✅ Используем botService - endpoint проверяет права доступа и проксирует в TTS Service
+    return await botService.post('/api/admin/voices/test', payload);
 };
 
 // TTS Configuration API

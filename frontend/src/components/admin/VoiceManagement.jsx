@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,10 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Trash2, Edit, Users, Globe, Settings, TestTube2, Mic, ChevronDown, ChevronRight, Loader2, RefreshCw, Volume2 } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Upload, Trash2, Edit, Users, Globe, Settings, TestTube2, Mic, ChevronDown, ChevronRight, Loader2, RefreshCw, Volume2, X } from 'lucide-react';
 import { Slider } from "@/components/ui/slider"
-import { getAdminVoices, uploadVoice, deleteVoice, updateVoiceSettings, transcribeVoice, testVoice, getUsers, renameVoice } from '../../services/unified-api';
+import { getAdminVoices, uploadVoice, deleteVoice, updateVoiceSettings, transcribeVoice, retranscribeVoice, testVoice, getUsers, renameVoice } from '../../services/unified-api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../ui/toast';
 import { useButtonPosition } from '../../hooks/useButtonPosition';
@@ -32,11 +33,9 @@ const VoiceManagement = () => {
     const [testCfgStrength, setTestCfgStrength] = useState(2.5);
     const [testSpeedPreset, setTestSpeedPreset] = useState('normal');
     
-    // Состояние для сворачивания разделов
-    const [expandedSections, setExpandedSections] = useState({
-        global: true,
-        user: true
-    });
+    // Состояние для фильтрации
+    const [filterType, setFilterType] = useState('all'); // 'all', 'global', 'user'
+    const [selectedUserFilter, setSelectedUserFilter] = useState('all'); // 'all' или ID пользователя
     
     // Состояние для загрузки
     const [uploadFile, setUploadFile] = useState(null);
@@ -49,18 +48,32 @@ const VoiceManagement = () => {
     const [isPlaying, setIsPlaying] = useState(false);
     const [hasLoaded, setHasLoaded] = useState(false);
     const loadingRef = useRef(false); // Ref to prevent double loading
+    const isUserClosingRef = useRef(false); // Ref to track if user explicitly closed dialog
+    const dialogCloseTimeoutRef = useRef(null); // Ref for close timeout
     
     const { user } = useAuth();
     let audioContext = null;
     let audioSource = null;
 
-    // Функция для переключения раздела
-    const toggleSection = (sectionType) => {
-        setExpandedSections(prev => ({
-            ...prev,
-            [sectionType]: !prev[sectionType]
-        }));
+    // Функция для фильтрации голосов
+    const getFilteredVoices = () => {
+        let filtered = voices;
+        
+        // Фильтр по типу
+        if (filterType === 'global') {
+            filtered = filtered.filter(voice => voice.voice_type === 'global');
+        } else if (filterType === 'user') {
+            filtered = filtered.filter(voice => voice.voice_type === 'user');
+            // Дополнительный фильтр по пользователю
+            if (selectedUserFilter !== 'all') {
+                filtered = filtered.filter(voice => voice.owner_id === parseInt(selectedUserFilter));
+            }
+        }
+        
+        return filtered;
     };
+    
+    const filteredVoices = getFilteredVoices();
 
     const loadVoices = useCallback(async () => {
         // Предотвращаем множественные одновременные вызовы (используем только ref)
@@ -69,24 +82,51 @@ const VoiceManagement = () => {
         }
         
         try {
+            loadingRef.current = true;
             setLoading(true);
-            const data = await getAdminVoices();
-            // Axios возвращает { data: { status, voices: [...] } }
-            const payload = (data && data.data) ? data.data : data;
-            const voicesArray = Array.isArray(payload)
-                ? payload
-                : (Array.isArray(payload?.voices) ? payload.voices : []);
+            const response = await getAdminVoices();
+            console.log('🔍 [ADMIN] Raw API response:', response);
+            
+            // Axios оборачивает ответ: { data: { status: "success", voices: [...] } }
+            const data = response?.data || response;
+            console.log('🔍 [ADMIN] Raw API response:', response);
+            console.log('🔍 [ADMIN] Extracted data:', data);
+            console.log('🔍 [ADMIN] Data type:', typeof data);
+            console.log('🔍 [ADMIN] Is array:', Array.isArray(data));
+            console.log('🔍 [ADMIN] Data keys:', data ? Object.keys(data) : 'null');
+            
+            // Извлекаем массив голосов - проверяем несколько вариантов структуры ответа
+            let voicesArray = [];
+            if (Array.isArray(data)) {
+                voicesArray = data;
+                console.log('✅ [ADMIN] Data is array, using directly');
+            } else if (data?.status === 'success' && Array.isArray(data.voices)) {
+                voicesArray = data.voices;
+                console.log('✅ [ADMIN] Found voices in data.voices');
+            } else if (Array.isArray(data?.voices)) {
+                voicesArray = data.voices;
+                console.log('✅ [ADMIN] Found voices array in data.voices');
+            } else if (Array.isArray(data?.data)) {
+                voicesArray = data.data;
+                console.log('✅ [ADMIN] Found voices in data.data');
+            } else {
+                console.warn('⚠️ [ADMIN] Could not extract voices array from response:', data);
+                voicesArray = [];
+            }
+            
+            console.log('✅ [ADMIN] Extracted voices array:', voicesArray);
+            console.log('✅ [ADMIN] Voices count:', voicesArray.length);
+            
+            console.log('✅ [ADMIN] Loaded voices:', voicesArray.length, 'voices');
             setVoices(voicesArray);
-            console.log('✅ Loaded voices:', voicesArray);
         } catch (error) {
-            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось загрузить голоса.' });
-            console.error('Error loading voices:', error);
+            console.error('❌ [ADMIN] Error loading voices:', error);
             setVoices([]); // Устанавливаем пустой массив в случае ошибки
         } finally {
             setLoading(false);
             loadingRef.current = false;
         }
-    }, [addToast, loading]);
+    }, []); // Убрали addToast из зависимостей - он не используется
 
     const loadUsers = useCallback(async () => {
         // Предотвращаем множественные одновременные вызовы
@@ -121,12 +161,60 @@ const VoiceManagement = () => {
 
     useEffect(() => {
         if (!hasLoaded) {
-            loadingRef.current = true;
             setHasLoaded(true);
+            // НЕ устанавливаем loadingRef.current здесь - пусть сами функции управляют своим состоянием
             loadVoices();
             loadUsers();
         }
     }, [hasLoaded, loadVoices, loadUsers]);
+
+    // Обработчик клавиши Escape для закрытия модального окна редактирования
+    useEffect(() => {
+        if (!editDialogOpen) return;
+        
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                setEditDialogOpen(false);
+            }
+        };
+        
+        document.addEventListener('keydown', handleEscape);
+        return () => document.removeEventListener('keydown', handleEscape);
+    }, [editDialogOpen]);
+    
+    // Блокируем скролл body при открытом попапе редактирования
+    useEffect(() => {
+        if (editDialogOpen) {
+            document.body.style.overflow = 'hidden';
+            return () => {
+                document.body.style.overflow = '';
+            };
+        }
+    }, [editDialogOpen]);
+
+    // Обработчик клавиши Escape для закрытия модального окна загрузки
+    useEffect(() => {
+        if (!uploadDialogOpen) return;
+        
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                setUploadDialogOpen(false);
+            }
+        };
+        
+        document.addEventListener('keydown', handleEscape);
+        return () => document.removeEventListener('keydown', handleEscape);
+    }, [uploadDialogOpen]);
+    
+    // Блокируем скролл body при открытом попапе загрузки
+    useEffect(() => {
+        if (uploadDialogOpen) {
+            document.body.style.overflow = 'hidden';
+            return () => {
+                document.body.style.overflow = '';
+            };
+        }
+    }, [uploadDialogOpen]);
 
     const handleFileUpload = (event) => {
         const file = event.target.files[0];
@@ -171,13 +259,15 @@ const VoiceManagement = () => {
             formData.append('file', uploadFile);
             formData.append('voice_name', voiceName.trim());
             
-            // Если выбран пользовательский голос, добавляем owner_id
             if (ownerId === 'user') {
-                formData.append('owner_id', selectedUserId);
+                // Для пользовательских голосов используем endpoint user voices
+                formData.append('user_id', selectedUserId);
+                const { uploadUserVoice } = await import('../../services/unified-api');
+                await uploadUserVoice(selectedUserId, formData);
+            } else {
+                // Для глобальных голосов используем admin endpoint
+                await uploadVoice(formData);
             }
-            // Для глобальных голосов owner_id не передаем
-
-            await uploadVoice(formData);
 
             const position = getButtonPosition(event);
             const message = ownerId === 'global' 
@@ -282,9 +372,10 @@ const VoiceManagement = () => {
         if (!currentVoice) return;
         
         try {
+            // ✅ Используем актуальные значения из testCfgStrength и testSpeedPreset (которые синхронизированы с currentVoice)
             const settings = {
-                cfg_strength: currentVoice.cfg_strength,
-                speed_preset: currentVoice.speed_preset,
+                cfg_strength: testCfgStrength, // ✅ Используем актуальное значение из слайдера
+                speed_preset: testSpeedPreset, // ✅ Используем актуальное значение из слайдера
                 reference_text: currentVoice.reference_text
             };
             
@@ -297,6 +388,11 @@ const VoiceManagement = () => {
                     : voice
             ));
             
+            // Обновляем currentVoice с новыми значениями
+            setCurrentVoice(prev => ({...prev, ...settings}));
+            
+            // Помечаем как явное закрытие пользователем
+            isUserClosingRef.current = true;
             setEditDialogOpen(false);
             addToast({ type: 'success', title: 'Успех', message: 'Настройки голоса сохранены!' });
         } catch (error) {
@@ -423,7 +519,8 @@ const VoiceManagement = () => {
         
         setIsTranscribing(true);
         try {
-            const response = await transcribeVoice(currentVoice.id, currentVoice.reference_text);
+            // transcribeVoice извлекает reference_text из аудиофайла автоматически
+            const response = await transcribeVoice(currentVoice.id);
             
             // Обновляем референсный текст в текущем голосе
             setCurrentVoice(prev => ({...prev, reference_text: response.data.reference_text}));
@@ -449,7 +546,8 @@ const VoiceManagement = () => {
         
         setIsTranscribing(true);
         try {
-            const response = await retranscribeVoice(currentVoice.id, currentVoice.reference_text);
+            // retranscribeVoice извлекает reference_text из аудиофайла автоматически
+            const response = await retranscribeVoice(currentVoice.id);
             
             // Обновляем референсный текст в текущем голосе
             setCurrentVoice(prev => ({...prev, reference_text: response.data.reference_text}));
@@ -478,6 +576,8 @@ const VoiceManagement = () => {
                         // Только cfg_strength настраивается пользователем
                     });
                     addToast({ type: 'success', title: 'Успех', message: `Настройки голоса "${currentVoice.name}" обновлены.` });
+                    // Помечаем как явное закрытие пользователем
+                    isUserClosingRef.current = true;
                     setEditDialogOpen(false);
                     loadVoices();
                 } catch (error) {
@@ -501,451 +601,497 @@ const VoiceManagement = () => {
                     </h2>
                     <p className="text-gray-300 mt-1">Загрузка и управление всеми голосовыми сэмплами</p>
                 </div>
-                <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button className="bg-gray-600 hover:bg-gray-700">
-                            <Upload className="h-4 w-4 mr-2" />
-                            Загрузить голос
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-md">
-                        <DialogHeader>
-                            <DialogTitle>Загрузка нового голоса</DialogTitle>
-                            <DialogDescription>
-                                Загрузите аудио файл для создания нового голоса. Поддерживаются все популярные форматы.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                            <div>
-                                <Label htmlFor="file">Аудио файл (WAV, MP3, FLAC, OGG, M4A, AAC, WMA, AIFF, AU)</Label>
-                                <div className="mt-1">
-                                    <Input
-                                        id="file"
-                                        type="file"
-                                        accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,.wma,.aiff,.au"
-                                        onChange={handleFileUpload}
-                                        className="file:bg-gray-600 file:text-white file:border-0 file:rounded-md file:px-1.5 file:py-0.5 file:mr-1 file:cursor-pointer hover:file:bg-gray-700 file:text-xs cursor-pointer text-xs"
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <Label htmlFor="voiceName">Имя голоса</Label>
-                                <Input
-                                    id="voiceName"
-                                    value={voiceName}
-                                    onChange={(e) => setVoiceName(e.target.value)}
-                                    placeholder="e.g., speaker1"
-                                    className="mt-1"
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="ownerType">Тип голоса</Label>
-                                <Select value={ownerId} onValueChange={(value) => {
-                                    setOwnerId(value);
-                                    if (value === 'global') {
-                                        setSelectedUserId('');
-                                    }
-                                }}>
-                                    <SelectTrigger className="mt-1">
-                                        <SelectValue placeholder="Выберите тип голоса" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="global">
-                                            <div className="flex items-center gap-2">
-                                                <Globe className="w-4 h-4" />
-                                                <span>Глобальный голос</span>
-                                            </div>
-                                        </SelectItem>
-                                        <SelectItem value="user">
-                                            <div className="flex items-center gap-2">
-                                                <Users className="w-4 h-4" />
-                                                <span>Пользовательский голос</span>
-                                            </div>
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            {ownerId === 'user' && (
-                                <div>
-                                    <Label htmlFor="selectedUserId">Пользователь</Label>
-                                    <Select 
-                                        value={selectedUserId} 
-                                        onValueChange={setSelectedUserId}
-                                        onOpenChange={(open) => {
-                                            if (open && users.length === 0) {
-                                                loadUsers();
-                                            }
-                                        }}
-                                    >
-                                        <SelectTrigger className="mt-1">
-                                            <SelectValue placeholder="Выберите пользователя" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {usersLoading ? (
-                                                <div className="flex items-center justify-center p-4">
-                                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                                    <span className="ml-2">Загрузка...</span>
-                                                </div>
-                                            ) : users.length === 0 ? (
-                                                <div className="p-4 text-center text-sm text-muted-foreground">
-                                                    Пользователи не найдены
-                                                </div>
-                                            ) : (
-                                                users.map(u => (
-                                                    <SelectItem key={u.id} value={u.id.toString()}>
-                                                        {u.username || `User_${u.id}`}
-                                                    </SelectItem>
-                                                ))
-                                            )}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            )}
-                        </div>
-                         <DialogFooter className="flex justify-center gap-4">
-                             <Button 
-                                 onClick={() => setUploadDialogOpen(false)} 
-                                 variant="outline" 
-                                 className="w-28"
-                             >
-                                 Отмена
-                             </Button>
-                             <Button
-                                 onClick={(e) => handleUpload(e)}
-                                 disabled={isUploading || !uploadFile || !voiceName.trim() || (ownerId === 'user' && !selectedUserId)}
-                                 className="w-36 bg-green-600 hover:bg-green-700"
-                             >
-                                 {isUploading ? 'Загрузка...' : 'Загрузить'}
-                             </Button>
-                         </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                <Button 
+                    className="bg-gray-600 hover:bg-gray-700"
+                    onClick={() => setUploadDialogOpen(true)}
+                >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Загрузить голос
+                </Button>
             </div>
 
             <Card className="bg-gray-800/50 border-gray-700">
-                 <CardHeader>
-                    <CardTitle>Список голосов</CardTitle>
+                 <CardHeader className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <CardTitle className="text-xl font-bold">Список голосов</CardTitle>
+                        <Badge variant="outline" className="text-sm">
+                            Всего: {voices.length}
+                        </Badge>
+                    </div>
+                    {/* Фильтры */}
+                    <div className="flex items-center gap-4 pt-2">
+                        <Tabs value={filterType} onValueChange={setFilterType} className="w-full">
+                            <TabsList className="grid w-auto grid-cols-3">
+                                <TabsTrigger value="all" className="flex items-center gap-2">
+                                    <Settings className="h-4 w-4" />
+                                    Все
+                                    <Badge variant="outline" className="ml-2">
+                                        {voices.length}
+                                    </Badge>
+                                </TabsTrigger>
+                                <TabsTrigger value="global" className="flex items-center gap-2">
+                                    <Globe className="h-4 w-4" />
+                                    Глобальные
+                                    <Badge variant="outline" className="ml-2 text-blue-400 border-blue-400">
+                                        {voices.filter(v => v.voice_type === 'global').length}
+                                    </Badge>
+                                </TabsTrigger>
+                                <TabsTrigger value="user" className="flex items-center gap-2">
+                                    <Users className="h-4 w-4" />
+                                    Пользовательские
+                                    <Badge variant="outline" className="ml-2 text-green-400 border-green-400">
+                                        {voices.filter(v => v.voice_type === 'user').length}
+                                    </Badge>
+                                </TabsTrigger>
+                            </TabsList>
+                        </Tabs>
+                        {/* Фильтр по пользователю (только для пользовательских голосов) */}
+                        {filterType === 'user' && users.length > 0 && (
+                            <Select value={selectedUserFilter} onValueChange={setSelectedUserFilter}>
+                                <SelectTrigger className="w-[200px]">
+                                    <SelectValue placeholder="Все пользователи" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Все пользователи</SelectItem>
+                                    {users.map(u => (
+                                        <SelectItem key={u.id} value={u.id.toString()}>
+                                            {u.username || `User_${u.id}`}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                    </div>
                  </CardHeader>
                  <CardContent>
                     <div className="space-y-4">
                          {loading ? (
-                             <p>Загрузка...</p>
-                         ) : Array.isArray(voices) && voices.length > 0 ? (
-                             <>
-                                 {/* Глобальные голоса */}
-                                 {voices.filter(voice => voice.voice_type === 'global').length > 0 && (
-                                     <div className="mb-6">
-                                         <div 
-                                             className="flex items-center gap-2 mb-3 cursor-pointer hover:bg-gray-700 p-2 rounded-lg transition-colors"
-                                             onClick={() => toggleSection('global')}
-                                         >
-                                             <Globe className="h-5 w-5 text-gray-400"/>
-                                             <h3 className="text-lg font-semibold text-white">Глобальные голоса</h3>
-                                             <Badge variant="outline" className="ml-auto">
-                                                 {voices.filter(voice => voice.voice_type === 'global').length}
-                                             </Badge>
-                                             {expandedSections.global ? 
-                                                 <ChevronDown className="h-4 w-4 text-gray-400"/> : 
-                                                 <ChevronRight className="h-4 w-4 text-gray-400"/>
-                                             }
-                                             <span className="text-xs text-gray-500 ml-2">
-                                                 {expandedSections.global ? 'open' : 'closed'}
-                                             </span>
-                                         </div>
-                                         {expandedSections.global && (
-                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                                 {voices.filter(voice => voice.voice_type === 'global').map((voice) => (
-                                                     <Card key={voice.id} className="bg-gray-800 border-gray-700 h-full">
-                                                         <CardHeader className="pb-2">
-                                                             <div className="flex items-center justify-between">
-                                                                 <CardTitle className="text-sm font-medium text-white flex items-center gap-2 truncate">
-                                                                     <Globe className="h-3 w-3 text-gray-400 flex-shrink-0"/>
-                                                                     <span className="truncate">{voice.name}</span>
-                                                                 </CardTitle>
-                                                                 <Badge variant="default" className="text-xs">global</Badge>
-                                                             </div>
-                                                         </CardHeader>
-                                                         <CardContent className="pt-0">
-                                                             <div className="flex gap-1">
-                                                                 <Button 
-                                                                     onClick={() => handleEdit(voice)} 
-                                                                     size="sm" 
-                                                                     variant="outline"
-                                                                     className="flex-1 text-xs px-2"
-                                                                 >
-                                                                     <Settings className="h-3 w-3 mr-1"/>
-                                                                     Настройки
-                                                                 </Button>
-                                                                 <Button 
-                                                                     onClick={(e) => handleDelete(voice.id, voice.name)} 
-                                                                     size="sm" 
-                                                                     variant="destructive"
-                                                                     className="px-2"
-                                                                 >
-                                                                     <Trash2 className="h-3 w-3"/>
-                                                                 </Button>
-                                                             </div>
-                                                         </CardContent>
-                                                     </Card>
-                                                 ))}
-                                             </div>
-                                         )}
-                                     </div>
-                                 )}
-
-                                 {/* Пользовательские голоса */}
-                                 {voices.filter(voice => voice.voice_type === 'user').length > 0 && (
-                                     <div className="mb-6">
-                                         <div 
-                                             className="flex items-center gap-2 mb-3 cursor-pointer hover:bg-gray-700 p-2 rounded-lg transition-colors"
-                                             onClick={() => toggleSection('user')}
-                                         >
-                                             <Users className="h-5 w-5 text-gray-400"/>
-                                             <h3 className="text-lg font-semibold text-white">Пользовательские голоса</h3>
-                                             <Badge variant="outline" className="ml-auto">
-                                                 {voices.filter(voice => voice.voice_type === 'user').length}
-                                             </Badge>
-                                             {expandedSections.user ? 
-                                                 <ChevronDown className="h-4 w-4 text-gray-400"/> : 
-                                                 <ChevronRight className="h-4 w-4 text-gray-400"/>
-                                             }
-                                             <span className="text-xs text-gray-500 ml-2">
-                                                 {expandedSections.user ? 'open' : 'closed'}
-                                             </span>
-                                         </div>
-                                         {expandedSections.user && (
-                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                                 {voices.filter(voice => voice.voice_type === 'user').map((voice) => (
-                                                     <Card key={voice.id} className="bg-gray-800 border-gray-700 h-full">
-                                                         <CardHeader className="pb-2">
-                                                             <div className="flex items-center justify-between">
-                                                                 <CardTitle className="text-sm font-medium text-white flex items-center gap-2 truncate">
-                                                                     <Users className="h-3 w-3 text-gray-400 flex-shrink-0"/>
-                                                                     <span className="truncate">{voice.name}</span>
-                                                                 </CardTitle>
-                                                                 <Badge variant="secondary" className="text-xs">user</Badge>
-                                                             </div>
-                                                             <div className="text-xs text-gray-400 truncate">
-                                                                 {(() => {
-                                                                     const owner = users.find(u => u.id === voice.owner_id);
-                                                                     return owner ? (
-                                                                         <div className="flex items-center gap-1">
-                                                                             <Users className="h-3 w-3 flex-shrink-0" />
-                                                                             <span className="truncate">{owner.username || `User_${owner.id}`}</span>
-                                                                             {owner.is_online && <Badge variant="outline" className="text-xs ml-1">Онлайн</Badge>}
-                                                                         </div>
-                                                                     ) : (
-                                                                         <span>Owner ID: {voice.owner_id}</span>
-                                                                     );
-                                                                 })()}
-                                                             </div>
-                                                         </CardHeader>
-                                                         <CardContent className="pt-0">
-                                                             <div className="flex gap-1">
-                                                                 <Button 
-                                                                     onClick={() => handleEdit(voice)} 
-                                                                     size="sm" 
-                                                                     variant="outline"
-                                                                     className="flex-1 text-xs px-2"
-                                                                 >
-                                                                     <Settings className="h-3 w-3 mr-1"/>
-                                                                     Настройки
-                                                                 </Button>
-                                                                 <Button 
-                                                                     onClick={(e) => handleDelete(voice.id, voice.name)} 
-                                                                     size="sm" 
-                                                                     variant="destructive"
-                                                                     className="px-2"
-                                                                 >
-                                                                     <Trash2 className="h-3 w-3"/>
-                                                                 </Button>
-                                                             </div>
-                                                         </CardContent>
-                                                     </Card>
-                                                 ))}
-                                             </div>
-                                         )}
-                                     </div>
-                                 )}
-                             </>
+                             <div className="flex items-center justify-center py-12">
+                                 <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+                                 <span className="ml-3 text-gray-400">Загрузка голосов...</span>
+                             </div>
+                         ) : filteredVoices.length === 0 ? (
+                            <div className="text-center py-12 bg-gray-800/30 rounded-lg border border-gray-700 border-dashed">
+                                <Mic className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                                <p className="text-gray-400 text-lg mb-2">
+                                    {filterType === 'all' ? 'Голосов пока нет' :
+                                     filterType === 'global' ? 'Глобальных голосов пока нет' :
+                                     selectedUserFilter !== 'all' ? 'У выбранного пользователя нет голосов' :
+                                     'Пользовательских голосов пока нет'}
+                                </p>
+                                {filterType === 'all' && (
+                                    <p className="text-gray-500 text-sm mb-4">Загрузите первый голос через кнопку "Загрузить голос"</p>
+                                )}
+                                {filterType === 'all' && (
+                                    <Button 
+                                        onClick={() => setUploadDialogOpen(true)}
+                                        className="bg-purple-600 hover:bg-purple-700"
+                                    >
+                                        <Upload className="h-4 w-4 mr-2" />
+                                        Загрузить голос
+                                    </Button>
+                                )}
+                             </div>
                          ) : (
-                             <div className="col-span-full text-center py-8">
-                                 <p className="text-gray-400">Голосов не найдено</p>
+                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                 {filteredVoices.map((voice) => (
+                                     <Card key={voice.id} className="bg-slate-800 border-slate-700 flex flex-col h-full transition-all hover:border-slate-600 hover:shadow-lg">
+                                         <CardHeader className="pb-3">
+                                             <div className="flex items-center justify-between">
+                                                 <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
+                                                     {voice.voice_type === 'global' ? (
+                                                         <Globe className="h-4 w-4 text-blue-400 flex-shrink-0"/>
+                                                     ) : (
+                                                         <Users className="h-4 w-4 text-green-400 flex-shrink-0"/>
+                                                     )}
+                                                     <span className="truncate">{voice.name}</span>
+                                                 </CardTitle>
+                                             </div>
+                                             {voice.voice_type === 'user' && (
+                                                 <div className="text-xs text-gray-400 truncate mt-2">
+                                                     {(() => {
+                                                         const owner = users.find(u => u.id === voice.owner_id);
+                                                         return owner ? (
+                                                             <span className="truncate flex items-center gap-1">
+                                                                 <User className="h-3 w-3" />
+                                                                 {owner.username || `User_${owner.id}`}
+                                                             </span>
+                                                         ) : (
+                                                             <span>Owner ID: {voice.owner_id}</span>
+                                                         );
+                                                     })()}
+                                                 </div>
+                                             )}
+                                         </CardHeader>
+                                         <CardContent className="flex-grow flex flex-col justify-end pt-0">
+                                             <div className="flex gap-2">
+                                                 <Button 
+                                                     onClick={() => handleEdit(voice)} 
+                                                     className="flex-1" 
+                                                     variant="outline"
+                                                     size="sm"
+                                                 >
+                                                     <Settings className="h-4 w-4 mr-1"/>
+                                                     Настроить
+                                                 </Button>
+                                                 {voice.voice_type === 'user' && (
+                                                     <Button 
+                                                         onClick={(e) => handleDelete(voice.id, voice.name)} 
+                                                         variant="destructive"
+                                                         size="sm"
+                                                     >
+                                                         <Trash2 className="h-4 w-4"/>
+                                                     </Button>
+                                                 )}
+                                             </div>
+                                         </CardContent>
+                                     </Card>
+                                 ))}
                              </div>
                          )}
                      </div>
                  </CardContent>
              </Card>
 
-            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Настройки голоса "{currentVoice?.name}"</DialogTitle>
-                        <DialogDescription>
-                            Настройте параметры голоса, референсный текст и протестируйте изменения
-                        </DialogDescription>
-                    </DialogHeader>
-                    {currentVoice && (
-                        <div className="grid gap-6 py-4">
-                            {/* Референсный текст - ПЕРВЫЙ БЛОК */}
-                            <div className="space-y-4">
+            {/* Диалог загрузки голоса - используем Portal как в ChatBoxSettingsModal */}
+            {uploadDialogOpen && ReactDOM.createPortal(
+                <>
+                    {/* Backdrop - затемнение заднего фона */}
+                    <div 
+                        className="fixed inset-0 bg-black/80 z-[9999]"
+                        onClick={() => setUploadDialogOpen(false)}
+                        style={{ backdropFilter: 'blur(4px)' }}
+                    />
+                    
+                    {/* Modal Content */}
+                    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pointer-events-none">
+                        <div 
+                            className="bg-gray-900 rounded-lg max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {/* Header */}
+                            <div className="border-b border-gray-700 p-4 flex items-center justify-between">
                                 <div>
-                                    <Label>Референсный текст</Label>
-                                    <div className="flex justify-center mt-2 mb-2">
-                                        <Button
-                                            onClick={handleRetranscribeVoice}
-                                            disabled={isTranscribing || !currentVoice?.reference_text?.trim()}
-                                            variant="outline"
-                                            size="sm"
-                                            className="w-32 text-xs px-3"
-                                        >
-                                            {isTranscribing ? (
-                                                <>
-                                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                                    Перетранскрибирую...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <RefreshCw className="h-3 w-3 mr-1" />
-                                                    Перетранскрибировать
-                                                </>
-                                            )}
-                                        </Button>
+                                    <h2 className="text-xl font-bold text-white">Загрузка нового голоса</h2>
+                                    <p className="text-sm text-gray-400 mt-1">Загрузите аудио файл для создания нового голоса. Поддерживаются все популярные форматы.</p>
+                                </div>
+                                <button 
+                                    onClick={() => setUploadDialogOpen(false)} 
+                                    className="text-gray-400 hover:text-white transition-colors"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                            
+                            {/* Content */}
+                            <div className="flex-1 overflow-y-auto p-6">
+                                <div className="space-y-4">
+                                    <div>
+                                        <Label htmlFor="file">Аудио файл (WAV, MP3, FLAC, OGG, M4A, AAC, WMA, AIFF, AU)</Label>
+                                        <div className="mt-1">
+                                            <Input
+                                                id="file"
+                                                type="file"
+                                                accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,.wma,.aiff,.au"
+                                                onChange={handleFileUpload}
+                                                className="file:bg-gray-600 file:text-white file:border-0 file:rounded-md file:px-1.5 file:py-0.5 file:mr-1 file:cursor-pointer hover:file:bg-gray-700 file:text-xs cursor-pointer text-xs"
+                                            />
+                                        </div>
                                     </div>
-                                    <Textarea
-                                        value={currentVoice?.reference_text || ''}
-                                        onChange={(e) => handleReferenceTextChange(e.target.value)}
-                                        placeholder="Введите текст для транскрипции..."
-                                        className="mt-1"
-                                        rows={3}
-                                    />
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Текст, который будет использоваться для транскрипции аудио
-                                    </p>
+                                    <div>
+                                        <Label htmlFor="voiceName">Имя голоса</Label>
+                                        <Input
+                                            id="voiceName"
+                                            value={voiceName}
+                                            onChange={(e) => setVoiceName(e.target.value)}
+                                            placeholder="e.g., speaker1"
+                                            className="mt-1"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="ownerType">Тип голоса</Label>
+                                        <Select value={ownerId} onValueChange={(value) => {
+                                            setOwnerId(value);
+                                            if (value === 'global') {
+                                                setSelectedUserId('');
+                                            }
+                                        }}>
+                                            <SelectTrigger className="mt-1">
+                                                <SelectValue placeholder="Выберите тип голоса" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="global">
+                                                    <div className="flex items-center gap-2">
+                                                        <Globe className="w-4 h-4" />
+                                                        <span>Глобальный голос</span>
+                                                    </div>
+                                                </SelectItem>
+                                                <SelectItem value="user">
+                                                    <div className="flex items-center gap-2">
+                                                        <Users className="w-4 h-4" />
+                                                        <span>Пользовательский голос</span>
+                                                    </div>
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    {ownerId === 'user' && (
+                                        <div>
+                                            <Label htmlFor="selectedUserId">Пользователь</Label>
+                                            <Select 
+                                                value={selectedUserId} 
+                                                onValueChange={setSelectedUserId}
+                                                onOpenChange={(open) => {
+                                                    if (open && users.length === 0) {
+                                                        loadUsers();
+                                                    }
+                                                }}
+                                            >
+                                                <SelectTrigger className="mt-1">
+                                                    <SelectValue placeholder="Выберите пользователя" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {usersLoading ? (
+                                                        <div className="flex items-center justify-center p-4">
+                                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                                            <span className="ml-2">Загрузка...</span>
+                                                        </div>
+                                                    ) : users.length === 0 ? (
+                                                        <div className="p-4 text-center text-sm text-muted-foreground">
+                                                            Пользователи не найдены
+                                                        </div>
+                                                    ) : (
+                                                        users.map(u => (
+                                                            <SelectItem key={u.id} value={u.id.toString()}>
+                                                                {u.username || `User_${u.id}`}
+                                                            </SelectItem>
+                                                        ))
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             
-                            <div>
-                                <Label htmlFor="test-text">Текст для тестирования</Label>
-                                <Textarea
-                                  id="test-text"
-                                  value={testText}
-                                  onChange={(e) => setTestText(e.target.value)}
-                                  className="mt-1"
-                                  rows={3}
-                                  placeholder="Введите текст для тестирования голоса..."
-                                />
-                            </div>
-                            
-                            {/* Настройки генерации TTS */}
-                            <div className="space-y-4">
-                                <h4 className="text-sm font-medium text-white">Настройки генерации</h4>
-                                
-                                {/* Единственный настраиваемый параметр */}
-                                <div>
-                                    <Label htmlFor="cfg-strength">Стабильность синтеза: {testCfgStrength}</Label>
-                                    <Slider
-                                        id="cfg-strength"
-                                        min={0.1}
-                                        max={10.0}
-                                        step={0.1}
-                                        value={[testCfgStrength]}
-                                        onValueChange={(value) => {
-                                            setTestCfgStrength(value[0]);
-                                            setCurrentVoice(prev => ({ ...prev, cfg_strength: value[0] }));
-                                        }}
-                                        className="mt-2"
-                                    />
-                                    <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded mt-1">
-                                        💡 <strong>Стабильность:</strong> Влияет на стабильность и консистентность речи. 
-                                        Рекомендуемое значение 2.5. Слишком высокое значение может сделать речь роботизированной.
-                                    </div>
-                                </div>
-                                
-                                <div>
-                                    <Label htmlFor="speed-preset">Скорость речи: {
-                                        testSpeedPreset === 'very_slow' ? 'Очень медленный' :
-                                        testSpeedPreset === 'slow' ? 'Медленный' :
-                                        testSpeedPreset === 'normal' ? 'Нормальный' :
-                                        testSpeedPreset === 'fast' ? 'Быстрый' : 'Очень быстрый'
-                                    }</Label>
-                                    <Slider
-                                        id="speed-preset"
-                                        min={0}
-                                        max={4}
-                                        step={1}
-                                        value={[
-                                            testSpeedPreset === 'very_slow' ? 0 :
-                                            testSpeedPreset === 'slow' ? 1 :
-                                            testSpeedPreset === 'normal' ? 2 :
-                                            testSpeedPreset === 'fast' ? 3 : 4
-                                        ]}
-                                        onValueChange={(value) => {
-                                            const preset = value[0] === 0 ? 'very_slow' : 
-                                                         value[0] === 1 ? 'slow' : 
-                                                         value[0] === 2 ? 'normal' :
-                                                         value[0] === 3 ? 'fast' : 'very_fast';
-                                            setTestSpeedPreset(preset);
-                                            setCurrentVoice(prev => ({ ...prev, speed_preset: preset }));
-                                        }}
-                                        className="mt-2"
-                                    />
-                                    <div className="flex justify-between text-xs text-muted-foreground mt-1 px-1">
-                                        <span>Очень медл.</span>
-                                        <span>Медленный</span>
-                                        <span>Нормальный</span>
-                                        <span>Быстрый</span>
-                                        <span>Очень быстрый</span>
-                                    </div>
-                                    <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded mt-1">
-                                        💡 <strong>Скорость:</strong> Подберите подходящий пресет. Сильно быстрый может обрывать конец фразы. 
-                                        Слишком медленный может тормозить речь. Начните с "Нормальный" и корректируйте по результату.
-                                    </div>
-                                </div>
-                                
+                            {/* Footer */}
+                            <div className="border-t border-gray-700 p-4 flex justify-center gap-4">
+                                <Button 
+                                    onClick={() => setUploadDialogOpen(false)} 
+                                    variant="outline" 
+                                    className="w-28"
+                                >
+                                    Отмена
+                                </Button>
+                                <Button
+                                    onClick={(e) => handleUpload(e)}
+                                    disabled={isUploading || !uploadFile || !voiceName.trim() || (ownerId === 'user' && !selectedUserId)}
+                                    className="w-36 bg-green-600 hover:bg-green-700"
+                                >
+                                    {isUploading ? 'Загрузка...' : 'Загрузить'}
+                                </Button>
                             </div>
                         </div>
-                    )}
-                    <DialogFooter className="flex justify-center gap-4">
-                        <Button 
-                            onClick={handleTestVoice} 
-                            variant="outline" 
-                            disabled={isTestingVoice}
-                            className="w-32"
+                    </div>
+                </>,
+                document.body
+            )}
+
+            {/* Редактирование голоса - используем Portal как в ChatBoxSettingsModal */}
+            {editDialogOpen && currentVoice && ReactDOM.createPortal(
+                <>
+                    {/* Backdrop - затемнение заднего фона */}
+                    <div 
+                        className="fixed inset-0 bg-black/80 z-[9999]"
+                        onClick={() => setEditDialogOpen(false)}
+                        style={{ backdropFilter: 'blur(4px)' }}
+                    />
+                    
+                    {/* Modal Content */}
+                    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pointer-events-none">
+                        <div 
+                            className="bg-gray-900 rounded-lg max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
                         >
-                            {isTestingVoice ? (
-                                <>
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin"/>
-                                    Тест...
-                                </>
-                            ) : isPlaying ? (
-                                <>
-                                    <Volume2 className="h-4 w-4 mr-2"/>
-                                    Воспроизводится
-                                </>
-                            ) : (
-                                <>
-                                    <TestTube2 className="h-4 w-4 mr-2"/>
-                                    Тест
-                                </>
-                            )}
-                        </Button>
-                        <Button 
-                            onClick={handleRenameVoice} 
-                            variant="outline" 
-                            className="w-32 text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white"
-                        >
-                            <Edit className="h-4 w-4 mr-2"/>Переименовать
-                        </Button>
-                        <Button 
-                            onClick={handleSaveSettings} 
-                            className="w-32 bg-green-600 hover:bg-green-700"
-                        >
-                            <Settings className="h-4 w-4 mr-2"/>Сохранить
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                            {/* Header */}
+                            <div className="border-b border-gray-700 p-4 flex items-center justify-between">
+                                <h2 className="text-xl font-bold text-white">Настройки голоса "{currentVoice?.name}"</h2>
+                                <button 
+                                    onClick={() => setEditDialogOpen(false)} 
+                                    className="text-gray-400 hover:text-white transition-colors"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                            
+                            {/* Content */}
+                            <div className="flex-1 overflow-y-auto p-6">
+                                <div className="grid gap-6 py-4">
+                                    {/* Референсный текст - ПЕРВЫЙ БЛОК */}
+                                    <div className="space-y-4">
+                                        <div className="w-full">
+                                            <Label>Референсный текст</Label>
+                                            <Textarea
+                                                value={currentVoice?.reference_text || ''}
+                                                onChange={(e) => handleReferenceTextChange(e.target.value)}
+                                                placeholder="Введите текст для транскрипции..."
+                                                className="mt-1 w-full"
+                                                rows={3}
+                                            />
+                                            <div className="w-full mt-2">
+                                                <Button
+                                                    onClick={handleRetranscribeVoice}
+                                                    disabled={isTranscribing || !currentVoice?.reference_text?.trim()}
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="w-full justify-center items-center whitespace-nowrap"
+                                                >
+                                                    {isTranscribing ? (
+                                                        <>
+                                                            <Loader2 className="h-4 w-4 mr-2 animate-spin flex-shrink-0" />
+                                                            <span>Перетранскрибирую...</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <RefreshCw className="h-4 w-4 mr-2 flex-shrink-0" />
+                                                            <span>Перетранскрибировать</span>
+                                                        </>
+                                                    )}
+                                                </Button>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                Текст, который будет использоваться для транскрипции аудио
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <Label htmlFor="test-text">Текст для тестирования</Label>
+                                        <Textarea
+                                          id="test-text"
+                                          value={testText}
+                                          onChange={(e) => setTestText(e.target.value)}
+                                          className="mt-1"
+                                          rows={3}
+                                          placeholder="Введите текст для тестирования голоса..."
+                                        />
+                                    </div>
+                                    
+                                    {/* Настройки генерации TTS */}
+                                    <div className="space-y-4">
+                                        <h4 className="text-sm font-medium text-white">Настройки генерации</h4>
+                                        
+                                        {/* Единственный настраиваемый параметр */}
+                                        <div>
+                                            <Label htmlFor="cfg-strength">Стабильность синтеза: {testCfgStrength}</Label>
+                                            <Slider
+                                                id="cfg-strength"
+                                                min={0.1}
+                                                max={10.0}
+                                                step={0.1}
+                                                value={[testCfgStrength]}
+                                                onValueChange={(value) => {
+                                                    setTestCfgStrength(value[0]);
+                                                    setCurrentVoice(prev => ({ ...prev, cfg_strength: value[0] }));
+                                                }}
+                                                className="mt-2"
+                                            />
+                                            <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded mt-1">
+                                                💡 <strong>Стабильность:</strong> Влияет на стабильность и консистентность речи. 
+                                                Рекомендуемое значение 2.5. Слишком высокое значение может сделать речь роботизированной.
+                                            </div>
+                                        </div>
+                                        
+                                        <div>
+                                            <Label htmlFor="speed-preset">Скорость речи: {
+                                                testSpeedPreset === 'very_slow' ? 'Очень медленный' :
+                                                testSpeedPreset === 'slow' ? 'Медленный' :
+                                                testSpeedPreset === 'normal' ? 'Нормальный' :
+                                                testSpeedPreset === 'fast' ? 'Быстрый' : 'Очень быстрый'
+                                            }</Label>
+                                            <Slider
+                                                id="speed-preset"
+                                                min={0}
+                                                max={4}
+                                                step={1}
+                                                value={[
+                                                    testSpeedPreset === 'very_slow' ? 0 :
+                                                    testSpeedPreset === 'slow' ? 1 :
+                                                    testSpeedPreset === 'normal' ? 2 :
+                                                    testSpeedPreset === 'fast' ? 3 : 4
+                                                ]}
+                                                onValueChange={(value) => {
+                                                    const preset = value[0] === 0 ? 'very_slow' : 
+                                                                 value[0] === 1 ? 'slow' : 
+                                                                 value[0] === 2 ? 'normal' :
+                                                                 value[0] === 3 ? 'fast' : 'very_fast';
+                                                    setTestSpeedPreset(preset);
+                                                    setCurrentVoice(prev => ({ ...prev, speed_preset: preset }));
+                                                }}
+                                                className="mt-2"
+                                            />
+                                            <div className="flex justify-between text-xs text-muted-foreground mt-1 px-1">
+                                                <span>Очень медл.</span>
+                                                <span>Медленный</span>
+                                                <span>Нормальный</span>
+                                                <span>Быстрый</span>
+                                                <span>Очень быстрый</span>
+                                            </div>
+                                            <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded mt-1">
+                                                💡 <strong>Скорость:</strong> Подберите подходящий пресет. Сильно быстрый может обрывать конец фразы. 
+                                                Слишком медленный может тормозить речь. Начните с "Нормальный" и корректируйте по результату.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* Footer */}
+                            <div className="border-t border-gray-700 p-4 flex justify-center gap-4">
+                                <Button 
+                                    onClick={handleTestVoice} 
+                                    variant="outline" 
+                                    disabled={isTestingVoice}
+                                    className="w-32 whitespace-nowrap overflow-hidden text-ellipsis"
+                                >
+                                    {isTestingVoice ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 mr-2 animate-spin flex-shrink-0"/>
+                                            <span className="truncate">Тест...</span>
+                                        </>
+                                    ) : isPlaying ? (
+                                        <>
+                                            <Volume2 className="h-4 w-4 mr-2 flex-shrink-0"/>
+                                            <span className="truncate">Воспроизводится</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <TestTube2 className="h-4 w-4 mr-2 flex-shrink-0"/>
+                                            <span className="truncate">Тест</span>
+                                        </>
+                                    )}
+                                </Button>
+                                <Button 
+                                    onClick={handleRenameVoice} 
+                                    variant="outline" 
+                                    className="w-32 whitespace-nowrap overflow-hidden text-ellipsis text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white"
+                                >
+                                    <Edit className="h-4 w-4 mr-2 flex-shrink-0"/>
+                                    <span className="truncate">Переименовать</span>
+                                </Button>
+                                <Button 
+                                    onClick={handleSaveSettings} 
+                                    className="w-32 whitespace-nowrap overflow-hidden text-ellipsis bg-green-600 hover:bg-green-700"
+                                >
+                                    <Settings className="h-4 w-4 mr-2 flex-shrink-0"/>
+                                    <span className="truncate">Сохранить</span>
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </>,
+                document.body
+            )}
         </div>
     );
 };

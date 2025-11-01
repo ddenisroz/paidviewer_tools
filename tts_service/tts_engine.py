@@ -89,43 +89,115 @@ class TTSEngineManager:
             logger.error(f"Error during synthesis: {e}")
             raise
     
-    async def synthesize_speech_async(self, text: str, voice: str = "female_1", user_id: int = None) -> str:
+    async def synthesize_speech_async(
+        self, 
+        text: str, 
+        voice: str = "female_1", 
+        user_id: int = None,
+        channel_name: str = None,
+        author: str = None,
+        word_filter: list = None,
+        blocked_users: list = None,
+        volume: float = 50.0,
+        tts_settings: dict = None
+    ) -> dict:
         """
-        Асинхронный синтез речи для worker'ов
+        Асинхронный синтез речи для channel messages
         
         Args:
             text: Текст для озвучивания
             voice: Голос для синтеза
             user_id: ID пользователя (для логирования)
+            channel_name: Имя канала
+            author: Автор сообщения
+            word_filter: Список запрещенных слов
+            blocked_users: Список заблокированных пользователей
+            volume: Уровень громкости (0-100)
+            tts_settings: Дополнительные настройки TTS (включая voice_settings)
             
         Returns:
-            str: Путь к сгенерированному аудио файлу
+            dict: Результат синтеза {"success": bool, "audio_url": str, ...}
         """
         if not self.is_ready():
-            raise RuntimeError("TTS engine not initialized")
+            return {"success": False, "error": "TTS engine not initialized"}
         
         try:
-            logger.info(f"Async synthesizing speech for user {user_id}: '{text[:50]}...' with voice '{voice}'")
+            logger.info(f"🎙️ Synthesizing for {channel_name} | {author}: '{text[:50]}...'")
+            
+            # Получаем информацию о голосе из БД
+            from tts_service.database import SessionLocal, Voice as VoiceModel
+            db = SessionLocal()
+            try:
+                voice_record = db.query(VoiceModel).filter(VoiceModel.name == voice).first()
+                if not voice_record:
+                    logger.warning(f"Voice '{voice}' not found in DB, using default")
+                    # Используем дефолтный голос female_1
+                    voice_record = db.query(VoiceModel).filter(VoiceModel.name == "female_1").first()
+                    if not voice_record:
+                        return {"success": False, "error": "No voices available"}
+                
+                ref_audio_path = voice_record.file_path
+                ref_text = voice_record.reference_text or ""
+                
+                # Извлекаем voice_settings из tts_settings если есть
+                voice_settings = (tts_settings or {}).get("voice_settings", {}) if tts_settings else {}
+                cfg_strength = voice_settings.get("cfg_strength") or voice_record.cfg_strength
+                speed_preset = voice_settings.get("speed_preset") or voice_record.speed_preset
+                
+                if voice_settings:
+                    logger.info(f"🎛️ Using custom voice settings: cfg={cfg_strength}, speed={speed_preset}")
+                
+            finally:
+                db.close()
             
             # Выполняем синтез в executor для неблокирующей работы
             loop = asyncio.get_event_loop()
             audio_path = await loop.run_in_executor(
                 None,
-                self.tts_engine.synthesize,
+                self.tts_engine.synthesize_speech,
                 text,
-                voice
+                ref_audio_path,  # ✅ Путь к референсному аудио из БД
+                ref_text,  # ✅ Референсный текст из БД
+                None,  # speed (определяется автоматически)
+                None,  # nfe_step (определяется автоматически)
+                None,  # fix_duration
+                False,  # remove_silence
+                None,  # seed
+                cfg_strength,  # ✅ Применяем персональный cfg_strength
+                None,  # target_rms (определяется автоматически)
+                speed_preset  # ✅ Применяем персональный speed_preset
             )
             
             if audio_path and Path(audio_path).exists():
-                logger.info(f"Async speech synthesized successfully: {audio_path}")
-                return audio_path
+                logger.info(f"✅ Speech synthesized: {audio_path}")
+                # Формируем URL для аудио относительно audio директории
+                from tts_service.config import config
+                audio_path_obj = Path(audio_path).resolve()
+                abs_audio_path = config.audio_path.resolve()
+                
+                try:
+                    # Получаем относительный путь от audio директории
+                    relative_path = audio_path_obj.relative_to(abs_audio_path)
+                    audio_url = f"/audio/{relative_path.as_posix()}"
+                except ValueError:
+                    # Если файл находится вне audio, используем только имя файла
+                    audio_url = f"/audio/{audio_path_obj.name}"
+                
+                return {
+                    "success": True,
+                    "audio_url": audio_url,
+                    "audio_path": str(audio_path),  # Сохраняем также полный путь для совместимости
+                    "voice": voice,
+                    "duration": 0,  # TODO: вычислить реальную длительность
+                    "tts_type": "f5"
+                }
             else:
-                logger.error("Async TTS synthesis failed: no audio file generated")
-                return None
+                logger.error("❌ TTS synthesis failed: no audio file generated")
+                return {"success": False, "error": "No audio file generated"}
                 
         except Exception as e:
-            logger.error(f"Async TTS synthesis error: {e}")
-            return None
+            logger.error(f"❌ TTS synthesis error: {e}", exc_info=True)
+            return {"success": False, "error": str(e)}
     
     async def synthesize_with_conversion_async(
         self, 

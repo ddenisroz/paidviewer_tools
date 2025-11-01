@@ -584,3 +584,70 @@ class TTSService:
         except Exception as e:
             logger.error(f"Error saving platform settings: {e}")
             return False
+
+    async def set_voice(self, user_id: int, voice_name: str, db: Session) -> bool:
+        """Установить голос для пользователя (вызывается из команды !voice)"""
+        try:
+            # Проверяем существование голоса в TTS Service
+            import httpx
+            import os
+            from constants import DEFAULT_TTS_SERVICE_URL
+            
+            tts_service_url = os.getenv('TTS_SERVICE_URL', DEFAULT_TTS_SERVICE_URL)
+            
+            try:
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    # Проверяем глобальные голоса
+                    response = await client.get(f"{tts_service_url}/api/tts/voices/global")
+                    if response.status_code == 200:
+                        global_voices = response.json().get('voices', [])
+                        voice_exists_global = any(v.get('name') == voice_name.lower() for v in global_voices)
+                        
+                        # Проверяем пользовательские голоса
+                        response_user = await client.get(f"{tts_service_url}/api/tts/user/voices/{user_id}")
+                        user_voices = []
+                        if response_user.status_code == 200:
+                            user_voices = response_user.json().get('voices', [])
+                        
+                        voice_exists_user = any(v.get('name') == voice_name.lower() for v in user_voices)
+                        
+                        if not (voice_exists_global or voice_exists_user):
+                            logger.warning(f"Voice '{voice_name}' not found in TTS Service")
+                            return False
+            except Exception as e:
+                logger.error(f"Error checking voice in TTS Service: {e}")
+                # Не блокируем, если TTS Service недоступен - просто продолжаем
+            
+            # Сохраняем голос в TTSUserSettings
+            settings = db.query(TTSUserSettings).filter(
+                TTSUserSettings.user_id == user_id
+            ).first()
+            
+            if settings:
+                settings.voice = voice_name.lower()
+                settings.updated_at = datetime.utcnow()
+                logger.info(f"✅ Voice updated to '{voice_name}' for user {user_id}")
+            else:
+                # Создаем новые настройки если их нет
+                settings = TTSUserSettings(
+                    user_id=user_id,
+                    voice=voice_name.lower(),
+                    engine='f5',  # По умолчанию F5-TTS
+                    listening_mode='website',
+                    enable_7tv=False,
+                    enable_twitch=False,
+                    enable_lexicon_filter=True,
+                    enable_custom_lexicon=False,
+                    max_message_length=500,
+                    skip_commands=True
+                )
+                db.add(settings)
+                logger.info(f"✅ Created TTS settings with voice '{voice_name}' for user {user_id}")
+            
+            db.commit()
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error setting voice: {e}", exc_info=True)
+            db.rollback()
+            return False

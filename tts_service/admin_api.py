@@ -1,6 +1,6 @@
 # tts_service/admin_api.py
 """API для администрирования TTS Service"""
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body
 from sqlalchemy.orm import Session
 from tts_service.database import get_db, Voice as VoiceModel
 from tts_service.tts_engine import tts_engine_manager
@@ -300,6 +300,106 @@ async def retranscribe_voice(voice_id: int, db: Session = Depends(get_db)):
         logger.error(f"Retranscribe error: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка перетранскрибации: {str(e)}")
 
+@admin_router.post("/voices/test")
+async def test_voice(
+    voice_name: str = Form(...),
+    user_id: int = Form(...),
+    test_text: str = Form(...),
+    cfg_strength: float = Form(None),
+    speed_preset: str = Form(None),
+    db: Session = Depends(get_db)
+):
+    """Тестировать голос с заданным текстом и настройками"""
+    from pathlib import Path
+    
+    try:
+        if not voice_name or not test_text:
+            raise HTTPException(status_code=400, detail="voice_name and test_text are required")
+        
+        # Получаем голос из БД
+        voice = db.query(VoiceModel).filter(VoiceModel.name == voice_name).first()
+        if not voice:
+            raise HTTPException(status_code=404, detail=f"Voice '{voice_name}' not found")
+        
+        # Проверяем права доступа для пользовательских голосов
+        if voice.owner_id and user_id and voice.owner_id != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        logger.info(f"🎤 Testing voice '{voice_name}' with text: '{test_text[:50]}...'")
+        
+        # Используем переданные параметры или значения по умолчанию из голоса
+        cfg = cfg_strength if cfg_strength is not None else voice.cfg_strength
+        speed = speed_preset if speed_preset is not None else voice.speed_preset
+        
+        # Выполняем синтез
+        result = await tts_engine_manager.synthesize_speech_async(
+            text=test_text,
+            voice=voice_name,
+            user_id=user_id,
+            channel_name="test",
+            author="admin",
+            volume=50.0,
+            tts_settings={
+                "voice_settings": {
+                    "cfg_strength": cfg,
+                    "speed_preset": speed
+                }
+            }
+        )
+        
+        if not result.get("success"):
+            raise HTTPException(status_code=500, detail=result.get("error", "Synthesis failed"))
+        
+        # Проверяем, есть ли audio_url или audio_path в результате
+        audio_url = result.get("audio_url")
+        audio_path = result.get("audio_path")
+        
+        # Если есть audio_url, используем его напрямую
+        if audio_url:
+            logger.info(f"✅ Test synthesis completed: {audio_url}")
+            return {
+                "status": "success",
+                "audio_url": audio_url,
+                "message": "Test synthesis completed successfully"
+            }
+        
+        # Если есть только audio_path, преобразуем его в audio_url
+        if audio_path:
+            from tts_service.config import config
+            audio_path_obj = Path(audio_path)
+            # Получаем путь относительно audio директории
+            try:
+                # Абсолютный путь к audio директории
+                abs_audio_path = config.audio_path.resolve()
+                abs_audio_file = audio_path_obj.resolve()
+                
+                # Проверяем, находится ли файл внутри audio директории
+                try:
+                    relative_path = abs_audio_file.relative_to(abs_audio_path)
+                    audio_url = f"/audio/{relative_path.as_posix()}"
+                except ValueError:
+                    # Если файл находится вне audio, пытаемся найти его имя
+                    audio_url = f"/audio/{audio_path_obj.name}"
+                    
+                logger.info(f"✅ Test synthesis completed: {audio_url}")
+                return {
+                    "status": "success",
+                    "audio_url": audio_url,
+                    "message": "Test synthesis completed successfully"
+                }
+            except Exception as e:
+                logger.error(f"Error processing audio path: {e}", exc_info=True)
+                raise HTTPException(status_code=500, detail=f"Error processing audio path: {str(e)}")
+        
+        # Если нет ни audio_url, ни audio_path
+        raise HTTPException(status_code=500, detail="Audio file not generated")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Test voice error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Test failed: {str(e)}")
+
 @admin_router.delete("/voices/{voice_id}")
 async def delete_voice(voice_id: int, db: Session = Depends(get_db)):
     """Удалить голос"""
@@ -332,6 +432,52 @@ async def delete_voice(voice_id: int, db: Session = Depends(get_db)):
         logger.error(f"Voice delete error: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Ошибка удаления голоса: {str(e)}")
+
+@admin_router.put("/voices/{voice_id}/settings")
+async def update_voice_settings(
+    voice_id: int,
+    settings: dict = Body(...),
+    db: Session = Depends(get_db)
+):
+    """Обновить настройки голоса (reference_text, cfg_strength, speed_preset)"""
+    try:
+        voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
+        if not voice:
+            raise HTTPException(status_code=404, detail="Голос не найден")
+        
+        # Обновляем доступные настройки
+        if 'reference_text' in settings:
+            voice.reference_text = settings['reference_text']
+        
+        if 'cfg_strength' in settings:
+            voice.cfg_strength = settings['cfg_strength']
+        
+        if 'speed_preset' in settings:
+            voice.speed_preset = settings['speed_preset']
+        
+        db.commit()
+        db.refresh(voice)
+        
+        logger.info(f"✅ Voice {voice_id} settings updated")
+        
+        return {
+            "status": "success",
+            "message": "Настройки голоса обновлены",
+            "voice": {
+                "id": voice.id,
+                "name": voice.name,
+                "reference_text": voice.reference_text,
+                "cfg_strength": voice.cfg_strength,
+                "speed_preset": voice.speed_preset
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update voice settings error: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Ошибка обновления настроек: {str(e)}")
 
 @admin_router.put("/voices/{voice_id}/rename")
 async def rename_voice(

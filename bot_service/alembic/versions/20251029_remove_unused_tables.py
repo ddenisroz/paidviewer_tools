@@ -27,9 +27,9 @@ def upgrade() -> None:
     
     # Проверяем, существуют ли таблицы перед удалением
     from sqlalchemy import inspect
-    from bot_service.core.database import engine
     
-    inspector = inspect(engine)
+    conn = op.get_bind()
+    inspector = inspect(conn)
     existing_tables = inspector.get_table_names()
     
     # Удаляем только если таблица существует

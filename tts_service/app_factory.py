@@ -122,5 +122,15 @@ def create_app() -> FastAPI:
     app.include_router(health_router, prefix="")
     app.include_router(admin_router, prefix="/api/admin")
     app.include_router(tts_control_router, prefix="")
-
+    
+    # Раздача статических файлов для аудио
+    from fastapi.staticfiles import StaticFiles
+    from tts_service.config import config
+    
+    # Создаем директорию audio если её нет
+    config.audio_path.mkdir(parents=True, exist_ok=True)
+    
+    # Подключаем раздачу статических файлов
+    app.mount("/audio", StaticFiles(directory=str(config.audio_path)), name="audio")
+    
     return app

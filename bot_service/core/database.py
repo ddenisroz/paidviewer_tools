@@ -145,9 +145,13 @@ try:
     class TTSBlockedUser(Base):
         """Модель пользователей, заблокированных от TTS"""
         __tablename__ = "tts_blocked_users"
-        __table_args__ = {'extend_existing': True}
+        __table_args__ = (
+            CheckConstraint('(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)', name='check_user_or_session_tts_blocked_user'),
+            {'extend_existing': True}
+        )
         id = Column(Integer, primary_key=True, index=True)
-        user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+        user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)  # Владелец канала (для авторизованных)
+        session_id = Column(String, nullable=True, index=True)  # Владелец канала (для гостей)
         channel_name = Column(String, nullable=False, index=True)
         platform = Column(String, nullable=False)  # 'twitch' or 'vk'
         username = Column(String, nullable=False)
@@ -164,32 +168,9 @@ try:
         bot_name = Column(String, unique=True, index=True, nullable=False)
         added_at = Column(DateTime, default=utcnow_naive)
 
-    class Voice(Base):
-        __tablename__ = 'voices'
-        __table_args__ = {'extend_existing': True}
-        id = Column(Integer, primary_key=True, index=True)
-        name = Column(String, unique=True, index=True, nullable=False)
-        voice_type = Column(String, default='global')  # 'global' or 'user'
-        file_path = Column(String, nullable=False)
-        reference_text = Column(String, nullable=True)
-        owner_id = Column(Integer, ForeignKey('users.id'), nullable=True)  # Integer, не String!
-        is_public = Column(Boolean, default=False)
-        is_active = Column(Boolean, default=True)
-        created_at = Column(DateTime, default=utcnow_naive)
-        
-        # Настройки генерации TTS
-        cfg_strength = Column(Float, default=2.5)
-        speed_preset = Column(String, default='normal')
-        cross_fade_duration = Column(Float, default=0.15)
-        silence_duration = Column(Float, default=0.0)
-        silence_duration_ms = Column(Integer, default=100)  # Добавляем поле из TTS сервиса
-        sway_sampling_coef = Column(Float, default=-1.0)  # Добавляем поле из TTS сервиса
-        temperature = Column(Float, default=1.0)
-        top_p = Column(Float, default=0.9)
-        top_k = Column(Integer, default=50)
-        repetition_penalty = Column(Float, default=1.0)
-        length_penalty = Column(Float, default=1.0)
-        early_stopping = Column(Boolean, default=False)
+    # ВАЖНО: Модель Voice удалена из bot_service!
+    # Голоса хранятся ТОЛЬКО в tts_service/database.py (Voice таблица).
+    # Bot service использует UserVoiceSettings для персональных настроек голосов пользователей.
 
     class BlockedChannel(Base):
         """Модель для заблокированных каналов"""
@@ -262,13 +243,17 @@ try:
         __tablename__ = 'filtered_words'
         __table_args__ = (
             Index('idx_user_word', 'user_id', 'word'),
+            Index('idx_session_word', 'session_id', 'word'),
             Index('idx_platform', 'platform'),
             Index('idx_active', 'is_active'),
             UniqueConstraint('user_id', 'word', 'platform', name='uq_user_word_platform'),
+            UniqueConstraint('session_id', 'word', 'platform', name='uq_session_word_platform'),
+            CheckConstraint('(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)', name='check_user_or_session_filtered_word'),
             {'extend_existing': True}
         )
         id = Column(Integer, primary_key=True, index=True)
-        user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)  # Владелец фильтра
+        user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)  # Владелец фильтра (для авторизованных)
+        session_id = Column(String, nullable=True, index=True)  # Владелец фильтра (для гостей)
         word = Column(String, nullable=False, index=True)  # Заблокированное слово
         platform = Column(String, nullable=False, default='all')  # Платформа: all, twitch, vk
         created_at = Column(DateTime, default=utcnow_naive, index=True)
@@ -277,9 +262,13 @@ try:
     class YouTubeQueue(Base):
         """Модель очереди YouTube видео"""
         __tablename__ = 'youtube_queue'
-        __table_args__ = {'extend_existing': True}
+        __table_args__ = (
+            CheckConstraint('(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)', name='check_user_or_session_youtube_queue'),
+            {'extend_existing': True}
+        )
         id = Column(Integer, primary_key=True, index=True)
-        user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+        user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)  # Для авторизованных пользователей
+        session_id = Column(String, nullable=True, index=True)  # Для гостей
         video_url = Column(String, nullable=False)
         video_id = Column(String, nullable=False, index=True)  # YouTube video ID
         title = Column(String, nullable=False)
@@ -478,6 +467,31 @@ try:
         # Метаданные
         tts_version = Column(String, nullable=True)  # Версия TTS движка
         gpu_info = Column(JSON, nullable=True)  # Информация о GPU
+        
+        created_at = Column(DateTime, default=utcnow_naive)
+        updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
+
+    class UserVoiceSettings(Base):
+        """Модель персональных настроек голосов для пользователей
+        
+        Позволяет пользователям переопределять дефолтные настройки голосов для себя.
+        Для глобальных голосов: пользователь настраивает под себя (не влияет на других)
+        Для пользовательских голосов: настройки уже есть в Voice таблице TTS Service
+        """
+        __tablename__ = 'user_voice_settings'
+        __table_args__ = (
+            UniqueConstraint('user_id', 'voice_id', name='uq_user_voice'),
+            {'extend_existing': True}
+        )
+        id = Column(Integer, primary_key=True, index=True)
+        user_id = Column(Integer, ForeignKey('users.id'), nullable=False)  # Пользователь
+        voice_id = Column(Integer, nullable=False)  # ID голоса из TTS Service
+        voice_name = Column(String, nullable=True)  # Название голоса (для кэша)
+        
+        # Персональные настройки (переопределяют дефолтные из Voice)
+        cfg_strength = Column(Float, nullable=True)  # Стабильность синтеза (None = использовать дефолт)
+        speed_preset = Column(String, nullable=True)  # Скорость речи (None = использовать дефолт)
+        volume = Column(Float, nullable=True)  # Индивидуальная громкость голоса (0-100, None = использовать общую)
         
         created_at = Column(DateTime, default=utcnow_naive)
         updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)

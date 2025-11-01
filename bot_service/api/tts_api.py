@@ -1311,9 +1311,10 @@ async def get_local_tts_config(
         user_id = user.get('id') if user and user.get('id') != -1 else None
         session_id = user.get('session_id') if is_guest and user else None
         
-        # Для гостей whitelist не проверяем - они могут использовать локальный TTS
+        # Для гостей: они могут использовать локальный TTS и загружать голоса через свой endpoint
+        # Облачные голоса НЕ доступны (загрузка требует check_user_whitelisted)
         if is_guest:
-            can_manage_voices = True  # Гости всегда могут управлять своим локальным TTS
+            can_manage_voices = True  # Гости могут управлять своим локальным TTS и загружать голоса через него
         else:
             # Проверяем whitelist для авторизованных пользователей
             user_obj = db.query(WhitelistedChannel).filter(
@@ -1537,6 +1538,60 @@ async def test_local_tts_connection(
             "success": False,
             "error": f"Ошибка подключения: {str(e)}"
         }
+
+@local_tts_router.post("/sync-global-voices")
+async def sync_global_voices_to_local(
+    user: dict = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    """Обнаружить голоса в локальном TTS и загрузить их на сайт"""
+    try:
+        # Получаем конфиг локального TTS
+        is_guest = (not user or user.get('id') == -1)
+        user_id = user.get('id') if user and user.get('id') != -1 else None
+        session_id = user.get('session_id') if is_guest and user else None
+        
+        if is_guest and session_id:
+            config = db.query(LocalTTSEndpoint).filter(LocalTTSEndpoint.session_id == session_id).first()
+        elif user_id:
+            config = db.query(LocalTTSEndpoint).filter(LocalTTSEndpoint.user_id == user_id).first()
+        else:
+            raise HTTPException(status_code=404, detail="Локальный TTS не настроен")
+        
+        if not config:
+            raise HTTPException(status_code=404, detail="Локальный TTS не настроен")
+        
+        # Подготавливаем заголовки для локального TTS
+        headers = {}
+        if config.api_key:
+            headers['Authorization'] = f'Bearer {config.api_key}'
+        
+        # Получаем список голосов в локальном TTS
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                local_voices_response = await client.get(f"{config.endpoint_url}/api/voices/list", headers=headers)
+                if local_voices_response.status_code != 200:
+                    raise HTTPException(status_code=local_voices_response.status_code, detail="Не удалось подключиться к локальному TTS")
+                
+                local_voices_data = local_voices_response.json()
+                local_voices = local_voices_data.get('voices', [])
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=500, detail=f"Ошибка подключения к локальному TTS: {str(e)}")
+        
+        # Возвращаем список обнаруженных голосов
+        result = {
+            "success": True,
+            "message": f"Обнаружено голосов в локальном TTS: {len(local_voices)}",
+            "voices": local_voices
+        }
+        
+        return result
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error syncing global voices: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Ошибка синхронизации голосов: {str(e)}")
 
 # ============================================================================
 # FILTERS AND BLOCKED USERS MANAGEMENT

@@ -52,46 +52,54 @@ queue_service = QueueService()
 youtube_service = YouTubeService()
 
 # Импортируем правильную аутентификацию
-from auth.auth import get_current_user
+from auth.auth import get_current_user, get_current_user_optional
 
 # Вспомогательная функция для отправки WebSocket уведомлений
-async def notify_queue_update(user_id: int, db: Session):
+async def notify_queue_update(user_id: int = None, session_id: str = None, db: Session = None):
     """Отправляет WebSocket уведомление об обновлении очереди"""
     try:
         connection_manager = get_connection_manager()
-        queue_items = queue_service.get_queue(user_id, db)
+        queue_items = queue_service.get_queue(user_id=user_id, session_id=session_id, db=db)
+        
+        # Определяем получателя уведомления
+        target_id = str(user_id) if user_id else session_id
         
         await connection_manager.send_to_user(
-            str(user_id),
+            target_id,
             {
                 "type": "youtube_queue_update",
                 "queue": queue_items,
                 "timestamp": time.time()
             }
         )
-        logger.debug(f"📺 Sent youtube_queue_update to user {user_id}")
+        logger.debug(f"📺 Sent youtube_queue_update to {target_id}")
     except Exception as e:
         logger.error(f"Error sending youtube_queue_update: {e}")
 
 @youtube_router.post("/queue/add")
 async def add_video_to_queue(
     request: AddVideoRequest,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """Добавление видео в очередь"""
-    log_request("/youtube/queue/add", "POST", {"video_url": request.video_url}, user.get('id'))
+    is_guest = (not user or user.get('id') == -1)
+    user_id = user.get('id') if user and user.get('id') != -1 else None
+    session_id = user.get('session_id') if is_guest and user else None
+    
+    log_request("/youtube/queue/add", "POST", {"video_url": request.video_url}, user_id or session_id)
     start_time = time.time()
     try:
         # Временно используем заглушки для requester info
         # В реальной системе это будет из сессии/чата
         result = await queue_service.add_video_to_queue(
-            user_id=user["id"],
+            user_id=user_id,
+            session_id=session_id,
             video_url=request.video_url,
             channel_name="web_interface",  # Добавлено через веб-интерфейс
             platform="web",
-            requester_name=f"User_{user['id']}",
-            requester_id=str(user["id"]),
+            requester_name=f"User_{user_id}" if user_id else f"Guest_{session_id}",
+            requester_id=str(user_id) if user_id else session_id,
             is_paid=request.is_paid,
             points_cost=request.points_cost,
             db=db
@@ -99,7 +107,7 @@ async def add_video_to_queue(
         
         if result["success"]:
             # Отправляем WebSocket уведомление об обновлении очереди
-            await notify_queue_update(user["id"], db)
+            await notify_queue_update(user_id=user_id, session_id=session_id, db=db)
             
             response = {
                 "success": True,
@@ -118,17 +126,21 @@ async def add_video_to_queue(
 
 @youtube_router.get("/queue")
 async def get_queue(
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """Получение очереди видео с текущим воспроизводящимся видео"""
     try:
-        queue_items = queue_service.get_queue(user["id"], db)
+        is_guest = (not user or user.get('id') == -1)
+        user_id = user.get('id') if user and user.get('id') != -1 else None
+        session_id = user.get('session_id') if is_guest and user else None
+        
+        queue_items = queue_service.get_queue(user_id=user_id, session_id=session_id, db=db)
         
         # Текущее видео - первое в очереди (все уже отфильтрованы по status='pending')
         current_video = queue_items[0] if queue_items and len(queue_items) > 0 else None
         
-        logger.debug(f"📺 [Queue] User {user['id']}: {len(queue_items)} videos, current: {current_video['title'] if current_video else 'None'}")
+        logger.debug(f"📺 [Queue] User {user_id or session_id}: {len(queue_items)} videos, current: {current_video['title'] if current_video else 'None'}")
         
         return {
             "queue": queue_items,

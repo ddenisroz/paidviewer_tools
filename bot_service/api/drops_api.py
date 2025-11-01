@@ -825,11 +825,12 @@ async def donationalerts_webhook(
         channel_name = user.twitch_username or user.vk_channel_name or 'default'
         
         # === СОХРАНЯЕМ ДОНАТ В БД ===
+        # ✅ Используем транзакцию для атомарности операции
         try:
-            # Проверяем, не обработан ли этот донат уже
+            # ✅ Проверяем дублирование с блокировкой для предотвращения race condition
             existing_donation = db.query(DonationAlert).filter(
                 DonationAlert.alert_id == alert_id
-            ).first()
+            ).with_for_update().first()  # ✅ Lock для предотвращения дублирования
             
             if not existing_donation:
                 # Создаем новую запись о донате
@@ -846,29 +847,28 @@ async def donationalerts_webhook(
                 logger.info(f"✅ [DONATION RECORD] Saved donation {alert_id} from {donor_name}")
             else:
                 logger.info(f"ℹ️ [DONATION RECORD] Donation {alert_id} already recorded")
-        except Exception as e:
-            logger.error(f"Error saving donation record: {e}")
-            # Не прерываем обработку Drops если сохранение не удалось
-        
-        # Инициализируем DropsService
-        drops_service = DropsService(db)
-        
-        # Обрабатываем донат Drops
-        result = drops_service.process_donation_drops(
-            user_id=user_token.user_id,
-            channel_name=channel_name,
-            platform='donationalerts',
-            viewer_id=donor_id,
-            viewer_name=donor_name,
-            donation_amount=donation_amount
-        )
-        
-        # Сохраняем изменения в БД (донат и drops)
-        try:
+                
+            # Инициализируем DropsService
+            drops_service = DropsService(db)
+            
+            # Обрабатываем донат Drops
+            result = drops_service.process_donation_drops(
+                user_id=user_token.user_id,
+                channel_name=channel_name,
+                platform='donationalerts',
+                viewer_id=donor_id,
+                viewer_name=donor_name,
+                donation_amount=donation_amount
+            )
+            
+            # ✅ Атомарный commit всех изменений (донат + drops)
             db.commit()
+            
         except Exception as e:
-            logger.error(f"Error committing donation and drops to DB: {e}")
+            # ✅ Rollback при любой ошибке
             db.rollback()
+            logger.error(f"❌ Error processing donation {alert_id}: {e}", exc_info=True)
+            # Не прерываем обработку, но логируем ошибку
         
         if result:
             logger.info(f"🎁 [DONATION DROPS] {donor_name} получил {result['reward']} ({result['quality']})")

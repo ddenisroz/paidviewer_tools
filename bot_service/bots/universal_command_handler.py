@@ -888,13 +888,15 @@ class UniversalCommandHandler:
             
             # Получаем настройки TTS
             from services.tts_service import TTSService
-            tts_service = TTSService()
+            tts_service = TTSService(db)
             
-            # Устанавливаем голос
-            success = await tts_service.set_voice(user.id, args.lower(), db)
+            # Устанавливаем голос (объединяем аргументы если имя голоса состоит из нескольких слов)
+            voice_name = ' '.join(args).lower() if isinstance(args, list) else args.lower()
+            success = await tts_service.set_voice(user.id, voice_name, db)
             
             if success:
-                await ctx.send(f"@{ctx.author.name} 🎙️ Голос изменён на: {args}")
+                voice_display = ' '.join(args) if isinstance(args, list) else args
+                await ctx.send(f"@{ctx.author.name} 🎙️ Голос изменён на: {voice_display}")
                 self.logger.info(f"✓ Voice changed to {args} for {ctx.channel.name}")
             else:
                 await ctx.send(f"@{ctx.author.name} ❌ Голос '{args}' не найден")
@@ -923,14 +925,16 @@ class UniversalCommandHandler:
             
             # Получаем настройки TTS
             from services.tts_service import TTSService
-            tts_service = TTSService()
+            tts_service = TTSService(db)
             
-            # Устанавливаем голос
-            success = await tts_service.set_voice(user.id, args.lower(), db)
+            # Устанавливаем голос (объединяем аргументы если имя голоса состоит из нескольких слов)
+            voice_name = ' '.join(args).lower() if isinstance(args, list) else args.lower()
+            success = await tts_service.set_voice(user.id, voice_name, db)
             
             if success:
+                voice_display = ' '.join(args) if isinstance(args, list) else args
                 await vk_bot.send_message(channel_name, 
-                    f"@{author_name} 🎙️ Голос изменён на: {args}")
+                    f"@{author_name} 🎙️ Голос изменён на: {voice_display}")
                 self.logger.info(f"✓ Voice changed to {args} for VK {channel_name}")
             else:
                 await vk_bot.send_message(channel_name, 
