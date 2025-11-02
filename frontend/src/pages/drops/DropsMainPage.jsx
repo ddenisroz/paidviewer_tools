@@ -26,8 +26,6 @@ import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Copy, ExternalLink } from 'lucide-react';
-import { usePageAnimation, getAnimationClasses } from '../../hooks/usePageAnimation';
-
 const DropsMainPage = () => {
   const { user, isAuthenticated } = useAuth();
   const { integrations } = useIntegrations();
@@ -35,9 +33,6 @@ const DropsMainPage = () => {
   const [selectedPlatform, setSelectedPlatform] = useState(null);
   const [channelName, setChannelName] = useState(null);
   const [widgetUrl, setWidgetUrl] = useState(null);
-  
-  // 🎬 Анимация страницы
-  const { shouldAnimate, contentLoaded } = usePageAnimation('drops', 100);
 
   // Определяем доступную платформу
   useEffect(() => {
@@ -108,9 +103,8 @@ const DropsMainPage = () => {
       description="Управление наградами и дропами для зрителей"
     >
       {/* Выбор платформы */}
-      <div {...getAnimationClasses(shouldAnimate, contentLoaded, 0)}>
-        <div className="mb-6 flex justify-end">
-          <div className="flex bg-muted rounded-lg p-1">
+      <div className="mb-6 flex justify-end">
+        <div className="flex bg-muted rounded-lg p-1">
             <Button
               variant={selectedPlatform === 'twitch' ? 'default' : 'ghost'}
               size="sm"
@@ -144,12 +138,10 @@ const DropsMainPage = () => {
             VK Live
           </Button>
         </div>
-        </div>
       </div>
 
       {/* Основной контент */}
-      <div {...getAnimationClasses(shouldAnimate, contentLoaded, 100)}>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="streak" className="flex items-center gap-2">
             <Users className="w-4 h-4" />
@@ -288,8 +280,7 @@ const DropsMainPage = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        </Tabs>
-      </div>
+      </Tabs>
     </PageWrapper>
   );
 };
