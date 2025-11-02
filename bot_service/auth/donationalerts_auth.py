@@ -71,19 +71,29 @@ async def donationalerts_callback(
     
     # Для DonationAlerts callback пользователь может быть не авторизован в сессии
     # потому что callback приходит от внешнего сервиса
-    # Мы будем использовать state parameter или искать пользователя по другим критериям
+    # Поддерживаем гостей (user_id = -1) и авторизованных пользователей
     user_id = None
-    if current_user and current_user.get('id') and current_user.get('id') > 0:
-        user_id = current_user.get('id')
-        logger.info(f"DonationAlerts callback for authenticated user {user_id}")
+    session_id = None
+    is_guest = False
+    
+    if current_user and current_user.get('id'):
+        if current_user.get('id') > 0:
+            user_id = current_user.get('id')
+            logger.info(f"DonationAlerts callback for authenticated user {user_id}")
+        elif current_user.get('id') == -1:
+            is_guest = True
+            session_id = current_user.get('session_id')
+            logger.info(f"DonationAlerts callback for guest session {session_id}")
+        else:
+            logger.error("Invalid user_id in session")
+            return RedirectResponse(url=f"{DEFAULT_FRONTEND_URL}/dashboard?auth_error=invalid_session")
     else:
-        logger.info("DonationAlerts callback without authenticated session - will need to handle this case")
-        # TODO: Добавить логику для определения пользователя без сессии
-        # Пока что редиректим на страницу входа
+        logger.info("DonationAlerts callback without authenticated session")
         return RedirectResponse(url=f"{DEFAULT_FRONTEND_URL}/dashboard?auth_error=not_authenticated")
     
     try:
-        logger.info(f"DonationAlerts callback for user {user_id}, code: {code[:10]}...")
+        user_identifier = f"guest {session_id}" if is_guest else f"user {user_id}"
+        logger.info(f"DonationAlerts callback for {user_identifier}, code: {code[:10]}...")
         
         # 1. Обмен кода на токен
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -138,12 +148,18 @@ async def donationalerts_callback(
             
             logger.info(f"DonationAlerts user: {da_username} (ID: {da_user_id})")
             
-            # 3. Сохраняем токен
+            # 3. Сохраняем токен (для гостей используем session_id, для авторизованных - user_id)
             # Проверяем, существует ли уже токен
-            existing_token = db.query(UserToken).filter(
-                UserToken.user_id == user_id,
-                UserToken.platform == "donationalerts"
-            ).first()
+            if is_guest:
+                existing_token = db.query(UserToken).filter(
+                    UserToken.session_id == session_id,
+                    UserToken.platform == "donationalerts"
+                ).first()
+            else:
+                existing_token = db.query(UserToken).filter(
+                    UserToken.user_id == user_id,
+                    UserToken.platform == "donationalerts"
+                ).first()
             
             if existing_token:
                 # Обновляем существующий токен
@@ -152,11 +168,12 @@ async def donationalerts_callback(
                 existing_token.platform_user_id = da_user_id
                 existing_token.is_active = True  # Активируем токен при повторной авторизации
                 existing_token.updated_at = utcnow_naive()
-                logger.info(f"✅ Updated DonationAlerts token for user {user_id}")
+                logger.info(f"✅ Updated DonationAlerts token for {user_identifier}")
             else:
                 # Создаем новый токен
                 new_token = UserToken(
-                    user_id=user_id,
+                    user_id=user_id if not is_guest else None,
+                    session_id=session_id if is_guest else None,
                     platform="donationalerts",
                     platform_user_id=da_user_id,
                     access_token=access_token,
@@ -165,12 +182,12 @@ async def donationalerts_callback(
                     scopes=["oauth-user-show", "oauth-donation-subscribe", "oauth-donation-index"]
                 )
                 db.add(new_token)
-                logger.info(f"✅ Created DonationAlerts token for user {user_id}")
+                logger.info(f"✅ Created DonationAlerts token for {user_identifier}")
             
             db.commit()
             
             # 4. Редиректим на дашборд
-            logger.info(f"✅ DonationAlerts integration completed for user {user_id}")
+            logger.info(f"✅ DonationAlerts integration completed for {user_identifier}")
             return RedirectResponse(url=f"{DEFAULT_FRONTEND_URL}/dashboard?da_connected=true")
             
     except HTTPException:

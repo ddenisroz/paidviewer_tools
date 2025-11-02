@@ -240,6 +240,18 @@ class SessionManager:
             except Exception as e:
                 logger.warning(f"Could not transfer YouTube queue: {e}")
             
+            # ✅ Переносим UserToken (DonationAlerts и др.) с session_id
+            try:
+                from core.database import UserToken
+                tokens = db.query(UserToken).filter(UserToken.session_id == guest_session_id).all()
+                for token in tokens:
+                    token.user_id = new_user.id
+                    token.session_id = None
+                if tokens:
+                    logger.info(f"✅ Transferred {len(tokens)} tokens (DonationAlerts, etc)")
+            except Exception as e:
+                logger.warning(f"Could not transfer tokens: {e}")
+            
             # Завершаем ВСЕ гостевые сессии для этого канала
             channel_name = platform_user_id.lower()
             self.terminate_guest_sessions_for_channel(channel_name, "converted_to_authenticated")

@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from core.database import get_db, User
-from auth.auth import get_current_user
+from auth.auth import get_current_user, get_current_user_optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -12,21 +12,38 @@ router = APIRouter(prefix="/api/donationalerts", tags=["donationalerts"])
 
 @router.get("/status")
 async def get_donationalerts_status(
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """Получить статус DonationAlerts"""
     try:
         from core.database import UserToken
         
-        user_id = user.get('id')
+        # Поддерживаем гостей и авторизованных пользователей
+        user_id = user.get('id') if user and user.get('id') and user.get('id') > 0 else None
+        session_id = user.get('session_id') if user and user.get('id') == -1 else None
+        is_guest = (user and user.get('id') == -1)
+        
+        if not user_id and not session_id:
+            return {
+                "success": True,
+                "connected": False,
+                "user_info": None
+            }
         
         # Проверяем наличие токена DonationAlerts
-        token = db.query(UserToken).filter(
-            UserToken.user_id == user_id,
-            UserToken.platform == "donationalerts",
-            UserToken.is_active == True
-        ).first()
+        if is_guest:
+            token = db.query(UserToken).filter(
+                UserToken.session_id == session_id,
+                UserToken.platform == "donationalerts",
+                UserToken.is_active == True
+            ).first()
+        else:
+            token = db.query(UserToken).filter(
+                UserToken.user_id == user_id,
+                UserToken.platform == "donationalerts",
+                UserToken.is_active == True
+            ).first()
         
         if token:
             return {
@@ -48,12 +65,17 @@ async def get_donationalerts_status(
 
 @router.post("/connect")
 async def connect_donationalerts(
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """Подключить DonationAlerts"""
     try:
         import os
+        
+        # Проверяем что пользователь авторизован (гость или авторизованный пользователь)
+        if not user:
+            logger.error("User not authenticated")
+            return {"success": False, "error": "Not authenticated"}
         
         # Получаем настройки из .env
         client_id = os.getenv("DONATIONALERTS_CLIENT_ID")
@@ -78,7 +100,8 @@ async def connect_donationalerts(
         }
         auth_url = f"https://www.donationalerts.com/oauth/authorize?{urlencode(params)}"
         
-        logger.info(f"DonationAlerts auth URL generated for user {user.get('id')}: {auth_url}")
+        user_identifier = f"guest {user.get('session_id')}" if user.get('id') == -1 else f"user {user.get('id')}"
+        logger.info(f"DonationAlerts auth URL generated for {user_identifier}: {auth_url}")
         
         return {
             "success": True,
@@ -91,24 +114,37 @@ async def connect_donationalerts(
 
 @router.post("/disconnect")
 async def disconnect_donationalerts(
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     
     try:
         from core.database import UserToken
         
-        user_id = user.get('id')
+        # Поддерживаем гостей и авторизованных пользователей
+        user_id = user.get('id') if user and user.get('id') and user.get('id') > 0 else None
+        session_id = user.get('session_id') if user and user.get('id') == -1 else None
+        is_guest = (user and user.get('id') == -1)
+        
+        if not user_id and not session_id:
+            return {"success": False, "error": "Not authenticated"}
         
         # Удаляем токен DonationAlerts
-        deleted = db.query(UserToken).filter(
-            UserToken.user_id == user_id,
-            UserToken.platform == "donationalerts"
-        ).delete()
+        if is_guest:
+            deleted = db.query(UserToken).filter(
+                UserToken.session_id == session_id,
+                UserToken.platform == "donationalerts"
+            ).delete()
+        else:
+            deleted = db.query(UserToken).filter(
+                UserToken.user_id == user_id,
+                UserToken.platform == "donationalerts"
+            ).delete()
         
         db.commit()
         
-        logger.info(f"✅ Disconnected DonationAlerts for user {user_id}")
+        user_identifier = f"guest {session_id}" if is_guest else f"user {user_id}"
+        logger.info(f"✅ Disconnected DonationAlerts for {user_identifier}")
         return {
             "success": True,
             "message": "DonationAlerts disconnected successfully"

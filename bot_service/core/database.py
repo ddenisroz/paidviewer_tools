@@ -207,10 +207,14 @@ try:
     class UserToken(Base):
         """Модель для токенов пользователей разных платформ"""
         __tablename__ = 'user_tokens'
-        __table_args__ = {'extend_existing': True}
+        __table_args__ = (
+            CheckConstraint('(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)', name='check_user_or_session_token'),
+            {'extend_existing': True}
+        )
         id = Column(Integer, primary_key=True, index=True)
-        user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-        platform = Column(String, nullable=False)  # 'twitch', 'vk', etc.
+        user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)  # Для авторизованных пользователей
+        session_id = Column(String, nullable=True, index=True)  # Для гостей
+        platform = Column(String, nullable=False)  # 'twitch', 'vk', 'donationalerts', etc.
         platform_user_id = Column(String, nullable=False)  # ID пользователя на платформе
         avatar_url = Column(String, nullable=True)  # URL аватарки
         access_token = Column(String, nullable=False)
