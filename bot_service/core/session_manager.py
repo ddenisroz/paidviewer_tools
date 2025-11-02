@@ -353,10 +353,15 @@ class SessionManager:
         db = next(get_db())
         try:
             from sqlalchemy import text
+            from core.database import IS_POSTGRESQL
+            
+            # PostgreSQL использует оператор ->>, SQLite использует JSON_EXTRACT
+            json_query = "device_info->>'monitored_channel' = :channel" if IS_POSTGRESQL else "JSON_EXTRACT(device_info, '$.monitored_channel') = :channel"
+            
             guest_sessions = db.query(UserSession).filter(
                 UserSession.user_id == -1,
                 UserSession.is_active == True,
-                text("JSON_EXTRACT(device_info, '$.monitored_channel') = :channel")
+                text(json_query)
             ).params(channel=channel_name).all()
             
             for session in guest_sessions:
@@ -384,10 +389,15 @@ class SessionManager:
         db = next(get_db())
         try:
             from sqlalchemy import text
+            from core.database import IS_POSTGRESQL
+            
+            # PostgreSQL использует оператор ->>, SQLite использует JSON_EXTRACT
+            json_query = "device_info->>'monitored_channel' = :channel" if IS_POSTGRESQL else "JSON_EXTRACT(device_info, '$.monitored_channel') = :channel"
+            
             user_sessions = db.query(UserSession).filter(
                 UserSession.user_id == user_id,
                 UserSession.is_active == True,
-                text("JSON_EXTRACT(device_info, '$.monitored_channel') = :channel")
+                text(json_query)
             ).params(channel=channel_name).all()
             
             for session in user_sessions:

@@ -423,15 +423,26 @@ async def get_chat_history(
                 sql_query = """
                     SELECT id, user_id, channel_name, platform, message, timestamp, is_deleted
                     FROM chat_messages 
-                    WHERE user_id = ? AND channel_name = ? AND is_deleted = 0
+                    WHERE user_id = :user_id AND channel_name = :channel AND is_deleted = 0
                 """
+                from core.database import IS_POSTGRESQL
+                
                 if platform:
-                    sql_query += " AND platform = ?"
-                    sql_query += " ORDER BY timestamp DESC LIMIT ?"
-                    result = db.execute(text(sql_query), (user_id, channel, platform, limit))
+                    sql_query += " AND platform = :platform"
+                    sql_query += " ORDER BY timestamp DESC LIMIT :limit"
+                    if not IS_POSTGRESQL:
+                        # SQLite использует ? вместо именованных параметров
+                        sql_query = sql_query.replace(":user_id", "?").replace(":channel", "?").replace(":platform", "?").replace(":limit", "?")
+                        result = db.execute(text(sql_query), (user_id, channel, platform, limit))
+                    else:
+                        result = db.execute(text(sql_query), {"user_id": user_id, "channel": channel, "platform": platform, "limit": limit})
                 else:
-                    sql_query += " ORDER BY timestamp DESC LIMIT ?"
-                    result = db.execute(text(sql_query), (user_id, channel, limit))
+                    sql_query += " ORDER BY timestamp DESC LIMIT :limit"
+                    if not IS_POSTGRESQL:
+                        sql_query = sql_query.replace(":user_id", "?").replace(":channel", "?").replace(":limit", "?")
+                        result = db.execute(text(sql_query), (user_id, channel, limit))
+                    else:
+                        result = db.execute(text(sql_query), {"user_id": user_id, "channel": channel, "limit": limit})
                 
                 messages = []
                 for row in result:

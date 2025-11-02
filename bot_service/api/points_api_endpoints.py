@@ -1,5 +1,6 @@
 # bot_service/api/points_api_endpoints.py
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
+from starlette.requests import Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel, validator
@@ -8,6 +9,7 @@ import logging
 from core.database import get_db
 from services.points_service import PointsService
 from validators.input_validators import sanitize_input
+from core.security_modern import limiter
 
 logger = logging.getLogger('bot_service')
 

@@ -180,7 +180,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
         const loadingContent = (
             <>
                 {/* Backdrop */}
-                <div className="fixed inset-0 bg-black/80 z-[9999]" style={{ backdropFilter: 'blur(4px)' }} />
+                <div className="fixed inset-0 bg-black/80 z-[9999]" />
                 {/* Loading Content */}
                 <div className="fixed inset-0 z-[10000] flex items-center justify-center">
                     <div className="bg-gray-900 p-8 rounded-lg shadow-2xl">
@@ -253,7 +253,6 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
             <div 
                 className="fixed inset-0 bg-black/80 z-[9999]"
                 onClick={onClose}
-                style={{ backdropFilter: 'blur(4px)' }}
             />
             
             {/* Modal Content */}

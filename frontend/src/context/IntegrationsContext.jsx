@@ -118,9 +118,9 @@ export const IntegrationsProvider = ({ children }) => {
                 setIsLoading(false);
             }
         }
-    };
+    }, [refreshAuthStatus, fetchIntegrations]);
 
-    const updateVkIntegration = async (enabled, onClose = null) => {
+    const updateVkIntegration = useCallback(async (enabled, onClose = null) => {
         if (enabled) {
             // Подключить VK интеграцию - прямой редирект на OAuth
             logger.log('🔵 [INTEGRATIONS] VK integration enable requested');

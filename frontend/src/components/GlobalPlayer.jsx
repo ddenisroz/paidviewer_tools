@@ -165,17 +165,7 @@ const GlobalPlayer = () => {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => {
-                                        togglePlayPause();
-                                        // Синхронизируем с основным плеером
-                                        if (playerRef) {
-                                            if (isPlaying) {
-                                                playerRef.pauseVideo();
-                                            } else {
-                                                playerRef.playVideo();
-                                            }
-                                        }
-                                    }}
+                                    onClick={togglePlayPause}
                                     className="text-white bg-white/10 hover:bg-white/20 border-0 p-2 h-10 w-10"
                                 >
                                     {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}

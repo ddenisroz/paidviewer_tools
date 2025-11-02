@@ -144,9 +144,14 @@ class OAuthHandler:
             # Для Twitch используем username вместо ID
             channel_name = user_data.username.lower() if user_data.username else user_data.platform_user_id.lower()
             from sqlalchemy import text
+            from core.database import IS_POSTGRESQL
+            
+            # PostgreSQL использует оператор ->>, SQLite использует JSON_EXTRACT
+            json_query = "device_info->>'monitored_channel' = :channel" if IS_POSTGRESQL else "JSON_EXTRACT(device_info, '$.monitored_channel') = :channel"
+            
             active_session = db.query(UserSession).filter(
                 UserSession.is_active == True,
-                text("JSON_EXTRACT(device_info, '$.monitored_channel') = :channel")
+                text(json_query)
             ).params(channel=channel_name).first()
             
             if active_session:

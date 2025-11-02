@@ -14,6 +14,7 @@ const TtsControlPanel = ({
     isHealthy,
     isAuthenticated,
     isConnected,
+    isWhitelisted,
     listeningMode,
     setListeningMode,
     obsUrl,
@@ -41,7 +42,7 @@ const TtsControlPanel = ({
                     {/* Типы озвучки */}
                     <div className="grid grid-cols-2 gap-4">
                         {/* Базовая озвучка */}
-                        <div className="flex items-center space-x-4 p-4 bg-blue-500/10 border-2 border-blue-500/30 rounded-xl hover:border-blue-500/50 transition-all">
+                        <div className="flex items-center space-x-4 p-4 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-2 border-blue-500/30 rounded-2xl hover:border-blue-500/50 transition-all duration-200 cursor-pointer">
                             <Switch
                                 checked={basicTtsEnabled}
                                 onCheckedChange={(checked) => setBasicTtsEnabled(checked)}
@@ -58,15 +59,15 @@ const TtsControlPanel = ({
                         </div>
 
                         {/* ИИ озвучка F5-TTS */}
-                        <div className={`flex items-center space-x-4 p-4 rounded-xl border-2 transition-all ${
-                            isHealthy 
-                                ? 'bg-purple-500/10 border-purple-500/30 hover:border-purple-500/50' 
-                                : 'bg-gray-500/10 border-gray-500/30'
+                        <div className={`flex items-center space-x-4 p-4 rounded-2xl border-2 transition-all duration-200 ${
+                            isHealthy && isWhitelisted !== false
+                                ? 'bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/30 hover:border-purple-500/50 cursor-pointer' 
+                                : 'bg-gray-500/10 border-gray-500/30 opacity-50'
                         }`}>
                             <Switch
                                 checked={aiTtsEnabled}
                                 onCheckedChange={(checked) => setAiTtsEnabled(checked)}
-                                disabled={!isHealthy || !isAuthenticated || !isConnected}
+                                disabled={!isHealthy || !isAuthenticated || !isConnected || isWhitelisted === false}
                                 className="scale-125"
                             />
                             <div className="flex-1">
@@ -74,6 +75,9 @@ const TtsControlPanel = ({
                                 <p className="text-sm text-gray-400 mt-0.5">F5-TTS</p>
                                 {(!isAuthenticated || !isConnected) && (
                                     <p className="text-xs text-yellow-500 mt-1">⚠ Требуется канал</p>
+                                )}
+                                {isWhitelisted === false && (
+                                    <p className="text-xs text-red-400 mt-1">⚠ Только whitelist</p>
                                 )}
                             </div>
                         </div>
@@ -86,10 +90,10 @@ const TtsControlPanel = ({
                             <div className="grid grid-cols-2 gap-2">
                                 <button
                                     onClick={() => setListeningMode('website')}
-                                    className={`p-2.5 rounded-lg border-2 transition-all text-left ${
+                                    className={`p-3 rounded-xl border-2 transition-all duration-200 text-left ${
                                         listeningMode === 'website'
                                             ? 'border-primary bg-primary/10'
-                                            : 'border-border hover:border-primary/50'
+                                            : 'border-border hover:border-primary/50 hover:bg-primary/5'
                                     }`}
                                 >
                                     <div className="font-semibold text-sm mb-0.5">Сайт</div>
@@ -97,10 +101,10 @@ const TtsControlPanel = ({
                                 </button>
                                 <button
                                     onClick={() => setListeningMode('obs')}
-                                    className={`p-2.5 rounded-lg border-2 transition-all text-left ${
+                                    className={`p-3 rounded-xl border-2 transition-all duration-200 text-left ${
                                         listeningMode === 'obs'
                                             ? 'border-primary bg-primary/10'
-                                            : 'border-border hover:border-primary/50'
+                                            : 'border-border hover:border-primary/50 hover:bg-primary/5'
                                     }`}
                                 >
                                     <div className="font-semibold text-sm mb-0.5">OBS</div>

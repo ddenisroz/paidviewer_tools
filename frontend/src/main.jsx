@@ -55,7 +55,75 @@ root.render(
   // </React.StrictMode>
 );
 
-// Помечаем body как загруженный после монтирования React
-setTimeout(() => {
-  document.body.classList.add('loaded');
-}, 0);
+// Font loading detection and body visibility control
+(function() {
+  let fontsLoaded = false;
+  let reactLoaded = false;
+  
+  const showContent = () => {
+    if (fontsLoaded && reactLoaded) {
+      document.body.classList.add('fonts-loaded', 'loaded');
+      // Trigger reflow to ensure CSS transition works
+      requestAnimationFrame(() => {
+        document.body.offsetHeight;
+      });
+    }
+  };
+  
+  // Check if Inter font is actually loaded
+  const checkInterFont = () => {
+    if (document.fonts && document.fonts.check) {
+      // Check if Inter font is loaded
+      if (document.fonts.check('1em Inter')) {
+        fontsLoaded = true;
+        showContent();
+        return true;
+      }
+    }
+    return false;
+  };
+  
+  // Check if fonts are available
+  if (document.fonts && document.fonts.ready) {
+    // Wait for fonts to load, then verify Inter specifically
+    document.fonts.ready.then(() => {
+      // Double-check Inter is loaded
+      if (!checkInterFont()) {
+        // If Inter not loaded yet, wait a bit more and check again
+        setTimeout(() => {
+          if (!checkInterFont()) {
+            // Inter still not loaded, proceed anyway (safety fallback)
+            fontsLoaded = true;
+            showContent();
+          }
+        }, 200);
+      }
+    }).catch(() => {
+      // If font loading fails, proceed anyway after timeout
+      setTimeout(() => {
+        fontsLoaded = true;
+        showContent();
+      }, 300);
+    });
+  } else {
+    // Fallback: assume fonts are loaded after short delay
+    setTimeout(() => {
+      fontsLoaded = true;
+      showContent();
+    }, 250);
+  }
+  
+  // Safety timeout: show content after max 800ms even if fonts aren't ready
+  setTimeout(() => {
+    if (!fontsLoaded) {
+      fontsLoaded = true;
+      showContent();
+    }
+  }, 800);
+  
+  // Mark React as loaded after mount
+  setTimeout(() => {
+    reactLoaded = true;
+    showContent();
+  }, 0);
+})();

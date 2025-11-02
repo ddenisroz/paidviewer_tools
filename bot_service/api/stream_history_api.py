@@ -44,21 +44,36 @@ async def get_stream_history(
             
             try:
                 from sqlalchemy import text
-                # RAW SQL для старой БД
+                from core.database import IS_POSTGRESQL
+                
+                # RAW SQL для старой БД - используем правильные placeholders
                 sql_query = "SELECT * FROM chat_messages WHERE 1=1"
                 params = []
+                param_index = 1
                 
                 if channel_name:
-                    sql_query += " AND channel_name = ?"
+                    if IS_POSTGRESQL:
+                        sql_query += f" AND channel_name = ${param_index}"
+                    else:
+                        sql_query += " AND channel_name = ?"
                     params.append(channel_name)
+                    param_index += 1
                 if platform:
-                    sql_query += " AND platform = ?"
+                    if IS_POSTGRESQL:
+                        sql_query += f" AND platform = ${param_index}"
+                    else:
+                        sql_query += " AND platform = ?"
                     params.append(platform)
+                    param_index += 1
                 
-                sql_query += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+                # LIMIT и OFFSET
+                if IS_POSTGRESQL:
+                    sql_query += f" ORDER BY timestamp DESC LIMIT ${param_index} OFFSET ${param_index + 1}"
+                else:
+                    sql_query += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
                 params.extend([limit, offset])
                 
-                result = db.execute(text(sql_query), params)
+                result = db.execute(text(sql_query), tuple(params) if IS_POSTGRESQL else params)
                 messages = []
                 for row in result:
                     messages.append(type('Message', (), {
@@ -76,14 +91,23 @@ async def get_stream_history(
                 # Подсчитаем total отдельно
                 count_sql = "SELECT COUNT(*) FROM chat_messages WHERE 1=1"
                 count_params = []
+                count_index = 1
+                
                 if channel_name:
-                    count_sql += " AND channel_name = ?"
+                    if IS_POSTGRESQL:
+                        count_sql += f" AND channel_name = ${count_index}"
+                    else:
+                        count_sql += " AND channel_name = ?"
                     count_params.append(channel_name)
+                    count_index += 1
                 if platform:
-                    count_sql += " AND platform = ?"
+                    if IS_POSTGRESQL:
+                        count_sql += f" AND platform = ${count_index}"
+                    else:
+                        count_sql += " AND platform = ?"
                     count_params.append(platform)
                 
-                count_result = db.execute(text(count_sql), count_params)
+                count_result = db.execute(text(count_sql), tuple(count_params) if IS_POSTGRESQL else count_params)
                 total_messages = list(count_result)[0][0]
                 
             except Exception as fallback_error:

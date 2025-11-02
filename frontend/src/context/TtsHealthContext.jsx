@@ -31,7 +31,7 @@ export const TtsHealthProvider = ({ children }) => {
     
     // Начинаем с проверки для не-гостевых пользователей
     const [isHealthy, setIsHealthy] = useState(false);
-    const [isChecking, setIsChecking] = useState(!isGuest); // Начинаем с проверки если не гость
+    const [isChecking, setIsChecking] = useState(false); // НЕ начинаем с проверки, чтобы избежать мерцания
     const [lastCheck, setLastCheck] = useState(null);
 
     // Убрали кэширование в localStorage
@@ -161,13 +161,12 @@ export const TtsHealthProvider = ({ children }) => {
         if (!hasCheckedRef.current && !checkInProgressRef.current) {
             logger.log('TtsHealthContext: Starting health check on mount');
             hasCheckedRef.current = true;
-            // Добавляем небольшую задержку для предотвращения двойных вызовов
-            const initialDelay = parseInt(import.meta.env.VITE_TTS_INITIAL_CHECK_DELAY || '100', 10);
+            // Небольшая задержка чтобы страница успела отрендериться и пользователь не видел мерцание
             const timeoutId = setTimeout(() => {
                 if (mountedRef.current && !checkInProgressRef.current) {
                     checkHealth();
                 }
-            }, initialDelay);
+            }, 50);
             
             return () => {
                 clearTimeout(timeoutId);

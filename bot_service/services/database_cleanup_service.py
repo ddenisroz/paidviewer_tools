@@ -383,25 +383,78 @@ class DatabaseCleanupService:
             backup_dir = os.path.join(os.getcwd(), 'backups')
             os.makedirs(backup_dir, exist_ok=True)
             
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            backup_file = os.path.join(backup_dir, f'backup_{timestamp}.db')
+            from core.database import IS_POSTGRESQL
             
-            # Копируем БД файл
-            db_file = os.getenv('DATABASE_URL', '').replace('sqlite:///', '')
-            if db_file and os.path.exists(db_file):
-                import shutil
-                shutil.copy2(db_file, backup_file)
-                file_size = os.path.getsize(backup_file)
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            
+            if IS_POSTGRESQL:
+                # PostgreSQL: используем pg_dump
+                import subprocess
+                database_url = os.getenv('DATABASE_URL', '')
+                if not database_url or 'postgresql://' not in database_url:
+                    return {'success': False, 'error': 'PostgreSQL DATABASE_URL not configured'}
                 
-                logger.info(f"🔐 Backup created: {backup_file} ({file_size / (1024*1024):.2f} MB)")
-                return {
-                    'success': True,
-                    'backup_file': backup_file,
-                    'size_bytes': file_size,
-                    'timestamp': timestamp
-                }
+                # Парсим DATABASE_URL для pg_dump
+                from urllib.parse import urlparse
+                parsed = urlparse(database_url)
+                backup_file = os.path.join(backup_dir, f'backup_{timestamp}.sql')
+                
+                try:
+                    # Формируем команду pg_dump
+                    pg_dump_cmd = [
+                        'pg_dump',
+                        '-h', parsed.hostname or 'localhost',
+                        '-p', str(parsed.port or 5432),
+                        '-U', parsed.username,
+                        '-d', parsed.path[1:] if parsed.path else '',
+                        '-f', backup_file
+                    ]
+                    
+                    # Устанавливаем пароль через переменную окружения
+                    env = os.environ.copy()
+                    if parsed.password:
+                        env['PGPASSWORD'] = parsed.password
+                    
+                    result = subprocess.run(pg_dump_cmd, env=env, capture_output=True, text=True)
+                    
+                    if result.returncode == 0:
+                        file_size = os.path.getsize(backup_file)
+                        logger.info(f"🔐 PostgreSQL backup created: {backup_file} ({file_size / (1024*1024):.2f} MB)")
+                        return {
+                            'success': True,
+                            'backup_file': backup_file,
+                            'size_bytes': file_size,
+                            'timestamp': timestamp,
+                            'type': 'postgresql'
+                        }
+                    else:
+                        logger.error(f"pg_dump error: {result.stderr}")
+                        return {'success': False, 'error': f'pg_dump failed: {result.stderr}'}
+                except FileNotFoundError:
+                    return {'success': False, 'error': 'pg_dump not found. Install PostgreSQL client tools.'}
+                except Exception as e:
+                    logger.error(f"PostgreSQL backup error: {e}")
+                    return {'success': False, 'error': str(e)}
             else:
-                return {'success': False, 'error': 'Database file not found'}
+                # SQLite: копируем файл
+                backup_file = os.path.join(backup_dir, f'backup_{timestamp}.db')
+                database_url = os.getenv('DATABASE_URL', '')
+                db_file = database_url.replace('sqlite:///', '') if database_url else ''
+                if db_file and os.path.exists(db_file):
+                    import shutil
+                    shutil.copy2(db_file, backup_file)
+                    file_size = os.path.getsize(backup_file)
+                    
+                    logger.info(f"🔐 SQLite backup created: {backup_file} ({file_size / (1024*1024):.2f} MB)")
+                    return {
+                        'success': True,
+                        'backup_file': backup_file,
+                        'size_bytes': file_size,
+                        'timestamp': timestamp,
+                        'type': 'sqlite'
+                    }
+                else:
+                    return {'success': False, 'error': 'Database file not found'}
             
         except Exception as e:
             logger.error(f"Error creating backup: {e}")
@@ -410,39 +463,95 @@ class DatabaseCleanupService:
     def restore_from_backup(self) -> Dict[str, Any]:
         """Восстанавливает БД из последней резервной копии"""
         try:
-            import shutil
+            from core.database import IS_POSTGRESQL
             import pathlib
             
             backup_dir = os.path.join(os.getcwd(), 'backups')
             if not os.path.exists(backup_dir):
                 return {'success': False, 'error': 'No backups found'}
             
-            # Находим последний бэкап
-            backup_files = sorted(pathlib.Path(backup_dir).glob('backup_*.db'), 
-                                 key=lambda p: p.stat().st_mtime, reverse=True)
-            
-            if not backup_files:
-                return {'success': False, 'error': 'No backups found'}
-            
-            latest_backup = backup_files[0]
-            db_file = os.getenv('DATABASE_URL', '').replace('sqlite:///', '')
-            
-            if not db_file or not os.path.exists(db_file):
-                return {'success': False, 'error': 'Database file not found'}
-            
-            # Создаем резервную копию текущей БД перед восстановлением
-            current_backup = os.path.join(backup_dir, f'pre_restore_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db')
-            shutil.copy2(db_file, current_backup)
-            
-            # Восстанавливаем из бэкапа
-            shutil.copy2(latest_backup, db_file)
-            
-            logger.info(f"✅ Database restored from {latest_backup}")
-            return {
-                'success': True,
-                'restored_from': str(latest_backup),
-                'backup_of_current': current_backup
-            }
+            if IS_POSTGRESQL:
+                # PostgreSQL: используем pg_restore или psql
+                database_url = os.getenv('DATABASE_URL', '')
+                if not database_url or 'postgresql://' not in database_url:
+                    return {'success': False, 'error': 'PostgreSQL DATABASE_URL not configured'}
+                
+                # Находим последний SQL бэкап
+                backup_files = sorted(pathlib.Path(backup_dir).glob('backup_*.sql'), 
+                                     key=lambda p: p.stat().st_mtime, reverse=True)
+                
+                if not backup_files:
+                    return {'success': False, 'error': 'No PostgreSQL backups found'}
+                
+                latest_backup = backup_files[0]
+                
+                # Парсим DATABASE_URL
+                from urllib.parse import urlparse
+                parsed = urlparse(database_url)
+                
+                try:
+                    import subprocess
+                    # Используем psql для восстановления
+                    psql_cmd = [
+                        'psql',
+                        '-h', parsed.hostname or 'localhost',
+                        '-p', str(parsed.port or 5432),
+                        '-U', parsed.username,
+                        '-d', parsed.path[1:] if parsed.path else '',
+                        '-f', str(latest_backup)
+                    ]
+                    
+                    env = os.environ.copy()
+                    if parsed.password:
+                        env['PGPASSWORD'] = parsed.password
+                    
+                    result = subprocess.run(psql_cmd, env=env, capture_output=True, text=True)
+                    
+                    if result.returncode == 0:
+                        logger.info(f"✅ PostgreSQL database restored from {latest_backup}")
+                        return {
+                            'success': True,
+                            'restored_from': str(latest_backup),
+                            'type': 'postgresql'
+                        }
+                    else:
+                        logger.error(f"psql restore error: {result.stderr}")
+                        return {'success': False, 'error': f'Restore failed: {result.stderr}'}
+                except FileNotFoundError:
+                    return {'success': False, 'error': 'psql not found. Install PostgreSQL client tools.'}
+                except Exception as e:
+                    logger.error(f"PostgreSQL restore error: {e}")
+                    return {'success': False, 'error': str(e)}
+            else:
+                # SQLite: копируем файл
+                import shutil
+                backup_files = sorted(pathlib.Path(backup_dir).glob('backup_*.db'), 
+                                     key=lambda p: p.stat().st_mtime, reverse=True)
+                
+                if not backup_files:
+                    return {'success': False, 'error': 'No backups found'}
+                
+                latest_backup = backup_files[0]
+                database_url = os.getenv('DATABASE_URL', '')
+                db_file = database_url.replace('sqlite:///', '') if database_url else ''
+                
+                if not db_file or not os.path.exists(db_file):
+                    return {'success': False, 'error': 'Database file not found'}
+                
+                # Создаем резервную копию текущей БД перед восстановлением
+                current_backup = os.path.join(backup_dir, f'pre_restore_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db')
+                shutil.copy2(db_file, current_backup)
+                
+                # Восстанавливаем из бэкапа
+                shutil.copy2(latest_backup, db_file)
+                
+                logger.info(f"✅ SQLite database restored from {latest_backup}")
+                return {
+                    'success': True,
+                    'restored_from': str(latest_backup),
+                    'backup_of_current': current_backup,
+                    'type': 'sqlite'
+                }
             
         except Exception as e:
             logger.error(f"Error restoring backup: {e}")
@@ -451,11 +560,21 @@ class DatabaseCleanupService:
     def _get_actual_database_size(self) -> int:
         """Получает реальный размер базы данных в байтах"""
         try:
-            # Получаем размер файла БД
-            db_file = os.getenv('DATABASE_URL', '').replace('sqlite:///', '')
-            if db_file and os.path.exists(db_file):
-                return os.path.getsize(db_file)
-            return 0
+            from core.database import IS_POSTGRESQL
+            
+            if IS_POSTGRESQL:
+                # PostgreSQL: используем SQL запрос
+                from sqlalchemy import text
+                result = self.db.execute(text("SELECT pg_database_size(current_database())"))
+                size = result.scalar()
+                return size if size else 0
+            else:
+                # SQLite: получаем размер файла
+                database_url = os.getenv('DATABASE_URL', '')
+                db_file = database_url.replace('sqlite:///', '') if database_url else ''
+                if db_file and os.path.exists(db_file):
+                    return os.path.getsize(db_file)
+                return 0
         except Exception as e:
             logger.error(f"Error getting actual database size: {e}")
             return 0
@@ -621,41 +740,97 @@ class DatabaseCleanupService:
     def restore_from_backup_file(self, filename: str) -> Dict[str, Any]:
         """Восстанавливает БД из конкретной резервной копии"""
         try:
-            import shutil
+            from core.database import IS_POSTGRESQL
             from datetime import datetime
             
             backup_dir = os.path.join(os.getcwd(), 'backups')
             backup_file = os.path.join(backup_dir, filename)
             
-            # Безопасность: проверяем что файл находится в backup_dir
-            if not filename.startswith('backup_') or not filename.endswith('.db'):
-                return {'success': False, 'error': 'Invalid backup filename'}
-            
-            if not os.path.exists(backup_file):
-                return {'success': False, 'error': 'Backup file not found'}
-            
-            # Проверяем что путь нормализован
-            if os.path.abspath(backup_file) != backup_file or '..' in filename:
-                return {'success': False, 'error': 'Invalid file path'}
-            
-            db_file = os.getenv('DATABASE_URL', '').replace('sqlite:///', '')
-            if not db_file or not os.path.exists(db_file):
-                return {'success': False, 'error': 'Database file not found'}
-            
-            # Создаем резервную копию текущей БД перед восстановлением
-            current_backup = os.path.join(backup_dir, f'pre_restore_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db')
-            shutil.copy2(db_file, current_backup)
-            
-            # Восстанавливаем из указанного бэкапа
-            shutil.copy2(backup_file, db_file)
-            
-            logger.info(f"✅ Database restored from {filename}")
-            return {
-                'success': True,
-                'restored_from': filename,
-                'backup_of_current': os.path.basename(current_backup),
-                'message': f'Database restored from {filename}. Previous state saved as {os.path.basename(current_backup)}'
-            }
+            if IS_POSTGRESQL:
+                # PostgreSQL: проверяем расширение .sql
+                if not filename.startswith('backup_') or not filename.endswith('.sql'):
+                    return {'success': False, 'error': 'Invalid PostgreSQL backup filename (must be .sql)'}
+                
+                if not os.path.exists(backup_file):
+                    return {'success': False, 'error': 'Backup file not found'}
+                
+                # Проверяем что путь нормализован
+                if os.path.abspath(backup_file) != backup_file or '..' in filename:
+                    return {'success': False, 'error': 'Invalid file path'}
+                
+                database_url = os.getenv('DATABASE_URL', '')
+                if not database_url or 'postgresql://' not in database_url:
+                    return {'success': False, 'error': 'PostgreSQL DATABASE_URL not configured'}
+                
+                from urllib.parse import urlparse
+                parsed = urlparse(database_url)
+                
+                try:
+                    import subprocess
+                    psql_cmd = [
+                        'psql',
+                        '-h', parsed.hostname or 'localhost',
+                        '-p', str(parsed.port or 5432),
+                        '-U', parsed.username,
+                        '-d', parsed.path[1:] if parsed.path else '',
+                        '-f', backup_file
+                    ]
+                    
+                    env = os.environ.copy()
+                    if parsed.password:
+                        env['PGPASSWORD'] = parsed.password
+                    
+                    result = subprocess.run(psql_cmd, env=env, capture_output=True, text=True)
+                    
+                    if result.returncode == 0:
+                        logger.info(f"✅ PostgreSQL database restored from {filename}")
+                        return {
+                            'success': True,
+                            'restored_from': filename,
+                            'type': 'postgresql',
+                            'message': f'PostgreSQL database restored from {filename}'
+                        }
+                    else:
+                        logger.error(f"psql restore error: {result.stderr}")
+                        return {'success': False, 'error': f'Restore failed: {result.stderr}'}
+                except FileNotFoundError:
+                    return {'success': False, 'error': 'psql not found. Install PostgreSQL client tools.'}
+                except Exception as e:
+                    logger.error(f"PostgreSQL restore error: {e}")
+                    return {'success': False, 'error': str(e)}
+            else:
+                # SQLite: проверяем расширение .db
+                if not filename.startswith('backup_') or not filename.endswith('.db'):
+                    return {'success': False, 'error': 'Invalid SQLite backup filename (must be .db)'}
+                
+                if not os.path.exists(backup_file):
+                    return {'success': False, 'error': 'Backup file not found'}
+                
+                # Проверяем что путь нормализован
+                if os.path.abspath(backup_file) != backup_file or '..' in filename:
+                    return {'success': False, 'error': 'Invalid file path'}
+                
+                import shutil
+                database_url = os.getenv('DATABASE_URL', '')
+                db_file = database_url.replace('sqlite:///', '') if database_url else ''
+                if not db_file or not os.path.exists(db_file):
+                    return {'success': False, 'error': 'Database file not found'}
+                
+                # Создаем резервную копию текущей БД перед восстановлением
+                current_backup = os.path.join(backup_dir, f'pre_restore_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db')
+                shutil.copy2(db_file, current_backup)
+                
+                # Восстанавливаем из указанного бэкапа
+                shutil.copy2(backup_file, db_file)
+                
+                logger.info(f"✅ SQLite database restored from {filename}")
+                return {
+                    'success': True,
+                    'restored_from': filename,
+                    'backup_of_current': os.path.basename(current_backup),
+                    'type': 'sqlite',
+                    'message': f'Database restored from {filename}. Previous state saved as {os.path.basename(current_backup)}'
+                }
         except Exception as e:
             logger.error(f"Error restoring from {filename}: {e}")
             return {'success': False, 'error': str(e)}

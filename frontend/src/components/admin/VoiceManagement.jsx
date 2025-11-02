@@ -807,7 +807,6 @@ const VoiceManagement = () => {
                     <div 
                         className="fixed inset-0 bg-black/80 z-[9999]"
                         onClick={() => setUploadDialogOpen(false)}
-                        style={{ backdropFilter: 'blur(4px)' }}
                     />
                     
                     {/* Modal Content */}
@@ -951,7 +950,6 @@ const VoiceManagement = () => {
                     <div 
                         className="fixed inset-0 bg-black/80 z-[9999]"
                         onClick={() => setEditDialogOpen(false)}
-                        style={{ backdropFilter: 'blur(4px)' }}
                     />
                     
                     {/* Modal Content */}

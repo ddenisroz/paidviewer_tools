@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
 
 const AudioSettings = ({
     audioSettings,
@@ -57,45 +58,21 @@ const AudioSettings = ({
                 <div className="space-y-3">
                     {/* Громкость для сайта */}
                     <div className="space-y-3">
-                        <div className="flex items-center gap-3 px-2">
-                            <input
-                                type="range"
+                        <div className="flex items-center gap-3 px-1">
+                            <Slider
                                 id="volume-slider"
-                                min="0"
-                                max="100"
-                                value={localVolume}
-                                onChange={(e) => handleVolumeChange(e.target.value)}
-                                className="flex-1 h-3 bg-gray-700 rounded-lg appearance-none slider cursor-pointer accent-blue-500"
-                                style={{
-                                    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${localVolume}%, #374151 ${localVolume}%, #374151 100%)`
-                                }}
+                                min={0}
+                                max={100}
+                                step={1}
+                                value={[localVolume]}
+                                onValueChange={(value) => handleVolumeChange(value[0])}
+                                className="flex-1"
                             />
-                            <span className="text-sm font-bold text-blue-400 bg-blue-400/10 px-2 py-1 rounded min-w-[50px] text-center">
+                            <span className="text-sm font-bold text-blue-400 bg-blue-400/10 px-3 py-1.5 rounded-lg min-w-[55px] text-center border border-blue-500/30">
                                 {localVolume}%
                             </span>
-                            <style>{`
-                                input[type="range"]::-webkit-slider-thumb {
-                                    appearance: none;
-                                    width: 24px;
-                                    height: 24px;
-                                    border-radius: 50%;
-                                    background: #3b82f6;
-                                    cursor: pointer;
-                                    box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
-                                    border: 2px solid #1e3a8a;
-                                }
-                                input[type="range"]::-moz-range-thumb {
-                                    width: 24px;
-                                    height: 24px;
-                                    border-radius: 50%;
-                                    background: #3b82f6;
-                                    cursor: pointer;
-                                    box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
-                                    border: 2px solid #6b21a8;
-                                }
-                            `}</style>
                         </div>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-gray-400 italic">
                             Применяется к аудио, воспроизводимому в браузере
                         </p>
                     </div>

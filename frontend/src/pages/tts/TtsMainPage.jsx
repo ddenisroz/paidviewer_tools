@@ -18,6 +18,7 @@ import HealthStatus from '../../components/tts/HealthStatus';
 import TtsFilterManager from '../../components/tts/TtsFilterManager';
 import { ttsLogger } from '../../utils/logger';
 import { logger } from '../../utils/prodLogger';
+import cacheManager, { CACHE_CONFIG } from '../../utils/cacheManager';
 
 const TtsMainPageContent = () => {
     const { ttsEnabled, toggleTts, isWhitelisted, engineStatus, isToggling, initializeTts, setNotificationHandler, syncWithHealthContext } = useTts();
@@ -71,6 +72,7 @@ const TtsMainPageContent = () => {
     // Выбор движка TTS
     const [ttsEngine, setTtsEngine] = useState('cloud'); // 'cloud' или 'local'
     const [localTtsConfig, setLocalTtsConfig] = useState(null);
+    const [engineLoading, setEngineLoading] = useState(true); // Флаг загрузки данных движка
     
     // Функция для сохранения настроек звука
     const saveAudioSettings = async (newSettings) => {
@@ -144,17 +146,23 @@ const TtsMainPageContent = () => {
         const loadSettings = async () => {
             if (!isAuthenticated) {
                 ttsLogger.debug('Skipping settings load - not authenticated');
+                setEngineLoading(false);
                 return;
             }
             
             ttsLogger.info('Loading TTS settings from server...');
+            setEngineLoading(true);
             try {
-                // 🚀 ОПТИМИЗАЦИЯ: Parallel API calls вместо sequential (было 3 последовательных запроса)
-                const [audioResponse, ttsResponse, platformResponse, ttsStatusResponse] = await Promise.all([
+                // 🚀 ОПТИМИЗАЦИЯ: Parallel API calls с кэшированием
+                const [ttsStatusResponse, audioResponse, ttsResponse, platformResponse] = await Promise.all([
+                    // Кэшируем TTS статус (engine type) для быстрой загрузки
+                    cacheManager.getOrFetch(CACHE_CONFIG.TTS_STATUS, async () => {
+                        const response = await botService.get('/api/tts/status');
+                        return response;
+                    }),
                     botService.get('/api/tts/audio-settings'),
                     botService.get('/api/tts/settings'),
-                    botService.get('/api/tts/platform-settings'),
-                    botService.get('/api/tts/status')
+                    botService.get('/api/tts/platform-settings')
                 ]);
                 
                 // Обрабатываем настройки звука
@@ -218,6 +226,8 @@ const TtsMainPageContent = () => {
             } catch (error) {
                 ttsLogger.error('Error loading settings:', error);
                 // При ошибке загрузки с сервера используем значения по умолчанию
+            } finally {
+                setEngineLoading(false);
             }
         };
 
@@ -517,7 +527,7 @@ const TtsMainPageContent = () => {
                 />
                 
                 {/* Выбор движка TTS - ВСЕГДА показываем */}
-                <div className="mb-6 p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-blue-500/20">
+                <div className="mb-6 p-5 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-blue-600/5 rounded-2xl border-2 border-blue-500/30">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold">Выбор движка озвучки</h3>
                         {!localTtsConfig?.configured && (
@@ -529,8 +539,22 @@ const TtsMainPageContent = () => {
                             </a>
                         )}
                     </div>
-                    <div className="flex gap-3">
-                        <label className={`flex-1 flex items-center gap-2 cursor-pointer px-3 py-2 rounded border transition ${
+                    {engineLoading ? (
+                        <div className="flex gap-3">
+                            {/* Skeleton для облачного движка */}
+                            <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded border border-gray-700 bg-gray-700/20">
+                                <div className="w-4 h-4 rounded-full bg-gray-600 animate-pulse"></div>
+                                <div className="h-4 w-16 bg-gray-600 rounded animate-pulse"></div>
+                            </div>
+                            {/* Skeleton для локального движка */}
+                            <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded border border-gray-700 bg-gray-700/20">
+                                <div className="w-4 h-4 rounded-full bg-gray-600 animate-pulse"></div>
+                                <div className="h-4 w-16 bg-gray-600 rounded animate-pulse"></div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex gap-3">
+                        <label className={`flex-1 flex items-center gap-3 cursor-pointer px-4 py-3 rounded-xl border-2 transition-all duration-200 ${
                             ttsEngine === 'cloud' 
                                 ? 'border-blue-500 bg-blue-500/10 text-blue-400' 
                                 : 'border-gray-700 hover:border-blue-500 text-gray-400'
@@ -554,7 +578,7 @@ const TtsMainPageContent = () => {
                             <div className="text-sm font-medium">☁️ Облачный</div>
                         </label>
                         
-                        <label className={`flex-1 flex items-center gap-2 px-3 py-2 rounded border transition ${
+                        <label className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-200 ${
                             !localTtsConfig?.configured || !isWhitelisted
                                 ? 'opacity-40 cursor-not-allowed border-gray-700 text-gray-500'
                                 : ttsEngine === 'local'
@@ -599,7 +623,8 @@ const TtsMainPageContent = () => {
                                 </span>
                             )}
                         </label>
-                    </div>
+                        </div>
+                    )}
                 </div>
                 
                 {/* Основной контент */}
@@ -611,6 +636,7 @@ const TtsMainPageContent = () => {
                     isHealthy={isHealthy}
                     isAuthenticated={isAuthenticated}
                     isConnected={isConnected}
+                    isWhitelisted={isWhitelisted}
                     listeningMode={listeningMode}
                     setListeningMode={handleListeningModeChange}
                     obsUrl={obsUrl}

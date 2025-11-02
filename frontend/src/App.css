@@ -173,39 +173,23 @@ body {
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Body visibility is controlled by inline CSS in index.html */
 }
 
-/* Предотвращение FOUT - устанавливаем размеры по умолчанию */
-.text-xs { font-size: 0.75rem; line-height: 1rem; }
-.text-sm { font-size: 0.875rem; line-height: 1.25rem; }
-.text-base { font-size: 1rem; line-height: 1.5rem; }
-.text-lg { font-size: 1.125rem; line-height: 1.75rem; }
-.text-xl { font-size: 1.25rem; line-height: 1.75rem; }
-.text-2xl { font-size: 1.5rem; line-height: 2rem; }
-.text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
+/* Font sizes are defined in index.html inline CSS with !important */
+/* This prevents Tailwind from overriding them and causing FOUT */
 
 /* Оптимизация рендеринга - приоритет отрисовки видимого контента */
 * {
   will-change: auto;
 }
 
-/* Отключаем анимации при первой загрузке для мгновенной отрисовки */
-@media (prefers-reduced-motion: no-preference) {
-  /* Анимации только после загрузки */
-  body.loaded * {
-    transition: opacity 0.2s ease-in-out;
-  }
-}
-
-/* Скрываем элементы до полной загрузки, чтобы избежать мерцания */
-body:not(.loaded) [data-lazy] {
-  opacity: 0;
-  visibility: hidden;
-}
+/* Content visibility is controlled by body.fonts-loaded.loaded class in index.html */
+/* No additional animations or hiding needed - everything is hidden until ready */
 
 /* Убрали все анимации fade-in */
 

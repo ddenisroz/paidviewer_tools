@@ -198,7 +198,8 @@ const YoutubeIntegrationPage = () => {
         }
     };
 
-    const handleVolumeChange = (newVolume) => {
+    const handleVolumeChange = (value) => {
+        const newVolume = value[0];
         setVolume(newVolume);
     };
     

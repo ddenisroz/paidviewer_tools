@@ -1,5 +1,5 @@
 // src/components/StreamTitleCard.jsx
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { TwitchIcon, VKIcon } from './PlatformIcons';
 import { useData } from '../context/DataContext';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useUserSettings } from '../context/UserSettingsContext';
+import { toast } from 'sonner';
 import { logger } from '../utils/prodLogger';
 
 const StreamTitleCard = ({ onLinkStateChange }) => {
@@ -18,6 +19,7 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
     const { getCombineSettings, updateSetting } = useUserSettings();
     const { combine_titles: combineTitles, combine_categories: combineCategories } = getCombineSettings();
     const [isLinked, setIsLinked] = useState(false);
+    const autoSaveTimerRef = useRef(null);
 
     const twitchEnabled = useMemo(() => integrations.twitch?.enabled === true, [integrations.twitch?.enabled]);
     const vkEnabled = useMemo(() => integrations.vk?.enabled === true, [integrations.vk?.enabled]);
@@ -118,6 +120,13 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
     };
 
     const handleSave = (mode) => {
+        // Очищаем таймер автосброса (пользователь сохраняет вручную)
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+            logger.log('⏰ [AUTO-RESET] Timer cleared - user saved manually');
+        }
+        
         const payload = {};
         
         logger.log('StreamTitleCard handleSave:', {
@@ -182,6 +191,42 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
             return titleChanged;
         }
     }, [initialData.twitch?.title, initialData.vk?.title, currentData.twitch?.title, currentData.vk?.title, twitchEnabled, vkEnabled, isLinked, bothEnabled]);
+
+    // Автосброс изменений через 10 секунд, если пользователь не сохранил
+    useEffect(() => {
+        // Очищаем предыдущий таймер
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+        }
+
+        // Если есть несохранённые изменения - запускаем таймер
+        if (isChanged && status.saveTitle !== 'loading' && status.saveTitle !== 'success') {
+            logger.log('⏰ [AUTO-RESET] Starting 10s timer to reset unsaved changes');
+            
+            autoSaveTimerRef.current = setTimeout(() => {
+                logger.log('⏰ [AUTO-RESET] 10 seconds passed - resetting to initial data');
+                
+                // Сбрасываем к исходным данным
+                setCurrentData(prev => ({
+                    ...prev,
+                    twitch: { ...prev.twitch, title: initialData.twitch?.title || '' },
+                    vk: { ...prev.vk, title: initialData.vk?.title || '' }
+                }));
+                
+                // Уведомление пользователю
+                toast.info('Изменения названия отменены (не были сохранены в течение 10 секунд)');
+            }, 10000); // 10 секунд
+        }
+
+        // Cleanup при размонтировании
+        return () => {
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+                autoSaveTimerRef.current = null;
+            }
+        };
+    }, [isChanged, status.saveTitle, initialData.twitch?.title, initialData.vk?.title, setCurrentData]);
 
     if (isLoading) {
         return (

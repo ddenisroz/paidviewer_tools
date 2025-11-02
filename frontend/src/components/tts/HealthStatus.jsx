@@ -20,7 +20,7 @@ const HealthStatus = ({ isHealthy, isChecking, checkTtsHealth, isWhitelisted }) 
     
     if (isChecking) {
         return (
-            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-6">
                 <div className="flex items-start gap-3">
                     <div className="w-5 h-5 bg-blue-500 rounded-full flex-shrink-0 mt-0.5 animate-pulse"></div>
                     <div className="flex-1">
@@ -28,7 +28,7 @@ const HealthStatus = ({ isHealthy, isChecking, checkTtsHealth, isWhitelisted }) 
                             Проверка состояния TTS
                         </h3>
                         <p className="text-sm text-blue-300">
-                            Проверяем доступность TTS сервера... ({checkingDuration}с)
+                            Проверяем доступность TTS сервера... {checkingDuration > 0 && `(${checkingDuration}с)`}
                         </p>
                     </div>
                 </div>
@@ -39,7 +39,7 @@ const HealthStatus = ({ isHealthy, isChecking, checkTtsHealth, isWhitelisted }) 
     // Если TTS сервер здоров, но пользователь не в whitelist
     if (isHealthy && isWhitelisted === false) {
         return (
-            <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4 mb-6">
+            <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4 mb-6">
                 <div className="flex items-start gap-3">
                     <div className="w-5 h-5 bg-orange-500 rounded-full flex-shrink-0 mt-0.5"></div>
                     <div className="flex-1">
@@ -61,7 +61,7 @@ const HealthStatus = ({ isHealthy, isChecking, checkTtsHealth, isWhitelisted }) 
     // Если TTS сервер недоступен
     if (!isHealthy) {
         return (
-            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-6">
+            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-6">
                 <div className="flex items-start gap-3">
                     <div className="w-5 h-5 bg-yellow-500 rounded-full flex-shrink-0 mt-0.5"></div>
                     <div className="flex-1">

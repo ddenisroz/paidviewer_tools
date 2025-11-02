@@ -141,11 +141,11 @@ const SettingsPage = () => {
             </Card>
 
             {/* User Info and Danger Zone */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* User Info */}
-                <div className="flex items-center justify-between px-4 py-3 rounded-lg border bg-card">
-                    <span className="text-sm text-muted-foreground">ID:</span>
-                    <span className="text-sm font-medium">{user?.id}</span>
+            <div className="flex items-start gap-4">
+                {/* User Info - минималистичная версия */}
+                <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-card/50 text-sm">
+                    <span className="text-muted-foreground">ID:</span>
+                    <span className="font-mono font-medium text-foreground">{user?.id}</span>
                 </div>
 
                 {/* Danger Zone - Delete Account */}

@@ -6,13 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Payedviewer</title>
     
-    <!-- Preconnect to external domains -->
+    <!-- Preconnect to external domains (early connection) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     
-    <!-- Preload critical font -->
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"></noscript>
+    <!-- CRITICAL: Font loading with swap to prevent blocking -->
+    <!-- display=swap shows fallback immediately, then swaps to Inter when loaded -->
+    <!-- This prevents invisible text while still avoiding FOUT once loaded -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    
+    <!-- Fallback: if stylesheet fails, we already have inline CSS with system fonts -->
     
     <!-- Critical CSS inline to prevent FOUT -->
     <style>
@@ -32,28 +35,57 @@
         margin: 0;
         padding: 0;
         overflow-x: hidden;
-        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        /* Fallback fonts with same metrics to prevent layout shift */
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
         font-size: 14px;
         line-height: 1.5;
+        font-weight: 400;
         background-color: hsl(260, 30%, 8%);
         color: hsl(270, 20%, 95%);
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+        /* Hide content until React mounts and fonts are ready */
+        visibility: hidden;
+        opacity: 0;
+        transition: opacity 0.1s ease-in, visibility 0.1s ease-in;
       }
       
-      /* Base font sizes to prevent FOUT */
-      .text-xs { font-size: 0.75rem; line-height: 1rem; }
-      .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
-      .text-base { font-size: 1rem; line-height: 1.5rem; }
-      .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
-      .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
-      .text-2xl { font-size: 1.5rem; line-height: 2rem; }
-      .text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
+      /* Show body when fonts are loaded and React is ready */
+      body.fonts-loaded.loaded {
+        visibility: visible;
+        opacity: 1;
+      }
+      
+      /* Base font sizes to prevent FOUT - using rem units for consistency */
+      /* These sizes match exactly with Tailwind defaults */
+      .text-xs { font-size: 0.75rem !important; line-height: 1rem !important; }
+      .text-sm { font-size: 0.875rem !important; line-height: 1.25rem !important; }
+      .text-base { font-size: 1rem !important; line-height: 1.5rem !important; }
+      .text-lg { font-size: 1.125rem !important; line-height: 1.75rem !important; }
+      .text-xl { font-size: 1.25rem !important; line-height: 1.75rem !important; }
+      .text-2xl { font-size: 1.5rem !important; line-height: 2rem !important; }
+      .text-3xl { font-size: 1.875rem !important; line-height: 2.25rem !important; }
+      
+      /* Ensure all text elements use consistent sizing */
+      p, span, div, button, input, textarea, label, a {
+        font-size: inherit;
+        line-height: inherit;
+      }
       
       /* Prevent layout shift */
       #root {
         min-height: 100vh;
         width: 100%;
+        /* Hide root content until React is ready */
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.15s ease-in, visibility 0.15s ease-in;
+      }
+      
+      /* Root visibility is controlled by body classes */
+      body.fonts-loaded.loaded #root {
+        opacity: 1;
+        visibility: visible;
       }
       
       /* Hide scrollbar initially */

@@ -40,11 +40,12 @@ const HomePage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Пустой массив зависимостей - срабатывает ТОЛЬКО при монтировании
     
-    // Дополнительные данные для VK Live
+    // Дополнительные данные для стримов (Twitch и VK)
+    const [twitchStreamInfo, setTwitchStreamInfo] = useState(null);
     const [vkStreamInfo, setVkStreamInfo] = useState(null);
     
-    // 🚀 КЭШИРОВАНИЕ: Храним время последней загрузки VK stream info
-    const [lastVkLoadTime, setLastVkLoadTime] = useState(0);
+    // 🚀 КЭШИРОВАНИЕ: Храним время последней загрузки stream info
+    const [lastLoadTime, setLastLoadTime] = useState({ twitch: 0, vk: 0 });
     const CACHE_TTL = 30000; // 30 секунд кэш
     
     // Общее состояние загрузки для всех карточек
@@ -56,34 +57,50 @@ const HomePage = () => {
 
     // Состояние будет загружаться через контекст CombineSettingsContext
 
-    // Загружаем данные VK Live отдельно
+    // Загружаем данные стримов (Twitch и VK) отдельно
     useEffect(() => {
-        const loadVkStreamInfo = async () => {
-            if (integrations?.vk?.enabled && isAuthenticated) {
+        const loadStreamInfo = async (platform) => {
+            if ((integrations?.twitch?.enabled && platform === 'twitch') || 
+                (integrations?.vk?.enabled && platform === 'vk')) {
+                if (!isAuthenticated) return;
+                
                 // Проверяем кэш
                 const now = Date.now();
-                if (now - lastVkLoadTime < CACHE_TTL) {
-                    logger.log('📦 [HomePage] Using cached VK stream info');
+                if (now - lastLoadTime[platform] < CACHE_TTL) {
+                    logger.log(`📦 [HomePage] Using cached ${platform} stream info`);
                     return;
                 }
                 
                 try {
-                    const response = await botService.get('/api/vk/stream-info');
-                    setVkStreamInfo(response.data);
-                    setLastVkLoadTime(now);
+                    const response = await botService.get(`/api/${platform}/stream-info`);
+                    if (platform === 'twitch') {
+                        setTwitchStreamInfo(response.data);
+                    } else {
+                        setVkStreamInfo(response.data);
+                    }
+                    setLastLoadTime(prev => ({ ...prev, [platform]: now }));
                 } catch (error) {
-                    logger.error('Error loading VK stream info:', error);
-                    setVkStreamInfo(null);
+                    logger.error(`Error loading ${platform} stream info:`, error);
+                    if (platform === 'twitch') {
+                        setTwitchStreamInfo(null);
+                    } else {
+                        setVkStreamInfo(null);
+                    }
                 }
             }
         };
 
-        loadVkStreamInfo();
+        // Загружаем данные для обеих платформ
+        loadStreamInfo('twitch');
+        loadStreamInfo('vk');
         
         // Обновляем каждые 30 секунд
-        const interval = setInterval(loadVkStreamInfo, 30000);
+        const interval = setInterval(() => {
+            loadStreamInfo('twitch');
+            loadStreamInfo('vk');
+        }, 30000);
         return () => clearInterval(interval);
-    }, [integrations?.vk?.enabled, isAuthenticated, lastVkLoadTime]);
+    }, [integrations?.twitch?.enabled, integrations?.vk?.enabled, isAuthenticated, lastLoadTime]);
 
     // Удален неиспользуемый preparedStreamHistory
 
@@ -91,46 +108,23 @@ const HomePage = () => {
     
     // Подготавливаем данные о стримах для компонента StreamStatus
     const streamData = useMemo(() => {
+        // Для Twitch используем данные из twitchStreamInfo или fallback на streamHistory
         const twitchData = integrations?.twitch?.enabled ? {
-            isLive: streamHistory?.status === 'online' || false,
-            viewerCount: streamHistory?.current_viewers || 0
+            isLive: twitchStreamInfo?.is_live !== undefined ? twitchStreamInfo.is_live : (streamHistory?.status === 'online' || false),
+            viewerCount: twitchStreamInfo?.viewers !== undefined ? twitchStreamInfo.viewers : (streamHistory?.current_viewers || 0)
         } : null;
         
-        // Для VK Live используем данные из vkStreamInfo (приоритет) или vk_history
+        // Для VK Live используем данные из vkStreamInfo или fallback на streamHistory
         const vkData = integrations?.vk?.enabled ? {
-            isLive: (() => {
-                // Приоритет: данные из vkStreamInfo
-                if (vkStreamInfo?.online !== undefined) {
-                    return vkStreamInfo.online;
-                }
-                // Fallback: vk_history
-                if (streamHistory?.vk_history && Array.isArray(streamHistory.vk_history) && streamHistory.vk_history.length > 0) {
-                    const latestVkData = streamHistory.vk_history[streamHistory.vk_history.length - 1];
-                    return latestVkData?.viewers > 0 || false;
-                }
-                // Fallback на общий статус
-                return streamHistory?.status === 'online' || false;
-            })(),
-            viewerCount: (() => {
-                // Приоритет: данные из vkStreamInfo
-                if (vkStreamInfo?.viewer_count !== undefined) {
-                    return vkStreamInfo.viewer_count;
-                }
-                // Fallback: vk_history
-                if (streamHistory?.vk_history && Array.isArray(streamHistory.vk_history) && streamHistory.vk_history.length > 0) {
-                    const latestVkData = streamHistory.vk_history[streamHistory.vk_history.length - 1];
-                    return latestVkData?.viewers || 0;
-                }
-                // Fallback на current_vk_viewers
-                return streamHistory?.current_vk_viewers || 0;
-            })()
+            isLive: vkStreamInfo?.is_live !== undefined ? vkStreamInfo.is_live : (streamHistory?.status === 'online' || false),
+            viewerCount: vkStreamInfo?.viewers !== undefined ? vkStreamInfo.viewers : (streamHistory?.current_vk_viewers || 0)
         } : null;
         
         return {
             twitch: twitchData,
             vk: vkData
         };
-    }, [integrations, streamHistory, vkStreamInfo]);
+    }, [integrations, streamHistory, twitchStreamInfo, vkStreamInfo]);
 
 
     // Показываем пустые карточки если интеграции еще загружаются

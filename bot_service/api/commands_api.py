@@ -2,6 +2,7 @@
 """API для управления командами бота"""
 import logging
 from fastapi import APIRouter, Depends, HTTPException
+from starlette.requests import Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, validator
 from typing import List, Optional
