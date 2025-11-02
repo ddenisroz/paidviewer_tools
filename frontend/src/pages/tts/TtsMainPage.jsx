@@ -564,21 +564,7 @@ const TtsMainPageContent = () => {
                             </a>
                         )}
                     </div>
-                    {engineLoading || isChecking ? (
-                        <div className="flex gap-3">
-                            {/* Skeleton для облачного движка */}
-                            <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded border border-gray-700 bg-gray-700/20">
-                                <div className="w-4 h-4 rounded-full bg-gray-600 animate-pulse"></div>
-                                <div className="h-4 w-16 bg-gray-600 rounded animate-pulse"></div>
-                            </div>
-                            {/* Skeleton для локального движка */}
-                            <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded border border-gray-700 bg-gray-700/20">
-                                <div className="w-4 h-4 rounded-full bg-gray-600 animate-pulse"></div>
-                                <div className="h-4 w-16 bg-gray-600 rounded animate-pulse"></div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="flex gap-3">
+                    <div className="flex gap-3">
                         <label className={`flex-1 flex items-center gap-3 cursor-pointer px-4 py-3 rounded-xl border-2 transition-all duration-200 ${
                             ttsEngine === 'cloud' 
                                 ? 'border-blue-500 bg-blue-500/10 text-blue-400' 
@@ -662,8 +648,7 @@ const TtsMainPageContent = () => {
                                 </span>
                             )}
                         </label>
-                        </div>
-                    )}
+                    </div>
                 </div>
                 
                 {/* Основной контент */}

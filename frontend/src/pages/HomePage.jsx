@@ -163,95 +163,27 @@ const HomePage = () => {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Карточка названия */}
                             <div {...getAnimationClasses(shouldAnimate, contentLoaded, 0)}>
-                                {isLoading ? (
-                                    <Card className="border-muted-foreground/20 bg-muted/5">
-                                        <CardHeader className="pb-3">
-                                            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                                                <div className="w-5 h-5 bg-muted-foreground/30 rounded"></div>
-                                                <div className="h-5 bg-muted-foreground/30 rounded w-24"></div>
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="space-y-4">
-                                            <div className="space-y-3">
-                                                <div className="flex items-center justify-center h-12">
-                                                    <div className="flex space-x-1">
-                                                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-                                                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                                                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                ) : (
-                                    <StreamTitleCard onLinkStateChange={setTitleLinked} />
-                                )}
+                                <StreamTitleCard onLinkStateChange={setTitleLinked} />
                             </div>
                             
                             {/* Карточка категории */}
                             <div {...getAnimationClasses(shouldAnimate, contentLoaded, 100)}>
-                                {isLoading ? (
-                                    <Card className="border-muted-foreground/20 bg-muted/5">
-                                        <CardHeader className="pb-3">
-                                            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                                                <div className="w-5 h-5 bg-muted-foreground/30 rounded"></div>
-                                                <div className="h-5 bg-muted-foreground/30 rounded w-32"></div>
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="space-y-4">
-                                            <div className="space-y-3">
-                                                <div className="flex items-center justify-center h-12">
-                                                    <div className="flex space-x-1">
-                                                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-                                                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                                                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                ) : (
-                                    <StreamCategoryCard onLinkStateChange={setCategoryLinked} />
-                                )}
+                                <StreamCategoryCard onLinkStateChange={setCategoryLinked} />
                             </div>
                         </div>
                         
                         {/* Чат - на всю ширину */}
                         <div {...getAnimationClasses(shouldAnimate, contentLoaded, 200)}>
-                            {isLoading ? (
-                                <Card className="border-muted-foreground/20 bg-muted/5">
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                                            <div className="w-5 h-5 bg-muted-foreground/30 rounded"></div>
-                                            <div className="h-5 bg-muted-foreground/30 rounded w-20"></div>
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-center h-32">
-                                                <div className="flex space-x-1">
-                                                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-                                                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                                                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ) : (
                             <ChatCard 
                                 integrations={integrations}
                                 isOnHomePage={true}
                             />
-                            )}
                         </div>
                         
                         {/* Быстрые настройки TTS - под чатом */}
-                        {!isLoading && (
-                            <div {...getAnimationClasses(shouldAnimate, contentLoaded, 300)}>
-                                <TtsQuickSettings />
-                            </div>
-                        )}
+                        <div {...getAnimationClasses(shouldAnimate, contentLoaded, 300)}>
+                            <TtsQuickSettings />
+                        </div>
                     </>
                 )}
             </div>
