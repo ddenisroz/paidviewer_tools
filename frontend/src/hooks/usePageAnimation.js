@@ -25,19 +25,22 @@ export const usePageAnimation = (pageKey, delay = 100) => {
             // Первая загрузка страницы в этой сессии - показываем анимацию
             setShouldAnimate(true);
             
-            // Сразу помечаем страницу как загруженную
-            sessionStorage.setItem(cacheKey, 'true');
-            
             let timer;
-            // Небольшая задержка чтобы браузер успел отрисовать элементы в начальном состоянии
+            let rafId2;
+            // Двойной RAF для гарантированного рендера начального состояния
             const rafId1 = requestAnimationFrame(() => {
-                timer = setTimeout(() => {
-                    setContentLoaded(true);
-                }, delay);
+                rafId2 = requestAnimationFrame(() => {
+                    // Помечаем страницу как загруженную ПОСЛЕ рендера
+                    sessionStorage.setItem(cacheKey, 'true');
+                    timer = setTimeout(() => {
+                        setContentLoaded(true);
+                    }, delay);
+                });
             });
 
             return () => {
                 cancelAnimationFrame(rafId1);
+                if (rafId2) cancelAnimationFrame(rafId2);
                 if (timer) clearTimeout(timer);
             };
         }
