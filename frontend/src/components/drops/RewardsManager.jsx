@@ -94,7 +94,6 @@ const REWARD_TYPES = [
 const RewardsManager = ({ user, platform, channelName }) => {
   const [rewards, setRewards] = useState([]);
   const [qualitiesData, setQualitiesData] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [rewardDialogOpen, setRewardDialogOpen] = useState(false);
   const [editingReward, setEditingReward] = useState(null);
   const [selectedQuality, setSelectedQuality] = useState(null);
@@ -128,12 +127,10 @@ const RewardsManager = ({ user, platform, channelName }) => {
 
   const loadRewards = async () => {
     if (!user || !platform || !channelName) {
-      setLoading(false);
       return;
     }
 
     try {
-      setLoading(true);
       const response = await botService.get(`/api/drops/rewards/${channelName}`, {
         params: { platform }
       });
@@ -143,9 +140,6 @@ const RewardsManager = ({ user, platform, channelName }) => {
       }
     } catch (error) {
       logger.error('Error loading rewards:', error);
-      toast.error('Ошибка загрузки наград');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -233,20 +227,6 @@ const RewardsManager = ({ user, platform, channelName }) => {
     const qualityRewards = getRewardsForQuality(qualityId);
     return qualityRewards.reduce((sum, r) => sum + r.weight, 0);
   };
-
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="animate-pulse space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-24 bg-gray-700 rounded-lg"></div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <div className="space-y-6">

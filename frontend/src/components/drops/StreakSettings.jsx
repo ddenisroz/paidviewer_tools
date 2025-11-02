@@ -11,7 +11,6 @@ import StreakCalendar from './StreakCalendar';
 
 const StreakSettings = ({ user, platform, channelName }) => {
   const [config, setConfig] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     streak_enabled: true,
@@ -29,12 +28,10 @@ const StreakSettings = ({ user, platform, channelName }) => {
 
   const loadConfig = async () => {
     if (!user || !platform || !channelName) {
-      setLoading(false);
       return;
     }
 
     try {
-      setLoading(true);
       const response = await botService.get(`/api/drops/config/${channelName}`, {
         params: { platform }
       });
@@ -53,9 +50,6 @@ const StreakSettings = ({ user, platform, channelName }) => {
       }
     } catch (error) {
       logger.error('Error loading streak config:', error);
-      toast.error('Ошибка загрузки настроек стрика');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -91,20 +85,6 @@ const StreakSettings = ({ user, platform, channelName }) => {
       setSaving(false);
     }
   };
-
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="animate-pulse space-y-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-16 bg-gray-700 rounded-lg"></div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <div className="space-y-4">

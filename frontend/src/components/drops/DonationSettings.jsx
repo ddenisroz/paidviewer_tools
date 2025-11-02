@@ -13,7 +13,6 @@ import DonationHistory from './DonationHistory';
 
 const DonationSettings = ({ user, platform, channelName }) => {
   const [config, setConfig] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     donation_enabled: true,
@@ -34,12 +33,10 @@ const DonationSettings = ({ user, platform, channelName }) => {
 
   const loadConfig = async () => {
     if (!user || !platform || !channelName) {
-      setLoading(false);
       return;
     }
 
     try {
-      setLoading(true);
       const response = await botService.get(`/api/drops/config/${channelName}`, {
         params: { platform }
       });
@@ -61,9 +58,6 @@ const DonationSettings = ({ user, platform, channelName }) => {
       }
     } catch (error) {
       logger.error('Error loading donation config:', error);
-      toast.error('Ошибка загрузки настроек донатов');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -110,10 +104,6 @@ const DonationSettings = ({ user, platform, channelName }) => {
       setSaving(false);
     }
   };
-
-  if (loading) {
-    return null;
-  }
 
   return (
     <div className="space-y-4">
