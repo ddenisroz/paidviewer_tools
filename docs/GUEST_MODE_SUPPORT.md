@@ -145,6 +145,69 @@ config = LocalTTSEndpoint(
 
 ---
 
+### 5. **DonationAlerts интеграция** ✅
+
+**Статус:** Полностью поддерживается
+
+**Что доступно:**
+- ✅ Подключение DonationAlerts через OAuth
+- ✅ Получение донатов в реальном времени
+- ✅ Обработка webhook событий
+- ✅ Хранение токенов по `session_id`
+
+**Технические детали:**
+- `UserToken` поддерживает `session_id` для гостей
+- OAuth callback работает для гостей и авторизованных пользователей
+- Миграция токенов при авторизации (`convert_guest_to_authenticated`)
+- Миграция: `ea7fa0815699_add_session_id_to_user_tokens_for_guests.py`
+
+**Примеры:**
+```python
+# Токен DonationAlerts для гостя
+token = UserToken(
+    session_id="guest_abc123",
+    platform="donationalerts",
+    access_token="...",
+    platform_user_id="12345"
+)
+```
+
+---
+
+### 6. **Drops система лояльности** ✅
+
+**Статус:** Полностью поддерживается
+
+**Что доступно:**
+- ✅ Настройка системы Drops (стрик, донат, мифический лутбокс)
+- ✅ Управление наградами (Common, Rare, Epic, Legendary, Mythical)
+- ✅ История получения наград
+- ✅ OBS виджет для анимации открытия сундуков
+- ✅ Миграция всех настроек при авторизации
+
+**Технические детали:**
+- Все модели Drops поддерживают `session_id`: `DropsConfig`, `DropsReward`, `UserStreak`, `DropsHistory`, `MythicalDropsSession`
+- `DropsService` методы принимают `user_id` и `session_id`
+- Миграция настроек при конвертации гостя в авторизованного
+- Миграция: `4fe4104541d9_add_session_id_to_drops_tables_for_guests.py`
+
+**Примеры:**
+```python
+# Конфигурация Drops для гостя
+config = DropsConfig(
+    session_id="guest_abc123",
+    channel_name="my_channel",
+    platform="twitch",
+    streak_enabled=True,
+    donation_enabled=True,
+    mythical_enabled=True
+)
+```
+
+**Страница UI:** `/dashboard/drops`
+
+---
+
 ## ❌ Что НЕ РАБОТАЕТ для гостей
 
 ### 1. **Управление стримом** ❌
@@ -249,6 +312,49 @@ async def endpoint(
    - `session_id` (nullable)
    - Constraint: `(user_id XOR session_id)`
 
+8. **`UserToken`** ✅ (DonationAlerts и др.)
+   - `user_id` (nullable)
+   - `session_id` (nullable)
+   - Constraint: `(user_id XOR session_id)`
+   - Миграция: `ea7fa0815699_add_session_id_to_user_tokens_for_guests.py`
+
+9. **`DropsConfig`** ✅
+   - `user_id` (nullable)
+   - `session_id` (nullable)
+   - Constraint: `(user_id XOR session_id)`
+
+10. **`DropsReward`** ✅
+   - `user_id` (nullable)
+   - `session_id` (nullable)
+   - Constraint: `(user_id XOR session_id)`
+
+11. **`UserStreak`** ✅
+   - `user_id` (nullable)
+   - `session_id` (nullable)
+   - Constraint: `(user_id XOR session_id)`
+   - Unique constraints: `uq_user_streak`, `uq_session_streak`
+
+12. **`DropsHistory`** ✅
+   - `user_id` (nullable)
+   - `session_id` (nullable)
+   - Constraint: `(user_id XOR session_id)`
+
+13. **`MythicalDropsSession`** ✅
+   - `user_id` (nullable)
+   - `session_id` (nullable)
+   - Constraint: `(user_id XOR session_id)`
+
+14. **`BotCommand`** ✅ (user overrides)
+   - `user_id` (nullable)
+   - `session_id` (nullable)
+   - Constraint: `(user_id XOR session_id)` (если добавлена поддержка)
+
+**Миграции для гостей:**
+- `0c8f9a3b4d2e_add_session_id_to_local_tts_endpoints.py`
+- `20251101_add_session_id_to_guest_tables.py` (FilteredWord, TTSBlockedUser, YouTubeQueue)
+- `ea7fa0815699_add_session_id_to_user_tokens_for_guests.py` (UserToken для DonationAlerts)
+- `4fe4104541d9_add_session_id_to_drops_tables_for_guests.py` (Drops models)
+
 ---
 
 ## 📊 Сравнительная таблица
@@ -263,8 +369,11 @@ async def endpoint(
 | Создание кастомных команд | ✅ (макс. 5) | ❌ |
 | User overrides команд | ✅ | ❌ |
 | YouTube очередь | ✅ | ✅ |
+| DonationAlerts интеграция | ✅ | ✅ |
+| Drops система лояльности | ✅ | ✅ |
 | Управление стримом (!game, !title) | ✅ | ❌ |
 | Сохранение настроек | ✅ (постоянно) | ✅ (до конца сессии) |
+| Миграция настроек при авторизации | N/A | ✅ |
 
 ---
 
@@ -290,16 +399,19 @@ async def endpoint(
 
 ## 🛠️ Миграции
 
-**Последняя миграция для гостей:**
+**Все миграции для гостей:**
 ```
 0c8f9a3b4d2e_add_session_id_to_local_tts_endpoints.py
+20251101_add_session_id_to_guest_tables.py
+ea7fa0815699_add_session_id_to_user_tokens_for_guests.py
+4fe4104541d9_add_session_id_to_drops_tables_for_guests.py
 ```
 
-**Что делает:**
-- Добавляет `session_id` в `LocalTTSEndpoint`
-- Делает `user_id` nullable
-- Добавляет check constraint для XOR
-- Создает index на `session_id`
+**Что делают:**
+- Добавляют `session_id` в модели (LocalTTSEndpoint, FilteredWord, TTSBlockedUser, YouTubeQueue, UserToken, DropsConfig, DropsReward, UserStreak, DropsHistory, MythicalDropsSession)
+- Делают `user_id` nullable
+- Добавляют check constraint для XOR (user_id XOR session_id)
+- Создают индексы на `session_id`
 
 ---
 

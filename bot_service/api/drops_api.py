@@ -102,6 +102,17 @@ class DropsOpenRequest(BaseModel):
 
 # === UTILITY FUNCTIONS ===
 
+def get_user_or_session_filters(current_user: dict) -> tuple:
+    """Возвращает user_id, session_id и is_guest для текущего пользователя"""
+    if not current_user:
+        return None, None, False
+    
+    user_id = current_user.get('id') if current_user.get('id') and current_user.get('id') > 0 else None
+    session_id = current_user.get('session_id') if current_user.get('id') == -1 else None
+    is_guest = (current_user.get('id') == -1)
+    
+    return user_id, session_id, is_guest
+
 def sanitize_html(text: str) -> str:
     """Очищает HTML теги из текста"""
     import re
@@ -139,27 +150,36 @@ def get_drops_quality_by_donation(amount: float, config: DropsConfig) -> str:
 async def get_drops_config(
     channel_name: str,
     platform: str = "twitch",
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """Получает конфигурацию Drops для канала"""
     try:
-        config = db.query(DropsConfig).filter(
-            DropsConfig.user_id == current_user["id"],
-            DropsConfig.channel_name == channel_name,
-            DropsConfig.platform == platform
-        ).first()
+        if not current_user:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        user_id, session_id, is_guest = get_user_or_session_filters(current_user)
+        
+        # Используем DropsService для получения конфига
+        from services.drops_service import DropsService
+        drops_service = DropsService(db)
+        
+        config = drops_service.get_config(
+            user_id=user_id,
+            session_id=session_id,
+            channel_name=channel_name,
+            platform=platform
+        )
         
         if not config:
             # Создаем конфигурацию по умолчанию
-            config = DropsConfig(
-                user_id=current_user["id"],
+            config = drops_service.create_or_update_config(
+                user_id=user_id,
+                session_id=session_id,
                 channel_name=channel_name,
-                platform=platform
+                platform=platform,
+                config_data={}
             )
-            db.add(config)
-            db.commit()
-            db.refresh(config)
         
         return {
             "success": True,
@@ -189,6 +209,8 @@ async def get_drops_config(
             }
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting drops config: {e}")
         raise HTTPException(status_code=500, detail="Ошибка получения конфигурации Drops")
@@ -198,27 +220,39 @@ async def update_drops_config(
     channel_name: str,
     config_data: DropsConfigUpdate,
     platform: str = "twitch",
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """Обновляет конфигурацию лутбоксов для канала"""
     try:
-        config = db.query(DropsConfig).filter(
-            DropsConfig.user_id == current_user["id"],
-            DropsConfig.channel_name == channel_name,
-            DropsConfig.platform == platform
-        ).first()
+        if not current_user:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        user_id, session_id, is_guest = get_user_or_session_filters(current_user)
+        
+        from services.drops_service import DropsService
+        drops_service = DropsService(db)
+        
+        config = drops_service.get_config(
+            user_id=user_id,
+            session_id=session_id,
+            channel_name=channel_name,
+            platform=platform
+        )
         
         if not config:
             raise HTTPException(status_code=404, detail="Конфигурация не найдена")
         
         # Обновляем только переданные поля
         update_data = config_data.dict(exclude_unset=True)
-        for field, value in update_data.items():
-            setattr(config, field, value)
         
-        config.updated_at = utcnow_naive()
-        db.commit()
+        config = drops_service.create_or_update_config(
+            user_id=user_id,
+            session_id=session_id,
+            channel_name=channel_name,
+            platform=platform,
+            config_data=update_data
+        )
         
         return {
             "success": True,
