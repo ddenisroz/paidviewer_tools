@@ -616,8 +616,38 @@ async def get_tts_status(
             return JSONResponse(content={"enabled": False, "authenticated": False, "is_whitelisted": False})
         
         user_type = UserIdentityService.get_user_type(current_user)
+        
+        # Для гостей проверяем локальный TTS endpoint
         if user_type == UserType.GUEST:
-            return JSONResponse(content={"enabled": True, "authenticated": True, "user_type": "guest", "is_whitelisted": True})
+            from core.database import LocalTTSEndpoint
+            session_id = current_user.get('session_id')
+            local_endpoint = None
+            
+            if session_id:
+                local_endpoint = db.query(LocalTTSEndpoint).filter(
+                    LocalTTSEndpoint.session_id == session_id,
+                    LocalTTSEndpoint.is_active == True
+                ).first()
+            
+            has_local_setup = local_endpoint and local_endpoint.is_healthy
+            is_whitelisted = has_local_setup  # Гости используют локальный TTS без whitelist
+            
+            # Проверяем engine_type из настроек гостя
+            from core.database import TTSUserSettings
+            tts_settings = None
+            if session_id:
+                tts_settings = db.query(TTSUserSettings).filter(TTSUserSettings.session_id == session_id).first()
+            
+            engine_type = 'local' if (tts_settings and (tts_settings.use_local_tts or tts_settings.engine == 'f5tts')) else 'cloud'
+            
+            return JSONResponse(content={
+                "enabled": True, 
+                "authenticated": True, 
+                "user_type": "guest", 
+                "is_whitelisted": is_whitelisted,
+                "engine_type": engine_type,
+                "has_local_setup": has_local_setup
+            })
         
         user_id = current_user['id']
         user = db.query(User).filter(User.id == user_id).first()
@@ -1473,42 +1503,11 @@ async def save_local_tts_config(
 ):
     """Сохранить конфигурацию локального TTS"""
     try:
+        # Локальный TTS доступен всем пользователям (не требует whitelist)
         # Определяем тип пользователя
         is_guest = (not user or user.get('id') == -1)
         user_id = user.get('id') if user and user.get('id') != -1 else None
         session_id = user.get('session_id') if is_guest and user else None
-        
-        if not is_guest:
-            # Проверяем whitelist для авторизованных пользователей
-            from core.database import User, WhitelistedChannel
-            
-            db_user = db.query(User).filter(User.id == user_id).first()
-            if not db_user:
-                raise HTTPException(status_code=404, detail="Пользователь не найден")
-            
-            login_platform = user.get('login_platform')
-            is_whitelisted = False
-            
-            if login_platform == 'twitch' and db_user.twitch_username:
-                whitelisted = db.query(WhitelistedChannel).filter(
-                    WhitelistedChannel.channel_name == db_user.twitch_username.lower(),
-                    WhitelistedChannel.platform == 'twitch'
-                ).first()
-                is_whitelisted = bool(whitelisted)
-            elif login_platform == 'vk' and db_user.vk_username:
-                whitelisted = db.query(WhitelistedChannel).filter(
-                    WhitelistedChannel.channel_name == db_user.vk_username.lower(),
-                    WhitelistedChannel.platform == 'vk'
-                ).first()
-                is_whitelisted = bool(whitelisted)
-            
-            if not is_whitelisted:
-                channel_name = db_user.twitch_username or db_user.vk_username or 'неизвестен'
-                logger.warning(f"❌ User {channel_name} NOT whitelisted, cannot save local TTS config")
-                raise HTTPException(
-                    status_code=403,
-                    detail="Доступ к локальному TTS требует whitelist. Обратитесь к администратору для добавления в whitelist."
-                )
         
         # Ищем существующий конфиг
         if is_guest and session_id:
