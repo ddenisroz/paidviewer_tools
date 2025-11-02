@@ -672,7 +672,7 @@ async def get_tts_status(
             is_whitelisted = bool(whitelisted)
         
         # Также получаем engine_type из настроек TTS и проверяем локальный endpoint
-        from core.database import LocalTTSEndpoint
+        from core.database import LocalTTSEndpoint, TTSUserSettings
         tts_settings = db.query(TTSUserSettings).filter(TTSUserSettings.user_id == user_id).first()
         local_endpoint = db.query(LocalTTSEndpoint).filter(
             LocalTTSEndpoint.user_id == user_id,
