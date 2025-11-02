@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useIntegrations } from '../../context/IntegrationsContext';
-import { TwitchIcon, VKIcon } from '../../components/PlatformIcons';
 import StreakSettings from '../../components/drops/StreakSettings';
 import DonationSettings from '../../components/drops/DonationSettings';
 import RewardsManager from '../../components/drops/RewardsManager';
@@ -75,44 +74,6 @@ const DropsMainPage = () => {
 
   return (
     <PageWrapper>
-      {/* Выбор платформы */}
-      <div className="mb-6 flex justify-end">
-        <div className="flex bg-muted rounded-lg p-1">
-            <Button
-              variant={selectedPlatform === 'twitch' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => {
-                if (user?.twitch_username) {
-                  setSelectedPlatform('twitch');
-                  setChannelName(user.twitch_username);
-                }
-              }}
-              disabled={!integrations?.twitch?.enabled || !user?.twitch_username}
-              className="gap-1.5"
-            >
-            <TwitchIcon className="w-4 h-4" />
-            Twitch
-          </Button>
-          <Button
-            variant={selectedPlatform === 'vk' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => {
-              if (user?.vk_username || user?.vk_channel_name) {
-                setSelectedPlatform('vk');
-                setChannelName(user.vk_username || user.vk_channel_name);
-              }
-            }}
-            disabled={!integrations?.vk?.enabled || (!user?.vk_username && !user?.vk_channel_name)}
-            className={`gap-1.5 ${
-              selectedPlatform === 'vk' && 'bg-red-600 text-white hover:bg-red-700'
-            }`}
-          >
-            <VKIcon className="w-4 h-4" />
-            VK Live
-          </Button>
-        </div>
-      </div>
-
       {/* Основной контент */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-5">
