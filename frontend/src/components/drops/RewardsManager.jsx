@@ -258,38 +258,27 @@ const RewardsManager = ({ user, platform, channelName }) => {
         
         return (
           <Card key={quality.id}>
-            <CardHeader>
+            <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <img 
                     src={quality.image} 
                     alt={`${quality.label} chest`}
-                    className="w-12 h-12 object-contain"
+                    className="w-8 h-8 object-contain"
                   />
                   <div>
-                    <CardTitle className="flex items-center gap-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
                       <span style={{ color: qualityData?.color || quality.color }}>
                         {quality.label}
                       </span>
                       <Badge 
                         variant="secondary" 
                         style={{ backgroundColor: qualityData?.color || quality.color }}
-                        className="text-white"
+                        className="text-white text-xs"
                       >
-                        {qualityRewards.length} наград
+                        {qualityRewards.length}
                       </Badge>
                     </CardTitle>
-                    <CardDescription className="flex items-center gap-2 mt-1">
-                      Общий вес: <span className="font-semibold">{totalWeight}</span>
-                      {totalWeight > 0 && (
-                        <span className="text-xs">
-                          ({(qualityRewards.length > 0 
-                            ? qualityRewards.map(r => `${r.weight / totalWeight * 100}%`).join(' / ')
-                            : '0%'
-                          )})
-                        </span>
-                      )}
-                    </CardDescription>
                   </div>
                 </div>
                 <Button
@@ -319,28 +308,27 @@ const RewardsManager = ({ user, platform, channelName }) => {
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <h4 className="font-medium">{reward.name}</h4>
+                            <h4 className="text-sm font-medium">{reward.name}</h4>
                             {!reward.is_active && (
                               <Badge variant="outline" className="text-xs">Отключено</Badge>
                             )}
                           </div>
                           {reward.description && (
-                            <p className="text-sm text-muted-foreground mt-1">{reward.description}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{reward.description}</p>
                           )}
-                          <div className="flex items-center gap-4 mt-2">
-                            <div className="flex items-center gap-1.5 text-xs">
+                          <div className="flex items-center gap-3 mt-1.5">
+                            <div className="flex items-center gap-1 text-xs">
                               <RewardTypeIcon className="w-3 h-3" />
-                              <span className="text-muted-foreground">{reward.reward_type}:</span>
                               <span className="font-mono">{reward.reward_value}</span>
                             </div>
-                            <div className="flex items-center gap-1.5 text-xs">
-                              <span className="text-muted-foreground">Вес:</span>
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <span>Вес:</span>
                               <span className="font-semibold">{reward.weight}</span>
                             </div>
                             {reward.sound_file && (
-                              <div className="flex items-center gap-1.5 text-xs">
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                 <Music className="w-3 h-3" />
-                                <span className="text-muted-foreground">Звук</span>
+                                <span>Звук</span>
                               </div>
                             )}
                           </div>
