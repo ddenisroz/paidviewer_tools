@@ -25,10 +25,12 @@ export const usePageAnimation = (pageKey, delay = 100) => {
             // Первая загрузка страницы в этой сессии - показываем анимацию
             setShouldAnimate(true);
             
+            let timer;
+            let rafId2;
             // Небольшая задержка чтобы браузер успел отрисовать элементы в начальном состоянии
-            const rafId = requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    const timer = setTimeout(() => {
+            const rafId1 = requestAnimationFrame(() => {
+                rafId2 = requestAnimationFrame(() => {
+                    timer = setTimeout(() => {
                         setContentLoaded(true);
                     }, delay);
 
@@ -38,7 +40,9 @@ export const usePageAnimation = (pageKey, delay = 100) => {
             });
 
             return () => {
-                cancelAnimationFrame(rafId);
+                cancelAnimationFrame(rafId1);
+                if (rafId2) cancelAnimationFrame(rafId2);
+                if (timer) clearTimeout(timer);
             };
         }
     }, [pageKey, delay]);
