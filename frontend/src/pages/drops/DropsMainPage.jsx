@@ -144,6 +144,7 @@ const DropsMainPage = () => {
             VK Live
           </Button>
         </div>
+        </div>
       </div>
 
       {/* Основной контент */}

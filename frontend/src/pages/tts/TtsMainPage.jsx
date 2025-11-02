@@ -551,13 +551,15 @@ const TtsMainPageContent = () => {
                     `}
                 </style>
                 
-                {/* Статус здоровья TTS */}
-                <HealthStatus 
-                    isHealthy={isHealthy} 
-                    isChecking={isChecking} 
-                    checkTtsHealth={checkTtsHealth}
-                    isWhitelisted={isWhitelisted}
-                />
+                {/* Статус здоровья TTS - с минимальной высотой чтобы предотвратить jerking */}
+                <div className="min-h-[96px]">
+                    <HealthStatus 
+                        isHealthy={isHealthy} 
+                        isChecking={isChecking} 
+                        checkTtsHealth={checkTtsHealth}
+                        isWhitelisted={isWhitelisted}
+                    />
+                </div>
                 
                 {/* Выбор движка TTS - ВСЕГДА показываем */}
                 <div className="mb-6 p-5 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-blue-600/5 rounded-2xl border-2 border-blue-500/30">
