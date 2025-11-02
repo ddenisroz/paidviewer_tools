@@ -19,12 +19,16 @@ import TtsFilterManager from '../../components/tts/TtsFilterManager';
 import { ttsLogger } from '../../utils/logger';
 import { logger } from '../../utils/prodLogger';
 import cacheManager, { CACHE_CONFIG } from '../../utils/cacheManager';
+import { usePageAnimation, getAnimationClasses } from '../../hooks/usePageAnimation';
 
 const TtsMainPageContent = () => {
     const { ttsEnabled, toggleTts, isWhitelisted, engineStatus, isToggling, initializeTts, setNotificationHandler, syncWithHealthContext } = useTts();
     const { isHealthy, isChecking, lastCheck, checkTtsHealth } = useTtsHealth();
     const { isAuthenticated, user, isGuest } = useAuth();
     const { integrations } = useIntegrations();
+    
+    // 🎬 Анимация страницы
+    const { shouldAnimate, contentLoaded } = usePageAnimation('tts', 100);
     
     // Логируем инициализацию компонента
     useEffect(() => {
@@ -522,9 +526,10 @@ const TtsMainPageContent = () => {
         <PageWrapper 
             title="Озвучка сообщений"
         >
-            <div className="relative space-y-6">
-                {/* CSS для слайдера */}
-                <style>
+            <div {...getAnimationClasses(shouldAnimate, contentLoaded, 0)}>
+                <div className="relative space-y-6">
+                    {/* CSS для слайдера */}
+                    <style>
                     {`
                         .slider::-webkit-slider-thumb {
                             appearance: none;
@@ -697,6 +702,7 @@ const TtsMainPageContent = () => {
                 
                 {/* Фильтрация TTS */}
                 <TtsFilterManager />
+                </div>
             </div>
         </PageWrapper>
     );

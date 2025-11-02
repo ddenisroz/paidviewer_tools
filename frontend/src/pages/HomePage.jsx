@@ -15,6 +15,7 @@ import IntegrationsDisabledPlaceholder from '../components/IntegrationsDisabledP
 import TtsQuickSettings from '../components/TtsQuickSettings';
 import { getAndClearReturnUrl } from '../utils/oauthRedirect';
 import { logger } from '../utils/prodLogger';
+import { usePageAnimation, getAnimationClasses } from '../hooks/usePageAnimation';
 
 
 
@@ -48,8 +49,8 @@ const HomePage = () => {
     const [lastLoadTime, setLastLoadTime] = useState({ twitch: 0, vk: 0 });
     const CACHE_TTL = 30000; // 30 секунд кэш
     
-    // Общее состояние загрузки для всех карточек
-    const [contentLoaded, setContentLoaded] = useState(false);
+    // 🎬 Анимация страницы: проигрывается только при первой загрузке
+    const { shouldAnimate, contentLoaded } = usePageAnimation('home', 100);
     
     // Состояние объединения полей для карточек
     const [titleLinked, setTitleLinked] = useState(false);
@@ -129,25 +130,12 @@ const HomePage = () => {
 
     // Показываем пустые карточки если интеграции еще загружаются
     const isLoading = integrations.twitch.enabled === null || integrations.vk.enabled === null || integrationsLoading;
-    
-    // Управляем состоянием загрузки контента
-    useEffect(() => {
-        if (!isLoading) {
-            // Небольшая задержка для плавного появления всех карточек одновременно
-            const timer = setTimeout(() => {
-                setContentLoaded(true);
-            }, 100);
-            return () => clearTimeout(timer);
-        } else {
-            setContentLoaded(false);
-        }
-    }, [isLoading]);
 
     return (
         <div className="space-y-8 pb-20">
             {/* Статусы стримов - скрываем для гостей */}
             {!isGuest && (
-                <div className={`flex justify-center transition-all duration-500 ${contentLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                <div {...getAnimationClasses(shouldAnimate, contentLoaded, 0)}>
                     <StreamStatus 
                         integrations={integrations}
                         streamData={streamData}
@@ -174,7 +162,7 @@ const HomePage = () => {
                         {/* Настройки стрима - в две колонки */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Карточка названия */}
-                            <div className={`transition-all duration-500 ${contentLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                            <div {...getAnimationClasses(shouldAnimate, contentLoaded, 0)}>
                                 {isLoading ? (
                                     <Card className="border-muted-foreground/20 bg-muted/5">
                                         <CardHeader className="pb-3">
@@ -201,7 +189,7 @@ const HomePage = () => {
                             </div>
                             
                             {/* Карточка категории */}
-                            <div className={`transition-all duration-500 ${contentLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                            <div {...getAnimationClasses(shouldAnimate, contentLoaded, 100)}>
                                 {isLoading ? (
                                     <Card className="border-muted-foreground/20 bg-muted/5">
                                         <CardHeader className="pb-3">
@@ -229,7 +217,7 @@ const HomePage = () => {
                         </div>
                         
                         {/* Чат - на всю ширину */}
-                        <div className={`w-full transition-all duration-500 delay-200 ${contentLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                        <div {...getAnimationClasses(shouldAnimate, contentLoaded, 200)}>
                             {isLoading ? (
                                 <Card className="border-muted-foreground/20 bg-muted/5">
                                     <CardHeader className="pb-3">
@@ -260,7 +248,7 @@ const HomePage = () => {
                         
                         {/* Быстрые настройки TTS - под чатом */}
                         {!isLoading && (
-                            <div className={`w-full transition-all duration-500 delay-300 ${contentLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                            <div {...getAnimationClasses(shouldAnimate, contentLoaded, 300)}>
                                 <TtsQuickSettings />
                             </div>
                         )}
