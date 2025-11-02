@@ -25,14 +25,21 @@ export const usePageAnimation = (pageKey, delay = 100) => {
             // Первая загрузка страницы в этой сессии - показываем анимацию
             setShouldAnimate(true);
             
-            const timer = setTimeout(() => {
-                setContentLoaded(true);
-            }, delay);
+            // Небольшая задержка чтобы браузер успел отрисовать элементы в начальном состоянии
+            const rafId = requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    const timer = setTimeout(() => {
+                        setContentLoaded(true);
+                    }, delay);
 
-            // Помечаем страницу как загруженную
-            sessionStorage.setItem(cacheKey, 'true');
+                    // Помечаем страницу как загруженную
+                    sessionStorage.setItem(cacheKey, 'true');
+                });
+            });
 
-            return () => clearTimeout(timer);
+            return () => {
+                cancelAnimationFrame(rafId);
+            };
         }
     }, [pageKey, delay]);
 
