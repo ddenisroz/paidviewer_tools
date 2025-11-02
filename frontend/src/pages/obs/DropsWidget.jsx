@@ -28,6 +28,12 @@ const DropsWidget = () => {
   const [animationPhase, setAnimationPhase] = useState('idle'); // idle, spinning, opening, opened, closing
   const ws = useRef(null);
   const [status, setStatus] = useState('Подключение...');
+  const [widgetConfig, setWidgetConfig] = useState({
+    spinning_duration: 1500,
+    opening_duration: 1000,
+    result_duration: 5500,
+    closing_duration: 500
+  });
 
   useEffect(() => {
     if (!token) {
@@ -57,6 +63,27 @@ const DropsWidget = () => {
         }
         const data = await response.json();
         userId = data.user_id;
+        
+        // Загружаем настройки виджета
+        if (userId && data.channel_name && data.platform) {
+          try {
+            const configResponse = await fetch(`${apiUrl}/api/drops/config/${data.channel_name}?platform=${data.platform}`);
+            if (configResponse.ok) {
+              const configData = await configResponse.json();
+              if (configData.success && configData.data) {
+                setWidgetConfig({
+                  spinning_duration: configData.data.widget_spinning_duration_ms || 1500,
+                  opening_duration: configData.data.widget_opening_duration_ms || 1000,
+                  result_duration: configData.data.widget_result_duration_ms || 5500,
+                  closing_duration: configData.data.widget_closing_duration_ms || 500
+                });
+              }
+            }
+          } catch (configError) {
+            logger.error('Error loading widget config:', configError);
+            // Продолжаем с дефолтными значениями
+          }
+        }
         
         // Теперь подключаемся к WebSocket
         const wsUrl = `${wsBaseUrl}/ws/chat/${userId}`;
@@ -126,25 +153,23 @@ const DropsWidget = () => {
       audio.play().catch(console.error);
     }
 
-    // Анимация крутки (3 секунды)
+    // Анимация с настраиваемыми длительностями
     setTimeout(() => {
       setAnimationPhase('opening');
-    }, 1500);
+    }, widgetConfig.spinning_duration);
 
-    // Анимация открытия
     setTimeout(() => {
       setAnimationPhase('opened');
-    }, 2500);
+    }, widgetConfig.spinning_duration + widgetConfig.opening_duration);
 
-    // Скрываем через 8 секунд
     setTimeout(() => {
       setAnimationPhase('closing');
       setTimeout(() => {
         setIsAnimating(false);
         setCurrentReward(null);
         setAnimationPhase('idle');
-      }, 500);
-    }, 8000);
+      }, widgetConfig.closing_duration);
+    }, widgetConfig.spinning_duration + widgetConfig.opening_duration + widgetConfig.result_duration);
   };
 
   const getQualityImages = (quality) => {

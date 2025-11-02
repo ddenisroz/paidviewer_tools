@@ -843,8 +843,20 @@ async def get_user_from_token(
             logger.warning(f"Drops widget: User not found for token: {token[:8]}...")
             raise HTTPException(status_code=404, detail="Invalid widget token")
         
+        # Определяем канал и платформу
+        channel_name = None
+        platform = None
+        if user.twitch_username:
+            channel_name = user.twitch_username
+            platform = 'twitch'
+        elif user.vk_channel_name or user.vk_username:
+            channel_name = user.vk_channel_name or user.vk_username
+            platform = 'vk'
+        
         return {
             "user_id": user.id,
+            "channel_name": channel_name,
+            "platform": platform,
             "success": True
         }
         
