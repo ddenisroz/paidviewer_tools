@@ -414,6 +414,13 @@ ea7fa0815699_add_session_id_to_user_tokens_for_guests.py
 - Добавляют check constraint для XOR (user_id XOR session_id)
 - Создают индексы на `session_id`
 
+**ВАЖНО:** Миграции должны быть применены к базе данных:
+```bash
+cd bot_service
+alembic upgrade head
+```
+Это необходимо для работы DonationAlerts и Drops для гостей.
+
 ---
 
 ## 📝 Рекомендации для разработчиков
