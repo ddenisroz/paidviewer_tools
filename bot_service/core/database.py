@@ -736,6 +736,12 @@ class DropsConfig(Base):
     mythical_donation_amount = Column(Float, default=2000.0)  # Сумма для получения
     mythical_last_appeared = Column(DateTime, nullable=True)  # Последнее появление
     
+    # Настройки виджета (OBS анимация)
+    widget_spinning_duration_ms = Column(Integer, default=1500)  # Длительность крутки (мс)
+    widget_opening_duration_ms = Column(Integer, default=1000)  # Длительность открытия (мс)
+    widget_result_duration_ms = Column(Integer, default=5500)  # Длительность показа результата (мс)
+    widget_closing_duration_ms = Column(Integer, default=500)  # Длительность закрытия (мс)
+    
     created_at = Column(DateTime, default=utcnow_naive)
     updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 

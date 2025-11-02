@@ -21,18 +21,16 @@ import DonationSettings from '../../components/drops/DonationSettings';
 import RewardsManager from '../../components/drops/RewardsManager';
 import DropsHistory from '../../components/drops/DropsHistory';
 import StreakTracker from '../../components/drops/StreakTracker';
+import WidgetSettings from '../../components/drops/WidgetSettings';
 import { logger } from '../../utils/prodLogger';
 import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
-import { Input } from '@/components/ui/input';
-import { Copy, ExternalLink } from 'lucide-react';
 const DropsMainPage = () => {
   const { user, isAuthenticated } = useAuth();
   const { integrations } = useIntegrations();
   const [activeTab, setActiveTab] = useState('streak');
   const [selectedPlatform, setSelectedPlatform] = useState(null);
   const [channelName, setChannelName] = useState(null);
-  const [widgetUrl, setWidgetUrl] = useState(null);
   const [rewardsCount, setRewardsCount] = useState(0);
   const hasNoRewards = rewardsCount === 0;
 
@@ -56,26 +54,6 @@ const DropsMainPage = () => {
       setChannelName(null);
     }
   }, [isAuthenticated, user, integrations]);
-
-  const generateWidgetUrl = async () => {
-    try {
-      const response = await botService.post('/api/drops/widget-url');
-      if (response.data.success) {
-        setWidgetUrl(response.data.data.url);
-        toast.success('URL виджета сгенерирован');
-      }
-    } catch (error) {
-      logger.error('Error generating widget URL:', error);
-      toast.error('Ошибка генерации URL');
-    }
-  };
-
-  const copyWidgetUrl = () => {
-    if (widgetUrl) {
-      navigator.clipboard.writeText(widgetUrl);
-      toast.success('URL скопирован в буфер обмена');
-    }
-  };
 
   // Если пользователь не авторизован или нет подключенной платформы
   if (!isAuthenticated || !selectedPlatform || !channelName) {
@@ -208,75 +186,11 @@ const DropsMainPage = () => {
 
         {/* Виджет */}
         <TabsContent value="widget" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Monitor className="w-5 h-5" />
-                OBS Виджет для анимации
-              </CardTitle>
-              <CardContent className="text-sm text-muted-foreground mt-2">
-                Добавьте этот виджет в OBS как Browser Source для отображения анимаций открытия сундуков
-              </CardContent>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <h3 className="font-medium">Настройка OBS</h3>
-                <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
-                  <li>В OBS добавьте новый источник «Browser Source»</li>
-                  <li>Вставьте URL виджета в поле URL</li>
-                  <li>Установите ширину 1280px и высоту 720px</li>
-                  <li>Включите опцию «Shutdown source when not visible» для оптимизации</li>
-                </ol>
-              </div>
-
-              <div className="space-y-4">
-                <Button
-                  onClick={generateWidgetUrl}
-                  disabled={!user}
-                  className="w-full"
-                >
-                  Сгенерировать URL виджета
-                </Button>
-
-                {widgetUrl && (
-                  <div className="space-y-2">
-                    <Label>URL виджета</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        value={widgetUrl}
-                        readOnly
-                        className="flex-1 font-mono text-sm"
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={copyWidgetUrl}
-                        className="gap-2"
-                      >
-                        <Copy className="w-4 h-4" />
-                        Копировать
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(widgetUrl, '_blank')}
-                        className="gap-2"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        Открыть
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-4 border rounded-lg bg-muted/50">
-                <p className="text-sm text-muted-foreground">
-                  <strong>💡 Совет:</strong> Виджет будет автоматически отображать анимацию открытия сундуков когда зрители получают награды через систему Drops.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <WidgetSettings 
+            user={user}
+            platform={selectedPlatform}
+            channelName={channelName}
+          />
         </TabsContent>
       </Tabs>
     </PageWrapper>

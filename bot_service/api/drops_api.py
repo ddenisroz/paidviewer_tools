@@ -68,6 +68,12 @@ class DropsConfigUpdate(BaseModel):
     mythical_max_interval_hours: Optional[int] = Field(None, ge=0, le=24)
     mythical_window_duration_minutes: Optional[int] = Field(None, ge=1, le=60)
     mythical_donation_amount: Optional[float] = Field(None, ge=0.01, le=1000000)
+    
+    # Настройки виджета (OBS анимация)
+    widget_spinning_duration_ms: Optional[int] = Field(None, ge=500, le=5000)
+    widget_opening_duration_ms: Optional[int] = Field(None, ge=500, le=3000)
+    widget_result_duration_ms: Optional[int] = Field(None, ge=2000, le=15000)
+    widget_closing_duration_ms: Optional[int] = Field(None, ge=200, le=2000)
 
 class DropsRewardCreate(BaseModel):
     """Создание награды в Drops"""
@@ -204,6 +210,10 @@ async def get_drops_config(
                 "mythical_window_duration_minutes": config.mythical_window_duration_minutes,
                 "mythical_donation_amount": config.mythical_donation_amount,
                 "mythical_last_appeared": config.mythical_last_appeared,
+                "widget_spinning_duration_ms": config.widget_spinning_duration_ms,
+                "widget_opening_duration_ms": config.widget_opening_duration_ms,
+                "widget_result_duration_ms": config.widget_result_duration_ms,
+                "widget_closing_duration_ms": config.widget_closing_duration_ms,
                 "created_at": config.created_at,
                 "updated_at": config.updated_at
             }
