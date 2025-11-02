@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react';
  * @returns {{ shouldAnimate: boolean, contentLoaded: boolean }}
  */
 export const usePageAnimation = (pageKey, delay = 100) => {
-    const [shouldAnimate, setShouldAnimate] = useState(true);
+    const [shouldAnimate, setShouldAnimate] = useState(false); // НЕ показываем сразу
     const [contentLoaded, setContentLoaded] = useState(false);
 
     useEffect(() => {
@@ -23,15 +23,17 @@ export const usePageAnimation = (pageKey, delay = 100) => {
             setContentLoaded(true);
         } else {
             // Первая загрузка страницы в этой сессии - показываем анимацию
-            setShouldAnimate(true);
-            
-            let timer;
+            // Сначала даем браузеру отрендерить opacity-0 состояние
             let rafId2;
-            // Двойной RAF для гарантированного рендера начального состояния
+            let timer;
             const rafId1 = requestAnimationFrame(() => {
                 rafId2 = requestAnimationFrame(() => {
-                    // Помечаем страницу как загруженную ПОСЛЕ рендера
+                    setShouldAnimate(true); // Только теперь включаем анимацию
+                    
+                    // Помечаем страницу как загруженную
                     sessionStorage.setItem(cacheKey, 'true');
+                    
+                    // Чуть позже включаем контент (fade-in)
                     timer = setTimeout(() => {
                         setContentLoaded(true);
                     }, delay);
