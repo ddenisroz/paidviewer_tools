@@ -68,7 +68,6 @@ const TtsQuickSettings = () => {
             
             // Загружаем начальное состояние TTS из API
             setTtsEnabled(statusResponse.data.enabled || false);
-            setAiTtsEnabled(statusResponse.data.engine_type === 'local');
             
             // Проверяем whitelist статус
             const whitelistStatus = whitelistResponse.data?.is_whitelisted || false;
@@ -81,6 +80,9 @@ const TtsQuickSettings = () => {
             
             // Доступен = настроен И здоров И в whitelist
             setAiTtsAvailable(isConfigured && isHealthy && whitelistStatus);
+            
+            // ✅ FIX: Устанавливаем aiTtsEnabled только если пользователь в whitelist
+            setAiTtsEnabled(statusResponse.data.engine_type === 'local' && whitelistStatus);
             
             // Отмечаем что инициализация завершена
             initializedRef.current = true;
