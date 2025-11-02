@@ -33,6 +33,8 @@ const DropsMainPage = () => {
   const [selectedPlatform, setSelectedPlatform] = useState(null);
   const [channelName, setChannelName] = useState(null);
   const [widgetUrl, setWidgetUrl] = useState(null);
+  const [rewardsCount, setRewardsCount] = useState(0);
+  const hasNoRewards = rewardsCount === 0;
 
   // Определяем доступную платформу
   useEffect(() => {
@@ -139,10 +141,12 @@ const DropsMainPage = () => {
           <TabsTrigger value="streak" className="flex items-center gap-2">
             <Users className="w-4 h-4" />
             Стрик
+            {hasNoRewards && <span className="ml-1 w-2 h-2 bg-orange-500 rounded-full" />}
           </TabsTrigger>
           <TabsTrigger value="donation" className="flex items-center gap-2">
             <DollarSign className="w-4 h-4" />
             Донат
+            {hasNoRewards && <span className="ml-1 w-2 h-2 bg-orange-500 rounded-full" />}
           </TabsTrigger>
           <TabsTrigger value="rewards" className="flex items-center gap-2">
             <Package className="w-4 h-4" />
@@ -189,6 +193,7 @@ const DropsMainPage = () => {
             user={user}
             platform={selectedPlatform}
             channelName={channelName}
+            onRewardsCountChange={setRewardsCount}
           />
         </TabsContent>
 

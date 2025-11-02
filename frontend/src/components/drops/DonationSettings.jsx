@@ -129,7 +129,7 @@ const DonationSettings = ({ user, platform, channelName }) => {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg flex items-center gap-2 text-pink-400">
-              <img src={MythycClosed} alt="Мифический" className="w-6 h-6" />
+              <img src={MythycClosed} alt="Мифический" className="w-10 h-10" />
               <Sparkles className="w-5 h-5" />
               Мифический лутбокс
             </CardTitle>
@@ -202,14 +202,16 @@ const DonationSettings = ({ user, platform, channelName }) => {
       {/* История донатов */}
       <DonationHistory user={user} platform={platform} channelName={channelName} />
 
-      {/* Кнопка сохранения */}
+      {/* Кнопка сохранения - компактно справа */}
       <div className="flex justify-end">
         <Button 
           onClick={handleSave}
           disabled={saving}
           size="sm"
+          variant="default"
+          className="gap-2"
         >
-          {saving ? 'Сохранение...' : 'Сохранить'}
+          {saving ? '...' : '✓'}
         </Button>
       </div>
     </div>

@@ -91,7 +91,7 @@ const REWARD_TYPES = [
   { value: 'custom', label: 'Своя награда', icon: Sparkles }
 ];
 
-const RewardsManager = ({ user, platform, channelName }) => {
+const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) => {
   const [rewards, setRewards] = useState([]);
   const [qualitiesData, setQualitiesData] = useState([]);
   const [rewardDialogOpen, setRewardDialogOpen] = useState(false);
@@ -113,6 +113,13 @@ const RewardsManager = ({ user, platform, channelName }) => {
     loadQualities();
     loadRewards();
   }, [user, platform, channelName]);
+
+  // Уведомляем родителя об изменении количества наград
+  useEffect(() => {
+    if (onRewardsCountChange) {
+      onRewardsCountChange(rewards.length);
+    }
+  }, [rewards.length, onRewardsCountChange]);
 
   const loadQualities = async () => {
     try {

@@ -150,14 +150,16 @@ const StreakSettings = ({ user, platform, channelName }) => {
         </CardContent>
       </Card>
 
-      {/* Кнопка сохранения */}
+      {/* Кнопка сохранения - компактно справа */}
       <div className="flex justify-end">
         <Button 
           onClick={handleSave}
           disabled={saving}
           size="sm"
+          variant="default"
+          className="gap-2"
         >
-          {saving ? 'Сохранение...' : 'Сохранить'}
+          {saving ? '...' : '✓'}
         </Button>
       </div>
     </div>
