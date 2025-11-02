@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, validator
 import random
 import time
 
-from core.database import get_db, DropsConfig, DropsReward, DropsQuality, DropsType, UserStreak, DropsHistory, MythicalDropsSession, DonationAlert, UserToken
+from core.database import get_db, DropsConfig, DropsReward, DropsQuality, DropsType, UserStreak, DropsHistory, MythicalDropsSession, DonationAlert, UserToken, User
 from auth.auth import get_current_user
 from core.datetime_utils import utcnow_naive
 from utils.enhanced_logger import log_request, log_response, drops_logger
@@ -748,6 +748,32 @@ async def test_drops_trigger(
         logger.error(f"❌ [DROPS] Error testing trigger: {e}")
         raise HTTPException(status_code=500, detail="Ошибка тестирования триггера")
 
+@router.get("/user-from-token/{token}")
+async def get_user_from_token(
+    token: str,
+    db: Session = Depends(get_db)
+):
+    """Получить user_id по OBS токену (для виджета, без авторизации)"""
+    try:
+        from core.database import User
+        
+        user = db.query(User).filter(User.obs_token == token).first()
+        
+        if not user:
+            logger.warning(f"Drops widget: User not found for token: {token[:8]}...")
+            raise HTTPException(status_code=404, detail="Invalid widget token")
+        
+        return {
+            "user_id": user.id,
+            "success": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting user from token: {e}")
+        raise HTTPException(status_code=500, detail="Error validating widget token")
+
 @router.post("/widget-url")
 async def generate_widget_url(
     current_user: dict = Depends(get_current_user),
@@ -757,6 +783,7 @@ async def generate_widget_url(
     try:
         import secrets
         import os
+        from core.database import User
         
         # Генерируем уникальный токен
         token = secrets.token_urlsafe(32)
@@ -768,7 +795,7 @@ async def generate_widget_url(
             user.obs_token = token
             db.commit()
         
-        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
         widget_url = f"{frontend_url}/drops-widget/{token}"
         
         return {

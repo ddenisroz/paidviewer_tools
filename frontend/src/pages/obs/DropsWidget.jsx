@@ -1,67 +1,123 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Gift, 
-  Star, 
-  Crown, 
-  Gem, 
-  Zap,
-  Trophy,
-  Sparkles
-} from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import { logger } from '../../utils/prodLogger';
+import CommonClosed from '../../images/lootboxes/common/common_closed.png';
+import CommonOpened from '../../images/lootboxes/common/common_opened.png';
+import RareClosed from '../../images/lootboxes/rare/rare_closed.png';
+import RareOpened from '../../images/lootboxes/rare/rare_opened_.png';
+import EpicClosed from '../../images/lootboxes/epic/epic_closed.png';
+import EpicOpened from '../../images/lootboxes/epic/epic_opened.png';
+import LegendaryClosed from '../../images/lootboxes/legendary/legendary_closed.png';
+import LegendaryOpened from '../../images/lootboxes/legendary/legendary_opened.png';
+import MythycClosed from '../../images/lootboxes/mythyc/mythyc_closed.png';
+import MythycOpened from '../../images/lootboxes/mythyc/mythyc_opened.png';
+
+const QUALITY_IMAGES = {
+  'common': { closed: CommonClosed, opened: CommonOpened },
+  'rare': { closed: RareClosed, opened: RareOpened },
+  'epic': { closed: EpicClosed, opened: EpicOpened },
+  'legendary': { closed: LegendaryClosed, opened: LegendaryOpened },
+  'mythical': { closed: MythycClosed, opened: MythycOpened },
+  'mythyc': { closed: MythycClosed, opened: MythycOpened }
+};
 
 const DropsWidget = () => {
+  const { token } = useParams();
   const [currentReward, setCurrentReward] = useState(null);
   const [isAnimating, setIsAnimating] = useState(false);
-  const [ws, setWs] = useState(null);
+  const [animationPhase, setAnimationPhase] = useState('idle'); // idle, spinning, opening, opened, closing
+  const ws = useRef(null);
+  const [status, setStatus] = useState('Подключение...');
 
   useEffect(() => {
-    // Получаем токен из URL
-    const token = window.location.pathname.split('/').pop();
     if (!token) {
       logger.error('No token provided');
+      setStatus('Ошибка: Отсутствует токен');
       return;
     }
 
-    // Подключаемся к WebSocket
-    const wsUrl = `${import.meta.env.VITE_WS_URL || 'ws://localhost:8000'}/ws/drops-widget/${token}`;
-    const websocket = new WebSocket(wsUrl);
+    const wsBaseUrl = import.meta.env.VITE_BOT_SERVICE_WS_URL;
+    const apiUrl = import.meta.env.VITE_BOT_SERVICE_URL;
+    
+    if (!wsBaseUrl || !apiUrl) {
+      logger.error('Missing environment variables');
+      setStatus('Ошибка: WebSocket URL не настроен');
+      return;
+    }
 
-    websocket.onopen = () => {
-      logger.log('Connected to drops WebSocket');
-      setWs(websocket);
-    };
+    let userId = null;
 
-    websocket.onmessage = (event) => {
+    // Сначала получаем user_id из токена
+    const fetchUserId = async () => {
       try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'drops' && data.event === 'reward_received') {
-          showReward(data.data);
+        const response = await fetch(`${apiUrl}/api/drops/user-from-token/${token}`);
+        if (!response.ok) {
+          setStatus('Ошибка: Недействительный токен');
+          return;
         }
+        const data = await response.json();
+        userId = data.user_id;
+        
+        // Теперь подключаемся к WebSocket
+        const wsUrl = `${wsBaseUrl}/ws/chat/${userId}`;
+        const websocket = new WebSocket(wsUrl);
+
+        websocket.onopen = () => {
+          logger.log('Connected to drops WebSocket');
+          setWs(websocket);
+          setStatus('Ожидание наград...');
+        };
+
+        websocket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'drops' && data.event === 'reward_received') {
+              showReward(data.data);
+            }
+          } catch (error) {
+            logger.error('Error parsing WebSocket message:', error);
+          }
+        };
+
+        websocket.onclose = () => {
+          logger.log('Drops WebSocket disconnected');
+          setWs(null);
+          setStatus('Переподключение...');
+          // Попытка переподключения
+          setTimeout(() => {
+            const reconnectWs = new WebSocket(wsUrl);
+            reconnectWs.onopen = websocket.onopen;
+            reconnectWs.onmessage = websocket.onmessage;
+            reconnectWs.onclose = websocket.onclose;
+            reconnectWs.onerror = websocket.onerror;
+            ws.current = reconnectWs;
+          }, 3000);
+        };
+
+        websocket.onerror = (error) => {
+          logger.error('Drops WebSocket error:', error);
+        };
+
+        ws.current = websocket;
       } catch (error) {
-        logger.error('Error parsing WebSocket message:', error);
+        logger.error('Error fetching user ID:', error);
+        setStatus('Ошибка: Не удалось подключиться');
       }
     };
 
-    websocket.onclose = () => {
-      logger.log('Drops WebSocket disconnected');
-      setWs(null);
-    };
-
-    websocket.onerror = (error) => {
-      logger.error('Drops WebSocket error:', error);
-    };
+    fetchUserId();
 
     return () => {
-      websocket.close();
+      if (ws.current) {
+        ws.current.close();
+      }
     };
-  }, []);
+  }, [token]);
 
   const showReward = (rewardData) => {
     setCurrentReward(rewardData);
     setIsAnimating(true);
+    setAnimationPhase('spinning');
 
     // Проигрываем звук если есть
     if (rewardData.sound_file) {
@@ -70,146 +126,146 @@ const DropsWidget = () => {
       audio.play().catch(console.error);
     }
 
-    // Скрываем через 10 секунд
+    // Анимация крутки (3 секунды)
     setTimeout(() => {
-      setIsAnimating(false);
-      setCurrentReward(null);
-    }, 10000);
+      setAnimationPhase('opening');
+    }, 1500);
+
+    // Анимация открытия
+    setTimeout(() => {
+      setAnimationPhase('opened');
+    }, 2500);
+
+    // Скрываем через 8 секунд
+    setTimeout(() => {
+      setAnimationPhase('closing');
+      setTimeout(() => {
+        setIsAnimating(false);
+        setCurrentReward(null);
+        setAnimationPhase('idle');
+      }, 500);
+    }, 8000);
   };
 
-  const getQualityIcon = (quality) => {
-    switch (quality?.toLowerCase()) {
-      case 'common':
-        return <Gift className="w-6 h-6 text-gray-400" />;
-      case 'rare':
-        return <Star className="w-6 h-6 text-blue-400" />;
-      case 'epic':
-        return <Crown className="w-6 h-6 text-purple-400" />;
-      case 'legendary':
-        return <Gem className="w-6 h-6 text-yellow-400" />;
-      case 'mythical':
-        return <Sparkles className="w-6 h-6 text-pink-400" />;
-      default:
-        return <Trophy className="w-6 h-6 text-gray-400" />;
-    }
+  const getQualityImages = (quality) => {
+    const qualityLower = quality?.toLowerCase();
+    return QUALITY_IMAGES[qualityLower] || QUALITY_IMAGES['common'];
   };
 
   const getQualityColor = (quality) => {
     switch (quality?.toLowerCase()) {
       case 'common':
-        return 'bg-gray-500';
+        return 'from-gray-500 to-gray-600';
       case 'rare':
-        return 'bg-blue-500';
+        return 'from-blue-500 to-blue-600';
       case 'epic':
-        return 'bg-purple-500';
+        return 'from-purple-500 to-purple-600';
       case 'legendary':
-        return 'bg-yellow-500';
+        return 'from-yellow-500 to-yellow-600';
       case 'mythical':
-        return 'bg-pink-500';
+      case 'mythyc':
+        return 'from-pink-500 to-pink-600';
       default:
-        return 'bg-gray-500';
+        return 'from-gray-500 to-gray-600';
     }
   };
 
-  const getRewardTypeIcon = (type) => {
-    switch (type) {
-      case 'points':
-        return <Zap className="w-4 h-4" />;
-      case 'voice':
-        return <Gift className="w-4 h-4" />;
-      case 'command':
-        return <Trophy className="w-4 h-4" />;
-      default:
-        return <Gift className="w-4 h-4" />;
-    }
-  };
-
-  if (!currentReward || !isAnimating) {
+  // Показываем status если не подключены
+  if (!isAnimating || !currentReward) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-black/20 rounded-lg">
-        <div className="text-center text-white/60">
-          <Gift className="w-12 h-12 mx-auto mb-2 opacity-50" />
-          <p className="text-sm">Ожидание наград...</p>
+      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-900 to-black rounded-lg">
+        <div className="text-center text-white/40">
+          <div className="mb-4">
+            <img 
+              src={CommonClosed} 
+              alt="Waiting"
+              className="w-32 h-32 mx-auto opacity-30"
+            />
+          </div>
+          <p className="text-sm font-medium">{status}</p>
         </div>
       </div>
     );
   }
 
+  const images = getQualityImages(currentReward.quality);
+
   return (
-    <div className={`w-full h-full transition-all duration-1000 ${
-      isAnimating ? 'animate-pulse' : ''
-    }`}>
-      <Card className={`w-full h-full border-2 ${
-        getQualityColor(currentReward.quality)
-      } shadow-2xl transform transition-all duration-500 ${
-        isAnimating ? 'scale-105' : 'scale-100'
-      }`}>
-        <CardContent className="p-6 h-full flex flex-col items-center justify-center text-center">
-          {/* Анимация появления */}
-          <div className={`mb-4 transition-all duration-500 ${
-            isAnimating ? 'animate-bounce' : ''
-          }`}>
-            {getQualityIcon(currentReward.quality)}
-          </div>
+    <div className="w-full h-full flex items-center justify-center">
+      {/* Анимация крутки и открытия */}
+      <div className="relative w-full h-full">
+        {/* Основной контейнер сундука */}
+        <div className={`relative w-full h-full flex items-center justify-center transition-all duration-300 ${
+          animationPhase === 'spinning' ? 'animate-spin' : ''
+        } ${
+          animationPhase === 'opening' ? 'scale-110' : ''
+        } ${
+          animationPhase === 'opened' ? 'scale-100' : ''
+        }`}>
+          <img 
+            src={animationPhase === 'opened' ? images.opened : images.closed}
+            alt={`${currentReward.quality} chest`}
+            className="w-64 h-64 object-contain transition-all duration-500"
+          />
+        </div>
 
-          {/* Имя зрителя */}
-          <h2 className="text-2xl font-bold text-white mb-2 drop-shadow-lg">
-            {currentReward.viewer_name}
-          </h2>
+        {/* Информация о награде (появляется после открытия) */}
+        {animationPhase === 'opened' && (
+          <div className={`absolute inset-0 flex flex-col items-center justify-center animate-fade-in`}>
+            <div className="bg-gradient-to-r from-black/90 to-black/70 rounded-xl p-6 backdrop-blur-lg border-2 border-white/20 max-w-md">
+              {/* Имя зрителя */}
+              <h2 className={`text-2xl font-bold mb-3 bg-gradient-to-r ${getQualityColor(currentReward.quality)} bg-clip-text text-transparent`}>
+                {currentReward.viewer_name}
+              </h2>
 
-          {/* Награда */}
-          <div className="mb-4">
-            <h3 className="text-xl font-semibold text-white mb-1 drop-shadow-lg">
-              {currentReward.reward}
-            </h3>
-            <div className="flex items-center justify-center gap-2">
-              {getRewardTypeIcon(currentReward.reward_type)}
-              <span className="text-sm text-white/80">
-                {currentReward.reward_type}
-              </span>
+              {/* Награда */}
+              <div className="mb-4">
+                <h3 className="text-xl font-semibold text-white mb-1">
+                  {currentReward.reward}
+                </h3>
+                <p className="text-sm text-white/60 capitalize">
+                  {currentReward.reward_type}
+                </p>
+              </div>
+
+              {/* Дополнительная информация */}
+              <div className="flex flex-col gap-2 text-sm text-white/80">
+                {currentReward.streak_days && (
+                  <div>Стрик: {currentReward.streak_days} дней</div>
+                )}
+                {currentReward.donation_amount && (
+                  <div>Донат: {currentReward.donation_amount}₽</div>
+                )}
+              </div>
+
+              {/* Качество */}
+              <div className={`mt-4 inline-block px-4 py-2 rounded-lg bg-gradient-to-r ${getQualityColor(currentReward.quality)} text-white font-bold`}>
+                {currentReward.quality.toUpperCase()}
+              </div>
             </div>
           </div>
+        )}
 
-          {/* Качество */}
-          <Badge 
-            variant="secondary" 
-            className={`${getQualityColor(currentReward.quality)} text-white font-bold px-3 py-1`}
-          >
-            {currentReward.quality}
-          </Badge>
-
-          {/* Дополнительная информация */}
-          {currentReward.streak_days && (
-            <div className="mt-3 text-sm text-white/80">
-              Стрик: {currentReward.streak_days} дней
-            </div>
-          )}
-
-          {currentReward.donation_amount && (
-            <div className="mt-3 text-sm text-white/80">
-              Донат: {currentReward.donation_amount}₽
-            </div>
-          )}
-
-          {/* Анимация частиц */}
-          {isAnimating && (
-            <div className="absolute inset-0 pointer-events-none">
-              {[...Array(20)].map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute w-2 h-2 bg-white/60 rounded-full animate-ping"
-                  style={{
-                    left: `${Math.random() * 100}%`,
-                    top: `${Math.random() * 100}%`,
-                    animationDelay: `${Math.random() * 2}s`,
-                    animationDuration: `${2 + Math.random() * 2}s`
-                  }}
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        {/* Анимация частиц вокруг сундука */}
+        {isAnimating && animationPhase !== 'closing' && (
+          <div className="absolute inset-0 pointer-events-none">
+            {[...Array(30)].map((_, i) => (
+              <div
+                key={i}
+                className={`absolute w-2 h-2 bg-white rounded-full ${
+                  animationPhase === 'opening' || animationPhase === 'opened' ? 'animate-ping' : ''
+                }`}
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                  animationDelay: `${Math.random() * 2}s`,
+                  animationDuration: `${1 + Math.random()}s`
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

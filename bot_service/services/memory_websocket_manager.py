@@ -200,6 +200,27 @@ class MemoryWebSocketManager:
                 logger.error(f"Error broadcasting message: {e}")
                 # Удаляем неактивное соединение
                 await self.remove_connection(conn_id)
+    
+    async def broadcast_to_all(self, message: str):
+        """
+        Отправить текстовое сообщение всем подключенным клиентам
+        Используется для broadcast_drops_event
+        
+        Args:
+            message: Текстовое сообщение (JSON строка)
+        """
+        disconnected = []
+        for conn_id, connection in list(self.connections.items()):
+            try:
+                if connection.is_active:
+                    await connection.websocket.send_text(message)
+            except Exception as e:
+                logger.error(f"Error broadcasting message to all: {e}")
+                disconnected.append(conn_id)
+        
+        # Удаляем отключенные соединения
+        for conn_id in disconnected:
+            await self.remove_connection(conn_id)
                 
     async def _ping_loop(self):
         """Цикл ping для проверки соединений"""
