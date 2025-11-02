@@ -45,6 +45,7 @@ const TtsMainPageContent = () => {
         global_enabled: true
     });
     const [platformLoading, setPlatformLoading] = useState(false);
+    const [engineToggleLoading, setEngineToggleLoading] = useState(false); // Флаг для переключения движка
     
     // Состояния для двухуровневой системы TTS
     const [basicTtsEnabled, setBasicTtsEnabled] = useState(false);
@@ -416,6 +417,7 @@ const TtsMainPageContent = () => {
     // Функция для сохранения состояния ИИ TTS
     const saveAiTtsState = async (enabled) => {
         try {
+            setEngineToggleLoading(true);
             const engine = enabled ? 'local' : 'cloud';
             await botService.post('/api/tts/engine', { engine_type: engine });
             logger.log('AI TTS state saved:', enabled);
@@ -429,6 +431,8 @@ const TtsMainPageContent = () => {
             toast.error('Ошибка переключения движка');
             // Откатываем состояние при ошибке
             setAiTtsEnabled(!enabled);
+        } finally {
+            setEngineToggleLoading(false);
         }
     };
 
@@ -444,6 +448,11 @@ const TtsMainPageContent = () => {
     };
 
     const handleAiTtsToggle = (enabled) => {
+        // Предотвращаем спам переключений
+        if (engineToggleLoading) {
+            return;
+        }
+        
         // Проверяем whitelist для F5-TTS
         if (enabled && isWhitelisted === false) {
             toast.error('F5-TTS доступен только для пользователей из whitelist. Обратитесь к администратору.');
@@ -650,6 +659,7 @@ const TtsMainPageContent = () => {
                     isAuthenticated={isAuthenticated}
                     isConnected={isConnected}
                     isWhitelisted={isWhitelisted}
+                    engineToggleLoading={engineToggleLoading}
                     listeningMode={listeningMode}
                     setListeningMode={handleListeningModeChange}
                     obsUrl={obsUrl}

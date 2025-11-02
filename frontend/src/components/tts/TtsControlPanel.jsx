@@ -15,6 +15,7 @@ const TtsControlPanel = ({
     isAuthenticated,
     isConnected,
     isWhitelisted,
+    engineToggleLoading,
     listeningMode,
     setListeningMode,
     obsUrl,
@@ -67,7 +68,7 @@ const TtsControlPanel = ({
                             <Switch
                                 checked={aiTtsEnabled}
                                 onCheckedChange={(checked) => setAiTtsEnabled(checked)}
-                                disabled={!isHealthy || !isAuthenticated || !isConnected || isWhitelisted === false}
+                                disabled={!isHealthy || !isAuthenticated || !isConnected || isWhitelisted === false || engineToggleLoading}
                                 className="scale-125"
                             />
                             <div className="flex-1">

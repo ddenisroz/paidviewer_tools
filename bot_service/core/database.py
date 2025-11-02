@@ -711,6 +711,7 @@ class DropsConfig(Base):
     streak_days_epic = Column(Integer, default=7)
     streak_days_legendary = Column(Integer, default=14)
     streak_messages_required = Column(Integer, default=5)  # Сообщений в чате за стрим
+    streak_reset_on_skip = Column(Boolean, default=True)  # Сбрасывать стрик при пропуске стрима
     
     # Донат настройки
     donation_enabled = Column(Boolean, default=True)
