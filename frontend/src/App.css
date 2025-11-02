@@ -590,12 +590,8 @@ input[placeholder] {
   to { transform: rotate(360deg); }
 }
 
-/* Убираем transitions */
-.transition-all,
-.transition-opacity,
-.transition-transform {
-  transition: none !important;
-}
+/* Убираем transitions только для некоторых элементов */
+/* Но НЕ отключаем полностью - transitions нужны для плавной загрузки */
 
 /* Скрываем контент до полной загрузки */
 .content-hidden {
