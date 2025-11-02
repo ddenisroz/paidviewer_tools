@@ -7,18 +7,7 @@ import { Slider } from '@/components/ui/slider';
 import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
 import { logger } from '../../utils/prodLogger';
-
-import CommonClosed from '../../images/lootboxes/common/common_closed.png';
-import RareClosed from '../../images/lootboxes/rare/rare_closed.png';
-import EpicClosed from '../../images/lootboxes/epic/epic_closed.png';
-import LegendaryClosed from '../../images/lootboxes/legendary/legendary_closed.png';
-
-const QUALITIES = [
-  { name: 'Common', color: '#6B7280', label: 'Обычный', image: CommonClosed },
-  { name: 'Rare', color: '#3B82F6', label: 'Редкий', image: RareClosed },
-  { name: 'Epic', color: '#8B5CF6', label: 'Эпический', image: EpicClosed },
-  { name: 'Legendary', color: '#F59E0B', label: 'Легендарный', image: LegendaryClosed }
-];
+import StreakCalendar from './StreakCalendar';
 
 const StreakSettings = ({ user, platform, channelName }) => {
   const [config, setConfig] = useState(null);
@@ -118,34 +107,43 @@ const StreakSettings = ({ user, platform, channelName }) => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Общие настройки */}
+    <div className="space-y-4">
+      {/* Общие настройки - компактно */}
       <Card>
-        <CardHeader>
-          <CardTitle>Общие настройки стрика</CardTitle>
-          <CardDescription>
-            Настройте условия получения наград за присутствие на стримах
-          </CardDescription>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Общие настройки</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Включить стрик */}
-          <div className="flex items-center justify-between p-4 border rounded-lg">
-            <div>
-              <h3 className="font-medium">Включить стрик награды</h3>
-              <p className="text-sm text-muted-foreground">
-                Зрители получают награды за постоянное присутствие на стримах
-              </p>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Включить стрик */}
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div>
+                <h3 className="text-sm font-medium">Включить стрик</h3>
+                <p className="text-xs text-muted-foreground">Награды за активность</p>
+              </div>
+              <Switch
+                checked={formData.streak_enabled}
+                onCheckedChange={(checked) => setFormData({...formData, streak_enabled: checked})}
+              />
             </div>
-            <Switch
-              checked={formData.streak_enabled}
-              onCheckedChange={(checked) => setFormData({...formData, streak_enabled: checked})}
-            />
+
+            {/* Сброс стрика */}
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div>
+                <h3 className="text-sm font-medium">Сброс при пропуске</h3>
+                <p className="text-xs text-muted-foreground">Обнулять при неактивности</p>
+              </div>
+              <Switch
+                checked={formData.streak_reset_on_skip}
+                onCheckedChange={(checked) => setFormData({...formData, streak_reset_on_skip: checked})}
+              />
+            </div>
           </div>
 
-          {/* Сообщений для засчета дня */}
-          <div className="space-y-4">
+          {/* Сообщений для засчета дня - компактно */}
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Сообщений в чате для засчета дня</Label>
+              <Label className="text-sm">Сообщений для засчета дня</Label>
               <span className="text-lg font-semibold">{formData.streak_messages_required[0]}</span>
             </div>
             <Slider
@@ -155,81 +153,20 @@ const StreakSettings = ({ user, platform, channelName }) => {
               max={100}
               step={1}
             />
-            <p className="text-xs text-muted-foreground">
-              Зритель должен написать это количество сообщений за стрим, чтобы день засчитался в стрике
-            </p>
-          </div>
-
-          {/* Сброс стрика */}
-          <div className="flex items-center justify-between p-4 border rounded-lg">
-            <div>
-              <h3 className="font-medium">Сбрасывать стрик при пропуске</h3>
-              <p className="text-sm text-muted-foreground">
-                Если зритель не набрал нужное количество сообщений, его стрик сбрасывается
-              </p>
-            </div>
-            <Switch
-              checked={formData.streak_reset_on_skip}
-              onCheckedChange={(checked) => setFormData({...formData, streak_reset_on_skip: checked})}
-            />
           </div>
         </CardContent>
       </Card>
 
-      {/* Дни для каждого качества */}
+      {/* Календарь дней стрика */}
       <Card>
-        <CardHeader>
-          <CardTitle>Дни стрика для получения наград</CardTitle>
-          <CardDescription>
-            Установите количество дней непрерывного стрика для каждого качества сундука
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Дни для наград</CardTitle>
+          <CardDescription className="text-xs">
+            Количество дней стрика для каждого качества
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {QUALITIES.map((quality, index) => {
-            const fieldName = `streak_days_${quality.name.toLowerCase()}`;
-            const value = formData[fieldName];
-            const isLast = index === QUALITIES.length - 1;
-            const isFirst = index === 0;
-            
-            return (
-              <div key={quality.name} className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <img 
-                    src={quality.image} 
-                    alt={`${quality.label} chest`}
-                    className="w-16 h-16 object-contain flex-shrink-0"
-                  />
-                  <div className="flex-1">
-                    <Label className="font-medium">
-                      {quality.label}
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      {isFirst && 'Первая награда после'}
-                      {!isFirst && !isLast && `Следующая награда после`}
-                      {isLast && 'Максимальная награда от'}
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <span className="text-2xl font-bold">{value[0]}</span>
-                    <span className="text-sm text-muted-foreground ml-1">дней</span>
-                  </div>
-                </div>
-                <div className="px-0">
-                  <Slider
-                    value={value}
-                    onValueChange={(val) => setFormData({
-                      ...formData, 
-                      [fieldName]: val
-                    })}
-                    min={1}
-                    max={365}
-                    step={1}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-            );
-          })}
+        <CardContent>
+          <StreakCalendar formData={formData} setFormData={setFormData} />
         </CardContent>
       </Card>
 
@@ -238,9 +175,9 @@ const StreakSettings = ({ user, platform, channelName }) => {
         <Button 
           onClick={handleSave}
           disabled={saving}
-          className="w-full sm:w-auto"
+          size="sm"
         >
-          {saving ? 'Сохранение...' : 'Сохранить настройки'}
+          {saving ? 'Сохранение...' : 'Сохранить'}
         </Button>
       </div>
     </div>

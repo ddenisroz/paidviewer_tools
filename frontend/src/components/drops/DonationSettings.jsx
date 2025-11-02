@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
@@ -9,19 +8,8 @@ import { Sparkles } from 'lucide-react';
 import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
 import { logger } from '../../utils/prodLogger';
-
-import CommonClosed from '../../images/lootboxes/common/common_closed.png';
-import RareClosed from '../../images/lootboxes/rare/rare_closed.png';
-import EpicClosed from '../../images/lootboxes/epic/epic_closed.png';
-import LegendaryClosed from '../../images/lootboxes/legendary/legendary_closed.png';
-import MythycClosed from '../../images/lootboxes/mythyc/mythyc_closed.png';
-
-const QUALITIES = [
-  { name: 'Common', color: '#6B7280', label: 'Обычный', image: CommonClosed },
-  { name: 'Rare', color: '#3B82F6', label: 'Редкий', image: RareClosed },
-  { name: 'Epic', color: '#8B5CF6', label: 'Эпический', image: EpicClosed },
-  { name: 'Legendary', color: '#F59E0B', label: 'Легендарный', image: LegendaryClosed }
-];
+import DonationGrid from './DonationGrid';
+import DonationHistory from './DonationHistory';
 
 const DonationSettings = ({ user, platform, channelName }) => {
   const [config, setConfig] = useState(null);
@@ -124,211 +112,112 @@ const DonationSettings = ({ user, platform, channelName }) => {
   };
 
   if (loading) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="animate-pulse space-y-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-16 bg-gray-700 rounded-lg"></div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
+    return null;
   }
 
   return (
-    <div className="space-y-6">
-      {/* Общие настройки */}
+    <div className="space-y-4">
+      {/* Настройки донатов - компактно */}
       <Card>
-        <CardHeader>
-          <CardTitle>Настройки донат наград</CardTitle>
-          <CardDescription>
-            Установите минимальную сумму доната для каждого качества сундука
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Включить донаты */}
-          <div className="flex items-center justify-between p-4 border rounded-lg">
-            <div>
-              <h3 className="font-medium">Включить донат награды</h3>
-              <p className="text-sm text-muted-foreground">
-                Зрители получают награды за донаты через DonationAlerts
-              </p>
-            </div>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Настройки донатов</CardTitle>
             <Switch
               checked={formData.donation_enabled}
               onCheckedChange={(checked) => setFormData({...formData, donation_enabled: checked})}
             />
           </div>
+        </CardHeader>
+        <CardContent>
+          <DonationGrid formData={formData} setFormData={setFormData} />
         </CardContent>
       </Card>
 
-        {/* Суммы для каждого качества */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Суммы доната для наград</CardTitle>
-            <CardDescription>
-              Установите минимальную сумму доната для получения каждого качества сундука
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {QUALITIES.map((quality, index) => {
-              const fieldName = `donation_amount_${quality.name.toLowerCase()}`;
-              const value = formData[fieldName];
-              const isLast = quality.name === QUALITIES[QUALITIES.length - 1].name;
-              
-              return (
-                <div key={quality.name} className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <img 
-                      src={quality.image} 
-                      alt={`${quality.label} chest`}
-                      className="w-16 h-16 object-contain flex-shrink-0"
-                    />
-                    <div className="flex-1">
-                      <Label htmlFor={fieldName} className="font-medium">
-                        {quality.label}
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        {isLast ? 'Максимальная награда от' : 'Награда от'}
-                      </p>
-                    </div>
-                    <div className="w-32">
-                      <div className="text-center">
-                        <span className="text-2xl font-bold">{value[0]}₽</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="px-0">
-                    <Slider
-                      value={value}
-                      onValueChange={(val) => setFormData({
-                        ...formData, 
-                        [fieldName]: val
-                      })}
-                      min={0}
-                      max={isLast ? 10000 : 5000}
-                      step={isLast ? 100 : 50}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-        
-        {/* Мифический лутбокс */}
-        <Card className="border-2 border-pink-500/30 bg-gradient-to-br from-pink-500/10 to-purple-600/5">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-pink-400">
-              <img src={MythycClosed} alt="Мифический" className="w-8 h-8" />
+      {/* Мифический лутбокс - компактно */}
+      <Card className="border-2 border-pink-500/30 bg-gradient-to-br from-pink-500/10 to-purple-600/5">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2 text-pink-400">
               <Sparkles className="w-5 h-5" />
               Мифический лутбокс
             </CardTitle>
-            <CardDescription>
-              Редкие лутбоксы, которые появляются случайно через определенные интервалы времени
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Включить мифический */}
-            <div className="flex items-center justify-between p-4 border border-pink-500/30 rounded-lg bg-pink-500/5">
-              <div>
-                <h3 className="font-medium">Включить мифический лутбокс</h3>
-                <p className="text-sm text-muted-foreground">
-                  Случайно появляющиеся мифические лутбоксы с повышенными наградами
-                </p>
+            <Switch
+              checked={formData.mythical_enabled}
+              onCheckedChange={(checked) => setFormData({...formData, mythical_enabled: checked})}
+            />
+          </div>
+        </CardHeader>
+        {formData.mythical_enabled && (
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Мин. интервал (ч)</Label>
+                  <span className="text-sm font-semibold">{formData.mythical_min_interval_hours[0]}</span>
+                </div>
+                <Slider
+                  value={formData.mythical_min_interval_hours}
+                  onValueChange={(value) => setFormData({...formData, mythical_min_interval_hours: value})}
+                  min={0}
+                  max={24}
+                  step={1}
+                />
               </div>
-              <Switch
-                checked={formData.mythical_enabled}
-                onCheckedChange={(checked) => setFormData({...formData, mythical_enabled: checked})}
-              />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Макс. интервал (ч)</Label>
+                  <span className="text-sm font-semibold">{formData.mythical_max_interval_hours[0]}</span>
+                </div>
+                <Slider
+                  value={formData.mythical_max_interval_hours}
+                  onValueChange={(value) => setFormData({...formData, mythical_max_interval_hours: value})}
+                  min={0}
+                  max={24}
+                  step={1}
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Длительность окна (м)</Label>
+                  <span className="text-sm font-semibold">{formData.mythical_window_duration_minutes[0]}</span>
+                </div>
+                <Slider
+                  value={formData.mythical_window_duration_minutes}
+                  onValueChange={(value) => setFormData({...formData, mythical_window_duration_minutes: value})}
+                  min={1}
+                  max={60}
+                  step={1}
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Мин. сумма (₽)</Label>
+                  <span className="text-sm font-semibold">{formData.mythical_donation_amount[0]}₽</span>
+                </div>
+                <Slider
+                  value={formData.mythical_donation_amount}
+                  onValueChange={(value) => setFormData({...formData, mythical_donation_amount: value})}
+                  min={500}
+                  max={10000}
+                  step={100}
+                />
+              </div>
             </div>
-
-            {/* Интервалы появления */}
-            {formData.mythical_enabled && (
-              <>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label>Минимальный интервал (часы)</Label>
-                    <span className="text-lg font-semibold">{formData.mythical_min_interval_hours[0]}</span>
-                  </div>
-                  <Slider
-                    value={formData.mythical_min_interval_hours}
-                    onValueChange={(value) => setFormData({...formData, mythical_min_interval_hours: value})}
-                    min={0}
-                    max={24}
-                    step={1}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Лутбокс появится не раньше чем через N часов после последнего
-                  </p>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label>Максимальный интервал (часы)</Label>
-                    <span className="text-lg font-semibold">{formData.mythical_max_interval_hours[0]}</span>
-                  </div>
-                  <Slider
-                    value={formData.mythical_max_interval_hours}
-                    onValueChange={(value) => setFormData({...formData, mythical_max_interval_hours: value})}
-                    min={0}
-                    max={24}
-                    step={1}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Лутбокс появится не позже чем через N часов после последнего
-                  </p>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label>Длительность окна (минуты)</Label>
-                    <span className="text-lg font-semibold">{formData.mythical_window_duration_minutes[0]}</span>
-                  </div>
-                  <Slider
-                    value={formData.mythical_window_duration_minutes}
-                    onValueChange={(value) => setFormData({...formData, mythical_window_duration_minutes: value})}
-                    min={1}
-                    max={60}
-                    step={1}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Сколько минут лутбокс остается доступным после появления
-                  </p>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label>Минимальная сумма доната (₽)</Label>
-                    <span className="text-lg font-semibold">{formData.mythical_donation_amount[0]}₽</span>
-                  </div>
-                  <Slider
-                    value={formData.mythical_donation_amount}
-                    onValueChange={(value) => setFormData({...formData, mythical_donation_amount: value})}
-                    min={500}
-                    max={10000}
-                    step={100}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Донот должен быть не меньше этой суммы для получения мифического лутбокса
-                  </p>
-                </div>
-              </>
-            )}
           </CardContent>
-        </Card>
+        )}
+      </Card>
+
+      {/* История донатов */}
+      <DonationHistory user={user} platform={platform} channelName={channelName} />
 
       {/* Кнопка сохранения */}
       <div className="flex justify-end">
         <Button 
           onClick={handleSave}
           disabled={saving}
-          className="w-full sm:w-auto"
+          size="sm"
         >
-          {saving ? 'Сохранение...' : 'Сохранить настройки'}
+          {saving ? 'Сохранение...' : 'Сохранить'}
         </Button>
       </div>
     </div>
@@ -336,4 +225,3 @@ const DonationSettings = ({ user, platform, channelName }) => {
 };
 
 export default DonationSettings;
-
