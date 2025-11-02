@@ -9,15 +9,18 @@ import { useState, useEffect } from 'react';
  * @returns {{ shouldAnimate: boolean, contentLoaded: boolean }}
  */
 export const usePageAnimation = (pageKey, delay = 100) => {
-    const [shouldAnimate, setShouldAnimate] = useState(false); // НЕ показываем сразу
-    const [contentLoaded, setContentLoaded] = useState(false);
+    // Проверяем кэш сразу, чтобы правильно инициализировать состояние
+    const cacheKey = `page_animation_${pageKey}`;
+    const wasCached = typeof window !== 'undefined' ? sessionStorage.getItem(cacheKey) : null;
+    
+    const [shouldAnimate, setShouldAnimate] = useState(!wasCached); // Если не закэшировано - анимируем
+    const [contentLoaded, setContentLoaded] = useState(!!wasCached); // Если закэшировано - сразу показываем
 
     useEffect(() => {
         // Проверяем localStorage: была ли страница уже загружена в этой сессии
-        const cacheKey = `page_animation_${pageKey}`;
-        const wasCached = sessionStorage.getItem(cacheKey);
+        const wasCachedNow = sessionStorage.getItem(cacheKey);
 
-        if (wasCached) {
+        if (wasCachedNow) {
             // Если страница уже была загружена в этой сессии, не показываем анимацию
             setShouldAnimate(false);
             setContentLoaded(true);
@@ -28,8 +31,6 @@ export const usePageAnimation = (pageKey, delay = 100) => {
             let timer;
             const rafId1 = requestAnimationFrame(() => {
                 rafId2 = requestAnimationFrame(() => {
-                    setShouldAnimate(true); // Только теперь включаем анимацию
-                    
                     // Помечаем страницу как загруженную
                     sessionStorage.setItem(cacheKey, 'true');
                     
@@ -46,7 +47,7 @@ export const usePageAnimation = (pageKey, delay = 100) => {
                 if (timer) clearTimeout(timer);
             };
         }
-    }, [pageKey, delay]);
+    }, [pageKey, delay, cacheKey]);
 
     return { shouldAnimate, contentLoaded };
 };
