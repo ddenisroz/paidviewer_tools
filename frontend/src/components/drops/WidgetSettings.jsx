@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
-import { Monitor, Copy, ExternalLink, Settings2 } from 'lucide-react';
+import { Monitor, Copy, ExternalLink, Settings2, Loader2, Check } from 'lucide-react';
 import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
 import { logger } from '../../utils/prodLogger';
@@ -13,11 +13,11 @@ const WidgetSettings = ({ user, platform, channelName }) => {
   const [config, setConfig] = useState(null);
   const [widgetUrl, setWidgetUrl] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [savedSuccessfully, setSavedSuccessfully] = useState(false);
   const [formData, setFormData] = useState({
     widget_spinning_duration_ms: [1500],
     widget_opening_duration_ms: [1000],
-    widget_result_duration_ms: [5500],
-    widget_closing_duration_ms: [500]
+    widget_result_duration_ms: [5500]
   });
 
   useEffect(() => {
@@ -38,8 +38,7 @@ const WidgetSettings = ({ user, platform, channelName }) => {
         setFormData({
           widget_spinning_duration_ms: [response.data.data.widget_spinning_duration_ms ?? 1500],
           widget_opening_duration_ms: [response.data.data.widget_opening_duration_ms ?? 1000],
-          widget_result_duration_ms: [response.data.data.widget_result_duration_ms ?? 5500],
-          widget_closing_duration_ms: [response.data.data.widget_closing_duration_ms ?? 500]
+          widget_result_duration_ms: [response.data.data.widget_result_duration_ms ?? 5500]
         });
       }
     } catch (error) {
@@ -68,14 +67,15 @@ const WidgetSettings = ({ user, platform, channelName }) => {
       const payload = {
         widget_spinning_duration_ms: formData.widget_spinning_duration_ms[0],
         widget_opening_duration_ms: formData.widget_opening_duration_ms[0],
-        widget_result_duration_ms: formData.widget_result_duration_ms[0],
-        widget_closing_duration_ms: formData.widget_closing_duration_ms[0]
+        widget_result_duration_ms: formData.widget_result_duration_ms[0]
       };
       const response = await botService.put(`/api/drops/config/${channelName}`, payload, {
         params: { platform }
       });
       if (response.data.success) {
         toast.success('Настройки виджета сохранены');
+        setSavedSuccessfully(true);
+        setTimeout(() => setSavedSuccessfully(false), 2000);
         await loadConfig();
       }
     } catch (error) {
@@ -152,33 +152,54 @@ const WidgetSettings = ({ user, platform, channelName }) => {
               />
               <p className="text-xs text-muted-foreground">Показ награды зрителю</p>
             </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm">Закрытие (мс)</Label>
-                <span className="text-lg font-semibold">{formData.widget_closing_duration_ms[0]}</span>
-              </div>
-              <Slider
-                value={formData.widget_closing_duration_ms}
-                onValueChange={(value) => setFormData({...formData, widget_closing_duration_ms: value})}
-                min={200}
-                max={2000}
-                step={100}
-              />
-              <p className="text-xs text-muted-foreground">Скрытие виджета</p>
-            </div>
           </div>
 
-          {/* Кнопка сохранения */}
-          <div className="flex justify-end">
+          {/* Кнопки */}
+          <div className="flex justify-between items-center">
+            <Button
+              onClick={() => {
+                if (widgetUrl) {
+                  // Открываем виджет в новой вкладке для настройки и тестирования
+                  const previewUrl = `${widgetUrl}?preview=true`;
+                  window.open(previewUrl, '_blank');
+                } else {
+                  toast.error('URL виджета еще не загружен');
+                }
+              }}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              disabled={!widgetUrl}
+            >
+              <ExternalLink className="w-4 h-4" />
+              Предпросмотр анимации
+            </Button>
             <Button 
               onClick={handleSave}
               disabled={saving}
               size="sm"
               variant="default"
-              className="gap-2 px-6"
+              className={`gap-2 px-6 transition-all duration-300 ${
+                savedSuccessfully 
+                  ? 'bg-green-600 hover:bg-green-500 scale-105' 
+                  : saving 
+                    ? 'opacity-75' 
+                    : ''
+              }`}
             >
-              {saving ? 'Сохранение...' : 'Сохранить'}
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Сохранение...
+                </>
+              ) : savedSuccessfully ? (
+                <>
+                  <Check className="w-4 h-4" />
+                  Сохранено!
+                </>
+              ) : (
+                'Сохранить'
+              )}
             </Button>
           </div>
         </CardContent>
@@ -206,7 +227,7 @@ const WidgetSettings = ({ user, platform, channelName }) => {
             </ol>
           </div>
 
-          {widgetUrl && (
+          {widgetUrl ? (
             <div className="space-y-2">
               <Label className="text-sm">URL виджета</Label>
               <div className="flex gap-2">
@@ -231,9 +252,18 @@ const WidgetSettings = ({ user, platform, channelName }) => {
                   className="gap-2"
                 >
                   <ExternalLink className="w-4 h-4" />
-                  Открыть
+                  Открыть виджет
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                💡 Скопируйте этот URL или нажмите «Открыть виджет» для предпросмотра анимации
+              </p>
+            </div>
+          ) : (
+            <div className="p-4 border rounded-lg bg-muted/50">
+              <p className="text-sm text-muted-foreground">
+                URL виджета загружается...
+              </p>
             </div>
           )}
 
@@ -244,6 +274,7 @@ const WidgetSettings = ({ user, platform, channelName }) => {
           </div>
         </CardContent>
       </Card>
+
     </div>
   );
 };

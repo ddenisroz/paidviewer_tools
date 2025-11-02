@@ -8,10 +8,13 @@ import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
 import { logger } from '../../utils/prodLogger';
 import StreakCalendar from './StreakCalendar';
+import { AlertTriangle, Loader2, Check, Package } from 'lucide-react';
 
-const StreakSettings = ({ user, platform, channelName }) => {
+const StreakSettings = ({ user, platform, channelName, hasRewards = false }) => {
   const [config, setConfig] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [savedSuccessfully, setSavedSuccessfully] = useState(false);
   const [formData, setFormData] = useState({
     streak_enabled: true,
     streak_days_common: [1],
@@ -76,6 +79,8 @@ const StreakSettings = ({ user, platform, channelName }) => {
       
       if (response.data.success) {
         toast.success('Настройки стрика сохранены');
+        setSavedSuccessfully(true);
+        setTimeout(() => setSavedSuccessfully(false), 2000);
         await loadConfig();
       }
     } catch (error) {
@@ -86,41 +91,96 @@ const StreakSettings = ({ user, platform, channelName }) => {
     }
   };
 
+  const handleResetStatistics = async () => {
+    if (!user || !platform || !channelName) {
+      toast.error('Недостаточно данных');
+      return;
+    }
+
+    if (!confirm('Вы уверены, что хотите сбросить всю статистику стриков? Это действие необратимо!')) {
+      return;
+    }
+
+    try {
+      setResetting(true);
+      const response = await botService.post(`/api/drops/streak/reset/${channelName}`, {}, {
+        params: { platform }
+      });
+      
+      if (response.data.success) {
+        toast.success(`Статистика стриков сброшена (удалено ${response.data.data.deleted_count} записей)`);
+      }
+    } catch (error) {
+      logger.error('Error resetting streak statistics:', error);
+      toast.error('Ошибка сброса статистики');
+    } finally {
+      setResetting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      {/* Общие настройки - компактно */}
+      {/* Предупреждение если нет наград */}
+      {!hasRewards && (
+        <Card className="border-2 border-orange-500/50 bg-orange-500/10">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-orange-400 mb-1">
+                  Награды не настроены
+                </h4>
+                <p className="text-xs text-orange-200/80 mb-2">
+                  Для работы системы стриков необходимо сначала настроить содержимое сундуков на вкладке "Награды".
+                </p>
+                <Button 
+                  onClick={() => window.location.href = '/dashboard/drops?tab=rewards'}
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs border-orange-500/50 text-orange-400 hover:bg-orange-500/20"
+                >
+                  <Package className="w-3 h-3 mr-1.5" />
+                  Настроить награды
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Календарь дней стрика - поднят вверх */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Общие настройки</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Включить стрик */}
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div>
-                <h3 className="text-sm font-medium">Включить стрик</h3>
-                <p className="text-xs text-muted-foreground">Награды за активность</p>
-              </div>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Дни для наград</CardTitle>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-medium">Включить стрик drops</Label>
               <Switch
-                checked={formData.streak_enabled}
-                onCheckedChange={(checked) => setFormData({...formData, streak_enabled: checked})}
-              />
-            </div>
-
-            {/* Сброс стрика */}
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div>
-                <h3 className="text-sm font-medium">Сброс при пропуске</h3>
-                <p className="text-xs text-muted-foreground">Обнулять при неактивности</p>
-              </div>
-              <Switch
-                checked={formData.streak_reset_on_skip}
-                onCheckedChange={(checked) => setFormData({...formData, streak_reset_on_skip: checked})}
+                checked={formData.streak_enabled && hasRewards}
+                disabled={!hasRewards}
+                onCheckedChange={(checked) => {
+                  if (!hasRewards) {
+                    toast.error('Сначала настройте содержимое сундуков на вкладке "Награды"');
+                    return;
+                  }
+                  setFormData({...formData, streak_enabled: checked});
+                }}
               />
             </div>
           </div>
+        </CardHeader>
+        <CardContent>
+          <StreakCalendar formData={formData} setFormData={setFormData} />
+        </CardContent>
+      </Card>
 
-          {/* Сообщений для засчета дня - компактно */}
+      {/* Общие настройки - перемещены вниз */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Дополнительные настройки</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Сообщений для засчета дня */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label className="text-sm">Сообщений для засчета дня</Label>
@@ -134,32 +194,59 @@ const StreakSettings = ({ user, platform, channelName }) => {
               step={1}
             />
           </div>
+
+          {/* Сброс при пропуске */}
+          <div className="flex items-center justify-between p-3 border rounded-lg">
+            <div>
+              <Label className="text-sm font-medium">Сброс при пропуске</Label>
+              <p className="text-xs text-muted-foreground">Обнулять стрик при неактивности в течение дня</p>
+            </div>
+            <Switch
+              checked={formData.streak_reset_on_skip}
+              onCheckedChange={(checked) => setFormData({...formData, streak_reset_on_skip: checked})}
+            />
+          </div>
         </CardContent>
       </Card>
 
-      {/* Календарь дней стрика */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Дни для наград</CardTitle>
-          <CardDescription className="text-xs">
-            Количество дней стрика для каждого качества
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <StreakCalendar formData={formData} setFormData={setFormData} />
-        </CardContent>
-      </Card>
-
-      {/* Кнопка сохранения - компактно справа */}
-      <div className="flex justify-end">
+      {/* Кнопки сохранения и сброса статистики */}
+      <div className="flex items-center gap-3 justify-end">
+        <Button 
+          onClick={handleResetStatistics}
+          disabled={resetting}
+          size="sm"
+          variant="destructive"
+          className="gap-2"
+        >
+          <AlertTriangle className="w-4 h-4" />
+          {resetting ? 'Сброс...' : 'Сбросить статистику стриков'}
+        </Button>
         <Button 
           onClick={handleSave}
           disabled={saving}
           size="sm"
-          variant="default"
-          className="gap-2 px-6"
+          variant={savedSuccessfully ? "default" : "default"}
+          className={`gap-2 px-6 transition-all duration-300 ${
+            savedSuccessfully 
+              ? 'bg-green-600 hover:bg-green-500 scale-105' 
+              : saving 
+                ? 'opacity-75' 
+                : ''
+          }`}
         >
-          {saving ? 'Сохранение...' : 'Сохранить'}
+          {saving ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Сохранение...
+            </>
+          ) : savedSuccessfully ? (
+            <>
+              <Check className="w-4 h-4" />
+              Сохранено!
+            </>
+          ) : (
+            'Сохранить'
+          )}
         </Button>
       </div>
     </div>

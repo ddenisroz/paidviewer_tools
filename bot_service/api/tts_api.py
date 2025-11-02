@@ -654,25 +654,8 @@ async def get_tts_status(
         if not user:
             return JSONResponse(content={"enabled": False, "authenticated": True, "is_whitelisted": False})
         
-        # Проверяем whitelist статус
-        login_platform = current_user.get('login_platform')
-        is_whitelisted = False
-        
-        if login_platform == 'twitch' and user.twitch_username:
-            whitelisted = db.query(WhitelistedChannel).filter(
-                WhitelistedChannel.channel_name == user.twitch_username.lower(),
-                WhitelistedChannel.platform == 'twitch'
-            ).first()
-            is_whitelisted = bool(whitelisted)
-        elif login_platform == 'vk' and user.vk_username:
-            whitelisted = db.query(WhitelistedChannel).filter(
-                WhitelistedChannel.channel_name == user.vk_username.lower(),
-                WhitelistedChannel.platform == 'vk'
-            ).first()
-            is_whitelisted = bool(whitelisted)
-        
         # Также получаем engine_type из настроек TTS и проверяем локальный endpoint
-        from core.database import LocalTTSEndpoint, TTSUserSettings
+        from core.database import LocalTTSEndpoint, TTSUserSettings, WhitelistedChannel
         tts_settings = db.query(TTSUserSettings).filter(TTSUserSettings.user_id == user_id).first()
         local_endpoint = db.query(LocalTTSEndpoint).filter(
             LocalTTSEndpoint.user_id == user_id,
@@ -688,6 +671,34 @@ async def get_tts_status(
         
         # Если есть локальный endpoint, считаем что пользователь может использовать локальный TTS без whitelist
         has_local_setup = local_endpoint and local_endpoint.is_healthy
+        
+        # Проверяем whitelist статус
+        # ВАЖНО: Проверяем обе платформы, так как пользователь может быть в whitelist на любой из них
+        login_platform = current_user.get('login_platform')
+        is_whitelisted = False
+        
+        # Проверяем Twitch whitelist
+        if user.twitch_username:
+            twitch_whitelisted = db.query(WhitelistedChannel).filter(
+                WhitelistedChannel.channel_name == user.twitch_username.lower(),
+                WhitelistedChannel.platform == 'twitch'
+            ).first()
+            if twitch_whitelisted:
+                is_whitelisted = True
+                logger.info(f"✅ [TTS STATUS] User {user_id} ({user.twitch_username}) whitelisted on Twitch")
+        
+        # Проверяем VK whitelist (если не найден в Twitch)
+        if not is_whitelisted and user.vk_username:
+            vk_whitelisted = db.query(WhitelistedChannel).filter(
+                WhitelistedChannel.channel_name == user.vk_username.lower(),
+                WhitelistedChannel.platform == 'vk'
+            ).first()
+            if vk_whitelisted:
+                is_whitelisted = True
+                logger.info(f"✅ [TTS STATUS] User {user_id} ({user.vk_username}) whitelisted on VK")
+        
+        if not is_whitelisted and not has_local_setup:
+            logger.warning(f"❌ [TTS STATUS] User {user_id} (twitch: {user.twitch_username}, vk: {user.vk_username}) NOT whitelisted, login_platform: {login_platform}")
         
         return JSONResponse(content={
             "enabled": user.tts_enabled or False, 

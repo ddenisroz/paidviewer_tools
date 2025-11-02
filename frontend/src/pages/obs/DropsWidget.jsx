@@ -25,17 +25,49 @@ const DropsWidget = () => {
   const { token } = useParams();
   const [currentReward, setCurrentReward] = useState(null);
   const [isAnimating, setIsAnimating] = useState(false);
-  const [animationPhase, setAnimationPhase] = useState('idle'); // idle, spinning, opening, opened, closing
+  const [animationPhase, setAnimationPhase] = useState('idle'); // idle, spinning, opening, opened
   const ws = useRef(null);
   const [status, setStatus] = useState('Подключение...');
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [widgetConfig, setWidgetConfig] = useState({
     spinning_duration: 1500,
     opening_duration: 1000,
-    result_duration: 5500,
-    closing_duration: 500
+    result_duration: 5500
   });
 
   useEffect(() => {
+    // Проверяем режим предпросмотра из URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const preview = urlParams.get('preview');
+    if (preview === 'true') {
+      setIsPreviewMode(true);
+      setStatus('Режим предпросмотра - нажмите кнопку для тестирования анимации');
+      // Загружаем настройки виджета для предпросмотра
+      const apiUrl = import.meta.env.VITE_BOT_SERVICE_URL;
+      if (apiUrl && token) {
+        // Пытаемся получить настройки через токен
+        fetch(`${apiUrl}/api/drops/user-from-token/${token}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.channel_name && data.platform) {
+              return fetch(`${apiUrl}/api/drops/config/${data.channel_name}?platform=${data.platform}`);
+            }
+          })
+          .then(res => res?.json())
+          .then(configData => {
+            if (configData?.success && configData.data) {
+              setWidgetConfig({
+                spinning_duration: configData.data.widget_spinning_duration_ms || 1500,
+                opening_duration: configData.data.widget_opening_duration_ms || 1000,
+                result_duration: configData.data.widget_result_duration_ms || 5500
+              });
+            }
+          })
+          .catch(err => logger.error('Error loading preview config:', err));
+      }
+      return; // Не подключаемся к WebSocket в режиме предпросмотра
+    }
+
     if (!token) {
       logger.error('No token provided');
       setStatus('Ошибка: Отсутствует токен');
@@ -74,8 +106,7 @@ const DropsWidget = () => {
                 setWidgetConfig({
                   spinning_duration: configData.data.widget_spinning_duration_ms || 1500,
                   opening_duration: configData.data.widget_opening_duration_ms || 1000,
-                  result_duration: configData.data.widget_result_duration_ms || 5500,
-                  closing_duration: configData.data.widget_closing_duration_ms || 500
+                  result_duration: configData.data.widget_result_duration_ms || 5500
                 });
               }
             }
@@ -162,13 +193,11 @@ const DropsWidget = () => {
       setAnimationPhase('opened');
     }, widgetConfig.spinning_duration + widgetConfig.opening_duration);
 
+    // После показа результата просто скрываем виджет без анимации закрытия
     setTimeout(() => {
-      setAnimationPhase('closing');
-      setTimeout(() => {
-        setIsAnimating(false);
-        setCurrentReward(null);
-        setAnimationPhase('idle');
-      }, widgetConfig.closing_duration);
+      setIsAnimating(false);
+      setCurrentReward(null);
+      setAnimationPhase('idle');
     }, widgetConfig.spinning_duration + widgetConfig.opening_duration + widgetConfig.result_duration);
   };
 
@@ -195,6 +224,21 @@ const DropsWidget = () => {
     }
   };
 
+  // Тестовая анимация для режима предпросмотра
+  const testAnimation = () => {
+    const testReward = {
+      quality: 'epic',
+      viewer_name: 'TestViewer',
+      reward: '1000 очков',
+      reward_type: 'points',
+      streak_days: 5,
+      donation_amount: null,
+      sound_file: null,
+      sound_volume: 1.0
+    };
+    showReward(testReward);
+  };
+
   // Показываем status если не подключены
   if (!isAnimating || !currentReward) {
     return (
@@ -207,7 +251,15 @@ const DropsWidget = () => {
               className="w-32 h-32 mx-auto opacity-30"
             />
           </div>
-          <p className="text-sm font-medium">{status}</p>
+          <p className="text-sm font-medium mb-4">{status}</p>
+          {isPreviewMode && (
+            <button
+              onClick={testAnimation}
+              className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors font-medium"
+            >
+              🎬 Тестировать анимацию
+            </button>
+          )}
         </div>
       </div>
     );
@@ -272,7 +324,7 @@ const DropsWidget = () => {
         )}
 
         {/* Анимация частиц вокруг сундука */}
-        {isAnimating && animationPhase !== 'closing' && (
+        {isAnimating && animationPhase !== 'idle' && (
           <div className="absolute inset-0 pointer-events-none">
             {[...Array(30)].map((_, i) => (
               <div

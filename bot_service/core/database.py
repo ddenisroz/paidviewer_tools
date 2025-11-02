@@ -768,6 +768,9 @@ class DropsReward(Base):
     reward_type = Column(String, nullable=False)  # "points", "voice", "command", "custom"
     reward_value = Column(String, nullable=False)  # Значение награды (JSON)
     
+    # Изображение для карточки в гача крутке
+    image_url = Column(String, nullable=True)  # URL изображения награды
+    
     # Звук награды
     sound_file = Column(String, nullable=True)  # Путь к файлу звука
     sound_volume = Column(Float, default=1.0)

@@ -770,26 +770,26 @@ const VoiceManagementPageContent = () => {
                                     <p className="text-sm text-slate-500">Загрузите свой первый голос, чтобы начать</p>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
                                     {userVoices.map((voice) => (
                                         <Card key={voice.id} className="bg-slate-800 border-slate-700 flex flex-col">
-                                            <CardHeader className="pb-3">
+                                            <CardHeader className="pb-2 pt-3 px-3">
                                                 <div className="flex items-center justify-between">
-                                                    <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
-                                                        <User className="h-4 w-4 text-green-400"/>
-                                                        {voice.name}
+                                                    <CardTitle className="text-xs font-medium text-white flex items-center gap-1.5">
+                                                        <User className="h-3.5 w-3.5 text-green-400 flex-shrink-0"/>
+                                                        <span className="truncate">{voice.name}</span>
                                                     </CardTitle>
                                                 </div>
                                             </CardHeader>
-                                            <CardContent className="flex-grow flex flex-col justify-end pt-0">
-                                                <div className="flex gap-2">
+                                            <CardContent className="flex-grow flex flex-col justify-end pt-0 px-3 pb-3">
+                                                <div className="flex gap-1.5">
                                                     <Button 
-                                                        className="flex-1" 
+                                                        className="flex-1 h-7 text-xs px-2" 
                                                         variant="outline" 
                                                         size="sm" 
                                                         onClick={() => handleEdit(voice)}
                                                     >
-                                                        <Settings className="h-4 w-4 mr-1"/>
+                                                        <Settings className="h-3 w-3 mr-1"/>
                                                         Настроить
                                                     </Button>
                                                     {whitelistStatus?.can_manage_voices && (
@@ -797,8 +797,9 @@ const VoiceManagementPageContent = () => {
                                                             variant="destructive" 
                                                             size="icon" 
                                                             onClick={() => handleDelete(voice.id, voice.voice_type)}
+                                                            className="h-7 w-7"
                                                         >
-                                                            <Trash2 className="h-4 w-4"/>
+                                                            <Trash2 className="h-3 w-3"/>
                                                         </Button>
                                                     )}
                                                 </div>
@@ -831,25 +832,25 @@ const VoiceManagementPageContent = () => {
                                 <p className="text-sm text-slate-500">Глобальные голоса доступны всем пользователям</p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
                                 {globalVoices.map((voice) => (
                                     <Card key={voice.id} className="bg-slate-800 border-slate-700 flex flex-col">
-                                        <CardHeader className="pb-3">
+                                        <CardHeader className="pb-2 pt-3 px-3">
                                             <div className="flex items-center justify-between">
-                                                <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
-                                                    <Globe className="h-4 w-4 text-blue-400"/>
-                                                    {voice.name}
+                                                <CardTitle className="text-xs font-medium text-white flex items-center gap-1.5">
+                                                    <Globe className="h-3.5 w-3.5 text-blue-400 flex-shrink-0"/>
+                                                    <span className="truncate">{voice.name}</span>
                                                 </CardTitle>
                                             </div>
                                         </CardHeader>
-                                        <CardContent className="flex-grow flex flex-col justify-end pt-0">
+                                        <CardContent className="flex-grow flex flex-col justify-end pt-0 px-3 pb-3">
                                             <Button 
-                                                className="w-full" 
+                                                className="w-full h-7 text-xs px-2" 
                                                 variant="outline" 
                                                 size="sm" 
                                                 onClick={() => handleEdit(voice)}
                                             >
-                                                <Settings className="h-4 w-4 mr-1"/>
+                                                <Settings className="h-3 w-3 mr-1"/>
                                                 Настроить
                                             </Button>
                                         </CardContent>

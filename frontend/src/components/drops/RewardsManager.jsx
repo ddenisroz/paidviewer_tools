@@ -27,13 +27,8 @@ import {
   Plus, 
   Edit, 
   Trash2, 
-  Volume2,
-  Zap,
-  Mic,
-  Command,
   Crown,
   Music,
-  Sparkles,
   Save
 } from 'lucide-react';
 import { botService } from '../../services/microservices';
@@ -44,7 +39,6 @@ import CommonClosed from '../../images/lootboxes/common/common_closed.png';
 import RareClosed from '../../images/lootboxes/rare/rare_closed.png';
 import EpicClosed from '../../images/lootboxes/epic/epic_closed.png';
 import LegendaryClosed from '../../images/lootboxes/legendary/legendary_closed.png';
-import MythycClosed from '../../images/lootboxes/mythyc/mythyc_closed.png';
 
 const QUALITIES = [
   { 
@@ -74,22 +68,10 @@ const QUALITIES = [
     color: '#F59E0B', 
     label: 'Легендарный',
     image: LegendaryClosed
-  },
-  { 
-    id: 5, 
-    name: 'Mythical', 
-    color: '#EC4899', 
-    label: 'Мифический',
-    image: MythycClosed
   }
+  // Мифический сундук только для донатов, не включаем здесь
 ];
 
-const REWARD_TYPES = [
-  { value: 'points', label: 'Баллы канала', icon: Zap },
-  { value: 'voice', label: 'Озвучка', icon: Mic },
-  { value: 'command', label: 'Команда', icon: Command },
-  { value: 'custom', label: 'Своя награда', icon: Sparkles }
-];
 
 const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) => {
   const [rewards, setRewards] = useState([]);
@@ -103,7 +85,7 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
     description: '',
     quality_id: null,
     weight: [100],
-    reward_type: 'points',
+    reward_type: 'custom',
     reward_value: '',
     sound_volume: [1.0],
     is_active: true
@@ -153,13 +135,16 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
   const handleOpenRewardDialog = (qualityId = null) => {
     setSelectedQuality(qualityId);
     setEditingReward(null);
+    // Если qualityId не передан, берем первый из БД
+    const defaultQualityId = qualityId || (qualitiesData.length > 0 ? qualitiesData[0].id : null);
     setRewardForm({
       name: '',
       description: '',
-      quality_id: qualityId,
+      quality_id: defaultQualityId,
       weight: [100],
-      reward_type: 'points',
+      reward_type: 'custom',
       reward_value: '',
+      image_url: '',
       sound_volume: [1.0],
       is_active: true
     });
@@ -168,30 +153,44 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
 
   const handleEditReward = (reward) => {
     setEditingReward(reward);
-    setSelectedQuality(reward.quality.id);
+    // Используем реальный ID из БД (может быть объект quality или просто id)
+    const qualityId = reward.quality?.id || (reward.quality && typeof reward.quality === 'object' ? reward.quality.id : reward.quality);
+    setSelectedQuality(qualityId);
     setRewardForm({
       name: reward.name,
       description: reward.description || '',
-      quality_id: reward.quality.id,
+      quality_id: qualityId,
       weight: [reward.weight],
       reward_type: reward.reward_type,
-      reward_value: reward.reward_value,
-      sound_volume: [reward.sound_volume],
-      is_active: reward.is_active
+      reward_value: reward.reward_value || '',
+      image_url: reward.image_url || '',
+      sound_volume: [reward.sound_volume || 1.0],
+      is_active: reward.is_active !== undefined ? reward.is_active : true
     });
     setRewardDialogOpen(true);
   };
 
   const handleSaveReward = async () => {
-    if (!rewardForm.name || !rewardForm.reward_value) {
-      toast.error('Заполните все обязательные поля');
+    if (!rewardForm.name) {
+      toast.error('Укажите название награды');
+      return;
+    }
+
+    if (!rewardForm.quality_id) {
+      toast.error('Выберите качество сундука');
       return;
     }
 
     const payload = {
-      ...rewardForm,
+      name: rewardForm.name,
+      description: rewardForm.description || null,
+      quality_id: rewardForm.quality_id,
       weight: rewardForm.weight[0],
-      sound_volume: rewardForm.sound_volume[0]
+      reward_type: 'custom', // Всегда custom, так как награда - это просто сундук
+      reward_value: '', // Пустое значение, так как награда - это просто показ сундука
+      image_url: rewardForm.image_url || null, // URL изображения для карточки в гача крутке
+      sound_volume: 1.0, // Дефолтное значение, настройка звука в виджете
+      is_active: rewardForm.is_active
     };
 
     try {
@@ -209,7 +208,34 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
       setRewardDialogOpen(false);
     } catch (error) {
       logger.error('Error saving reward:', error);
-      toast.error('Ошибка сохранения награды');
+      
+      // Обрабатываем ошибки валидации
+      let errorMessage = 'Ошибка сохранения награды';
+      
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        
+        // Если это массив ошибок валидации
+        if (Array.isArray(errorData.detail)) {
+          const messages = errorData.detail.map(err => {
+            if (typeof err === 'object' && err.msg) {
+              return `${err.loc?.join('.')}: ${err.msg}`;
+            }
+            return String(err);
+          });
+          errorMessage = messages.join(', ');
+        } 
+        // Если это строка
+        else if (typeof errorData.detail === 'string') {
+          errorMessage = errorData.detail;
+        }
+        // Если есть message
+        else if (errorData.message) {
+          errorMessage = errorData.message;
+        }
+      }
+      
+      toast.error(errorMessage);
     }
   };
 
@@ -226,12 +252,12 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
     }
   };
 
-  const getRewardsForQuality = (qualityId) => {
-    return rewards.filter(r => r.quality.id === qualityId);
+  const getRewardsForQuality = (qualityName) => {
+    return rewards.filter(r => r.quality?.name === qualityName);
   };
 
-  const getTotalWeight = (qualityId) => {
-    const qualityRewards = getRewardsForQuality(qualityId);
+  const getTotalWeight = (qualityName) => {
+    const qualityRewards = getRewardsForQuality(qualityName);
     return qualityRewards.reduce((sum, r) => sum + r.weight, 0);
   };
 
@@ -239,9 +265,9 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
     <div className="space-y-6">
       {/* Награды по качествам */}
       {QUALITIES.map((quality) => {
-        const qualityRewards = getRewardsForQuality(quality.id);
-        const totalWeight = getTotalWeight(quality.id);
-        const qualityData = qualitiesData.find(q => q.id === quality.id);
+        const qualityRewards = getRewardsForQuality(quality.name);
+        const totalWeight = getTotalWeight(quality.name);
+        const qualityData = qualitiesData.find(q => q.name === quality.name);
         
         return (
           <Card key={quality.id}>
@@ -269,7 +295,15 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
                   </div>
                 </div>
                 <Button
-                  onClick={() => handleOpenRewardDialog(quality.id)}
+                  onClick={() => {
+                    // Пытаемся найти реальный ID качества из БД (сравниваем без учета регистра)
+                    // Если не найдено, используем статический ID из константы (fallback)
+                    const dbQuality = qualitiesData.find(q => 
+                      q.name.toLowerCase() === quality.name.toLowerCase()
+                    );
+                    const qualityId = dbQuality ? dbQuality.id : quality.id;
+                    handleOpenRewardDialog(qualityId);
+                  }}
                   size="sm"
                   className="gap-2"
                 >
@@ -288,7 +322,6 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
               ) : (
                 <div className="space-y-2">
                   {qualityRewards.map((reward) => {
-                    const RewardTypeIcon = REWARD_TYPES.find(t => t.value === reward.reward_type)?.icon || Zap;
                     return (
                       <div 
                         key={reward.id} 
@@ -304,13 +337,21 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
                           {reward.description && (
                             <p className="text-xs text-muted-foreground mt-1">{reward.description}</p>
                           )}
-                          <div className="flex items-center gap-3 mt-1.5">
-                            <div className="flex items-center gap-1 text-xs">
-                              <RewardTypeIcon className="w-3 h-3" />
-                              <span className="font-mono">{reward.reward_value}</span>
+                          {reward.image_url && (
+                            <div className="mt-2 w-20 h-20 border rounded overflow-hidden">
+                              <img 
+                                src={reward.image_url} 
+                                alt={reward.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                }}
+                              />
                             </div>
+                          )}
+                          <div className="flex items-center gap-3 mt-1.5">
                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <span>Вес:</span>
+                              <span>Шанс выпадения:</span>
                               <span className="font-semibold">{reward.weight}</span>
                             </div>
                             {reward.sound_file && (
@@ -365,7 +406,7 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
               <Label htmlFor="reward_name">Название награды *</Label>
               <Input
                 id="reward_name"
-                placeholder="Например: 100 баллов канала"
+                placeholder="Например: показать анус на стриме"
                 value={rewardForm.name}
                 onChange={(e) => setRewardForm({...rewardForm, name: e.target.value})}
               />
@@ -383,6 +424,75 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
               />
             </div>
 
+            {/* Изображение для карточки */}
+            <div className="space-y-2">
+              <Label htmlFor="reward_image">Изображение для карточки (гача)</Label>
+              <div className="space-y-2">
+                <Input
+                  id="reward_image_url"
+                  type="url"
+                  value={rewardForm.image_url || ''}
+                  onChange={(e) => setRewardForm({...rewardForm, image_url: e.target.value})}
+                  placeholder="URL изображения (или загрузите файл после сохранения)"
+                />
+                {editingReward && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="reward_image_file"
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        
+                        try {
+                          const formData = new FormData();
+                          formData.append('image_file', file);
+                          
+                          const response = await botService.post(
+                            `/api/drops/rewards/${editingReward.id}/image`,
+                            formData,
+                            {
+                              headers: {
+                                'Content-Type': 'multipart/form-data'
+                              }
+                            }
+                          );
+                          
+                          if (response.data.success) {
+                            setRewardForm({...rewardForm, image_url: response.data.data.image_url});
+                            toast.success('Изображение загружено');
+                          }
+                        } catch (error) {
+                          logger.error('Error uploading image:', error);
+                          toast.error('Ошибка загрузки изображения');
+                        } finally {
+                          // Сброс input
+                          e.target.value = '';
+                        }
+                      }}
+                      className="flex-1"
+                    />
+                  </div>
+                )}
+                {rewardForm.image_url && (
+                  <div className="w-24 h-24 border rounded overflow-hidden bg-muted">
+                    <img 
+                      src={rewardForm.image_url} 
+                      alt="Preview" 
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Изображение будет показано на карточке при крутке сундука (как в гача-играх)
+              </p>
+            </div>
+
             {/* Качество */}
             <div className="space-y-2">
               <Label htmlFor="reward_quality">Качество сундука *</Label>
@@ -394,72 +504,41 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
                   <SelectValue placeholder="Выберите качество" />
                 </SelectTrigger>
                 <SelectContent>
-                  {QUALITIES.map(q => (
-                    <SelectItem key={q.id} value={q.id.toString()}>
-                      <div className="flex items-center gap-2">
-                        <img src={q.image} alt={q.label} className="w-5 h-5" />
-                        {q.label}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Тип награды */}
-            <div className="space-y-2">
-              <Label htmlFor="reward_type">Тип награды *</Label>
-              <Select
-                value={rewardForm.reward_type}
-                onValueChange={(value) => setRewardForm({...rewardForm, reward_type: value})}
-              >
-                <SelectTrigger id="reward_type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {REWARD_TYPES.map(type => {
-                    const Icon = type.icon;
-                    return (
-                      <SelectItem key={type.value} value={type.value}>
+                  {/* Используем данные из БД если есть, иначе fallback на статические */}
+                  {qualitiesData.length > 0 ? (
+                    qualitiesData.map(q => {
+                      const qualityInfo = QUALITIES.find(qual => qual.name.toLowerCase() === q.name.toLowerCase());
+                      return (
+                        <SelectItem key={q.id} value={q.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            {qualityInfo && (
+                              <img src={qualityInfo.image} alt={qualityInfo.label} className="w-5 h-5" />
+                            )}
+                            {qualityInfo?.label || q.name}
+                          </div>
+                        </SelectItem>
+                      );
+                    })
+                  ) : (
+                    // Fallback на статические качества если БД еще не загружена
+                    QUALITIES.map(q => (
+                      <SelectItem key={q.id} value={q.id.toString()}>
                         <div className="flex items-center gap-2">
-                          <Icon className="w-4 h-4" />
-                          {type.label}
+                          <img src={q.image} alt={q.label} className="w-5 h-5" />
+                          {q.label}
                         </div>
                       </SelectItem>
-                    );
-                  })}
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Значение награды */}
-            <div className="space-y-2">
-              <Label htmlFor="reward_value">
-                Значение награды * 
-                <span className="text-xs text-muted-foreground ml-2">
-                  ({rewardForm.reward_type === 'points' && 'число баллов'}
-                  {rewardForm.reward_type === 'voice' && 'ID голоса'}
-                  {rewardForm.reward_type === 'command' && 'название команды'}
-                  {rewardForm.reward_type === 'custom' && 'произвольное значение'})
-                </span>
-              </Label>
-              <Input
-                id="reward_value"
-                placeholder={
-                  rewardForm.reward_type === 'points' ? '100' :
-                  rewardForm.reward_type === 'voice' ? 'female_1' :
-                  rewardForm.reward_type === 'command' ? '!custom' :
-                  'любое значение'
-                }
-                value={rewardForm.reward_value}
-                onChange={(e) => setRewardForm({...rewardForm, reward_value: e.target.value})}
-              />
-            </div>
 
             {/* Вес награды */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <Label htmlFor="reward_weight">Вес награды</Label>
+                <Label htmlFor="reward_weight">Шанс выпадения (вес награды)</Label>
                 <span className="text-sm font-semibold">{rewardForm.weight[0]}</span>
               </div>
               <Slider
@@ -471,30 +550,16 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
                 step={1}
                 className="w-full"
               />
-              <p className="text-xs text-muted-foreground">
-                Чем выше вес, тем больше шанс выпадения этой награды среди других наград того же качества
-              </p>
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                <p className="text-xs text-blue-300 font-medium mb-1">💡 Как работает вес награды:</p>
+                <p className="text-xs text-blue-200/80">
+                  Система случайно выбирает награду из всех наград того же качества. 
+                  Награда с весом <span className="font-semibold">200</span> выпадет в <span className="font-semibold">2 раза чаще</span>, чем награда с весом <span className="font-semibold">100</span>.
+                  Используйте вес для регулирования редкости наград.
+                </p>
+              </div>
             </div>
 
-            {/* Громкость звука */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="reward_sound_volume">
-                  <Volume2 className="w-4 h-4 inline mr-2" />
-                  Громкость звука
-                </Label>
-                <span className="text-sm font-semibold">{rewardForm.sound_volume[0].toFixed(1)}</span>
-              </div>
-              <Slider
-                id="reward_sound_volume"
-                value={rewardForm.sound_volume}
-                onValueChange={(value) => setRewardForm({...rewardForm, sound_volume: value})}
-                min={0}
-                max={2}
-                step={0.1}
-                className="w-full"
-              />
-            </div>
 
             {/* Активность */}
             <div className="flex items-center justify-between p-4 border rounded-lg">

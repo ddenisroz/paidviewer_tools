@@ -1,7 +1,7 @@
 # 📚 Индекс Документации TTS_TTV_0.02
 
-**Последнее обновление:** 31 октября 2025  
-**Версия:** 1.0.0
+**Последнее обновление:** 2 ноября 2025  
+**Версия:** 1.1.0
 
 ---
 
@@ -63,6 +63,9 @@
 ### VK Live
 - **`VK_CHANNEL_POINTS_IMPLEMENTATION.md`** - реализация наград VK Live
 - **`vk/VK_LIVE_DEMANDS_AND_REWARDS.md`** - документация VK Live Demands
+
+### Drops (Лутбоксы)
+- **`DROPS_SYSTEM.md`** - полное руководство по системе Drops (лутбоксы, стрики, донаты, награды)
 
 ---
 
@@ -162,9 +165,10 @@ docs/
 │   ├── ACCOUNT_DELETION_SYSTEM.md
 │   └── GUEST_MODE_SUPPORT.md
 │
-├── 🎁 Channel Points
+├── 🎁 Channel Points & Drops
 │   ├── CHANNEL_POINTS_AUDIT.md
-│   └── VK_CHANNEL_POINTS_IMPLEMENTATION.md
+│   ├── VK_CHANNEL_POINTS_IMPLEMENTATION.md
+│   └── DROPS_SYSTEM.md
 │
 ├── 🎮 Команды и Интеграции
 │   ├── UNIFIED_COMMANDS.md
@@ -228,6 +232,9 @@ docs/
 **Channel Points:**
 - Twitch → `CHANNEL_POINTS_AUDIT.md`
 - VK Live → `VK_CHANNEL_POINTS_IMPLEMENTATION.md`
+
+**Drops (Лутбоксы):**
+- Система Drops → `DROPS_SYSTEM.md`
 
 **Команды:**
 - Система команд → `UNIFIED_COMMANDS.md`
@@ -296,8 +303,8 @@ docs/
 
 ---
 
-**Индекс составлен:** 31 октября 2025  
-**Версия:** 1.0.0  
-**Всего документов:** 38
+**Индекс составлен:** 2 ноября 2025  
+**Версия:** 1.1.0  
+**Всего документов:** 39
 
 

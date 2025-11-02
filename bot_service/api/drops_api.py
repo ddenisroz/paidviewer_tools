@@ -56,6 +56,7 @@ class DropsConfigUpdate(BaseModel):
     streak_days_epic: Optional[int] = Field(None, ge=1, le=365)
     streak_days_legendary: Optional[int] = Field(None, ge=1, le=365)
     streak_messages_required: Optional[int] = Field(None, ge=1, le=100)
+    streak_reset_on_skip: Optional[bool] = None
     
     donation_enabled: Optional[bool] = None
     donation_amount_common: Optional[float] = Field(None, ge=0.01, le=1000000)
@@ -82,7 +83,8 @@ class DropsRewardCreate(BaseModel):
     quality_id: int = Field(..., ge=1)
     weight: int = Field(100, ge=1, le=1000)
     reward_type: str = Field(..., pattern="^(points|voice|command|custom)$")
-    reward_value: str = Field(..., min_length=1, max_length=1000)
+    reward_value: str = Field(default="", max_length=1000)  # Пустая строка разрешена - награда это просто сундук
+    image_url: Optional[str] = Field(None, max_length=1000)  # URL изображения для карточки в гача крутке
     sound_volume: float = Field(1.0, ge=0.0, le=2.0)
     is_active: bool = True
 
@@ -93,7 +95,8 @@ class DropsRewardUpdate(BaseModel):
     quality_id: Optional[int] = Field(None, ge=1)
     weight: Optional[int] = Field(None, ge=1, le=1000)
     reward_type: Optional[str] = Field(None, pattern="^(points|voice|command|custom)$")
-    reward_value: Optional[str] = Field(None, min_length=1, max_length=1000)
+    reward_value: Optional[str] = Field(None, max_length=1000)
+    image_url: Optional[str] = Field(None, max_length=1000)  # URL изображения для карточки в гача крутке
     sound_volume: Optional[float] = Field(None, ge=0.0, le=2.0)
     is_active: Optional[bool] = None
 
@@ -187,6 +190,11 @@ async def get_drops_config(
                 config_data={}
             )
         
+        # Безопасное получение streak_reset_on_skip (на случай если миграция не применена)
+        streak_reset_on_skip = True  # значение по умолчанию
+        if hasattr(config, 'streak_reset_on_skip'):
+            streak_reset_on_skip = config.streak_reset_on_skip
+        
         return {
             "success": True,
             "data": {
@@ -199,6 +207,7 @@ async def get_drops_config(
                 "streak_days_epic": config.streak_days_epic,
                 "streak_days_legendary": config.streak_days_legendary,
                 "streak_messages_required": config.streak_messages_required,
+                "streak_reset_on_skip": streak_reset_on_skip,
                 "donation_enabled": config.donation_enabled,
                 "donation_amount_common": config.donation_amount_common,
                 "donation_amount_rare": config.donation_amount_rare,
@@ -319,6 +328,7 @@ async def get_drops_rewards(
                     "weight": reward.weight,
                     "reward_type": reward.reward_type,
                     "reward_value": reward.reward_value,
+                    "image_url": reward.image_url,
                     "sound_file": reward.sound_file,
                     "sound_volume": reward.sound_volume,
                     "is_active": reward.is_active,
@@ -346,7 +356,11 @@ async def create_drops_reward(
         # Проверяем существование качества
         quality = db.query(DropsQuality).filter(DropsQuality.id == reward_data.quality_id).first()
         if not quality:
-            raise HTTPException(status_code=400, detail="Качество не найдено")
+            # Логируем для отладки - какие качества есть в БД
+            available_qualities = db.query(DropsQuality).all()
+            available_ids = [q.id for q in available_qualities]
+            logger.warning(f"Quality with id {reward_data.quality_id} not found. Available quality IDs: {available_ids}")
+            raise HTTPException(status_code=400, detail=f"Качество с ID {reward_data.quality_id} не найдено. Доступные ID: {available_ids}")
         
         # Санитизируем входные данные
         reward_data.name = sanitize_html(reward_data.name)
@@ -363,6 +377,7 @@ async def create_drops_reward(
             weight=reward_data.weight,
             reward_type=reward_data.reward_type,
             reward_value=reward_data.reward_value,
+            image_url=reward_data.image_url,
             sound_volume=reward_data.sound_volume,
             is_active=reward_data.is_active
         )
@@ -461,6 +476,64 @@ async def delete_drops_reward(
     except Exception as e:
         logger.error(f"Error deleting drops reward: {e}")
         raise HTTPException(status_code=500, detail="Ошибка удаления награды")
+
+@router.post("/rewards/{reward_id}/image")
+async def upload_reward_image(
+    reward_id: int,
+    image_file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Загружает изображение для награды (карточка в гача крутке)"""
+    try:
+        reward = db.query(DropsReward).filter(
+            DropsReward.id == reward_id,
+            DropsReward.user_id == current_user["id"]
+        ).first()
+        
+        if not reward:
+            raise HTTPException(status_code=404, detail="Награда не найдена")
+        
+        # Проверяем тип файла
+        if not image_file.content_type or not image_file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="Файл должен быть изображением")
+        
+        # Сохраняем файл
+        import os
+        upload_dir = f"uploads/drops/{current_user['id']}/images"
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # Генерируем имя файла
+        file_extension = os.path.splitext(image_file.filename)[1] or '.png'
+        filename = f"reward_{reward_id}_{int(time.time())}{file_extension}"
+        file_path = os.path.join(upload_dir, filename)
+        
+        # Сохраняем файл
+        with open(file_path, "wb") as buffer:
+            content = await image_file.read()
+            buffer.write(content)
+        
+        # Обновляем путь к файлу в БД
+        # Формируем URL относительно статики или полный путь
+        image_url = f"/static/uploads/drops/{current_user['id']}/images/{filename}"
+        reward.image_url = image_url
+        reward.updated_at = utcnow_naive()
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Изображение загружено",
+            "data": {
+                "image_url": image_url,
+                "filename": filename
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading reward image: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка загрузки изображения")
 
 @router.post("/rewards/{reward_id}/sound")
 async def upload_reward_sound(
@@ -1013,3 +1086,63 @@ async def donationalerts_webhook(
             "success": False,
             "error": str(e)
         }
+
+@router.post("/streak/reset/{channel_name}")
+async def reset_streak_statistics(
+    channel_name: str,
+    platform: str = "twitch",
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Сбрасывает всю статистику стриков для канала (только статистика, не настройки)"""
+    try:
+        user_id, session_id, is_guest = get_user_or_session_filters(current_user)
+        
+        from services.drops_service import DropsService
+        drops_service = DropsService(db)
+        
+        # Проверяем, что конфигурация существует и принадлежит пользователю
+        config = drops_service.get_config(
+            user_id=user_id,
+            session_id=session_id,
+            channel_name=channel_name,
+            platform=platform
+        )
+        
+        if not config:
+            raise HTTPException(status_code=404, detail="Конфигурация не найдена")
+        
+        # Удаляем все записи UserStreak для этого канала
+        query = db.query(UserStreak).filter(
+            UserStreak.channel_name == channel_name,
+            UserStreak.platform == platform
+        )
+        
+        if user_id:
+            query = query.filter(UserStreak.user_id == user_id)
+        elif session_id:
+            query = query.filter(UserStreak.session_id == session_id)
+        else:
+            raise HTTPException(status_code=400, detail="Не удалось определить пользователя")
+        
+        deleted_count = query.delete(synchronize_session=False)
+        db.commit()
+        
+        drops_logger.info(f"🗑️ [STREAK RESET] Удалено {deleted_count} записей стриков для {channel_name} ({platform})")
+        
+        return {
+            "success": True,
+            "message": f"Статистика стриков сброшена",
+            "data": {
+                "channel_name": channel_name,
+                "platform": platform,
+                "deleted_count": deleted_count
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resetting streak statistics: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Ошибка сброса статистики стриков")
