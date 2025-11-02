@@ -20,6 +20,7 @@ import { useIntegrations } from '../../context/IntegrationsContext';
 import { TwitchIcon, VKIcon } from '../../components/PlatformIcons';
 import StreakSettings from '../../components/drops/StreakSettings';
 import DonationSettings from '../../components/drops/DonationSettings';
+import MythicalSettings from '../../components/drops/MythicalSettings';
 import { logger } from '../../utils/prodLogger';
 
 const DropsMainPage = () => {
@@ -122,13 +123,13 @@ const DropsMainPage = () => {
             <Users className="w-4 h-4" />
             Стрик
           </TabsTrigger>
-          <TabsTrigger value="points" className="flex items-center gap-2">
-            <Coins className="w-4 h-4" />
-            Баллы
-          </TabsTrigger>
           <TabsTrigger value="donation" className="flex items-center gap-2">
             <DollarSign className="w-4 h-4" />
             Донат
+          </TabsTrigger>
+          <TabsTrigger value="mythical" className="flex items-center gap-2">
+            <Star className="w-4 h-4" />
+            Мифический
           </TabsTrigger>
           <TabsTrigger value="widget" className="flex items-center gap-2">
             <Gift className="w-4 h-4" />
@@ -145,27 +146,18 @@ const DropsMainPage = () => {
           />
         </TabsContent>
 
-        {/* Баллы */}
-        <TabsContent value="points" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Coins className="w-5 h-5" />
-                Награды за баллы
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-gray-500">
-                <Coins className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Компонент в разработке</p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         {/* Донат */}
         <TabsContent value="donation" className="mt-6">
           <DonationSettings 
+            user={user}
+            platform={selectedPlatform}
+            channelName={channelName}
+          />
+        </TabsContent>
+
+        {/* Мифический */}
+        <TabsContent value="mythical" className="mt-6">
+          <MythicalSettings 
             user={user}
             platform={selectedPlatform}
             channelName={channelName}
