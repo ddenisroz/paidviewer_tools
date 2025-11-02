@@ -81,8 +81,11 @@ const TtsControlPanel = ({
                                 {(!isAuthenticated || !isConnected) && (
                                     <p className="text-xs text-yellow-500 mt-1">⚠ Требуется канал</p>
                                 )}
-                                {!canUseF5TTS && (
-                                    <p className="text-xs text-red-400 mt-1">⚠ Требуется настройка</p>
+                                {!isHealthy && (
+                                    <p className="text-xs text-yellow-400 mt-1">⚠ Сервер недоступен</p>
+                                )}
+                                {isHealthy && !isWhitelisted && !hasLocalSetup && (
+                                    <p className="text-xs text-orange-400 mt-1">⚠ Только для whitelist</p>
                                 )}
                             </div>
                         </div>
