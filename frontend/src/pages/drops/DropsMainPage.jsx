@@ -19,6 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useIntegrations } from '../../context/IntegrationsContext';
 import { TwitchIcon, VKIcon } from '../../components/PlatformIcons';
 import StreakSettings from '../../components/drops/StreakSettings';
+import DonationSettings from '../../components/drops/DonationSettings';
 import { logger } from '../../utils/prodLogger';
 
 const DropsMainPage = () => {
@@ -164,20 +165,11 @@ const DropsMainPage = () => {
 
         {/* Донат */}
         <TabsContent value="donation" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5" />
-                Донатные награды
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-gray-500">
-                <DollarSign className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Компонент в разработке</p>
-              </div>
-            </CardContent>
-          </Card>
+          <DonationSettings 
+            user={user}
+            platform={selectedPlatform}
+            channelName={channelName}
+          />
         </TabsContent>
 
         {/* Виджет */}
