@@ -209,9 +209,9 @@ const DonationSettings = ({ user, platform, channelName }) => {
           disabled={saving}
           size="sm"
           variant="default"
-          className="gap-2"
+          className="gap-2 px-6"
         >
-          {saving ? '...' : '✓'}
+          {saving ? 'Сохранение...' : 'Сохранить'}
         </Button>
       </div>
     </div>
