@@ -9,11 +9,20 @@ import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
 import { logger } from '../../utils/prodLogger';
 
+import CommonClosed from '../../images/lootboxes/common/common_closed.png';
+import CommonOpened from '../../images/lootboxes/common/common_opened.png';
+import RareClosed from '../../images/lootboxes/rare/rare_closed.png';
+import RareOpened from '../../images/lootboxes/rare/rare_opened_.png';
+import EpicClosed from '../../images/lootboxes/epic/epic_closed.png';
+import EpicOpened from '../../images/lootboxes/epic/epic_opened.png';
+import LegendaryClosed from '../../images/lootboxes/legendary/legendary_closed.png';
+import LegendaryOpened from '../../images/lootboxes/legendary/legendary_opened.png';
+
 const QUALITIES = [
-  { name: 'Common', color: '#6B7280', icon: Shield, label: 'Обычный' },
-  { name: 'Rare', color: '#3B82F6', icon: Star, label: 'Редкий' },
-  { name: 'Epic', color: '#8B5CF6', icon: Gem, label: 'Эпический' },
-  { name: 'Legendary', color: '#F59E0B', icon: Crown, label: 'Легендарный' }
+  { name: 'Common', color: '#6B7280', icon: Shield, label: 'Обычный', closed: CommonClosed, opened: CommonOpened },
+  { name: 'Rare', color: '#3B82F6', icon: Star, label: 'Редкий', closed: RareClosed, opened: RareOpened },
+  { name: 'Epic', color: '#8B5CF6', icon: Gem, label: 'Эпический', closed: EpicClosed, opened: EpicOpened },
+  { name: 'Legendary', color: '#F59E0B', icon: Crown, label: 'Легендарный', closed: LegendaryClosed, opened: LegendaryOpened }
 ];
 
 const StreakSettings = ({ user, platform, channelName }) => {
@@ -180,12 +189,11 @@ const StreakSettings = ({ user, platform, channelName }) => {
             return (
               <div key={quality.name} className="space-y-2">
                 <div className="flex items-center gap-3">
-                  <div 
-                    className="w-10 h-10 rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: `${quality.color}20` }}
-                  >
-                    <Icon className="w-5 h-5" style={{ color: quality.color }} />
-                  </div>
+                  <img 
+                    src={quality.closed} 
+                    alt={`${quality.label} chest`}
+                    className="w-16 h-16 object-contain flex-shrink-0"
+                  />
                   <div className="flex-1">
                     <Label htmlFor={fieldName} className="font-medium">
                       {quality.label}
