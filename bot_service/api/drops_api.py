@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from pydantic import BaseModel, Field, validator
 import random
 import time
@@ -633,13 +634,13 @@ async def get_drops_stats(
         # Топ зрителей
         top_viewers = db.query(
             DropsHistory.viewer_name,
-            db.func.count(DropsHistory.id).label('drops_count')
+            func.count(DropsHistory.id).label('drops_count')
         ).filter(
             DropsHistory.user_id == current_user["id"],
             DropsHistory.channel_name == channel_name,
             DropsHistory.platform == platform
         ).group_by(DropsHistory.viewer_name).order_by(
-            db.func.count(DropsHistory.id).desc()
+            func.count(DropsHistory.id).desc()
         ).limit(10).all()
         
         return {
@@ -659,6 +660,41 @@ async def get_drops_stats(
     except Exception as e:
         logger.error(f"Error getting drops stats: {e}")
         raise HTTPException(status_code=500, detail="Ошибка получения статистики Drops")
+
+@router.get("/streaks/{channel_name}")
+async def get_user_streaks(
+    channel_name: str,
+    platform: str = "twitch",
+    limit: int = 50,
+    offset: int = 0,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получает список стриков пользователей"""
+    try:
+        streaks = db.query(UserStreak).filter(
+            UserStreak.user_id == current_user["id"],
+            UserStreak.channel_name == channel_name,
+            UserStreak.platform == platform
+        ).order_by(UserStreak.current_streak.desc()).offset(offset).limit(limit).all()
+        
+        return {
+            "success": True,
+            "data": [
+                {
+                    "viewer_name": streak.viewer_name,
+                    "current_streak": streak.current_streak,
+                    "max_streak": streak.max_streak,
+                    "messages_this_stream": streak.messages_this_stream,
+                    "last_activity": streak.last_activity
+                }
+                for streak in streaks
+            ]
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting user streaks: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка получения стриков пользователей")
 
 # === TRIGGERS API (STUB) ===
 @router.get("/triggers")

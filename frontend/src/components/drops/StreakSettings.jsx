@@ -1,28 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Shield, Star, Gem, Crown } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
 import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
 import { logger } from '../../utils/prodLogger';
 
 import CommonClosed from '../../images/lootboxes/common/common_closed.png';
-import CommonOpened from '../../images/lootboxes/common/common_opened.png';
 import RareClosed from '../../images/lootboxes/rare/rare_closed.png';
-import RareOpened from '../../images/lootboxes/rare/rare_opened_.png';
 import EpicClosed from '../../images/lootboxes/epic/epic_closed.png';
-import EpicOpened from '../../images/lootboxes/epic/epic_opened.png';
 import LegendaryClosed from '../../images/lootboxes/legendary/legendary_closed.png';
-import LegendaryOpened from '../../images/lootboxes/legendary/legendary_opened.png';
 
 const QUALITIES = [
-  { name: 'Common', color: '#6B7280', icon: Shield, label: 'Обычный', closed: CommonClosed, opened: CommonOpened },
-  { name: 'Rare', color: '#3B82F6', icon: Star, label: 'Редкий', closed: RareClosed, opened: RareOpened },
-  { name: 'Epic', color: '#8B5CF6', icon: Gem, label: 'Эпический', closed: EpicClosed, opened: EpicOpened },
-  { name: 'Legendary', color: '#F59E0B', icon: Crown, label: 'Легендарный', closed: LegendaryClosed, opened: LegendaryOpened }
+  { name: 'Common', color: '#6B7280', label: 'Обычный', image: CommonClosed },
+  { name: 'Rare', color: '#3B82F6', label: 'Редкий', image: RareClosed },
+  { name: 'Epic', color: '#8B5CF6', label: 'Эпический', image: EpicClosed },
+  { name: 'Legendary', color: '#F59E0B', label: 'Легендарный', image: LegendaryClosed }
 ];
 
 const StreakSettings = ({ user, platform, channelName }) => {
@@ -31,11 +26,11 @@ const StreakSettings = ({ user, platform, channelName }) => {
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     streak_enabled: true,
-    streak_days_common: 1,
-    streak_days_rare: 7,
-    streak_days_epic: 30,
-    streak_days_legendary: 60,
-    streak_messages_required: 10,
+    streak_days_common: [1],
+    streak_days_rare: [7],
+    streak_days_epic: [30],
+    streak_days_legendary: [60],
+    streak_messages_required: [10],
     streak_reset_on_skip: true
   });
 
@@ -59,11 +54,11 @@ const StreakSettings = ({ user, platform, channelName }) => {
         setConfig(response.data.data);
         setFormData({
           streak_enabled: response.data.data.streak_enabled ?? true,
-          streak_days_common: response.data.data.streak_days_common ?? 1,
-          streak_days_rare: response.data.data.streak_days_rare ?? 7,
-          streak_days_epic: response.data.data.streak_days_epic ?? 30,
-          streak_days_legendary: response.data.data.streak_days_legendary ?? 60,
-          streak_messages_required: response.data.data.streak_messages_required ?? 10,
+          streak_days_common: [response.data.data.streak_days_common ?? 1],
+          streak_days_rare: [response.data.data.streak_days_rare ?? 7],
+          streak_days_epic: [response.data.data.streak_days_epic ?? 30],
+          streak_days_legendary: [response.data.data.streak_days_legendary ?? 60],
+          streak_messages_required: [response.data.data.streak_messages_required ?? 10],
           streak_reset_on_skip: response.data.data.streak_reset_on_skip ?? true
         });
       }
@@ -83,7 +78,16 @@ const StreakSettings = ({ user, platform, channelName }) => {
 
     try {
       setSaving(true);
-      const response = await botService.put(`/api/drops/config/${channelName}`, formData, {
+      const payload = {
+        streak_enabled: formData.streak_enabled,
+        streak_days_common: formData.streak_days_common[0],
+        streak_days_rare: formData.streak_days_rare[0],
+        streak_days_epic: formData.streak_days_epic[0],
+        streak_days_legendary: formData.streak_days_legendary[0],
+        streak_messages_required: formData.streak_messages_required[0],
+        streak_reset_on_skip: formData.streak_reset_on_skip
+      };
+      const response = await botService.put(`/api/drops/config/${channelName}`, payload, {
         params: { platform }
       });
       
@@ -139,15 +143,17 @@ const StreakSettings = ({ user, platform, channelName }) => {
           </div>
 
           {/* Сообщений для засчета дня */}
-          <div className="space-y-2">
-            <Label htmlFor="messages_required">Сообщений в чате для засчета дня</Label>
-            <Input
-              id="messages_required"
-              type="number"
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label>Сообщений в чате для засчета дня</Label>
+              <span className="text-lg font-semibold">{formData.streak_messages_required[0]}</span>
+            </div>
+            <Slider
+              value={formData.streak_messages_required}
+              onValueChange={(value) => setFormData({...formData, streak_messages_required: value})}
               min={1}
               max={100}
-              value={formData.streak_messages_required}
-              onChange={(e) => setFormData({...formData, streak_messages_required: parseInt(e.target.value) || 1})}
+              step={1}
             />
             <p className="text-xs text-muted-foreground">
               Зритель должен написать это количество сообщений за стрим, чтобы день засчитался в стрике
@@ -179,44 +185,47 @@ const StreakSettings = ({ user, platform, channelName }) => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {QUALITIES.map((quality) => {
-            const Icon = quality.icon;
+          {QUALITIES.map((quality, index) => {
             const fieldName = `streak_days_${quality.name.toLowerCase()}`;
             const value = formData[fieldName];
-            const isLast = quality.name === QUALITIES[QUALITIES.length - 1].name;
-            const isFirst = quality.name === QUALITIES[0].name;
+            const isLast = index === QUALITIES.length - 1;
+            const isFirst = index === 0;
             
             return (
-              <div key={quality.name} className="space-y-2">
+              <div key={quality.name} className="space-y-4">
                 <div className="flex items-center gap-3">
                   <img 
-                    src={quality.closed} 
+                    src={quality.image} 
                     alt={`${quality.label} chest`}
                     className="w-16 h-16 object-contain flex-shrink-0"
                   />
                   <div className="flex-1">
-                    <Label htmlFor={fieldName} className="font-medium">
+                    <Label className="font-medium">
                       {quality.label}
                     </Label>
                     <p className="text-xs text-muted-foreground">
                       {isFirst && 'Первая награда после'}
-                      {!isFirst && !isLast && `Следующая награда после ${value} дней`}
+                      {!isFirst && !isLast && `Следующая награда после`}
                       {isLast && 'Максимальная награда от'}
                     </p>
                   </div>
-                  <Input
-                    id={fieldName}
-                    type="number"
+                  <div className="text-center">
+                    <span className="text-2xl font-bold">{value[0]}</span>
+                    <span className="text-sm text-muted-foreground ml-1">дней</span>
+                  </div>
+                </div>
+                <div className="px-0">
+                  <Slider
+                    value={value}
+                    onValueChange={(val) => setFormData({
+                      ...formData, 
+                      [fieldName]: val
+                    })}
                     min={1}
                     max={365}
-                    value={value}
-                    onChange={(e) => setFormData({
-                      ...formData, 
-                      [fieldName]: parseInt(e.target.value) || 1
-                    })}
-                    className="w-24"
+                    step={1}
+                    className="w-full"
                   />
-                  <span className="text-sm text-muted-foreground">дней</span>
                 </div>
               </div>
             );
