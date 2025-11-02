@@ -94,9 +94,6 @@ const StreakTracker = ({ user, platform, channelName }) => {
           <TrendingUp className="w-5 h-5" />
           Стрики зрителей
         </CardTitle>
-        <CardDescription>
-          Текущие стрики зрителей за активность в чате ({streaks.length} записей)
-        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Поиск */}
