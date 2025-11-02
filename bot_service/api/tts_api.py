@@ -25,7 +25,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 # Core imports
-from core.database import get_db, User, WhitelistedChannel, LocalTTSEndpoint
+from core.database import get_db, User, WhitelistedChannel, LocalTTSEndpoint, TTSUserSettings
 from auth.auth import get_current_user, get_current_user_optional
 from constants import DEFAULT_TTS_SERVICE_URL
 
@@ -590,24 +590,56 @@ async def get_tts_status(
     try:
         if not current_user:
             # Not authenticated - return default disabled status
-            return JSONResponse(content={"enabled": False, "authenticated": False})
+            return JSONResponse(content={"enabled": False, "authenticated": False, "is_whitelisted": False})
         
         if not UserIdentityService.validate_user_data(current_user):
-            return JSONResponse(content={"enabled": False, "authenticated": False})
+            return JSONResponse(content={"enabled": False, "authenticated": False, "is_whitelisted": False})
         
         user_type = UserIdentityService.get_user_type(current_user)
         if user_type == UserType.GUEST:
-            return JSONResponse(content={"enabled": True, "authenticated": True, "user_type": "guest"})
+            return JSONResponse(content={"enabled": True, "authenticated": True, "user_type": "guest", "is_whitelisted": True})
         
         user_id = current_user['id']
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
-            return JSONResponse(content={"enabled": False, "authenticated": True})
+            return JSONResponse(content={"enabled": False, "authenticated": True, "is_whitelisted": False})
         
-        return JSONResponse(content={"enabled": user.tts_enabled or False, "authenticated": True, "user_type": "user"})
+        # Проверяем whitelist статус
+        login_platform = current_user.get('login_platform')
+        is_whitelisted = False
+        
+        if login_platform == 'twitch' and user.twitch_username:
+            whitelisted = db.query(WhitelistedChannel).filter(
+                WhitelistedChannel.channel_name == user.twitch_username.lower(),
+                WhitelistedChannel.platform == 'twitch'
+            ).first()
+            is_whitelisted = bool(whitelisted)
+        elif login_platform == 'vk' and user.vk_username:
+            whitelisted = db.query(WhitelistedChannel).filter(
+                WhitelistedChannel.channel_name == user.vk_username.lower(),
+                WhitelistedChannel.platform == 'vk'
+            ).first()
+            is_whitelisted = bool(whitelisted)
+        
+        # Также получаем engine_type из настроек TTS
+        tts_settings = db.query(TTSUserSettings).filter(TTSUserSettings.user_id == user_id).first()
+        if tts_settings:
+            # Если use_local_tts = True, значит используется локальный движок (F5-TTS)
+            # Если engine = 'f5tts', тоже означает локальный
+            engine_type = 'local' if (tts_settings.use_local_tts or tts_settings.engine == 'f5tts') else 'cloud'
+        else:
+            engine_type = 'cloud'  # По умолчанию облачный
+        
+        return JSONResponse(content={
+            "enabled": user.tts_enabled or False, 
+            "authenticated": True, 
+            "user_type": "user",
+            "is_whitelisted": is_whitelisted,
+            "engine_type": engine_type
+        })
     except Exception as e:
         logger.error(f"Error getting TTS status: {e}")
-        return JSONResponse(content={"enabled": False, "error": str(e)}, status_code=500)
+        return JSONResponse(content={"enabled": False, "is_whitelisted": False, "error": str(e)}, status_code=500)
 
 @tts_router.post("/enable")
 async def enable_tts(

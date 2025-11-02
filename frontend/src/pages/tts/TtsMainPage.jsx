@@ -232,7 +232,7 @@ const TtsMainPageContent = () => {
         };
 
         loadSettings();
-    }, [isAuthenticated, isHealthy, user?.tts_listening_mode]);
+    }, [isAuthenticated, isHealthy, isWhitelisted, user?.tts_listening_mode]);
 
     // Слушаем изменения Basic TTS с главной страницы
     useEffect(() => {
@@ -419,9 +419,16 @@ const TtsMainPageContent = () => {
             const engine = enabled ? 'local' : 'cloud';
             await botService.post('/api/tts/engine', { engine_type: engine });
             logger.log('AI TTS state saved:', enabled);
+            
+            // Очищаем кэш TTS статуса после изменения
+            cacheManager.invalidate(CACHE_CONFIG.TTS_STATUS);
+            
+            toast.success(`Движок: ${enabled ? '💻 Локальный F5-TTS' : '☁️ Облачный'}`);
         } catch (error) {
             logger.error('Error saving AI TTS state:', error);
-            // apiClient.js уже показывает toast при ошибках
+            toast.error('Ошибка переключения движка');
+            // Откатываем состояние при ошибке
+            setAiTtsEnabled(!enabled);
         }
     };
 
@@ -437,6 +444,12 @@ const TtsMainPageContent = () => {
     };
 
     const handleAiTtsToggle = (enabled) => {
+        // Проверяем whitelist для F5-TTS
+        if (enabled && isWhitelisted === false) {
+            toast.error('F5-TTS доступен только для пользователей из whitelist. Обратитесь к администратору.');
+            return;
+        }
+        
         setAiTtsEnabled(enabled);
         saveAiTtsState(enabled);
     };
