@@ -191,7 +191,16 @@ body {
 /* Content visibility is controlled by body.fonts-loaded.loaded class in index.html */
 /* No additional animations or hiding needed - everything is hidden until ready */
 
-/* Убрали все анимации fade-in */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 @keyframes progress-shimmer {
   0% {
