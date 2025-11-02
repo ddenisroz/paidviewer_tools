@@ -5,11 +5,16 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Plus, Minus } from 'lucide-react';
 
+import CommonClosed from '../../images/lootboxes/common/common_closed.png';
+import RareClosed from '../../images/lootboxes/rare/rare_closed.png';
+import EpicClosed from '../../images/lootboxes/epic/epic_closed.png';
+import LegendaryClosed from '../../images/lootboxes/legendary/legendary_closed.png';
+
 const QUALITY_CONFIGS = [
-  { id: 'common', label: 'Обычный', color: '#6B7280', icon: '⬜' },
-  { id: 'rare', label: 'Редкий', color: '#3B82F6', icon: '🔵' },
-  { id: 'epic', label: 'Эпический', color: '#8B5CF6', icon: '🟣' },
-  { id: 'legendary', label: 'Легендарный', color: '#F59E0B', icon: '🟡' }
+  { id: 'common', label: 'Обычный', color: '#6B7280', image: CommonClosed },
+  { id: 'rare', label: 'Редкий', color: '#3B82F6', image: RareClosed },
+  { id: 'epic', label: 'Эпический', color: '#8B5CF6', image: EpicClosed },
+  { id: 'legendary', label: 'Легендарный', color: '#F59E0B', image: LegendaryClosed }
 ];
 
 const DonationGrid = ({ formData, setFormData }) => {
@@ -41,7 +46,11 @@ const DonationGrid = ({ formData, setFormData }) => {
             <div key={quality.id} className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl">{quality.icon}</span>
+                  <img 
+                    src={quality.image} 
+                    alt={`${quality.label} chest`}
+                    className="w-8 h-8 object-contain"
+                  />
                   <div>
                     <Label className="text-sm font-medium">{quality.label}</Label>
                     <p className="text-xs text-muted-foreground">От {value}₽</p>

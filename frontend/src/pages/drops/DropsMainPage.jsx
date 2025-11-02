@@ -78,14 +78,10 @@ const DropsMainPage = () => {
   // Если пользователь не авторизован или нет подключенной платформы
   if (!isAuthenticated || !selectedPlatform || !channelName) {
     return (
-      <PageWrapper 
-        title="🎁 Система лояльности"
-        description="Управление наградами и дропами для зрителей"
-      >
+      <PageWrapper>
         <Card>
           <CardContent className="p-8">
             <div className="text-center py-8 text-muted-foreground">
-              <Gift className="w-16 h-16 mx-auto mb-4 opacity-50" />
               <h3 className="text-lg font-semibold mb-2">Требуется подключение</h3>
               <p className="text-sm mb-4">
                 Для использования системы лояльности необходимо подключить хотя бы одну платформу (Twitch или VK)
@@ -98,10 +94,7 @@ const DropsMainPage = () => {
   }
 
   return (
-    <PageWrapper 
-      title="🎁 Система лояльности"
-      description="Управление наградами и дропами для зрителей"
-    >
+    <PageWrapper>
       {/* Выбор платформы */}
       <div className="mb-6 flex justify-end">
         <div className="flex bg-muted rounded-lg p-1">
