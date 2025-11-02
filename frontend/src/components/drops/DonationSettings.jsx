@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { logger } from '../../utils/prodLogger';
 import DonationGrid from './DonationGrid';
 import DonationHistory from './DonationHistory';
+import MythycClosed from '../../images/lootboxes/mythyc/mythyc_closed.png';
 
 const DonationSettings = ({ user, platform, channelName }) => {
   const [config, setConfig] = useState(null);
@@ -128,6 +129,7 @@ const DonationSettings = ({ user, platform, channelName }) => {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg flex items-center gap-2 text-pink-400">
+              <img src={MythycClosed} alt="Мифический" className="w-6 h-6" />
               <Sparkles className="w-5 h-5" />
               Мифический лутбокс
             </CardTitle>

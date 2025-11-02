@@ -273,9 +273,10 @@ const RewardsManager = ({ user, platform, channelName }) => {
             </CardHeader>
             <CardContent>
               {qualityRewards.length === 0 ? (
-                <div className="text-center py-6 text-muted-foreground">
-                  <p className="text-sm">Нет наград для этого качества</p>
-                  <p className="text-xs mt-1">Добавьте награды, чтобы зрители могли их получить</p>
+                <div className="text-center py-6 border-2 border-dashed border-orange-500/30 bg-orange-500/5 rounded-lg">
+                  <p className="text-sm font-medium text-orange-400">⚠️ Награды не настроены</p>
+                  <p className="text-xs mt-2 text-muted-foreground">Добавьте награды в этот лутбокс, чтобы зрители могли их получить</p>
+                  <p className="text-xs mt-1 text-yellow-500">Без наград система Drops не будет работать</p>
                 </div>
               ) : (
                 <div className="space-y-2">
