@@ -17,30 +17,40 @@ class DropsService:
     def __init__(self, db: Session):
         self.db = db
     
-    def get_config(self, user_id: int, channel_name: str, platform: str = "twitch") -> Optional[DropsConfig]:
+    def get_config(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch") -> Optional[DropsConfig]:
         """Получает конфигурацию Drops для канала"""
-        return self.db.query(DropsConfig).filter(
-            DropsConfig.user_id == user_id,
+        query = self.db.query(DropsConfig).filter(
             DropsConfig.channel_name == channel_name,
             DropsConfig.platform == platform
-        ).first()
+        )
+        
+        if user_id:
+            query = query.filter(DropsConfig.user_id == user_id)
+        elif session_id:
+            query = query.filter(DropsConfig.session_id == session_id)
+        else:
+            return None
+        
+        return query.first()
     
-    def create_or_update_config(self, user_id: int, channel_name: str, platform: str, config_data: Dict[str, Any]) -> DropsConfig:
+    def create_or_update_config(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", config_data: Dict[str, Any] = None) -> DropsConfig:
         """Создает или обновляет конфигурацию Drops"""
-        config = self.get_config(user_id, channel_name, platform)
+        config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
         
         if not config:
             config = DropsConfig(
                 user_id=user_id,
+                session_id=session_id,
                 channel_name=channel_name,
                 platform=platform
             )
             self.db.add(config)
         
         # Обновляем поля
-        for field, value in config_data.items():
-            if hasattr(config, field):
-                setattr(config, field, value)
+        if config_data:
+            for field, value in config_data.items():
+                if hasattr(config, field):
+                    setattr(config, field, value)
         
         config.updated_at = utcnow_naive()
         self.db.commit()
@@ -48,14 +58,20 @@ class DropsService:
         
         return config
     
-    def get_rewards(self, user_id: int, channel_name: str, platform: str, quality_id: Optional[int] = None) -> List[DropsReward]:
+    def get_rewards(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", quality_id: Optional[int] = None) -> List[DropsReward]:
         """Получает награды для канала"""
         query = self.db.query(DropsReward).filter(
-            DropsReward.user_id == user_id,
             DropsReward.channel_name == channel_name,
             DropsReward.platform == platform,
             DropsReward.is_active == True
         )
+        
+        if user_id:
+            query = query.filter(DropsReward.user_id == user_id)
+        elif session_id:
+            query = query.filter(DropsReward.session_id == session_id)
+        else:
+            return []
         
         if quality_id:
             query = query.filter(DropsReward.quality_id == quality_id)
@@ -66,22 +82,31 @@ class DropsService:
         """Получает качество по имени"""
         return self.db.query(DropsQuality).filter(DropsQuality.name == quality_name).first()
     
-    def get_user_streak(self, user_id: int, channel_name: str, platform: str, viewer_id: str) -> Optional[UserStreak]:
+    def get_user_streak(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None) -> Optional[UserStreak]:
         """Получает стрик пользователя"""
-        return self.db.query(UserStreak).filter(
-            UserStreak.user_id == user_id,
+        query = self.db.query(UserStreak).filter(
             UserStreak.channel_name == channel_name,
             UserStreak.platform == platform,
             UserStreak.viewer_id == viewer_id
-        ).first()
+        )
+        
+        if user_id:
+            query = query.filter(UserStreak.user_id == user_id)
+        elif session_id:
+            query = query.filter(UserStreak.session_id == session_id)
+        else:
+            return None
+        
+        return query.first()
     
-    def update_user_streak(self, user_id: int, channel_name: str, platform: str, viewer_id: str, viewer_name: str, is_streaming: bool = True) -> UserStreak:
+    def update_user_streak(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None, is_streaming: bool = True) -> UserStreak:
         """Обновляет стрик пользователя"""
-        streak = self.get_user_streak(user_id, channel_name, platform, viewer_id)
+        streak = self.get_user_streak(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, viewer_id=viewer_id)
         
         if not streak:
             streak = UserStreak(
                 user_id=user_id,
+                session_id=session_id,
                 channel_name=channel_name,
                 platform=platform,
                 viewer_id=viewer_id,
@@ -112,14 +137,14 @@ class DropsService:
         
         return streak
     
-    def process_streak_drops(self, user_id: int, channel_name: str, platform: str, viewer_id: str, viewer_name: str) -> Optional[Dict[str, Any]]:
+    def process_streak_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None) -> Optional[Dict[str, Any]]:
         """Обрабатывает стрик Drops"""
-        config = self.get_config(user_id, channel_name, platform)
+        config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
         if not config or not config.streak_enabled:
             return None
         
         # Обновляем стрик
-        streak = self.update_user_streak(user_id, channel_name, platform, viewer_id, viewer_name)
+        streak = self.update_user_streak(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, viewer_id=viewer_id, viewer_name=viewer_name)
         
         # Определяем качество по дням стрика
         quality_name = self._get_streak_quality(streak.current_streak, config)
@@ -131,14 +156,14 @@ class DropsService:
             return None
         
         # Получаем награду
-        reward = self._get_random_reward(user_id, channel_name, platform, quality.id)
+        reward = self._get_random_reward(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, quality_id=quality.id)
         if not reward:
             return None
         
         # Записываем в историю
         self._record_drops_history(
-            user_id, channel_name, platform, viewer_id, viewer_name,
-            "streak", quality.id, reward, streak_days=streak.current_streak
+            user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, viewer_id=viewer_id, viewer_name=viewer_name,
+            drops_type="streak", quality_id=quality.id, reward=reward, streak_days=streak.current_streak
         )
         
         return {
@@ -153,9 +178,9 @@ class DropsService:
             "sound_volume": reward.sound_volume
         }
     
-    def process_donation_drops(self, user_id: int, channel_name: str, platform: str, viewer_id: str, viewer_name: str, donation_amount: float) -> Optional[Dict[str, Any]]:
+    def process_donation_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None, donation_amount: float = None) -> Optional[Dict[str, Any]]:
         """Обрабатывает донатные Drops"""
-        config = self.get_config(user_id, channel_name, platform)
+        config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
         if not config or not config.donation_enabled:
             return None
         
@@ -169,14 +194,14 @@ class DropsService:
             return None
         
         # Получаем награду
-        reward = self._get_random_reward(user_id, channel_name, platform, quality.id)
+        reward = self._get_random_reward(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, quality_id=quality.id)
         if not reward:
             return None
         
         # Записываем в историю
         self._record_drops_history(
-            user_id, channel_name, platform, viewer_id, viewer_name,
-            "donation", quality.id, reward, donation_amount=donation_amount
+            user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, viewer_id=viewer_id, viewer_name=viewer_name,
+            drops_type="donation", quality_id=quality.id, reward=reward, donation_amount=donation_amount
         )
         
         return {
@@ -191,9 +216,9 @@ class DropsService:
             "sound_volume": reward.sound_volume
         }
     
-    def process_mythical_drops(self, user_id: int, channel_name: str, platform: str, viewer_id: str, viewer_name: str) -> Optional[Dict[str, Any]]:
+    def process_mythical_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None) -> Optional[Dict[str, Any]]:
         """Обрабатывает мифические Drops"""
-        config = self.get_config(user_id, channel_name, platform)
+        config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
         if not config or not config.mythical_enabled:
             return None
         
@@ -207,7 +232,7 @@ class DropsService:
             return None
         
         # Получаем награду
-        reward = self._get_random_reward(user_id, channel_name, platform, quality.id)
+        reward = self._get_random_reward(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, quality_id=quality.id)
         if not reward:
             return None
         
@@ -217,8 +242,8 @@ class DropsService:
         
         # Записываем в историю
         self._record_drops_history(
-            user_id, channel_name, platform, viewer_id, viewer_name,
-            "mythical", quality.id, reward
+            user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, viewer_id=viewer_id, viewer_name=viewer_name,
+            drops_type="mythical", quality_id=quality.id, reward=reward
         )
         
         return {
@@ -256,9 +281,9 @@ class DropsService:
             return "Common"
         return None
     
-    def _get_random_reward(self, user_id: int, channel_name: str, platform: str, quality_id: int) -> Optional[DropsReward]:
+    def _get_random_reward(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", quality_id: int = None) -> Optional[DropsReward]:
         """Получает случайную награду по качеству"""
-        rewards = self.get_rewards(user_id, channel_name, platform, quality_id)
+        rewards = self.get_rewards(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, quality_id=quality_id)
         if not rewards:
             return None
         
@@ -277,20 +302,21 @@ class DropsService:
         
         return rewards[0]  # Fallback
     
-    def _record_drops_history(self, user_id: int, channel_name: str, platform: str, viewer_id: str, viewer_name: str, drops_type: str, quality_id: int, reward: DropsReward, **kwargs):
+    def _record_drops_history(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None, drops_type: str = None, quality_id: int = None, reward: DropsReward = None, **kwargs):
         """Записывает в историю Drops"""
         history_entry = DropsHistory(
             user_id=user_id,
+            session_id=session_id,
             channel_name=channel_name,
             platform=platform,
             viewer_id=viewer_id,
             viewer_name=viewer_name,
-            drops_type=drops_type,
+            lootbox_type=drops_type,
             quality_id=quality_id,
-            reward_id=reward.id,
-            reward_name=reward.name,
-            reward_type=reward.reward_type,
-            reward_value=reward.reward_value,
+            reward_id=reward.id if reward else None,
+            reward_name=reward.name if reward else "",
+            reward_type=reward.reward_type if reward else "",
+            reward_value=reward.reward_value if reward else "",
             **kwargs
         )
         
@@ -307,9 +333,9 @@ class DropsService:
         
         return time_since_last >= config.mythical_min_interval_hours
     
-    def check_mythical_drops(self, user_id: int, channel_name: str, platform: str) -> bool:
+    def check_mythical_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch") -> bool:
         """Проверяет, можно ли запустить мифический Drops"""
-        config = self.get_config(user_id, channel_name, platform)
+        config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
         if not config or not config.mythical_enabled:
             return False
         
@@ -332,9 +358,9 @@ class DropsService:
         # Случайная вероятность
         return random.random() < 0.1  # 10% шанс каждый раз
     
-    def start_mythical_drops(self, user_id: int, channel_name: str, platform: str) -> Optional[MythicalDropsSession]:
+    def start_mythical_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch") -> Optional[MythicalDropsSession]:
         """Запускает мифический Drops"""
-        config = self.get_config(user_id, channel_name, platform)
+        config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
         if not config:
             return None
         
@@ -344,6 +370,7 @@ class DropsService:
         
         session = MythicalDropsSession(
             user_id=user_id,
+            session_id=session_id,
             channel_name=channel_name,
             platform=platform,
             donation_amount=config.mythical_donation_amount,
@@ -362,16 +389,24 @@ class DropsService:
         
         return session
     
-    def process_mythical_drops(self, user_id: int, channel_name: str, platform: str, viewer_id: str, viewer_name: str, amount: float) -> Optional[Dict[str, Any]]:
-        """Обрабатывает мифический Drops"""
+    def process_mythical_drops_with_session(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None, amount: float = None) -> Optional[Dict[str, Any]]:
+        """Обрабатывает мифический Drops с активной сессией"""
         # Ищем активную сессию
-        session = self.db.query(MythicalDropsSession).filter(
-            MythicalDropsSession.user_id == user_id,
+        query = self.db.query(MythicalDropsSession).filter(
             MythicalDropsSession.channel_name == channel_name,
             MythicalDropsSession.platform == platform,
             MythicalDropsSession.is_active == True,
             MythicalDropsSession.expires_at > utcnow_naive()
-        ).first()
+        )
+        
+        if user_id:
+            query = query.filter(MythicalDropsSession.user_id == user_id)
+        elif session_id:
+            query = query.filter(MythicalDropsSession.session_id == session_id)
+        else:
+            return None
+        
+        session = query.first()
         
         if not session or amount < session.donation_amount:
             return None
@@ -381,14 +416,14 @@ class DropsService:
         if not quality:
             return None
         
-        reward = self._get_random_reward(user_id, channel_name, platform, quality.id)
+        reward = self._get_random_reward(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, quality_id=quality.id)
         if not reward:
             return None
         
         # Записываем в историю
         self._record_drops_history(
-            user_id, channel_name, platform, viewer_id, viewer_name,
-            "mythical", quality.id, reward, donation_amount=amount
+            user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, viewer_id=viewer_id, viewer_name=viewer_name,
+            drops_type="mythical", quality_id=quality.id, reward=reward, donation_amount=amount
         )
         
         # Закрываем сессию
@@ -411,109 +446,49 @@ class DropsService:
             "donation_amount": amount
         }
     
-    def _get_streak_quality(self, days: int, config: DropsConfig) -> Optional[str]:
-        """Определяет качество по дням стрика"""
-        if days >= config.streak_days_legendary:
-            return "Legendary"
-        elif days >= config.streak_days_epic:
-            return "Epic"
-        elif days >= config.streak_days_rare:
-            return "Rare"
-        elif days >= config.streak_days_common:
-            return "Common"
-        return None
-    
-    def _get_donation_quality(self, amount: float, config: DropsConfig) -> Optional[str]:
-        """Определяет качество по сумме доната"""
-        if amount >= config.donation_amount_legendary:
-            return "Legendary"
-        elif amount >= config.donation_amount_epic:
-            return "Epic"
-        elif amount >= config.donation_amount_rare:
-            return "Rare"
-        elif amount >= config.donation_amount_common:
-            return "Common"
-        return None
-    
-    def _get_random_reward(self, user_id: int, channel_name: str, platform: str, quality_id: int) -> Optional[DropsReward]:
-        """Получает случайную награду по качеству"""
-        rewards = self.get_rewards(user_id, channel_name, platform, quality_id)
-        if not rewards:
-            return None
-        
-        # Взвешенный случайный выбор
-        total_weight = sum(reward.weight for reward in rewards)
-        if total_weight == 0:
-            return random.choice(rewards)
-        
-        random_value = random.randint(1, total_weight)
-        current_weight = 0
-        
-        for reward in rewards:
-            current_weight += reward.weight
-            if random_value <= current_weight:
-                return reward
-        
-        return rewards[0]  # Fallback
-    
-    def _record_drops_history(self, user_id: int, channel_name: str, platform: str, viewer_id: str, viewer_name: str, 
-                            drops_type: str, quality_id: int, reward: DropsReward, **kwargs):
-        """Записывает Drops в историю"""
-        history = DropsHistory(
-            user_id=user_id,
-            channel_name=channel_name,
-            platform=platform,
-            viewer_id=viewer_id,
-            viewer_name=viewer_name,
-            lootbox_type=drops_type,
-            quality_id=quality_id,
-            reward_id=reward.id,
-            reward_name=reward.name,
-            reward_type=reward.reward_type,
-            reward_value=reward.reward_value,
-            **kwargs
+    def get_drops_history(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", limit: int = 50, offset: int = 0) -> List[DropsHistory]:
+        """Получает историю Drops"""
+        query = self.db.query(DropsHistory).filter(
+            DropsHistory.channel_name == channel_name,
+            DropsHistory.platform == platform
         )
         
-        self.db.add(history)
-        self.db.commit()
+        if user_id:
+            query = query.filter(DropsHistory.user_id == user_id)
+        elif session_id:
+            query = query.filter(DropsHistory.session_id == session_id)
+        else:
+            return []
+        
+        return query.order_by(DropsHistory.created_at.desc()).offset(offset).limit(limit).all()
     
-    def get_drops_history(self, user_id: int, channel_name: str, platform: str, limit: int = 50, offset: int = 0) -> List[DropsHistory]:
-        """Получает историю Drops"""
-        return self.db.query(DropsHistory).filter(
-            DropsHistory.user_id == user_id,
-            DropsHistory.channel_name == channel_name,
-            DropsHistory.platform == platform
-        ).order_by(DropsHistory.created_at.desc()).offset(offset).limit(limit).all()
-    
-    def get_drops_stats(self, user_id: int, channel_name: str, platform: str) -> Dict[str, Any]:
+    def get_drops_stats(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch") -> Dict[str, Any]:
         """Получает статистику Drops"""
-        total_drops = self.db.query(DropsHistory).filter(
-            DropsHistory.user_id == user_id,
+        query = self.db.query(DropsHistory).filter(
             DropsHistory.channel_name == channel_name,
             DropsHistory.platform == platform
-        ).count()
+        )
+        
+        if user_id:
+            query = query.filter(DropsHistory.user_id == user_id)
+        elif session_id:
+            query = query.filter(DropsHistory.session_id == session_id)
+        else:
+            return {
+                "totalDrops": 0,
+                "todayDrops": 0,
+                "legendaryDrops": 0,
+                "mythicalDrops": 0
+            }
+        
+        total_drops = query.count()
         
         today = utcnow_naive().date()
-        today_drops = self.db.query(DropsHistory).filter(
-            DropsHistory.user_id == user_id,
-            DropsHistory.channel_name == channel_name,
-            DropsHistory.platform == platform,
-            DropsHistory.created_at >= today
-        ).count()
+        today_drops = query.filter(DropsHistory.created_at >= today).count()
         
-        legendary_drops = self.db.query(DropsHistory).join(DropsQuality).filter(
-            DropsHistory.user_id == user_id,
-            DropsHistory.channel_name == channel_name,
-            DropsHistory.platform == platform,
-            DropsQuality.name == "Legendary"
-        ).count()
+        legendary_drops = query.join(DropsQuality).filter(DropsQuality.name == "Legendary").count()
         
-        mythical_drops = self.db.query(DropsHistory).filter(
-            DropsHistory.user_id == user_id,
-            DropsHistory.channel_name == channel_name,
-            DropsHistory.platform == platform,
-            DropsHistory.lootbox_type == "mythical"
-        ).count()
+        mythical_drops = query.filter(DropsHistory.lootbox_type == "mythical").count()
         
         return {
             "totalDrops": total_drops,

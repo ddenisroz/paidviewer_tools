@@ -252,6 +252,51 @@ class SessionManager:
             except Exception as e:
                 logger.warning(f"Could not transfer tokens: {e}")
             
+            # ✅ Переносим Drops настройки с session_id
+            try:
+                from core.database import DropsConfig, DropsReward, UserStreak, DropsHistory, MythicalDropsSession
+                # DropsConfig
+                drops_configs = db.query(DropsConfig).filter(DropsConfig.session_id == guest_session_id).all()
+                for config in drops_configs:
+                    config.user_id = new_user.id
+                    config.session_id = None
+                if drops_configs:
+                    logger.info(f"✅ Transferred {len(drops_configs)} Drops configs")
+                
+                # DropsReward
+                drops_rewards = db.query(DropsReward).filter(DropsReward.session_id == guest_session_id).all()
+                for reward in drops_rewards:
+                    reward.user_id = new_user.id
+                    reward.session_id = None
+                if drops_rewards:
+                    logger.info(f"✅ Transferred {len(drops_rewards)} Drops rewards")
+                
+                # UserStreak
+                user_streaks = db.query(UserStreak).filter(UserStreak.session_id == guest_session_id).all()
+                for streak in user_streaks:
+                    streak.user_id = new_user.id
+                    streak.session_id = None
+                if user_streaks:
+                    logger.info(f"✅ Transferred {len(user_streaks)} user streaks")
+                
+                # DropsHistory
+                drops_history = db.query(DropsHistory).filter(DropsHistory.session_id == guest_session_id).all()
+                for history in drops_history:
+                    history.user_id = new_user.id
+                    history.session_id = None
+                if drops_history:
+                    logger.info(f"✅ Transferred {len(drops_history)} Drops history entries")
+                
+                # MythicalDropsSession
+                mythical_sessions = db.query(MythicalDropsSession).filter(MythicalDropsSession.session_id == guest_session_id).all()
+                for session in mythical_sessions:
+                    session.user_id = new_user.id
+                    session.session_id = None
+                if mythical_sessions:
+                    logger.info(f"✅ Transferred {len(mythical_sessions)} mythical drop sessions")
+            except Exception as e:
+                logger.warning(f"Could not transfer Drops settings: {e}")
+            
             # Завершаем ВСЕ гостевые сессии для этого канала
             channel_name = platform_user_id.lower()
             self.terminate_guest_sessions_for_channel(channel_name, "converted_to_authenticated")

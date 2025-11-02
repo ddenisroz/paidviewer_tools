@@ -701,10 +701,14 @@ class DropsQuality(Base):
 class DropsConfig(Base):
     """Конфигурация Drops для канала"""
     __tablename__ = 'drops_configs'
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = (
+        CheckConstraint('(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)', name='check_user_or_session_drops_config'),
+        {'extend_existing': True}
+    )
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)  # Для авторизованных пользователей
+    session_id = Column(String, nullable=True, index=True)  # Для гостей
     channel_name = Column(String, nullable=False, index=True)
     platform = Column(String, nullable=False)  # twitch, vk
     
@@ -738,10 +742,14 @@ class DropsConfig(Base):
 class DropsReward(Base):
     """Награды в Drops"""
     __tablename__ = 'drops_rewards'
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = (
+        CheckConstraint('(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)', name='check_user_or_session_drops_reward'),
+        {'extend_existing': True}
+    )
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)  # Для авторизованных пользователей
+    session_id = Column(String, nullable=True, index=True)  # Для гостей
     channel_name = Column(String, nullable=False, index=True)
     platform = Column(String, nullable=False)
     
@@ -765,10 +773,16 @@ class DropsReward(Base):
 class UserStreak(Base):
     """Стрики пользователей"""
     __tablename__ = 'user_streaks'
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = (
+        UniqueConstraint('user_id', 'viewer_id', 'platform', name='uq_user_streak'),
+        UniqueConstraint('session_id', 'viewer_id', 'platform', name='uq_session_streak'),
+        CheckConstraint('(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)', name='check_user_or_session_user_streak'),
+        {'extend_existing': True}
+    )
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)  # Для авторизованных пользователей
+    session_id = Column(String, nullable=True, index=True)  # Для гостей
     channel_name = Column(String, nullable=False, index=True)
     platform = Column(String, nullable=False)
     viewer_id = Column(String, nullable=False, index=True)
@@ -781,20 +795,18 @@ class UserStreak(Base):
     
     created_at = Column(DateTime, default=utcnow_naive)
     updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
-    
-    # Уникальный индекс для предотвращения дублирования
-    __table_args__ = (
-        UniqueConstraint('user_id', 'viewer_id', 'platform', name='uq_user_streak'),
-        {'extend_existing': True}
-    )
 
 class DropsHistory(Base):
     """История получения Drops"""
     __tablename__ = 'drops_history'
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = (
+        CheckConstraint('(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)', name='check_user_or_session_drops_history'),
+        {'extend_existing': True}
+    )
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)  # Для авторизованных пользователей
+    session_id = Column(String, nullable=True, index=True)  # Для гостей
     channel_name = Column(String, nullable=False, index=True)
     platform = Column(String, nullable=False)
     viewer_id = Column(String, nullable=False, index=True)
@@ -824,10 +836,14 @@ class DropsHistory(Base):
 class MythicalDropsSession(Base):
     """Сессии мифических Drops"""
     __tablename__ = 'mythical_drops_sessions'
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = (
+        CheckConstraint('(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)', name='check_user_or_session_mythical_drops'),
+        {'extend_existing': True}
+    )
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)  # Для авторизованных пользователей
+    session_id = Column(String, nullable=True, index=True)  # Для гостей
     channel_name = Column(String, nullable=False, index=True)
     platform = Column(String, nullable=False)
     

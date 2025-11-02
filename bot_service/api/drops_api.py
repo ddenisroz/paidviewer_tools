@@ -11,7 +11,7 @@ import random
 import time
 
 from core.database import get_db, DropsConfig, DropsReward, DropsQuality, DropsType, UserStreak, DropsHistory, MythicalDropsSession, DonationAlert, UserToken, User
-from auth.auth import get_current_user
+from auth.auth import get_current_user, get_current_user_optional
 from core.datetime_utils import utcnow_naive
 from utils.enhanced_logger import log_request, log_response, drops_logger
 
