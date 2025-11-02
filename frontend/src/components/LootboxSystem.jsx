@@ -6,11 +6,11 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Gift, Trophy, Star, Coins, Calendar, MessageSquare, TrendingUp, Check, X, Settings, BarChart3, Plus } from 'lucide-react';
 import api from '../services/api';
-import { dropsLogger as logger } from '../utils/logger';
+import { logger } from '../utils/prodLogger';
 import { CardSkeleton } from './ui/skeleton';
 import ImageLootbox from './ImageLootbox';
-import { 
-    createLootboxImageConfig, 
+import {
+    createLootboxImageConfig,
     createMockLootboxes,
     animateLootboxOpening,
     createSparkleEffect
@@ -35,11 +35,11 @@ const LootboxSystem = ({ channelName }) => {
         },
         categories: ['coins', 'items', 'special', 'exclusive']
     });
-    
+
     // Состояние для анимированных лутбоксов
     const [imageLootboxes, setImageLootboxes] = useState([]);
     const [openingLootboxId, setOpeningLootboxId] = useState(null);
-    
+
     // Данные для игрового поля
     const [gameFieldData, setGameFieldData] = useState(() => {
         // Инициализируем 30 дней с моковыми данными
@@ -53,7 +53,7 @@ const LootboxSystem = ({ channelName }) => {
             const hasViewer = Math.random() > 0.6;
             const viewerName = hasViewer ? viewers[Math.floor(Math.random() * viewers.length)] : null;
             const isActive = hasViewer && Math.random() > 0.5;
-            
+
             return {
                 day: dayNumber,
                 viewerName,
@@ -76,11 +76,11 @@ const LootboxSystem = ({ channelName }) => {
 
     // Функция для обновления данных дня
     const updateDayData = (dayNumber, viewerName, isActive) => {
-        setGameFieldData(prev => prev.map(day => 
-            day.day === dayNumber 
-                ? { 
-                    ...day, 
-                    viewerName: viewerName || null, 
+        setGameFieldData(prev => prev.map(day =>
+            day.day === dayNumber
+                ? {
+                    ...day,
+                    viewerName: viewerName || null,
                     isActive: isActive || false,
                     hasViewer: !!viewerName
                   }
@@ -121,7 +121,7 @@ const LootboxSystem = ({ channelName }) => {
         try {
             setOpeningLootbox(lootboxId);
             const response = await api.post('/lootbox/open', { lootbox_id: lootboxId });
-            
+
             if (response.data.success) {
                 // Показываем результат
                 showLootboxResult(response.data.result);
@@ -144,13 +144,13 @@ const LootboxSystem = ({ channelName }) => {
     // Функции для управления анимированными лутбоксами
     const handleLootboxOpen = (lootboxId) => {
         setOpeningLootboxId(lootboxId);
-        
+
         // Создаем эффект блеска
         const element = document.getElementById(`image-lootbox-${lootboxId}`);
         if (element) {
             createSparkleEffect(element);
         }
-        
+
         // Сбрасываем состояние через 3 секунды (время анимации)
         setTimeout(() => {
             setOpeningLootboxId(null);
@@ -189,7 +189,7 @@ const LootboxSystem = ({ channelName }) => {
             <div className="text-center space-y-4">
                 <h2 className="text-3xl font-bold text-white">🎁 Система Лутбоксов</h2>
                 <p className="text-gray-400 text-lg">Зарабатывайте награды за активность!</p>
-                
+
                 {/* Переключатель платформ */}
                 <div className="flex justify-center">
                     <div className="bg-gray-800 rounded-lg p-1 flex">
@@ -233,8 +233,8 @@ const LootboxSystem = ({ channelName }) => {
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-xl font-bold text-white">Анимированные лутбоксы</h3>
                             <div className="flex gap-2">
-                                <Button 
-                                    variant="outline" 
+                                <Button
+                                    variant="outline"
                                     size="sm"
                                     onClick={() => {
                                         // Открыть все лутбоксы одновременно
@@ -246,8 +246,8 @@ const LootboxSystem = ({ channelName }) => {
                                     <Gift className="w-4 h-4 mr-2" />
                                     Открыть все
                                 </Button>
-                                <Button 
-                                    variant="outline" 
+                                <Button
+                                    variant="outline"
                                     size="sm"
                                     onClick={() => {
                                         // Сбросить все анимации
@@ -259,7 +259,7 @@ const LootboxSystem = ({ channelName }) => {
                                 </Button>
                             </div>
                         </div>
-                        
+
                         <div className="mb-6">
                             <p className="text-gray-400 text-sm">
                                 Нажмите на лутбокс, чтобы увидеть анимацию открытия. Картинки будут сменяться, создавая эффект открытия.
@@ -271,7 +271,7 @@ const LootboxSystem = ({ channelName }) => {
                             {imageLootboxes.map((lootbox) => {
                                 const config = createLootboxImageConfig(lootbox, 'grid');
                                 return (
-                                    <div 
+                                    <div
                                         key={lootbox.id}
                                         id={`image-lootbox-${lootbox.id}`}
                                         className="animate-lootbox-appear"
@@ -285,7 +285,7 @@ const LootboxSystem = ({ channelName }) => {
                                             onOpen={() => handleLootboxOpen(lootbox.id)}
                                             className={`${config.effects} cursor-pointer`}
                                         />
-                                        
+
                                         {/* Дополнительная кнопка для анимации открытия */}
                                         <div className="mt-2 text-center">
                                             <Button
@@ -307,7 +307,7 @@ const LootboxSystem = ({ channelName }) => {
                         <div className="mt-8 p-4 bg-gray-700 rounded-lg">
                             <h4 className="text-sm font-semibold text-white mb-2">ℹ️ О системе анимации</h4>
                             <p className="text-sm text-gray-300">
-                                Система использует смену картинок для создания эффекта открытия лутбокса. 
+                                Система использует смену картинок для создания эффекта открытия лутбокса.
                                 Каждый лутбокс имеет набор картинок: закрытый → этапы открытия → открытый.
                                 Добавьте свои картинки в папку <code className="bg-gray-800 px-1 rounded">/src/images/lootboxes/</code>
                             </p>
@@ -331,7 +331,7 @@ const LootboxSystem = ({ channelName }) => {
                                 </Button>
                             </div>
                         </div>
-                        
+
                         {/* Простое игровое поле 6x5 = 30 ячеек */}
                         <div className="grid grid-cols-6 gap-2">
                             {gameFieldData.map((dayData) => (
@@ -339,9 +339,9 @@ const LootboxSystem = ({ channelName }) => {
                                     key={dayData.day}
                                     className={`
                                         aspect-square flex flex-col items-center justify-center text-sm rounded-lg cursor-pointer transition-all duration-200 border-2
-                                        ${dayData.hasViewer 
-                                            ? dayData.isActive 
-                                                ? 'bg-green-600 text-white border-green-500 hover:bg-green-700' 
+                                        ${dayData.hasViewer
+                                            ? dayData.isActive
+                                                ? 'bg-green-600 text-white border-green-500 hover:bg-green-700'
                                                 : 'bg-blue-600 text-white border-blue-500 hover:bg-blue-700'
                                             : 'bg-gray-700 text-gray-400 border-gray-600 hover:bg-gray-600'
                                         }
@@ -353,7 +353,7 @@ const LootboxSystem = ({ channelName }) => {
                                             `Редактировать день ${dayData.day}:\nВведите никнейм зрителя (или оставьте пустым для удаления):`,
                                             dayData.viewerName || ''
                                         );
-                                        
+
                                         if (newViewerName !== null) {
                                             if (newViewerName.trim() === '') {
                                                 removeViewerFromDay(dayData.day);
@@ -375,7 +375,7 @@ const LootboxSystem = ({ channelName }) => {
                                 </div>
                             ))}
                         </div>
-                        
+
                         {/* Статистика */}
                         <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div className="bg-gray-700 rounded-lg p-3 text-center">
@@ -415,7 +415,7 @@ const LootboxSystem = ({ channelName }) => {
                                 <div className="text-xs text-gray-300">Макс. дней подряд</div>
                             </div>
                         </div>
-                        
+
                         {/* Легенда */}
                         <div className="flex gap-6 mt-6 text-sm">
                             <div className="flex items-center gap-2">
@@ -444,7 +444,7 @@ const LootboxSystem = ({ channelName }) => {
                                 Добавить лутбокс
                             </Button>
                         </div>
-                        
+
                         {/* Прогресс-бар общей суммы донатов */}
                         <div className="mb-8">
                             <div className="flex justify-between items-center mb-2">
@@ -459,7 +459,7 @@ const LootboxSystem = ({ channelName }) => {
                                 <span className="text-yellow-400">МЕГА лутбокс (10,000₽)</span>
                             </div>
                         </div>
-                        
+
                         {/* Список лутбоксов по суммам */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {[
@@ -498,7 +498,7 @@ const LootboxSystem = ({ channelName }) => {
                                                 </div>
                                                 <Progress value={(lootbox.current / lootbox.max) * 100} className="h-2" />
                                             </div>
-                                            
+
                                             <div className="space-y-1">
                                                 <span className="text-sm text-gray-300">Награды:</span>
                                                 {lootbox.rewards.map((reward, idx) => (
@@ -508,9 +508,9 @@ const LootboxSystem = ({ channelName }) => {
                                                     </div>
                                                 ))}
                                             </div>
-                                            
-                                            <Button 
-                                                className="w-full" 
+
+                                            <Button
+                                                className="w-full"
                                                 disabled={lootbox.current < lootbox.max}
                                                 variant={lootbox.current >= lootbox.max ? "default" : "outline"}
                                             >
@@ -534,13 +534,13 @@ const LootboxSystem = ({ channelName }) => {
                                 Добавить достижение
                             </Button>
                         </div>
-                        
+
                         {/* Список достижений из чата */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {[
-                                { 
-                                    id: 1, 
-                                    name: 'Автор топ-клипа', 
+                                {
+                                    id: 1,
+                                    name: 'Автор топ-клипа',
                                     description: 'Создать самый просматриваемый клип недели',
                                     type: 'clip',
                                     reward: 'Эксклюзивный лутбокс',
@@ -548,9 +548,9 @@ const LootboxSystem = ({ channelName }) => {
                                     max: 100,
                                     rarity: 'epic'
                                 },
-                                { 
-                                    id: 2, 
-                                    name: 'Чат-машина', 
+                                {
+                                    id: 2,
+                                    name: 'Чат-машина',
                                     description: 'Написать 1000 сообщений в чате',
                                     type: 'messages',
                                     reward: 'Редкий лутбокс',
@@ -558,9 +558,9 @@ const LootboxSystem = ({ channelName }) => {
                                     max: 1000,
                                     rarity: 'rare'
                                 },
-                                { 
-                                    id: 3, 
-                                    name: 'Первая кровь', 
+                                {
+                                    id: 3,
+                                    name: 'Первая кровь',
                                     description: 'Написать первое сообщение в стриме',
                                     type: 'first_message',
                                     reward: 'Обычный лутбокс',
@@ -569,9 +569,9 @@ const LootboxSystem = ({ channelName }) => {
                                     rarity: 'common',
                                     completed: true
                                 },
-                                { 
-                                    id: 4, 
-                                    name: 'Подписчик года', 
+                                {
+                                    id: 4,
+                                    name: 'Подписчик года',
                                     description: 'Подписаться на канал на год',
                                     type: 'subscription',
                                     reward: 'Легендарный лутбокс',
@@ -579,9 +579,9 @@ const LootboxSystem = ({ channelName }) => {
                                     max: 365,
                                     rarity: 'legendary'
                                 },
-                                { 
-                                    id: 5, 
-                                    name: 'Модератор чата', 
+                                {
+                                    id: 5,
+                                    name: 'Модератор чата',
                                     description: 'Помочь модерировать чат 50 раз',
                                     type: 'moderation',
                                     reward: 'Эпический лутбокс',
@@ -589,9 +589,9 @@ const LootboxSystem = ({ channelName }) => {
                                     max: 50,
                                     rarity: 'epic'
                                 },
-                                { 
-                                    id: 6, 
-                                    name: 'Стример-друг', 
+                                {
+                                    id: 6,
+                                    name: 'Стример-друг',
                                     description: 'Быть в топ-10 зрителей 30 дней подряд',
                                     type: 'viewer',
                                     reward: 'МЕГА лутбокс',
@@ -630,12 +630,12 @@ const LootboxSystem = ({ channelName }) => {
                                                         {achievement.completed ? '100%' : `${achievement.progress}/${achievement.max}`}
                                                     </span>
                                                 </div>
-                                                <Progress 
-                                                    value={achievement.completed ? 100 : (achievement.progress / achievement.max) * 100} 
-                                                    className="h-2" 
+                                                <Progress
+                                                    value={achievement.completed ? 100 : (achievement.progress / achievement.max) * 100}
+                                                    className="h-2"
                                                 />
                                             </div>
-                                            
+
                                             <div className="flex items-center justify-between">
                                                 <span className="text-sm text-gray-300">
                                                     Награда: {achievement.reward}
@@ -644,9 +644,9 @@ const LootboxSystem = ({ channelName }) => {
                                                     <Check className="w-5 h-5 text-green-400" />
                                                 )}
                                             </div>
-                                            
-                                            <Button 
-                                                className="w-full" 
+
+                                            <Button
+                                                className="w-full"
                                                 disabled={!achievement.completed}
                                                 variant={achievement.completed ? "default" : "outline"}
                                             >
@@ -693,10 +693,10 @@ const LootboxSystem = ({ channelName }) => {
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <input 
-                                                        type="range" 
-                                                        min="0" 
-                                                        max="100" 
+                                                    <input
+                                                        type="range"
+                                                        min="0"
+                                                        max="100"
                                                         value={rate}
                                                         className="w-24"
                                                     />
@@ -706,7 +706,7 @@ const LootboxSystem = ({ channelName }) => {
                                         ))}
                                     </div>
                                 </div>
-                                
+
                                 <div>
                                     <h4 className="text-lg font-semibold text-white mb-4">Категории наград</h4>
                                     <div className="space-y-2">
@@ -745,30 +745,30 @@ const LootboxSystem = ({ channelName }) => {
                             <CardContent className="space-y-4">
                                 <div>
                                     <label className="text-sm text-gray-300">Дней для получения лутбокса</label>
-                                    <input 
-                                        type="number" 
-                                        min="1" 
-                                        max="30" 
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="30"
                                         defaultValue="7"
                                         className="w-full mt-2 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
                                     />
                                 </div>
                                 <div>
                                     <label className="text-sm text-gray-300">Минимум сообщений в день</label>
-                                    <input 
-                                        type="number" 
-                                        min="1" 
-                                        max="100" 
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="100"
                                         defaultValue="5"
                                         className="w-full mt-2 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
                                     />
                                 </div>
                                 <div>
                                     <label className="text-sm text-gray-300">Минимум времени в стриме (минуты)</label>
-                                    <input 
-                                        type="number" 
-                                        min="1" 
-                                        max="480" 
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="480"
                                         defaultValue="30"
                                         className="w-full mt-2 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
                                     />
@@ -799,8 +799,8 @@ const LootboxSystem = ({ channelName }) => {
                                 <div>
                                     <label className="text-sm text-gray-300">URL для OBS</label>
                                     <div className="flex gap-2 mt-2">
-                                        <input 
-                                            type="text" 
+                                        <input
+                                            type="text"
                                             value={`https://yourchy.com/lootbox/obs/${channelName || 'Yourchy'}`}
                                             readOnly
                                             className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white text-sm"
@@ -840,7 +840,7 @@ const LootboxSystem = ({ channelName }) => {
                                 </Button>
                             </div>
                         </div>
-                        
+
                         {recentOpenings.length > 0 ? (
                             <div className="space-y-3">
                                 {[

@@ -18,8 +18,21 @@ class PointsAPI {
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(errorText || `Failed to load ${platform} rewards`);
+            let errorMessage = `Failed to load ${platform} rewards`;
+            try {
+                // Пытаемся получить детали ошибки из JSON ответа FastAPI
+                const errorData = await response.json();
+                errorMessage = errorData.detail || errorData.message || errorMessage;
+            } catch {
+                // Если не удалось распарсить JSON, используем текст ответа
+                const errorText = await response.text();
+                errorMessage = errorText || errorMessage;
+            }
+            
+            const error = new Error(errorMessage);
+            error.status = response.status;
+            error.response = response;
+            throw error;
         }
 
         return response.json();

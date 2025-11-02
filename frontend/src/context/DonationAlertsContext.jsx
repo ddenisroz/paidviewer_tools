@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { API_BASE_URL } from '../constants';
 import { useAuth } from './AuthContext';
 import { saveReturnUrl } from '../utils/oauthRedirect';
+import { logger } from '../utils/prodLogger';
 
 const DonationAlertsContext = createContext();
 
@@ -45,7 +46,7 @@ export const DonationAlertsProvider = ({ children }) => {
                 setIsConnected(false);
             }
         } catch (err) {
-            console.error('Error checking DonationAlerts status:', err);
+            logger.error('Error checking DonationAlerts status:', err);
             setIsConnected(false);
             setError('Ошибка проверки статуса');
         } finally {
@@ -90,7 +91,7 @@ export const DonationAlertsProvider = ({ children }) => {
                 throw new Error('URL авторизации не получен');
             }
         } catch (err) {
-            console.error('Error connecting to DonationAlerts:', err);
+            logger.error('Error connecting to DonationAlerts:', err);
             setError(err.message);
             return false;
         } finally {
@@ -119,7 +120,7 @@ export const DonationAlertsProvider = ({ children }) => {
                 throw new Error('Ошибка отключения');
             }
         } catch (err) {
-            console.error('Error disconnecting from DonationAlerts:', err);
+            logger.error('Error disconnecting from DonationAlerts:', err);
             setError(err.message);
             return false;
         } finally {

@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { TwitchIcon, VKIcon } from './PlatformIcons';
 import { Gift, AlertCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { logger } from '../utils/prodLogger';
 
 const IntegrationsDialog = ({ open, onOpenChange }) => {
     const navigate = useNavigate();
@@ -28,7 +29,7 @@ const IntegrationsDialog = ({ open, onOpenChange }) => {
             }
             await updateTwitchIntegration(newEnabled);
         } catch (error) {
-            console.error('Error toggling Twitch integration:', error);
+            logger.error('Error toggling Twitch integration:', error);
         }
     };
 
@@ -41,7 +42,7 @@ const IntegrationsDialog = ({ open, onOpenChange }) => {
             }
             await updateVkIntegration(newEnabled);
         } catch (error) {
-            console.error('Error toggling VK integration:', error);
+            logger.error('Error toggling VK integration:', error);
         }
     };
 

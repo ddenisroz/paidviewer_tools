@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Circle, Activity, Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import CookieConsent from '@/components/CookieConsent';
+import { logger } from '../utils/prodLogger';
 
 // Иконка Twitch "Glitch" (точная)
 const TwitchIcon = (props) => (
@@ -143,7 +144,7 @@ const LoginPage = () => {
                 platform: guestPlatform  // ✅ Отправляем выбранную платформу
             });
             
-            console.log('[LoginPage] Guest connect response:', response.data);
+            logger.log('[LoginPage] Guest connect response:', response.data);
             
             // Новый API возвращает код напрямую
             if (response.data.success && response.data.verification_code) {
@@ -158,7 +159,7 @@ const LoginPage = () => {
             }
             
         } catch (error) {
-            console.error('LoginPage: Failed to connect bot:', error);
+            logger.error('LoginPage: Failed to connect bot:', error);
             const errorMsg = error.response?.data?.detail || 'Канал не найден или недоступен';
             setChannelError(errorMsg);
         } finally {
@@ -213,12 +214,12 @@ const LoginPage = () => {
                             navigate('/dashboard');
                         }
                     } catch (error) {
-                        console.error('[LoginPage] Failed to finalize guest session:', error);
+                        logger.error('[LoginPage] Failed to finalize guest session:', error);
                         setChannelError(error.response?.data?.detail || 'Ошибка входа в гостевой режим');
                     }
                 }
             } catch (error) {
-                console.error('LoginPage: Failed to check verification automatically:', error);
+                logger.error('LoginPage: Failed to check verification automatically:', error);
             }
         }, 3000);
 
@@ -240,7 +241,7 @@ const LoginPage = () => {
             });
             // LoginPage: Bot disconnected due to verification timeout');
         } catch (error) {
-            console.error('LoginPage: Failed to disconnect bot:', error);
+            logger.error('LoginPage: Failed to disconnect bot:', error);
         } finally {
             // Закрываем попап и перезагружаем страницу
             setVerificationModalOpen(false);
@@ -273,7 +274,7 @@ const LoginPage = () => {
                     setVerificationModalOpen(false);
                     navigate('/dashboard');
                 } catch (error) {
-                    console.error('LoginPage: Failed to set guest mode after manual verification:', error);
+                    logger.error('LoginPage: Failed to set guest mode after manual verification:', error);
                     setChannelError(error.message || 'Ошибка входа в гостевой режим');
                 }
             } else {
@@ -281,7 +282,7 @@ const LoginPage = () => {
                 toast.error('Код не подтвержден владельцем канала');
             }
         } catch (error) {
-            console.error('LoginPage: Failed to check verification:', error);
+            logger.error('LoginPage: Failed to check verification:', error);
         } finally {
             setIsVerifying(false);
         }
@@ -293,7 +294,7 @@ const LoginPage = () => {
             setIsCodeCopied(true);
             setTimeout(() => setIsCodeCopied(false), 2000); // Сбрасываем через 2 секунды
         } catch (error) {
-            console.error('LoginPage: Failed to copy code:', error);
+            logger.error('LoginPage: Failed to copy code:', error);
             // Fallback для старых браузеров
             const textArea = document.createElement('textarea');
             textArea.value = verificationCode;
@@ -346,9 +347,9 @@ const LoginPage = () => {
 
                         <button
                             onClick={() => {
-                                console.log('🔵 [LOGIN PAGE] VK Live button clicked!');
+                                logger.log('🔵 [LOGIN PAGE] VK Live button clicked!');
                                 loginWithVk();
-                                console.log('🔵 [LOGIN PAGE] loginWithVk() called');
+                                logger.log('🔵 [LOGIN PAGE] loginWithVk() called');
                             }}
                             className="w-full bg-red-800 hover:bg-red-900 text-white font-semibold py-3 px-5 rounded-lg transition-colors duration-300 flex items-center justify-center text-base"
                         >

@@ -47,7 +47,6 @@ const SettingsPage = () => {
     return (
         <PageWrapper 
             title="Настройки"
-            description="Управление интеграциями и настройками бота"
         >
 
             {/* Табы */}
@@ -141,42 +140,36 @@ const SettingsPage = () => {
                 </CardContent>
             </Card>
 
-            {/* User Info */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Информация о пользователе</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-2">
-                        <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">ID:</span>
-                            <span className="text-sm font-medium">{user?.id}</span>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+            {/* User Info and Danger Zone */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* User Info */}
+                <div className="flex items-center justify-between px-4 py-3 rounded-lg border bg-card">
+                    <span className="text-sm text-muted-foreground">ID:</span>
+                    <span className="text-sm font-medium">{user?.id}</span>
+                </div>
 
-            {/* Danger Zone - Delete Account */}
-            <Card className="border-red-500/20 bg-red-500/5">
-                <CardHeader>
-                    <CardTitle className="text-red-500 flex items-center gap-2">
-                        <Trash2 className="h-5 w-5" />
-                        Опасная зона
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
+                {/* Danger Zone - Delete Account */}
+                <div className="border border-red-500/20 bg-red-500/5 rounded-lg px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                            <Trash2 className="h-4 w-4 text-red-500 flex-shrink-0" />
+                            <span className="text-sm font-semibold text-red-500">Опасная зона</span>
+                        </div>
                         <Button
                             variant="destructive"
                             onClick={() => setShowDeleteModal(true)}
-                            className="bg-red-600 hover:bg-red-700"
+                            className="bg-red-600 hover:bg-red-700 flex-shrink-0"
+                            size="sm"
                         >
                             <Trash2 className="h-4 w-4 mr-2" />
-                            Удалить аккаунт
+                            Удалить
                         </Button>
                     </div>
-                </CardContent>
-            </Card>
+                    <p className="text-xs text-red-400/70 mt-2">
+                        ⚠️ Необратимые действия. Удаление аккаунта приведет к полной потере всех данных.
+                    </p>
+                </div>
+            </div>
 
             {/* Delete Account Modal */}
             <DeleteAccountModal 

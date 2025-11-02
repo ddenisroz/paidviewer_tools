@@ -7,38 +7,49 @@
 
 ## 🚀 Быстрый старт
 
-### Для новых разработчиков:
-1. 📖 **[QUICK_START.md](QUICK_START.md)** - Запуск за 5 минут
-2. 🏗️ **[ARCHITECTURE_GUIDE.md](ARCHITECTURE_GUIDE.md)** - Архитектура системы
-3. 👨‍💻 **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - Паттерны и примеры
+### Для обычных пользователей (стримеры):
+1. 📖 **[README.md](../README.md)** - Главный README (5 минут)
+2. 🚀 **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Шпаргалка (команды, типичные задачи)
+3. 🎯 **[QUICK_START.md](QUICK_START.md)** - Полная установка
 
-### Для AI-агентов:
-1. 🚨 **[CURRENT_STATUS.md](CURRENT_STATUS.md)** - ЧТО РАБОТАЕТ/НЕ РАБОТАЕТ
-2. 🤖 **[LLM_DEVELOPMENT_RULES.md](LLM_DEVELOPMENT_RULES.md)** - ПРАВИЛА (обязательно!)
-3. 🔧 **[QUICK_FIX_GUIDE.md](QUICK_FIX_GUIDE.md)** - Типичные баги
+### Для новых разработчиков:
+1. 📖 **[README.md](../README.md)** - Обзор проекта
+2. 🏗️ **[ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md)** - Архитектура (1 страница)
+3. 👨‍💻 **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - Паттерны и примеры
+4. 🏗️ **[ARCHITECTURE_GUIDE.md](ARCHITECTURE_GUIDE.md)** - Полная архитектура
+
+### Для AI-агентов (Claude, GPT):
+1. ⚠️ **[LLM_DEVELOPMENT_RULES.md](LLM_DEVELOPMENT_RULES.md)** - ОБЯЗАТЕЛЬНО! Правила
+2. 🚨 **[CURRENT_STATUS.md](CURRENT_STATUS.md)** - ЧТО РАБОТАЕТ/НЕ РАБОТАЕТ
+3. 🚫 **[DO_NOT_TOUCH.md](DO_NOT_TOUCH.md)** - Что нельзя менять
 
 ---
 
-## 📁 Структура документации
+## 📚 Организованная структура
 
-### 🔴 КРИТИЧЕСКИЕ (читать обязательно!)
+### ⚡ БЫСТРЫЕ (для тех кто спешит)
+| Файл | Время | Для кого |
+|------|-------|----------|
+| **[README.md](../README.md)** | 5 мин | Все |
+| **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** | 10 мин | Разработчики |
+| **[ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md)** | 10 мин | Разработчики |
 
-| Файл | Описание |
+### 🔴 КРИТИЧЕСКИЕ (обязательно читать!)
+| Файл | Для кого |
 |------|----------|
-| **[DO_NOT_TOUCH.md](DO_NOT_TOUCH.md)** | 🚫 НЕЛЬЗЯ ТРОГАТЬ! Категории стримов |
-| **[CURRENT_STATUS.md](CURRENT_STATUS.md)** | ✅ Что работает, ❌ что сломано |
-| **[LLM_DEVELOPMENT_RULES.md](LLM_DEVELOPMENT_RULES.md)** | Правила для AI-агентов |
+| **[DO_NOT_TOUCH.md](DO_NOT_TOUCH.md)** | AI-агенты, разработчики |
+| **[CURRENT_STATUS.md](CURRENT_STATUS.md)** | AI-агенты, разработчики |
+| **[LLM_DEVELOPMENT_RULES.md](LLM_DEVELOPMENT_RULES.md)** | AI-агенты |
 
-### 🟢 Основная документация
-
+### 🟢 ОСНОВНАЯ ДОКУМЕНТАЦИЯ
 | Файл | Описание |
 |------|----------|
 | [QUICK_START.md](QUICK_START.md) | Установка и первый запуск |
-| [ARCHITECTURE_GUIDE.md](ARCHITECTURE_GUIDE.md) | Backend, Frontend, Database |
+| [ARCHITECTURE_GUIDE.md](ARCHITECTURE_GUIDE.md) | Полная архитектура |
 | [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) | Паттерны, best practices |
-| [CHANGELOG.md](CHANGELOG.md) | История изменений (Session 7-10) |
+| [CHANGELOG.md](CHANGELOG.md) | История изменений |
 
-### 🔵 Специализированные темы
+### 🔵 СПЕЦИАЛИЗИРОВАННЫЕ (по темам)
 
 | Файл | Тема |
 |------|------|

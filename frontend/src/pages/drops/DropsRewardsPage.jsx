@@ -22,6 +22,7 @@ import {
   Play
 } from 'lucide-react';
 import { useApi } from '@/hooks/useApi';
+import { logger } from '../../utils/prodLogger';
 
 const DropsRewardsPage = () => {
   const [rewards, setRewards] = useState([]);
@@ -56,7 +57,7 @@ const DropsRewardsPage = () => {
       }
 
     } catch (error) {
-      console.error('Error loading rewards data:', error);
+      logger.error('Error loading rewards data:', error);
     } finally {
       setLoading(false);
     }
@@ -70,7 +71,7 @@ const DropsRewardsPage = () => {
         setIsCreateDialogOpen(false);
       }
     } catch (error) {
-      console.error('Error creating reward:', error);
+      logger.error('Error creating reward:', error);
     }
   };
 
@@ -83,7 +84,7 @@ const DropsRewardsPage = () => {
         setEditingReward(null);
       }
     } catch (error) {
-      console.error('Error updating reward:', error);
+      logger.error('Error updating reward:', error);
     }
   };
 
@@ -95,7 +96,7 @@ const DropsRewardsPage = () => {
           await loadData();
         }
       } catch (error) {
-        console.error('Error deleting reward:', error);
+        logger.error('Error deleting reward:', error);
       }
     }
   };

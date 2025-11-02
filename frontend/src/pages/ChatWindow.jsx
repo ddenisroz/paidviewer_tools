@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import MessageContent from '../components/MessageContent';
 import { twitchBadgesService } from '../services/twitchBadges';
 import { useChat } from '../context/ChatContext';
+import { logger } from '../utils/prodLogger';
 
 /**
  * Чат в отдельном окне
@@ -34,7 +35,7 @@ const ChatWindow = () => {
         if (!badgesLoaded) {
             twitchBadgesService.loadGlobalBadges()
                 .then(() => setBadgesLoaded(true))
-                .catch(err => console.error('Failed to load badges:', err));
+                .catch(err => logger.error('Failed to load badges:', err));
         }
     }, [badgesLoaded]);
     

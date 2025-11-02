@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { API_BASE_URL } from '../constants';
 import { useNavigate } from 'react-router-dom';
+import { logger } from '../utils/prodLogger';
 
 const DonationAlertsCallback = () => {
   const [status, setStatus] = useState('Обработка авторизации...');
@@ -50,7 +51,7 @@ const DonationAlertsCallback = () => {
           setTimeout(() => navigate('/settings'), 3000);
         }
       } catch (error) {
-        console.error('DonationAlerts callback error:', error);
+        logger.error('DonationAlerts callback error:', error);
         setStatus(`Ошибка: ${error.message}`);
         setTimeout(() => navigate('/settings'), 3000);
       }

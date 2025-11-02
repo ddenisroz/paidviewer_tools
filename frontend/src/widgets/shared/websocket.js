@@ -1,3 +1,5 @@
+import { logger } from '../../utils/prodLogger';
+
 /**
  * Общий WebSocket клиент для виджетов
  */
@@ -33,7 +35,7 @@ class WidgetWebSocket {
                     const data = JSON.parse(event.data);
                     this.emit('message', data);
                 } catch (error) {
-                    console.error('Error parsing WebSocket message:', error);
+                    logger.error('Error parsing WebSocket message:', error);
                 }
             };
             
@@ -45,12 +47,12 @@ class WidgetWebSocket {
             };
             
             this.ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
+                logger.error('WebSocket error:', error);
                 this.emit('error', error);
             };
             
         } catch (error) {
-            console.error('Error creating WebSocket:', error);
+            logger.error('Error creating WebSocket:', error);
             this.handleReconnect();
         }
     }
@@ -64,7 +66,7 @@ class WidgetWebSocket {
                 this.connect();
             }, this.options.reconnectInterval);
         } else {
-            console.error('Max reconnection attempts reached');
+            logger.error('Max reconnection attempts reached');
             this.emit('maxReconnectAttemptsReached');
         }
     }
@@ -75,11 +77,11 @@ class WidgetWebSocket {
                 this.ws.send(JSON.stringify(data));
                 return true;
             } catch (error) {
-                console.error('Error sending message:', error);
+                logger.error('Error sending message:', error);
                 return false;
             }
         } else {
-            console.warn('WebSocket not connected');
+            logger.warn('WebSocket not connected');
             return false;
         }
     }
@@ -107,7 +109,7 @@ class WidgetWebSocket {
                 try {
                     handler(data);
                 } catch (error) {
-                    console.error('Error in event handler:', error);
+                    logger.error('Error in event handler:', error);
                 }
             });
         }

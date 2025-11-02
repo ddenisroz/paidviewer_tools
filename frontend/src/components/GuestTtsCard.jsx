@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Mic, Check, X, AlertCircle, Loader } from 'lucide-react';
 import { useNotification } from '../context/NotificationContext';
 import api from '../services/api';
+import { logger } from '../utils/prodLogger';
 
 const GuestTtsCard = () => {
     const { showNotification } = useNotification();
@@ -50,7 +51,7 @@ const GuestTtsCard = () => {
                 });
             }
         } catch (error) {
-            console.error('Error loading allowed channels:', error);
+            logger.error('Error loading allowed channels:', error);
         }
     };
 
@@ -68,7 +69,7 @@ const GuestTtsCard = () => {
             setTtsStatus({ enabled, ready: true, loaded: true });
             setTtsEnabled(enabled);
         } catch (error) {
-            console.error('Error loading TTS status:', error);
+            logger.error('Error loading TTS status:', error);
             setTtsStatus({ enabled: false, message: 'Ошибка загрузки статуса TTS' });
             setTtsEnabled(false);
         }
@@ -82,7 +83,7 @@ const GuestTtsCard = () => {
                 setSelectedVoice(response.data.voices[0].name);
             }
         } catch (error) {
-            console.error('Error loading voices:', error);
+            logger.error('Error loading voices:', error);
         }
     };
 
@@ -116,7 +117,7 @@ const GuestTtsCard = () => {
                 showNotification('Верификация не пройдена. Бот отключился от канала.', 'error');
             }
         } catch (error) {
-            console.error('Error checking verification status:', error);
+            logger.error('Error checking verification status:', error);
         }
     };
 
@@ -202,7 +203,7 @@ const GuestTtsCard = () => {
             setSelectedVoice('');
             showNotification('Отключен от канала', 'success');
         } catch (error) {
-            console.error('Error disconnecting:', error);
+            logger.error('Error disconnecting:', error);
             showNotification('Ошибка отключения от канала', 'error');
         }
     };

@@ -3,6 +3,7 @@ import { Mic, MicOff, Volume2, Monitor } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { TwitchIcon, VKIcon } from './PlatformIcons';
 import { botService } from '../services/microservices';
+import { logger } from '../utils/prodLogger';
 
 const TtsPlatformSelector = () => {
   const { user } = useAuth();
@@ -21,16 +22,16 @@ const TtsPlatformSelector = () => {
       const response = await botService.get('/api/tts/platform-settings', {
         params: { _t: Date.now() }  // Cache-busting достаточно, без лишних заголовков
       });
-      console.log('🔄 [TTS SELECTOR] Loaded settings from API:', response.data);
-      console.log('🔄 [TTS SELECTOR] enabled_platforms:', response.data.enabled_platforms);
+      logger.log('🔄 [TTS SELECTOR] Loaded settings from API:', response.data);
+      logger.log('🔄 [TTS SELECTOR] enabled_platforms:', response.data.enabled_platforms);
       setSettings(response.data);
-      console.log('🔄 [TTS SELECTOR] State updated. Current state:', {
+      logger.log('🔄 [TTS SELECTOR] State updated. Current state:', {
         enabled_platforms: response.data.enabled_platforms,
         twitch_enabled: response.data.enabled_platforms.includes('twitch'),
         vk_enabled: response.data.enabled_platforms.includes('vk')
       });
     } catch (err) {
-      console.error('❌ [TTS SELECTOR] Error loading TTS settings:', err);
+      logger.error('❌ [TTS SELECTOR] Error loading TTS settings:', err);
       setSettings({
         enabled_platforms: ['twitch', 'vk'],
         global_enabled: true
@@ -54,13 +55,13 @@ const TtsPlatformSelector = () => {
       window.dispatchEvent(new CustomEvent('tts-settings-changed', {
         detail: { enabledPlatforms: newSettings.enabled_platforms }
       }));
-      console.log('🔄 [TTS SELECTOR] Dispatched settings update:', newSettings.enabled_platforms);
+      logger.log('🔄 [TTS SELECTOR] Dispatched settings update:', newSettings.enabled_platforms);
       
       if (window.toast) {
         window.toast.success('Настройки TTS сохранены');
       }
     } catch (err) {
-      console.error('Error saving TTS settings:', err);
+      logger.error('Error saving TTS settings:', err);
       if (window.toast) {
         window.toast.error('Ошибка сохранения настроек');
       }
@@ -102,9 +103,9 @@ const TtsPlatformSelector = () => {
     // 🔄 Слушаем изменения TTS настроек из нижних кнопок
     const handleTtsSettingsChanged = (event) => {
       const { enabledPlatforms } = event.detail;
-      console.log('🔄 [TTS SELECTOR] Received settings update from shortcuts:', enabledPlatforms);
+      logger.log('🔄 [TTS SELECTOR] Received settings update from shortcuts:', enabledPlatforms);
       setSettings(prev => {
-        console.log('🔄 [TTS SELECTOR] Updating state from', prev.enabled_platforms, 'to', enabledPlatforms);
+        logger.log('🔄 [TTS SELECTOR] Updating state from', prev.enabled_platforms, 'to', enabledPlatforms);
         return {
           ...prev,
           enabled_platforms: enabledPlatforms

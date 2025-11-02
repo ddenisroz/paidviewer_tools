@@ -11,7 +11,7 @@ import YouTube from 'react-youtube';
 import { usePlayer } from '../../context/PlayerContext';
 import { useChat } from '../../context/ChatContext';
 import api from '../../services/api';
-import { youtubeLogger as logger } from '../../utils/logger';
+import { logger } from '../../utils/prodLogger';
 
 const YoutubeIntegrationPage = () => {
     const {
@@ -59,7 +59,7 @@ const YoutubeIntegrationPage = () => {
             setPlaybackMode(response.data.playback_mode || 'browser');
             setVolume([response.data.volume_level || 100]); // По умолчанию 100% для синхронизации
         } catch (error) {
-            console.error('Error loading YouTube settings:', error);
+            logger.error('Error loading YouTube settings:', error);
         }
     };
 
@@ -72,7 +72,7 @@ const YoutubeIntegrationPage = () => {
             });
             toast.success('Настройки YouTube сохранены');
         } catch (error) {
-            console.error('Error saving YouTube settings:', error);
+            logger.error('Error saving YouTube settings:', error);
             toast.error('Ошибка сохранения настроек YouTube');
         }
     };
@@ -102,7 +102,7 @@ const YoutubeIntegrationPage = () => {
             
             return url;
         } catch (error) {
-            console.error('Error generating YouTube OBS URL:', error);
+            logger.error('Error generating YouTube OBS URL:', error);
             toast.error('Ошибка создания YouTube OBS URL');
             return null;
         }
@@ -125,7 +125,7 @@ const YoutubeIntegrationPage = () => {
             
             return url;
         } catch (error) {
-            console.error('Error regenerating YouTube OBS URL:', error);
+            logger.error('Error regenerating YouTube OBS URL:', error);
             toast.error('Ошибка перегенерации YouTube OBS URL');
             return null;
         }
@@ -148,7 +148,7 @@ const YoutubeIntegrationPage = () => {
                 setIsObsUrlVisible(false); // По умолчанию скрыт
             }
         } catch (error) {
-            console.error('Error loading existing OBS URL:', error);
+            logger.error('Error loading existing OBS URL:', error);
         }
     };
 
@@ -175,7 +175,7 @@ const YoutubeIntegrationPage = () => {
             if (lastJsonMessage.type === 'youtube_queue_update') {
                 // Received youtube_queue_update from WebSocket, reloading queue
                 // Молча обновляем - не спамим уведомлениями
-                console.log('📺 [YouTube] Queue updated via WebSocket');
+                logger.log('📺 [YouTube] Queue updated via WebSocket');
             }
         }
     }, [lastJsonMessage]);
@@ -194,7 +194,7 @@ const YoutubeIntegrationPage = () => {
             } else {
                 toast.error("Не удалось очистить очередь.");
             }
-            console.error("Error clearing queue:", error);
+            logger.error("Error clearing queue:", error);
         }
     };
 

@@ -8,6 +8,7 @@ import { Button } from '../ui/button';
 import { TwitchIcon, VKIcon } from '../PlatformIcons';
 import { API_BASE_URL } from '../../constants';
 import { saveReturnUrl } from '../../utils/oauthRedirect';
+import { logger } from '../../utils/prodLogger';
 
 const Header = () => {
     const { user, logout, isGuest, isAuthenticated, refreshAuthStatus } = useAuth();
@@ -77,22 +78,22 @@ const Header = () => {
                                 // Перенаправляем на страницу авторизации DonationAlerts
                                 window.location.href = data.auth_url;
                             } else {
-                                console.error('URL авторизации DonationAlerts не получен:', data);
+                                logger.error('URL авторизации DonationAlerts не получен:', data);
                                 alert('Ошибка: URL авторизации DonationAlerts не получен');
                             }
                         } else {
                             const errorData = await response.json().catch(() => ({}));
-                            console.error('Ошибка получения URL авторизации DonationAlerts:', errorData);
+                            logger.error('Ошибка получения URL авторизации DonationAlerts:', errorData);
                             alert(`Ошибка подключения DonationAlerts: ${errorData.error || 'Неизвестная ошибка'}`);
                         }
                     } catch (error) {
-                        console.error('Ошибка подключения DonationAlerts:', error);
+                        logger.error('Ошибка подключения DonationAlerts:', error);
                         alert(`Ошибка подключения DonationAlerts: ${error.message}`);
                     }
                 }
             }
         } catch (error) {
-            console.error('Error toggling integration:', error);
+            logger.error('Error toggling integration:', error);
         }
     };
 

@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Gift, Plus, Edit, Trash2, Trophy, Coins } from 'lucide-react';
 import api from '../../services/api';
-import { dropsLogger as logger } from '../../utils/logger';
+import { logger } from '../../utils/prodLogger';
 import { toast } from 'sonner';
 
 const LootboxManagement = () => {

@@ -33,6 +33,7 @@ import { getAllEmotesForChannel } from '../utils/emotes';
 import { twitchBadgesService } from '../services/twitchBadges';
 import MessageContent from './MessageContent';
 import ChatBoxSettingsModal from './ChatBoxSettingsModal';
+import { logger } from '../utils/prodLogger';
 
 const ChatCard = ({ integrations, isOnHomePage = true }) => {
     const { user, isGuest } = useAuth();
@@ -84,11 +85,11 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
         obsoleteKeys.forEach(key => {
             if (localStorage.getItem(key) !== null) {
                 localStorage.removeItem(key);
-                console.log(`🧹 [CLEANUP] Removed obsolete localStorage key: ${key}`);
+                logger.log(`🧹 [CLEANUP] Removed obsolete localStorage key: ${key}`);
             }
         });
         
-        console.log('🧹 [CLEANUP] Finished cleaning up obsolete localStorage');
+        logger.log('🧹 [CLEANUP] Finished cleaning up obsolete localStorage');
         
         const loadTtsSettings = async () => {
             try {
@@ -96,36 +97,36 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                     params: { _t: Date.now() }  // Cache-busting достаточно
                 });
                 setTtsSettings(response.data);
-                console.log('✅ [TTS SHORTCUT] Settings loaded:', response.data);
-                console.log('✅ [TTS SHORTCUT] enabled_platforms:', response.data.enabled_platforms);
+                logger.log('✅ [TTS SHORTCUT] Settings loaded:', response.data);
+                logger.log('✅ [TTS SHORTCUT] enabled_platforms:', response.data.enabled_platforms);
                 
                 // 🔄 СИНХРОНИЗАЦИЯ: Обновляем видимость платформ на основе API (не localStorage)
                 const enabledPlatforms = response.data.enabled_platforms || [];
                 setTwitchChatVisible(enabledPlatforms.includes('twitch'));
                 setVkChatVisible(enabledPlatforms.includes('vk'));
-                console.log('🔄 [TTS SHORTCUT] Synced visibility from API:', {
+                logger.log('🔄 [TTS SHORTCUT] Synced visibility from API:', {
                     enabled_platforms: enabledPlatforms,
                     twitch: enabledPlatforms.includes('twitch'),
                     vk: enabledPlatforms.includes('vk')
                 });
             } catch (error) {
-                console.error('❌ [TTS SHORTCUT] Error loading settings:', error);
+                logger.error('❌ [TTS SHORTCUT] Error loading settings:', error);
             }
         };
         const loadBadges = async () => {
             // Предотвращаем повторную загрузку
             if (badgesLoadedRef.current) {
-                console.log('⏭️ [BADGES] Already loaded, skipping...');
+                logger.log('⏭️ [BADGES] Already loaded, skipping...');
                 return;
             }
             
             try {
                 await twitchBadgesService.loadGlobalBadges();
-                console.log('✅ [BADGES] Twitch badges loaded');
+                logger.log('✅ [BADGES] Twitch badges loaded');
                 badgesLoadedRef.current = true;
                 setBadgesLoaded(true); // Триггерим ре-рендер
             } catch (error) {
-                console.error('❌ [BADGES] Error loading badges:', error);
+                logger.error('❌ [BADGES] Error loading badges:', error);
             }
         };
         loadTtsSettings();
@@ -134,7 +135,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
         // 🔄 Слушаем изменения TTS настроек из верхних переключателей
         const handleTtsSettingsChanged = (event) => {
             const { enabledPlatforms } = event.detail;
-            console.log('🔄 [TTS SHORTCUT] Received settings update:', enabledPlatforms);
+            logger.log('🔄 [TTS SHORTCUT] Received settings update:', enabledPlatforms);
             setTwitchChatVisible(enabledPlatforms.includes('twitch'));
             setVkChatVisible(enabledPlatforms.includes('vk'));
             setTtsSettings(prev => ({
@@ -187,10 +188,10 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                 detail: { enabledPlatforms: enabledPlatforms }
             }));
             
-            console.log(`🎮 [TTS SHORTCUT] Twitch ${newVisible ? 'включен' : 'выключен'}`);
+            logger.log(`🎮 [TTS SHORTCUT] Twitch ${newVisible ? 'включен' : 'выключен'}`);
             toast.success(`Twitch озвучка ${newVisible ? 'включена' : 'выключена'}`);
         } catch (error) {
-            console.error('❌ [TTS SHORTCUT] Error saving:', error);
+            logger.error('❌ [TTS SHORTCUT] Error saving:', error);
             toast.error('Ошибка сохранения настроек TTS');
         }
     };
@@ -232,10 +233,10 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                 detail: { enabledPlatforms: enabledPlatforms }
             }));
             
-            console.log(`📺 [TTS SHORTCUT] VK ${newVisible ? 'включен' : 'выключен'}`);
+            logger.log(`📺 [TTS SHORTCUT] VK ${newVisible ? 'включен' : 'выключен'}`);
             toast.success(`VK озвучка ${newVisible ? 'включена' : 'выключена'}`);
         } catch (error) {
-            console.error('❌ [TTS SHORTCUT] Error saving:', error);
+            logger.error('❌ [TTS SHORTCUT] Error saving:', error);
             toast.error('Ошибка сохранения настроек TTS');
         }
     };
@@ -381,7 +382,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                 if (container) {
                     // Используем scrollTop - НЕ вызывает скролл страницы!
                     container.scrollTop = container.scrollHeight;
-                    console.log('⬇️ Auto-scrolled to bottom on initial load');
+                    logger.log('⬇️ Auto-scrolled to bottom on initial load');
                 }
             }, 100);
             hasScrolledOnLoad.current = true;
@@ -397,10 +398,10 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
             requestAnimationFrame(() => {
                 setTimeout(() => {
                     const atBottom = isUserAtBottom();
-                    console.log('🔍 [AUTOSCROLL] Check:', { atBottom, lastMessageId: String(lastMessageId).substring(0, 20) });
+                    logger.log('🔍 [AUTOSCROLL] Check:', { atBottom, lastMessageId: String(lastMessageId).substring(0, 20) });
                     if (atBottom) {
                         scrollToBottom();
-                        console.log('⬇️ [AUTOSCROLL] Scrolling to bottom');
+                        logger.log('⬇️ [AUTOSCROLL] Scrolling to bottom');
                     }
                 }, 0);
             });
@@ -418,7 +419,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
     useEffect(() => {
         // Предотвращаем повторную загрузку
         if (historyLoadedRef.current) {
-            console.log('⏭️ [CHAT] History already loaded, skipping...');
+            logger.log('⏭️ [CHAT] History already loaded, skipping...');
             return;
         }
         
@@ -442,23 +443,23 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
             // 🎭 Loaded emotes:', emotesData);
             setEmotes(emotesData);
         } catch (error) {
-            console.error('Error loading emotes:', error);
+            logger.error('Error loading emotes:', error);
         }
     };
 
     const loadChatHistory = async () => {
         try {
-            console.log('📜 [CHAT] Loading chat history...');
-            console.log('📜 [CHAT] twitchEnabled:', integrations?.twitch?.enabled, 'user.twitch_username:', user?.twitch_username);
-            console.log('📜 [CHAT] vkEnabled:', integrations?.vk?.enabled, 'user.vk_username:', user?.vk_username);
+            logger.log('📜 [CHAT] Loading chat history...');
+            logger.log('📜 [CHAT] twitchEnabled:', integrations?.twitch?.enabled, 'user.twitch_username:', user?.twitch_username);
+            logger.log('📜 [CHAT] vkEnabled:', integrations?.vk?.enabled, 'user.vk_username:', user?.vk_username);
             
             // Убеждаемся что badges загружены ДО загрузки истории
             try {
                 await twitchBadgesService.loadGlobalBadges();
                 setBadgesLoaded(true); // Устанавливаем СРАЗУ чтобы badges рендерились
-                console.log('✅ [CHAT] Twitch badges loaded before history');
+                logger.log('✅ [CHAT] Twitch badges loaded before history');
                                 } catch (error) {
-                console.warn('⚠️ [CHAT] Failed to load badges, continuing anyway:', error);
+                logger.warn('⚠️ [CHAT] Failed to load badges, continuing anyway:', error);
             }
             
             const limit = 500; // Загружаем последние 500 сообщений из env
@@ -467,7 +468,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
             // Загружаем историю для Twitch (не проверяем isOnHomePage - это для отображения, а не для загрузки)
             if (integrations?.twitch?.enabled && user?.twitch_username) {
                 try {
-                    console.log('📜 [CHAT] Fetching Twitch history for:', user.twitch_username);
+                    logger.log('📜 [CHAT] Fetching Twitch history for:', user.twitch_username);
                     const response = await microservicesAPI.get(`/api/chat/history`, {
                         params: {
                             platform: 'twitch',
@@ -477,27 +478,27 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                     });
                     
                     if (response.data.success && response.data.messages) {
-                        console.log(`✅ [CHAT] Loaded ${response.data.messages.length} Twitch messages`);
+                        logger.log(`✅ [CHAT] Loaded ${response.data.messages.length} Twitch messages`);
                         // Отладка: проверяем первое сообщение на badges
                         if (response.data.messages[0]) {
-                            console.log('🎖️ [CHAT HISTORY] First message badges:', response.data.messages[0].badges, 'type:', typeof response.data.messages[0].badges);
-                            console.log('🎖️ [CHAT HISTORY] First message role:', response.data.messages[0].role);
+                            logger.log('🎖️ [CHAT HISTORY] First message badges:', response.data.messages[0].badges, 'type:', typeof response.data.messages[0].badges);
+                            logger.log('🎖️ [CHAT HISTORY] First message role:', response.data.messages[0].role);
                         }
                         historyMessages.push(...response.data.messages);
                     } else {
-                        console.log('⚠️ [CHAT] No Twitch messages in response');
+                        logger.log('⚠️ [CHAT] No Twitch messages in response');
                     }
                 } catch (error) {
-                    console.error('❌ Error loading Twitch history:', error);
+                    logger.error('❌ Error loading Twitch history:', error);
                 }
             } else {
-                console.log('⏭️ [CHAT] Skipping Twitch history (not enabled or no username)');
+                logger.log('⏭️ [CHAT] Skipping Twitch history (not enabled or no username)');
             }
             
             // Загружаем историю для VK
             if (integrations?.vk?.enabled && user?.vk_username) {
                 try {
-                    console.log('📜 [CHAT] Fetching VK history for:', user.vk_username);
+                    logger.log('📜 [CHAT] Fetching VK history for:', user.vk_username);
                     const response = await microservicesAPI.get(`/api/chat/history`, {
                         params: {
                             platform: 'vk',
@@ -507,16 +508,16 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                     });
                     
                     if (response.data.success && response.data.messages) {
-                        console.log(`✅ [CHAT] Loaded ${response.data.messages.length} VK messages`);
+                        logger.log(`✅ [CHAT] Loaded ${response.data.messages.length} VK messages`);
                         historyMessages.push(...response.data.messages);
                     } else {
-                        console.log('⚠️ [CHAT] No VK messages in response');
+                        logger.log('⚠️ [CHAT] No VK messages in response');
                     }
                 } catch (error) {
-                    console.error('❌ Error loading VK history:', error);
+                    logger.error('❌ Error loading VK history:', error);
                 }
             } else {
-                console.log('⏭️ [CHAT] Skipping VK history (not enabled or no username)');
+                logger.log('⏭️ [CHAT] Skipping VK history (not enabled or no username)');
             }
             
             // Устанавливаем загруженные сообщения в состояние чата
@@ -526,18 +527,18 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                 
                 // Обновляем состояние чата историческими сообщениями
                 setMessages(historyMessages);
-                console.log(`✅ [CHAT] Loaded ${historyMessages.length} messages into chat`);
+                logger.log(`✅ [CHAT] Loaded ${historyMessages.length} messages into chat`);
             } else {
-                console.log('📜 [CHAT] No history messages found');
+                logger.log('📜 [CHAT] No history messages found');
             }
         } catch (error) {
-            console.error('❌ Error loading chat history:', error);
+            logger.error('❌ Error loading chat history:', error);
         }
     };
 
     const loadBlockedUsers = async () => {
         try {
-            console.log('🔇 [CHAT] Loading muted users...');
+            logger.log('🔇 [CHAT] Loading muted users...');
             
             // Используем единый endpoint для обеих платформ
             const response = await microservicesAPI.get('/api/moderation/muted-users');
@@ -549,11 +550,11 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                     blockedSet.add(`${u.platform}:${u.username.toLowerCase()}`);
                 });
                 
-                console.log(`🔇 [CHAT] Loaded ${blockedSet.size} muted users:`, Array.from(blockedSet));
+                logger.log(`🔇 [CHAT] Loaded ${blockedSet.size} muted users:`, Array.from(blockedSet));
                 setTtsBlockedUsers(blockedSet);
             }
         } catch (error) {
-            console.error('Error loading blocked users:', error);
+            logger.error('Error loading blocked users:', error);
         }
     };
 
@@ -565,7 +566,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
         const x = e.clientX + 2;
         const y = e.clientY + 2;
         
-        console.log(`📍 [CONTEXT MENU] Opening menu:`, {
+        logger.log(`📍 [CONTEXT MENU] Opening menu:`, {
             x, y,
             clientX: e.clientX,
             clientY: e.clientY,
@@ -593,7 +594,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
         // Context menu action:', { action, username, platform, channelName, msg });
         
         if (!channelName) {
-            console.error('Channel name not found:', { platform, user });
+            logger.error('Channel name not found:', { platform, user });
             toast.error('Канал не найден');
             return;
         }
@@ -602,7 +603,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
         switch (action) {
             case 'block_tts':
             case 'unblock_tts': {
-                console.log(`🔇 [CHAT MUTE] ${action} для ${username} (${platform})`);
+                logger.log(`🔇 [CHAT MUTE] ${action} для ${username} (${platform})`);
                     
                 const response = await microservicesAPI.post('/api/moderation/toggle-mute', {
                     username,
@@ -612,7 +613,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                     reason: action === 'block_tts' ? 'Заглушен в TTS' : undefined
                 });
                 
-                console.log('🔇 [CHAT MUTE] Response:', response.data);
+                logger.log('🔇 [CHAT MUTE] Response:', response.data);
                 
                 const resultAction = response.data?.action;  // 'muted' или 'unmuted'
                 
@@ -632,11 +633,11 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
             }
 
             default:
-                console.warn('Unknown action:', action);
+                logger.warn('Unknown action:', action);
                 break;
             }
         } catch (error) {
-            console.error('Error executing moderation action:', error);
+            logger.error('Error executing moderation action:', error);
             toast.error(error.response?.data?.detail || 'Ошибка выполнения действия');
         }
     };
@@ -705,7 +706,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
         const url = generateObsUrl();
         setGeneratedObsUrl(url);
         setHasExistingUrl(true);
-        console.log('🔗 Generated OBS URL:', url);
+        logger.log('🔗 Generated OBS URL:', url);
     };
 
     // Функция для показа существующего URL
@@ -713,7 +714,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
         const url = generateObsUrl();
         setGeneratedObsUrl(url);
         setHasExistingUrl(true);
-        console.log('👁️ Showing existing URL:', url);
+        logger.log('👁️ Showing existing URL:', url);
     };
 
     // Проверяем, есть ли уже сохраненные настройки OBS (значит URL уже был сгенерирован)
@@ -730,7 +731,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
             const newUrl = generateObsUrl();
             if (newUrl !== generatedObsUrl) {
                 setGeneratedObsUrl(newUrl);
-                console.log('🔄 URL auto-updated:', newUrl);
+                logger.log('🔄 URL auto-updated:', newUrl);
             }
         }
     }, [obsSettings, twitchChatEnabled, vkChatEnabled, generatedObsUrl, user]);

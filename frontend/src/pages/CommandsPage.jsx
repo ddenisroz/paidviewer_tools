@@ -44,6 +44,7 @@ import { toast } from 'sonner';
 import { CardSkeleton } from '@/components/ui/skeleton';
 import { PageLoader } from '@/components/ui/loader';
 import PageWrapper from '../components/PageWrapper';
+import { logger } from '../utils/prodLogger';
 
 
     const CommandsPage = () => {
@@ -137,7 +138,7 @@ import PageWrapper from '../components/PageWrapper';
         if (!force) {
             const now = Date.now();
             if (now - lastLoadTime < CACHE_TTL) {
-                console.log('📦 [CommandsPage] Using cached commands data');
+                logger.log('📦 [CommandsPage] Using cached commands data');
                 return;
             }
         }
@@ -162,7 +163,7 @@ import PageWrapper from '../components/PageWrapper';
             setLastLoadTime(Date.now());
             
         } catch (error) {
-            console.error('Error loading commands:', error);
+            logger.error('Error loading commands:', error);
             toast.error('Ошибка загрузки команд');
         } finally {
             setLoading(false);
@@ -224,7 +225,7 @@ import PageWrapper from '../components/PageWrapper';
             });
             loadCommands();
         } catch (error) {
-            console.error('Error creating command:', error);
+            logger.error('Error creating command:', error);
             toast.error(error.response?.data?.detail || 'Ошибка создания команды');
         }
     };
@@ -237,7 +238,7 @@ import PageWrapper from '../components/PageWrapper';
             setEditingCommand(null);
             loadCommands();
         } catch (error) {
-            console.error('Error updating command:', error);
+            logger.error('Error updating command:', error);
             const errorMsg = error.response?.data?.detail || 'Ошибка обновления команды';
             toast.error(errorMsg);
         }
@@ -265,7 +266,7 @@ import PageWrapper from '../components/PageWrapper';
         try {
             await api.put(`/api/commands/${commandName}`, data);
         } catch (error) {
-            console.error('Error toggling command:', error);
+            logger.error('Error toggling command:', error);
             toast.error('Ошибка переключения команды');
             // Откатываем изменения при ошибке
             loadCommands();
@@ -280,7 +281,7 @@ import PageWrapper from '../components/PageWrapper';
             toast.success('Команда удалена!');
             loadCommands();
         } catch (error) {
-            console.error('Error deleting command:', error);
+            logger.error('Error deleting command:', error);
             toast.error('Ошибка удаления команды');
         }
     };
@@ -466,9 +467,6 @@ import PageWrapper from '../components/PageWrapper';
                                 <Settings className="h-5 w-5" />
                                 Базовые команды
                             </CardTitle>
-                            <p className="text-sm text-muted-foreground">
-                                Встроенные команды бота. Можно настроить синтаксис, кулдаун и права доступа.
-                            </p>
                         </CardHeader>
                         <CardContent>
                             {/* Фильтры для базовых команд */}

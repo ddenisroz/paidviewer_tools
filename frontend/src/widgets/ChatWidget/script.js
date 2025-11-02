@@ -1,3 +1,5 @@
+import { logger } from '../../utils/prodLogger';
+
 class ChatWidget {
     constructor() {
         this.config = null;
@@ -125,7 +127,7 @@ class ChatWidget {
         if (wsUrl && !wsUrl.includes('null')) {
             this.ws = new WebSocket(wsUrl);
         } else {
-            console.warn('Invalid WebSocket URL:', wsUrl);
+            logger.warn('Invalid WebSocket URL:', wsUrl);
             return;
         }
         

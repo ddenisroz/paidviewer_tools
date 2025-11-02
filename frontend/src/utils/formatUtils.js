@@ -1,3 +1,5 @@
+import { logger } from '../utils/prodLogger';
+
 // src/utils/formatUtils.js
 
 /**
@@ -13,7 +15,7 @@ export const formatDate = (date, locale = 'ru-RU') => {
         const dateObj = typeof date === 'string' ? new Date(date) : date;
         return dateObj.toLocaleString(locale);
     } catch (error) {
-        console.error('Error formatting date:', error);
+        logger.error('Error formatting date:', error);
         return 'Неверная дата';
     }
 };
@@ -36,7 +38,7 @@ export const formatRelativeTime = (date) => {
         if (diffMinutes < 24 * 60) return `${Math.round(diffMinutes / 60)} ч. назад`;
         return `${Math.round(diffMinutes / (24 * 60))} дн. назад`;
     } catch (error) {
-        console.error('Error formatting relative time:', error);
+        logger.error('Error formatting relative time:', error);
         return 'Неверная дата';
     }
 };

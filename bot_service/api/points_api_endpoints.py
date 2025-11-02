@@ -150,11 +150,29 @@ async def get_twitch_rewards(
         # Расшифровываем токен перед использованием
         decrypted_token = _decrypt_access_token(user_token.access_token)
         
-        rewards = await twitch_api.get_custom_rewards(
-            twitch_user_id,
-            decrypted_token,
-            only_manageable=True
-        )
+        try:
+            rewards = await twitch_api.get_custom_rewards(
+                twitch_user_id,
+                decrypted_token,
+                only_manageable=True
+            )
+        except ValueError as e:
+            # Обрабатываем ошибку от twitch_api с информацией о статусе коде
+            error_msg = str(e)
+            if error_msg.startswith("403:"):
+                error_detail = error_msg.replace("403:", "").strip()
+                if "partner or affiliate" in error_detail.lower():
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Награды Twitch доступны только для партнёров и аффилейтов"
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"Не удалось получить награды: {error_detail}"
+                    )
+            else:
+                raise HTTPException(status_code=400, detail="Не удалось получить награды от Twitch")
         
         if rewards is None:
             logger.warning(f"❌ [TWITCH REWARDS] Failed to fetch rewards from Twitch API")
@@ -251,7 +269,9 @@ async def get_vk_rewards(
         raise HTTPException(status_code=500, detail=f"Ошибка получения наград VK: {str(e)}")
 
 @points_router.post("/rewards/twitch/create")
+@limiter.limit("10/minute")
 async def create_twitch_reward(
+    request: Request,
     reward_data: CreateRewardRequest,
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -327,7 +347,9 @@ async def create_twitch_reward(
         raise HTTPException(status_code=500, detail=f"Ошибка создания награды Twitch: {str(e)}")
 
 @points_router.post("/rewards/vk/create")
+@limiter.limit("10/minute")
 async def create_vk_reward(
+    request: Request,
     reward_data: CreateRewardRequest,
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -583,7 +605,9 @@ async def update_vk_reward(
         raise HTTPException(status_code=500, detail=f"Ошибка обновления награды VK: {str(e)}")
 
 @points_router.delete("/rewards/vk/{reward_id}")
+@limiter.limit("20/minute")
 async def delete_vk_reward(
+    request: Request,
     reward_id: str,
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -1231,7 +1255,9 @@ class UpdateRewardRequest(BaseModel):
     enabled: Optional[bool] = None
 
 @points_router.put("/rewards/{reward_id}")
+@limiter.limit("30/minute")
 async def update_reward(
+    http_request: Request,
     reward_id: int,
     request: UpdateRewardRequest,
     user: dict = Depends(get_current_user),
@@ -1258,7 +1284,9 @@ async def update_reward(
         raise HTTPException(status_code=500, detail="Ошибка обновления награды")
 
 @points_router.delete("/rewards/{reward_id}")
+@limiter.limit("20/minute")
 async def delete_reward(
+    request: Request,
     reward_id: int,
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)

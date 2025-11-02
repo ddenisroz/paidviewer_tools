@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { botService } from '../services/microservices';
 import { toast } from 'sonner';
+import { logger } from '../utils/prodLogger';
 
 const DeleteAccountModal = ({ isOpen, onClose }) => {
     const [confirmText, setConfirmText] = useState('');
@@ -29,7 +30,7 @@ const DeleteAccountModal = ({ isOpen, onClose }) => {
                 }, 2000);
             }
         } catch (error) {
-            console.error('Error deleting account:', error);
+            logger.error('Error deleting account:', error);
             toast.error(error.response?.data?.detail || 'Ошибка удаления аккаунта');
             setIsDeleting(false);
         }

@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Trash2, Play, Settings, Gift } from 'lucide-react';
 import { toast } from 'sonner';
+import { logger } from '../../utils/prodLogger';
 
 const DropsTriggersConfigurator = () => {
     const [triggers, setTriggers] = useState([]);
@@ -35,7 +36,7 @@ const DropsTriggersConfigurator = () => {
             const data = await response.json();
             setTriggers(data.triggers || []);
         } catch (error) {
-            console.error('Error loading triggers:', error);
+            logger.error('Error loading triggers:', error);
             toast.error('Ошибка загрузки триггеров');
         }
     };
@@ -65,7 +66,7 @@ const DropsTriggersConfigurator = () => {
                 toast.error('Ошибка создания триггера');
             }
         } catch (error) {
-            console.error('Error creating trigger:', error);
+            logger.error('Error creating trigger:', error);
             toast.error('Ошибка создания триггера');
         } finally {
             setIsLoading(false);
@@ -87,7 +88,7 @@ const DropsTriggersConfigurator = () => {
                 toast.error('Ошибка обновления триггера');
             }
         } catch (error) {
-            console.error('Error updating trigger:', error);
+            logger.error('Error updating trigger:', error);
             toast.error('Ошибка обновления триггера');
         }
     };
@@ -107,7 +108,7 @@ const DropsTriggersConfigurator = () => {
                 toast.error('Ошибка удаления триггера');
             }
         } catch (error) {
-            console.error('Error deleting trigger:', error);
+            logger.error('Error deleting trigger:', error);
             toast.error('Ошибка удаления триггера');
         }
     };
@@ -124,7 +125,7 @@ const DropsTriggersConfigurator = () => {
                 toast.error('Ошибка тестирования триггера');
             }
         } catch (error) {
-            console.error('Error testing trigger:', error);
+            logger.error('Error testing trigger:', error);
             toast.error('Ошибка тестирования триггера');
         }
     };
@@ -142,7 +143,7 @@ const DropsTriggersConfigurator = () => {
                 toast.error('Ошибка создания предустановок');
             }
         } catch (error) {
-            console.error('Error creating presets:', error);
+            logger.error('Error creating presets:', error);
             toast.error('Ошибка создания предустановок');
         }
     };

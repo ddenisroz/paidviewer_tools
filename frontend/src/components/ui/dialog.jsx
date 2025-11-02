@@ -33,46 +33,74 @@ const DialogContent = React.forwardRef(({ className, children, closeOnOverlayCli
   // Получаем состояние открытия из Radix
   const [open, setOpen] = React.useState(false);
   
+  // Проверяем состояние при монтировании и изменениях
   React.useEffect(() => {
-    // Слушаем изменения состояния от Radix
-    const handleStateChange = (newOpen) => {
-      setOpen(newOpen);
-      if (newOpen) {
-        setIsVisible(true);
-        setIsAnimating(true);
-        const timer = setTimeout(() => setIsAnimating(false), 50);
-        return () => clearTimeout(timer);
-      } else {
-        setIsAnimating(true);
-        const timer = setTimeout(() => {
-          setIsVisible(false);
-          setIsAnimating(false);
-        }, 200);
-        return () => clearTimeout(timer);
+    let observer = null;
+    
+    const checkState = () => {
+      const dialog = dialogRef.current?.closest('[data-state]');
+      if (dialog) {
+        const state = dialog.getAttribute('data-state');
+        const isOpen = state === 'open';
+        
+        setOpen(prevOpen => {
+          if (prevOpen !== isOpen) {
+            if (isOpen) {
+              setIsVisible(true);
+              setIsAnimating(true);
+              setTimeout(() => setIsAnimating(false), 50);
+            } else {
+              setIsAnimating(true);
+              setTimeout(() => {
+                setIsVisible(false);
+                setIsAnimating(false);
+              }, 200);
+            }
+          }
+          return isOpen;
+        });
       }
     };
 
-    // Подписываемся на изменения состояния
-    const dialog = dialogRef.current?.closest('[data-state]');
-    if (dialog) {
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          if (mutation.type === 'attributes' && mutation.attributeName === 'data-state') {
-            const state = dialog.getAttribute('data-state');
-            handleStateChange(state === 'open');
-          }
+    // Небольшая задержка для того, чтобы DOM обновился
+    const timeoutId = setTimeout(() => {
+      checkState();
+      
+      // Подписываемся на изменения состояния
+      const dialog = dialogRef.current?.closest('[data-state]');
+      if (dialog) {
+        observer = new MutationObserver(() => {
+          checkState();
         });
-      });
-      observer.observe(dialog, { attributes: true });
-      return () => observer.disconnect();
-    }
+        observer.observe(dialog, { attributes: true, attributeFilter: ['data-state'] });
+      }
+    }, 0);
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (observer) {
+        observer.disconnect();
+      }
+    };
   }, []);
 
   React.useEffect(() => {
     if (open) {
+      // Сохраняем текущее значение padding-right
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      const originalPaddingRight = document.body.style.paddingRight;
+      const originalOverflow = document.body.style.overflow;
+      
+      // Блокируем прокрутку и добавляем padding для компенсации скроллбара
       document.body.style.overflow = 'hidden';
+      if (scrollbarWidth > 0) {
+        document.body.style.paddingRight = `${scrollbarWidth}px`;
+      }
+      
       return () => {
-        document.body.style.overflow = 'unset';
+        // Восстанавливаем исходные значения
+        document.body.style.overflow = originalOverflow || '';
+        document.body.style.paddingRight = originalPaddingRight || '';
       };
     }
   }, [open]);

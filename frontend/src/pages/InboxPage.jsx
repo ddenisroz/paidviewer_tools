@@ -9,6 +9,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
 import { toast } from 'sonner';
+import { logger } from '../utils/prodLogger';
 
 const InboxPage = () => {
   const [tickets, setTickets] = useState([]);
@@ -41,7 +42,7 @@ const InboxPage = () => {
         toast.error('Ошибка при загрузке тикетов');
       }
     } catch (error) {
-      console.error('Error loading tickets:', error);
+      logger.error('Error loading tickets:', error);
       toast.error('Ошибка при загрузке тикетов');
     } finally {
       setLoading(false);
@@ -61,7 +62,7 @@ const InboxPage = () => {
         toast.error('Ошибка при загрузке ответов');
       }
     } catch (error) {
-      console.error('Error loading responses:', error);
+      logger.error('Error loading responses:', error);
       toast.error('Ошибка при загрузке ответов');
     }
   };
@@ -95,7 +96,7 @@ const InboxPage = () => {
         toast.error('Ошибка при отправке ответа');
       }
     } catch (error) {
-      console.error('Error sending response:', error);
+      logger.error('Error sending response:', error);
       toast.error('Ошибка при отправке ответа');
     } finally {
       setIsSubmitting(false);
@@ -134,7 +135,7 @@ const InboxPage = () => {
         toast.error(error.detail || 'Ошибка при создании тикета');
       }
     } catch (error) {
-      console.error('Error creating ticket:', error);
+      logger.error('Error creating ticket:', error);
       toast.error('Ошибка при создании тикета');
     } finally {
       setIsCreating(false);

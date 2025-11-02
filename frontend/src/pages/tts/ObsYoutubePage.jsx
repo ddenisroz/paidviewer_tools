@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import YouTube from 'react-youtube';
+import { logger } from '../../utils/prodLogger';
 
 const ObsYoutubePage = () => {
     const [searchParams] = useSearchParams();
@@ -22,7 +23,7 @@ const ObsYoutubePage = () => {
         // Подключаемся к WebSocket
         const wsBaseUrl = import.meta.env.VITE_BOT_SERVICE_WS_URL;
         if (!wsBaseUrl) {
-            console.error('VITE_BOT_SERVICE_WS_URL environment variable is required');
+            logger.error('VITE_BOT_SERVICE_WS_URL environment variable is required');
             return;
         }
         const wsUrl = `${wsBaseUrl}/obs/youtube/${token}`;
@@ -70,7 +71,7 @@ const ObsYoutubePage = () => {
                         // Unknown YouTube OBS message type:', data.type);
                 }
             } catch (error) {
-                console.error('Error parsing YouTube OBS WebSocket message:', error);
+                logger.error('Error parsing YouTube OBS WebSocket message:', error);
             }
         };
 
@@ -80,7 +81,7 @@ const ObsYoutubePage = () => {
         };
 
         ws.current.onerror = (error) => {
-            console.error('YouTube OBS WebSocket error:', error);
+            logger.error('YouTube OBS WebSocket error:', error);
             setStatus('Ошибка подключения YouTube OBS');
         };
 

@@ -14,6 +14,7 @@ import GuestStubs from '../components/GuestStubs';
 import IntegrationsDisabledPlaceholder from '../components/IntegrationsDisabledPlaceholder';
 import TtsQuickSettings from '../components/TtsQuickSettings';
 import { getAndClearReturnUrl } from '../utils/oauthRedirect';
+import { logger } from '../utils/prodLogger';
 
 
 
@@ -32,7 +33,7 @@ const HomePage = () => {
         
         const returnUrl = getAndClearReturnUrl();
         if (returnUrl) {
-            console.log('🔄 [OAuth] Redirecting back from dashboard to:', returnUrl);
+            logger.log('🔄 [OAuth] Redirecting back from dashboard to:', returnUrl);
             // Используем replace чтобы не добавлять /dashboard в историю
             navigate(returnUrl, { replace: true });
         }
@@ -62,7 +63,7 @@ const HomePage = () => {
                 // Проверяем кэш
                 const now = Date.now();
                 if (now - lastVkLoadTime < CACHE_TTL) {
-                    console.log('📦 [HomePage] Using cached VK stream info');
+                    logger.log('📦 [HomePage] Using cached VK stream info');
                     return;
                 }
                 
@@ -71,7 +72,7 @@ const HomePage = () => {
                     setVkStreamInfo(response.data);
                     setLastVkLoadTime(now);
                 } catch (error) {
-                    console.error('Error loading VK stream info:', error);
+                    logger.error('Error loading VK stream info:', error);
                     setVkStreamInfo(null);
                 }
             }

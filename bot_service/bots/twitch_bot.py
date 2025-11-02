@@ -162,6 +162,10 @@ class Bot(TwitchBotCore):
     async def event_raw_data(self, data: str):
         """Обработка raw IRC данных для отлова банов"""
         try:
+            # Проверяем что data - строка
+            if not isinstance(data, str):
+                return
+            
             # Отлавливаем CLEARCHAT для бана бота
             if 'CLEARCHAT' in data:
                 parts = data.split(' ')
@@ -173,6 +177,8 @@ class Bot(TwitchBotCore):
                         await self._disconnect_and_cleanup(channel, "ban_detected")
         except Exception as e:
             logger.error(f"Error processing raw data for ban detection: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
     
     async def event_message(self, message):
         """Обработка входящих сообщений"""

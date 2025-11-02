@@ -16,13 +16,34 @@ logger = logging.getLogger(__name__)
 # Импортируем централизованные пути
 from .project_paths import DATA_DIR
 
-# Определяем путь к файлу базы данных
-DATABASE_URL = f"sqlite:///{os.path.join(DATA_DIR, 'app_data.db')}"
+# Определяем URL базы данных из переменной окружения или используем SQLite по умолчанию
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    f"sqlite:///{os.path.join(DATA_DIR, 'app_data.db')}"  # Fallback на SQLite для совместимости
+)
+
+# Определяем, используется ли PostgreSQL или SQLite
+IS_POSTGRESQL = DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgresql+psycopg2://")
 
 try:
     # Создаем движок SQLAlchemy
-    # check_same_thread=False требуется для SQLite при использовании с FastAPI
-    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False}, echo=False)
+    if IS_POSTGRESQL:
+        # PostgreSQL: connection pooling для лучшей производительности
+        engine = create_engine(
+            DATABASE_URL,
+            pool_size=20,          # Базовый размер пула соединений
+            max_overflow=40,       # Дополнительные соединения при нагрузке
+            pool_pre_ping=True,    # Проверка соединений перед использованием
+            pool_recycle=3600,     # Переиспользование соединений каждый час
+            echo=False
+        )
+    else:
+        # SQLite: check_same_thread=False требуется для FastAPI
+        engine = create_engine(
+            DATABASE_URL,
+            connect_args={"check_same_thread": False},
+            echo=False
+        )
 
     # Создаем сессию для взаимодействия с БД
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -871,6 +892,28 @@ class SecurityLog(Base):
     user_agent = Column(String, nullable=True)
     details = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=utcnow_naive, index=True)
+
+
+class SystemLog(Base):
+    """Логи действий в системе (история действий администраторов)"""
+    __tablename__ = 'system_logs'
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    admin_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    action_type = Column(String, nullable=False, index=True)  # "user_deleted", "user_blocked", "settings_changed", etc
+    target_user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)  # Целевой пользователь (если применимо)
+    target_resource = Column(String, nullable=True)  # Например: "voice_123", "command_456", "bot_status"
+    description = Column(String, nullable=True)  # Понятное описание действия
+    old_value = Column(JSON, nullable=True)  # Старое значение (если изменение)
+    new_value = Column(JSON, nullable=True)  # Новое значение (если изменение)
+    ip_address = Column(String, nullable=True)  # IP админа
+    user_agent = Column(String, nullable=True)  # User Agent админа
+    details = Column(JSON, nullable=True)  # Дополнительные детали
+    status = Column(String, default='success')  # success, failed, warning
+    error_message = Column(String, nullable=True)  # Сообщение об ошибке если есть
+    timestamp = Column(DateTime, default=utcnow_naive, index=True)
+
 
 
 class ChatBoxSettings(Base):

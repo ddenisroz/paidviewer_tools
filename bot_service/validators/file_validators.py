@@ -1,0 +1,207 @@
+"""Валидаторы для загрузки файлов"""
+import os
+from typing import Tuple
+from fastapi import UploadFile, HTTPException
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Константы для лимитов файлов
+MAX_VOICE_FILE_SIZE_MB = 5  # 5 MB для голосов
+MAX_REWARD_SOUND_FILE_SIZE_MB = 2  # 2 MB для звуков наград
+MAX_UPLOAD_FILE_SIZE_MB = 50  # Общий лимит
+
+# Разрешенные типы контента
+ALLOWED_AUDIO_TYPES = {
+    'audio/wav',
+    'audio/mpeg',
+    'audio/mp3',
+    'audio/x-wav',
+    'audio/x-mpeg',
+    'audio/ogg',
+    'audio/webm',
+    'audio/aac',
+    'audio/flac',
+}
+
+ALLOWED_IMAGE_TYPES = {
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+}
+
+
+class FileValidator:
+    """Класс для валидации загружаемых файлов"""
+
+    @staticmethod
+    def validate_audio_file(
+        file: UploadFile,
+        max_size_mb: int = MAX_VOICE_FILE_SIZE_MB
+    ) -> Tuple[bool, str]:
+        """
+        Валидирует аудио файл
+        Returns: (is_valid, error_message)
+        """
+        try:
+            # Проверка типа контента
+            if file.content_type not in ALLOWED_AUDIO_TYPES:
+                logger.warning(f"Invalid audio file type: {file.content_type}")
+                allowed_types = ', '.join(ALLOWED_AUDIO_TYPES)
+                return False, f"Неподдерживаемый формат. Разрешены: {allowed_types}"
+
+            # Проверка расширения файла
+            if file.filename:
+                _, ext = os.path.splitext(file.filename)
+                ext = ext.lower()
+                allowed_extensions = {'.wav', '.mp3', '.ogg', '.webm', '.aac', '.flac', '.mpeg'}
+                if ext not in allowed_extensions:
+                    return False, f"Неподдерживаемое расширение файла: {ext}"
+
+            return True, ""
+
+        except Exception as e:
+            logger.error(f"Error validating audio file: {e}")
+            return False, f"Ошибка при валидации файла: {str(e)}"
+
+    @staticmethod
+    def validate_file_size(
+        file: UploadFile,
+        max_size_mb: int = MAX_VOICE_FILE_SIZE_MB
+    ) -> Tuple[bool, str]:
+        """
+        Валидирует размер файла
+        Returns: (is_valid, error_message)
+        """
+        try:
+            max_size_bytes = max_size_mb * 1024 * 1024
+
+            if file.size and file.size > max_size_bytes:
+                size_mb = file.size / (1024 * 1024)
+                return False, f"Размер файла ({size_mb:.2f} MB) превышает максимум ({max_size_mb} MB)"
+
+            return True, ""
+
+        except Exception as e:
+            logger.error(f"Error validating file size: {e}")
+            return False, f"Ошибка при проверке размера: {str(e)}"
+
+    @staticmethod
+    def validate_image_file(file: UploadFile) -> Tuple[bool, str]:
+        """
+        Валидирует файл изображения
+        Returns: (is_valid, error_message)
+        """
+        try:
+            if file.content_type not in ALLOWED_IMAGE_TYPES:
+                allowed_types = ', '.join(ALLOWED_IMAGE_TYPES)
+                return False, f"Неподдерживаемый формат. Разрешены: {allowed_types}"
+
+            if file.filename:
+                _, ext = os.path.splitext(file.filename)
+                ext = ext.lower()
+                allowed_extensions = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
+                if ext not in allowed_extensions:
+                    return False, f"Неподдерживаемое расширение: {ext}"
+
+            return True, ""
+
+        except Exception as e:
+            logger.error(f"Error validating image file: {e}")
+            return False, f"Ошибка при валидации файла: {str(e)}"
+
+    @staticmethod
+    def validate_filename(filename: str, max_length: int = 255) -> Tuple[bool, str]:
+        """
+        Валидирует имя файла на безопасность
+        Returns: (is_valid, error_message)
+        """
+        try:
+            if not filename or len(filename) == 0:
+                return False, "Имя файла не может быть пустым"
+
+            if len(filename) > max_length:
+                return False, f"Имя файла слишком длинное (макс {max_length} символов)"
+
+            # Проверяем на опасные символы
+            dangerous_chars = {'/', '\\', '..', '\x00', '\n', '\r'}
+            for char in dangerous_chars:
+                if char in filename:
+                    return False, f"Имя файла содержит недопустимый символ: {repr(char)}"
+
+            return True, ""
+
+        except Exception as e:
+            logger.error(f"Error validating filename: {e}")
+            return False, f"Ошибка при валидации имени: {str(e)}"
+
+
+def validate_voice_file(file: UploadFile) -> str:
+    """
+    Полная валидация файла голоса
+    Raises HTTPException если файл невалиден
+    """
+    # Валидация имени
+    is_valid, error = FileValidator.validate_filename(file.filename)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error)
+
+    # Валидация типа
+    is_valid, error = FileValidator.validate_audio_file(file)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error)
+
+    # Валидация размера
+    is_valid, error = FileValidator.validate_file_size(file, MAX_VOICE_FILE_SIZE_MB)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error)
+
+    return "OK"
+
+
+def validate_sound_file(file: UploadFile) -> str:
+    """
+    Полная валидация файла звука награды
+    Raises HTTPException если файл невалиден
+    """
+    # Валидация имени
+    is_valid, error = FileValidator.validate_filename(file.filename)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error)
+
+    # Валидация типа
+    is_valid, error = FileValidator.validate_audio_file(file)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error)
+
+    # Валидация размера
+    is_valid, error = FileValidator.validate_file_size(file, MAX_REWARD_SOUND_FILE_SIZE_MB)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error)
+
+    return "OK"
+
+
+def validate_image_upload(file: UploadFile, max_size_mb: int = 10) -> str:
+    """
+    Полная валидация файла изображения
+    Raises HTTPException если файл невалиден
+    """
+    # Валидация имени
+    is_valid, error = FileValidator.validate_filename(file.filename)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error)
+
+    # Валидация типа
+    is_valid, error = FileValidator.validate_image_file(file)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error)
+
+    # Валидация размера
+    is_valid, error = FileValidator.validate_file_size(file, max_size_mb)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error)
+
+    return "OK"

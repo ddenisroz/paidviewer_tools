@@ -22,6 +22,7 @@ import { useApi } from '@/hooks/useApi';
 import LootboxWidgetConfigurator from '../../components/widgets/LootboxConfigurator';
 import DropsTriggersConfigurator from '../../components/widgets/DropsTriggersConfigurator';
 import PageWrapper from '../../components/PageWrapper';
+import { logger } from '../../utils/prodLogger';
 
 const DropsMainPage = () => {
   const [activeTab, setActiveTab] = useState('config');
@@ -81,7 +82,7 @@ const DropsMainPage = () => {
         setWidgetUrl(data.data.url);
       }
     } catch (error) {
-      console.error('Error generating widget URL:', error);
+      logger.error('Error generating widget URL:', error);
     }
   };
 

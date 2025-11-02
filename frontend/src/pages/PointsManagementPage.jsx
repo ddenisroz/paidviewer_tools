@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import pointsApi from '../services/pointsApi';
 import { PLATFORM_COLORS } from '../constants/uiConstants';
+import { logger } from '../utils/prodLogger';
 
 const PointsManagementPage = () => {
   const { user } = useAuth();
@@ -37,13 +38,17 @@ const PointsManagementPage = () => {
       
       setRewards(sortedRewards);
     } catch (err) {
-      console.error('Error loading rewards:', err);
-      if (err.message.includes('404')) {
-        toast.error(`Платформа не подключена`);
-      } else if (err.message.includes('партнёров и аффилейтов') || err.message.includes('partner or affiliate')) {
+      logger.error('Error loading rewards:', err);
+      const errorMessage = err.message || 'Неизвестная ошибка';
+      
+      // Обработка специфичных ошибок
+      if (err.status === 404) {
+        toast.error('Платформа не подключена. Авторизуйтесь через настройки', { duration: 5000 });
+      } else if (err.status === 403 || errorMessage.includes('партнёров и аффилейтов') || errorMessage.includes('partner or affiliate')) {
         toast.error('Награды Twitch доступны только для партнёров и аффилейтов', { duration: 5000 });
       } else {
-        // apiClient.js уже показывает toast при других ошибках
+        // Показываем сообщение об ошибке из API
+        toast.error(errorMessage, { duration: 5000 });
       }
       setRewards([]);
     } finally {
@@ -126,40 +131,49 @@ const PointsManagementPage = () => {
       </div>
 
       {/* Контент вкладок */}
-      {activeTab === 'rewards' ? (
-        <div>
-          {/* Кнопка создания */}
-          <Button onClick={() => setShowCreateDialog(true)} className="w-full h-10 mb-6" variant="outline">
-            <Plus className="w-4 h-4 mr-2" />
-            Создать награду
-          </Button>
-
-          {/* Награды в grid layout */}
-          {rewards.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Gift className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
-                <p className="text-sm text-muted-foreground font-medium">Нет наград</p>
-                <p className="text-xs text-muted-foreground mt-1">Создайте первую награду для зрителей!</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {rewards.map((reward) => (
-                <RewardCard
-                  key={reward.id}
-                  reward={reward}
-                  platform={selectedPlatform}
-                  onEdit={() => setEditingReward(reward)}
-                  onRefresh={loadRewards}
-                />
-              ))}
-            </div>
+      <div className="min-h-[400px]">
+        {/* Кнопка создания - всегда резервируем место, но видна только во вкладке Награды */}
+        <div className="mb-6 h-10">
+          {activeTab === 'rewards' && (
+            <Button onClick={() => setShowCreateDialog(true)} className="w-full h-10" variant="outline">
+              <Plus className="w-4 h-4 mr-2" />
+              Создать награду
+            </Button>
           )}
         </div>
-      ) : (
-        <RedemptionQueue platform={selectedPlatform} />
-      )}
+        
+        {/* Контент вкладок */}
+        <div>
+          {activeTab === 'rewards' ? (
+            <div>
+              {/* Награды в grid layout */}
+              {rewards.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <Gift className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
+                    <p className="text-sm text-muted-foreground font-medium">Нет наград</p>
+                    <p className="text-xs text-muted-foreground mt-1">Создайте первую награду для зрителей!</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {rewards.map((reward) => (
+                    <RewardCard
+                      key={reward.id}
+                      reward={reward}
+                      platform={selectedPlatform}
+                      onEdit={() => setEditingReward(reward)}
+                      onRefresh={loadRewards}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <RedemptionQueue platform={selectedPlatform} />
+          )}
+        </div>
+      </div>
 
       {/* Диалог создания/редактирования */}
       <RewardDialog
@@ -205,7 +219,7 @@ const RewardCard = ({ reward, platform, onEdit, onRefresh }) => {
           await new Promise(resolve => setTimeout(resolve, 500));
         } catch (toggleErr) {
           // Ignore toggle error, награда может быть уже отключена
-          console.log('Toggle before delete:', toggleErr.message);
+          logger.log('Toggle before delete:', toggleErr.message);
         }
       }
 
@@ -213,7 +227,7 @@ const RewardCard = ({ reward, platform, onEdit, onRefresh }) => {
       toast.success('Награда удалена');
       onRefresh();
     } catch (err) {
-      console.error('Error deleting reward:', err);
+      logger.error('Error deleting reward:', err);
       // apiClient.js уже показывает toast при ошибках
     } finally {
       setDeleting(false);
@@ -231,7 +245,7 @@ const RewardCard = ({ reward, platform, onEdit, onRefresh }) => {
       // Молча обновляем - не спамим уведомлениями
       await onRefresh();
     } catch (err) {
-      console.error('Error toggling reward:', err);
+      logger.error('Error toggling reward:', err);
       // apiClient.js уже показывает toast при ошибках
     } finally {
       setToggling(false);
@@ -448,7 +462,7 @@ const RewardDialog = ({ open, onClose, reward, platform, onSuccess }) => {
       
       onSuccess();
     } catch (err) {
-      console.error('Error saving reward:', err);
+      logger.error('Error saving reward:', err);
       // apiClient.js уже показывает toast при ошибках
     } finally {
       setSaving(false);
@@ -725,7 +739,7 @@ const RedemptionQueue = ({ platform }) => {
         setRedemptions([]);
       }
     } catch (err) {
-      console.error('Error loading redemptions:', err);
+      logger.error('Error loading redemptions:', err);
       toast.error('Не удалось загрузить очередь запросов');
       setRedemptions([]);
     } finally {
@@ -744,7 +758,7 @@ const RedemptionQueue = ({ platform }) => {
       // Молча обновляем - не спамим уведомлениями
       loadRedemptions();
     } catch (err) {
-      console.error('Error accepting redemption:', err);
+      logger.error('Error accepting redemption:', err);
       // apiClient.js уже показывает toast при ошибках
     } finally {
       setProcessing(prev => {
@@ -762,7 +776,7 @@ const RedemptionQueue = ({ platform }) => {
       // Молча обновляем - не спамим уведомлениями
       loadRedemptions();
     } catch (err) {
-      console.error('Error rejecting redemption:', err);
+      logger.error('Error rejecting redemption:', err);
       // apiClient.js уже показывает toast при ошибках
     } finally {
       setProcessing(prev => {
@@ -775,7 +789,7 @@ const RedemptionQueue = ({ platform }) => {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
+      <div className="flex justify-center py-12 min-h-[400px]">
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
       </div>
     );
@@ -783,22 +797,24 @@ const RedemptionQueue = ({ platform }) => {
 
   if (redemptions.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <Gift className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
-          <p className="text-sm text-muted-foreground">
-            Нет ожидающих запросов
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Когда зрители активируют награды, они появятся здесь
-          </p>
-        </CardContent>
-      </Card>
+      <div className="min-h-[400px]">
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Gift className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
+            <p className="text-sm text-muted-foreground">
+              Нет ожидающих запросов
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Когда зрители активируют награды, они появятся здесь
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 min-h-[400px]">
       {Array.isArray(redemptions) && redemptions.map((demand, index) => {
         const rewardData = rewardsMap.get(demand.reward?.id);
         const rewardTitle = rewardData?.name || rewardData?.title || 'Неизвестная награда';

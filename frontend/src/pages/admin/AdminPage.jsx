@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Shield, Users, Settings, Mic, MessageCircle } from 'lucide-react';
+import { Shield, Users, Settings, Mic, MessageCircle, HardDrive, History, Zap, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import VoiceManagement from '../../components/admin/VoiceManagement';
 import UserManagementPage from './UserManagementPage';
 import BotManagementPage from './BotManagementPage';
 import SupportTicketsPage from './SupportTicketsPage';
+import StorageManagementPage from './StorageManagementPage';
+import SystemLogsPage from './SystemLogsPage';
+import ErrorLogsPage from './ErrorLogsPage';
 
 const AdminPage = () => {
     const navigate = useNavigate();
@@ -90,6 +93,33 @@ const AdminPage = () => {
                                <span className="hidden sm:inline">Тикеты</span>
                                <span className="sm:hidden">Тикеты</span>
                            </Button>
+                           <Button
+                               variant={activeTab === 'storage' ? 'default' : 'ghost'}
+                               onClick={() => setActiveTab('storage')}
+                               className={`flex-1 ${activeTab === 'storage' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
+                           >
+                               <HardDrive className="h-4 w-4 mr-1 sm:mr-2" />
+                               <span className="hidden sm:inline">Хранилище</span>
+                               <span className="sm:hidden">Хранилище</span>
+                           </Button>
+                           <Button
+                               variant={activeTab === 'logs' ? 'default' : 'ghost'}
+                               onClick={() => setActiveTab('logs')}
+                               className={`flex-1 ${activeTab === 'logs' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
+                           >
+                               <History className="h-4 w-4 mr-1 sm:mr-2" />
+                               <span className="hidden sm:inline">Логи</span>
+                               <span className="sm:hidden">Логи</span>
+                           </Button>
+                           <Button
+                               variant={activeTab === 'error-logs' ? 'default' : 'ghost'}
+                               onClick={() => setActiveTab('error-logs')}
+                               className={`flex-1 ${activeTab === 'error-logs' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
+                           >
+                               <AlertTriangle className="h-4 w-4 mr-1 sm:mr-2" />
+                               <span className="hidden sm:inline">Ошибки</span>
+                               <span className="sm:hidden">Ошибки</span>
+                           </Button>
                        </div>
 
                 {/* Контент по табам - lazy loading + кеширование компонентов */}
@@ -111,6 +141,21 @@ const AdminPage = () => {
                 {loadedTabs.tickets && (
                     <div style={{ display: activeTab === 'tickets' ? 'block' : 'none' }}>
                         <SupportTicketsPage />
+                    </div>
+                )}
+                {loadedTabs.storage && (
+                    <div style={{ display: activeTab === 'storage' ? 'block' : 'none' }}>
+                        <StorageManagementPage />
+                    </div>
+                )}
+                {loadedTabs.logs && (
+                    <div style={{ display: activeTab === 'logs' ? 'block' : 'none' }}>
+                        <SystemLogsPage />
+                    </div>
+                )}
+                {loadedTabs['error-logs'] && (
+                    <div style={{ display: activeTab === 'error-logs' ? 'block' : 'none' }}>
+                        <ErrorLogsPage />
                     </div>
                 )}
             </div>

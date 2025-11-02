@@ -30,6 +30,7 @@ import { PageLoader } from '@/components/ui/loader';
 import { useLoadingState } from '../../hooks/useLoadingState';
 import { TTS_SERVICE_URL } from '@/services/microservices';
 import PageWrapper from '../../components/PageWrapper';
+import { logger } from '../../utils/prodLogger';
 
 
 const VoiceManagementPageContent = () => {
@@ -95,7 +96,7 @@ const VoiceManagementPageContent = () => {
         
         // Предотвращаем множественные одновременные запросы
         if (whitelistCheckInProgressRef.current) {
-            console.log('Whitelist check already in progress, skipping...');
+            logger.log('Whitelist check already in progress, skipping...');
             return;
         }
         
@@ -103,7 +104,7 @@ const VoiceManagementPageContent = () => {
         const now = Date.now();
         const cacheTime = 30000; // 30 секунд
         if (now - whitelistCheckTimeRef.current < cacheTime && whitelistStatus) {
-            console.log('Using cached whitelist status');
+            logger.log('Using cached whitelist status');
             return;
         }
         
@@ -115,7 +116,7 @@ const VoiceManagementPageContent = () => {
             const response = await botService.get('/api/voices/whitelist-status');
             setWhitelistStatus(response.data);
         } catch (error) {
-            console.error('Error checking whitelist status:', error);
+            logger.error('Error checking whitelist status:', error);
             setWhitelistStatus({
                 is_whitelisted: false,
                 can_manage_voices: false,
@@ -131,14 +132,14 @@ const VoiceManagementPageContent = () => {
         
         // Ждём пока whitelistStatus загрузится
         if (whitelistStatus === null) {
-            console.log('Waiting for whitelist status to load...');
+            logger.log('Waiting for whitelist status to load...');
             return;
         }
         
         // Проверяем whitelist статус перед загрузкой голосов
         // Для гостей и OAuth пользователей без whitelist - не загружаем голоса
         if (!whitelistStatus.can_manage_voices) {
-            console.log(`${user.isGuest ? 'Guest' : 'User'} not in whitelist - F5-TTS not available`);
+            logger.log(`${user.isGuest ? 'Guest' : 'User'} not in whitelist - F5-TTS not available`);
             setGlobalVoices([]);
             setUserVoices([]);
             setLoading(false);
@@ -171,7 +172,7 @@ const VoiceManagementPageContent = () => {
             }
         } catch (error) {
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось загрузить голоса.' });
-            console.error('Error loading voices:', error);
+            logger.error('Error loading voices:', error);
             setGlobalVoices([]);
             setUserVoices([]);
         } finally {
@@ -259,7 +260,7 @@ const VoiceManagementPageContent = () => {
             setVoiceName('');
             loadVoices();
         } catch (error) {
-            console.error('Error uploading voice:', error);
+            logger.error('Error uploading voice:', error);
             addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось загрузить голос.' });
         } finally {
             setIsUploading(false);
@@ -329,7 +330,7 @@ const VoiceManagementPageContent = () => {
             
             addToast({ type: 'success', title: 'Успех', message: 'Транскрипция аудиофайла завершена успешно!' });
         } catch (error) {
-            console.error('Error transcribing voice:', error);
+            logger.error('Error transcribing voice:', error);
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось выполнить транскрипцию аудиофайла.' });
         } finally {
             setIsTranscribing(false);
@@ -377,7 +378,7 @@ const VoiceManagementPageContent = () => {
             setRenameDialogOpen(false);
             addToast({ type: 'success', title: 'Успех', message: 'Голос переименован успешно!' });
         } catch (error) {
-            console.error('Error renaming voice:', error);
+            logger.error('Error renaming voice:', error);
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось переименовать голос.' });
         }
     };
@@ -420,7 +421,7 @@ const VoiceManagementPageContent = () => {
                     : 'Настройки голоса сохранены!' 
             });
         } catch (error) {
-            console.error('Error updating voice settings:', error);
+            logger.error('Error updating voice settings:', error);
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось сохранить настройки.' });
         }
     };
@@ -438,7 +439,7 @@ const VoiceManagementPageContent = () => {
             audioSource.connect(audioContext.destination);
             audioSource.start(0);
         }, (error) => {
-            console.error('Error decoding audio data', error);
+            logger.error('Error decoding audio data', error);
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось воспроизвести аудио.' });
         });
     };
@@ -448,7 +449,7 @@ const VoiceManagementPageContent = () => {
         
         setIsTestingVoice(true);
         try {
-            console.log('Testing voice with parameters:', {
+            logger.log('Testing voice with parameters:', {
                 name: currentVoice.name,
                 cfg_strength: currentVoice.cfg_strength,
                 speed_preset: currentVoice.speed_preset,
@@ -474,7 +475,7 @@ const VoiceManagementPageContent = () => {
                         fullAudioUrl = `${TTS_SERVICE_URL}${audioUrl}`;
                     }
                     
-                    console.log('Playing test audio:', fullAudioUrl);
+                    logger.log('Playing test audio:', fullAudioUrl);
                     const audio = new Audio(fullAudioUrl);
                     
                     // Применяем индивидуальную громкость для этого голоса
@@ -483,26 +484,26 @@ const VoiceManagementPageContent = () => {
                     
                     // Добавляем обработчики событий
                     audio.oncanplaythrough = () => {
-                        console.log('Test audio ready to play with volume:', audio.volume);
+                        logger.log('Test audio ready to play with volume:', audio.volume);
                         audio.play().catch(e => {
-                            console.error("Test audio play failed:", e);
+                            logger.error("Test audio play failed:", e);
                             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось воспроизвести аудио.' });
                         });
                     };
                     
                     audio.onended = () => {
-                        console.log('Test audio playback ended');
+                        logger.log('Test audio playback ended');
                     };
                     
                     audio.onerror = (e) => {
-                        console.error("Error loading test audio:", fullAudioUrl, e);
+                        logger.error("Error loading test audio:", fullAudioUrl, e);
                         addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось загрузить аудио файл.' });
                     };
                     
                     // Загружаем аудио
                     audio.load();
                 } catch (error) {
-                    console.error("Error creating audio:", error);
+                    logger.error("Error creating audio:", error);
                     addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось создать аудио объект.' });
                 }
             } else {
@@ -993,7 +994,7 @@ const VoiceManagementPageContent = () => {
                                                          value[0] === 1 ? 'slow' : 
                                                          value[0] === 2 ? 'normal' :
                                                          value[0] === 3 ? 'fast' : 'very_fast';
-                                            console.log('Speed preset changed to:', preset);
+                                            logger.log('Speed preset changed to:', preset);
                                             setCurrentVoice(prev => ({ ...prev, speed_preset: preset }));
                                         }}
                                         className="mt-2"

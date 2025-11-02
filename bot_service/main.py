@@ -997,6 +997,7 @@ from api.active_channels_api import router as active_channels_router
 from api.stream_history_api import router as stream_history_router
 from api.donationalerts_api import router as donationalerts_router
 from api.guest_api import router as guest_router
+from api.system_logs_api import router as system_logs_router
 
 app.include_router(admin_router)
 app.include_router(active_channels_router)
@@ -1004,6 +1005,7 @@ app.include_router(stream_history_router)
 app.include_router(donationalerts_router)
 app.include_router(monitoring_router)
 app.include_router(guest_router)
+app.include_router(system_logs_router)
 
 # --- Static Files for Widgets ---
 # Добавляем статические файлы для виджетов

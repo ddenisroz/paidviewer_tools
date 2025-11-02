@@ -18,7 +18,12 @@ async def get_current_user(request: Request) -> Dict[str, Any]:
     """
     Получает данные текущего пользователя из валидной сессии.
     Вызывает HTTPException 401, если сессия не найдена или невалидна.
+    Использует кэширование в request.state для избежания повторных запросов.
     """
+    # Кэшируем результат в request.state для одного запроса
+    if hasattr(request.state, 'current_user'):
+        return request.state.current_user
+    
     session_data = get_session_data(request)
     if session_data:
         # Проверяем, не заблокирован ли пользователь
@@ -29,6 +34,8 @@ async def get_current_user(request: Request) -> Dict[str, Any]:
             )
         
         logger.info(f"User authenticated via session: ID {session_data.get('id')}")
+        # Кэшируем в request.state
+        request.state.current_user = session_data
         return session_data
     
     raise HTTPException(
@@ -38,8 +45,18 @@ async def get_current_user(request: Request) -> Dict[str, Any]:
     )
 
 async def get_current_user_optional(request: Request) -> Optional[Dict[str, Any]]:
-    """Получает данные текущего пользователя, если сессия валидна, иначе возвращает None."""
-    return get_session_data(request)
+    """
+    Получает данные текущего пользователя, если сессия валидна, иначе возвращает None.
+    Использует кэширование в request.state для избежания повторных запросов.
+    """
+    # Кэшируем результат в request.state для одного запроса
+    if hasattr(request.state, 'current_user_optional'):
+        return request.state.current_user_optional
+    
+    session_data = get_session_data(request)
+    # Кэшируем результат (может быть None)
+    request.state.current_user_optional = session_data
+    return session_data
 
 async def get_admin_user(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     """

@@ -10,6 +10,7 @@ import {
     Volume2,
     Crown
 } from 'lucide-react';
+import { logger } from '../utils/prodLogger';
 
 const ChatContextMenu = ({ 
     x, 
@@ -52,7 +53,7 @@ const ChatContextMenu = ({
                 adjustedY = 10;
             }
             
-            console.log(`📐 [CONTEXT MENU] Position adjusted: original(${x}, ${y}) → final(${adjustedX}, ${adjustedY}), size: ${menuRect.width}x${menuRect.height}`);
+            logger.log(`📐 [CONTEXT MENU] Position adjusted: original(${x}, ${y}) → final(${adjustedX}, ${adjustedY}), size: ${menuRect.width}x${menuRect.height}`);
             setPosition({ x: adjustedX, y: adjustedY });
         }
     }, [x, y]);

@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { logger } from '../utils/prodLogger';
 
 const AuthCallbackPage = () => {
     const navigate = useNavigate();
@@ -14,7 +15,7 @@ const AuthCallbackPage = () => {
                 // Перенаправляем на дашборд
                 navigate('/dashboard', { replace: true });
             } catch (error) {
-                console.error("❌ Ошибка при обновлении статуса аутентификации:", error);
+                logger.error("❌ Ошибка при обновлении статуса аутентификации:", error);
                 navigate('/login', { replace: true });
             }
         };

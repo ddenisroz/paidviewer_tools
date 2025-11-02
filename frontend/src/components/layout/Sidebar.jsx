@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { Home, Mic, Youtube, Coins, Headphones, Settings, Shield, MessageSquare, Command, Sparkles, Monitor, Menu, X, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getAdminList, botService } from '../../services/microservices';
+import { logger } from '../../utils/prodLogger';
 
 const getNavItems = (isYourchy) => {
     const baseItems = [
@@ -179,7 +180,7 @@ const Sidebar = () => {
                 const response = await botService.get('/api/admin/list');
                 setAdminUsers(response.data);
             } catch (error) {
-                console.error('Failed to load admin list:', error);
+                logger.error('Failed to load admin list:', error);
                 setAdminUsers([]);
             }
         };

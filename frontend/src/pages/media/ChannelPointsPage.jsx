@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
 import { API_BASE_URL } from '../../constants';
+import { logger } from '../../utils/prodLogger';
 
 const ChannelPointsPage = () => {
     const { integrations } = useIntegrations();
@@ -58,7 +59,7 @@ const ChannelPointsPage = () => {
                 }
             }
         } catch (error) {
-            console.error('Error loading rewards:', error);
+            logger.error('Error loading rewards:', error);
             toast.error('Ошибка загрузки наград');
         } finally {
             setLoading(false);
@@ -132,7 +133,7 @@ const ChannelPointsPage = () => {
                 toast.error('Ошибка создания награды');
             }
         } catch (error) {
-            console.error('Error creating reward:', error);
+            logger.error('Error creating reward:', error);
             toast.error('Ошибка создания награды');
         }
     };
@@ -162,7 +163,7 @@ const ChannelPointsPage = () => {
                 toast.error('Ошибка переключения награды');
             }
         } catch (error) {
-            console.error('Error toggling reward:', error);
+            logger.error('Error toggling reward:', error);
             toast.error('Ошибка переключения награды');
         }
     };
@@ -195,7 +196,7 @@ const ChannelPointsPage = () => {
                 toast.error(errorData.detail || 'Ошибка удаления награды');
             }
         } catch (error) {
-            console.error('Error deleting reward:', error);
+            logger.error('Error deleting reward:', error);
             toast.error('Ошибка удаления награды');
         }
     };

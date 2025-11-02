@@ -7,13 +7,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Upload, Trash2, Edit, Users, Globe, Settings, TestTube2, Mic, ChevronDown, ChevronRight, Loader2, RefreshCw, Volume2, X, User } from 'lucide-react';
+import { Upload, Trash2, Edit, Users, Globe, Settings, TestTube2, Mic, ChevronDown, ChevronRight, Loader2, RefreshCw, Volume2, X, User, AlertCircle } from 'lucide-react';
 import { Slider } from "@/components/ui/slider"
 import { getAdminVoices, uploadVoice, deleteVoice, updateVoiceSettings, transcribeVoice, retranscribeVoice, testVoice, getUsers, renameVoice } from '../../services/unified-api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../ui/toast';
 import { useButtonPosition } from '../../hooks/useButtonPosition';
 import { TTS_SERVICE_URL } from '../../constants';
+import { logger } from '../../utils/prodLogger';
 
 const VoiceManagement = () => {
     const { addToast } = useToast();
@@ -45,6 +46,7 @@ const VoiceManagement = () => {
     const [isTestingVoice, setIsTestingVoice] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const [hasLoaded, setHasLoaded] = useState(false);
+    const [ttsServiceWarning, setTtsServiceWarning] = useState(null);
     const loadingRef = useRef(false); // Ref to prevent double loading
     const isUserClosingRef = useRef(false); // Ref to track if user explicitly closed dialog
     const dialogCloseTimeoutRef = useRef(null); // Ref for close timeout
@@ -64,43 +66,61 @@ const VoiceManagement = () => {
             loadingRef.current = true;
             setLoading(true);
             const response = await getAdminVoices();
-            console.log('🔍 [ADMIN] Raw API response:', response);
+            logger.log('🔍 [ADMIN] Raw API response:', response);
             
             // Axios оборачивает ответ: { data: { status: "success", voices: [...] } }
             const data = response?.data || response;
-            console.log('🔍 [ADMIN] Raw API response:', response);
-            console.log('🔍 [ADMIN] Extracted data:', data);
-            console.log('🔍 [ADMIN] Data type:', typeof data);
-            console.log('🔍 [ADMIN] Is array:', Array.isArray(data));
-            console.log('🔍 [ADMIN] Data keys:', data ? Object.keys(data) : 'null');
+            logger.log('🔍 [ADMIN] Raw API response:', response);
+            logger.log('🔍 [ADMIN] Extracted data:', data);
+            logger.log('🔍 [ADMIN] Data type:', typeof data);
+            logger.log('🔍 [ADMIN] Is array:', Array.isArray(data));
+            logger.log('🔍 [ADMIN] Data keys:', data ? Object.keys(data) : 'null');
+            
+            // Проверяем предупреждение о недоступности TTS сервиса
+            if (data?.warning) {
+                setTtsServiceWarning(data.warning);
+                logger.warn('⚠️ [ADMIN] TTS Service warning:', data.warning);
+            } else {
+                setTtsServiceWarning(null);
+            }
             
             // Извлекаем массив голосов - проверяем несколько вариантов структуры ответа
             let voicesArray = [];
             if (Array.isArray(data)) {
                 voicesArray = data;
-                console.log('✅ [ADMIN] Data is array, using directly');
+                logger.log('✅ [ADMIN] Data is array, using directly');
             } else if (data?.status === 'success' && Array.isArray(data.voices)) {
                 voicesArray = data.voices;
-                console.log('✅ [ADMIN] Found voices in data.voices');
+                logger.log('✅ [ADMIN] Found voices in data.voices');
             } else if (Array.isArray(data?.voices)) {
                 voicesArray = data.voices;
-                console.log('✅ [ADMIN] Found voices array in data.voices');
+                logger.log('✅ [ADMIN] Found voices array in data.voices');
             } else if (Array.isArray(data?.data)) {
                 voicesArray = data.data;
-                console.log('✅ [ADMIN] Found voices in data.data');
+                logger.log('✅ [ADMIN] Found voices in data.data');
+            } else if (data?.success && Array.isArray(data.voices)) {
+                voicesArray = data.voices;
+                logger.log('✅ [ADMIN] Found voices in success response');
             } else {
-                console.warn('⚠️ [ADMIN] Could not extract voices array from response:', data);
+                logger.warn('⚠️ [ADMIN] Could not extract voices array from response:', data);
                 voicesArray = [];
             }
             
-            console.log('✅ [ADMIN] Extracted voices array:', voicesArray);
-            console.log('✅ [ADMIN] Voices count:', voicesArray.length);
+            logger.log('✅ [ADMIN] Extracted voices array:', voicesArray);
+            logger.log('✅ [ADMIN] Voices count:', voicesArray.length);
             
-            console.log('✅ [ADMIN] Loaded voices:', voicesArray.length, 'voices');
+            logger.log('✅ [ADMIN] Loaded voices:', voicesArray.length, 'voices');
             setVoices(voicesArray);
         } catch (error) {
-            console.error('❌ [ADMIN] Error loading voices:', error);
+            logger.error('❌ [ADMIN] Error loading voices:', error);
             setVoices([]); // Устанавливаем пустой массив в случае ошибки
+            
+            // Показываем предупреждение если ошибка связана с подключением
+            if (error.message?.includes('connection') || error.message?.includes('timeout') || error.code === 'ECONNREFUSED') {
+                setTtsServiceWarning(`Ошибка подключения к TTS сервису: ${error.message || 'Сервис недоступен'}`);
+            } else if (error.response?.status === 500 && error.response?.data?.detail?.includes('connection')) {
+                setTtsServiceWarning(error.response.data.detail);
+            }
         } finally {
             setLoading(false);
             loadingRef.current = false;
@@ -129,7 +149,7 @@ const VoiceManagement = () => {
             
             setUsers(usersData);
         } catch (error) {
-            console.error('Error loading users:', error);
+            logger.error('Error loading users:', error);
             addToast({ type: 'error', title: 'Ошибка', message: `Не удалось загрузить пользователей: ${error.message || 'Неизвестная ошибка'}` });
             setUsers([]);
         } finally {
@@ -310,7 +330,7 @@ const VoiceManagement = () => {
             
             addToast({ type: 'success', title: 'Успех', message: 'Транскрипция завершена успешно!' });
         } catch (error) {
-            console.error('Error transcribing voice:', error);
+            logger.error('Error transcribing voice:', error);
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось выполнить транскрипцию аудио.' });
         } finally {
             setIsTranscribing(false);
@@ -342,7 +362,7 @@ const VoiceManagement = () => {
             
             addToast({ type: 'success', title: 'Успех', message: 'Голос переименован успешно!' });
         } catch (error) {
-            console.error('Error renaming voice:', error);
+            logger.error('Error renaming voice:', error);
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось переименовать голос.' });
         }
     };
@@ -375,7 +395,7 @@ const VoiceManagement = () => {
             setEditDialogOpen(false);
             addToast({ type: 'success', title: 'Успех', message: 'Настройки голоса сохранены!' });
         } catch (error) {
-            console.error('Error updating voice settings:', error);
+            logger.error('Error updating voice settings:', error);
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось сохранить настройки.' });
         }
     };
@@ -393,7 +413,7 @@ const VoiceManagement = () => {
             audioSource.connect(audioContext.destination);
             audioSource.start(0);
         }, (error) => {
-            console.error('Error decoding audio data', error);
+            logger.error('Error decoding audio data', error);
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось воспроизвести аудио.' });
         });
     };
@@ -433,7 +453,7 @@ const VoiceManagement = () => {
                         setIsPlaying(true);
                         addToast({ type: 'success', title: 'Успех', message: 'Аудио воспроизводится!' });
                     }).catch((playError) => {
-                        console.error('Play error:', playError);
+                        logger.error('Play error:', playError);
                         setIsPlaying(false);
                         addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось воспроизвести аудио. Проверьте настройки браузера.' });
                     });
@@ -448,12 +468,12 @@ const VoiceManagement = () => {
                     audio.play().then(() => {
                         // Audio playing successfully
                     }).catch((playError) => {
-                        console.error('Play error (onloadeddata):', playError);
+                        logger.error('Play error (onloadeddata):', playError);
                     });
                 };
                 
                 audio.onerror = (e) => {
-                    console.error('Audio error:', e);
+                    logger.error('Audio error:', e);
                     setIsTestingVoice(false);
                     addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось загрузить аудио файл.' });
                 };
@@ -477,17 +497,17 @@ const VoiceManagement = () => {
                         audio.play().then(() => {
                             // Audio playing successfully (delayed)
                         }).catch((playError) => {
-                            console.error('Delayed play error:', playError);
+                            logger.error('Delayed play error:', playError);
                         });
                     }
                 }, 100);
             } else {
-                console.error('No audio URL in response:', response);
+                logger.error('No audio URL in response:', response);
                 setIsTestingVoice(false);
                 addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось получить аудио для воспроизведения.' });
             }
         } catch (error) {
-            console.error('Test voice error:', error);
+            logger.error('Test voice error:', error);
             setIsTestingVoice(false);
             addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось протестировать голос.' });
         }
@@ -513,7 +533,7 @@ const VoiceManagement = () => {
             
             addToast({ type: 'success', title: 'Успех', message: 'Транскрипция завершена успешно!' });
         } catch (error) {
-            console.error('Error transcribing voice:', error);
+            logger.error('Error transcribing voice:', error);
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось выполнить транскрипцию аудио.' });
         } finally {
             setIsTranscribing(false);
@@ -540,7 +560,7 @@ const VoiceManagement = () => {
             
             addToast({ type: 'success', title: 'Успех', message: 'Перетранскрипция завершена успешно!' });
         } catch (error) {
-            console.error('Error retranscribing voice:', error);
+            logger.error('Error retranscribing voice:', error);
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось выполнить перетранскрипцию аудио.' });
         } finally {
             setIsTranscribing(false);
@@ -599,6 +619,29 @@ const VoiceManagement = () => {
                     </div>
                  </CardHeader>
                  <CardContent>
+                    {/* Предупреждение о недоступности TTS сервиса */}
+                    {ttsServiceWarning && (
+                        <div className="mb-6 p-4 bg-yellow-900/20 border border-yellow-600/50 rounded-lg">
+                            <div className="flex items-start gap-3">
+                                <AlertCircle className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                                <div className="flex-1">
+                                    <p className="text-yellow-300 font-semibold mb-1">⚠️ TTS Сервис недоступен</p>
+                                    <p className="text-yellow-400/80 text-sm">{ttsServiceWarning}</p>
+                                    <p className="text-yellow-400/60 text-xs mt-2">
+                                        Убедитесь, что TTS сервис запущен и доступен по адресу указанному в переменной окружения TTS_SERVICE_URL.
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={loadVoices}
+                                    className="text-yellow-300 hover:text-yellow-200"
+                                >
+                                    <RefreshCw className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                     <div className="space-y-8">
                          {loading ? (
                              <div className="flex items-center justify-center py-12">

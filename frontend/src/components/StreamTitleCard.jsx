@@ -10,6 +10,7 @@ import { TwitchIcon, VKIcon } from './PlatformIcons';
 import { useData } from '../context/DataContext';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useUserSettings } from '../context/UserSettingsContext';
+import { logger } from '../utils/prodLogger';
 
 const StreamTitleCard = ({ onLinkStateChange }) => {
     const { integrations, isLoading: integrationsLoading } = useIntegrations();
@@ -119,7 +120,7 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
     const handleSave = (mode) => {
         const payload = {};
         
-        console.log('StreamTitleCard handleSave:', {
+        logger.log('StreamTitleCard handleSave:', {
             mode,
             isLinked,
             bothEnabled,
@@ -134,7 +135,7 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
             const title = currentData.twitch?.title || '';
             const hasChanges = title !== (initialData.twitch?.title || '') || title !== (initialData.vk?.title || '');
             
-            console.log('Combined mode:', {
+            logger.log('Combined mode:', {
                 title,
                 hasChanges,
                 initialTwitch: initialData.twitch?.title,
@@ -155,12 +156,12 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
             }
         }
         
-        console.log('Final payload:', payload);
+        logger.log('Final payload:', payload);
         
         if (Object.keys(payload).length > 0) {
             saveChanges(payload, 'saveTitle');
         } else {
-            console.log('No changes detected, not saving');
+            logger.log('No changes detected, not saving');
         }
     };
     

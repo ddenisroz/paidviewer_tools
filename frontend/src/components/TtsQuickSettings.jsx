@@ -6,8 +6,8 @@ import { Button } from './ui/button';
 import { useNavigate } from 'react-router-dom';
 import { botService } from '../services/microservices';
 import { toast } from 'sonner';
-import { chatLogger as logger } from '../utils/logger';
 import { useTts } from '../context/TtsContext';
+import { logger } from '../utils/prodLogger';
 
 const TtsQuickSettings = () => {
     const navigate = useNavigate();
@@ -55,26 +55,32 @@ const TtsQuickSettings = () => {
         return () => window.removeEventListener('ai-tts-changed', handleAiTtsChange);
     }, []);
 
+    const [isWhitelisted, setIsWhitelisted] = useState(false);
+
     const loadSettings = async () => {
         try {
             // 🚀 ОПТИМИЗАЦИЯ: Parallel API calls вместо sequential
-            const [statusResponse, configResponse] = await Promise.all([
+            const [statusResponse, configResponse, whitelistResponse] = await Promise.all([
                 botService.get('/api/tts/status'),
-                botService.get('/api/local-tts/config').catch(() => ({ data: { configured: false } }))
+                botService.get('/api/local-tts/config').catch(() => ({ data: { configured: false } })),
+                botService.get('/api/voices/whitelist-status').catch(() => ({ data: { is_whitelisted: false } }))
             ]);
             
             // Загружаем начальное состояние TTS из API
             setTtsEnabled(statusResponse.data.enabled || false);
             setAiTtsEnabled(statusResponse.data.engine_type === 'local');
             
-            // ✅ FIX: aiTtsAvailable = configured AND (healthy OR whitelisted)
+            // Проверяем whitelist статус
+            const whitelistStatus = whitelistResponse.data?.is_whitelisted || false;
+            setIsWhitelisted(whitelistStatus);
+            
+            // ✅ FIX: aiTtsAvailable = configured AND healthy AND whitelisted
             // Если сервис настроен (configured), проверяем доступность
             const isConfigured = configResponse.data.configured || false;
             const isHealthy = configResponse.data.healthy !== false; // По умолчанию считаем здоровым если нет явного false
-            const isWhitelisted = configResponse.data.can_manage_voices !== false; // По умолчанию считаем в whitelist
             
-            // Доступен = настроен И (здоров ИЛИ в whitelist)
-            setAiTtsAvailable(isConfigured && (isHealthy || isWhitelisted));
+            // Доступен = настроен И здоров И в whitelist
+            setAiTtsAvailable(isConfigured && isHealthy && whitelistStatus);
             
             // Отмечаем что инициализация завершена
             initializedRef.current = true;
@@ -82,16 +88,17 @@ const TtsQuickSettings = () => {
             logger.info('TtsQuickSettings: Loaded initial state', {
                 ttsEnabled: statusResponse.data.enabled,
                 aiTtsEnabled: statusResponse.data.engine_type === 'local',
-                aiTtsAvailable: isConfigured && (isHealthy || isWhitelisted),
+                aiTtsAvailable: isConfigured && isHealthy && whitelistStatus,
                 isConfigured,
                 isHealthy,
-                isWhitelisted
+                isWhitelisted: whitelistStatus
             });
         } catch (error) {
-            console.error('Failed to load TTS settings:', error);
+            logger.error('Failed to load TTS settings:', error);
             // При ошибке устанавливаем false
             setTtsEnabled(false);
             setAiTtsAvailable(false);
+            setIsWhitelisted(false);
             initializedRef.current = true;
         }
     };
@@ -157,7 +164,7 @@ const TtsQuickSettings = () => {
             } else {
                 toast.error('Ошибка переключения озвучки');
             }
-            console.error('Failed to toggle TTS:', error);
+            logger.error('Failed to toggle TTS:', error);
             // Откатываем состояние
             setTtsEnabled(!enabled);
         } finally {
@@ -169,6 +176,12 @@ const TtsQuickSettings = () => {
         // Проверяем доступность локального TTS
         if (enabled && !aiTtsAvailable) {
             toast.error('Локальный TTS не настроен. Перейдите в настройки для его настройки.');
+            return;
+        }
+        
+        // Проверяем whitelist для F5-TTS
+        if (enabled && !isWhitelisted) {
+            toast.error('F5-TTS доступен только для пользователей из whitelist. Обратитесь к администратору.');
             return;
         }
         
@@ -189,12 +202,14 @@ const TtsQuickSettings = () => {
         } catch (error) {
             if (error.response?.status === 401) {
                 toast.error('Требуется авторизация');
+            } else if (error.response?.status === 403) {
+                toast.error('F5-TTS доступен только для пользователей из whitelist');
             } else if (error.code === 'ERR_NETWORK') {
                 toast.error('Сервер недоступен');
             } else {
                 toast.error('Ошибка переключения движка');
             }
-            console.error('Failed to toggle engine:', error);
+            logger.error('Failed to toggle engine:', error);
             // Откатываем состояние
             setAiTtsEnabled(!enabled);
         } finally {

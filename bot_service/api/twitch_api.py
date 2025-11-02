@@ -679,7 +679,20 @@ class TwitchAPI:
                     else:
                         error_text = await response.text()
                         logger.error(f"Twitch get rewards error: {response.status} - {error_text}")
+                        # Выбрасываем исключение с информацией об ошибке для правильной обработки на верхнем уровне
+                        if response.status == 403:
+                            try:
+                                import json
+                                error_data = json.loads(error_text)
+                                error_message = error_data.get("message", error_text)
+                                raise ValueError(f"403:{error_message}")
+                            except (json.JSONDecodeError, ValueError):
+                                # Если не удалось распарсить JSON, используем дефолтное сообщение
+                                raise ValueError(f"403:The broadcaster must have partner or affiliate status.")
                         return None
+        except ValueError as e:
+            # Пробрасываем ValueError дальше с информацией об ошибке
+            raise
         except Exception as e:
             logger.error(f"Error getting Twitch custom rewards: {e}")
             return None

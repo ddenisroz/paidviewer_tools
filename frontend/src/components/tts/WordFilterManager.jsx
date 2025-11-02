@@ -9,6 +9,7 @@ import { Plus, Trash2, AlertCircle, ChevronDown } from 'lucide-react';
 import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
 import { useIntegrations } from '../../context/IntegrationsContext';
+import { logger } from '../../utils/prodLogger';
 
 const WordFilterManager = React.memo(() => {
     const [words, setWords] = useState([]);
@@ -50,7 +51,7 @@ const WordFilterManager = React.memo(() => {
                 setWords(response.data.words || []);
             }
         } catch (error) {
-            console.error('Error loading filtered words:', error);
+            logger.error('Error loading filtered words:', error);
             // Не показываем ошибку если TTS сервис недоступен
             if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
                 toast.error('Ошибка загрузки списка слов');
@@ -82,7 +83,7 @@ const WordFilterManager = React.memo(() => {
                 toast.error(response.data.message || 'Ошибка добавления слова');
             }
         } catch (error) {
-            console.error('Error adding word:', error);
+            logger.error('Error adding word:', error);
             // Не показываем ошибку если TTS сервис недоступен
             if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
                 toast.error('Ошибка добавления слова');
@@ -103,7 +104,7 @@ const WordFilterManager = React.memo(() => {
                 toast.error(response.data.message || 'Ошибка удаления слова');
             }
         } catch (error) {
-            console.error('Error removing word:', error);
+            logger.error('Error removing word:', error);
             // Не показываем ошибку если TTS сервис недоступен
             if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
                 toast.error('Ошибка удаления слова');

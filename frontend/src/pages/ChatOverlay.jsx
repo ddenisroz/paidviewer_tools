@@ -6,6 +6,7 @@ import { botService } from '../services/microservices';
 import MessageContent from '../components/MessageContent';
 import { twitchBadgesService } from '../services/twitchBadges';
 import useSharedWebSocket from '../hooks/useSharedWebSocket';
+import { logger } from '../utils/prodLogger';
 
 const ChatOverlay = () => {
     const [searchParams] = useSearchParams();
@@ -30,7 +31,7 @@ const ChatOverlay = () => {
     const containerStyle = useMemo(() => {
         if (!settings) return {};
         
-        console.log('🎨 [STYLES] Recalculating containerStyle with font_family:', settings?.font_family);
+        logger.log('🎨 [STYLES] Recalculating containerStyle with font_family:', settings?.font_family);
         
         return {
             width: '100vw',
@@ -96,14 +97,14 @@ const ChatOverlay = () => {
         const isSystemFont = systemFonts.some(sf => fontFamily.includes(sf));
         
         if (isSystemFont) {
-            console.log(`🔤 [FONT] Using system font: ${fontFamily}`);
+            logger.log(`🔤 [FONT] Using system font: ${fontFamily}`);
             return;
         }
         
         // Проверяем, не загружен ли уже этот шрифт
         const existingLink = document.querySelector(`link[href*="${fontFamily.replace(/\s+/g, '+')}"]`);
         if (existingLink) {
-            console.log(`🔤 [FONT] Font already loaded: ${fontFamily}`);
+            logger.log(`🔤 [FONT] Font already loaded: ${fontFamily}`);
             return;
         }
         
@@ -112,8 +113,8 @@ const ChatOverlay = () => {
         link.rel = 'stylesheet';
         link.href = `https://fonts.googleapis.com/css2?family=${fontFamily.replace(/\s+/g, '+')}:wght@400;500;600;700&display=swap`;
         
-        console.log(`🔤 [FONT] Loading Google Font: ${fontFamily}`);
-        console.log(`🔗 [FONT] URL: ${link.href}`);
+        logger.log(`🔤 [FONT] Loading Google Font: ${fontFamily}`);
+        logger.log(`🔗 [FONT] URL: ${link.href}`);
         
         document.head.appendChild(link);
         
@@ -121,7 +122,7 @@ const ChatOverlay = () => {
         return () => {
             if (document.head.contains(link)) {
                 document.head.removeChild(link);
-                console.log(`🗑️ [FONT] Removed font: ${fontFamily}`);
+                logger.log(`🗑️ [FONT] Removed font: ${fontFamily}`);
             }
         };
     }, [settings?.font_family]);
@@ -141,7 +142,7 @@ const ChatOverlay = () => {
             const animationType = settings?.animation_type || 'fade';
             const animationDuration = settings?.animation_duration || 300;
             
-            console.log(`🎬 [ANIMATION] Applying ${animationType} (${animationDuration}ms) to message:`, msg.message?.substring(0, 30));
+            logger.log(`🎬 [ANIMATION] Applying ${animationType} (${animationDuration}ms) to message:`, msg.message?.substring(0, 30));
             
             const animationName = 
                 animationType === 'fade' ? 'fadeIn' :
@@ -198,8 +199,8 @@ const ChatOverlay = () => {
             
             // Логи только при первой загрузке (не при polling)
             if (!isPolling) {
-                console.log(`✅ [SETTINGS] Animation: ${normalizedSettings.animation_type} (${normalizedSettings.animation_duration}ms)`);
-                console.log(`✅ [SETTINGS] Chat direction: ${normalizedSettings.chat_direction}`);
+                logger.log(`✅ [SETTINGS] Animation: ${normalizedSettings.animation_type} (${normalizedSettings.animation_duration}ms)`);
+                logger.log(`✅ [SETTINGS] Chat direction: ${normalizedSettings.chat_direction}`);
             }
             
             setSettings(normalizedSettings);
@@ -211,8 +212,8 @@ const ChatOverlay = () => {
                 setUserId(normalizedSettings.user_id);
             }
         } catch (error) {
-            console.error('❌ Error loading ChatBox settings:', error);
-            console.error('Full error:', error.response?.data || error.message);
+            logger.error('❌ Error loading ChatBox settings:', error);
+            logger.error('Full error:', error.response?.data || error.message);
             if (!isPolling) {
                 setError(`Ошибка загрузки настроек: ${error.response?.data?.detail || error.message}`);
             }
@@ -227,9 +228,9 @@ const ChatOverlay = () => {
     const handleWebSocketMessage = React.useCallback((data) => {
         // 🔄 Обработка инвалидации кэша
         if (data.type === 'cache_invalidate') {
-            console.log('🔄 [CACHE] Received cache invalidation:', data.cache_key);
+            logger.log('🔄 [CACHE] Received cache invalidation:', data.cache_key);
             if (data.cache_key === 'cache_chatbox_settings') {
-                console.log('🔄 [CHATBOX] Reloading settings due to backend update...');
+                logger.log('🔄 [CHATBOX] Reloading settings due to backend update...');
                 loadSettings(true);
             }
             return;
@@ -237,7 +238,7 @@ const ChatOverlay = () => {
         
         // 🔄 Обработка обновления настроек ChatBox
         if (data.type === 'chatbox_settings_updated') {
-            console.log('🔄 [CHATBOX] Received settings update event');
+            logger.log('🔄 [CHATBOX] Received settings update event');
             
             setSettings(prevSettings => {
                 const updatedSettings = {
@@ -297,7 +298,7 @@ const ChatOverlay = () => {
         } 
         // 📜 Обработка истории сообщений
         else if (data.type === 'chat_history') {
-            console.log(`📜 Loaded ${data.messages?.length || 0} messages from history`);
+            logger.log(`📜 Loaded ${data.messages?.length || 0} messages from history`);
             
             const uniqueMessages = [];
             const seenIds = new Set();
@@ -360,7 +361,7 @@ const ChatOverlay = () => {
                 
                 // Логируем только если что-то удалено
                 if (filtered.length < prev.length) {
-                    console.log(`🗑️ [FADE] Removed ${prev.length - filtered.length} old messages (>${fadeSeconds}s)`);
+                    logger.log(`🗑️ [FADE] Removed ${prev.length - filtered.length} old messages (>${fadeSeconds}s)`);
                 }
                 
                 return filtered;
@@ -787,7 +788,7 @@ const ChatOverlay = () => {
                                 });
                                 setContextMenu(null);
                             } catch (error) {
-                                console.error('Ошибка блокировки TTS:', error);
+                                logger.error('Ошибка блокировки TTS:', error);
                             }
                         }}
                         style={{
@@ -820,7 +821,7 @@ const ChatOverlay = () => {
                                 });
                                 setContextMenu(null);
                             } catch (error) {
-                                console.error('Ошибка разблокировки TTS:', error);
+                                logger.error('Ошибка разблокировки TTS:', error);
                             }
                         }}
                         style={{

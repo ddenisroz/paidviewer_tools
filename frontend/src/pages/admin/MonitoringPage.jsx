@@ -17,6 +17,7 @@ import {
     Volume2
 } from 'lucide-react';
 import { botService } from '@/services/microservices';
+import { logger } from '../../utils/prodLogger';
 
 const MonitoringPage = () => {
     const [metrics, setMetrics] = useState(null);
@@ -33,7 +34,7 @@ const MonitoringPage = () => {
             setError(null);
         } catch (err) {
             setError(err.message);
-            console.error('Error fetching metrics:', err);
+            logger.error('Error fetching metrics:', err);
         } finally {
             setLoading(false);
         }

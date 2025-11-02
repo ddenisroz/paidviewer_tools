@@ -13,7 +13,7 @@
 import axios from 'axios';
 import { toast } from 'sonner';
 import { API_BASE_URL } from '../constants';
-import { apiLogger as logger } from '../utils/logger';
+import { logger } from '../utils/prodLogger';
 
 /**
  * Retry configuration

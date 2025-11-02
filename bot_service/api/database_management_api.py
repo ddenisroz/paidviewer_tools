@@ -5,10 +5,14 @@ from core.datetime_utils import utcnow_naive
 from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from core.database import get_db
 from services.database_cleanup_service import DatabaseCleanupService
 from auth.auth import get_current_user
+
+class CleanupRequest(BaseModel):
+    cleanup_type: str = "all"
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +42,33 @@ async def get_database_stats(
         logger.error(f"Error getting database stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/backups")
+async def list_backups(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить список всех резервных копий"""
+    try:
+        if not current_user.get("is_admin"):
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        cleanup_service = DatabaseCleanupService(db)
+        result = cleanup_service.list_backups()
+        
+        return {
+            "success": True,
+            "data": result,
+            "timestamp": utcnow_naive().isoformat()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing backups: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/cleanup")
 async def cleanup_database(
+    request: CleanupRequest,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -50,17 +79,104 @@ async def cleanup_database(
             raise HTTPException(status_code=403, detail="Access denied")
         
         cleanup_service = DatabaseCleanupService(db)
-        cleanup_stats = cleanup_service.cleanup_old_data()
+        cleanup_type = request.cleanup_type
         
-        return {
+        result = {
             "success": True,
-            "data": cleanup_stats,
-            "message": "Database cleanup completed",
+            "data": {},
+            "message": "Cleanup completed",
             "timestamp": utcnow_naive().isoformat()
         }
         
+        # Выполняем очистку в зависимости от типа
+        if cleanup_type in ["logs", "all"]:
+            # Очистка логов старше 30 дней
+            log_stats = cleanup_service.cleanup_old_data()
+            result["data"]["logs"] = log_stats
+            logger.info(f"Cleaned up logs: {log_stats}")
+        
+        if cleanup_type in ["cache", "all"]:
+            # Очистка кеша
+            cache_cleanup = cleanup_service.cleanup_cache()
+            result["data"]["cache"] = cache_cleanup
+            logger.info(f"Cleaned up cache: {cache_cleanup}")
+        
+        if cleanup_type == "backup":
+            # Создание резервной копии
+            backup_result = cleanup_service.create_backup()
+            result["data"]["backup"] = backup_result
+            result["message"] = "Backup created successfully"
+            logger.info(f"Backup created: {backup_result}")
+        
+        if cleanup_type == "restore":
+            # Восстановление из резервной копии
+            restore_result = cleanup_service.restore_from_backup()
+            result["data"]["restore"] = restore_result
+            result["message"] = "Restored from backup successfully"
+            logger.info(f"Restored from backup: {restore_result}")
+        
+        return result
+        
     except Exception as e:
         logger.error(f"Error cleaning up database: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/backups/{filename}")
+async def delete_backup(
+    filename: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Удалить конкретную резервную копию"""
+    try:
+        if not current_user.get("is_admin"):
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        cleanup_service = DatabaseCleanupService(db)
+        result = cleanup_service.delete_backup(filename)
+        
+        if not result.get('success'):
+            raise HTTPException(status_code=400, detail=result.get('error', 'Failed to delete backup'))
+        
+        return {
+            "success": True,
+            "data": result,
+            "message": f"Backup {filename} deleted successfully",
+            "timestamp": utcnow_naive().isoformat()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting backup: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/backups/{filename}/restore")
+async def restore_backup(
+    filename: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Восстановить БД из конкретной резервной копии"""
+    try:
+        if not current_user.get("is_admin"):
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        cleanup_service = DatabaseCleanupService(db)
+        result = cleanup_service.restore_from_backup_file(filename)
+        
+        if not result.get('success'):
+            raise HTTPException(status_code=400, detail=result.get('error', 'Failed to restore backup'))
+        
+        return {
+            "success": True,
+            "data": result,
+            "message": result.get('message', f"Database restored from {filename}"),
+            "timestamp": utcnow_naive().isoformat()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error restoring backup: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/optimize")

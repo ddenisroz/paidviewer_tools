@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { botService } from '../../services/microservices';
 import { useIntegrations } from '../../context/IntegrationsContext';
 import { useAuth } from '../../context/AuthContext';
+import { logger } from '../../utils/prodLogger';
 
 const TtsFilterManager = React.memo(() => {
     // Общие состояния
@@ -95,7 +96,7 @@ const TtsFilterManager = React.memo(() => {
                 setBlacklist([]);
             }
         } catch (error) {
-            console.error('Error loading blacklist:', error);
+            logger.error('Error loading blacklist:', error);
             setBlacklist([]);
         } finally {
             setLoadingUsers(false);
@@ -137,7 +138,7 @@ const TtsFilterManager = React.memo(() => {
                 toast.error(response.data.message || 'Ошибка при добавлении в черный список');
             }
         } catch (error) {
-            console.error('Error adding to blacklist:', error);
+            logger.error('Error adding to blacklist:', error);
             toast.error('Ошибка при добавлении в черный список');
         } finally {
             setAddingUser(false);
@@ -164,7 +165,7 @@ const TtsFilterManager = React.memo(() => {
                 toast.error('Ошибка удаления из черного списка');
             }
         } catch (error) {
-            console.error('Error removing from blacklist:', error);
+            logger.error('Error removing from blacklist:', error);
             toast.error('Ошибка удаления из черного списка');
         }
     };
@@ -182,7 +183,7 @@ const TtsFilterManager = React.memo(() => {
                 setWords([]);
             }
         } catch (error) {
-            console.error('Error loading words:', error);
+            logger.error('Error loading words:', error);
             setWords([]);
         } finally {
             setLoadingWords(false);
@@ -211,7 +212,7 @@ const TtsFilterManager = React.memo(() => {
                 toast.error(response.data.message || 'Ошибка добавления слова');
             }
         } catch (error) {
-            console.error('Error adding word:', error);
+            logger.error('Error adding word:', error);
             toast.error('Ошибка добавления слова');
         } finally {
             setAddingWord(false);
@@ -229,7 +230,7 @@ const TtsFilterManager = React.memo(() => {
                 toast.error('Ошибка удаления слова');
             }
         } catch (error) {
-            console.error('Error removing word:', error);
+            logger.error('Error removing word:', error);
             toast.error('Ошибка удаления слова');
         }
     };

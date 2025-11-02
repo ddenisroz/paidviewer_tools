@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 import { botService } from '../services/microservices';
-import { youtubeLogger as logger } from '../utils/logger';
+import { logger } from '../utils/prodLogger';
 import { useAuth } from './AuthContext';
 import { useChat } from './ChatContext';
 
@@ -374,16 +374,21 @@ export const PlayerProvider = ({ children }) => {
         loadQueue();
         
         // Периодическое обновление очереди
-        const interval = setInterval(loadQueue, 15000);
+        // Используем ref для стабильной ссылки на функцию
+        const intervalId = setInterval(() => {
+            loadQueue();
+        }, 15000);
         
         // Обновление времени воспроизведения
-        const timeInterval = setInterval(updateTime, 3000);
+        const timeIntervalId = setInterval(() => {
+            updateTime();
+        }, 3000);
         
         return () => {
-            clearInterval(interval);
-            clearInterval(timeInterval);
+            clearInterval(intervalId);
+            clearInterval(timeIntervalId);
         };
-    }, [isAuthenticated]);
+    }, [isAuthenticated]); // loadQueue и updateTime стабильны (useCallback), можно не добавлять
 
     // Обработка WebSocket сообщений
     useEffect(() => {

@@ -2,6 +2,7 @@ import React from 'react';
 import { AlertCircle, RefreshCw, Home } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
+import { logger } from '../utils/prodLogger';
 
 /**
  * ErrorBoundary - компонент для отлова React ошибок
@@ -29,8 +30,8 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     // Логируем ошибку
-    console.error('🚨 [ErrorBoundary] React error caught:', error);
-    console.error('🚨 [ErrorBoundary] Error info:', errorInfo);
+    logger.error('🚨 [ErrorBoundary] React error caught:', error);
+    logger.error('🚨 [ErrorBoundary] Error info:', errorInfo);
     
     // Сохраняем детали для отображения
     this.setState({

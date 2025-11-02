@@ -2,9 +2,10 @@
 """API для системы поддержки"""
 from fastapi import APIRouter, Depends, HTTPException, Request, Form
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from core.database import get_db, User, SupportTicket, TicketResponse
 from auth.auth import get_current_user
+from validators.input_validators import sanitize_input
 from datetime import datetime, timedelta
 import logging
 
@@ -14,9 +15,31 @@ class CreateTicketRequest(BaseModel):
     subject: str
     message: str
     priority: str = "normal"
+    
+    @validator('subject')
+    def sanitize_subject(cls, v):
+        """Санитизация темы тикета"""
+        return sanitize_input(v, max_length=100)
+    
+    @validator('message')
+    def sanitize_message(cls, v):
+        """Санитизация сообщения"""
+        return sanitize_input(v, max_length=2000)
+    
+    @validator('priority')
+    def validate_priority(cls, v):
+        """Валидация приоритета"""
+        if v not in ['low', 'normal', 'high', 'critical']:
+            raise ValueError("Invalid priority")
+        return v
 
 class RespondTicketRequest(BaseModel):
     message: str
+    
+    @validator('message')
+    def sanitize_message(cls, v):
+        """Санитизация сообщения ответа"""
+        return sanitize_input(v, max_length=2000)
 
 router = APIRouter(prefix="/api/support", tags=["support"])
 
@@ -153,6 +176,14 @@ async def create_ticket(
 ):
     """Создать новый тикет поддержки"""
     try:
+        # Санитизируем входные данные
+        subject = sanitize_input(subject, max_length=100)
+        message = sanitize_input(message, max_length=2000)
+        
+        # Валидируем приоритет
+        if priority not in ['low', 'normal', 'high', 'critical']:
+            raise HTTPException(status_code=400, detail="Invalid priority value")
+        
         # Создаем новый тикет
         ticket = SupportTicket(
             user_id=user['id'],
@@ -173,6 +204,8 @@ async def create_ticket(
             "ticket_id": ticket.id,
             "message": "Ticket created successfully"
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating ticket: {e}")
         db.rollback()
@@ -187,6 +220,9 @@ async def respond_to_ticket(
 ):
     """Ответить на тикет"""
     try:
+        # Санитизируем сообщение
+        message = sanitize_input(message, max_length=2000)
+        
         # Проверяем существование тикета
         ticket = db.query(SupportTicket).filter(SupportTicket.id == ticket_id).first()
         if not ticket:

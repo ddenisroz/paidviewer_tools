@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { botService, loginVk } from '../services/microservices';
 import { toast } from 'sonner';
-import { authLogger as logger } from '../utils/logger';
+import { logger } from '../utils/prodLogger';
 import { API_BASE_URL } from '../constants';
 
 // Глобальный флаг для предотвращения множественных проверок аутентификации
@@ -147,11 +147,11 @@ export const AuthProvider = ({ children }) => {
 
     const loginWithVk = () => {
         try {
-            console.log('🔵 [AUTH CONTEXT] loginWithVk() called');
+            logger.log('🔵 [AUTH CONTEXT] loginWithVk() called');
             loginVk();
-            console.log('🔵 [AUTH CONTEXT] loginVk() from microservices executed');
+            logger.log('🔵 [AUTH CONTEXT] loginVk() from microservices executed');
         } catch (error) {
-            console.error('❌ [AUTH CONTEXT] VK login error:', error);
+            logger.error('❌ [AUTH CONTEXT] VK login error:', error);
             logger.error("VK login error:", error);
             toast.error('Ошибка при входе через VK Live.');
         }

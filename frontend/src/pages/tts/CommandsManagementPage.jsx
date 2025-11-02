@@ -33,6 +33,7 @@ import { CardSkeleton } from '@/components/ui/skeleton';
 import PageLayout from '@/components/ui/PageLayout';
 import { PageLoader } from '@/components/ui/loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { logger } from '../../utils/prodLogger';
 
 const CommandsManagementPage = () => {
     const { user } = useAuth();
@@ -109,7 +110,7 @@ const CommandsManagementPage = () => {
                 
                 setCommands(allCommands);
             } catch (error) {
-                console.error('Failed to fetch commands:', error);
+                logger.error('Failed to fetch commands:', error);
         } finally {
             setLoading(false);
             setShowSkeleton(false);
@@ -235,7 +236,7 @@ const CommandsManagementPage = () => {
             await fetchCommands();
             setEditingCommand(null);
         } catch (error) {
-            console.error('Failed to update command:', error);
+            logger.error('Failed to update command:', error);
         }
     };
 
@@ -268,7 +269,7 @@ const CommandsManagementPage = () => {
             setShowCreateForm(false);
             setCreateForm({ command: '', description: '', permissions: 'all', enabled: true, tags: 'пользовательские' });
         } catch (error) {
-            console.error('Failed to create command:', error);
+            logger.error('Failed to create command:', error);
         }
     };
 
@@ -282,7 +283,7 @@ const CommandsManagementPage = () => {
             await api.put(`/api/commands/${commandName}`, { is_enabled: enabled });
             await fetchCommands();
         } catch (error) {
-            console.error('Failed to toggle command:', error);
+            logger.error('Failed to toggle command:', error);
         }
     };
 
@@ -296,7 +297,7 @@ const CommandsManagementPage = () => {
                 await api.post(`/api/commands/${channelName}/reset`);
                 await fetchCommands();
             } catch (error) {
-                console.error('Failed to reset commands:', error);
+                logger.error('Failed to reset commands:', error);
             }
         }
     };

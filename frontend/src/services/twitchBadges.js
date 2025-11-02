@@ -2,6 +2,7 @@
  * Сервис для работы с Twitch badges
  */
 import { microservicesAPI } from './microservices';
+import { logger } from '../utils/prodLogger';
 
 class TwitchBadgesService {
     constructor() {
@@ -27,11 +28,11 @@ class TwitchBadgesService {
                 // Кеш валиден 24 часа
                 if (age < 24 * 60 * 60 * 1000) {
                     this.globalBadges = badges;
-                    console.log('✅ [BADGES] Loaded from cache:', Object.keys(this.globalBadges).length, 'sets');
+                    logger.log('✅ [BADGES] Loaded from cache:', Object.keys(this.globalBadges).length, 'sets');
                     
                     // Обновляем в фоне если кеш старше 1 часа
                     if (age > 60 * 60 * 1000) {
-                        console.log('🔄 [BADGES] Refreshing cache in background...');
+                        logger.log('🔄 [BADGES] Refreshing cache in background...');
                         this.refreshBadgesInBackground();
                     }
                     
@@ -39,7 +40,7 @@ class TwitchBadgesService {
                 }
             }
         } catch (error) {
-            console.warn('⚠️ [BADGES] Cache read error:', error);
+            logger.warn('⚠️ [BADGES] Cache read error:', error);
         }
 
         if (this.loading) {
@@ -63,7 +64,7 @@ class TwitchBadgesService {
                 const data = await response.json();
                 if (data.success) {
                     this.globalBadges = data.badges;
-                    console.log('✅ [BADGES] Loaded global badges:', Object.keys(this.globalBadges).length, 'sets');
+                    logger.log('✅ [BADGES] Loaded global badges:', Object.keys(this.globalBadges).length, 'sets');
                     
                     // Сохраняем в localStorage
                     try {
@@ -71,17 +72,17 @@ class TwitchBadgesService {
                             badges: this.globalBadges,
                             timestamp: Date.now()
                         }));
-                        console.log('💾 [BADGES] Saved to cache');
+                        logger.log('💾 [BADGES] Saved to cache');
                     } catch (e) {
-                        console.warn('⚠️ [BADGES] Cache save error:', e);
+                        logger.warn('⚠️ [BADGES] Cache save error:', e);
                     }
                 }
             } else {
-                console.warn('⚠️ [BADGES] Failed to load badges:', response.status);
+                logger.warn('⚠️ [BADGES] Failed to load badges:', response.status);
                 this.globalBadges = {};
             }
         } catch (error) {
-            console.error('❌ [BADGES] Failed to load global badges:', error);
+            logger.error('❌ [BADGES] Failed to load global badges:', error);
             this.globalBadges = {}; // Пустой объект чтобы не запрашивать снова
         } finally {
             this.loading = false;
@@ -103,10 +104,10 @@ class TwitchBadgesService {
                         badges: this.globalBadges,
                         timestamp: Date.now()
                     }));
-                    console.log('🔄 [BADGES] Cache refreshed');
+                    logger.log('🔄 [BADGES] Cache refreshed');
                 }
             })
-            .catch(error => console.warn('⚠️ [BADGES] Background refresh failed:', error));
+            .catch(error => logger.warn('⚠️ [BADGES] Background refresh failed:', error));
     }
 
     /**
@@ -121,10 +122,10 @@ class TwitchBadgesService {
             const response = await microservicesAPI.get(`/api/twitch/badges/channel/${broadcasterId}`);
             if (response.data.success) {
                 this.channelBadges[broadcasterId] = response.data.badges;
-                console.log(`✅ [BADGES] Loaded channel badges for ${broadcasterId}:`, Object.keys(this.channelBadges[broadcasterId]).length);
+                logger.log(`✅ [BADGES] Loaded channel badges for ${broadcasterId}:`, Object.keys(this.channelBadges[broadcasterId]).length);
             }
         } catch (error) {
-            console.error(`❌ [BADGES] Failed to load channel badges for ${broadcasterId}:`, error);
+            logger.error(`❌ [BADGES] Failed to load channel badges for ${broadcasterId}:`, error);
             this.channelBadges[broadcasterId] = {};
         }
 
@@ -191,9 +192,9 @@ class TwitchBadgesService {
         this.channelBadges = {};
         try {
             localStorage.removeItem('twitch_badges_cache');
-            console.log('🗑️ [BADGES] Cache cleared (memory + localStorage)');
+            logger.log('🗑️ [BADGES] Cache cleared (memory + localStorage)');
         } catch (e) {
-            console.warn('⚠️ [BADGES] localStorage clear error:', e);
+            logger.warn('⚠️ [BADGES] localStorage clear error:', e);
         }
     }
 }

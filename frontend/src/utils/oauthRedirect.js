@@ -1,3 +1,5 @@
+import { logger } from '../utils/prodLogger';
+
 // frontend/src/utils/oauthRedirect.js
 /**
  * Утилиты для сохранения и восстановления URL перед OAuth редиректом
@@ -19,15 +21,15 @@ export function saveReturnUrl() {
         
         // Не сохраняем если мы уже на главной или логине
         if (currentPath === '/dashboard' || currentPath === '/login' || currentPath === '/' || currentPath.startsWith('/dashboard?')) {
-            console.log('🔄 [OAuth] Skipping save - already on main page or has query params');
+            logger.log('🔄 [OAuth] Skipping save - already on main page or has query params');
             return;
         }
         
         localStorage.setItem(RETURN_URL_KEY, currentPath);
         localStorage.setItem(RETURN_URL_TIMESTAMP, Date.now().toString());
-        console.log('💾 [OAuth] Saved return URL:', currentPath);
+        logger.log('💾 [OAuth] Saved return URL:', currentPath);
     } catch (error) {
-        console.error('❌ [OAuth] Failed to save return URL:', error);
+        logger.error('❌ [OAuth] Failed to save return URL:', error);
     }
 }
 
@@ -45,7 +47,7 @@ export function getAndClearReturnUrl() {
         localStorage.removeItem(RETURN_URL_TIMESTAMP);
         
         if (!returnUrl) {
-            console.log('ℹ️ [OAuth] No saved return URL');
+            logger.log('ℹ️ [OAuth] No saved return URL');
             return null;
         }
         
@@ -53,21 +55,21 @@ export function getAndClearReturnUrl() {
         if (timestamp) {
             const age = Date.now() - parseInt(timestamp, 10);
             if (age > MAX_AGE_MS) {
-                console.log('⏰ [OAuth] Return URL expired, ignoring');
+                logger.log('⏰ [OAuth] Return URL expired, ignoring');
                 return null;
             }
         }
         
         // Не возвращаем на /dashboard или корень (включая query params)
         if (returnUrl === '/dashboard' || returnUrl === '/' || returnUrl.startsWith('/dashboard?') || returnUrl.startsWith('/login')) {
-            console.log('🔄 [OAuth] Return URL is main page or login, ignoring');
+            logger.log('🔄 [OAuth] Return URL is main page or login, ignoring');
             return null;
         }
         
-        console.log('✅ [OAuth] Retrieved return URL:', returnUrl);
+        logger.log('✅ [OAuth] Retrieved return URL:', returnUrl);
         return returnUrl;
     } catch (error) {
-        console.error('❌ [OAuth] Failed to get return URL:', error);
+        logger.error('❌ [OAuth] Failed to get return URL:', error);
         return null;
     }
 }
@@ -79,9 +81,9 @@ export function clearReturnUrl() {
     try {
         localStorage.removeItem(RETURN_URL_KEY);
         localStorage.removeItem(RETURN_URL_TIMESTAMP);
-        console.log('🗑️ [OAuth] Cleared return URL');
+        logger.log('🗑️ [OAuth] Cleared return URL');
     } catch (error) {
-        console.error('❌ [OAuth] Failed to clear return URL:', error);
+        logger.error('❌ [OAuth] Failed to clear return URL:', error);
     }
 }
 

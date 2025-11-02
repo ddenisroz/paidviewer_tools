@@ -1,3 +1,5 @@
+import { logger } from '../utils/prodLogger';
+
 // frontend/src/utils/emotes.js
 // Утилиты для обработки эмодзи и смайлов
 
@@ -16,7 +18,7 @@ export async function getChannelEmotes(channelName) {
             return emotesCache.get(channelName);
         }
 
-        console.debug(`🔍 [7TV] Searching for Twitch user: ${channelName}`);
+        logger.debug(`🔍 [7TV] Searching for Twitch user: ${channelName}`);
 
         // GraphQL запрос для поиска пользователя Twitch
         const query = `
@@ -44,9 +46,9 @@ export async function getChannelEmotes(channelName) {
 
         if (!response.ok) {
             if (response.status === 404) {
-                console.debug(`ℹ️ [7TV] Channel "${channelName}" not found on 7TV`);
+                logger.debug(`ℹ️ [7TV] Channel "${channelName}" not found on 7TV`);
             } else {
-                console.debug(`⚠️ [7TV] API returned status ${response.status}`);
+                logger.debug(`⚠️ [7TV] API returned status ${response.status}`);
             }
             return new Map();
         }
@@ -55,7 +57,7 @@ export async function getChannelEmotes(channelName) {
         const users = result?.data?.users?.items || [];
         
         if (users.length === 0) {
-            console.debug(`ℹ️ [7TV] No 7TV user found for "${channelName}"`);
+            logger.debug(`ℹ️ [7TV] No 7TV user found for "${channelName}"`);
             return new Map();
         }
 
@@ -64,11 +66,11 @@ export async function getChannelEmotes(channelName) {
         const twitchConn = user.connections?.find(c => c.platform === 'TWITCH');
         
         if (!twitchConn?.emote_set_id) {
-            console.debug(`ℹ️ [7TV] User "${channelName}" has no emote set`);
+            logger.debug(`ℹ️ [7TV] User "${channelName}" has no emote set`);
             return new Map();
         }
 
-        console.debug(`✅ [7TV] Found emote set: ${twitchConn.emote_set_id}`);
+        logger.debug(`✅ [7TV] Found emote set: ${twitchConn.emote_set_id}`);
 
         // Получаем эмоуты из emote set
         const emoteSetQuery = `
@@ -103,14 +105,14 @@ export async function getChannelEmotes(channelName) {
         });
 
         if (!emoteSetResponse.ok) {
-            console.debug(`⚠️ [7TV] Failed to fetch emote set`);
+            logger.debug(`⚠️ [7TV] Failed to fetch emote set`);
             return new Map();
         }
 
         const emoteSetResult = await emoteSetResponse.json();
         const emotes = emoteSetResult?.data?.emoteSet?.emotes || [];
 
-        console.debug(`✅ [7TV] Loaded ${emotes.length} channel emotes for ${channelName}`);
+        logger.debug(`✅ [7TV] Loaded ${emotes.length} channel emotes for ${channelName}`);
 
         // Создаем мапу смайлов
         const emotesMap = new Map();
@@ -134,9 +136,9 @@ export async function getChannelEmotes(channelName) {
         return emotesMap;
     } catch (error) {
         if (error.name === 'TimeoutError') {
-            console.debug('⚠️ [7TV] Request timeout (5s exceeded)');
+            logger.debug('⚠️ [7TV] Request timeout (5s exceeded)');
         } else {
-            console.debug('⚠️ [7TV] Error fetching channel emotes:', error.message);
+            logger.debug('⚠️ [7TV] Error fetching channel emotes:', error.message);
         }
         return new Map();
     }
@@ -151,7 +153,7 @@ export async function getGlobalEmotes() {
             return emotesCache.get('global');
         }
 
-        console.debug('🔍 [7TV] Fetching global emotes');
+        logger.debug('🔍 [7TV] Fetching global emotes');
 
         const query = `
             query GlobalEmotes {
@@ -182,14 +184,14 @@ export async function getGlobalEmotes() {
         });
 
         if (!response.ok) {
-            console.debug(`⚠️ [7TV] Global emotes API returned status ${response.status}`);
+            logger.debug(`⚠️ [7TV] Global emotes API returned status ${response.status}`);
             return new Map();
         }
 
         const result = await response.json();
         const emotes = result?.data?.emoteSet?.emotes || [];
 
-        console.debug(`✅ [7TV] Loaded ${emotes.length} global emotes`);
+        logger.debug(`✅ [7TV] Loaded ${emotes.length} global emotes`);
 
         const emotesMap = new Map();
         emotes.forEach(emote => {
@@ -211,9 +213,9 @@ export async function getGlobalEmotes() {
         return emotesMap;
     } catch (error) {
         if (error.name === 'TimeoutError') {
-            console.debug('⚠️ [7TV] Global emotes request timeout');
+            logger.debug('⚠️ [7TV] Global emotes request timeout');
         } else {
-            console.debug('⚠️ [7TV] Error fetching global emotes:', error.message);
+            logger.debug('⚠️ [7TV] Error fetching global emotes:', error.message);
         }
         return new Map();
     }

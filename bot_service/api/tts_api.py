@@ -36,6 +36,7 @@ from services.user_identity_service import UserIdentityService, UserType
 from services.memory_tts_queue import memory_tts_queue
 from services.memory_websocket_manager import memory_websocket_manager
 from services.advanced_rate_limiter import advanced_rate_limiter as database_rate_limiter
+from core.security_modern import limiter
 
 # Utils
 from utils.enhanced_logger import log_request, log_response, tts_logger
@@ -391,6 +392,8 @@ async def update_tts_engine(
 ):
     """Быстрое переключение TTS движка"""
     from fastapi.responses import JSONResponse
+    from core.database import User, WhitelistedChannel
+    
     try:
         body = await request.json()
         engine_type = body.get('engine_type', 'cloud')
@@ -403,6 +406,37 @@ async def update_tts_engine(
         
         if not UserIdentityService.validate_user_data(current_user):
             raise HTTPException(status_code=400, detail="Invalid user data")
+        
+        # Проверяем whitelist при попытке включить F5-TTS
+        if engine_type == 'local' or use_local_tts:
+            db_user = db.query(User).filter(User.id == current_user['id']).first()
+            if not db_user:
+                raise HTTPException(status_code=404, detail="Пользователь не найден")
+            
+            login_platform = current_user.get('login_platform')
+            is_whitelisted = False
+            
+            if login_platform == 'twitch' and db_user.twitch_username:
+                twitch_whitelisted = db.query(WhitelistedChannel).filter(
+                    WhitelistedChannel.channel_name == db_user.twitch_username.lower(),
+                    WhitelistedChannel.platform == 'twitch'
+                ).first()
+                is_whitelisted = bool(twitch_whitelisted)
+                
+            elif login_platform == 'vk' and db_user.vk_username:
+                vk_whitelisted = db.query(WhitelistedChannel).filter(
+                    WhitelistedChannel.channel_name == db_user.vk_username.lower(),
+                    WhitelistedChannel.platform == 'vk'
+                ).first()
+                is_whitelisted = bool(vk_whitelisted)
+            
+            if not is_whitelisted:
+                channel_name = db_user.twitch_username or db_user.vk_username or 'неизвестен'
+                logger.warning(f"❌ User {channel_name} NOT whitelisted, cannot enable F5-TTS")
+                raise HTTPException(
+                    status_code=403,
+                    detail="F5-TTS доступен только для пользователей из whitelist. Обратитесь к администратору для добавления в whitelist."
+                )
         
         tts_service = TTSService(db)
         user_filters = UserIdentityService.get_database_filters(current_user)
@@ -1263,11 +1297,12 @@ async def get_user_voices(
         raise HTTPException(status_code=500, detail="Ошибка получения голосов")
 
 @user_voices_router.post("/upload")
+@limiter.limit("10/minute")
 async def upload_user_voice(
+    request: Request,
     user_id: int,
     file: UploadFile = File(...),
     name: str = Form(...),
-    request: Request = None,
     user: dict = Depends(check_user_whitelisted),
     db: Session = Depends(get_db)
 ):
@@ -1306,22 +1341,46 @@ async def get_local_tts_config(
 ):
     """Получить конфигурацию локального TTS"""
     try:
+        from core.database import User, WhitelistedChannel
+        
         # Определяем тип пользователя
         is_guest = (not user or user.get('id') == -1)
         user_id = user.get('id') if user and user.get('id') != -1 else None
         session_id = user.get('session_id') if is_guest and user else None
         
-        # Для гостей: они могут использовать локальный TTS и загружать голоса через свой endpoint
-        # Облачные голоса НЕ доступны (загрузка требует check_user_whitelisted)
-        if is_guest:
-            can_manage_voices = True  # Гости могут управлять своим локальным TTS и загружать голоса через него
-        else:
-            # Проверяем whitelist для авторизованных пользователей
-            user_obj = db.query(WhitelistedChannel).filter(
-                (WhitelistedChannel.channel_name == user.get('twitch_name')) |
-                (WhitelistedChannel.channel_name == user.get('vk_username'))
-            ).first()
-            can_manage_voices = user_obj is not None
+        # Проверяем whitelist для авторизованных пользователей
+        is_whitelisted = False
+        if not is_guest and user_id:
+            db_user = db.query(User).filter(User.id == user_id).first()
+            if db_user:
+                login_platform = user.get('login_platform')
+                if login_platform == 'twitch' and db_user.twitch_username:
+                    whitelisted = db.query(WhitelistedChannel).filter(
+                        WhitelistedChannel.channel_name == db_user.twitch_username.lower(),
+                        WhitelistedChannel.platform == 'twitch'
+                    ).first()
+                    is_whitelisted = bool(whitelisted)
+                elif login_platform == 'vk' and db_user.vk_username:
+                    whitelisted = db.query(WhitelistedChannel).filter(
+                        WhitelistedChannel.channel_name == db_user.vk_username.lower(),
+                        WhitelistedChannel.platform == 'vk'
+                    ).first()
+                    is_whitelisted = bool(whitelisted)
+        
+        # Для гостей разрешаем доступ к локальному TTS
+        # Для авторизованных пользователей - только если в whitelist
+        can_manage_voices = is_guest or is_whitelisted
+        
+        # Если не в whitelist (и не гость), не показываем конфигурацию
+        if not is_guest and not is_whitelisted:
+            return {
+                "success": True,
+                "configured": False,
+                "config": None,
+                "healthy": False,
+                "can_manage_voices": False,
+                "message": "Локальный TTS доступен только для пользователей из whitelist"
+            }
         
         # Ищем конфиг по user_id или session_id
         if is_guest and session_id:
@@ -1378,15 +1437,34 @@ async def save_local_tts_config(
         
         if not is_guest:
             # Проверяем whitelist для авторизованных пользователей
-            user_obj = db.query(WhitelistedChannel).filter(
-                (WhitelistedChannel.channel_name == user.get('twitch_name')) |
-                (WhitelistedChannel.channel_name == user.get('vk_username'))
-            ).first()
+            from core.database import User, WhitelistedChannel
             
-            if not user_obj:
+            db_user = db.query(User).filter(User.id == user_id).first()
+            if not db_user:
+                raise HTTPException(status_code=404, detail="Пользователь не найден")
+            
+            login_platform = user.get('login_platform')
+            is_whitelisted = False
+            
+            if login_platform == 'twitch' and db_user.twitch_username:
+                whitelisted = db.query(WhitelistedChannel).filter(
+                    WhitelistedChannel.channel_name == db_user.twitch_username.lower(),
+                    WhitelistedChannel.platform == 'twitch'
+                ).first()
+                is_whitelisted = bool(whitelisted)
+            elif login_platform == 'vk' and db_user.vk_username:
+                whitelisted = db.query(WhitelistedChannel).filter(
+                    WhitelistedChannel.channel_name == db_user.vk_username.lower(),
+                    WhitelistedChannel.platform == 'vk'
+                ).first()
+                is_whitelisted = bool(whitelisted)
+            
+            if not is_whitelisted:
+                channel_name = db_user.twitch_username or db_user.vk_username or 'неизвестен'
+                logger.warning(f"❌ User {channel_name} NOT whitelisted, cannot save local TTS config")
                 raise HTTPException(
-                    status_code=403, 
-                    detail="Доступ к локальному TTS требует whitelist"
+                    status_code=403,
+                    detail="Доступ к локальному TTS требует whitelist. Обратитесь к администратору для добавления в whitelist."
                 )
         
         # Ищем существующий конфиг
@@ -1448,6 +1526,37 @@ async def toggle_local_tts(
 ):
     """Переключить использование локального TTS"""
     try:
+        from core.database import User, WhitelistedChannel
+        
+        # Проверяем whitelist перед переключением
+        db_user = db.query(User).filter(User.id == user["id"]).first()
+        if not db_user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        login_platform = user.get('login_platform')
+        is_whitelisted = False
+        
+        if login_platform == 'twitch' and db_user.twitch_username:
+            whitelisted = db.query(WhitelistedChannel).filter(
+                WhitelistedChannel.channel_name == db_user.twitch_username.lower(),
+                WhitelistedChannel.platform == 'twitch'
+            ).first()
+            is_whitelisted = bool(whitelisted)
+        elif login_platform == 'vk' and db_user.vk_username:
+            whitelisted = db.query(WhitelistedChannel).filter(
+                WhitelistedChannel.channel_name == db_user.vk_username.lower(),
+                WhitelistedChannel.platform == 'vk'
+            ).first()
+            is_whitelisted = bool(whitelisted)
+        
+        if not is_whitelisted:
+            channel_name = db_user.twitch_username or db_user.vk_username or 'неизвестен'
+            logger.warning(f"❌ User {channel_name} NOT whitelisted, cannot toggle local TTS")
+            raise HTTPException(
+                status_code=403,
+                detail="Локальный TTS доступен только для пользователей из whitelist. Обратитесь к администратору для добавления в whitelist."
+            )
+        
         # Получаем конфигурацию локального TTS
         config = db.query(LocalTTSEndpoint).filter(LocalTTSEndpoint.user_id == user["id"]).first()
         
@@ -1487,10 +1596,42 @@ async def toggle_local_tts(
 @local_tts_router.post("/test-connection")
 async def test_local_tts_connection(
     request: LocalTTSConfigRequest,
-    user: dict = Depends(get_current_user_optional)
+    user: dict = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
 ):
     """Проверить подключение к локальному TTS"""
     try:
+        from core.database import User, WhitelistedChannel
+        
+        # Проверяем whitelist для авторизованных пользователей
+        is_guest = (not user or user.get('id') == -1)
+        if not is_guest and user.get('id'):
+            db_user = db.query(User).filter(User.id == user["id"]).first()
+            if db_user:
+                login_platform = user.get('login_platform')
+                is_whitelisted = False
+                
+                if login_platform == 'twitch' and db_user.twitch_username:
+                    whitelisted = db.query(WhitelistedChannel).filter(
+                        WhitelistedChannel.channel_name == db_user.twitch_username.lower(),
+                        WhitelistedChannel.platform == 'twitch'
+                    ).first()
+                    is_whitelisted = bool(whitelisted)
+                elif login_platform == 'vk' and db_user.vk_username:
+                    whitelisted = db.query(WhitelistedChannel).filter(
+                        WhitelistedChannel.channel_name == db_user.vk_username.lower(),
+                        WhitelistedChannel.platform == 'vk'
+                    ).first()
+                    is_whitelisted = bool(whitelisted)
+                
+                if not is_whitelisted:
+                    channel_name = db_user.twitch_username or db_user.vk_username or 'неизвестен'
+                    logger.warning(f"❌ User {channel_name} NOT whitelisted, cannot test local TTS")
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Тестирование локального TTS доступно только для пользователей из whitelist. Обратитесь к администратору для добавления в whitelist."
+                    )
+        
         # Проверяем health endpoint
         headers = {}
         if request.api_key:

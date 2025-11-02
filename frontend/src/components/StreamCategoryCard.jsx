@@ -14,6 +14,7 @@ import { useIntegrations } from '../context/IntegrationsContext';
 import { useUserSettings } from '../context/UserSettingsContext';
 import { findMappedCategory, categoryMapping } from '../constants/categoryMapping';
 import { toast } from 'sonner';
+import { logger } from '../utils/prodLogger';
 
 // Portal dropdown для отображения поверх всех элементов
 const CategoryDropdown = ({ platform, search, onSelect, results, inputRef }) => {
@@ -38,7 +39,7 @@ const CategoryDropdown = ({ platform, search, onSelect, results, inputRef }) => 
                     key={cat.id}
                     className="px-3 py-2 hover:bg-muted cursor-pointer flex items-center gap-3 transition-colors duration-200"
                     onClick={() => {
-                        console.log('🎮 [CATEGORY DROPDOWN] Category clicked:', { platform, category: cat.name, id: cat.id });
+                        logger.log('🎮 [CATEGORY DROPDOWN] Category clicked:', { platform, category: cat.name, id: cat.id });
                         onSelect(platform, cat);
                     }}
                 >
@@ -145,13 +146,13 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                 const twitchCategory = currentData.twitch?.category;
                 
                 if (twitchCategory) {
-                    console.log('🔍 [AUTO-SYNC] ===== START AUTO-SYNC =====');
-                    console.log('🔍 [AUTO-SYNC] Twitch category:', twitchCategory);
-                    console.log('🔍 [AUTO-SYNC] Twitch category name:', twitchCategory.name);
+                    logger.log('🔍 [AUTO-SYNC] ===== START AUTO-SYNC =====');
+                    logger.log('🔍 [AUTO-SYNC] Twitch category:', twitchCategory);
+                    logger.log('🔍 [AUTO-SYNC] Twitch category name:', twitchCategory.name);
                     
                     // Применяем маппинг категорий (Just Chatting → Говорим и смотрим)
                     const mappedName = categoryMapping[twitchCategory.name];
-                    console.log('🔍 [AUTO-SYNC] Mapping lookup result:', {
+                    logger.log('🔍 [AUTO-SYNC] Mapping lookup result:', {
                         twitchName: twitchCategory.name,
                         mappedName: mappedName,
                         hasMappedName: !!mappedName
@@ -162,15 +163,15 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                     
                     // Сначала пробуем маппинг
                     if (mappedName) {
-                        console.log('🔍 [AUTO-SYNC] Trying mapped name:', mappedName);
+                        logger.log('🔍 [AUTO-SYNC] Trying mapped name:', mappedName);
                         searchResults = await searchCategories('vk', mappedName);
-                        console.log('🔍 [AUTO-SYNC] Mapped search results:', searchResults);
-                        console.log('🔍 [AUTO-SYNC] Mapped search results count:', searchResults?.length || 0);
-                        console.log('🔍 [AUTO-SYNC] First result:', searchResults?.[0]);
+                        logger.log('🔍 [AUTO-SYNC] Mapped search results:', searchResults);
+                        logger.log('🔍 [AUTO-SYNC] Mapped search results count:', searchResults?.length || 0);
+                        logger.log('🔍 [AUTO-SYNC] First result:', searchResults?.[0]);
                         
                         if (searchResults && searchResults.length > 0) {
                             const candidate = searchResults[0];
-                            console.log('🔍 [AUTO-SYNC] Candidate category:', candidate);
+                            logger.log('🔍 [AUTO-SYNC] Candidate category:', candidate);
                             
                             // Для маппинга используем МЯГКУЮ проверку (доверяем маппингу!)
                             const catNormalized = candidate.name.toLowerCase().replace(/[\-–—]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -193,12 +194,12 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                             
                             if (isGoodMatch) {
                                 vkCategory = candidate;
-                                console.log('✅ [AUTO-SYNC] Found via mapping (good match):', vkCategory.name);
+                                logger.log('✅ [AUTO-SYNC] Found via mapping (good match):', vkCategory.name);
                             } else {
                                 // Для маппинга берем первый результат даже если релевантность низкая
                                 // (маппинг создан вручную - доверяем ему)
                                 vkCategory = candidate;
-                                console.log('⚠️ [AUTO-SYNC] Using mapped category despite low text match:', {
+                                logger.log('⚠️ [AUTO-SYNC] Using mapped category despite low text match:', {
                                     mapped: mappedName,
                                     found: candidate.name,
                                     reason: 'Manual mapping takes priority'
@@ -209,9 +210,9 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                     
                     // Если по маппингу не нашли - пробуем оригинальное название
                     if (!vkCategory) {
-                        console.log('🔍 [AUTO-SYNC] Trying original name:', twitchCategory.name);
+                        logger.log('🔍 [AUTO-SYNC] Trying original name:', twitchCategory.name);
                         searchResults = await searchCategories('vk', twitchCategory.name);
-                        console.log('🔍 [AUTO-SYNC] Original search results:', searchResults?.length || 0);
+                        logger.log('🔍 [AUTO-SYNC] Original search results:', searchResults?.length || 0);
                         
                         if (searchResults && searchResults.length > 0) {
                             const candidate = searchResults[0];
@@ -232,9 +233,9 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                             
                             if (isGoodMatch) {
                                 vkCategory = candidate;
-                                console.log('✅ [AUTO-SYNC] Found via original name (good match):', vkCategory.name);
+                                logger.log('✅ [AUTO-SYNC] Found via original name (good match):', vkCategory.name);
                             } else {
-                                console.warn('⚠️ [AUTO-SYNC] Found category but relevance too low:', {
+                                logger.warn('⚠️ [AUTO-SYNC] Found category but relevance too low:', {
                                     query: twitchCategory.name,
                                     found: candidate.name,
                                     normalized: { query: queryNormalized, category: catNormalized }
@@ -244,12 +245,12 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                     }
                     
                     if (searchResults && searchResults.length > 0) {
-                        console.log('🔍 [AUTO-SYNC] Top 3 results:', searchResults.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
+                        logger.log('🔍 [AUTO-SYNC] Top 3 results:', searchResults.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
                     }
                     
                     if (vkCategory) {
                         // Нашли VK категорию!
-                        console.log('✅ [AUTO-SYNC] Found VK category by name:', {
+                        logger.log('✅ [AUTO-SYNC] Found VK category by name:', {
                             twitch: twitchCategory.name,
                             vk: vkCategory.name,
                             vkId: vkCategory.id
@@ -277,7 +278,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                             vk: vkPayload
                         };
                         
-                        console.log('💾 [AUTO-SYNC] Final payload (both platforms):', payload);
+                        logger.log('💾 [AUTO-SYNC] Final payload (both platforms):', payload);
                         
                         // Уведомление об успешной автосинхронизации
                         toast.success(`Категории синхронизированы: Twitch → VK Live (${vkCategory.name})`);
@@ -285,15 +286,15 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                         saveChanges(payload, 'saveCategory');
                     } else {
                         // НЕ НАШЛИ VK категорию - меняем ТОЛЬКО Twitch, VK оставляем как есть
-                        console.warn('⚠️ [AUTO-SYNC] Could not find VK category for:', twitchCategory.name);
-                        console.warn('💡 [AUTO-SYNC] Only Twitch category will be updated. VK category unchanged.');
+                        logger.warn('⚠️ [AUTO-SYNC] Could not find VK category for:', twitchCategory.name);
+                        logger.warn('💡 [AUTO-SYNC] Only Twitch category will be updated. VK category unchanged.');
                         
                     const payload = {
                             twitch: { category_id: twitchCategory.id }
                             // VK НЕ включаем - оставляем как было!
                         };
                         
-                        console.log('💾 [AUTO-SYNC] Final payload (Twitch only):', payload);
+                        logger.log('💾 [AUTO-SYNC] Final payload (Twitch only):', payload);
                         
                         // Уведомление что VK категория не найдена
                         toast.warning(`VK Live категория для "${twitchCategory.name}" не найдена. Обновлена только Twitch категория.`);
@@ -321,7 +322,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
     useEffect(() => {
         // Only search when the dropdown is open and there's a search term
         if (debouncedTwitchSearch && debouncedTwitchSearch.length >= 2 && showDropdown.twitch && twitchEnabled) {
-            console.log('🔍 Debounced Twitch search:', debouncedTwitchSearch);
+            logger.log('🔍 Debounced Twitch search:', debouncedTwitchSearch);
             searchCategories('twitch', debouncedTwitchSearch);
         }
     }, [debouncedTwitchSearch, showDropdown.twitch, searchCategories, twitchEnabled]);
@@ -329,7 +330,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
     useEffect(() => {
         // Only search when the dropdown is open and there's a search term
         if (debouncedVkSearch && debouncedVkSearch.length >= 2 && showDropdown.vk && vkEnabled) {
-            console.log('🔍 Debounced VK search:', debouncedVkSearch);
+            logger.log('🔍 Debounced VK search:', debouncedVkSearch);
             searchCategories('vk', debouncedVkSearch);
         }
     }, [debouncedVkSearch, showDropdown.vk, searchCategories, vkEnabled]);
@@ -342,7 +343,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
             const isClickInsideCard = dropdownRef.current && dropdownRef.current.contains(event.target);
             
             if (!isClickInsidePortal && !isClickInsideCard) {
-                // console.log('StreamCategoryCard: Click outside, closing dropdowns');
+                // logger.log('StreamCategoryCard: Click outside, closing dropdowns');
                 // Возвращаем к исходным значениям при клике вне области
                 const originalTwitch = currentData.twitch?.category?.name || '';
                 const originalVk = currentData.vk?.category?.name || '';
@@ -358,14 +359,14 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
     useEffect(() => {
         const handleFocusIn = (event) => {
             if (dropdownRef.current && dropdownRef.current.contains(event.target)) {
-                // console.log('StreamCategoryCard: Focus inside dropdown area');
+                // logger.log('StreamCategoryCard: Focus inside dropdown area');
                 // Не закрываем dropdown при фокусе внутри области
             }
         };
 
         const handleFocusOut = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                // console.log('StreamCategoryCard: Focus outside dropdown area');
+                // logger.log('StreamCategoryCard: Focus outside dropdown area');
                 // Закрываем dropdown только если фокус ушел полностью из области
                 setTimeout(() => {
                     if (!dropdownRef.current?.contains(document.activeElement)) {
@@ -387,7 +388,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
     }, [currentData]);
 
     const handleSearchChange = (platform, value) => {
-        console.log('⌨️ Search change:', { platform, value, length: value.length });
+        logger.log('⌨️ Search change:', { platform, value, length: value.length });
         
         // НЕ убираем пробелы - они нужны для поиска категорий с пробелами
         const trimmedValue = value; // Убрали .trim() - пробелы разрешены!
@@ -403,14 +404,14 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
     };
 
     const handleSearchFocus = (platform) => {
-        // console.log('StreamCategoryCard: Search focus:', { platform });
+        // logger.log('StreamCategoryCard: Search focus:', { platform });
         // Закрываем dropdown других платформ при открытии текущей
         setShowDropdown({ twitch: false, vk: false, [platform]: true });
         
         // Очищаем поле при фокусе, если в нем текущее значение категории
         const currentCategoryName = currentData[platform]?.category?.name || '';
         if (searchTerms[platform] === currentCategoryName) {
-            // console.log('StreamCategoryCard: Clearing field on focus');
+            // logger.log('StreamCategoryCard: Clearing field on focus');
             setSearchTerms(prev => ({ ...prev, [platform]: '' }));
             
             // Выделяем весь текст для быстрого удаления
@@ -424,14 +425,14 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
     };
 
     const handleSearchBlur = (platform) => {
-        // console.log('StreamCategoryCard: Search blur:', { platform });
+        // logger.log('StreamCategoryCard: Search blur:', { platform });
         // Не закрываем dropdown при потере фокуса - только при клике вне области
         // Это предотвращает закрытие при клике в поле ввода
     };
 
     const handleSearchKeyDown = (platform, e) => {
         if (e.key === 'Escape') {
-            // console.log('StreamCategoryCard: ESC pressed, reverting to original value');
+            // logger.log('StreamCategoryCard: ESC pressed, reverting to original value');
             const originalValue = currentData[platform]?.category?.name || '';
             setSearchTerms(prev => ({ ...prev, [platform]: originalValue }));
             setShowDropdown(prev => ({ ...prev, [platform]: false }));
@@ -440,7 +441,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
     };
 
     const handleCategorySelect = async (platform, category) => {
-        console.log('🎮 [HANDLE SELECT] Category selected:', { platform, category: category.name, id: category.id, isLinked, bothEnabled });
+        logger.log('🎮 [HANDLE SELECT] Category selected:', { platform, category: category.name, id: category.id, isLinked, bothEnabled });
         
         if (isLinked && bothEnabled) {
             // В объединенном режиме ищем соответствующую категорию для другой платформы
@@ -449,7 +450,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
             
             // Ищем соответствующую категорию на другой платформе
             let mappedCategory = findMappedCategory(category.name, platform, otherCategories);
-            console.log('🎮 [HANDLE SELECT] Mapped category (from cache):', { otherPlatform, mappedCategory: mappedCategory?.name });
+            logger.log('🎮 [HANDLE SELECT] Mapped category (from cache):', { otherPlatform, mappedCategory: mappedCategory?.name });
             
             // Если не нашли в кеше - ИЩЕМ ЧЕРЕЗ API!
             if (!mappedCategory) {
@@ -457,7 +458,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                 const mappedName = categoryMapping[category.name];
                 const searchQuery = mappedName || category.name; // Если нет маппинга - ищем по оригинальному названию
                 
-                console.log('🎮 [HANDLE SELECT] Not found in cache - searching API:', {
+                logger.log('🎮 [HANDLE SELECT] Not found in cache - searching API:', {
                     hasMappedName: !!mappedName,
                     mappedName,
                     searchQuery
@@ -465,7 +466,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                 
                 try {
                     const searchResults = await searchCategories(otherPlatform, searchQuery);
-                    console.log('🎮 [HANDLE SELECT] API search results:', searchResults?.length || 0);
+                    logger.log('🎮 [HANDLE SELECT] API search results:', searchResults?.length || 0);
                     
                     if (searchResults && searchResults.length > 0) {
                         // Проверяем точное совпадение
@@ -484,27 +485,27 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                                 catNormalized.startsWith(queryNormalized) ||
                                 queryNormalized.split(/\s+/).every(word => catNormalized.includes(word))) {
                                 mappedCategory = candidate;
-                                console.log('🎮 [HANDLE SELECT] Using first result (relevant):', mappedCategory.name);
+                                logger.log('🎮 [HANDLE SELECT] Using first result (relevant):', mappedCategory.name);
                             } else {
-                                console.warn('🎮 [HANDLE SELECT] First result not relevant:', {
+                                logger.warn('🎮 [HANDLE SELECT] First result not relevant:', {
                                     query: searchQuery,
                                     found: candidate.name
                                 });
                             }
                         } else {
-                            console.log('🎮 [HANDLE SELECT] Found exact match via API:', mappedCategory.name);
+                            logger.log('🎮 [HANDLE SELECT] Found exact match via API:', mappedCategory.name);
                         }
                     } else {
-                        console.warn('🎮 [HANDLE SELECT] No results from API for:', searchQuery);
+                        logger.warn('🎮 [HANDLE SELECT] No results from API for:', searchQuery);
                     }
                 } catch (error) {
-                    console.error('🎮 [HANDLE SELECT] Error searching for category:', error);
+                    logger.error('🎮 [HANDLE SELECT] Error searching for category:', error);
                 }
             }
             
             if (mappedCategory) {
                 // Нашли соответствующую категорию - устанавливаем разные категории для разных платформ
-                console.log('🎮 [HANDLE SELECT] Setting linked categories');
+                logger.log('🎮 [HANDLE SELECT] Setting linked categories');
                 setCurrentData(prev => ({
                     ...prev,
                     [platform]: { ...prev[platform], category },
@@ -516,7 +517,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
             } else {
                 // Не нашли соответствующую категорию - НЕ копируем!
                 // Пользователь может вручную выбрать категорию на другой платформе
-                console.log('🎮 [HANDLE SELECT] Mapping not found - only updating selected platform');
+                logger.log('🎮 [HANDLE SELECT] Mapping not found - only updating selected platform');
                 setCurrentData(prev => ({
                     ...prev,
                     [platform]: { ...prev[platform], category },
@@ -531,7 +532,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                 toast.warning(`Категория "${category.name}" обновлена только на ${platformNames[platform]}. Для ${platformNames[otherPlatform]} категория не найдена — выберите вручную.`);
             }
         } else {
-            console.log('🎮 [HANDLE SELECT] Setting single platform category');
+            logger.log('🎮 [HANDLE SELECT] Setting single platform category');
             setCurrentData(prev => ({
                 ...prev,
                 [platform]: { ...prev[platform], category },
@@ -539,11 +540,11 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
         }
         setSearchTerms(prev => ({ ...prev, [platform]: category.name })); // Update search bar with selected category
         setShowDropdown({ twitch: false, vk: false });
-        console.log('🎮 [HANDLE SELECT] Category selection completed');
+        logger.log('🎮 [HANDLE SELECT] Category selection completed');
         
         // Логируем итоговое состояние после небольшой задержки (чтобы useState обновился)
         setTimeout(() => {
-            console.log('🎮 [HANDLE SELECT] Final state after selection:', {
+            logger.log('🎮 [HANDLE SELECT] Final state after selection:', {
                 platform,
                 categoryName: category.name,
                 categoryId: category.id
@@ -558,13 +559,13 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
     };
 
     const handleSave = (mode) => {
-        console.log('💾 [SAVE] handleSave called:', { mode, isChanged, twitchEnabled, vkEnabled });
+        logger.log('💾 [SAVE] handleSave called:', { mode, isChanged, twitchEnabled, vkEnabled });
         
         // Очищаем таймер автосброса (пользователь сохраняет вручную)
         if (autoSaveTimerRef.current) {
             clearTimeout(autoSaveTimerRef.current);
             autoSaveTimerRef.current = null;
-            console.log('⏰ [AUTO-RESET] Timer cleared - user saved manually');
+            logger.log('⏰ [AUTO-RESET] Timer cleared - user saved manually');
         }
         
         const payload = {};
@@ -584,8 +585,8 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                 const isVkUUID = vkCat?.id && vkCat.id.includes('-');
                 
                 if (!isVkUUID && vkCat?.id) {
-                    console.error('❌ [SAVE] VK category has Twitch-like ID! Skipping VK update to prevent error:', vkCat.id);
-                    console.warn('💡 [SAVE] Only Twitch will be updated. Please select VK category manually or use toggle.');
+                    logger.error('❌ [SAVE] VK category has Twitch-like ID! Skipping VK update to prevent error:', vkCat.id);
+                    logger.warn('💡 [SAVE] Only Twitch will be updated. Please select VK category manually or use toggle.');
                     
                     // Уведомление пользователю
                     toast.warning('VK Live категория не обновлена (неверный формат). Обновлена только Twitch категория.');
@@ -613,7 +614,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
             // Индивидуальный режим - сохраняем только измененные категории
             if (twitchEnabled && (currentData.twitch?.category?.id || null) !== (initialData.twitch?.category?.id || null)) {
                 payload.twitch = { category_id: currentData.twitch?.category?.id || null };
-                console.log('💾 [SAVE] Added Twitch to payload:', payload.twitch);
+                logger.log('💾 [SAVE] Added Twitch to payload:', payload.twitch);
             }
             if (vkEnabled && (currentData.vk?.category?.id || null) !== (initialData.vk?.category?.id || null)) {
                 // VK требует полный объект категории (даже в раздельном режиме!)
@@ -623,7 +624,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                 const isVkUUID = vkCat?.id && vkCat.id.includes('-');
                 
                 if (!isVkUUID && vkCat?.id) {
-                    console.error('❌ [SAVE] VK category has Twitch-like ID! Skipping VK update:', vkCat.id);
+                    logger.error('❌ [SAVE] VK category has Twitch-like ID! Skipping VK update:', vkCat.id);
                     
                     // Уведомление пользователю
                     toast.warning('VK Live категория не обновлена (неверный формат). Пожалуйста, выберите VK категорию вручную.');
@@ -645,18 +646,18 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                         category: vkCategoryPayload,
                         category_id: vkCat?.id || null // Fallback для совместимости
                 };
-                    console.log('💾 [SAVE] Added VK to payload (full object):', payload.vk);
+                    logger.log('💾 [SAVE] Added VK to payload (full object):', payload.vk);
                 }
             }
         }
         
-        console.log('💾 [SAVE] Final payload:', payload);
+        logger.log('💾 [SAVE] Final payload:', payload);
         
         if (Object.keys(payload).length > 0) {
-            console.log('💾 [SAVE] Calling saveChanges...');
+            logger.log('💾 [SAVE] Calling saveChanges...');
             saveChanges(payload, 'saveCategory');
         } else {
-            console.log('⚠️ [SAVE] Payload is empty, not saving');
+            logger.log('⚠️ [SAVE] Payload is empty, not saving');
         }
     };
 
@@ -665,7 +666,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
         const categoryChanged = 
             (twitchEnabled && initialData.twitch?.category?.id !== currentData.twitch?.category?.id) ||
             (vkEnabled && initialData.vk?.category?.id !== currentData.vk?.category?.id);
-        console.log('🔍 [IS CHANGED] Simple check:', {
+        logger.log('🔍 [IS CHANGED] Simple check:', {
             twitchEnabled,
             vkEnabled,
             twitchInitial: initialData.twitch?.category?.id,
@@ -687,10 +688,10 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
 
         // Если есть несохранённые изменения - запускаем таймер
         if (isChanged && status.saveCategory !== 'loading' && status.saveCategory !== 'success') {
-            console.log('⏰ [AUTO-RESET] Starting 10s timer to reset unsaved changes');
+            logger.log('⏰ [AUTO-RESET] Starting 10s timer to reset unsaved changes');
             
             autoSaveTimerRef.current = setTimeout(() => {
-                console.log('⏰ [AUTO-RESET] 10 seconds passed - resetting to initial data');
+                logger.log('⏰ [AUTO-RESET] 10 seconds passed - resetting to initial data');
                 
                 // Сбрасываем к исходным данным
                 setCurrentData(prev => ({

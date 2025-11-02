@@ -52,8 +52,26 @@ class DatabaseCleanupService:
             total_users = self.db.query(User).count()
             stats['total_users'] = total_users
             
-            # Размер базы данных (приблизительно)
-            stats['estimated_db_size_mb'] = self._estimate_database_size()
+            # Размер базы данных (в байтах)
+            database_size_bytes = self._get_actual_database_size()
+            stats['database_size_bytes'] = database_size_bytes
+            stats['estimated_db_size_mb'] = round(database_size_bytes / (1024 * 1024), 2)
+            
+            # Для фронтенда
+            stats['total_records'] = total_messages + total_users
+            
+            # Размеры компонентов (приблизительно)
+            stats['logs_size_bytes'] = int(database_size_bytes * 0.3)  # ~30% на логи
+            stats['log_entries'] = total_messages
+            
+            stats['voices_size_bytes'] = self._get_voices_size()
+            stats['voices_count'] = self._count_voice_files()
+            
+            stats['cache_size_bytes'] = self._get_cache_size()
+            stats['cache_files'] = self._count_cache_files()
+            
+            stats['backup_size_bytes'] = self._get_latest_backup_size()
+            stats['last_backup_time'] = self._get_latest_backup_time()
             
             # Старые записи
             old_messages = self.db.query(ChatMessage).filter(
@@ -87,39 +105,57 @@ class DatabaseCleanupService:
             return {}
     
     def cleanup_old_data(self) -> Dict[str, int]:
-        """Очищает данные ТОЛЬКО по лимитам (без очистки по возрасту)"""
+        """Очищает данные: старые записи (старше 30 дней) и по лимитам"""
         try:
             cleanup_stats = {
                 'messages_deleted': 0,
+                'old_messages_deleted': 0,
+                'limit_based_deleted': 0,
                 'users_cleaned': 0,
-                'cleanup_reason': 'limit_based_only'
+                'cleanup_reason': 'age_and_limit_based'
             }
             
-            # Очистка избыточных сообщений (если превышен общий лимит)
+            # 1. Очистка сообщений старше RETENTION_DAYS (30 дней по умолчанию)
+            cutoff_date = utcnow_naive() - timedelta(days=self.CHAT_MESSAGES_RETENTION_DAYS)
+            old_messages_query = self.db.query(ChatMessage).filter(
+                ChatMessage.timestamp < cutoff_date
+            )
+            old_messages_count = old_messages_query.count()
+            
+            if old_messages_count > 0:
+                old_messages_query.delete(synchronize_session=False)
+                cleanup_stats['old_messages_deleted'] = old_messages_count
+                cleanup_stats['messages_deleted'] += old_messages_count
+                logger.info(f"🗑️ Deleted {old_messages_count} messages older than {self.CHAT_MESSAGES_RETENTION_DAYS} days")
+            
+            # 2. Очистка избыточных сообщений (если превышен общий лимит)
             total_messages = self.db.query(ChatMessage).count()
             if total_messages > self.MAX_TOTAL_CHAT_MESSAGES:
                 excess_count = total_messages - self.MAX_TOTAL_CHAT_MESSAGES
                 oldest_messages = self.db.query(ChatMessage).order_by(ChatMessage.timestamp.asc()).limit(excess_count)
                 oldest_messages.delete(synchronize_session=False)
+                cleanup_stats['limit_based_deleted'] = excess_count
                 cleanup_stats['messages_deleted'] += excess_count
                 logger.info(f"🗑️ Deleted {excess_count} excess messages to maintain total limit ({self.MAX_TOTAL_CHAT_MESSAGES})")
             
-            # Очистка избыточных сообщений на пользователя (если превышен лимит на пользователя)
+            # 3. Очистка избыточных сообщений на пользователя (если превышен лимит на пользователя)
             user_cleanup_count = self._cleanup_user_message_limits()
+            cleanup_stats['limit_based_deleted'] += user_cleanup_count
             cleanup_stats['messages_deleted'] += user_cleanup_count
             
             if cleanup_stats['messages_deleted'] == 0:
-                logger.info("✅ No messages deleted - all within limits")
+                logger.info("✅ No messages deleted - all within limits and retention period")
             else:
-                logger.info(f"✅ Cleanup completed: {cleanup_stats['messages_deleted']} messages deleted (limit-based only)")
+                logger.info(f"✅ Cleanup completed: {cleanup_stats['messages_deleted']} messages deleted "
+                          f"(old: {cleanup_stats['old_messages_deleted']}, limit-based: {cleanup_stats['limit_based_deleted']})")
             
             self.db.commit()
             return cleanup_stats
             
         except Exception as e:
-            logger.error(f"❌ Error cleaning up old data: {e}")
+            logger.error(f"❌ Error cleaning up old data: {e}", exc_info=True)
             self.db.rollback()
-            return {'messages_deleted': 0, 'users_cleaned': 0, 'error': str(e)}
+            return {'messages_deleted': 0, 'old_messages_deleted': 0, 'limit_based_deleted': 0, 'users_cleaned': 0, 'error': str(e)}
     
     def optimize_database(self) -> Dict[str, Any]:
         """Оптимизирует базу данных"""
@@ -296,3 +332,330 @@ class DatabaseCleanupService:
             logger.error(f"Error cleaning user data: {e}")
             self.db.rollback()
             return 0
+    
+    def cleanup_cache(self) -> Dict[str, Any]:
+        """Очищает кеш файлы"""
+        try:
+            import shutil
+            import pathlib
+            
+            cache_dirs = [
+                os.path.join(os.getcwd(), '.cache'),
+                os.path.join(os.getcwd(), 'tts_service', 'cache'),
+                os.path.join(os.getcwd(), 'temp'),
+            ]
+            
+            deleted_files = 0
+            freed_space = 0
+            
+            for cache_dir in cache_dirs:
+                if not os.path.exists(cache_dir):
+                    continue
+                    
+                try:
+                    for cache_file in pathlib.Path(cache_dir).glob('**/*'):
+                        if cache_file.is_file():
+                            try:
+                                freed_space += cache_file.stat().st_size
+                                cache_file.unlink()
+                                deleted_files += 1
+                            except Exception as e:
+                                logger.warning(f"Could not delete cache file {cache_file}: {e}")
+                except Exception as e:
+                    logger.warning(f"Error cleaning cache directory {cache_dir}: {e}")
+            
+            logger.info(f"💾 Cache cleaned: {deleted_files} files removed, freed {freed_space / (1024*1024):.2f} MB")
+            return {
+                'deleted_files': deleted_files,
+                'freed_space_bytes': freed_space
+            }
+            
+        except Exception as e:
+            logger.error(f"Error cleaning cache: {e}")
+            return {'deleted_files': 0, 'freed_space_bytes': 0, 'error': str(e)}
+    
+    def create_backup(self) -> Dict[str, Any]:
+        """Создает резервную копию базы данных"""
+        try:
+            from datetime import datetime
+            import subprocess
+            
+            backup_dir = os.path.join(os.getcwd(), 'backups')
+            os.makedirs(backup_dir, exist_ok=True)
+            
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            backup_file = os.path.join(backup_dir, f'backup_{timestamp}.db')
+            
+            # Копируем БД файл
+            db_file = os.getenv('DATABASE_URL', '').replace('sqlite:///', '')
+            if db_file and os.path.exists(db_file):
+                import shutil
+                shutil.copy2(db_file, backup_file)
+                file_size = os.path.getsize(backup_file)
+                
+                logger.info(f"🔐 Backup created: {backup_file} ({file_size / (1024*1024):.2f} MB)")
+                return {
+                    'success': True,
+                    'backup_file': backup_file,
+                    'size_bytes': file_size,
+                    'timestamp': timestamp
+                }
+            else:
+                return {'success': False, 'error': 'Database file not found'}
+            
+        except Exception as e:
+            logger.error(f"Error creating backup: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def restore_from_backup(self) -> Dict[str, Any]:
+        """Восстанавливает БД из последней резервной копии"""
+        try:
+            import shutil
+            import pathlib
+            
+            backup_dir = os.path.join(os.getcwd(), 'backups')
+            if not os.path.exists(backup_dir):
+                return {'success': False, 'error': 'No backups found'}
+            
+            # Находим последний бэкап
+            backup_files = sorted(pathlib.Path(backup_dir).glob('backup_*.db'), 
+                                 key=lambda p: p.stat().st_mtime, reverse=True)
+            
+            if not backup_files:
+                return {'success': False, 'error': 'No backups found'}
+            
+            latest_backup = backup_files[0]
+            db_file = os.getenv('DATABASE_URL', '').replace('sqlite:///', '')
+            
+            if not db_file or not os.path.exists(db_file):
+                return {'success': False, 'error': 'Database file not found'}
+            
+            # Создаем резервную копию текущей БД перед восстановлением
+            current_backup = os.path.join(backup_dir, f'pre_restore_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db')
+            shutil.copy2(db_file, current_backup)
+            
+            # Восстанавливаем из бэкапа
+            shutil.copy2(latest_backup, db_file)
+            
+            logger.info(f"✅ Database restored from {latest_backup}")
+            return {
+                'success': True,
+                'restored_from': str(latest_backup),
+                'backup_of_current': current_backup
+            }
+            
+        except Exception as e:
+            logger.error(f"Error restoring backup: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def _get_actual_database_size(self) -> int:
+        """Получает реальный размер базы данных в байтах"""
+        try:
+            # Получаем размер файла БД
+            db_file = os.getenv('DATABASE_URL', '').replace('sqlite:///', '')
+            if db_file and os.path.exists(db_file):
+                return os.path.getsize(db_file)
+            return 0
+        except Exception as e:
+            logger.error(f"Error getting actual database size: {e}")
+            return 0
+
+    def _get_voices_size(self) -> int:
+        """Получает размер директории пользовательских голосов в байтах"""
+        try:
+            voices_dir = os.path.join(os.getcwd(), 'tts_service', 'user_voices')
+            if not os.path.exists(voices_dir):
+                return 0
+            total_size = 0
+            for root, dirs, files in os.walk(voices_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    total_size += os.path.getsize(file_path)
+            return total_size
+        except Exception as e:
+            logger.error(f"Error getting voices size: {e}")
+            return 0
+
+    def _count_voice_files(self) -> int:
+        """Подсчитывает количество файлов голосов в директории"""
+        try:
+            voices_dir = os.path.join(os.getcwd(), 'tts_service', 'user_voices')
+            if not os.path.exists(voices_dir):
+                return 0
+            return len([f for f in os.listdir(voices_dir) if f.endswith('.wav')])
+        except Exception as e:
+            logger.error(f"Error counting voice files: {e}")
+            return 0
+
+    def _get_cache_size(self) -> int:
+        """Получает размер директории кеша в байтах"""
+        try:
+            cache_dirs = [
+                os.path.join(os.getcwd(), '.cache'),
+                os.path.join(os.getcwd(), 'tts_service', 'cache'),
+                os.path.join(os.getcwd(), 'temp'),
+            ]
+            total_size = 0
+            for cache_dir in cache_dirs:
+                if not os.path.exists(cache_dir):
+                    continue
+                for root, dirs, files in os.walk(cache_dir):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        total_size += os.path.getsize(file_path)
+            return total_size
+        except Exception as e:
+            logger.error(f"Error getting cache size: {e}")
+            return 0
+
+    def _count_cache_files(self) -> int:
+        """Подсчитывает количество файлов в директориях кеша"""
+        try:
+            cache_dirs = [
+                os.path.join(os.getcwd(), '.cache'),
+                os.path.join(os.getcwd(), 'tts_service', 'cache'),
+                os.path.join(os.getcwd(), 'temp'),
+            ]
+            total_count = 0
+            for cache_dir in cache_dirs:
+                if not os.path.exists(cache_dir):
+                    continue
+                total_count += sum(len(files) for _, _, files in os.walk(cache_dir))
+            return total_count
+        except Exception as e:
+            logger.error(f"Error counting cache files: {e}")
+            return 0
+
+    def _get_latest_backup_size(self) -> int:
+        """Получает размер последней резервной копии в байтах"""
+        try:
+            backup_dir = os.path.join(os.getcwd(), 'backups')
+            if not os.path.exists(backup_dir):
+                return 0
+            latest_backup = sorted(os.listdir(backup_dir), key=lambda x: os.path.getmtime(os.path.join(backup_dir, x)))[-1]
+            return os.path.getsize(os.path.join(backup_dir, latest_backup))
+        except Exception as e:
+            logger.error(f"Error getting latest backup size: {e}")
+            return 0
+
+    def _get_latest_backup_time(self) -> str:
+        """Получает время последней резервной копии"""
+        try:
+            from datetime import datetime
+            backup_dir = os.path.join(os.getcwd(), 'backups')
+            if not os.path.exists(backup_dir):
+                return None
+            files = [f for f in os.listdir(backup_dir) if f.startswith('backup_') and f.endswith('.db')]
+            if not files:
+                return None
+            latest_backup = sorted(files, key=lambda x: os.path.getmtime(os.path.join(backup_dir, x)))[-1]
+            timestamp = os.path.getmtime(os.path.join(backup_dir, latest_backup))
+            return datetime.fromtimestamp(timestamp).isoformat()
+        except Exception as e:
+            logger.error(f"Error getting latest backup time: {e}")
+            return None
+    
+    def list_backups(self) -> Dict[str, Any]:
+        """Получает список всех резервных копий"""
+        try:
+            from datetime import datetime
+            backup_dir = os.path.join(os.getcwd(), 'backups')
+            if not os.path.exists(backup_dir):
+                return {'success': True, 'backups': []}
+            
+            backups = []
+            for filename in os.listdir(backup_dir):
+                if filename.startswith('backup_') and filename.endswith('.db'):
+                    file_path = os.path.join(backup_dir, filename)
+                    stat = os.stat(file_path)
+                    backups.append({
+                        'filename': filename,
+                        'size_bytes': stat.st_size,
+                        'created_at': datetime.fromtimestamp(stat.st_ctime).isoformat(),
+                        'modified_at': datetime.fromtimestamp(stat.st_mtime).isoformat()
+                    })
+            
+            # Сортируем по дате создания (новые первыми)
+            backups.sort(key=lambda x: x['created_at'], reverse=True)
+            
+            return {
+                'success': True,
+                'backups': backups,
+                'total': len(backups),
+                'total_size_bytes': sum(b['size_bytes'] for b in backups)
+            }
+        except Exception as e:
+            logger.error(f"Error listing backups: {e}")
+            return {'success': False, 'error': str(e), 'backups': []}
+    
+    def delete_backup(self, filename: str) -> Dict[str, Any]:
+        """Удаляет конкретную резервную копию"""
+        try:
+            backup_dir = os.path.join(os.getcwd(), 'backups')
+            file_path = os.path.join(backup_dir, filename)
+            
+            # Безопасность: проверяем что файл находится в backup_dir и имеет правильное имя
+            if not filename.startswith('backup_') or not filename.endswith('.db'):
+                return {'success': False, 'error': 'Invalid backup filename'}
+            
+            if not os.path.exists(file_path):
+                return {'success': False, 'error': 'Backup file not found'}
+            
+            # Проверяем что путь нормализован (защита от path traversal)
+            if os.path.abspath(file_path) != file_path or '..' in filename:
+                return {'success': False, 'error': 'Invalid file path'}
+            
+            file_size = os.path.getsize(file_path)
+            os.remove(file_path)
+            
+            logger.info(f"🗑️ Backup deleted: {filename} ({file_size / (1024*1024):.2f} MB)")
+            return {
+                'success': True,
+                'deleted_file': filename,
+                'freed_bytes': file_size
+            }
+        except Exception as e:
+            logger.error(f"Error deleting backup: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def restore_from_backup_file(self, filename: str) -> Dict[str, Any]:
+        """Восстанавливает БД из конкретной резервной копии"""
+        try:
+            import shutil
+            from datetime import datetime
+            
+            backup_dir = os.path.join(os.getcwd(), 'backups')
+            backup_file = os.path.join(backup_dir, filename)
+            
+            # Безопасность: проверяем что файл находится в backup_dir
+            if not filename.startswith('backup_') or not filename.endswith('.db'):
+                return {'success': False, 'error': 'Invalid backup filename'}
+            
+            if not os.path.exists(backup_file):
+                return {'success': False, 'error': 'Backup file not found'}
+            
+            # Проверяем что путь нормализован
+            if os.path.abspath(backup_file) != backup_file or '..' in filename:
+                return {'success': False, 'error': 'Invalid file path'}
+            
+            db_file = os.getenv('DATABASE_URL', '').replace('sqlite:///', '')
+            if not db_file or not os.path.exists(db_file):
+                return {'success': False, 'error': 'Database file not found'}
+            
+            # Создаем резервную копию текущей БД перед восстановлением
+            current_backup = os.path.join(backup_dir, f'pre_restore_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db')
+            shutil.copy2(db_file, current_backup)
+            
+            # Восстанавливаем из указанного бэкапа
+            shutil.copy2(backup_file, db_file)
+            
+            logger.info(f"✅ Database restored from {filename}")
+            return {
+                'success': True,
+                'restored_from': filename,
+                'backup_of_current': os.path.basename(current_backup),
+                'message': f'Database restored from {filename}. Previous state saved as {os.path.basename(current_backup)}'
+            }
+        except Exception as e:
+            logger.error(f"Error restoring from {filename}: {e}")
+            return {'success': False, 'error': str(e)}

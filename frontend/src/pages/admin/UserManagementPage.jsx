@@ -45,6 +45,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { botService } from '../../services/microservices';
+import { logger } from '../../utils/prodLogger';
 
 const UserManagementPage = () => {
     const [users, setUsers] = useState([]);
@@ -86,7 +87,7 @@ const UserManagementPage = () => {
             const response = await botService.get('/api/admin/users');
             setUsers(response.data?.users || []);
         } catch (error) {
-            console.error('Error loading users:', error);
+            logger.error('Error loading users:', error);
             toast.error('Ошибка загрузки пользователей');
         } finally {
             setLoading(false);
@@ -99,7 +100,7 @@ const UserManagementPage = () => {
             const response = await botService.get('/api/admin/sessions');
             setSessions(response.data?.sessions || []);
         } catch (error) {
-            console.error('Error loading sessions:', error);
+            logger.error('Error loading sessions:', error);
             toast.error('Ошибка загрузки сессий');
         } finally {
             setSessionsLoading(false);
@@ -112,7 +113,7 @@ const UserManagementPage = () => {
             const response = await botService.get('/api/integrations');
             setIntegrations(response.data?.integrations || []);
         } catch (error) {
-            console.error('Error loading integrations:', error);
+            logger.error('Error loading integrations:', error);
             toast.error('Ошибка загрузки интеграций');
         } finally {
             setIntegrationsLoading(false);
@@ -247,7 +248,7 @@ const UserManagementPage = () => {
             setEditDialogOpen(false);
             loadUsers();
         } catch (error) {
-            console.error('Error updating user:', error);
+            logger.error('Error updating user:', error);
             toast.error('Ошибка обновления пользователя');
         }
     };
@@ -261,7 +262,7 @@ const UserManagementPage = () => {
             setBlockDialogOpen(false);
             loadUsers();
         } catch (error) {
-            console.error('Error blocking user:', error);
+            logger.error('Error blocking user:', error);
             toast.error('Ошибка блокировки пользователя');
         }
     };
@@ -274,7 +275,7 @@ const UserManagementPage = () => {
             toast.success('Пользователь удален');
             loadUsers();
         } catch (error) {
-            console.error('Error deleting user:', error);
+            logger.error('Error deleting user:', error);
             toast.error('Ошибка удаления пользователя');
         }
     };
@@ -295,7 +296,7 @@ const UserManagementPage = () => {
             setWhitelistForm({ channel_name: '' });
             loadUsers(); // Перезагружаем для обновления статуса whitelist
         } catch (error) {
-            console.error('Error adding to whitelist:', error);
+            logger.error('Error adding to whitelist:', error);
             // Ошибка уже обрабатывается в apiClient
         }
     };
@@ -322,7 +323,7 @@ const UserManagementPage = () => {
             }
             loadUsers(); // Обновляем список
         } catch (error) {
-            console.error('Error toggling whitelist:', error);
+            logger.error('Error toggling whitelist:', error);
             // Ошибка уже обрабатывается в apiClient
         }
     };
@@ -403,88 +404,6 @@ const UserManagementPage = () => {
                 </div>
             </div>
 
-            {/* Фильтры */}
-            <Card className="bg-slate-800/50 border-slate-700">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Filter className="w-5 h-5" />
-                        Фильтры и поиск
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                        {/* Поиск */}
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                                <Input
-                            placeholder="Поиск по ID, никнейму или платформе..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10 bg-slate-700/50 border-slate-600"
-                                />
-                        </div>
-
-                    {/* Фильтры в ряд */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="space-y-2">
-                            <Label>Роль</Label>
-                            <Select value={roleFilter} onValueChange={setRoleFilter}>
-                                <SelectTrigger className="bg-slate-700/50 border-slate-600">
-                                    <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">Все роли</SelectItem>
-                                                <SelectItem value="admin">Администраторы</SelectItem>
-                                                <SelectItem value="user">Пользователи</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                        <div className="space-y-2">
-                            <Label>Статус</Label>
-                            <Select value={statusFilter} onValueChange={setStatusFilter}>
-                                <SelectTrigger className="bg-slate-700/50 border-slate-600">
-                                    <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">Все статусы</SelectItem>
-                                                <SelectItem value="active">Активные</SelectItem>
-                                                <SelectItem value="blocked">Заблокированные</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                        <div className="space-y-2">
-                            <Label>Интеграции</Label>
-                            <Select value={integrationFilter} onValueChange={setIntegrationFilter}>
-                                <SelectTrigger className="bg-slate-700/50 border-slate-600">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Все</SelectItem>
-                                    <SelectItem value="twitch">Twitch</SelectItem>
-                                    <SelectItem value="vk">VK Live</SelectItem>
-                                    <SelectItem value="none">Без интеграций</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Whitelist</Label>
-                            <Select value={whitelistFilter} onValueChange={setWhitelistFilter}>
-                                <SelectTrigger className="bg-slate-700/50 border-slate-600">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Все</SelectItem>
-                                    <SelectItem value="whitelisted">В whitelist</SelectItem>
-                                    <SelectItem value="not_whitelisted">Не в whitelist</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
             {/* Таблица пользователей */}
             <Card className="bg-slate-800/50 border-slate-700">
                 <CardHeader>
@@ -515,7 +434,7 @@ const UserManagementPage = () => {
                                             onClick={() => handleSort('total_integrations')}
                                             className="flex items-center gap-1 hover:text-purple-400 font-semibold"
                                         >
-                                            Стримеры {getSortIcon('total_integrations')}
+                                            Интеграции {getSortIcon('total_integrations')}
                                         </button>
                                     </th>
                                     <th className="text-left p-2 whitespace-nowrap">
@@ -586,13 +505,23 @@ const UserManagementPage = () => {
                                                     {user.integrations?.twitch?.connected && (
                                                         <Badge className="bg-purple-900/50 text-purple-200 text-xs">
                                                             <Twitch className="w-2.5 h-2.5 mr-1" />
-                                                            {user.integrations.twitch.username || 'N/A'}
+                                                            <span title={`Канал: ${user.twitch_username}`}>
+                                                                {user.integrations.twitch.username || 'N/A'}
+                                                                {user.twitch_username && user.integrations.twitch.username !== user.twitch_username && 
+                                                                    ` (${user.twitch_username})`
+                                                                }
+                                                            </span>
                                                         </Badge>
                                                     )}
                                                     {user.integrations?.vk?.connected && (
                                                         <Badge className="bg-blue-900/50 text-blue-200 text-xs">
                                                             <MessageCircle className="w-2.5 h-2.5 mr-1" />
-                                                            {user.integrations.vk.username || 'N/A'}
+                                                            <span title={`Канал: ${user.vk_channel_name}`}>
+                                                                {user.integrations.vk.username || 'N/A'}
+                                                                {user.vk_channel_name && user.integrations.vk.username !== user.vk_channel_name && 
+                                                                    ` (${user.vk_channel_name})`
+                                                                }
+                                                            </span>
                                                         </Badge>
                                                     )}
                                                     {user.total_integrations === 0 && (

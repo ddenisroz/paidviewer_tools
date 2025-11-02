@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Trash2, Plus, AlertCircle, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { botService } from '../../services/microservices';
+import { logger } from '../../utils/prodLogger';
 
 const BlockedChannelsPage = () => {
   const [blockedChannels, setBlockedChannels] = useState([]);
@@ -20,7 +21,7 @@ const BlockedChannelsPage = () => {
       const response = await botService.get('/api/admin/blocked-channels');
       setBlockedChannels(response.data.blocked_channels || []);
     } catch (error) {
-      console.error('Error loading blocked channels:', error);
+      logger.error('Error loading blocked channels:', error);
       toast.error('Ошибка загрузки заблокированных каналов');
     } finally {
       setLoading(false);
@@ -44,7 +45,7 @@ const BlockedChannelsPage = () => {
       setNewChannel('');
       await loadBlockedChannels();
     } catch (error) {
-      console.error('Error adding blocked channel:', error);
+      logger.error('Error adding blocked channel:', error);
       toast.error('Ошибка блокировки канала');
     } finally {
       setAddingChannel(false);
@@ -57,7 +58,7 @@ const BlockedChannelsPage = () => {
       toast.success('Канал разблокирован');
       await loadBlockedChannels();
     } catch (error) {
-      console.error('Error removing blocked channel:', error);
+      logger.error('Error removing blocked channel:', error);
       toast.error('Ошибка разблокировки канала');
     }
   };

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import api from '../../services/api';
+import { logger } from '../../utils/prodLogger';
 
 const YoutubeSettingsPage = () => {
     const [playbackMode, setPlaybackMode] = useState('browser');
@@ -16,7 +17,7 @@ const YoutubeSettingsPage = () => {
             setPlaybackMode(response.data.playback_mode || 'browser');
             setVolume(response.data.volume_level || 50);
         } catch (error) {
-            console.error('Error loading YouTube settings:', error);
+            logger.error('Error loading YouTube settings:', error);
         }
     };
 
@@ -29,7 +30,7 @@ const YoutubeSettingsPage = () => {
             });
             toast.success('Настройки YouTube сохранены');
         } catch (error) {
-            console.error('Error saving YouTube settings:', error);
+            logger.error('Error saving YouTube settings:', error);
             toast.error('Ошибка сохранения настроек YouTube');
         }
     };
@@ -41,7 +42,7 @@ const YoutubeSettingsPage = () => {
             setYoutubeObsUrl(response.data.youtube_obs_url);
             return response.data.youtube_obs_url;
         } catch (error) {
-            console.error('Error generating YouTube OBS URL:', error);
+            logger.error('Error generating YouTube OBS URL:', error);
             toast.error('Ошибка создания YouTube OBS URL');
             return null;
         }

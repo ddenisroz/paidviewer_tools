@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './AuthContext';
 import { botService } from '../services/microservices';
 import { saveReturnUrl } from '../utils/oauthRedirect';
 import { API_BASE_URL } from '../constants';
+import { logger } from '../utils/prodLogger';
 
 const IntegrationsContext = createContext();
 
@@ -77,7 +78,7 @@ export const IntegrationsProvider = ({ children }) => {
         }
     }, [integrationsNeedRefresh, fetchIntegrations, markIntegrationsRefreshed, refreshAuthStatus]);
 
-    const updateTwitchIntegration = async (enabled, onClose = null) => {
+    const updateTwitchIntegration = useCallback(async (enabled, onClose = null) => {
         if (enabled) {
             // Подключить Twitch интеграцию - прямой редирект на OAuth
             if (onClose) onClose(); // Закрываем попап перед перенаправлением
@@ -103,16 +104,16 @@ export const IntegrationsProvider = ({ children }) => {
                         detail: { enabledPlatforms: updatedPlatforms }
                     }));
                     
-                    console.log('🔄 Automatically removed twitch from TTS enabled_platforms');
+                    logger.log('🔄 Automatically removed twitch from TTS enabled_platforms');
                 } catch (ttsError) {
-                    console.error('Error updating TTS settings after disconnect:', ttsError);
+                    logger.error('Error updating TTS settings after disconnect:', ttsError);
                 }
                 
                 // Обновляем данные пользователя из AuthContext
                 await refreshAuthStatus(true);
                 await fetchIntegrations();
             } catch (error) {
-                console.error('Error disconnecting Twitch:', error);
+                logger.error('Error disconnecting Twitch:', error);
             } finally {
                 setIsLoading(false);
             }
@@ -122,7 +123,7 @@ export const IntegrationsProvider = ({ children }) => {
     const updateVkIntegration = async (enabled, onClose = null) => {
         if (enabled) {
             // Подключить VK интеграцию - прямой редирект на OAuth
-            console.log('🔵 [INTEGRATIONS] VK integration enable requested');
+            logger.log('🔵 [INTEGRATIONS] VK integration enable requested');
             if (onClose) onClose(); // Закрываем попап перед перенаправлением
             saveReturnUrl(); // Сохраняем текущую страницу
             window.location.href = `${API_BASE_URL}/auth/vk/login`;
@@ -146,29 +147,36 @@ export const IntegrationsProvider = ({ children }) => {
                         detail: { enabledPlatforms: updatedPlatforms }
                     }));
                     
-                    console.log('🔄 Automatically removed vk from TTS enabled_platforms');
+                    logger.log('🔄 Automatically removed vk from TTS enabled_platforms');
                 } catch (ttsError) {
-                    console.error('Error updating TTS settings after disconnect:', ttsError);
+                    logger.error('Error updating TTS settings after disconnect:', ttsError);
                 }
                 
                 // Обновляем данные пользователя из AuthContext
                 await refreshAuthStatus(true);
                 await fetchIntegrations();
             } catch (error) {
-                console.error('Error disconnecting VK:', error);
+                logger.error('Error disconnecting VK:', error);
             } finally {
                 setIsLoading(false);
             }
         }
-    };
+    }, [refreshAuthStatus, fetchIntegrations]);
 
-    const value = {
+    // Мемоизируем значение контекста для предотвращения лишних re-renders
+    const value = useMemo(() => ({
         integrations,
         isLoading,
         refreshIntegrations: fetchIntegrations,
         updateTwitchIntegration,
         updateVkIntegration,
-    };
+    }), [
+        integrations,
+        isLoading,
+        fetchIntegrations,
+        updateTwitchIntegration,
+        updateVkIntegration,
+    ]);
 
     return (
         <IntegrationsContext.Provider value={value}>

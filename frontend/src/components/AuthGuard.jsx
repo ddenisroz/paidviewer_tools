@@ -8,14 +8,19 @@ const AuthGuard = () => {
     const { isAuthenticated, isGuest, isCheckingAuth } = useAuth();
     const location = useLocation();
 
-    // Пока проверяем авторизацию - показываем простой индикатор загрузки
+    // Пока проверяем авторизацию - показываем только фон без видимых элементов
     if (isCheckingAuth || isAuthenticated === null) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 to-gray-800">
-                <div className="text-center">
-                    <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent mb-4"></div>
-                    <p className="text-gray-400">Загрузка...</p>
-                </div>
+            <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'hsl(260, 30%, 8%)',
+                zIndex: 9999
+            }}>
+                {/* Invisible loading - no spinners, no text */}
             </div>
         );
     }

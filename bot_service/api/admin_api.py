@@ -145,27 +145,13 @@ async def get_admin_users(
                 UserToken.access_token.isnot(None)
             ).first()
             
-            # Проверяем валидность токенов
-            twitch_connected = False
-            vk_connected = False
+            # Проверяем наличие активных токенов (упрощенно - без проверки через API)
+            twitch_connected = twitch_token is not None and twitch_token.is_active
+            vk_connected = vk_token is not None and vk_token.is_active
             
-            if twitch_token:
-                try:
-                    import requests
-                    test_response = requests.get(f'https://api.twitch.tv/helix/users?id={twitch_token.platform_user_id}', 
-                                               headers={'Client-ID': 'your_client_id', 'Authorization': f'Bearer {twitch_token.access_token}'}, 
-                                               timeout=5)
-                    twitch_connected = test_response.status_code == 200
-                except:
-                    twitch_connected = False
-            
-            if vk_token:
-                try:
-                    import requests
-                    test_response = requests.get(f'https://api.vk.com/method/users.get?access_token={vk_token.access_token}&v=5.131', timeout=5)
-                    vk_connected = not test_response.json().get('error')
-                except:
-                    vk_connected = False
+            # Получаем username из токена или из User
+            twitch_display_name = u.twitch_username or (twitch_token.platform_user_id if twitch_token else None)
+            vk_display_name = u.vk_username or u.vk_channel_name or (vk_token.platform_user_id if vk_token else None)
             
             user_data.append({
                 'id': u.id,
@@ -176,14 +162,17 @@ async def get_admin_users(
                 'created_at': u.created_at.isoformat() if u.created_at else None,
                 'twitch_username': u.twitch_username,
                 'vk_username': u.vk_username,
+                'vk_channel_name': u.vk_channel_name,
                 'integrations': {
                     'twitch': {
                         'connected': twitch_connected,
-                        'username': u.twitch_username
+                        'username': twitch_display_name,
+                        'enabled': twitch_connected
                     },
                     'vk': {
                         'connected': vk_connected,
-                        'username': u.vk_username
+                        'username': vk_display_name,
+                        'enabled': vk_connected
                     }
                 },
                 'total_integrations': (1 if twitch_connected else 0) + (1 if vk_connected else 0),
@@ -594,11 +583,16 @@ async def get_tts_status(
                 response = await client.get(f"{tts_service_url}/health", timeout=5.0)
                 tts_data = response.json()
                 
+                # Определяем healthy на основе статуса ответа
+                service_status = tts_data.get("status", "unknown")
+                is_healthy = response.status_code == 200 and service_status in ["healthy", "ok", "up"]
+                
             return {
                 "success": True,
                 "tts_service": {
+                    "healthy": is_healthy,
                     "available": True,
-                    "status": tts_data.get("status", "unknown"),
+                    "status": service_status,
                     "url": tts_service_url
                 }
             }
@@ -606,8 +600,10 @@ async def get_tts_status(
             return {
                 "success": True,
                 "tts_service": {
+                    "healthy": False,
                     "available": False,
                     "error": str(e),
+                    "status": "offline",
                     "url": tts_service_url
                 }
             }
@@ -1650,8 +1646,8 @@ async def get_admin_voices(
             raise HTTPException(status_code=403, detail="Admin access required")
         
         from constants import DEFAULT_TTS_SERVICE_URL
-        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
         import httpx
+        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
         
         # Проксируем запрос в TTS Service
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -1670,9 +1666,32 @@ async def get_admin_voices(
             
     except HTTPException:
         raise
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
+        # TTS сервис недоступен - возвращаем пустой список с предупреждением
+        from constants import DEFAULT_TTS_SERVICE_URL
+        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        logger.warning(f"TTS Service недоступен ({TTS_SERVICE_URL}): {e}. Возвращаю пустой список голосов.")
+        return {
+            "success": True,
+            "voices": [],
+            "global_voices": [],
+            "user_voices": [],
+            "warning": f"TTS сервис недоступен ({TTS_SERVICE_URL}). Убедитесь, что TTS сервис запущен.",
+            "tts_service_url": TTS_SERVICE_URL
+        }
     except Exception as e:
         logger.error(f"Get admin voices error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to get voices: {str(e)}")
+        # Для других ошибок тоже возвращаем пустой список вместо 500
+        from constants import DEFAULT_TTS_SERVICE_URL
+        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        return {
+            "success": True,
+            "voices": [],
+            "global_voices": [],
+            "user_voices": [],
+            "warning": f"Ошибка подключения к TTS сервису: {str(e)}",
+            "tts_service_url": TTS_SERVICE_URL
+        }
 
 @router.post("/voices/upload")
 async def upload_voice_proxy(

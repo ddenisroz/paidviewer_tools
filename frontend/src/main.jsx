@@ -41,7 +41,10 @@ const ConditionalContextWrapper = ({ children }) => {
   return <CoreProviders>{children}</CoreProviders>;
 };
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+// Убираем класс "загрузка" после монтирования
+const root = ReactDOM.createRoot(document.getElementById('root'));
+
+root.render(
   // StrictMode отключен: создает двойные WebSocket подключения в dev режиме
   // <React.StrictMode>
     <BrowserRouter>
@@ -50,5 +53,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       </ConditionalContextWrapper>
     </BrowserRouter>
   // </React.StrictMode>
-  ,
-)
+);
+
+// Помечаем body как загруженный после монтирования React
+setTimeout(() => {
+  document.body.classList.add('loaded');
+}, 0);

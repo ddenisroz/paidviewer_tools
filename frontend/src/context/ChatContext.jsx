@@ -7,7 +7,7 @@ import { useToast } from '../components/ui/toast';
 import { useIntegrations } from './IntegrationsContext';
 import useSharedWebSocket from '../hooks/useSharedWebSocket';
 import api from '../services/api';
-import { chatLogger as logger } from '../utils/logger';
+import { logger } from '../utils/prodLogger';
 
 const ChatContext = createContext();
 
@@ -174,18 +174,18 @@ export const ChatProvider = ({ children }) => {
             setLastJsonMessage(data);
             
             // 🔍 DEBUG: Логируем ВСЕ входящие WebSocket сообщения
-            console.log('🔌 [WS] Received message type:', data.type, 'Data:', data);
+            logger.log('🔌 [WS] Received message type:', data.type, 'Data:', data);
             
             if (data.type === 'message' || data.type === 'chat_message') {
                 dispatchMessages({ type: 'ADD_MESSAGE', payload: data });
             } else if (data.type === 'chat_history') {
                 // Получили историю сообщений через WebSocket
-                console.log('📜 [WS] Processing chat_history, messages:', data.messages?.length);
+                logger.log('📜 [WS] Processing chat_history, messages:', data.messages?.length);
                 if (data.messages && Array.isArray(data.messages)) {
                     logger.info(`📜 Loaded ${data.messages.length} messages from WebSocket history`);
                     dispatchMessages({ type: 'SET_MESSAGES', payload: data.messages });
                 } else {
-                    console.warn('⚠️ [WS] chat_history received but messages is not an array:', data.messages);
+                    logger.warn('⚠️ [WS] chat_history received but messages is not an array:', data.messages);
                 }
             } else if (data.type === 'bot_status') {
                 setBotStatus(data.status);

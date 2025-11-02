@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tag, Save, RefreshCw, CheckCircle, XCircle, Search } from 'lucide-react';
 import { botService } from '../services/microservices';
 import { toast } from 'sonner';
+import { logger } from '../utils/prodLogger';
 
 const StreamCategoryPage = () => {
     const [twitchCategory, setTwitchCategory] = useState('');
@@ -24,9 +25,9 @@ const StreamCategoryPage = () => {
 
     // Обработчик выбора категории с логированием
     const handleTwitchCategoryChange = (categoryId) => {
-        console.log('🎮 [CATEGORY] Selected Twitch category ID:', categoryId);
+        logger.log('🎮 [CATEGORY] Selected Twitch category ID:', categoryId);
         const category = twitchCategories.find(cat => cat.id === categoryId);
-        console.log('🎮 [CATEGORY] Category details:', category);
+        logger.log('🎮 [CATEGORY] Category details:', category);
         setTwitchCategory(categoryId);
     };
 
@@ -47,7 +48,7 @@ const StreamCategoryPage = () => {
                 setTwitchCategory(data.category_id);
             }
         } catch (error) {
-            console.error('Error loading stream info:', error);
+            logger.error('Error loading stream info:', error);
         }
     };
 
@@ -57,7 +58,7 @@ const StreamCategoryPage = () => {
             const response = await botService.get(`/api/twitch/categories?search=${search}`);
             setTwitchCategories(response.data.categories || []);
         } catch (error) {
-            console.error('Error loading Twitch categories:', error);
+            logger.error('Error loading Twitch categories:', error);
             // Fallback на моковые данные
             setTwitchCategories([
                 { id: '509658', name: 'Just Chatting', viewers: 0 },
@@ -85,8 +86,8 @@ const StreamCategoryPage = () => {
     };
 
     const updateTwitchCategory = async () => {
-        console.log('🚀 [UPDATE] Starting Twitch category update');
-        console.log('🚀 [UPDATE] Selected category ID:', twitchCategory);
+        logger.log('🚀 [UPDATE] Starting Twitch category update');
+        logger.log('🚀 [UPDATE] Selected category ID:', twitchCategory);
         
         if (!twitchCategory) {
             toast.error('Пожалуйста, выберите категорию');
@@ -102,10 +103,10 @@ const StreamCategoryPage = () => {
                     category_id: twitchCategory
                 }
             };
-            console.log('🚀 [UPDATE] Sending payload:', payload);
+            logger.log('🚀 [UPDATE] Sending payload:', payload);
             
             const response = await botService.post('/api/stream/update', payload);
-            console.log('✅ [UPDATE] Response:', response.data);
+            logger.log('✅ [UPDATE] Response:', response.data);
             
             if (response.data.success) {
                 setStatus(prev => ({ ...prev, twitch: 'success' }));
@@ -122,8 +123,8 @@ const StreamCategoryPage = () => {
                 setStatus(prev => ({ ...prev, twitch: 'idle' }));
             }, 3000);
         } catch (error) {
-            console.error('❌ [UPDATE] Ошибка обновления категории:', error);
-            console.error('📄 [UPDATE] Детали ошибки:', error.response?.data);
+            logger.error('❌ [UPDATE] Ошибка обновления категории:', error);
+            logger.error('📄 [UPDATE] Детали ошибки:', error.response?.data);
             setStatus(prev => ({ ...prev, twitch: 'error' }));
             
             const errorMessage = error.response?.data?.detail || 
@@ -160,8 +161,8 @@ const StreamCategoryPage = () => {
                 setStatus(prev => ({ ...prev, vk: 'idle' }));
             }, 3000);
         } catch (error) {
-            console.error('❌ Ошибка обновления категории VK:', error);
-            console.error('📄 Детали ошибки:', error.response?.data);
+            logger.error('❌ Ошибка обновления категории VK:', error);
+            logger.error('📄 Детали ошибки:', error.response?.data);
             setStatus(prev => ({ ...prev, vk: 'error' }));
             
             const errorMessage = error.response?.data?.detail || 

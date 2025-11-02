@@ -11,7 +11,7 @@ import secrets
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["system"])
+router = APIRouter(prefix="/api/system", tags=["system"])
 
 @router.get("/health")
 async def health_check():
@@ -130,21 +130,67 @@ async def get_system_logs(
     lines: int = 100,
     user: dict = Depends(get_current_user)
 ):
-    """Получить системные логи"""
+    """Получить системные логи из файлов"""
     try:
         # Проверяем права доступа
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        # В реальной системе здесь бы читались логи из файла
-        # Пока возвращаем заглушку
+        import os
+        from pathlib import Path
+        
+        # Путь к логам
+        logs_dir = Path("logs")
+        
+        # Читаем логи из разных файлов (приоритет: ошибки, затем общие логи)
+        all_logs = []
+        
+        # 1. Читаем логи ошибок (самые важные)
+        error_log_file = logs_dir / "errors" / "bot_service_errors.log"
+        if error_log_file.exists():
+            try:
+                with open(error_log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                    error_lines = f.readlines()
+                    all_logs.extend([f"[ERROR] {line.strip()}" for line in error_lines[-lines//2:] if line.strip()])
+            except Exception as e:
+                logger.warning(f"Could not read error log file: {e}")
+        
+        # 2. Читаем основные логи приложения
+        app_log_file = logs_dir / "app" / "bot_service.log"
+        if app_log_file.exists():
+            try:
+                with open(app_log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                    app_lines = f.readlines()
+                    # Берем последние строки
+                    all_logs.extend([line.strip() for line in app_lines[-lines:] if line.strip()])
+            except Exception as e:
+                logger.warning(f"Could not read app log file: {e}")
+        
+        # Сортируем по времени (если есть timestamp) и берем последние N строк
+        all_logs.sort(reverse=True)  # Новые сверху
+        result_logs = all_logs[:lines]
+        
+        # Если логов нет, возвращаем информативное сообщение
+        if not result_logs:
+            return {
+                "success": True,
+                "logs": [
+                    "INFO - Логи пусты. Логи будут появляться здесь по мере работы системы.",
+                    "INFO - Логи сохраняются в папке bot_service/logs/",
+                    f"INFO - Проверьте файлы: logs/app/bot_service.log и logs/errors/bot_service_errors.log"
+                ],
+                "total_lines": 3,
+                "note": "No logs found yet"
+            }
+        
         return {
             "success": True,
-            "logs": [
-                f"System log entry {i}: {datetime.utcnow().isoformat()}" 
-                for i in range(min(lines, 50))
-            ],
-            "total_lines": min(lines, 50)
+            "logs": result_logs,
+            "total_lines": len(result_logs),
+            "sources": {
+                "error_log": str(error_log_file) if error_log_file.exists() else None,
+                "app_log": str(app_log_file) if app_log_file.exists() else None
+            }
         }
     except Exception as e:
         logger.error(f"Error getting system logs: {e}")
@@ -168,4 +214,30 @@ async def restart_system(
         }
     except Exception as e:
         logger.error(f"Error restarting system: {e}")
+        return {"success": False, "error": str(e)}
+
+@router.post("/csp-report")
+async def csp_report(request: Request):
+    """
+    Collect CSP violations from clients
+    Used for monitoring and improving security policy
+    """
+    try:
+        body = await request.json()
+        logger.warning(f"CSP Violation: {body}")
+        
+        # Можно сохранить в БД для дальнейшего анализа
+        # csp_violation = CSPViolation(
+        #     document_uri=body.get('csp-report', {}).get('document-uri'),
+        #     violated_directive=body.get('csp-report', {}).get('violated-directive'),
+        #     original_policy=body.get('csp-report', {}).get('original-policy'),
+        #     blocked_uri=body.get('csp-report', {}).get('blocked-uri'),
+        #     timestamp=datetime.utcnow()
+        # )
+        # db.add(csp_violation)
+        # db.commit()
+        
+        return {"success": True, "message": "CSP violation reported"}
+    except Exception as e:
+        logger.error(f"Error processing CSP report: {e}")
         return {"success": False, "error": str(e)}

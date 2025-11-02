@@ -1,5 +1,6 @@
 // src/services/vkApi.js
 import api from './api';
+import { logger } from '../utils/prodLogger';
 
 export const vkApi = {
     // Получить информацию о стриме
@@ -8,7 +9,7 @@ export const vkApi = {
             const response = await api.get('/api/vk/stream-info');
             return response.data;
         } catch (error) {
-            console.error('Error fetching VK stream info:', error);
+            logger.error('Error fetching VK stream info:', error);
             return null;
         }
     },
@@ -19,7 +20,7 @@ export const vkApi = {
             const response = await api.get('/api/vk/viewers');
             return response.data;
         } catch (error) {
-            console.error('Error fetching VK viewers:', error);
+            logger.error('Error fetching VK viewers:', error);
             return 0;
         }
     },
@@ -32,7 +33,7 @@ export const vkApi = {
             });
             return response.data;
         } catch (error) {
-            console.error('Error updating VK title:', error);
+            logger.error('Error updating VK title:', error);
             throw error;
         }
     },
@@ -43,7 +44,7 @@ export const vkApi = {
             const response = await api.get('/api/vk/categories');
             return response.data;
         } catch (error) {
-            console.error('Error fetching VK categories:', error);
+            logger.error('Error fetching VK categories:', error);
             return [];
         }
     },
@@ -56,7 +57,7 @@ export const vkApi = {
             });
             return response.data;
         } catch (error) {
-            console.error('Error updating VK category:', error);
+            logger.error('Error updating VK category:', error);
             throw error;
         }
     }

@@ -10,6 +10,7 @@ import { Textarea } from '../../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
 import { toast } from 'sonner';
+import { logger } from '../../utils/prodLogger';
 
 const SupportTicketsPage = () => {
   const [tickets, setTickets] = useState([]);
@@ -39,7 +40,7 @@ const SupportTicketsPage = () => {
         toast.error('Ошибка при загрузке тикетов');
       }
     } catch (error) {
-      console.error('Error loading tickets:', error);
+      logger.error('Error loading tickets:', error);
       toast.error('Ошибка при загрузке тикетов');
     } finally {
       setLoading(false);
@@ -63,7 +64,7 @@ const SupportTicketsPage = () => {
         toast.error('Ошибка при загрузке ответов');
       }
     } catch (error) {
-      console.error('Error loading responses:', error);
+      logger.error('Error loading responses:', error);
       toast.error('Ошибка при загрузке ответов');
     }
   };
@@ -90,7 +91,7 @@ const SupportTicketsPage = () => {
         toast.error('Ошибка при отправке ответа');
       }
     } catch (error) {
-      console.error('Error sending response:', error);
+      logger.error('Error sending response:', error);
       toast.error('Ошибка при отправке ответа');
     } finally {
       setIsSubmittingResponse(false);
@@ -125,7 +126,7 @@ const SupportTicketsPage = () => {
         toast.error('Ошибка при обновлении тикета');
       }
     } catch (error) {
-      console.error('Error updating ticket:', error);
+      logger.error('Error updating ticket:', error);
       toast.error('Ошибка при обновлении тикета');
     }
   };
@@ -150,7 +151,7 @@ const SupportTicketsPage = () => {
         toast.error('Ошибка архивирования тикета');
       }
     } catch (error) {
-      console.error('Error archiving ticket:', error);
+      logger.error('Error archiving ticket:', error);
       toast.error('Ошибка архивирования тикета');
     }
   };
@@ -174,7 +175,7 @@ const SupportTicketsPage = () => {
         toast.error('Ошибка извлечения тикета из архива');
       }
     } catch (error) {
-      console.error('Error unarchiving ticket:', error);
+      logger.error('Error unarchiving ticket:', error);
       toast.error('Ошибка извлечения тикета из архива');
     }
   };

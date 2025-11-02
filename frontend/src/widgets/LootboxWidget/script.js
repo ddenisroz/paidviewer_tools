@@ -1,3 +1,5 @@
+import { logger } from '../../utils/prodLogger';
+
 class LootboxWidget {
     constructor() {
         this.config = null;
@@ -32,7 +34,7 @@ class LootboxWidget {
             this.addTestControls();
             
         } catch (error) {
-            console.error('Error initializing lootbox widget:', error);
+            logger.error('Error initializing lootbox widget:', error);
         }
     }
     

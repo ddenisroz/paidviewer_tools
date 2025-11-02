@@ -1,3 +1,5 @@
+import { logger } from '../../utils/prodLogger';
+
 /**
  * Менеджер конфигураций для виджетов
  */
@@ -63,7 +65,7 @@ class WidgetConfigManager {
                 return result;
             }
         } catch (error) {
-            console.error('Error saving config:', error);
+            logger.error('Error saving config:', error);
             throw error;
         }
     }

@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 import { getWebSocketBaseUrl } from '../utils/urlUtils';
+import { logger } from '../utils/prodLogger';
 
 const WS_BASE_URL = import.meta.env.VITE_BOT_SERVICE_WS_URL || getWebSocketBaseUrl();
 
@@ -16,7 +17,7 @@ const RESET_INTERVAL_MS = parseInt(import.meta.env.VITE_WS_RESET_INTERVAL_MS || 
 // Сброс глобального счетчика через заданный интервал
 setInterval(() => {
   if (globalConnectionAttempts > 0) {
-    console.log(`useWebSocket: Resetting global connection attempts counter (was ${globalConnectionAttempts})`);
+    logger.log(`useWebSocket: Resetting global connection attempts counter (was ${globalConnectionAttempts})`);
     globalConnectionAttempts = 0;
   }
 }, RESET_INTERVAL_MS);
@@ -85,7 +86,7 @@ export function useWebSocket(endpoint, options = {}) {
           try {
             wsRef.current.send(JSON.stringify({ type: 'ping' }));
           } catch (err) {
-            console.error('Heartbeat send error:', err);
+            logger.error('Heartbeat send error:', err);
           }
         }
       }, heartbeatInterval);
@@ -100,12 +101,12 @@ export function useWebSocket(endpoint, options = {}) {
         wsRef.current.send(data);
         return true;
       } catch (err) {
-        console.error('WebSocket send error:', err);
+        logger.error('WebSocket send error:', err);
         setError(err);
         return false;
       }
     } else {
-      console.warn('WebSocket is not connected');
+      logger.warn('WebSocket is not connected');
       return false;
     }
   }, []);
@@ -144,19 +145,19 @@ export function useWebSocket(endpoint, options = {}) {
     
     // Проверяем глобальный лимит попыток подключения
     if (globalConnectionAttempts >= MAX_GLOBAL_ATTEMPTS) {
-      console.log(`useWebSocket: Global connection limit reached (${globalConnectionAttempts}/${MAX_GLOBAL_ATTEMPTS}), skipping`);
+      logger.log(`useWebSocket: Global connection limit reached (${globalConnectionAttempts}/${MAX_GLOBAL_ATTEMPTS}), skipping`);
       return;
     }
     
     // Закрываем существующее соединение перед созданием нового
     if (wsRef.current) {
-      console.log(`useWebSocket: Closing existing connection before creating new one. State: ${wsRef.current.readyState}`);
+      logger.log(`useWebSocket: Closing existing connection before creating new one. State: ${wsRef.current.readyState}`);
       wsRef.current.close();
       wsRef.current = null;
     }
     
     if (isConnecting) {
-      console.log(`useWebSocket: Already connecting, skipping`);
+      logger.log(`useWebSocket: Already connecting, skipping`);
       return;
     }
 
@@ -247,7 +248,7 @@ export function useWebSocket(endpoint, options = {}) {
           const maxDelay = parseInt(import.meta.env.VITE_WS_MAX_RECONNECT_DELAY || '10000', 10);
           const delay = Math.min(reconnectInterval * Math.pow(2, reconnectAttemptsRef.current - 1), maxDelay); // Exponential backoff
           
-          console.log(`useWebSocket: Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
+          logger.log(`useWebSocket: Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
 
           reconnectTimeoutRef.current = setTimeout(() => {
             if (isMountedRef.current && !isConnected) {
@@ -265,7 +266,7 @@ export function useWebSocket(endpoint, options = {}) {
 
       wsRef.current = ws;
     } catch (err) {
-      console.error(`WebSocket connection failed: ${endpoint}`, err);
+      logger.error(`WebSocket connection failed: ${endpoint}`, err);
       setError(err);
       setIsConnecting(false);
 

@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../constants';
 import AuthLoader from './AuthLoader';
 // import { toast } from 'sonner';
 // import { useAuth } from '../context/AuthContext';
+import { logger } from '../utils/prodLogger';
 
 const HiddenAuth = () => {
     const [isLoading, setIsLoading] = useState(false); // Убираем прелоадер
@@ -62,7 +63,7 @@ const HiddenAuth = () => {
                                 // Дополнительно перезагружаем страницу для гарантии
                                 setTimeout(() => window.location.reload(), 1000);
                             } else if (event.data.type === 'TWITCH_AUTH_ERROR') {
-                                console.error('❌ Ошибка авторизации Twitch:', event.data.error);
+                                logger.error('❌ Ошибка авторизации Twitch:', event.data.error);
                                 popup.close();
                                 window.removeEventListener('message', handleMessage);
                             }

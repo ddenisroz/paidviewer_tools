@@ -10,6 +10,7 @@ import {
   Trophy,
   Sparkles
 } from 'lucide-react';
+import { logger } from '../../utils/prodLogger';
 
 const DropsWidget = () => {
   const [currentReward, setCurrentReward] = useState(null);
@@ -20,7 +21,7 @@ const DropsWidget = () => {
     // Получаем токен из URL
     const token = window.location.pathname.split('/').pop();
     if (!token) {
-      console.error('No token provided');
+      logger.error('No token provided');
       return;
     }
 
@@ -29,7 +30,7 @@ const DropsWidget = () => {
     const websocket = new WebSocket(wsUrl);
 
     websocket.onopen = () => {
-      console.log('Connected to drops WebSocket');
+      logger.log('Connected to drops WebSocket');
       setWs(websocket);
     };
 
@@ -40,17 +41,17 @@ const DropsWidget = () => {
           showReward(data.data);
         }
       } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+        logger.error('Error parsing WebSocket message:', error);
       }
     };
 
     websocket.onclose = () => {
-      console.log('Drops WebSocket disconnected');
+      logger.log('Drops WebSocket disconnected');
       setWs(null);
     };
 
     websocket.onerror = (error) => {
-      console.error('Drops WebSocket error:', error);
+      logger.error('Drops WebSocket error:', error);
     };
 
     return () => {

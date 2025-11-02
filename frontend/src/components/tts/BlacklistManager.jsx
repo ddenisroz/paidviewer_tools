@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { botService } from '../../services/microservices';
 import { useIntegrations } from '../../context/IntegrationsContext';
 import { useAuth } from '../../context/AuthContext';
+import { logger } from '../../utils/prodLogger';
 
 const BlacklistManager = React.memo(() => {
     const [blacklist, setBlacklist] = useState([]);
@@ -57,7 +58,7 @@ const BlacklistManager = React.memo(() => {
         } catch (error) {
             // Не показываем ошибку если TTS сервис недоступен
             if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
-                console.error('Error loading blacklist:', error);
+                logger.error('Error loading blacklist:', error);
                 toast.error('Ошибка загрузки черного списка');
             }
             setBlacklist([]);
@@ -101,7 +102,7 @@ const BlacklistManager = React.memo(() => {
                 toast.error(response.data.message || 'Ошибка при добавлении в черный список');
             }
         } catch (error) {
-            console.error('Error adding to blacklist:', error);
+            logger.error('Error adding to blacklist:', error);
             toast.error('Ошибка при добавлении в черный список');
         } finally {
             setAdding(false);
@@ -125,7 +126,7 @@ const BlacklistManager = React.memo(() => {
                 toast.error('Ошибка удаления из черного списка');
             }
         } catch (error) {
-            console.error('Error removing from blacklist:', error);
+            logger.error('Error removing from blacklist:', error);
             // Не показываем ошибку если TTS сервис недоступен
             if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
                 toast.error('Ошибка удаления из черного списка');

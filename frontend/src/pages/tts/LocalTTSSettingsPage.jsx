@@ -29,6 +29,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { toast } from 'sonner';
 import { botService } from '../../services/microservices';
 import axios from 'axios';
+import { logger } from '../../utils/prodLogger';
 
 const LocalTTSSettingsPage = () => {
     const [config, setConfig] = useState({
@@ -52,15 +53,36 @@ const LocalTTSSettingsPage = () => {
     const [selectedVoice, setSelectedVoice] = useState(null);
     const [uploadingFile, setUploadingFile] = useState(false);
     const [currentTab, setCurrentTab] = useState('connection');
+    const [isWhitelisted, setIsWhitelisted] = useState(false);
+    const [whitelistChecked, setWhitelistChecked] = useState(false);
 
     useEffect(() => {
         loadConfig();
+        checkWhitelist();
     }, []);
+
+    const checkWhitelist = async () => {
+        try {
+            const response = await botService.get('/api/voices/whitelist-status').catch(() => ({ data: { is_whitelisted: false } }));
+            setIsWhitelisted(response.data?.is_whitelisted || false);
+            setWhitelistChecked(true);
+        } catch (error) {
+            logger.error('Error checking whitelist:', error);
+            setIsWhitelisted(false);
+            setWhitelistChecked(true);
+        }
+    };
 
     const loadConfig = async () => {
         try {
             setLoading(true);
             const response = await botService.get('/api/local-tts/config');
+            
+            // Проверяем whitelist из ответа
+            if (response.data.can_manage_voices === false && !response.data.configured) {
+                setIsWhitelisted(false);
+                setWhitelistChecked(true);
+            }
             
             if (response.data.config) {
                 setConfig({
@@ -70,7 +92,12 @@ const LocalTTSSettingsPage = () => {
                 });
             }
         } catch (error) {
-            console.error('Error loading config:', error);
+            logger.error('Error loading config:', error);
+            // Если ошибка 403 - пользователь не в whitelist
+            if (error.response?.status === 403) {
+                setIsWhitelisted(false);
+                setWhitelistChecked(true);
+            }
         } finally {
             setLoading(false);
         }
@@ -112,6 +139,11 @@ const LocalTTSSettingsPage = () => {
     };
 
     const saveConfig = async () => {
+        if (!isWhitelisted) {
+            toast.error('Сохранение конфигурации локального TTS доступно только для пользователей из whitelist');
+            return;
+        }
+        
         try {
             setSaving(true);
 
@@ -126,7 +158,7 @@ const LocalTTSSettingsPage = () => {
                 await loadConfig(); // Перезагружаем конфиг
             }
         } catch (error) {
-            console.error('Error saving config:', error);
+            logger.error('Error saving config:', error);
             toast.error('❌ Ошибка сохранения');
         } finally {
             setSaving(false);
@@ -144,7 +176,7 @@ const LocalTTSSettingsPage = () => {
                 toast.error(response.data.message);
             }
         } catch (error) {
-            console.error('Error toggling service:', error);
+            logger.error('Error toggling service:', error);
             toast.error('❌ Ошибка переключения сервиса');
         }
     };
@@ -163,7 +195,7 @@ const LocalTTSSettingsPage = () => {
             const response = await axios.get(`${config.endpoint_url}/api/voices/list`);
             setVoices(response.data.voices || []);
         } catch (error) {
-            console.error('Error loading voices:', error);
+            logger.error('Error loading voices:', error);
             toast.error('Ошибка загрузки голосов');
         } finally {
             setLoadingVoices(false);
@@ -192,7 +224,7 @@ const LocalTTSSettingsPage = () => {
             setNewVoice({ name: '', language: 'ru', description: '' });
             loadVoices();
         } catch (error) {
-            console.error('Error creating voice:', error);
+            logger.error('Error creating voice:', error);
             toast.error(error.response?.data?.detail || 'Ошибка создания голоса');
         }
     };
@@ -228,7 +260,7 @@ const LocalTTSSettingsPage = () => {
             setSampleText('');
             setSampleFile(null);
         } catch (error) {
-            console.error('Error uploading sample:', error);
+            logger.error('Error uploading sample:', error);
             toast.error(error.response?.data?.detail || 'Ошибка загрузки сэмпла');
         } finally {
             setUploadingFile(false);
@@ -258,7 +290,7 @@ const LocalTTSSettingsPage = () => {
             toast.success('🗑️ Голос удалён');
             loadVoices();
         } catch (error) {
-            console.error('Error deleting voice:', error);
+            logger.error('Error deleting voice:', error);
             toast.error('Ошибка удаления голоса');
         }
     };
@@ -287,11 +319,25 @@ const LocalTTSSettingsPage = () => {
                         <Server className="w-8 h-8" />
                         Локальный TTS сервис
                     </h1>
-                    <p className="text-muted-foreground mt-2">
-                        Подключите свой локальный F5-TTS сервис для генерации озвучки
-                    </p>
                 </div>
             </div>
+
+            {/* Уведомление для пользователей без whitelist */}
+            {whitelistChecked && !isWhitelisted && (
+                <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4 flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                        <h3 className="text-red-300 font-semibold mb-1">Доступ к локальному TTS ограничен</h3>
+                        <p className="text-red-200/80 text-sm">
+                            Локальный TTS доступен только для пользователей из whitelist. 
+                            Для получения доступа обратитесь к администратору системы.
+                        </p>
+                        <p className="text-red-200/60 text-xs mt-2">
+                            💡 Вам доступна только базовая озвучка (gTTS) через основные настройки TTS.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Tabs для Connection и Voices */}
             <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">

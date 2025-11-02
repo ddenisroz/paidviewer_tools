@@ -20,6 +20,11 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
+# Загружаем .env файл для получения DATABASE_URL
+from dotenv import load_dotenv
+env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+load_dotenv(dotenv_path=env_path)
+
 from core.database import Base
 # Импортируем все модели для автогенерации миграций
 from core.database import *
@@ -43,7 +48,8 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    # Используем DATABASE_URL из окружения, если он задан
+    url = os.getenv("DATABASE_URL") or config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -62,6 +68,12 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    # Используем DATABASE_URL из окружения, если он задан
+    # Иначе берем из alembic.ini
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        config.set_main_option("sqlalchemy.url", database_url)
+    
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

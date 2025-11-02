@@ -9,6 +9,7 @@ import { TwitchIcon, VKIcon } from '../PlatformIcons';
 import { useAuth } from '../../context/AuthContext';
 import { Loader2, Trash2 } from 'lucide-react';
 import apiClient from '../../services/apiClient';
+import { logger } from '../../utils/prodLogger';
 
 /**
  * Компонент для управления режимом TTS (все сообщения / за баллы канала)
@@ -41,7 +42,7 @@ const TtsChannelPointsMode = ({ asSection = false }) => {
       setTtsMode(data.tts_mode);
       setTtsRewardIds(data.tts_reward_ids || {});
     } catch (error) {
-      console.error('Error loading TTS mode settings:', error);
+      logger.error('Error loading TTS mode settings:', error);
       // Не показываем toast при первой загрузке - данные по умолчанию уже корректны
     }
   };
@@ -61,7 +62,7 @@ const TtsChannelPointsMode = ({ asSection = false }) => {
       
       await loadSettings();
     } catch (error) {
-      console.error('Error changing TTS mode:', error);
+      logger.error('Error changing TTS mode:', error);
       // apiClient.js уже показывает toast при ошибках
     } finally {
       setSaving(false);
@@ -100,7 +101,7 @@ const TtsChannelPointsMode = ({ asSection = false }) => {
       setShowCreateDialog(false);
       await loadSettings();
     } catch (error) {
-      console.error('Error creating TTS reward:', error);
+      logger.error('Error creating TTS reward:', error);
       // apiClient.js уже показывает toast при ошибках
     } finally {
       setSaving(false);
@@ -119,7 +120,7 @@ const TtsChannelPointsMode = ({ asSection = false }) => {
       toast.success('Награда удалена');
       await loadSettings();
     } catch (error) {
-      console.error('Error deleting TTS reward:', error);
+      logger.error('Error deleting TTS reward:', error);
       // apiClient.js уже показывает toast при ошибках
     }
   };

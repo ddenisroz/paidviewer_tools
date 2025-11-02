@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Trophy, MessageSquare, Calendar, Zap } from 'lucide-react';
 import { toast } from 'sonner';
+import { logger } from '../../utils/prodLogger';
 
 const DropsStats = () => {
     const [stats, setStats] = useState(null);
@@ -16,7 +17,7 @@ const DropsStats = () => {
             const data = await response.json();
             setStats(data);
         } catch (error) {
-            console.error('Error loading stats:', error);
+            logger.error('Error loading stats:', error);
             toast.error('Ошибка загрузки статистики');
         } finally {
             setIsLoading(false);

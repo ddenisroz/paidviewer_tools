@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { API_BASE_URL } from '../constants';
+import { logger } from '../utils/prodLogger';
 
 /**
  * Компонент для мониторинга кеша валидации токенов
@@ -32,7 +33,7 @@ const CacheMonitor = () => {
                 toast.error('Ошибка загрузки статистики кеша');
             }
         } catch (error) {
-            console.error('Error fetching cache stats:', error);
+            logger.error('Error fetching cache stats:', error);
             toast.error('Ошибка подключения к серверу');
         } finally {
             setLoading(false);
@@ -55,7 +56,7 @@ const CacheMonitor = () => {
                 toast.error(data.error || 'Ошибка очистки кеша');
             }
         } catch (error) {
-            console.error('Error clearing cache:', error);
+            logger.error('Error clearing cache:', error);
             toast.error('Ошибка подключения к серверу');
         }
     };
@@ -76,7 +77,7 @@ const CacheMonitor = () => {
                 toast.error(data.error || 'Ошибка очистки');
             }
         } catch (error) {
-            console.error('Error cleaning up cache:', error);
+            logger.error('Error cleaning up cache:', error);
             toast.error('Ошибка подключения к серверу');
         }
     };

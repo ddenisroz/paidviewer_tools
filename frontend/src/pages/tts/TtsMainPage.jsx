@@ -17,6 +17,7 @@ import TtsSettings from '../../components/tts/TtsSettings';
 import HealthStatus from '../../components/tts/HealthStatus';
 import TtsFilterManager from '../../components/tts/TtsFilterManager';
 import { ttsLogger } from '../../utils/logger';
+import { logger } from '../../utils/prodLogger';
 
 const TtsMainPageContent = () => {
     const { ttsEnabled, toggleTts, isWhitelisted, engineStatus, isToggling, initializeTts, setNotificationHandler, syncWithHealthContext } = useTts();
@@ -195,8 +196,17 @@ const TtsMainPageContent = () => {
                     const engineType = ttsStatusResponse.data.engine_type || 'gtts';
                     
                     setBasicTtsEnabled(isTtsEnabled);
-                    setAiTtsEnabled(isTtsEnabled && isHealthy);
-                    setTtsEngine(engineType === 'local' ? 'local' : 'cloud');
+                    // Если пользователь не в whitelist, но пытается использовать F5-TTS - переключаем на облачный
+                    if (engineType === 'local' && !isWhitelisted) {
+                        ttsLogger.warning('User not in whitelist but F5-TTS enabled, switching to cloud');
+                        setTtsEngine('cloud');
+                        setAiTtsEnabled(false);
+                        // Автоматически переключаем на облачный
+                        botService.post('/api/tts/engine', { engine_type: 'cloud' }).catch(err => ttsLogger.error('Error switching to cloud:', err));
+                    } else {
+                        setAiTtsEnabled(isTtsEnabled && isHealthy && isWhitelisted);
+                        setTtsEngine(engineType === 'local' && isWhitelisted ? 'local' : 'cloud');
+                    }
                     
                     ttsLogger.info('TTS engine loaded:', engineType);
                 }
@@ -266,7 +276,7 @@ const TtsMainPageContent = () => {
                         setObsUrl('');
                     }
                 } catch (error) {
-                    console.error('Error generating OBS URL:', error);
+                    logger.error('Error generating OBS URL:', error);
                     if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
                         toast.error('Ошибка генерации OBS URL');
                     }
@@ -304,9 +314,9 @@ const TtsMainPageContent = () => {
             }));
             
             // Молча обновляем - не спамим уведомлениями
-            console.log(`Platform ${platform} toggled successfully`);
+            logger.log(`Platform ${platform} toggled successfully`);
         } catch (error) {
-            console.error('Error toggling platform:', error);
+            logger.error('Error toggling platform:', error);
             toast.error('Не удалось переключить платформу');
         } finally {
             setPlatformLoading(false);
@@ -324,7 +334,7 @@ const TtsMainPageContent = () => {
             setSaveStatus('Сохранено');
             setTimeout(() => setSaveStatus(''), 2000);
         } catch (error) {
-            console.error('Error saving settings:', error);
+            logger.error('Error saving settings:', error);
             setSaveStatus('Ошибка сохранения');
         } finally {
             setIsSaving(false);
@@ -386,9 +396,9 @@ const TtsMainPageContent = () => {
             } else {
                 await botService.post('/api/tts/disable');
             }
-            console.log('Basic TTS state saved:', enabled);
+            logger.log('Basic TTS state saved:', enabled);
         } catch (error) {
-            console.error('Error saving basic TTS state:', error);
+            logger.error('Error saving basic TTS state:', error);
             // apiClient.js уже показывает toast при ошибках
         }
     };
@@ -398,9 +408,9 @@ const TtsMainPageContent = () => {
         try {
             const engine = enabled ? 'local' : 'cloud';
             await botService.post('/api/tts/engine', { engine_type: engine });
-            console.log('AI TTS state saved:', enabled);
+            logger.log('AI TTS state saved:', enabled);
         } catch (error) {
-            console.error('Error saving AI TTS state:', error);
+            logger.error('Error saving AI TTS state:', error);
             // apiClient.js уже показывает toast при ошибках
         }
     };
@@ -426,9 +436,9 @@ const TtsMainPageContent = () => {
         setListeningMode(mode);
         try {
             await botService.post('/api/tts/listening-mode', { listeningMode: mode });
-            console.log('Listening mode saved:', mode);
+            logger.log('Listening mode saved:', mode);
         } catch (error) {
-            console.error('Error saving listening mode:', error);
+            logger.error('Error saving listening mode:', error);
             // apiClient.js уже показывает toast при ошибках
         }
     };
@@ -448,7 +458,7 @@ const TtsMainPageContent = () => {
                 toast.error('Не удалось получить токен');
             }
         } catch (error) {
-            console.error('Error regenerating OBS URL:', error);
+            logger.error('Error regenerating OBS URL:', error);
             // apiClient.js уже показывает toast при ошибках
             setObsUrl('');
         }
@@ -545,7 +555,7 @@ const TtsMainPageContent = () => {
                         </label>
                         
                         <label className={`flex-1 flex items-center gap-2 px-3 py-2 rounded border transition ${
-                            !localTtsConfig?.configured 
+                            !localTtsConfig?.configured || !isWhitelisted
                                 ? 'opacity-40 cursor-not-allowed border-gray-700 text-gray-500'
                                 : ttsEngine === 'local'
                                     ? 'border-green-500 bg-green-500/10 text-green-400 cursor-pointer'
@@ -557,9 +567,16 @@ const TtsMainPageContent = () => {
                                 value="local"
                                 checked={ttsEngine === 'local'}
                                 onChange={(e) => {
-                                    if (localTtsConfig?.configured) {
+                                    if (localTtsConfig?.configured && isWhitelisted) {
                                         setTtsEngine(e.target.value);
-                                        botService.post('/api/tts/engine', { engine_type: 'local' }).catch(err => ttsLogger.error('Error setting TTS engine:', err));
+                                        botService.post('/api/tts/engine', { engine_type: 'local' }).catch(err => {
+                                            ttsLogger.error('Error setting TTS engine:', err);
+                                            // Откатываем изменение при ошибке
+                                            if (err.response?.status === 403) {
+                                                toast.error('F5-TTS доступен только для пользователей из whitelist');
+                                                setTtsEngine('cloud');
+                                            }
+                                        });
                                         
                                         // Уведомляем shortcuts на главной странице
                                         window.dispatchEvent(new CustomEvent('ai-tts-changed', { 
@@ -568,12 +585,17 @@ const TtsMainPageContent = () => {
                                     }
                                 }}
                                 className="w-4 h-4"
-                                disabled={!localTtsConfig?.configured}
+                                disabled={!localTtsConfig?.configured || !isWhitelisted}
                             />
                             <div className="text-sm font-medium">💻 Локальный</div>
                             {!localTtsConfig?.configured && (
                                 <span className="text-xs bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded ml-auto">
                                     Не настроен
+                                </span>
+                            )}
+                            {localTtsConfig?.configured && !isWhitelisted && (
+                                <span className="text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded ml-auto">
+                                    Только whitelist
                                 </span>
                             )}
                         </label>

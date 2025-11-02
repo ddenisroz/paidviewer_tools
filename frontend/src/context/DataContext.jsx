@@ -4,6 +4,7 @@ import { useIntegrations } from './IntegrationsContext';
 import { botService } from '../services/microservices';
 import { useToast } from '../components/ui/toast';
 import { expandQueryWithAliases } from '../constants/categoryAliases';
+import { logger } from '../utils/prodLogger';
 
 const DataContext = createContext();
 
@@ -255,7 +256,7 @@ export const DataProvider = ({ children }) => {
         // Проверяем кэш
         const now = Date.now();
         if (now - lastLoadTime.history < CACHE_TTL) {
-            console.log('📦 [DataContext] Using cached history data');
+            logger.log('📦 [DataContext] Using cached history data');
             return;
         }
         
@@ -279,7 +280,7 @@ export const DataProvider = ({ children }) => {
         if (!force) {
             const now = Date.now();
             if (now - lastLoadTime.streamData < CACHE_TTL) {
-                console.log('📦 [DataContext] Using cached stream data');
+                logger.log('📦 [DataContext] Using cached stream data');
                 return;
             }
         }
@@ -301,7 +302,7 @@ export const DataProvider = ({ children }) => {
                     botService.get('/api/twitch/stream-info', { params: { force } })
                         .then(twitchData => ({ platform: 'twitch', data: twitchData.data }))
                         .catch(error => {
-                            console.error('Error loading Twitch data:', error);
+                            logger.error('Error loading Twitch data:', error);
                             return { platform: 'twitch', data: null };
                         })
                 );
@@ -312,7 +313,7 @@ export const DataProvider = ({ children }) => {
                     botService.get('/api/vk/stream-info', { params: { force } })
                         .then(vkData => ({ platform: 'vk', data: vkData.data }))
                         .catch(error => {
-                            console.error('Error loading VK data:', error);
+                            logger.error('Error loading VK data:', error);
                             return { platform: 'vk', data: null };
                         })
                 );
@@ -351,7 +352,7 @@ export const DataProvider = ({ children }) => {
             // Data updated
 
         } catch (error) {
-            console.error('Error loading stream data:', error);
+            logger.error('Error loading stream data:', error);
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось загрузить данные о стриме.' });
         } finally {
             setLoading(prev => ({ ...prev, streamData: false }));
@@ -424,7 +425,7 @@ export const DataProvider = ({ children }) => {
             return;
         }
 
-        console.log('📤 [DataContext] Final payload before sending:', JSON.stringify(payload, null, 2));
+        logger.log('📤 [DataContext] Final payload before sending:', JSON.stringify(payload, null, 2));
 
         try {
             await botService.post('/api/stream/update', payload);
@@ -434,7 +435,7 @@ export const DataProvider = ({ children }) => {
         } catch (error) {
             setStatus(prev => ({ ...prev, [statusType]: 'error' }));
             
-            console.error('❌ [DATA CONTEXT] Error saving changes:', error);
+            logger.error('❌ [DATA CONTEXT] Error saving changes:', error);
             
             // Проверяем, является ли ошибка связанной с истекшим токеном
             if (error.response?.status === 401) {
@@ -448,7 +449,7 @@ export const DataProvider = ({ children }) => {
             }
             
             // ВАЖНО: При ошибке откатываем к реальным данным из API
-            console.log('🔄 [DATA CONTEXT] Rolling back to server data...');
+            logger.log('🔄 [DATA CONTEXT] Rolling back to server data...');
             await loadStreamData(true); // Перезагружаем данные с сервера
         } finally {
             setTimeout(() => setStatus(prev => ({ ...prev, [statusType]: 'idle' })), 3000);
@@ -457,7 +458,7 @@ export const DataProvider = ({ children }) => {
     
     // --- CATEGORY SEARCH ---
     const searchCategories = useCallback(async (platform, query) => {
-        console.log('DataContext: Searching categories:', { 
+        logger.log('DataContext: Searching categories:', { 
             platform, 
             query, 
             enabled: integrations[platform]?.enabled,
@@ -466,7 +467,7 @@ export const DataProvider = ({ children }) => {
         });
         
         if (!isAuthenticated) {
-            console.log('DataContext: User not authenticated, skipping search');
+            logger.log('DataContext: User not authenticated, skipping search');
             addToast({ 
                 type: 'error', 
                 title: 'Требуется авторизация', 
@@ -476,12 +477,12 @@ export const DataProvider = ({ children }) => {
         }
         
         if (integrationsLoading) {
-            console.log('DataContext: Integrations still loading, skipping search');
+            logger.log('DataContext: Integrations still loading, skipping search');
             return [];
         }
         
         if (!integrations[platform]?.enabled) {
-            console.log('DataContext: Platform not enabled, skipping search');
+            logger.log('DataContext: Platform not enabled, skipping search');
             return [];
         }
         
@@ -489,7 +490,7 @@ export const DataProvider = ({ children }) => {
         try {
             // 🔍 УМНЫЙ ПОИСК: Расширяем запрос с учетом алиасов (dbd → Dead by Daylight, общение → Just Chatting)
             const expandedQueries = expandQueryWithAliases(query);
-            console.log('🔍 DataContext: Expanded queries:', { original: query, expanded: expandedQueries });
+            logger.log('🔍 DataContext: Expanded queries:', { original: query, expanded: expandedQueries });
             
             // Делаем параллельные запросы для всех расширенных вариантов
             const requests = expandedQueries.map(searchQuery =>
@@ -497,13 +498,13 @@ export const DataProvider = ({ children }) => {
                     params: { search: searchQuery },
                     headers: { 'Content-Type': 'application/json' }
                 }).catch(err => {
-                    console.warn(`Search failed for query "${searchQuery}":`, err);
+                    logger.warn(`Search failed for query "${searchQuery}":`, err);
                     return { data: { categories: [] } };
                 })
             );
             
             const responses = await Promise.all(requests);
-            console.log('🔍 DataContext: All API responses received');
+            logger.log('🔍 DataContext: All API responses received');
             
             // Объединяем результаты всех запросов
             const allCategories = new Map(); // Используем Map для удаления дубликатов по ID
@@ -535,7 +536,7 @@ export const DataProvider = ({ children }) => {
             // 🎯 СОРТИРОВКА ПО РЕЛЕВАНТНОСТИ
             mergedCategories = sortCategoriesByRelevance(mergedCategories, query);
             
-            console.log('🎯 DataContext: Smart search complete:', { 
+            logger.log('🎯 DataContext: Smart search complete:', { 
                 query, 
                 totalFound: mergedCategories.length,
                 top3: mergedCategories.slice(0, 3).map(c => c.name)
@@ -546,16 +547,16 @@ export const DataProvider = ({ children }) => {
             // Возвращаем результаты для использования в других компонентах (например, auto-sync)
             return mergedCategories;
         } catch (error) {
-            console.error(`Error searching ${platform} categories:`, error);
+            logger.error(`Error searching ${platform} categories:`, error);
             if (error.response?.status === 401) {
-                console.log('DataContext: Authentication required for category search');
+                logger.log('DataContext: Authentication required for category search');
                 addToast({ 
                     type: 'error', 
                     title: 'Требуется авторизация', 
                     message: 'Пожалуйста, войдите в систему для поиска категорий.' 
                 });
             } else {
-                console.log('DataContext: Other error during search:', error.message);
+                logger.log('DataContext: Other error during search:', error.message);
                 addToast({ 
                     type: 'error', 
                     title: 'Ошибка поиска', 
@@ -585,11 +586,12 @@ export const DataProvider = ({ children }) => {
     useEffect(() => {
         if (!isAuthenticated) return;
         
-        const interval = setInterval(() => {
+        // Используем функцию напрямую, loadStreamHistory стабильна через useCallback
+        const intervalId = setInterval(() => {
             loadStreamHistory();
         }, 30000); // 30 секунд
         
-        return () => clearInterval(interval);
+        return () => clearInterval(intervalId);
     }, [isAuthenticated, loadStreamHistory]);
     
 

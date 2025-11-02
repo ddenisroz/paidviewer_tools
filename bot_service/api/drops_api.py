@@ -434,9 +434,9 @@ async def upload_reward_sound(
         if not reward:
             raise HTTPException(status_code=404, detail="Награда не найдена")
         
-        # Проверяем тип файла
-        if not sound_file.content_type.startswith('audio/'):
-            raise HTTPException(status_code=400, detail="Файл должен быть аудио")
+        # Проверяем валидность файла
+        from validators.file_validators import validate_sound_file
+        validate_sound_file(sound_file)
         
         # Сохраняем файл
         import os

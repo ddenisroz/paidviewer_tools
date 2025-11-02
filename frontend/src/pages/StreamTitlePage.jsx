@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Edit3, Save, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
 import api from '../services/api';
 import { toast } from 'sonner';
+import { logger } from '../utils/prodLogger';
 
 const StreamTitlePage = () => {
     const [twitchTitle, setTwitchTitle] = useState('');
@@ -38,7 +39,7 @@ const StreamTitlePage = () => {
             setVkTitle('VK Live: Играем вместе!');
             setVkDescription('Присоединяйтесь к стриму на VK Live');
         } catch (error) {
-            console.error('Error loading stream info:', error);
+            logger.error('Error loading stream info:', error);
             // Fallback на моковые данные при ошибке
             setTwitchTitle('Мой крутой стрим!');
             setTwitchDescription('Играю в интересную игру и общаюсь с чатом');
@@ -69,7 +70,7 @@ const StreamTitlePage = () => {
                 setStatus(prev => ({ ...prev, twitch: 'idle' }));
             }, 3000);
         } catch (error) {
-            console.error('Error updating Twitch title:', error);
+            logger.error('Error updating Twitch title:', error);
             setStatus(prev => ({ ...prev, twitch: 'error' }));
             toast.error(error.response?.data?.message || 'Ошибка обновления названия');
         } finally {
@@ -92,7 +93,7 @@ const StreamTitlePage = () => {
                 setStatus(prev => ({ ...prev, vk: 'idle' }));
             }, 3000);
         } catch (error) {
-            console.error('Error updating VK title:', error);
+            logger.error('Error updating VK title:', error);
             setStatus(prev => ({ ...prev, vk: 'error' }));
         } finally {
             setIsLoading(false);

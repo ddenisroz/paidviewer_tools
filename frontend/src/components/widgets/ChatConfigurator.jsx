@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
+import { logger } from '../../utils/prodLogger';
 
 const ChatConfigurator = () => {
     const [config, setConfig] = useState({
@@ -80,7 +81,7 @@ const ChatConfigurator = () => {
             setPreviewUrl(result.url);
             alert('Конфигурация сохранена!');
         } catch (error) {
-            console.error('Error saving config:', error);
+            logger.error('Error saving config:', error);
             alert('Ошибка при сохранении конфигурации');
         } finally {
             setIsLoading(false);

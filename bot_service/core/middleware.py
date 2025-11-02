@@ -2,6 +2,7 @@
 """Middleware для FastAPI приложения"""
 import time
 import logging
+import secrets
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -13,25 +14,56 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
         
-        # Content Security Policy
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: https:; "
-            "connect-src 'self' ws: wss:; "
-            "font-src 'self' data:; "
-            "object-src 'none'; "
-            "base-uri 'self'; "
-            "form-action 'self'"
+        # Генерируем nonce для inline скриптов (более безопасный подход)
+        script_nonce = secrets.token_urlsafe(16)
+        
+        # Content Security Policy - более строгая, без unsafe-inline/eval
+        # Используем nonce для необходимых inline скриптов
+        csp_policy = (
+            f"default-src 'self'; "
+            f"script-src 'self' 'nonce-{script_nonce}' https://cdn.jsdelivr.net https://cdn.socket.io; "
+            f"style-src 'self' 'nonce-{script_nonce}' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+            f"img-src 'self' data: https: blob:; "
+            f"connect-src 'self' ws: wss: https://api.twitch.tv https://api.vk.com https://www.youtube.com; "
+            f"font-src 'self' data: https://fonts.gstatic.com; "
+            f"media-src 'self' https: blob:; "
+            f"object-src 'none'; "
+            f"base-uri 'self'; "
+            f"form-action 'self'; "
+            f"frame-ancestors 'self' https://www.youtube.com https://twitch.tv; "
+            f"upgrade-insecure-requests; "
+            f"require-sri-for script style"
         )
         
-        # Другие заголовки безопасности
+        response.headers["Content-Security-Policy"] = csp_policy
+        response.headers["Content-Security-Policy-Report-Only"] = (
+            f"script-src 'self' 'nonce-{script_nonce}'; "
+            f"report-uri /api/csp-report"
+        )
+        
+        # CORS headers (дополнение к CORS middleware)
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Max-Age"] = "3600"
+        
+        # Другие security headers
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"  # Более мягче, чем DENY, для встраивания в OBS
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        response.headers["Permissions-Policy"] = (
+            "geolocation=(), "
+            "microphone=(), "
+            "camera=(), "
+            "payment=(), "
+            "usb=(), "
+            "magnetometer=(), "
+            "gyroscope=(), "
+            "accelerometer=()"
+        )
+        
+        # Expose nonce в заголовок для использования в клиенте (если нужно)
+        response.headers["X-Script-Nonce"] = script_nonce
         
         return response
 

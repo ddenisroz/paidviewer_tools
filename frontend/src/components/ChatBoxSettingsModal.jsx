@@ -10,6 +10,7 @@ import { botService } from '../services/microservices';
 import { TwitchIcon, VKIcon } from './PlatformIcons';
 import { toast } from 'sonner';
 import { twitchBadgesService } from '../services/twitchBadges';
+import { logger } from '../utils/prodLogger';
 
 const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
     // ✅ Устанавливаем начальные значения по умолчанию для предотвращения визуальных скачков
@@ -109,7 +110,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
             
             setSettings(normalizedSettings);
         } catch (error) {
-            console.error('Ошибка загрузки настроек ChatBox:', error);
+            logger.error('Ошибка загрузки настроек ChatBox:', error);
         } finally {
             setLoading(false);
         }
@@ -144,7 +145,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                 toast.success('Настройки ChatBox сохранены!');
             }
         } catch (error) {
-            console.error('Ошибка сохранения настроек:', error);
+            logger.error('Ошибка сохранения настроек:', error);
             toast.error('Не удалось сохранить настройки');
         } finally {
             setSaving(false);

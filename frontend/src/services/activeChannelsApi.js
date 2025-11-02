@@ -1,11 +1,12 @@
 import api from './api';
+import { logger } from '../utils/prodLogger';
 
 export const getActiveChannels = async () => {
     try {
         const response = await api.get('/api/active-channels');
         return response.data;
     } catch (error) {
-        console.error('Failed to fetch active channels:', error);
+        logger.error('Failed to fetch active channels:', error);
         // Возвращаем пустой массив при ошибке
         return [];
     }

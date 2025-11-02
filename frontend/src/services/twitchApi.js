@@ -1,5 +1,6 @@
 // src/services/twitchApi.js
 import api from './api';
+import { logger } from '../utils/prodLogger';
 
 const twitchApi = {
     // Получить информацию о стриме
@@ -8,7 +9,7 @@ const twitchApi = {
             const response = await api.get(`/api/twitch/stream-info?force=${forceRefresh}`);
             return response.data;
         } catch (error) {
-            console.error('Error fetching Twitch stream info:', error);
+            logger.error('Error fetching Twitch stream info:', error);
             return null;
         }
     },
@@ -19,7 +20,7 @@ const twitchApi = {
             const response = await api.post('/api/twitch/stream/title', { title });
             return response.data;
         } catch (error) {
-            console.error('API Error updating stream title:', error.response?.data || error);
+            logger.error('API Error updating stream title:', error.response?.data || error);
             throw error;
         }
     },
@@ -30,7 +31,7 @@ const twitchApi = {
             const response = await api.get(`/api/twitch/categories?search=${search}`);
             return response.data; // Теперь API возвращает массив напрямую
         } catch (error) {
-            console.error('Error fetching Twitch categories:', error);
+            logger.error('Error fetching Twitch categories:', error);
             return [];
         }
     },
@@ -41,7 +42,7 @@ const twitchApi = {
             const response = await api.post('/api/twitch/category', { categoryId: categoryId });
             return response.data;
         } catch (error) {
-            console.error('API Error updating stream category:', error.response?.data || error);
+            logger.error('API Error updating stream category:', error.response?.data || error);
             throw error;
         }
     }

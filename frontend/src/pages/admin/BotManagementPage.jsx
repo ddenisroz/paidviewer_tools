@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { botService } from '../../services/microservices';
 import { useTtsHealth } from '../../context/TtsHealthContext';
 import { TTS_SERVICE_URL } from '../../constants';
+import { logger } from '../../utils/prodLogger';
 
 const BotManagementPage = () => {
     const [bots, setBots] = useState([]);
@@ -58,7 +59,7 @@ const BotManagementPage = () => {
             
             setBots(botsArray);
         } catch (error) {
-            console.error('Error loading bots status:', error);
+            logger.error('Error loading bots status:', error);
             toast.error('Ошибка загрузки статуса ботов');
             setBots([]);
         } finally {
@@ -69,10 +70,32 @@ const BotManagementPage = () => {
     const loadTtsStatus = async () => {
         try {
             const response = await botService.get('/api/admin/tts/status');
-            setTtsStatus(response.data?.tts_service || null);
+            const ttsService = response.data?.tts_service || {};
+            
+            // Убеждаемся что healthy определен правильно
+            // Если healthy явно не установлен, определяем его из available и status
+            let isHealthy = ttsService.healthy;
+            if (isHealthy === undefined) {
+                // Fallback: если healthy не пришел, определяем из других полей
+                const status = (ttsService.status || '').toLowerCase();
+                isHealthy = ttsService.available === true && 
+                           (status === 'healthy' || status === 'ok' || status === 'up');
+            }
+            
+            setTtsStatus({
+                ...ttsService,
+                healthy: isHealthy === true, // Гарантируем boolean
+                status: ttsService.status || (isHealthy ? 'healthy' : 'offline')
+            });
         } catch (error) {
-            console.error('Error loading TTS status:', error);
-            setTtsStatus({ status: 'error', healthy: false, error: 'Failed to check TTS status' });
+            logger.error('Error loading TTS status:', error);
+            setTtsStatus({ 
+                status: 'error', 
+                healthy: false, 
+                available: false,
+                error: error.response?.data?.detail || error.message || 'Failed to check TTS status',
+                url: TTS_SERVICE_URL
+            });
         }
     };
 
@@ -84,7 +107,7 @@ const BotManagementPage = () => {
             toast.success('Bot Service перезапущен');
             await loadBotsStatus();
         } catch (error) {
-            console.error('Error restarting bot service:', error);
+            logger.error('Error restarting bot service:', error);
             toast.error('Ошибка перезапуска Bot Service');
         } finally {
             setRestarting(prev => ({ ...prev, 'bot_service': false }));
@@ -97,7 +120,7 @@ const BotManagementPage = () => {
             await botService.post('/api/admin/tts/restart');
             toast.success('TTS движок перезапущен');
         } catch (error) {
-            console.error('Error restarting TTS engine:', error);
+            logger.error('Error restarting TTS engine:', error);
             toast.error('Ошибка перезапуска TTS движка');
         } finally {
             setRestarting(prev => ({ ...prev, 'tts_engine': false }));
@@ -184,6 +207,12 @@ const BotManagementPage = () => {
     useEffect(() => {
         loadBotsStatus();
         loadTtsStatus();
+        // Автоматически обновляем статус каждые 10 секунд
+        const interval = setInterval(() => {
+            loadBotsStatus();
+            loadTtsStatus();
+        }, 10000);
+        return () => clearInterval(interval);
     }, []);
 
     if (loading) {
@@ -293,6 +322,9 @@ const BotManagementPage = () => {
                                     </h3>
                                     <p className="text-sm text-slate-400">
                                         Движок синтеза речи • Статус: {ttsStatus?.status || 'Проверяется...'} • URL: {ttsStatus?.url || TTS_SERVICE_URL}
+                                        {ttsStatus?.error && (
+                                            <span className="text-red-400 block mt-1">Ошибка: {ttsStatus.error}</span>
+                                        )}
                                     </p>
                                 </div>
                             </div>

@@ -2,6 +2,7 @@ import axios from 'axios';
 import { toast } from 'sonner';
 
 import { TTS_SERVICE_URL, API_BASE_URL } from '../constants';
+import { logger } from '../utils/prodLogger';
 
 export { TTS_SERVICE_URL };
 
@@ -41,22 +42,22 @@ export const ttsService = axios.create({
 // --- Authentication ---
 export const loginTwitch = async () => {
     try {
-        console.log('🔵 [TWITCH AUTH] Redirecting to /auth/twitch/login');
+        logger.log('🔵 [TWITCH AUTH] Redirecting to /auth/twitch/login');
         // Прямой редирект на Twitch OAuth (бэкенд сделает 302 на Twitch)
         window.location.href = `${API_BASE_URL}/auth/twitch/login`;
     } catch (error) {
-        console.error('❌ Ошибка при входе через Twitch:', error);
+        logger.error('❌ Ошибка при входе через Twitch:', error);
         toast.error('Ошибка при входе через Twitch.');
     }
 };
 
 export const loginVk = async () => {
     try {
-        console.log('🔵 [VK AUTH] Redirecting to /auth/vk/login');
+        logger.log('🔵 [VK AUTH] Redirecting to /auth/vk/login');
         // Прямой редирект на VK OAuth (бэкенд сделает 302 на VK)
         window.location.href = `${API_BASE_URL}/auth/vk/login`;
     } catch (error) {
-        console.error('❌ Ошибка при входе через VK Live:', error);
+        logger.error('❌ Ошибка при входе через VK Live:', error);
         toast.error('Ошибка при входе через VK Live.');
     }
 };
@@ -311,7 +312,7 @@ export const getBotHealth = async () => {
         const response = await botService.get('/health');
         return response.data;
     } catch (error) {
-        console.error("Error fetching bot health:", error);
+        logger.error("Error fetching bot health:", error);
         return { status: 'unhealthy' };
     }
 };
@@ -321,7 +322,7 @@ export const getTtsHealth = async () => {
         const response = await ttsService.get('/health');
         return response.data;
     } catch (error) {
-        console.error("Error fetching TTS health:", error);
+        logger.error("Error fetching TTS health:", error);
         return { status: 'unhealthy', tts_engine_loaded: false };
     }
 };

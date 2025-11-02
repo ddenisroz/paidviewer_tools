@@ -9,6 +9,7 @@ from core.database import get_db, BotCommand
 from auth.auth import get_current_user, get_current_user_optional
 from utils.enhanced_logger import log_api_call, log_request, log_response, commands_logger
 from validators.input_validators import sanitize_input
+from core.security_modern import limiter
 
 logger = logging.getLogger('bot_service')
 
@@ -199,7 +200,9 @@ async def _get_commands_impl(current_user: dict, db: Session):
         raise HTTPException(status_code=500, detail="Ошибка получения команд")
 
 @router.post("/")
+@limiter.limit("20/minute")
 async def create_command(
+    request: Request,
     command_data: CommandCreate,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -208,7 +211,9 @@ async def create_command(
     return await _create_command_impl(command_data, current_user, db)
 
 @router.post("")
+@limiter.limit("20/minute")
 async def create_command_no_slash(
+    request: Request,
     command_data: CommandCreate,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -239,13 +244,21 @@ async def _create_command_impl(command_data: CommandCreate, current_user: dict, 
         if existing_command:
             raise HTTPException(status_code=400, detail="Команда с таким именем уже существует")
         
+        # Санитизируем входные данные
+        try:
+            sanitized_response_text = sanitize_input(command_data.response_text, max_length=1000, allow_special=False)
+            sanitized_command_name = sanitize_input(command_data.command_name, max_length=50, allow_special=False)
+        except Exception as e:
+            logger.warning(f"Validation error for user {current_user['id']}: {e}")
+            raise HTTPException(status_code=400, detail=f"Некорректные данные: {str(e)}")
+        
         # Создаем новую команду
         new_command = BotCommand(
             user_id=current_user["id"],
             channel_name="default",  # Пока используем default
-            command_name=command_data.command_name,
+            command_name=sanitized_command_name,
             command_type="custom",
-            response_text=command_data.response_text,
+            response_text=sanitized_response_text,
             platforms=command_data.platforms,
             allowed_roles=command_data.allowed_roles,
             cooldown_seconds=command_data.cooldown_seconds,
@@ -273,7 +286,9 @@ async def _create_command_impl(command_data: CommandCreate, current_user: dict, 
         raise HTTPException(status_code=500, detail="Ошибка создания команды")
 
 @router.put("/{command_id}")
+@limiter.limit("30/minute")
 async def update_command(
+    request: Request,
     command_id: int,
     command_data: CommandUpdate,
     current_user: dict = Depends(get_current_user),
@@ -308,7 +323,12 @@ async def update_command(
         if command_data.cooldown_seconds is not None:
             command.cooldown_seconds = command_data.cooldown_seconds
         if command_data.response_text is not None:
-            command.response_text = command_data.response_text
+            try:
+                sanitized_response_text = sanitize_input(command_data.response_text, max_length=1000, allow_special=False)
+                command.response_text = sanitized_response_text
+            except Exception as e:
+                logger.warning(f"Validation error for user {current_user['id']}: {e}")
+                raise HTTPException(status_code=400, detail=f"Некорректные данные: {str(e)}")
         
         db.commit()
         
@@ -325,7 +345,9 @@ async def update_command(
         raise HTTPException(status_code=500, detail="Ошибка обновления команды")
 
 @router.post("/override")
+@limiter.limit("20/minute")
 async def create_command_override(
+    request: Request,
     override_data: CommandOverrideCreate,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -413,7 +435,9 @@ async def create_command_override(
         raise HTTPException(status_code=500, detail="Ошибка создания override")
 
 @router.delete("/{command_id}")
+@limiter.limit("30/minute")
 async def delete_command(
+    request: Request,
     command_id: int,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)

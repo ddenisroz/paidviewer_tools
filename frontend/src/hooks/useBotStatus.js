@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { toast } from 'sonner';
+import { logger } from '../utils/prodLogger';
 
 // Кэш для статуса бота
 const botStatusCache = new Map();
@@ -52,7 +53,7 @@ export const useBotStatus = () => {
             
             setBotEnabled(data);
         } catch (error) {
-            console.error("Failed to fetch bot status", error);
+            logger.error("Failed to fetch bot status", error);
             // Используем кэшированные данные при ошибке
             if (cached) {
                 setBotEnabled(cached.data);
@@ -80,7 +81,7 @@ export const useBotStatus = () => {
             const response = await api.post(`/api/bot/tts/toggle`, { is_enabled: enabled });
             toast.success(`TTS ${enabled ? 'включен' : 'выключен'}`);
         } catch (error) {
-            console.error('Failed to toggle TTS:', error);
+            logger.error('Failed to toggle TTS:', error);
             setBotEnabled(!enabled); // Revert on error
             if (cached) {
                 cached.data = !enabled;

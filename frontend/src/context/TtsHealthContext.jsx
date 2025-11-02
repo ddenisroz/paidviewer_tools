@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useContext, useCallback, use
 import { useLocation } from 'react-router-dom';
 import { ttsService } from '../services/microservices';
 import { useAuth } from './AuthContext';
+import { logger } from '../utils/prodLogger';
 
 export const TtsHealthContext = createContext();
 
@@ -52,7 +53,7 @@ export const TtsHealthProvider = ({ children }) => {
         
         // Глобальная проверка - предотвращаем множественные одновременные запросы
         if (globalHealthCheckInProgress) {
-            console.log('TtsHealthContext: Global health check already in progress, skipping...');
+            logger.log('TtsHealthContext: Global health check already in progress, skipping...');
             return;
         }
         
@@ -60,7 +61,7 @@ export const TtsHealthProvider = ({ children }) => {
         const now = Date.now();
         const minCheckInterval = parseInt(import.meta.env.VITE_TTS_MIN_CHECK_INTERVAL || '2000', 10);
         if (now - globalLastCheckTime < minCheckInterval) { // Минимум 2 секунды между проверками
-            console.log('TtsHealthContext: Health check too frequent, skipping...');
+            logger.log('TtsHealthContext: Health check too frequent, skipping...');
             return;
         }
         
@@ -70,12 +71,12 @@ export const TtsHealthProvider = ({ children }) => {
         lastCheckTimeRef.current = now;
         setIsChecking(true);
         
-        console.log('TtsHealthContext: Starting health check...');
+        logger.log('TtsHealthContext: Starting health check...');
         
         // Дополнительная защита - принудительно завершаем проверку через 6 секунд (на случай если что-то пойдёт не так)
         const forceCompleteTimeout = setTimeout(() => {
             if (checkInProgressRef.current && mountedRef.current) {
-                console.warn('TtsHealthContext: Force completing health check due to timeout (6s)');
+                logger.warn('TtsHealthContext: Force completing health check due to timeout (6s)');
                 setIsChecking(false);
                 setIsHealthy(false);
                 setLastCheck(new Date());
@@ -99,10 +100,10 @@ export const TtsHealthProvider = ({ children }) => {
             const data = response.data;
             const isOk = response.status === 200 && data.tts_engine_loaded;
             
-            console.log('TtsHealthContext: TTS server response:', { status: response.status, data, isOk });
+            logger.log('TtsHealthContext: TTS server response:', { status: response.status, data, isOk });
             
             if (!mountedRef.current) {
-                console.log('TtsHealthContext: Component unmounted during health check, aborting');
+                logger.log('TtsHealthContext: Component unmounted during health check, aborting');
                 return;
             }
             
@@ -110,10 +111,10 @@ export const TtsHealthProvider = ({ children }) => {
             setLastCheck(new Date());
             
         } catch (error) {
-            console.log('TtsHealthContext: TTS server check failed:', error.message || error.code);
+            logger.log('TtsHealthContext: TTS server check failed:', error.message || error.code);
             
             if (!mountedRef.current) {
-                console.log('TtsHealthContext: Component unmounted during error handling, aborting');
+                logger.log('TtsHealthContext: Component unmounted during error handling, aborting');
                 return;
             }
             
@@ -121,7 +122,7 @@ export const TtsHealthProvider = ({ children }) => {
             setLastCheck(new Date());
         } finally {
             if (mountedRef.current) {
-                console.log('TtsHealthContext: Health check completed, setting isChecking to false');
+                logger.log('TtsHealthContext: Health check completed, setting isChecking to false');
                 clearTimeout(forceCompleteTimeout);
                 setIsChecking(false);
             }
@@ -141,7 +142,7 @@ export const TtsHealthProvider = ({ children }) => {
         
         // Не проверяем для гостей
         if (isGuest) {
-            console.log('TtsHealthContext: Guest user, skipping health check');
+            logger.log('TtsHealthContext: Guest user, skipping health check');
             return;
         }
         
@@ -150,7 +151,7 @@ export const TtsHealthProvider = ({ children }) => {
         const isTtsPage = ttsRelatedPaths.some(path => location.pathname.startsWith(path));
         
         if (!isTtsPage) {
-            console.log('TtsHealthContext: Not a TTS page, skipping health check');
+            logger.log('TtsHealthContext: Not a TTS page, skipping health check');
             setIsChecking(false);
             return;
         }
@@ -158,7 +159,7 @@ export const TtsHealthProvider = ({ children }) => {
         // Проверяем только один раз при монтировании компонента
         // Дополнительная защита от двойных вызовов в React Strict Mode
         if (!hasCheckedRef.current && !checkInProgressRef.current) {
-            console.log('TtsHealthContext: Starting health check on mount');
+            logger.log('TtsHealthContext: Starting health check on mount');
             hasCheckedRef.current = true;
             // Добавляем небольшую задержку для предотвращения двойных вызовов
             const initialDelay = parseInt(import.meta.env.VITE_TTS_INITIAL_CHECK_DELAY || '100', 10);

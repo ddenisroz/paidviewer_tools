@@ -1,9 +1,10 @@
 // src/context/TtsContext.jsx
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { getTtsHealth, getGlobalVoices, enableTts, disableTts, getTtsStatus } from '../services/microservices';
 import { AuthContext } from './AuthContext';
 import { useToast } from '../components/ui/toast';
 import { useButtonPosition } from '../hooks/useButtonPosition';
+import { logger } from '../utils/prodLogger';
 
 const TtsContext = createContext();
 
@@ -50,7 +51,7 @@ export const TtsProvider = ({ children }) => {
                         setIsWhitelisted(response.data.is_whitelisted || false);
                     }
                 } catch (error) {
-                    console.error('Failed to get TTS status:', error);
+                    logger.error('Failed to get TTS status:', error);
                 }
                 
                 try {
@@ -60,7 +61,7 @@ export const TtsProvider = ({ children }) => {
                         setVoices(voicesResponse.voices || []);
                     }
                 } catch (error) {
-                    console.error('Failed to load voices:', error);
+                    logger.error('Failed to load voices:', error);
                 }
             };
             
@@ -83,7 +84,7 @@ export const TtsProvider = ({ children }) => {
             }
         } catch (error) {
             setEngineStatus({ loaded: false, error: "Не удается подключиться к TTS сервису" });
-            console.error("TTS Health check failed:", error);
+            logger.error("TTS Health check failed:", error);
         }
     }, []);
 
@@ -112,7 +113,7 @@ export const TtsProvider = ({ children }) => {
                 setTtsEnabled(enabled);
                 setIsWhitelisted(is_whitelisted || false);
             } catch (error) {
-                console.error("Could not get TTS status:", error);
+                logger.error("Could not get TTS status:", error);
                 setTtsEnabled(false);
             }
         }
@@ -121,7 +122,7 @@ export const TtsProvider = ({ children }) => {
     // Слушаем изменения от TtsQuickSettings (shortcuts на главной странице)
     useEffect(() => {
         const handleTtsStatusChange = (event) => {
-            console.log('🔄 TtsContext: Received tts-status-changed event:', event.detail);
+            logger.log('🔄 TtsContext: Received tts-status-changed event:', event.detail);
             setTtsEnabled(event.detail.enabled);
         };
 
@@ -135,7 +136,7 @@ export const TtsProvider = ({ children }) => {
                 const response = await getGlobalVoices();
                 setVoices(response.data);
             } catch (error) {
-                console.error("Failed to load voices:", error);
+                logger.error("Failed to load voices:", error);
                 const message = "Не удалось загрузить список голосов.";
                 if (notificationCallback) {
                     notificationCallback(message);
@@ -234,7 +235,7 @@ export const TtsProvider = ({ children }) => {
                 }
             }
         } catch (error) {
-            console.error("Failed to toggle TTS status:", error);
+            logger.error("Failed to toggle TTS status:", error);
             const message = "Не удалось изменить статус озвучки.";
             if (notificationCallback) {
                 notificationCallback(message);
@@ -272,7 +273,7 @@ export const TtsProvider = ({ children }) => {
                     setIsWhitelisted(response.data.is_whitelisted || false);
                 }
             } catch (error) {
-                console.error('Failed to get TTS status:', error);
+                logger.error('Failed to get TTS status:', error);
             }
             
             try {
@@ -282,7 +283,7 @@ export const TtsProvider = ({ children }) => {
                     setVoices(voicesResponse.voices || []);
                 }
             } catch (error) {
-                console.error('Failed to load voices:', error);
+                logger.error('Failed to load voices:', error);
             }
         }
         
@@ -290,7 +291,8 @@ export const TtsProvider = ({ children }) => {
         setIsInitialized(true);
     }, [isInitialized, engineStatus.loaded, user]);
 
-    const value = {
+    // Мемоизируем значение контекста для предотвращения лишних re-renders
+    const value = useMemo(() => ({
         ttsEnabled,
         isWhitelisted,
         setIsWhitelisted,
@@ -303,7 +305,19 @@ export const TtsProvider = ({ children }) => {
         initializeTts,
         setNotificationHandler,
         syncWithHealthContext,
-    };
+    }), [
+        ttsEnabled,
+        isWhitelisted,
+        voices,
+        engineStatus,
+        isInitialized,
+        isToggling,
+        toggleTts,
+        loadVoices,
+        initializeTts,
+        setNotificationHandler,
+        syncWithHealthContext,
+    ]);
 
     return (
         <TtsContext.Provider value={value}>

@@ -3,6 +3,7 @@
  */
 
 import { VALIDATION, TIMEOUTS, REGEX } from '../constants';
+import { logger } from '../utils/prodLogger';
 
 // === ВАЛИДАЦИЯ ===
 
@@ -310,7 +311,7 @@ export const getCookie = (name) => {
     try {
       return JSON.parse(decodeURIComponent(parts.pop().split(';').shift()));
     } catch (error) {
-      console.warn(`Failed to parse cookie ${name}:`, error);
+      logger.warn(`Failed to parse cookie ${name}:`, error);
       return null;
     }
   }
@@ -415,7 +416,7 @@ export const copyToClipboard = async (text) => {
       return result;
     }
   } catch (error) {
-    console.error('Error copying to clipboard:', error);
+    logger.error('Error copying to clipboard:', error);
     return false;
   }
 };

@@ -49,7 +49,22 @@ function App() {
         <>
             <Toaster />
             <ErrorBoundary>
-                <Suspense fallback={null}>
+                <Suspense fallback={
+                    <div style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'hsl(260, 30%, 8%)',
+                        zIndex: 9999
+                    }}>
+                        {/* Minimal invisible loading - no spinner, just background */}
+                    </div>
+                }>
                     <Routes>
                         {/* Public Routes */}
                         <Route path="/login" element={<LoginPage />} />

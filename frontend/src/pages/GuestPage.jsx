@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import { logger } from '../utils/prodLogger';
 
 const GuestPage = () => {
     const navigate = useNavigate();
@@ -42,7 +43,7 @@ const GuestPage = () => {
                     toast.success(`Добро пожаловать в гостевой режим канала ${channelName}!`);
                     navigate('/'); // Перенаправляем на главную страницу
                 } catch (finalizeError) {
-                    console.error('Error finalizing guest session:', finalizeError);
+                    logger.error('Error finalizing guest session:', finalizeError);
                     toast.error('Ошибка создания гостевой сессии');
                 }
             } else if (response.data.error === 'Verification code expired') {
@@ -56,7 +57,7 @@ const GuestPage = () => {
                 }
             }
         } catch (error) {
-            console.error('Error checking confirmation:', error);
+            logger.error('Error checking confirmation:', error);
         }
     }, [channelName, platform, setGuestMode, navigate]);
 
@@ -92,7 +93,7 @@ const GuestPage = () => {
                 toast.error(response.data.message || 'Ошибка подключения');
             }
         } catch (error) {
-            console.error('Error connecting to channel:', error);
+            logger.error('Error connecting to channel:', error);
             const errorMessage = error.response?.data?.detail || 'Ошибка подключения к каналу';
             toast.error(errorMessage);
         } finally {

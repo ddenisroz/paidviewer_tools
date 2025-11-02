@@ -1,3 +1,5 @@
+import { logger } from '../utils/prodLogger';
+
 /**
  * WebSocket service for real-time updates
  */
@@ -37,7 +39,7 @@ class WebSocketService {
                 const data = JSON.parse(event.data);
                 this.handleMessage(data);
             } catch (error) {
-                console.error('Error parsing WebSocket message:', error);
+                logger.error('Error parsing WebSocket message:', error);
             }
         };
         
@@ -53,7 +55,7 @@ class WebSocketService {
         };
         
         this.ws.onerror = (error) => {
-            console.error('WebSocket error:', error);
+            logger.error('WebSocket error:', error);
             this.emit('error', error);
         };
     }
@@ -105,7 +107,7 @@ class WebSocketService {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(message));
         } else {
-            console.warn('WebSocket not connected, cannot send message');
+            logger.warn('WebSocket not connected, cannot send message');
         }
     }
 
@@ -137,7 +139,7 @@ class WebSocketService {
                 try {
                     callback(data);
                 } catch (error) {
-                    console.error('Error in WebSocket event callback:', error);
+                    logger.error('Error in WebSocket event callback:', error);
                 }
             });
         }
