@@ -53,36 +53,17 @@ const LocalTTSSettingsPage = () => {
     const [selectedVoice, setSelectedVoice] = useState(null);
     const [uploadingFile, setUploadingFile] = useState(false);
     const [currentTab, setCurrentTab] = useState('connection');
-    const [isWhitelisted, setIsWhitelisted] = useState(false);
-    const [whitelistChecked, setWhitelistChecked] = useState(false);
+    const [isWhitelisted, setIsWhitelisted] = useState(true); // Локальный TTS доступен всем
+    const [whitelistChecked, setWhitelistChecked] = useState(true);
 
     useEffect(() => {
         loadConfig();
-        checkWhitelist();
     }, []);
-
-    const checkWhitelist = async () => {
-        try {
-            const response = await botService.get('/api/voices/whitelist-status').catch(() => ({ data: { is_whitelisted: false } }));
-            setIsWhitelisted(response.data?.is_whitelisted || false);
-            setWhitelistChecked(true);
-        } catch (error) {
-            logger.error('Error checking whitelist:', error);
-            setIsWhitelisted(false);
-            setWhitelistChecked(true);
-        }
-    };
 
     const loadConfig = async () => {
         try {
             setLoading(true);
             const response = await botService.get('/api/local-tts/config');
-            
-            // Проверяем whitelist из ответа
-            if (response.data.can_manage_voices === false && !response.data.configured) {
-                setIsWhitelisted(false);
-                setWhitelistChecked(true);
-            }
             
             if (response.data.config) {
                 setConfig({
@@ -93,11 +74,6 @@ const LocalTTSSettingsPage = () => {
             }
         } catch (error) {
             logger.error('Error loading config:', error);
-            // Если ошибка 403 - пользователь не в whitelist
-            if (error.response?.status === 403) {
-                setIsWhitelisted(false);
-                setWhitelistChecked(true);
-            }
         } finally {
             setLoading(false);
         }
@@ -139,11 +115,6 @@ const LocalTTSSettingsPage = () => {
     };
 
     const saveConfig = async () => {
-        if (!isWhitelisted) {
-            toast.error('Сохранение конфигурации локального TTS доступно только для пользователей из whitelist');
-            return;
-        }
-        
         try {
             setSaving(true);
 
@@ -322,22 +293,6 @@ const LocalTTSSettingsPage = () => {
                 </div>
             </div>
 
-            {/* Уведомление для пользователей без whitelist */}
-            {whitelistChecked && !isWhitelisted && (
-                <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4 flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                        <h3 className="text-red-300 font-semibold mb-1">Доступ к локальному TTS ограничен</h3>
-                        <p className="text-red-200/80 text-sm">
-                            Локальный TTS доступен только для пользователей из whitelist. 
-                            Для получения доступа обратитесь к администратору системы.
-                        </p>
-                        <p className="text-red-200/60 text-xs mt-2">
-                            💡 Вам доступна только базовая озвучка (gTTS) через основные настройки TTS.
-                        </p>
-                    </div>
-                </div>
-            )}
 
             {/* Tabs для Connection и Voices */}
             <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">

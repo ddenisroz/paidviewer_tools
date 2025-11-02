@@ -30,6 +30,10 @@ const TtsControlPanel = ({
     const isTwitchConnected = integrations.twitch?.enabled || (isGuest && user?.platform === 'twitch');
     const isVkConnected = integrations.vk?.enabled || (isGuest && user?.platform === 'vk');
     
+    // Проверяем есть ли локальный TTS setup
+    const hasLocalSetup = localStorage.getItem('tts_has_local_setup') === 'true';
+    const canUseF5TTS = hasLocalSetup || isWhitelisted;
+    
     return (
         <Card>
             <CardHeader>
@@ -61,14 +65,14 @@ const TtsControlPanel = ({
 
                         {/* ИИ озвучка F5-TTS */}
                         <div className={`flex items-center space-x-4 p-4 rounded-2xl border-2 transition-all duration-200 ${
-                            isHealthy && isWhitelisted !== false
+                            isHealthy && canUseF5TTS
                                 ? 'bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/30 hover:border-purple-500/50 cursor-pointer' 
                                 : 'bg-gray-500/10 border-gray-500/30 opacity-50'
                         }`}>
                             <Switch
                                 checked={aiTtsEnabled}
                                 onCheckedChange={(checked) => setAiTtsEnabled(checked)}
-                                disabled={!isHealthy || !isAuthenticated || !isConnected || isWhitelisted === false || engineToggleLoading}
+                                disabled={!isHealthy || !isAuthenticated || !isConnected || !canUseF5TTS || engineToggleLoading}
                                 className="scale-125"
                             />
                             <div className="flex-1">
@@ -77,8 +81,8 @@ const TtsControlPanel = ({
                                 {(!isAuthenticated || !isConnected) && (
                                     <p className="text-xs text-yellow-500 mt-1">⚠ Требуется канал</p>
                                 )}
-                                {isWhitelisted === false && (
-                                    <p className="text-xs text-red-400 mt-1">⚠ Только whitelist</p>
+                                {!canUseF5TTS && (
+                                    <p className="text-xs text-red-400 mt-1">⚠ Требуется настройка</p>
                                 )}
                             </div>
                         </div>

@@ -205,16 +205,19 @@ const TtsMainPageContent = () => {
                     const engineType = ttsStatusResponse.data.engine_type || 'gtts';
                     
                     setBasicTtsEnabled(isTtsEnabled);
-                    // Если пользователь не в whitelist, но пытается использовать F5-TTS - переключаем на облачный
-                    if (engineType === 'local' && !isWhitelisted) {
-                        ttsLogger.warning('User not in whitelist but F5-TTS enabled, switching to cloud');
+                    // Локальный TTS доступен всем, облачный - только с whitelist
+                    const hasLocalSetup = ttsStatusResponse.data.has_local_setup || false;
+                    const canUseLocalTTS = hasLocalSetup || isWhitelisted;
+                    
+                    if (engineType === 'local' && !canUseLocalTTS) {
+                        ttsLogger.warning('User trying to use local TTS without setup, switching to cloud');
                         setTtsEngine('cloud');
                         setAiTtsEnabled(false);
                         // Автоматически переключаем на облачный
                         botService.post('/api/tts/engine', { engine_type: 'cloud' }).catch(err => ttsLogger.error('Error switching to cloud:', err));
                     } else {
-                        setAiTtsEnabled(isTtsEnabled && isHealthy && isWhitelisted);
-                        setTtsEngine(engineType === 'local' && isWhitelisted ? 'local' : 'cloud');
+                        setAiTtsEnabled(isTtsEnabled && isHealthy && canUseLocalTTS);
+                        setTtsEngine(engineType === 'local' && canUseLocalTTS ? 'local' : 'cloud');
                     }
                     
                     ttsLogger.info('TTS engine loaded:', engineType);
@@ -453,9 +456,12 @@ const TtsMainPageContent = () => {
             return;
         }
         
-        // Проверяем whitelist для F5-TTS
-        if (enabled && isWhitelisted === false) {
-            toast.error('F5-TTS доступен только для пользователей из whitelist. Обратитесь к администратору.');
+        // Проверяем возможность использования F5-TTS (локальный setup ИЛИ whitelist)
+        const hasLocalSetup = localStorage.getItem('tts_has_local_setup') === 'true';
+        const canUseF5TTS = hasLocalSetup || isWhitelisted;
+        
+        if (enabled && !canUseF5TTS) {
+            toast.error('Для использования F5-TTS настройте локальный TTS (tts_service_simple) или обратитесь к администратору для whitelist.');
             return;
         }
         

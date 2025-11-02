@@ -49,6 +49,12 @@ export const TtsProvider = ({ children }) => {
                     if (response.data) {
                         setTtsEnabled(response.data.enabled);
                         setIsWhitelisted(response.data.is_whitelisted || false);
+                        // Сохраняем has_local_setup в localStorage для других компонентов
+                        if (response.data.has_local_setup) {
+                            localStorage.setItem('tts_has_local_setup', 'true');
+                        } else {
+                            localStorage.setItem('tts_has_local_setup', 'false');
+                        }
                     }
                 } catch (error) {
                     logger.error('Failed to get TTS status:', error);
@@ -109,9 +115,15 @@ export const TtsProvider = ({ children }) => {
             try {
                 const channelName = user?.isGuest ? user.username : null;
                 const response = await getTtsStatus(channelName);
-                const { enabled, is_whitelisted } = response.data;
+                const { enabled, is_whitelisted, has_local_setup } = response.data;
                 setTtsEnabled(enabled);
                 setIsWhitelisted(is_whitelisted || false);
+                // Сохраняем has_local_setup в localStorage для других компонентов
+                if (has_local_setup) {
+                    localStorage.setItem('tts_has_local_setup', 'true');
+                } else {
+                    localStorage.setItem('tts_has_local_setup', 'false');
+                }
             } catch (error) {
                 logger.error("Could not get TTS status:", error);
                 setTtsEnabled(false);

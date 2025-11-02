@@ -304,8 +304,11 @@ async def handle_tts_for_message(
                 logger.info(f"🎙️ [{platform.upper()} TTS] Engine not set, using basic TTS as default")
                 use_basic_tts = True
             
-            # Проверяем whitelist для F5-TTS
-            if use_ai_tts:
+            # Проверяем локальный TTS endpoint если выбран F5-TTS
+            has_local_endpoint = use_ai_tts and local_tts and local_tts.use_local
+            
+            # Проверяем whitelist ТОЛЬКО для облачного F5-TTS (если нет локального endpoint)
+            if use_ai_tts and not has_local_endpoint:
                 from core.database import WhitelistedChannel
                 is_whitelisted = False
                 
@@ -329,9 +332,8 @@ async def handle_tts_for_message(
                     use_ai_tts = False
                     use_basic_tts = True
             
-            # Проверяем локальный TTS endpoint если выбран F5-TTS и пользователь в whitelist
-            if use_ai_tts and local_tts and local_tts.use_local:
-                logger.info(f"Using local TTS endpoint for user {user_id}: {local_tts.endpoint_url}")
+            if has_local_endpoint:
+                logger.info(f"🏠 [{platform.upper()} TTS] Using local TTS endpoint for user {user_id}: {local_tts.endpoint_url}")
             
             # Громкость из AudioSettings
             volume_level = audio_settings.website_volume if audio_settings else 50.0

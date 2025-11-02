@@ -73,16 +73,16 @@ const TtsQuickSettings = () => {
             const whitelistStatus = whitelistResponse.data?.is_whitelisted || false;
             setIsWhitelisted(whitelistStatus);
             
-            // ✅ FIX: aiTtsAvailable = configured AND healthy AND whitelisted
-            // Если сервис настроен (configured), проверяем доступность
+            // Локальный TTS доступен если настроен И здоров (не требуется whitelist)
             const isConfigured = configResponse.data.configured || false;
-            const isHealthy = configResponse.data.healthy !== false; // По умолчанию считаем здоровым если нет явного false
+            const isHealthy = configResponse.data.healthy !== false;
+            const hasLocalSetup = statusResponse.data.has_local_setup || false;
             
-            // Доступен = настроен И здоров И в whitelist
-            setAiTtsAvailable(isConfigured && isHealthy && whitelistStatus);
+            // Доступен = настроен И здоров (whitelist не требуется для локального TTS)
+            setAiTtsAvailable(isConfigured && isHealthy);
             
-            // ✅ FIX: Устанавливаем aiTtsEnabled только если пользователь в whitelist
-            setAiTtsEnabled(statusResponse.data.engine_type === 'local' && whitelistStatus);
+            // aiTtsEnabled = включен И (настроен локальный ИЛИ в whitelist)
+            setAiTtsEnabled(statusResponse.data.engine_type === 'local' && (whitelistStatus || hasLocalSetup));
             
             // Отмечаем что инициализация завершена
             initializedRef.current = true;
@@ -90,10 +90,11 @@ const TtsQuickSettings = () => {
             logger.info('TtsQuickSettings: Loaded initial state', {
                 ttsEnabled: statusResponse.data.enabled,
                 aiTtsEnabled: statusResponse.data.engine_type === 'local',
-                aiTtsAvailable: isConfigured && isHealthy && whitelistStatus,
+                aiTtsAvailable: isConfigured && isHealthy,
                 isConfigured,
                 isHealthy,
-                isWhitelisted: whitelistStatus
+                isWhitelisted: whitelistStatus,
+                hasLocalSetup
             });
         } catch (error) {
             logger.error('Failed to load TTS settings:', error);
