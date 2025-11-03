@@ -28,7 +28,10 @@ async def get_global_badges(client_id: str, access_token: str) -> Dict:
     }
     
     try:
-        async with aiohttp.ClientSession() as session:
+        # Timeout: 10 секунд на соединение, 30 секунд на чтение
+        timeout = aiohttp.ClientTimeout(total=30, connect=10)
+        
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.get(url, headers=headers) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -70,7 +73,10 @@ async def get_channel_badges(broadcaster_id: str, client_id: str, access_token: 
     }
     
     try:
-        async with aiohttp.ClientSession() as session:
+        # Timeout: 10 секунд на соединение, 30 секунд на чтение
+        timeout = aiohttp.ClientTimeout(total=30, connect=10)
+        
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.get(url, headers=headers) as response:
                 if response.status == 200:
                     data = await response.json()

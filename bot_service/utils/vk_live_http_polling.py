@@ -27,6 +27,8 @@ class VKLiveHTTPPolling:
         self.message_handler: Optional[Callable] = None
         self.seen_message_ids: Set[int] = set()  # Для предотвращения дубликатов
         self.last_message_time: int = 0  # Timestamp последнего сообщения
+        self.error_count: int = 0  # Счетчик последовательных ошибок
+        self.max_errors: int = 10  # Максимум ошибок перед увеличением интервала
         
     async def start(self, message_handler: Callable):
         """Запустить polling сообщений"""
@@ -54,18 +56,39 @@ class VKLiveHTTPPolling:
     async def _poll_loop(self):
         """Основной цикл polling"""
         poll_interval = 0.5  # Запрашиваем каждые 500ms для быстрой реакции (как Twitch WebSocket)
+        max_interval = 30.0  # Максимальный интервал при ошибках (30 секунд)
         
         try:
             while self.is_running:
                 try:
                     await self._fetch_and_process_messages()
+                    # Успешный запрос - сбрасываем счетчик ошибок
+                    if self.error_count > 0:
+                        logger.info(f"✅ VK Live polling recovered after {self.error_count} errors")
+                        self.error_count = 0
+                        
+                except asyncio.CancelledError:
+                    raise  # Пробрасываем CancelledError выше
                 except Exception as e:
-                    logger.error(f"Error in polling loop: {e}")
-                    import traceback
-                    logger.error(traceback.format_exc())
+                    self.error_count += 1
+                    logger.error(f"❌ Error in polling loop ({self.error_count}/{self.max_errors}): {e}")
+                    
+                    # При превышении лимита показываем stack trace
+                    if self.error_count >= self.max_errors:
+                        import traceback
+                        logger.error(traceback.format_exc())
+                
+                # Вычисляем интервал: экспоненциальный backoff при ошибках
+                if self.error_count > 0:
+                    # Интервал растет: 0.5 -> 1 -> 2 -> 4 -> 8 -> 16 -> max_interval
+                    current_interval = min(poll_interval * (2 ** (self.error_count - 1)), max_interval)
+                    if self.error_count % 5 == 0:  # Логируем каждую 5-ю ошибку
+                        logger.warning(f"⏱️ Increased polling interval to {current_interval}s due to errors")
+                else:
+                    current_interval = poll_interval
                 
                 # Ждем перед следующим запросом
-                await asyncio.sleep(poll_interval)
+                await asyncio.sleep(current_interval)
                 
         except asyncio.CancelledError:
             logger.info(f"Polling loop cancelled for {self.channel_url}")
@@ -89,7 +112,13 @@ class VKLiveHTTPPolling:
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
             
-            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
+            # Timeout: 10 секунд на соединение, 30 секунд на чтение
+            timeout = aiohttp.ClientTimeout(total=30, connect=10)
+            
+            async with aiohttp.ClientSession(
+                connector=aiohttp.TCPConnector(ssl=ssl_context),
+                timeout=timeout
+            ) as session:
                 async with session.get(url, headers=headers, params=params) as response:
                     if response.status == 200:
                         data = await response.json()
