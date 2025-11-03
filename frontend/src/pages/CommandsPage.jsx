@@ -467,7 +467,7 @@ import { logger } from '../utils/prodLogger';
 
     if (!isAuthenticated) {
         return (
-            <PageWrapper title="Команды чата">
+            <PageWrapper>
                 <Card>
                     <CardContent className="flex items-center justify-center h-64">
                         <div className="text-center space-y-4">
@@ -483,14 +483,14 @@ import { logger } from '../utils/prodLogger';
     // Ранний return для загрузки - сохраняем структуру контейнера
     if (loading) {
         return (
-            <PageWrapper title="Команды чата">
+            <PageWrapper>
                 <PageLoader message="Загрузка команд..." />
             </PageWrapper>
         );
     }
 
     return (
-        <PageWrapper title="Команды чата">
+        <PageWrapper>
             <Tabs defaultValue="basic" className="space-y-6">
                 <TabsList>
                     <TabsTrigger value="basic">Базовые команды</TabsTrigger>

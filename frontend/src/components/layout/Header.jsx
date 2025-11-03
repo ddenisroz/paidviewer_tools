@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { LogOut, ChevronDown, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../context/AuthContext';
@@ -14,7 +14,30 @@ const Header = () => {
     const { user, logout, isGuest, isAuthenticated, refreshAuthStatus } = useAuth();
     const { integrations, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
     const navigate = useNavigate();
+    const location = useLocation();
     const [integrationsOpen, setIntegrationsOpen] = useState(false);
+    
+    // Маппинг путей к заголовкам страниц
+    const pageTitles = useMemo(() => ({
+        '/dashboard': '',
+        '/dashboard/tts': 'Озвучка сообщений',
+        '/dashboard/youtube': 'Youtube заказы',
+        '/dashboard/drops': 'Drops система',
+        '/dashboard/commands': 'Команды',
+        '/dashboard/points': 'Управление наградами',
+        '/dashboard/settings': 'Настройки',
+        '/dashboard/admin': 'Панель администратора',
+    }), []);
+    
+    const pageTitle = useMemo(() => {
+        // Ищем заголовок для текущего пути
+        for (const [path, title] of Object.entries(pageTitles)) {
+            if (location.pathname === path || location.pathname.startsWith(`${path}/`)) {
+                return title;
+            }
+        }
+        return '';
+    }, [location.pathname, pageTitles]);
 
     // Закрытие меню при клике вне его
     useEffect(() => {
@@ -98,8 +121,17 @@ const Header = () => {
     };
 
     return (
-        <header className="flex h-16 items-center justify-end gap-2 sm:gap-4 px-3 sm:px-6 lg:h-[70px] bg-muted/40">
-            {/* Кнопка интеграций (для всех авторизованных пользователей, включая гостей) */}
+        <header className="flex h-16 items-center justify-between gap-2 sm:gap-4 px-3 sm:px-6 lg:h-[70px] bg-muted/40">
+            {/* Заголовок страницы */}
+            {pageTitle && (
+                <h1 className="text-xl sm:text-2xl font-bold text-foreground">
+                    {pageTitle}
+                </h1>
+            )}
+            
+            {/* Правая часть: кнопки */}
+            <div className="flex items-center justify-end gap-2 sm:gap-4">
+                {/* Кнопка интеграций (для всех авторизованных пользователей, включая гостей) */}
             {isAuthenticated && (
                 <div className="relative integrations-menu">
             <Button 
@@ -207,6 +239,7 @@ const Header = () => {
                     <LogOut className="h-7 w-7 sm:h-9 sm:w-9 group-hover:scale-110 transition-transform duration-200" strokeWidth={2.5} />
                 </Button>
             )}
+            </div>
         </header>
     );
 };

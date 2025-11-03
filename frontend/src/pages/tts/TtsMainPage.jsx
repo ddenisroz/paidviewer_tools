@@ -628,9 +628,7 @@ const TtsMainPageContent = () => {
     // }
 
     return (
-        <PageWrapper 
-            title="Озвучка сообщений"
-        >
+        <PageWrapper>
             <div {...getAnimationClasses(shouldAnimate, contentLoaded, 0)}>
                 <div className="relative space-y-6">
                     {/* CSS для слайдера */}

@@ -134,7 +134,6 @@ const DropsMainPage = () => {
 
   return (
       <PageWrapper 
-        title="Drops система"
         actions={
           availablePlatforms.length > 1 && (
             <Select value={selectedPlatform} onValueChange={handlePlatformChange}>
