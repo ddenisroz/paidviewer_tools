@@ -428,7 +428,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
             loadChatHistory();
             historyLoadedRef.current = true;
         }
-    }, [user?.id, integrations?.twitch?.enabled, integrations?.vk?.enabled]);
+    }, [user?.id]); // Только при изменении user.id, не при integrations
 
     // Загружаем 7TV смайлы
     useEffect(() => {
