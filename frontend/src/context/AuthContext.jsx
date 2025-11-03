@@ -1,5 +1,5 @@
 // src/context/AuthContext.jsx
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { botService, loginVk } from '../services/microservices';
 import { toast } from 'sonner';
 import { logger } from '../utils/prodLogger';
@@ -140,12 +140,12 @@ export const AuthProvider = ({ children }) => {
         };
     }, [isAuthenticated, user?.id]); // Зависимости корректны - только меняющиеся значения
 
-    const loginWithTwitch = () => {
+    const loginWithTwitch = useCallback(() => {
         // Прямой редирект на OAuth endpoint (бэкенд сделает 302 редирект на Twitch)
         window.location.href = `${API_BASE_URL}/auth/twitch/login`;
-    };
+    }, []);
 
-    const loginWithVk = () => {
+    const loginWithVk = useCallback(() => {
         try {
             logger.log('🔵 [AUTH CONTEXT] loginWithVk() called');
             loginVk();
@@ -155,9 +155,9 @@ export const AuthProvider = ({ children }) => {
             logger.error("VK login error:", error);
             toast.error('Ошибка при входе через VK Live.');
         }
-    };
+    }, []);
 
-    const logout = async () => {
+    const logout = useCallback(async () => {
         try {
             const userId = user?.id;
             
@@ -189,18 +189,18 @@ export const AuthProvider = ({ children }) => {
             logger.error('Logout failed:', error);
             // apiClient.js уже показывает toast при ошибках
         }
-    };
+    }, [user?.id]);
 
-    const markIntegrationsRefreshed = () => {
+    const markIntegrationsRefreshed = useCallback(() => {
         setIntegrationsNeedRefresh(false);
-    };
+    }, []);
     
     // Функция для вызова обновления интеграций
-    const triggerIntegrationsRefresh = () => {
+    const triggerIntegrationsRefresh = useCallback(() => {
         setIntegrationsNeedRefresh(true);
-    };
+    }, []);
 
-    const setGuestMode = async (guestData) => {
+    const setGuestMode = useCallback(async (guestData) => {
         try {
             // Устанавливаем гостевой режим
             setIsAuthenticated(true);
@@ -219,9 +219,9 @@ export const AuthProvider = ({ children }) => {
             logger.error('Failed to set guest mode:', error);
             throw error;
         }
-    };
+    }, []);
 
-    const value = {
+    const value = useMemo(() => ({
         user,
         isAuthenticated,
         isGuest,
@@ -235,7 +235,7 @@ export const AuthProvider = ({ children }) => {
         markIntegrationsRefreshed,
         triggerIntegrationsRefresh,
         refreshAuthStatus: checkAuthStatus // Экспортируем функцию для обновления
-    };
+    }), [user, isAuthenticated, isGuest, isCheckingAuth, integrationsNeedRefresh, loginWithTwitch, loginWithVk, logout, setGuestMode, markIntegrationsRefreshed, triggerIntegrationsRefresh, checkAuthStatus]);
 
     return (
         <AuthContext.Provider value={value}>
