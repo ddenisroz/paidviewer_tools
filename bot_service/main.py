@@ -863,6 +863,7 @@ async def auth_status(request: Request, db: Session = Depends(get_db)):
                 "id": user.id,
                 "twitch_username": user.twitch_username,
                 "vk_username": user.vk_username,
+                "vk_channel_name": user.vk_channel_name,
                 "is_admin": user.is_admin
             }
         else:
@@ -873,6 +874,7 @@ async def auth_status(request: Request, db: Session = Depends(get_db)):
             "id": user_id,
             "twitch_username": None,
             "vk_username": None,
+            "vk_channel_name": None,
             "is_admin": session_data.get("is_admin", False)
         }
     

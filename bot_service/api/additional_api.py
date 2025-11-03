@@ -99,6 +99,7 @@ async def get_auth_status(
                 "is_guest": user.get("is_guest", False),
                 "twitch_username": db_user.twitch_username,
                 "vk_username": db_user.vk_username,
+                "vk_channel_name": db_user.vk_channel_name,
                 "tts_enabled": db_user.tts_enabled,
                 "created_at": db_user.created_at.isoformat() if db_user.created_at else None
             },
