@@ -10,13 +10,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from fastapi.staticfiles import StaticFiles
 import tempfile
 
-# Импорты для API классов
-from api.twitch_api import TwitchAPI
-from api.vk_api import VKLiveAPI
-from api.youtube_api import YouTubeAPI
-from api.tts_api import TTSAPI
-# AdminAPI не существует, удален из импортов
-from core.connection_manager import get_connection_manager
+# Импорты перенесены внутрь функций для избежания циклических импортов
 
 def setup_logging():
     """Настройка логирования с использованием современной конфигурации"""

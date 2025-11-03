@@ -83,12 +83,18 @@ class TwitchBotCore(commands.Bot):
             
             # Парсим badges из tags (если доступны)
             if hasattr(message, 'tags') and message.tags:
+                logger.info(f"📋 [DEBUG] Message has tags: {list(message.tags.keys())}")
                 if 'badges' in message.tags:
                     # Формат: "broadcaster/1,subscriber/12"
                     badges_str = message.tags.get('badges', '')
+                    logger.info(f"🎖️ [BADGES RAW] {message.author.name}: '{badges_str}'")
                     if badges_str:
                         badges_list = badges_str.split(',')
                         logger.info(f"🎖️ [BADGES PARSED] {message.author.name}: {badges_list}")
+                else:
+                    logger.warning(f"⚠️ [BADGES] 'badges' not in tags for {message.author.name}")
+            else:
+                logger.warning(f"⚠️ [BADGES] No tags attribute or empty tags for {message.author.name}")
             
             logger.debug(f"👤 [ROLE] {message.author.name}: role={role}, badges={badges_list}")
             
