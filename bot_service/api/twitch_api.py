@@ -10,6 +10,8 @@ from core.connection_manager import ConnectionManager
 from core.token_utils import get_user_token_from_db
 from core.database import User
 from core.session_manager import session_manager
+from core.retry_utils import retry_async
+from core.http_timeouts import TWITCH_API_TIMEOUT
 
 # Загружаем .env файл
 # Получаем путь к директории bot_service
@@ -57,7 +59,7 @@ class TwitchAPI:
             logger.error("TWITCH_CLIENT_SECRET is not set in environment variables")
             raise Exception("TWITCH_CLIENT_SECRET is not configured")
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
             url = "https://id.twitch.tv/oauth2/token"
             
             # Используем FormData для правильного кодирования
@@ -87,7 +89,7 @@ class TwitchAPI:
         """Получить информацию о пользователе Twitch"""
         token = await self.get_app_access_token()
         
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
             headers = {
                 "Client-ID": self.client_id,
                 "Authorization": f"Bearer {token}"
@@ -109,7 +111,7 @@ class TwitchAPI:
         """Получить информацию о стриме"""
         token = await self.get_app_access_token()
         
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
             headers = {
                 "Client-ID": self.client_id,
                 "Authorization": f"Bearer {token}"
@@ -142,7 +144,7 @@ class TwitchAPI:
         user_id = user_info["id"]
         token = await self.get_app_access_token()
         
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
             headers = {
                 "Client-ID": self.client_id,
                 "Authorization": f"Bearer {token}"
@@ -167,7 +169,7 @@ class TwitchAPI:
         """Получить информацию о канале по user_id"""
         token = await self.get_app_access_token()
         
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
             headers = {
                 "Client-ID": self.client_id,
                 "Authorization": f"Bearer {token}"
@@ -189,7 +191,7 @@ class TwitchAPI:
         """Получить информацию о стриме по user_id"""
         token = await self.get_app_access_token()
         
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
             headers = {
                 "Client-ID": self.client_id,
                 "Authorization": f"Bearer {token}"
@@ -221,7 +223,7 @@ class TwitchAPI:
 
         token = await self.get_app_access_token()
         
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
             headers = {
                 "Client-ID": self.client_id,
                 "Authorization": f"Bearer {token}"
@@ -280,7 +282,7 @@ class TwitchAPI:
             logger.error(f"Could not find platform_user_id for unified user {user_id}")
             return False
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
             headers = {
                 "Client-ID": self.client_id,
                 "Authorization": f"Bearer {access_token}",
@@ -337,7 +339,7 @@ class TwitchAPI:
         
         logger.info(f"✅ [TWITCH API] Got access token and platform_user_id={platform_user_id} for user {user_id}")
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
             headers = {
                 "Client-ID": self.client_id,
                 "Authorization": f"Bearer {access_token}",
@@ -387,7 +389,7 @@ class TwitchAPI:
             
             refresh_token = tokens["refresh_token"]
             
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
                 url = "https://id.twitch.tv/oauth2/token"
                 data = {
                     "grant_type": "refresh_token",
@@ -439,7 +441,7 @@ class TwitchAPI:
 
     async def get_user_access_token(self, code: str) -> Optional[Dict[str, Any]]:
         """Получить access token пользователя по коду авторизации"""
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
             url = "https://id.twitch.tv/oauth2/token"
             
             # Используем FormData для правильного кодирования
@@ -483,7 +485,7 @@ class TwitchAPI:
 
     async def get_user_from_token(self, access_token: str) -> Optional[Dict[str, Any]]:
         """Получить информацию о пользователе по access token"""
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
             headers = {
                 "Client-ID": self.client_id,
                 "Authorization": f"Bearer {access_token}"
@@ -502,7 +504,7 @@ class TwitchAPI:
 
     async def get_category_info(self, game_id: str) -> Optional[Dict[str, Any]]:
         """Получить информацию о категории по game_id"""
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
             headers = {
                 "Client-ID": self.client_id,
                 "Authorization": f"Bearer {await self.get_app_access_token()}"
@@ -522,7 +524,7 @@ class TwitchAPI:
 
     async def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Получить информацию о пользователе по user_id"""
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
             headers = {
                 "Client-ID": self.client_id,
                 "Authorization": f"Bearer {await self.get_app_access_token()}"
@@ -542,7 +544,7 @@ class TwitchAPI:
 
     async def get_user_by_username(self, username: str, access_token: str) -> Optional[Dict[str, Any]]:
         """Получить информацию о пользователе по username"""
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
             headers = {
                 "Client-ID": self.client_id,
                 "Authorization": f"Bearer {access_token}"
@@ -562,7 +564,7 @@ class TwitchAPI:
 
     async def add_channel_moderator(self, broadcaster_id: str, user_id: str, access_token: str) -> bool:
         """Добавить модератора на канал"""
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
             headers = {
                 "Client-ID": self.client_id,
                 "Authorization": f"Bearer {access_token}",
@@ -586,7 +588,7 @@ class TwitchAPI:
 
     async def remove_channel_moderator(self, broadcaster_id: str, user_id: str, access_token: str) -> bool:
         """Удалить модератора с канала"""
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
             headers = {
                 "Client-ID": self.client_id,
                 "Authorization": f"Bearer {access_token}"
@@ -609,7 +611,7 @@ class TwitchAPI:
 
     async def add_channel_vip(self, broadcaster_id: str, user_id: str, access_token: str) -> bool:
         """Добавить VIP на канал"""
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
             headers = {
                 "Client-ID": self.client_id,
                 "Authorization": f"Bearer {access_token}",
@@ -633,7 +635,7 @@ class TwitchAPI:
 
     async def remove_channel_vip(self, broadcaster_id: str, user_id: str, access_token: str) -> bool:
         """Удалить VIP с канала"""
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
             headers = {
                 "Client-ID": self.client_id,
                 "Authorization": f"Bearer {access_token}"
@@ -670,7 +672,7 @@ class TwitchAPI:
                 "only_manageable_rewards": str(only_manageable).lower()
             }
             
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
                 async with session.get(url, headers=headers, params=params) as response:
                     if response.status == 200:
                         data = await response.json()
@@ -708,7 +710,7 @@ class TwitchAPI:
             }
             params = {"broadcaster_id": broadcaster_id}
             
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
                 async with session.post(url, headers=headers, params=params, json=reward_data) as response:
                     if response.status == 200:
                         data = await response.json()
@@ -736,7 +738,7 @@ class TwitchAPI:
                 "id": reward_id
             }
             
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
                 async with session.patch(url, headers=headers, params=params, json=reward_data) as response:
                     if response.status == 200:
                         data = await response.json()
@@ -763,7 +765,7 @@ class TwitchAPI:
                 "id": reward_id
             }
             
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
                 async with session.delete(url, headers=headers, params=params) as response:
                     if response.status == 204:
                         logger.info(f"Deleted Twitch custom reward: {reward_id}")
@@ -802,7 +804,7 @@ class TwitchAPI:
             if status:
                 params["status"] = status  # UNFULFILLED, FULFILLED, CANCELED
             
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
                 async with session.get(url, headers=headers, params=params) as response:
                     if response.status == 200:
                         data = await response.json()
@@ -838,7 +840,7 @@ class TwitchAPI:
             }
             body = {"status": status}  # FULFILLED or CANCELED
             
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
                 async with session.patch(url, headers=headers, params=params, json=body) as response:
                     if response.status == 200:
                         logger.info(f"Updated Twitch redemption {redemption_id} to {status}")
@@ -926,7 +928,7 @@ class TwitchAPI:
                 }
             }
             
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
                 async with session.post(url, headers=headers, params=params, json=body) as response:
                     if response.status == 200:
                         logger.info(f"✅ [TWITCH TIMEOUT] User {target_username} timed out for {duration_seconds}s")
@@ -1008,7 +1010,7 @@ class TwitchAPI:
                 "user_id": target_user_id
             }
             
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
                 async with session.delete(url, headers=headers, params=params) as response:
                     if response.status == 204:
                         logger.info(f"✅ [TWITCH UNTIMEOUT] Timeout removed for {target_username}")
@@ -1040,7 +1042,7 @@ class TwitchAPI:
             }
             params = {"login": username.lower()}
             
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
                 async with session.get(url, headers=headers, params=params) as response:
                     if response.status == 200:
                         data = await response.json()

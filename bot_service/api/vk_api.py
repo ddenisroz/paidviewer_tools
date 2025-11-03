@@ -7,8 +7,8 @@ import logging
 import time
 import httpx
 
-# Глобальный timeout для VK API запросов (10 секунд)
-VK_API_TIMEOUT = aiohttp.ClientTimeout(total=10)
+# Глобальный timeout для VK API запросов (30 секунд на общий запрос, 10 секунд на соединение)
+VK_API_TIMEOUT = aiohttp.ClientTimeout(total=30, connect=10)
 import os
 import base64
 from typing import Optional, Dict, Any, List
