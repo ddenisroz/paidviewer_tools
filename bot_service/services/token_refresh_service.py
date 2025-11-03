@@ -4,6 +4,7 @@
 import logging
 import httpx
 import os
+import aiohttp
 from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -11,6 +12,7 @@ from sqlalchemy.orm import Session
 from core.database import get_db, UserToken
 from core.token_encryption import encrypt_token, decrypt_token
 from core.datetime_utils import utcnow_naive
+from core.retry_utils import retry_async
 
 logger = logging.getLogger('token_refresh')
 
@@ -143,49 +145,60 @@ class TokenRefreshService:
                 logger.error("Twitch credentials not configured")
                 return False
             
-            # Запрос к Twitch OAuth
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                logger.info(f"📡 Requesting new Twitch token for user {token.user_id}")
+            # Запрос к Twitch OAuth с retry
+            async def _do_refresh():
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    return await client.post(
+                        "https://id.twitch.tv/oauth2/token",
+                        data={
+                            "client_id": client_id,
+                            "client_secret": client_secret,
+                            "grant_type": "refresh_token",
+                            "refresh_token": refresh_token
+                        }
+                    )
+            
+            logger.info(f"📡 Requesting new Twitch token for user {token.user_id}")
+            response = await retry_async(
+                _do_refresh,
+                max_attempts=3,
+                initial_delay=2.0,
+                retry_on=(httpx.NetworkError, httpx.TimeoutException, aiohttp.ClientError)
+            )
+            
+            if not response:
+                logger.error("❌ Failed to refresh Twitch token after retries")
+                return False
+            
+            if response.status_code == 200:
+                data = response.json()
                 
-                response = await client.post(
-                    "https://id.twitch.tv/oauth2/token",
-                    data={
-                        "client_id": client_id,
-                        "client_secret": client_secret,
-                        "grant_type": "refresh_token",
-                        "refresh_token": refresh_token
-                    }
-                )
+                # Обновляем токены в БД
+                token.access_token = encrypt_token(data["access_token"])
+                token.refresh_token = encrypt_token(data["refresh_token"])
+                token.expires_at = utcnow_naive() + timedelta(seconds=data["expires_in"])
+                token.updated_at = utcnow_naive()
                 
-                if response.status_code == 200:
-                    data = response.json()
-                    
-                    # Обновляем токены в БД
-                    token.access_token = encrypt_token(data["access_token"])
-                    token.refresh_token = encrypt_token(data["refresh_token"])
-                    token.expires_at = utcnow_naive() + timedelta(seconds=data["expires_in"])
-                    token.updated_at = utcnow_naive()
-                    
+                db.commit()
+                
+                logger.info(f"✅ Twitch token refreshed for user {token.user_id}")
+                logger.info(f"   New expiration: {token.expires_at}")
+                return True
+                
+            elif response.status_code == 400:
+                error_data = response.json()
+                logger.error(f"❌ Failed to refresh Twitch token: {error_data}")
+                
+                # Если refresh token недействителен - удаляем его
+                if error_data.get("message") == "Invalid refresh token":
+                    logger.error(f"Refresh token invalid, user needs to re-authenticate")
+                    token.refresh_token = None
                     db.commit()
-                    
-                    logger.info(f"✅ Twitch token refreshed for user {token.user_id}")
-                    logger.info(f"   New expiration: {token.expires_at}")
-                    return True
-                    
-                elif response.status_code == 400:
-                    error_data = response.json()
-                    logger.error(f"❌ Failed to refresh Twitch token: {error_data}")
-                    
-                    # Если refresh token недействителен - удаляем его
-                    if error_data.get("message") == "Invalid refresh token":
-                        logger.error(f"Refresh token invalid, user needs to re-authenticate")
-                        token.refresh_token = None
-                        db.commit()
-                    
-                    return False
-                else:
-                    logger.error(f"❌ Failed to refresh token: {response.status_code} - {response.text}")
-                    return False
+                
+                return False
+            else:
+                logger.error(f"❌ Failed to refresh token: {response.status_code} - {response.text}")
+                return False
                     
         except Exception as e:
             logger.error(f"Error refreshing Twitch token: {e}", exc_info=True)
@@ -215,39 +228,50 @@ class TokenRefreshService:
             credentials = f"{client_id}:{client_secret}"
             auth_header = base64.b64encode(credentials.encode()).decode()
             
-            # Запрос к VK Live OAuth (ПРАВИЛЬНЫЙ endpoint из документации)
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                logger.info(f"📡 Requesting new VK Live token for user {token.user_id}")
+            # Запрос к VK Live OAuth с retry
+            async def _do_refresh():
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    return await client.post(
+                        "https://api.live.vkvideo.ru/oauth/server/token",
+                        headers={
+                            "Authorization": f"Basic {auth_header}",
+                            "Content-Type": "application/x-www-form-urlencoded"
+                        },
+                        data={
+                            "grant_type": "refresh_token",
+                            "refresh_token": refresh_token,
+                            "redirect_uri": redirect_uri
+                        }
+                    )
+            
+            logger.info(f"📡 Requesting new VK Live token for user {token.user_id}")
+            response = await retry_async(
+                _do_refresh,
+                max_attempts=3,
+                initial_delay=2.0,
+                retry_on=(httpx.NetworkError, httpx.TimeoutException, aiohttp.ClientError)
+            )
+            
+            if not response:
+                logger.error("❌ Failed to refresh VK token after retries")
+                return False
+            
+            if response.status_code == 200:
+                data = response.json()
                 
-                response = await client.post(
-                    "https://api.live.vkvideo.ru/oauth/server/token",  # ИСПРАВЛЕНО!
-                    headers={
-                        "Authorization": f"Basic {auth_header}",
-                        "Content-Type": "application/x-www-form-urlencoded"
-                    },
-                    data={
-                        "grant_type": "refresh_token",
-                        "refresh_token": refresh_token,
-                        "redirect_uri": redirect_uri
-                    }
-                )
+                # Обновляем токены в БД
+                token.access_token = encrypt_token(data["access_token"])
+                token.refresh_token = encrypt_token(data["refresh_token"])
+                token.expires_at = utcnow_naive() + timedelta(seconds=data["expires_in"])
+                token.updated_at = utcnow_naive()
                 
-                if response.status_code == 200:
-                    data = response.json()
-                    
-                    # Обновляем токены в БД
-                    token.access_token = encrypt_token(data["access_token"])
-                    token.refresh_token = encrypt_token(data["refresh_token"])
-                    token.expires_at = utcnow_naive() + timedelta(seconds=data["expires_in"])
-                    token.updated_at = utcnow_naive()
-                    
-                    db.commit()
-                    
-                    logger.info(f"✅ VK Live token refreshed for user {token.user_id}")
-                    return True
-                else:
-                    logger.error(f"❌ Failed to refresh VK token: {response.status_code}")
-                    return False
+                db.commit()
+                
+                logger.info(f"✅ VK Live token refreshed for user {token.user_id}")
+                return True
+            else:
+                logger.error(f"❌ Failed to refresh VK token: {response.status_code}")
+                return False
                     
         except Exception as e:
             logger.error(f"Error refreshing VK token: {e}", exc_info=True)
