@@ -44,7 +44,8 @@ from core.connection_manager import get_connection_manager
 from core.session_manager import session_manager
 from auth.auth import get_current_user, get_current_user_optional
 # Rate limiting handled by slowapi
-from bots.twitch_bot import Bot
+from bots.twitch_bot import Bot  # Используется в initialize_twitch_bot()
+from bots.vk_live_bot import VKLiveBot  # Используется в initialize_vk_live_bot()
 from services.memory_tts_queue import memory_tts_queue
 from core.security_modern import limiter, rate_limit_handler
 from services.memory_websocket_manager import memory_websocket_manager
@@ -75,6 +76,12 @@ from api.system_api import router as system_router
 from api.user_settings_api import router as user_settings_router
 from api.chatbox_api import router as chatbox_router
 from api.monitoring_api import router as monitoring_router
+from api.admin_api import router as admin_router
+from api.active_channels_api import router as active_channels_router
+from api.stream_history_api import router as stream_history_router
+from api.donationalerts_api import router as donationalerts_router
+from api.guest_api import router as guest_router
+from api.system_logs_api import router as system_logs_router
 
 from core.token_utils import get_user_token_from_db, validate_platform_token
 
@@ -82,7 +89,6 @@ async def initialize_twitch_bot():
     """Инициализация Twitch бота"""
     try:
         import os
-        from bots.twitch_bot import Bot
         
         twitch_token = os.getenv("TWITCH_BOT_TOKEN")
         if not twitch_token:
@@ -116,7 +122,6 @@ async def initialize_vk_live_bot():
     """
     try:
         import os
-        from bots.vk_live_bot import VKLiveBot
         
         vk_token = os.getenv("VK_LIVE_USER_TOKEN")  # Токен БОТА для чата
         if not vk_token:
@@ -152,65 +157,9 @@ bot_task = None
 vk_live_bot_instance = None
 vk_live_bot_task = None
 
-# Добавление middleware
-# Session Middleware (должен быть первым)
-from starlette.middleware.sessions import SessionMiddleware
-# Получаем секретный ключ из переменных окружения
-secret_key = os.getenv("SECRET_KEY")
-if not secret_key:
-    raise ValueError("SECRET_KEY environment variable is required for security")
-
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=secret_key
-)
-
-# Trusted Host Middleware для защиты от Host Header атак
-# Временно отключаем для тестов
-# from fastapi.middleware.trustedhost import TrustedHostMiddleware
-# app.add_middleware(
-#     TrustedHostMiddleware,
-#     allowed_hosts=["localhost", "127.0.0.1", "*.yourdomain.com"]
-# )
-
-# CORS Middleware
-from fastapi.middleware.cors import CORSMiddleware
-from constants import DEFAULT_FRONTEND_URL
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", f"{os.getenv('FRONTEND_URL', DEFAULT_FRONTEND_URL)},{os.getenv('FRONTEND_URL', DEFAULT_FRONTEND_URL).replace('5173', '3000')}")
-allowed_origins = [origin.strip() for origin in CORS_ORIGINS.split(',')]
-
-logger.info(f"🔐 CORS configured for origins: {allowed_origins}")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin", "X-CSRFToken"],
-    expose_headers=["Content-Type"],
-)
-
-# Явный обработчик OPTIONS запросов для CORS
-@app.options("/{path:path}")
-async def options_handler(request: Request, path: str):
-    """Обработчик OPTIONS запросов для CORS"""
-    from fastapi.responses import Response
-    
-    origin = request.headers.get("origin")
-    if origin in allowed_origins:
-        return Response(
-            status_code=200,
-            headers={
-                "Access-Control-Allow-Origin": origin,
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept, Origin, X-CSRFToken",
-                "Access-Control-Allow-Credentials": "true",
-                "Access-Control-Max-Age": "3600"
-            }
-        )
-    return Response(status_code=403)
-
-# Rate Limiting handled by advanced_rate_limiter in endpoints
+# Middleware - настроены в create_app()
+# CORS, Rate Limiting, Session - все настроено в app_config.py
+# Добавляем только кастомные middleware
 
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
@@ -432,7 +381,6 @@ async def lifespan(app: FastAPI):
                 # (переносим логику из else блока на этот уровень)
                 try:
                     global vk_live_bot_instance, vk_live_bot_task
-                    from bots.vk_live_bot import VKLiveBot
                     from core.database import SessionLocal, UserToken, User
                     
                     # Приоритет 1: Используем сгенерированный ClientCredentials токен
@@ -997,36 +945,14 @@ app.include_router(system_router)
 app.include_router(user_settings_router)
 app.include_router(support_router)
 app.include_router(chatbox_router)
-
-# --- New API Routes ---
-from api.admin_api import router as admin_router
-from api.active_channels_api import router as active_channels_router
-from api.stream_history_api import router as stream_history_router
-from api.donationalerts_api import router as donationalerts_router
-from api.guest_api import router as guest_router
-from api.system_logs_api import router as system_logs_router
-
 app.include_router(admin_router)
 app.include_router(active_channels_router)
 app.include_router(stream_history_router)
 app.include_router(donationalerts_router)
-app.include_router(monitoring_router)
 app.include_router(guest_router)
 app.include_router(system_logs_router)
 
-# --- Static Files for Widgets ---
-# Добавляем статические файлы для виджетов
-from fastapi.staticfiles import StaticFiles
-from core.project_paths import FRONTEND_ROOT, TEMP_DIR
-
-widgets_path = FRONTEND_ROOT / "src" / "widgets"
-if widgets_path.exists():
-    app.mount("/widgets", StaticFiles(directory=str(widgets_path)), name="widgets")
-
-# Добавляем статические файлы для аудио (базовая TTS)
-temp_audio_dir = TEMP_DIR / "tts_audio"
-temp_audio_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/audio", StaticFiles(directory=str(temp_audio_dir)), name="audio")
+# Static files - настроены в create_app()
 
 
 if __name__ == "__main__":

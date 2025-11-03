@@ -211,17 +211,6 @@ async def create_command(
     """Создать новую кастомную команду"""
     return await _create_command_impl(command_data, current_user, db)
 
-@router.post("")
-@limiter.limit("20/minute")
-async def create_command_no_slash(
-    request: Request,
-    command_data: CommandCreate,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Создать новую кастомную команду (без слэша)"""
-    return await _create_command_impl(command_data, current_user, db)
-
 async def _create_command_impl(command_data: CommandCreate, current_user: dict, db: Session):
     try:
         # Проверяем лимит кастомных команд (максимум 5 на пользователя)

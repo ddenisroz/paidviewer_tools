@@ -784,7 +784,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                 {/* Toggle объединения полей */}
                 {bothEnabled && (
                     <div className="flex items-center justify-between p-2 bg-background/10 rounded-lg mb-2">
-                        <Label htmlFor="link-categories" className="flex items-center gap-2 cursor-pointer text-sm pl-3">
+                        <Label htmlFor="link-categories" className="flex items-center gap-2 cursor-pointer text-sm">
                             {isLinked ? <Link className="h-4 w-4 text-green-500" /> : <Unlink className="h-4 w-4" />}
                             Объединить поля
                         </Label>

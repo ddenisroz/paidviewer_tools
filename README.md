@@ -1,7 +1,7 @@
 # 🎙️ TTS_TTV_0.02 - Text-to-Speech Bot для Twitch & VK Live
 
-![Status](https://img.shields.io/badge/status-stable-brightgreen)
-![Version](https://img.shields.io/badge/version-0.9.5-blue)
+![Status](https://img.shields.io/badge/status-production%20ready-brightgreen)
+![Version](https://img.shields.io/badge/version-0.02-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **TTS бот для стримеров** с поддержкой облачного (Google TTS) и локального (F5-TTS) синтеза, YouTube заказов, системы баллов и интеграции с донатами.
@@ -23,10 +23,6 @@ cd bot_service && pip install -r requirements.txt  # Backend
 cp .env.example .env
 # Заполни: TWITCH_TOKEN, VK_TOKEN, GOOGLE_CLOUD_KEY, DATABASE_URL
 
-# 3.5️⃣ Настрой PostgreSQL (если еще не установлен)
-# Windows: .\bot_service\scripts\setup_postgresql.ps1
-# Или установите PostgreSQL вручную и создайте базу данных
-
 # 4️⃣ Запусти
 npm run dev          # Frontend (localhost:5173)
 cd bot_service && python main.py  # Backend (localhost:8000)
@@ -36,41 +32,42 @@ cd bot_service && python main.py  # Backend (localhost:8000)
 
 ---
 
-## 📚 Документация
+## ✨ Основные возможности
 
-### Для обычных пользователей (стримеры)
-- 🎯 **[Как начать работу](docs/QUICK_START.md)**
-- ⚙️ **[Параметры и настройки](docs/FEATURES_GUIDE.md)** (если есть)
-- 🐛 **[Частые проблемы](docs/TROUBLESHOOTING.md)** (если есть)
-
-### Для разработчиков
-- 📖 **[Архитектура системы](docs/ARCHITECTURE_GUIDE.md)**
-- 👨‍💻 **[Руководство разработчика](docs/DEVELOPER_GUIDE.md)**
-- 🚨 **[Что работает / Что сломано](docs/CURRENT_STATUS.md)**
-
-### Для AI-агентов (Claude, GPT и т.д.)
-- 🤖 **[Правила разработки для AI](docs/LLM_DEVELOPMENT_RULES.md)** ⚠️ Обязательно!
-- 🚫 **[Что НЕ менять](docs/DO_NOT_TOUCH.md)** ⚠️ Критично!
-
-### Полный индекс
-👉 **[Все документы](docs/README.md)**
+| Функция | Статус | Описание |
+|---------|--------|----------|
+| 🎙️ Google TTS | ✅ | Облачный синтез через Google Cloud |
+| 🎧 Локальный F5-TTS | ✅ | Локальный синтез через F5-TTS |
+| 📺 Twitch | ✅ | OAuth, чат, команды, бейджи |
+| 🌐 VK Live | ✅ | OAuth, чат, команды, баллы |
+| 📊 YouTube | ✅ | Очередь заказов, плеер |
+| 💰 Баллы канала | ✅ | Twitch + VK Live награды |
+| 🎁 Drops система | ✅ | Lootbox, streak, donation |
+| 💝 DonationAlerts | ✅ | Автоматическая интеграция |
+| 👤 Гостевой режим | ✅ | Просмотр без авторизации |
+| 🎮 Кастомные команды | ✅ | Глобальные, override, custom |
+| 👥 Админ панель | ✅ | Управление пользователями |
+| 🔌 OBS виджеты | ✅ | Chat, TTS, YouTube, Drops |
 
 ---
 
-## ✨ Основные возможности
+## 📚 Документация
 
-| Функция | Статус |
-|---------|--------|
-| 🎙️ Google TTS синтез | ✅ Ready |
-| 🎧 Локальный F5-TTS | ✅ Ready |
-| 📺 Twitch интеграция | ✅ Ready |
-| 🌐 VK Live интеграция | ✅ Ready |
-| 📊 YouTube заказы | ✅ Ready |
-| 💰 Система баллов канала | ✅ Ready |
-| 🎁 Drops система (лутбоксы) | ✅ Ready |
-| 💝 Интеграция DonationAlerts | ✅ Ready |
-| 👤 Гостевой режим | ✅ Ready |
-| 🎮 Custom команды | ✅ Ready |
+### Для обычных пользователей
+- 🎯 **[Быстрый старт](docs/QUICK_START.md)**
+- 📖 **[Текущий статус](docs/CURRENT_STATUS.md)**
+
+### Для разработчиков
+- 📖 **[Архитектура](docs/ARCHITECTURE_OVERVIEW.md)**
+- 👨‍💻 **[Руководство](docs/DEVELOPER_GUIDE.md)**
+- 📜 **[Changelog](docs/CHANGELOG.md)**
+
+### Для AI-агентов
+- ⚠️ **[Правила разработки](docs/LLM_DEVELOPMENT_RULES.md)** ОБЯЗАТЕЛЬНО!
+- 🚨 **[Текущий статус](docs/CURRENT_STATUS.md)**
+- 🚫 **[Не трогать](docs/DO_NOT_TOUCH.md)**
+
+**Полный индекс:** 📚 [docs/README.md](docs/README.md)
 
 ---
 
@@ -94,95 +91,42 @@ cd bot_service && python main.py  # Backend (localhost:8000)
 │   └── public/
 │
 ├── docs/                 # Документация
-└── tts_service_simple/   # TTS микросервис (опциональный)
+└── tts_service_simple/   # TTS микросервис
 ```
 
 ---
 
-## 🚀 Команды для разработки
+## 🔐 Безопасность
 
-```bash
-# Frontend
-npm run dev              # Запуск dev сервера (localhost:5173)
-npm run build            # Production build
-npm run preview          # Preview build
-npm run fix-logs         # Заменить console.log на logger
-
-# Backend
-python main.py           # Запуск сервера
-python scripts/clear_database.py clear  # Очистить БД
-python scripts/init_db.py               # Инициализировать БД
-```
+- ✅ **Rate Limiting** - защита от DDoS
+- ✅ **Input Sanitization** - XSS/SQLi защита
+- ✅ **JWT + OAuth2** - безопасная аутентификация
+- ✅ **CSRF Protection** - защита от атак
+- ✅ **Retry Logic** - устойчивость к сетевому отказу
+- ✅ **Encryption** - токены зашифрованы в БД
 
 ---
 
-## 🔐 Переменные окружения
+## 📊 Технологии
 
-Создай файл `.env` в корне (или в `bot_service/`):
-
-```env
-# Twitch
-TWITCH_BOT_TOKEN=<token>
-TWITCH_CLIENT_ID=<id>
-TWITCH_CLIENT_SECRET=<secret>
-
-# VK Live
-VK_TOKEN=<token>
-
-# Google Cloud TTS
-GOOGLE_CLOUD_KEY=<path/to/key.json>
-
-# DonationAlerts
-DONATIONALERTS_TOKEN=<token>
-
-# Local TTS (F5-TTS)
-USE_LOCAL_TTS=false
-
-# Environment
-ENVIRONMENT=development  # development или production
-```
+**Backend:** Python, FastAPI, SQLAlchemy, Alembic  
+**Frontend:** React 19, Vite, Tailwind CSS, shadcn/ui, React Query  
+**Database:** SQLite (dev) / PostgreSQL (prod)  
+**TTS:** Google Cloud TTS / F5-TTS  
+**WebSocket:** FastAPI WebSocket (SharedWebSocket)  
+**Интеграции:** Twitch, VK Live, YouTube, DonationAlerts
 
 ---
 
-## 🤝 Как помочь проекту
+## 📝 История версий
 
-- 🐛 **Найти баг?** Открой issue с описанием
-- 💡 **Идея?** Предложи в discussions
-- 👨‍💻 **Хочешь кодить?** Прочитай [DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)
-
----
-
-## 📊 Статистика
-
-- **Backend:** Python, FastAPI, SQLAlchemy
-- **Frontend:** React 19, Vite, Tailwind CSS, shadcn/ui
-- **Database:** SQLite (dev) / PostgreSQL (prod)
-- **Интеграции:** Twitch, VK, YouTube, Google Cloud TTS
-- **Lines of Code:** ~50,000+ (backend + frontend)
-
----
-
-## 📝 История
-
-- **v0.9.5** (Nov 1, 2025) - Security & Performance improvements
-  - ✅ 501 console.log → logger replacements
-  - ✅ Input sanitization (XSS/SQL injection protection)
-  - ✅ Database utilities centralization
-  - ✅ CSP hardening (nonce-based)
-  
-- **v0.9.0** - Comprehensive audit & fixes
-- **v0.8.0** - Guest mode support
-- **v0.7.0** - YouTube integration
+| Дата | Версия | Основные изменения |
+|------|--------|-------------------|
+| Nov 3, 2025 | 0.02 | Code quality cleanup, production ready |
+| Nov 1, 2025 | 0.01 | Security improvements |
+| Oct 31, 2025 | 0.9.5 | Comprehensive audit |
 
 **Полный changelog:** 📖 [CHANGELOG.md](docs/CHANGELOG.md)
-
----
-
-## 🛟 Поддержка
-
-- 💬 **Проблема?** Смотри [Troubleshooting](docs/TROUBLESHOOTING.md)
-- 📖 **Документация** - [docs/README.md](docs/README.md)
-- 🤖 **AI помощь?** Используй [LLM_DEVELOPMENT_RULES.md](docs/LLM_DEVELOPMENT_RULES.md)
 
 ---
 
@@ -192,4 +136,4 @@ MIT License - Свободен для использования и модифи
 
 ---
 
-**Последнее обновление:** November 1, 2025 | **Версия:** 0.9.5
+**Последнее обновление:** 3 ноября 2025 | **Версия:** 0.02
