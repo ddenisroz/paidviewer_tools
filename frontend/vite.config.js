@@ -24,6 +24,10 @@ export default defineConfig({
             if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
               return 'react-vendor';
             }
+            // React Query - отдельный чанк для лучшей загрузки
+            if (id.includes('@tanstack/react-query')) {
+              return 'react-query';
+            }
             // UI библиотеки
             if (id.includes('lucide-react')) {
               return 'ui-icons';
@@ -102,7 +106,8 @@ export default defineConfig({
       'react',
       'react-dom',
       'react-router-dom',
-      'axios'
+      'axios',
+      '@tanstack/react-query'
     ],
     exclude: ['recharts'] // Исключаем тяжелые библиотеки из предварительной оптимизации
   }

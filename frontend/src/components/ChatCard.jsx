@@ -277,7 +277,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
         
         // Внешний вид
         fontSize: 14,
-        fontFamily: 'Arial',
+        fontFamily: 'var(--font-family-base)',
         fontWeight: 'normal',
         backgroundColor: 'rgba(0, 0, 0, 0.8)',
         backgroundImage: 'none',
@@ -1178,7 +1178,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                                                             />
                                                         )}
                                                         
-                                                        <span className="text-xs text-muted-foreground mr-1.5">
+                                                        <span className="text-xs text-muted-foreground mr-1.5 timestamp">
                                                             {new Date(msg.timestamp).toLocaleTimeString('ru-RU', { 
                                                                 hour: '2-digit', 
                                                                 minute: '2-digit' 

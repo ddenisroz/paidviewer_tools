@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -48,12 +49,7 @@ import { botService } from '../../services/microservices';
 import { logger } from '../../utils/prodLogger';
 
 const UserManagementPage = () => {
-    const [users, setUsers] = useState([]);
-    const [sessions, setSessions] = useState([]);
-    const [integrations, setIntegrations] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [sessionsLoading, setSessionsLoading] = useState(false);
-    const [integrationsLoading, setIntegrationsLoading] = useState(false);
+    const queryClient = useQueryClient();
     
     // Фильтры и поиск
     const [searchTerm, setSearchTerm] = useState('');
@@ -81,44 +77,139 @@ const UserManagementPage = () => {
         channel_name: ''
     });
 
-    const loadUsers = async () => {
-        try {
-            setLoading(true);
+    // React Query: загружаем пользователей
+    const { data: usersData = [], isLoading: usersLoading } = useQuery({
+        queryKey: ['admin-users'],
+        queryFn: async () => {
             const response = await botService.get('/api/admin/users');
-            setUsers(response.data?.users || []);
-        } catch (error) {
+            return response.data?.users || [];
+        },
+        staleTime: 30 * 1000, // 30 секунд
+        refetchOnMount: true,
+        refetchOnWindowFocus: false,
+        onError: (error) => {
             logger.error('Error loading users:', error);
             toast.error('Ошибка загрузки пользователей');
-        } finally {
-            setLoading(false);
-        }
-    };
+        },
+    });
 
-    const loadSessions = async () => {
-        try {
-            setSessionsLoading(true);
+    // React Query: загружаем сессии
+    const { data: sessionsData = [], isLoading: sessionsLoading } = useQuery({
+        queryKey: ['admin-sessions'],
+        queryFn: async () => {
             const response = await botService.get('/api/admin/sessions');
-            setSessions(response.data?.sessions || []);
-        } catch (error) {
+            return response.data?.sessions || [];
+        },
+        staleTime: 30 * 1000,
+        refetchOnMount: true,
+        refetchOnWindowFocus: false,
+        onError: (error) => {
             logger.error('Error loading sessions:', error);
             toast.error('Ошибка загрузки сессий');
-        } finally {
-            setSessionsLoading(false);
-        }
-    };
+        },
+    });
 
-    const loadIntegrations = async () => {
-        try {
-            setIntegrationsLoading(true);
+    // React Query: загружаем интеграции
+    const { data: integrationsData = [], isLoading: integrationsLoading } = useQuery({
+        queryKey: ['integrations'],
+        queryFn: async () => {
             const response = await botService.get('/api/integrations');
-            setIntegrations(response.data?.integrations || []);
-        } catch (error) {
+            return response.data?.integrations || [];
+        },
+        staleTime: 30 * 1000,
+        refetchOnMount: true,
+        refetchOnWindowFocus: false,
+        onError: (error) => {
             logger.error('Error loading integrations:', error);
             toast.error('Ошибка загрузки интеграций');
-        } finally {
-            setIntegrationsLoading(false);
-        }
-    };
+        },
+    });
+
+    // React Query мутации для операций с пользователями
+    const updateUserMutation = useMutation({
+        mutationFn: async ({ userId, data }) => {
+            return await botService.put(`/api/admin/users/${userId}`, data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+            toast.success('Пользователь обновлен');
+            setEditDialogOpen(false);
+        },
+        onError: (error) => {
+            logger.error('Error updating user:', error);
+            toast.error('Ошибка обновления пользователя');
+        },
+    });
+
+    const blockUserMutation = useMutation({
+        mutationFn: async ({ userId, reason }) => {
+            return await botService.post(`/api/admin/users/${userId}/block`, { reason });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+            toast.success('Пользователь заблокирован');
+            setBlockDialogOpen(false);
+        },
+        onError: (error) => {
+            logger.error('Error blocking user:', error);
+            toast.error('Ошибка блокировки пользователя');
+        },
+    });
+
+    const deleteUserMutation = useMutation({
+        mutationFn: async (userId) => {
+            return await botService.delete(`/api/admin/users/${userId}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+            toast.success('Пользователь удален');
+        },
+        onError: (error) => {
+            logger.error('Error deleting user:', error);
+            toast.error('Ошибка удаления пользователя');
+        },
+    });
+
+    const addToWhitelistMutation = useMutation({
+        mutationFn: async ({ username, platform }) => {
+            return await botService.post('/api/admin/whitelist/add', { username, platform });
+        },
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+            toast.success(`Канал ${variables.username} добавлен в whitelist`);
+            setWhitelistDialogOpen(false);
+            setWhitelistForm({ channel_name: '' });
+        },
+        onError: (error) => {
+            logger.error('Error adding to whitelist:', error);
+        },
+    });
+
+    const toggleWhitelistMutation = useMutation({
+        mutationFn: async ({ channelName, platform, isWhitelisted }) => {
+            if (isWhitelisted) {
+                return await botService.delete(`/api/admin/whitelist/${channelName}`);
+            } else {
+                return await botService.post('/api/admin/whitelist/add', { username: channelName, platform });
+            }
+        },
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+            toast.success(
+                variables.isWhitelisted 
+                    ? `${variables.channelName} удален из whitelist`
+                    : `${variables.channelName} добавлен в whitelist`
+            );
+        },
+        onError: (error) => {
+            logger.error('Error toggling whitelist:', error);
+        },
+    });
+
+    const users = usersData;
+    const sessions = sessionsData;
+    const integrations = integrationsData;
+    const loading = usersLoading;
 
     // Фильтрация и сортировка пользователей
     const filteredAndSortedUsers = useMemo(() => {
@@ -242,42 +333,18 @@ const UserManagementPage = () => {
     };
 
     const handleEditUser = async () => {
-        try {
-            await botService.put(`/api/admin/users/${currentUser.id}`, editForm);
-            toast.success('Пользователь обновлен');
-            setEditDialogOpen(false);
-            loadUsers();
-        } catch (error) {
-            logger.error('Error updating user:', error);
-            toast.error('Ошибка обновления пользователя');
-        }
+        if (!currentUser) return;
+        updateUserMutation.mutate({ userId: currentUser.id, data: editForm });
     };
 
     const handleBlockUser = async () => {
-        try {
-            await botService.post(`/api/admin/users/${currentUser.id}/block`, {
-                reason: blockForm.reason
-            });
-            toast.success('Пользователь заблокирован');
-            setBlockDialogOpen(false);
-            loadUsers();
-        } catch (error) {
-            logger.error('Error blocking user:', error);
-            toast.error('Ошибка блокировки пользователя');
-        }
+        if (!currentUser) return;
+        blockUserMutation.mutate({ userId: currentUser.id, reason: blockForm.reason });
     };
 
     const handleDeleteUser = async (userId) => {
         if (!confirm('Вы уверены, что хотите удалить этого пользователя?')) return;
-        
-        try {
-            await botService.delete(`/api/admin/users/${userId}`);
-            toast.success('Пользователь удален');
-            loadUsers();
-        } catch (error) {
-            logger.error('Error deleting user:', error);
-            toast.error('Ошибка удаления пользователя');
-        }
+        deleteUserMutation.mutate(userId);
     };
 
     const handleAddToWhitelist = async () => {
@@ -286,19 +353,10 @@ const UserManagementPage = () => {
             return;
         }
         
-        try {
-            await botService.post('/api/admin/whitelist/add', {
-                username: whitelistForm.channel_name.trim(),
-                platform: 'twitch' // По умолчанию Twitch, backend поддерживает оба
-            });
-            toast.success(`Канал ${whitelistForm.channel_name} добавлен в whitelist`);
-            setWhitelistDialogOpen(false);
-            setWhitelistForm({ channel_name: '' });
-            loadUsers(); // Перезагружаем для обновления статуса whitelist
-        } catch (error) {
-            logger.error('Error adding to whitelist:', error);
-            // Ошибка уже обрабатывается в apiClient
-        }
+        addToWhitelistMutation.mutate({
+            username: whitelistForm.channel_name.trim(),
+            platform: 'twitch' // По умолчанию Twitch, backend поддерживает оба
+        });
     };
 
     const handleToggleWhitelist = async (user) => {
@@ -308,30 +366,18 @@ const UserManagementPage = () => {
             return;
         }
 
-        try {
-            if (user.is_whitelisted) {
-                // Удаляем из whitelist
-                await botService.delete(`/api/admin/whitelist/${channelName}`);
-                toast.success(`${channelName} удален из whitelist`);
-            } else {
-                // Добавляем в whitelist
-                await botService.post('/api/admin/whitelist/add', {
-                    username: channelName,
-                    platform: user.twitch_username ? 'twitch' : 'vk'
-                });
-                toast.success(`${channelName} добавлен в whitelist`);
-            }
-            loadUsers(); // Обновляем список
-        } catch (error) {
-            logger.error('Error toggling whitelist:', error);
-            // Ошибка уже обрабатывается в apiClient
-        }
+        toggleWhitelistMutation.mutate({
+            channelName,
+            platform: user.twitch_username ? 'twitch' : 'vk',
+            isWhitelisted: user.is_whitelisted
+        });
     };
 
     useEffect(() => {
-        loadUsers();
-        loadSessions();
-        loadIntegrations();
+        // Данные обновятся автоматически через React Query
+        queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+        queryClient.invalidateQueries({ queryKey: ['admin-sessions'] });
+        queryClient.invalidateQueries({ queryKey: ['integrations'] });
     }, []);
 
     if (loading) {

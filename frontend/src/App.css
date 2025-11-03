@@ -109,6 +109,10 @@ body {
     --quality-epic: 262 83% 58%;        /* #8B5CF6 */
     --quality-legendary: 38 92% 50%;    /* #F59E0B */
     --quality-mythical: 310 70% 55%;    /* Мифический */
+    
+    /* Typography - стандартизированные шрифты */
+    --font-family-base: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    --font-family-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
   }
  
   .dark {
@@ -149,9 +153,11 @@ body {
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: var(--font-family-base);
     font-size: 14px; /* Базовый размер по умолчанию */
     line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   
   /* Устанавливаем базовые размеры для предотвращения FOUT */
@@ -336,8 +342,9 @@ body {
     display: none;
 }
 
+/* Body font - использует CSS переменную */
 body {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-family: var(--font-family-base);
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

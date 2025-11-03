@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,46 +12,42 @@ import { botService } from '../../services/microservices';
 import { logger } from '../../utils/prodLogger';
 
 const BotsManagementPage = () => {
-  const [botStatus, setBotStatus] = useState(null);
-  const [systemInfo, setSystemInfo] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const loadBotStatus = async () => {
-    try {
-      setLoading(true);
+  // React Query: загружаем статус ботов
+  const { data: botStatusData, isLoading: botStatusLoading, error: botStatusError, refetch: refetchBotStatus } = useQuery({
+    queryKey: ['bot-status'],
+    queryFn: async () => {
       const response = await botService.get('/api/bot/status');
-      if (response.data?.success) {
-        setBotStatus(response.data.data);
-      }
-    } catch (error) {
+      return response.data?.success ? response.data.data : null;
+    },
+    staleTime: 5 * 1000, // 5 секунд
+    refetchInterval: 10 * 1000, // Автоматически обновляем каждые 10 секунд
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+    onError: (error) => {
       logger.error('Error loading bot status:', error);
       toast.error('Ошибка загрузки статуса ботов');
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
 
-  const loadSystemInfo = async () => {
-    try {
+  // React Query: загружаем системную информацию
+  const { data: systemInfoData, refetch: refetchSystemInfo } = useQuery({
+    queryKey: ['system-info'],
+    queryFn: async () => {
       const response = await botService.get('/api/status');
-      if (response.data) {
-        setSystemInfo(response.data);
-      }
-    } catch (error) {
+      return response.data || null;
+    },
+    staleTime: 5 * 1000, // 5 секунд
+    refetchInterval: 10 * 1000, // Автоматически обновляем каждые 10 секунд
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+    onError: (error) => {
       logger.error('Error loading system info:', error);
-    }
-  };
+    },
+  });
 
-  useEffect(() => {
-    loadBotStatus();
-    loadSystemInfo();
-    // Автоматически обновляем каждые 10 секунд
-    const interval = setInterval(() => {
-      loadBotStatus();
-      loadSystemInfo();
-    }, 10000);
-    return () => clearInterval(interval);
-  }, []);
+  const botStatus = botStatusData;
+  const systemInfo = systemInfoData;
+  const loading = botStatusLoading;
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -97,7 +94,7 @@ const BotsManagementPage = () => {
           <h1 className="text-3xl font-bold">🤖 Управление ботами</h1>
           <p className="text-slate-400 mt-2">Мониторинг статуса TTS сервера, вебсокетов и платформ</p>
         </div>
-        <Button onClick={() => { loadBotStatus(); loadSystemInfo(); }} disabled={loading}>
+        <Button onClick={() => { refetchBotStatus(); refetchSystemInfo(); }} disabled={loading}>
           <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Обновить
         </Button>

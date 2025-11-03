@@ -1,6 +1,7 @@
 // src/pages/HomePage.jsx
 import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useAuth } from '../context/AuthContext';
@@ -41,14 +42,6 @@ const HomePage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Пустой массив зависимостей - срабатывает ТОЛЬКО при монтировании
     
-    // Дополнительные данные для стримов (Twitch и VK)
-    const [twitchStreamInfo, setTwitchStreamInfo] = useState(null);
-    const [vkStreamInfo, setVkStreamInfo] = useState(null);
-    
-    // 🚀 КЭШИРОВАНИЕ: Храним время последней загрузки stream info
-    const [lastLoadTime, setLastLoadTime] = useState({ twitch: 0, vk: 0 });
-    const CACHE_TTL = 30000; // 30 секунд кэш
-    
     // 🎬 Анимация страницы: проигрывается только при первой загрузке
     const { shouldAnimate, contentLoaded } = usePageAnimation('home', 100);
     
@@ -58,50 +51,37 @@ const HomePage = () => {
 
     // Состояние будет загружаться через контекст CombineSettingsContext
 
-    // Загружаем данные стримов (Twitch и VK) отдельно
-    useEffect(() => {
-        const loadStreamInfo = async (platform) => {
-            if ((integrations?.twitch?.enabled && platform === 'twitch') || 
-                (integrations?.vk?.enabled && platform === 'vk')) {
-                if (!isAuthenticated) return;
-                
-                // Проверяем кэш
-                const now = Date.now();
-                if (now - lastLoadTime[platform] < CACHE_TTL) {
-                    logger.log(`📦 [HomePage] Using cached ${platform} stream info`);
-                    return;
-                }
-                
-                try {
-                    const response = await botService.get(`/api/${platform}/stream-info`);
-                    if (platform === 'twitch') {
-                        setTwitchStreamInfo(response.data);
-                    } else {
-                        setVkStreamInfo(response.data);
-                    }
-                    setLastLoadTime(prev => ({ ...prev, [platform]: now }));
-                } catch (error) {
-                    logger.error(`Error loading ${platform} stream info:`, error);
-                    if (platform === 'twitch') {
-                        setTwitchStreamInfo(null);
-                    } else {
-                        setVkStreamInfo(null);
-                    }
-                }
-            }
-        };
+    // React Query: загружаем данные стримов (Twitch) с автоматическим обновлением
+    const { data: twitchStreamInfo } = useQuery({
+        queryKey: ['stream-info', 'twitch'],
+        queryFn: async () => {
+            if (!isAuthenticated || !integrations?.twitch?.enabled) return null;
+            const response = await botService.get('/api/twitch/stream-info');
+            return response.data;
+        },
+        enabled: !!isAuthenticated && !!integrations?.twitch?.enabled,
+        staleTime: 30 * 1000, // 30 секунд - данные считаются свежими
+        refetchInterval: 30 * 1000, // Автообновление каждые 30 секунд
+        refetchOnMount: true, // Обновлять при монтировании (обновление страницы)
+        refetchOnWindowFocus: false, // Не обновлять при фокусе окна (уже настроено глобально)
+        retry: 1,
+    });
 
-        // Загружаем данные для обеих платформ
-        loadStreamInfo('twitch');
-        loadStreamInfo('vk');
-        
-        // Обновляем каждые 30 секунд
-        const interval = setInterval(() => {
-            loadStreamInfo('twitch');
-            loadStreamInfo('vk');
-        }, 30000);
-        return () => clearInterval(interval);
-    }, [integrations?.twitch?.enabled, integrations?.vk?.enabled, isAuthenticated, lastLoadTime]);
+    // React Query: загружаем данные стримов (VK) с автоматическим обновлением
+    const { data: vkStreamInfo } = useQuery({
+        queryKey: ['stream-info', 'vk'],
+        queryFn: async () => {
+            if (!isAuthenticated || !integrations?.vk?.enabled) return null;
+            const response = await botService.get('/api/vk/stream-info');
+            return response.data;
+        },
+        enabled: !!isAuthenticated && !!integrations?.vk?.enabled,
+        staleTime: 30 * 1000, // 30 секунд - данные считаются свежими
+        refetchInterval: 30 * 1000, // Автообновление каждые 30 секунд
+        refetchOnMount: true, // Обновлять при монтировании (обновление страницы)
+        refetchOnWindowFocus: false, // Не обновлять при фокусе окна
+        retry: 1,
+    });
 
     // Удален неиспользуемый preparedStreamHistory
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,32 +21,31 @@ import { botService } from '@/services/microservices';
 import { logger } from '../../utils/prodLogger';
 
 const MonitoringPage = () => {
-    const [metrics, setMetrics] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [lastUpdate, setLastUpdate] = useState(null);
-
-    const fetchMetrics = async () => {
-        try {
-            setLoading(true);
+    const queryClient = useQueryClient();
+    
+    // React Query: загружаем метрики мониторинга
+    const { data: metricsData, isLoading: metricsLoading, error: metricsError } = useQuery({
+        queryKey: ['monitoring-metrics'],
+        queryFn: async () => {
             const response = await botService.get('/api/admin/monitoring/metrics');
-            setMetrics(response.data.metrics);
-            setLastUpdate(new Date());
-            setError(null);
-        } catch (err) {
-            setError(err.message);
+            return response.data.metrics || null;
+        },
+        staleTime: 5 * 1000, // 5 секунд
+        refetchInterval: 30 * 1000, // Автоматически обновляем каждые 30 секунд
+        refetchOnMount: true,
+        refetchOnWindowFocus: false,
+        onSuccess: () => {
+            // Успешная загрузка
+        },
+        onError: (err) => {
             logger.error('Error fetching metrics:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
+        },
+    });
 
-    useEffect(() => {
-        fetchMetrics();
-        // Обновляем каждые 30 секунд
-        const interval = setInterval(fetchMetrics, 30000);
-        return () => clearInterval(interval);
-    }, []);
+    const metrics = metricsData;
+    const loading = metricsLoading;
+    const error = metricsError?.message || null;
+    const lastUpdate = metricsData ? new Date() : null;
 
     const getStatusColor = (value, thresholds = { warning: 70, critical: 90 }) => {
         if (value >= thresholds.critical) return 'text-red-500';
@@ -74,7 +74,7 @@ const MonitoringPage = () => {
                 <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-white mb-2">Ошибка загрузки метрик</h3>
                 <p className="text-gray-400 mb-4">{error}</p>
-                <Button onClick={fetchMetrics} variant="outline">
+                <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['monitoring-metrics'] })} variant="outline">
                     <RefreshCw className="h-4 w-4 mr-2" />
                     Попробовать снова
                 </Button>
@@ -93,8 +93,8 @@ const MonitoringPage = () => {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <Button onClick={fetchMetrics} variant="outline" size="sm">
-                        <RefreshCw className="h-4 w-4 mr-2" />
+                    <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['monitoring-metrics'] })} variant="outline" size="sm" disabled={loading}>
+                        <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                         Обновить
                     </Button>
                     <Button 

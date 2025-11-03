@@ -1,5 +1,6 @@
 // frontend/src/pages/tts/LocalTTSSettingsPage.jsx
 import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
     Server, 
     CheckCircle, 
@@ -55,42 +56,45 @@ const LocalTTSSettingsPage = () => {
     const [currentTab, setCurrentTab] = useState('connection');
     const [isWhitelisted, setIsWhitelisted] = useState(true); // Локальный TTS доступен всем
     const [whitelistChecked, setWhitelistChecked] = useState(true);
+    
+    const queryClient = useQueryClient();
 
-    useEffect(() => {
-        loadConfig();
-    }, []);
-
-    const loadConfig = async () => {
-        try {
-            setLoading(true);
+    // React Query: загружаем конфигурацию локального TTS
+    const { data: configData, isLoading: configLoading } = useQuery({
+        queryKey: ['local-tts-config'],
+        queryFn: async () => {
             const response = await botService.get('/api/local-tts/config');
-            
-            if (response.data.config) {
+            return response.data.config || null;
+        },
+        staleTime: 5 * 60 * 1000,
+        refetchOnMount: true,
+        onSuccess: (data) => {
+            if (data) {
                 setConfig({
-                    endpoint_url: response.data.config.endpoint_url || 'http://localhost:8001',
-                    api_key: response.data.config.api_key || '',
-                    use_local: response.data.config.use_local || false
+                    endpoint_url: data.endpoint_url || 'http://localhost:8001',
+                    api_key: data.api_key || '',
+                    use_local: data.use_local || false
                 });
             }
-        } catch (error) {
+        },
+        onError: (error) => {
             logger.error('Error loading config:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+        },
+    });
 
-    const testConnection = async () => {
-        try {
-            setTesting(true);
-            setTestResult(null);
-            setHealthData(null);
-            setStatusData(null);
+    useEffect(() => {
+        setLoading(configLoading);
+    }, [configLoading]);
 
-            const response = await botService.post('/api/local-tts/test-connection', {
-                endpoint_url: config.endpoint_url,
-                api_key: config.api_key
+    // React Query мутации
+    const testConnectionMutation = useMutation({
+        mutationFn: async ({ endpoint_url, api_key }) => {
+            return await botService.post('/api/local-tts/test-connection', {
+                endpoint_url,
+                api_key
             });
-
+        },
+        onSuccess: (response) => {
             if (response.data.success) {
                 setTestResult({ success: true, message: 'Соединение успешно!' });
                 setHealthData(response.data.health_data);
@@ -103,53 +107,87 @@ const LocalTTSSettingsPage = () => {
                 });
                 toast.error('❌ Ошибка подключения');
             }
-        } catch (error) {
+        },
+        onError: (error) => {
             setTestResult({ 
                 success: false, 
                 message: error.response?.data?.detail || 'Ошибка подключения к серверу' 
             });
             toast.error('❌ Ошибка подключения');
-        } finally {
+        },
+        onMutate: () => {
+            setTesting(true);
+            setTestResult(null);
+            setHealthData(null);
+            setStatusData(null);
+        },
+        onSettled: () => {
             setTesting(false);
-        }
+        },
+    });
+
+    const testConnection = async () => {
+        testConnectionMutation.mutate({
+            endpoint_url: config.endpoint_url,
+            api_key: config.api_key
+        });
     };
 
-    const saveConfig = async () => {
-        try {
-            setSaving(true);
-
-            const response = await botService.post('/api/local-tts/config', {
-                endpoint_url: config.endpoint_url,
-                api_key: config.api_key,
-                use_local: config.use_local
+    const saveConfigMutation = useMutation({
+        mutationFn: async ({ endpoint_url, api_key, use_local }) => {
+            return await botService.post('/api/local-tts/config', {
+                endpoint_url,
+                api_key,
+                use_local
             });
-
+        },
+        onSuccess: (response) => {
             if (response.data.success) {
+                queryClient.invalidateQueries({ queryKey: ['local-tts-config'] });
                 toast.success('✅ Настройки сохранены!');
-                await loadConfig(); // Перезагружаем конфиг
             }
-        } catch (error) {
+        },
+        onError: (error) => {
             logger.error('Error saving config:', error);
             toast.error('❌ Ошибка сохранения');
-        } finally {
+        },
+        onMutate: () => {
+            setSaving(true);
+        },
+        onSettled: () => {
             setSaving(false);
-        }
+        },
+    });
+
+    const saveConfig = async () => {
+        saveConfigMutation.mutate({
+            endpoint_url: config.endpoint_url,
+            api_key: config.api_key,
+            use_local: config.use_local
+        });
     };
 
-    const toggleService = async () => {
-        try {
-            const response = await botService.post('/api/local-tts/toggle');
-            
+    const toggleServiceMutation = useMutation({
+        mutationFn: async () => {
+            return await botService.post('/api/local-tts/toggle');
+        },
+        onSuccess: (response) => {
             if (response.data.success) {
                 setConfig(prev => ({ ...prev, use_local: response.data.use_local }));
+                queryClient.invalidateQueries({ queryKey: ['local-tts-config'] });
                 toast.success(response.data.message);
             } else {
                 toast.error(response.data.message);
             }
-        } catch (error) {
+        },
+        onError: (error) => {
             logger.error('Error toggling service:', error);
             toast.error('❌ Ошибка переключения сервиса');
-        }
+        },
+    });
+
+    const toggleService = async () => {
+        toggleServiceMutation.mutate();
     };
 
     const copyToClipboard = (text) => {

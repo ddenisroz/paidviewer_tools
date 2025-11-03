@@ -362,12 +362,22 @@ async def get_sessions(
             raise HTTPException(status_code=403, detail="Admin access required")
         
         offset = (page - 1) * limit
+        # Оптимизация: загружаем все сессии и связанных пользователей одним запросом
         sessions = db.query(UserSession).offset(offset).limit(limit).all()
         total_sessions = db.query(UserSession).count()
         
+        # Получаем все уникальные user_id из сессий
+        user_ids = {session.user_id for session in sessions if session.user_id}
+        
+        # Загружаем всех пользователей одним запросом (оптимизация N+1)
+        users_dict = {}
+        if user_ids:
+            users = db.query(User).filter(User.id.in_(user_ids)).all()
+            users_dict = {user.id: user for user in users}
+        
         sessions_data = []
         for session in sessions:
-            session_user = db.query(User).filter(User.id == session.user_id).first()
+            session_user = users_dict.get(session.user_id)
             sessions_data.append({
                 'id': session.id,
                 'user_id': session.user_id,

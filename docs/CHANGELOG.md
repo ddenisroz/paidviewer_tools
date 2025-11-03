@@ -45,6 +45,49 @@
   - `useQuery` для config (общий queryKey с StreakSettings)
   - `useMutation` для сохранения настроек
   - Optimistic updates с автоматической синхронизацией
+- **TtsMainPage** ✅ (критичная миграция):
+  - 5 `useQuery`: status, audio-settings, settings, platform-settings, local-config
+  - 6 `useMutation`: saveAudioSettings, saveTtsSettings, switchEngine, toggleBasicTts, setListeningMode, savePlatformSettings
+  - Удален ручной `cacheManager` (заменен на React Query кеш)
+  - Optimistic updates с rollback при ошибках
+- **VoiceManagementPage** ✅ (критичная миграция):
+  - 3 `useQuery`: whitelist-status, global-voices, user-voices
+  - 5 `useMutation`: uploadVoice, deleteVoice, updateVoiceSettings, transcribeVoice, renameVoice
+  - Условная загрузка голосов в зависимости от whitelist статуса (`enabled`)
+  - Автоматическое обновление списков через `invalidateQueries`
+- **LocalTTSSettingsPage** ✅:
+  - 1 `useQuery`: local-tts-config
+  - 3 `useMutation`: testConnection, saveConfig, toggleService
+- **BotsManagementPage** ✅:
+  - 2 `useQuery`: bot-status, system-info
+  - `refetchInterval: 10s` вместо ручного `setInterval`
+  - Автоматическое обновление статуса ботов каждые 10 секунд
+- **MonitoringPage** ✅:
+  - 1 `useQuery`: monitoring-metrics
+  - `refetchInterval: 30s` вместо ручного `setInterval`
+- **UserManagementPage** ✅:
+  - 3 `useQuery`: admin-users, admin-sessions, integrations
+  - 5 `useMutation`: updateUser, blockUser, deleteUser, addToWhitelist, toggleWhitelist
+  - Автоматическое обновление списков через `invalidateQueries`
+- **admin/VoiceManagement** ✅:
+  - 2 `useQuery`: admin-voices, admin-voice-users
+  - Упрощена логика загрузки, убран ручной `loadingRef`
+- **YouTubeQueueCarousel** ✅:
+  - 1 `useQuery`: youtube-queue с `refetchInterval: 30s`
+  - 5 `useMutation`: addVideo, removeVideo, playVideo, markAsPlayed, clearQueue
+  - Автоматическое обновление очереди каждые 30 секунд
+  - Убран ручной `setInterval`, заменен на `refetchInterval`
+- **useBotStatus** ✅:
+  - 1 `useQuery`: bot-status с `staleTime: 15s`, `refetchInterval: 30s`
+  - 1 `useMutation`: toggleBot с optimistic updates
+  - Убран ручной кеш (`Map`), заменен на React Query кеширование
+
+### 🐍 Backend оптимизации
+
+#### Исправление N+1 запросов
+- **admin_api.py**: Исправлен N+1 запрос для sessions
+  - Загрузка всех пользователей одним запросом через `User.id.in_(user_ids)`
+  - Создание словаря для быстрого доступа: O(1) вместо O(N) запросов
 
 #### View Transitions API
 - Добавлены CSS стили для плавных переходов между страницами

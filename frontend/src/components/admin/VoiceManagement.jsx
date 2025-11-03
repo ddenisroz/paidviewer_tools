@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ReactDOM from 'react-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -45,36 +46,21 @@ const VoiceManagement = () => {
     const [isTranscribing, setIsTranscribing] = useState(false);
     const [isTestingVoice, setIsTestingVoice] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
-    const [hasLoaded, setHasLoaded] = useState(false);
     const [ttsServiceWarning, setTtsServiceWarning] = useState(null);
-    const loadingRef = useRef(false); // Ref to prevent double loading
     const isUserClosingRef = useRef(false); // Ref to track if user explicitly closed dialog
     const dialogCloseTimeoutRef = useRef(null); // Ref for close timeout
+    const queryClient = useQueryClient();
     
     const { user } = useAuth();
     let audioContext = null;
     let audioSource = null;
 
-
-    const loadVoices = useCallback(async () => {
-        // Предотвращаем множественные одновременные вызовы (используем только ref)
-        if (loadingRef.current) {
-            return;
-        }
-        
-        try {
-            loadingRef.current = true;
-            setLoading(true);
+    // React Query: загружаем голоса для админа
+    const { data: voicesData = [], isLoading: voicesLoading } = useQuery({
+        queryKey: ['admin-voices'],
+        queryFn: async () => {
             const response = await getAdminVoices();
-            logger.log('🔍 [ADMIN] Raw API response:', response);
-            
-            // Axios оборачивает ответ: { data: { status: "success", voices: [...] } }
             const data = response?.data || response;
-            logger.log('🔍 [ADMIN] Raw API response:', response);
-            logger.log('🔍 [ADMIN] Extracted data:', data);
-            logger.log('🔍 [ADMIN] Data type:', typeof data);
-            logger.log('🔍 [ADMIN] Is array:', Array.isArray(data));
-            logger.log('🔍 [ADMIN] Data keys:', data ? Object.keys(data) : 'null');
             
             // Проверяем предупреждение о недоступности TTS сервиса
             if (data?.warning) {
@@ -88,32 +74,28 @@ const VoiceManagement = () => {
             let voicesArray = [];
             if (Array.isArray(data)) {
                 voicesArray = data;
-                logger.log('✅ [ADMIN] Data is array, using directly');
             } else if (data?.status === 'success' && Array.isArray(data.voices)) {
                 voicesArray = data.voices;
-                logger.log('✅ [ADMIN] Found voices in data.voices');
             } else if (Array.isArray(data?.voices)) {
                 voicesArray = data.voices;
-                logger.log('✅ [ADMIN] Found voices array in data.voices');
             } else if (Array.isArray(data?.data)) {
                 voicesArray = data.data;
-                logger.log('✅ [ADMIN] Found voices in data.data');
             } else if (data?.success && Array.isArray(data.voices)) {
                 voicesArray = data.voices;
-                logger.log('✅ [ADMIN] Found voices in success response');
             } else {
                 logger.warn('⚠️ [ADMIN] Could not extract voices array from response:', data);
                 voicesArray = [];
             }
             
-            logger.log('✅ [ADMIN] Extracted voices array:', voicesArray);
-            logger.log('✅ [ADMIN] Voices count:', voicesArray.length);
-            
             logger.log('✅ [ADMIN] Loaded voices:', voicesArray.length, 'voices');
-            setVoices(voicesArray);
-        } catch (error) {
+            return voicesArray;
+        },
+        staleTime: 5 * 60 * 1000,
+        refetchOnMount: true,
+        refetchOnWindowFocus: false,
+        onError: (error) => {
             logger.error('❌ [ADMIN] Error loading voices:', error);
-            setVoices([]); // Устанавливаем пустой массив в случае ошибки
+            setVoices([]);
             
             // Показываем предупреждение если ошибка связана с подключением
             if (error.message?.includes('connection') || error.message?.includes('timeout') || error.code === 'ECONNREFUSED') {
@@ -121,20 +103,16 @@ const VoiceManagement = () => {
             } else if (error.response?.status === 500 && error.response?.data?.detail?.includes('connection')) {
                 setTtsServiceWarning(error.response.data.detail);
             }
-        } finally {
-            setLoading(false);
-            loadingRef.current = false;
-        }
-    }, []); // Убрали addToast из зависимостей - он не используется
+        },
+        onSuccess: (data) => {
+            setVoices(data);
+        },
+    });
 
-    const loadUsers = useCallback(async () => {
-        // Предотвращаем множественные одновременные вызовы
-        if (usersLoading || loadingRef.current) {
-            return;
-        }
-        
-        try {
-            setUsersLoading(true);
+    // React Query: загружаем пользователей
+    const { data: usersData = [], isLoading: usersLoading } = useQuery({
+        queryKey: ['admin-voice-users'],
+        queryFn: async () => {
             const response = await getUsers();
             
             // Проверяем разные форматы ответа
@@ -147,25 +125,25 @@ const VoiceManagement = () => {
                 usersData = response.users;
             }
             
-            setUsers(usersData);
-        } catch (error) {
+            return usersData;
+        },
+        staleTime: 5 * 60 * 1000,
+        refetchOnMount: true,
+        refetchOnWindowFocus: false,
+        onError: (error) => {
             logger.error('Error loading users:', error);
             addToast({ type: 'error', title: 'Ошибка', message: `Не удалось загрузить пользователей: ${error.message || 'Неизвестная ошибка'}` });
             setUsers([]);
-        } finally {
-            setUsersLoading(false);
-            loadingRef.current = false;
-        }
-    }, [addToast, usersLoading]);
+        },
+        onSuccess: (data) => {
+            setUsers(data);
+        },
+    });
 
+    // Комбинированное состояние загрузки
     useEffect(() => {
-        if (!hasLoaded) {
-            setHasLoaded(true);
-            // НЕ устанавливаем loadingRef.current здесь - пусть сами функции управляют своим состоянием
-            loadVoices();
-            loadUsers();
-        }
-    }, [hasLoaded, loadVoices, loadUsers]);
+        setLoading(voicesLoading);
+    }, [voicesLoading]);
 
     // Обработчик клавиши Escape для закрытия модального окна редактирования
     useEffect(() => {
@@ -278,7 +256,7 @@ const VoiceManagement = () => {
             setVoiceName('');
             setOwnerId('global');
             setSelectedUserId('');
-            loadVoices();
+            queryClient.invalidateQueries({ queryKey: ['admin-voices'] });
         } catch (error) {
             addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось загрузить голос.' });
         } finally {
@@ -296,7 +274,7 @@ const VoiceManagement = () => {
             await deleteVoice(voiceId);
             const position = getButtonPosition(event);
             addToast({ type: 'success', title: 'Успех', message: `Голос "${voiceToDelete.name}" удален.` });
-            loadVoices();
+            queryClient.invalidateQueries({ queryKey: ['admin-voices'] });
         } catch (error) {
             addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось удалить голос.' });
         }
@@ -578,7 +556,7 @@ const VoiceManagement = () => {
                     // Помечаем как явное закрытие пользователем
                     isUserClosingRef.current = true;
                     setEditDialogOpen(false);
-                    loadVoices();
+                    queryClient.invalidateQueries({ queryKey: ['admin-voices'] });
                 } catch (error) {
                     addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось обновить настройки.' });
                 }
@@ -889,7 +867,7 @@ const VoiceManagement = () => {
                                                 onValueChange={setSelectedUserId}
                                                 onOpenChange={(open) => {
                                                     if (open && users.length === 0) {
-                                                        loadUsers();
+                                                        queryClient.invalidateQueries({ queryKey: ['admin-voice-users'] });
                                                     }
                                                 }}
                                             >

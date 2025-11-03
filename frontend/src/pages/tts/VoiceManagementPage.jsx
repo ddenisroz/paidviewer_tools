@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -58,6 +59,7 @@ const VoiceManagementPageContent = () => {
     const { user } = useAuth();
     const { initializeTts, engineStatus } = useTts();
     const { isHealthy, isChecking, lastCheck, checkTtsHealth } = useTtsHealth();
+    const queryClient = useQueryClient();
     let audioContext = null;
     let audioSource = null;
     
@@ -79,124 +81,90 @@ const VoiceManagementPageContent = () => {
         initializeTts();
     }, [initializeTts]);
 
-    // Ref для предотвращения множественных проверок
-    const whitelistCheckInProgressRef = useRef(false);
-    const whitelistCheckTimeRef = useRef(0);
-    
-    // Проверяем whitelist статус пользователя (включая гостей)
-    const checkWhitelistStatus = useCallback(async () => {
-        if (!user) {
-            setWhitelistStatus({
-                is_whitelisted: false,
-                can_manage_voices: false,
-                message: "Пользователь не авторизован"
-            });
-            return;
-        }
-        
-        // Предотвращаем множественные одновременные запросы
-        if (whitelistCheckInProgressRef.current) {
-            logger.log('Whitelist check already in progress, skipping...');
-            return;
-        }
-        
-        // Кэширование - не проверяем чаще чем раз в 30 секунд
-        const now = Date.now();
-        const cacheTime = 30000; // 30 секунд
-        if (now - whitelistCheckTimeRef.current < cacheTime && whitelistStatus) {
-            logger.log('Using cached whitelist status');
-            return;
-        }
-        
-        whitelistCheckInProgressRef.current = true;
-        whitelistCheckTimeRef.current = now;
-        
-        try {
-            // API проверяет whitelist для всех: OAuth пользователей и гостей
+    // React Query: проверяем whitelist статус пользователя
+    const { data: whitelistStatusData } = useQuery({
+        queryKey: ['voices-whitelist-status'],
+        queryFn: async () => {
+            if (!user) {
+                return {
+                    is_whitelisted: false,
+                    can_manage_voices: false,
+                    message: "Пользователь не авторизован"
+                };
+            }
             const response = await botService.get('/api/voices/whitelist-status');
-            setWhitelistStatus(response.data);
-        } catch (error) {
+            return response.data;
+        },
+        enabled: !!user,
+        staleTime: 30 * 1000, // 30 секунд
+        refetchOnMount: true,
+        refetchOnWindowFocus: false,
+        onSuccess: (data) => {
+            setWhitelistStatus(data);
+        },
+        onError: (error) => {
             logger.error('Error checking whitelist status:', error);
-            setWhitelistStatus({
+            const errorStatus = {
                 is_whitelisted: false,
                 can_manage_voices: false,
                 message: "Ошибка проверки статуса доступа"
-            });
-        } finally {
-            whitelistCheckInProgressRef.current = false;
-        }
-    }, [user, whitelistStatus]);
+            };
+            setWhitelistStatus(errorStatus);
+        },
+    });
 
-    const loadVoices = useCallback(async () => {
-        if (!user) return;
-        
-        // Ждём пока whitelistStatus загрузится
-        if (whitelistStatus === null) {
-            logger.log('Waiting for whitelist status to load...');
-            return;
-        }
-        
-        // Проверяем whitelist статус перед загрузкой голосов
-        // Для гостей и OAuth пользователей без whitelist - не загружаем голоса
-        if (!whitelistStatus.can_manage_voices) {
-            logger.log(`${user.isGuest ? 'Guest' : 'User'} not in whitelist - F5-TTS not available`);
+    // React Query: загружаем глобальные голоса
+    const { data: globalVoicesData = [], isLoading: globalVoicesLoading } = useQuery({
+        queryKey: ['global-voices'],
+        queryFn: async () => {
+            const response = await getGlobalVoices();
+            const data = response?.data || response || [];
+            return Array.isArray(data) ? data : [];
+        },
+        enabled: !!whitelistStatusData?.can_manage_voices,
+        staleTime: 5 * 60 * 1000,
+        refetchOnMount: true,
+        onSuccess: (data) => {
+            setGlobalVoices(data);
+        },
+        onError: (error) => {
+            logger.error('Error loading global voices:', error);
+            setGlobalVoices([]);
+        },
+    });
+
+    // React Query: загружаем пользовательские голоса
+    const userId = user?.isGuest ? -1 : user?.id;
+    const { data: userVoicesData = [], isLoading: userVoicesLoading } = useQuery({
+        queryKey: ['user-voices', userId],
+        queryFn: async () => {
+            if (!userId) return [];
+            const response = await getUserVoices(userId);
+            const data = response?.data || response || [];
+            return Array.isArray(data) ? data : [];
+        },
+        enabled: !!userId && !!whitelistStatusData?.can_manage_voices,
+        staleTime: 5 * 60 * 1000,
+        refetchOnMount: true,
+        onSuccess: (data) => {
+            setUserVoices(data);
+        },
+        onError: (error) => {
+            logger.error('Error loading user voices:', error);
+            setUserVoices([]);
+        },
+    });
+
+    // Комбинированное состояние загрузки
+    useEffect(() => {
+        if (!whitelistStatusData?.can_manage_voices) {
             setGlobalVoices([]);
             setUserVoices([]);
             setLoading(false);
             return;
         }
-        
-        try {
-            setLoading(true);
-            
-            // Загружаем глобальные голоса для всех пользователей (включая гостей)
-            const globalResponse = await getGlobalVoices();
-            const globalData = globalResponse?.data || globalResponse || [];
-            const globalArray = Array.isArray(globalData) ? globalData : [];
-            setGlobalVoices(globalArray);
-            
-            // ✅ Для гостей и авторизованных пользователей загружаем их личные голоса
-            // Для гостей используем user_id = -1
-            const userId = user.isGuest ? -1 : user.id;
-            const userResponse = await getUserVoices(userId);
-            const userData = userResponse?.data || userResponse || [];
-            const userArray = Array.isArray(userData) ? userData : [];
-            setUserVoices(userArray);
-            
-            // Загружаем индивидуальные громкости для всех голосов
-            const allVoices = [...globalArray, ...userArray];
-            for (const voice of allVoices) {
-                if (voice.name) {
-                    loadVoiceVolume(voice.name);
-                }
-            }
-        } catch (error) {
-            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось загрузить голоса.' });
-            logger.error('Error loading voices:', error);
-            setGlobalVoices([]);
-            setUserVoices([]);
-        } finally {
-            setLoading(false);
-        }
-    }, [user, addToast, whitelistStatus]);
-
-    useEffect(() => {
-        // Сначала проверяем whitelist статус
-        checkWhitelistStatus();
-    }, [checkWhitelistStatus]);
-
-    useEffect(() => {
-        // Загружаем голоса ПОСЛЕ того как whitelistStatus загрузился
-        if (whitelistStatus !== null) {
-            loadVoices();
-        }
-    }, [whitelistStatus, loadVoices]);
-
-    useEffect(() => {
-        // Остальная логика
-        // TTS нужен только для тестирования/создания голосов, не для просмотра
-        // Диалоги не закрываются при сворачивании вкладки (как в ChatBoxSettingsModal)
-    }, [user, loadVoices, checkWhitelistStatus]);
+        setLoading(globalVoicesLoading || userVoicesLoading);
+    }, [globalVoicesLoading, userVoicesLoading, whitelistStatusData]);
 
     const handleFileUpload = (event) => {
         event.stopPropagation();
@@ -238,33 +206,18 @@ const VoiceManagementPageContent = () => {
             return;
         }
         
-        const userId = user?.id;
-        if (!userId) {
+        const uploadUserId = user?.id;
+        if (!uploadUserId) {
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось определить пользователя.' });
             return;
         }
         
-        setIsUploading(true);
-        try {
-            const formData = new FormData();
-            formData.append('file', uploadFile);
-            formData.append('voice_name', voiceName.trim());
-            formData.append('user_id', userId);
-            
-            await uploadUserVoice(userId, formData);
-            
-            const position = getButtonPosition(event);
-            addToast({ type: 'success', title: 'Успех', message: `Голос "${voiceName.trim()}" успешно загружен.` });
-            setUploadDialogOpen(false);
-            setUploadFile(null);
-            setVoiceName('');
-            loadVoices();
-        } catch (error) {
-            logger.error('Error uploading voice:', error);
-            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось загрузить голос.' });
-        } finally {
-            setIsUploading(false);
-        }
+        const formData = new FormData();
+        formData.append('file', uploadFile);
+        formData.append('voice_name', voiceName.trim());
+        formData.append('user_id', uploadUserId);
+        
+        uploadVoiceMutation.mutate({ userId: uploadUserId, formData });
     };
 
     const handleDelete = async (voiceId, voiceType) => {
@@ -289,13 +242,11 @@ const VoiceManagementPageContent = () => {
             return;
         }
 
-        try {
-            await deleteUserVoice(voiceId, user.id);
-            addToast({ type: 'success', title: 'Успех', message: `Голос "${voiceToDelete.name}" удален.` });
-            loadVoices();
-        } catch (error) {
-            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось удалить голос.' });
-        }
+        deleteVoiceMutation.mutate({ 
+            voiceId, 
+            userId: user.id,
+            voiceName: voiceToDelete.name 
+        });
     };
 
     const handleEdit = (voice) => {
@@ -312,29 +263,10 @@ const VoiceManagementPageContent = () => {
             return;
         }
         
-        setIsTranscribing(true);
-        try {
-            // Запускаем транскрипцию аудиофайла голоса
-            const response = await transcribeUserVoice(currentVoice.id, user.id);
-            const newReferenceText = response.data.reference_text;
-            
-            // Обновляем локальное состояние
-            setCurrentVoice(prev => ({...prev, reference_text: newReferenceText}));
-            
-            // Обновляем в списке пользовательских голосов
-            setUserVoices(prev => prev.map(voice => 
-                voice.id === currentVoice.id 
-                    ? {...voice, reference_text: newReferenceText}
-                    : voice
-            ));
-            
-            addToast({ type: 'success', title: 'Успех', message: 'Транскрипция аудиофайла завершена успешно!' });
-        } catch (error) {
-            logger.error('Error transcribing voice:', error);
-            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось выполнить транскрипцию аудиофайла.' });
-        } finally {
-            setIsTranscribing(false);
-        }
+        transcribeVoiceMutation.mutate({ 
+            voiceId: currentVoice.id, 
+            userId: user.id 
+        });
     };
 
     const handleReferenceTextChange = (value) => {
@@ -362,68 +294,54 @@ const VoiceManagementPageContent = () => {
             return;
         }
         
-        try {
-            await renameUserVoice(currentVoice.id, user.id, newVoiceName.trim());
-            
-            // Обновляем в списке пользовательских голосов
-            setUserVoices(prev => prev.map(voice => 
-                voice.id === currentVoice.id 
-                    ? {...voice, name: newVoiceName.trim()}
-                    : voice
-            ));
-            
-            // Обновляем currentVoice
-            setCurrentVoice(prev => ({...prev, name: newVoiceName.trim()}));
-            
-            setRenameDialogOpen(false);
-            addToast({ type: 'success', title: 'Успех', message: 'Голос переименован успешно!' });
-        } catch (error) {
-            logger.error('Error renaming voice:', error);
-            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось переименовать голос.' });
-        }
+        renameVoiceMutation.mutate({
+            voiceId: currentVoice.id,
+            userId: user.id,
+            newName: newVoiceName.trim()
+        });
     };
 
     const handleSaveSettings = async () => {
         if (!currentVoice || !user) return;
         
-        try {
-            const settings = {
-                cfg_strength: currentVoice.cfg_strength,
-                speed_preset: currentVoice.speed_preset,
-                reference_text: currentVoice.reference_text
-            };
-            
-            // Глобальные голоса: настройки применяются только к профилю пользователя
-            // Пользовательские голоса: настройки сохраняются глобально для голоса
-            await updateUserVoiceSettings(currentVoice.id, user.id, settings);
-            
-            // Обновляем в соответствующем списке голосов
-            if (currentVoice.voice_type === 'global') {
-                setGlobalVoices(prev => prev.map(voice => 
+        const settings = {
+            cfg_strength: currentVoice.cfg_strength,
+            speed_preset: currentVoice.speed_preset,
+            reference_text: currentVoice.reference_text
+        };
+        
+        // Optimistic update
+        if (currentVoice.voice_type === 'global') {
+            setGlobalVoices(prev => prev.map(voice => 
                 voice.id === currentVoice.id 
                     ? {...voice, ...settings}
                     : voice
             ));
-            } else {
-                setUserVoices(prev => prev.map(voice => 
-                    voice.id === currentVoice.id 
-                        ? {...voice, ...settings}
-                        : voice
-                ));
-            }
-            
-            setEditDialogOpen(false);
-            addToast({ 
-                type: 'success', 
-                title: 'Успех', 
-                message: currentVoice.voice_type === 'global' 
-                    ? 'Настройки применены к вашему профилю' 
-                    : 'Настройки голоса сохранены!' 
-            });
-        } catch (error) {
-            logger.error('Error updating voice settings:', error);
-            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось сохранить настройки.' });
+        } else {
+            setUserVoices(prev => prev.map(voice => 
+                voice.id === currentVoice.id 
+                    ? {...voice, ...settings}
+                    : voice
+            ));
         }
+        
+        updateVoiceSettingsMutation.mutate(
+            { voiceId: currentVoice.id, userId: user.id, settings },
+            {
+                onSuccess: () => {
+                    addToast({ 
+                        type: 'success', 
+                        title: 'Успех', 
+                        message: currentVoice.voice_type === 'global' 
+                            ? 'Настройки применены к вашему профилю' 
+                            : 'Настройки голоса сохранены!' 
+                    });
+                },
+                onError: () => {
+                    // Rollback при ошибке - React Query сам обновит через invalidateQueries
+                }
+            }
+        );
     };
 
     // Voice settings removed - F5-TTS uses dynamic settings based on text length
@@ -525,7 +443,9 @@ const VoiceManagementPageContent = () => {
                     });
                     addToast({ type: 'success', title: 'Успех', message: `Настройки голоса "${currentVoice.name}" обновлены.` });
                     setEditDialogOpen(false);
-                    loadVoices();
+                    // Данные обновятся автоматически через React Query
+                    queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
+                    queryClient.invalidateQueries({ queryKey: ['global-voices'] });
                 } catch (error) {
                     addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось обновить настройки.' });
                 }

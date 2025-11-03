@@ -17,6 +17,7 @@
 - **`ARCHITECTURE_GUIDE.md`** - общая архитектура системы
 - **`LLM_DEVELOPMENT_RULES.md`** - правила для AI-ассистентов
 - **`DO_NOT_TOUCH.md`** - критические файлы, не трогать!
+- **`REMAINING_LEGACY.md`** - ✅ статус миграции на React Query (100% завершено)
 
 ### 🚀 Deployment
 - **`DEPLOYMENT.md`** - инструкции по деплою

@@ -1,165 +1,151 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Play, SkipForward, Trash2, Plus, Search, Clock, User, ExternalLink } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { botService } from '../services/microservices';
 
 const YouTubeQueueCarousel = () => {
   const { user } = useAuth();
-  const [queue, setQueue] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const queryClient = useQueryClient();
   const [newVideoUrl, setNewVideoUrl] = useState('');
-  const [addingVideo, setAddingVideo] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
 
-  // Загрузка очереди
-  const loadQueue = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/youtube/queue', {
-        credentials: 'include'
+  // React Query: загружаем очередь YouTube
+  const { data: queueData = [], isLoading: loading, error: queueError } = useQuery({
+    queryKey: ['youtube-queue'],
+    queryFn: async () => {
+      const response = await botService.get('/api/youtube/queue', {
+        withCredentials: true
       });
-      
-      if (response.ok) {
-        const data = await response.json();
-        // Обрабатываем новый формат ответа
-        if (data.current_video && data.queue) {
-          setQueue([data.current_video, ...data.queue]);
-        } else {
-          setQueue(data);
-        }
+      const data = response.data;
+      // Обрабатываем новый формат ответа
+      if (data.current_video && data.queue) {
+        return [data.current_video, ...data.queue];
       } else {
-        throw new Error('Ошибка загрузки очереди');
+        return Array.isArray(data) ? data : [];
       }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    staleTime: 10 * 1000, // 10 секунд
+    refetchInterval: 30 * 1000, // Автоматически обновляем каждые 30 секунд
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+    onError: (err) => {
+      console.error('Error loading queue:', err);
+    },
+  });
+
+  // React Query мутация: добавление видео
+  const addVideoMutation = useMutation({
+    mutationFn: async (url) => {
+      return await botService.post('/api/youtube/queue', { url }, {
+        withCredentials: true
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['youtube-queue'] });
+      setNewVideoUrl('');
+      setShowAddForm(false);
+    },
+    onError: (error) => {
+      console.error('Error adding video:', error);
+    },
+  });
 
   // Добавление видео
   const addVideo = async (url) => {
-    try {
-      setAddingVideo(true);
-      const response = await fetch('/api/youtube/queue', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          url: url
-        })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        await loadQueue(); // Перезагружаем очередь
-        setNewVideoUrl('');
-        setShowAddForm(false);
-      } else {
-        const error = await response.json();
-        throw new Error(error.detail || 'Ошибка добавления видео');
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setAddingVideo(false);
-    }
+    if (!url.trim()) return;
+    addVideoMutation.mutate(url.trim());
   };
 
-  // Удаление видео
+  // React Query мутации для операций с очередью
+  const removeVideoMutation = useMutation({
+    mutationFn: async (queueId) => {
+      return await botService.delete(`/api/youtube/queue/remove/${queueId}`, {
+        withCredentials: true
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['youtube-queue'] });
+    },
+    onError: (error) => {
+      console.error('Error removing video:', error);
+    },
+  });
+
+  const playVideoMutation = useMutation({
+    mutationFn: async (video) => {
+      return await botService.post('/api/youtube/player/next', {}, {
+        withCredentials: true
+      });
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['youtube-queue'] });
+      // Уведомляем другие вкладки
+      window.dispatchEvent(new CustomEvent('youtube_event', {
+        detail: {
+          event: 'video_played',
+          data: { video: variables }
+        }
+      }));
+    },
+    onError: (error) => {
+      console.error('Error playing video:', error);
+    },
+  });
+
+  const markAsPlayedMutation = useMutation({
+    mutationFn: async (queueId) => {
+      return await botService.post(`/api/youtube/queue/mark-played/${queueId}`, {}, {
+        withCredentials: true
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['youtube-queue'] });
+    },
+    onError: (error) => {
+      console.error('Error marking as played:', error);
+    },
+  });
+
+  const clearQueueMutation = useMutation({
+    mutationFn: async () => {
+      return await botService.post('/api/youtube/clear', {}, {
+        withCredentials: true
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['youtube-queue'] });
+    },
+    onError: (error) => {
+      console.error('Error clearing queue:', error);
+    },
+  });
+
+  // Обертки для функций
+  const queue = queueData;
+  const error = queueError?.message || null;
+  const addingVideo = addVideoMutation.isPending;
+
   const removeVideo = async (queueId) => {
-    try {
-      const response = await fetch(`/api/youtube/queue/remove/${queueId}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        await loadQueue();
-      } else {
-        throw new Error('Ошибка удаления видео');
-      }
-    } catch (err) {
-      setError(err.message);
-    }
+    removeVideoMutation.mutate(queueId);
   };
 
-  // Переключиться на видео
   const playVideo = async (video) => {
-    try {
-      // Сначала переключаемся на это видео
-      const response = await fetch('/api/youtube/player/next', {
-        method: 'POST',
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        await loadQueue();
-        // Уведомляем другие вкладки
-        window.dispatchEvent(new CustomEvent('youtube_event', {
-          detail: {
-            event: 'video_played',
-            data: { video }
-          }
-        }));
-      } else {
-        throw new Error('Ошибка переключения видео');
-      }
-    } catch (err) {
-      setError(err.message);
-    }
+    playVideoMutation.mutate(video);
   };
 
-  // Отметить как проигранное
   const markAsPlayed = async (queueId) => {
-    try {
-      const response = await fetch(`/api/youtube/queue/mark-played/${queueId}`, {
-        method: 'POST',
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        await loadQueue();
-      } else {
-        throw new Error('Ошибка обновления статуса');
-      }
-    } catch (err) {
-      setError(err.message);
-    }
+    markAsPlayedMutation.mutate(queueId);
   };
 
-  // Очистка очереди
   const clearQueue = async () => {
     if (!confirm('Вы уверены, что хотите очистить всю очередь?')) {
       return;
     }
-
-    try {
-      const response = await fetch('/api/youtube/clear', {
-        method: 'POST',
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        await loadQueue();
-      } else {
-        throw new Error('Ошибка очистки очереди');
-      }
-    } catch (err) {
-      setError(err.message);
-    }
+    clearQueueMutation.mutate();
   };
 
-  useEffect(() => {
-    loadQueue();
-    
-    // Автообновление каждые 30 секунд
-    // Увеличиваем интервал до 60 секунд для снижения нагрузки
-    const interval = setInterval(loadQueue, 60000);
-    return () => clearInterval(interval);
-  }, []);
+  // useEffect удален - данные загружаются автоматически через useQuery с refetchInterval
 
   if (loading) {
     return (
