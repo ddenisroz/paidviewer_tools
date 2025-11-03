@@ -47,7 +47,32 @@ function App() {
     
     return (
         <>
-            <Toaster />
+            <Toaster 
+                position="top-right"
+                richColors
+                expand={true}
+                duration={4000}
+                toastOptions={{
+                    className: 'toast-notification',
+                    style: {
+                        background: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        color: 'hsl(var(--foreground))',
+                    },
+                    classNames: {
+                        toast: 'toast-base',
+                        title: 'toast-title',
+                        description: 'toast-description',
+                        success: 'toast-success',
+                        error: 'toast-error',
+                        warning: 'toast-warning',
+                        info: 'toast-info',
+                        actionButton: 'toast-action',
+                        cancelButton: 'toast-cancel',
+                        closeButton: 'toast-close',
+                    },
+                }}
+            />
             <ErrorBoundary>
                 <Suspense fallback={
                     <div style={{

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -11,9 +12,7 @@ import StreakCalendar from './StreakCalendar';
 import { AlertTriangle, Loader2, Check, Package } from 'lucide-react';
 
 const StreakSettings = ({ user, platform, channelName, hasRewards = false }) => {
-  const [config, setConfig] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [resetting, setResetting] = useState(false);
+  const queryClient = useQueryClient();
   const [savedSuccessfully, setSavedSuccessfully] = useState(false);
   const [formData, setFormData] = useState({
     streak_enabled: true,
@@ -25,36 +24,64 @@ const StreakSettings = ({ user, platform, channelName, hasRewards = false }) => 
     streak_reset_on_skip: true
   });
 
-  useEffect(() => {
-    loadConfig();
-  }, [user, platform, channelName]);
-
-  const loadConfig = async () => {
-    if (!user || !platform || !channelName) {
-      return;
-    }
-
-    try {
+  // React Query: загружаем конфигурацию
+  const { data: config, isLoading } = useQuery({
+    queryKey: ['drops-config', channelName, platform],
+    queryFn: async () => {
+      if (!channelName) return null;
       const response = await botService.get(`/api/drops/config/${channelName}`, {
         params: { platform }
       });
-      
-      if (response.data.success) {
-        setConfig(response.data.data);
+      return response.data.success ? response.data.data : null;
+    },
+    enabled: !!channelName && !!platform,
+    onSuccess: (data) => {
+      if (data) {
         setFormData({
-          streak_enabled: response.data.data.streak_enabled ?? true,
-          streak_days_common: [response.data.data.streak_days_common ?? 1],
-          streak_days_rare: [response.data.data.streak_days_rare ?? 7],
-          streak_days_epic: [response.data.data.streak_days_epic ?? 30],
-          streak_days_legendary: [response.data.data.streak_days_legendary ?? 60],
-          streak_messages_required: [response.data.data.streak_messages_required ?? 10],
-          streak_reset_on_skip: response.data.data.streak_reset_on_skip ?? true
+          streak_enabled: data.streak_enabled ?? true,
+          streak_days_common: [data.streak_days_common ?? 1],
+          streak_days_rare: [data.streak_days_rare ?? 7],
+          streak_days_epic: [data.streak_days_epic ?? 30],
+          streak_days_legendary: [data.streak_days_legendary ?? 60],
+          streak_messages_required: [data.streak_messages_required ?? 10],
+          streak_reset_on_skip: data.streak_reset_on_skip ?? true
         });
       }
-    } catch (error) {
-      logger.error('Error loading streak config:', error);
-    }
-  };
+    },
+  });
+
+  // React Query: мутация для сохранения настроек с optimistic updates
+  const saveMutation = useMutation({
+    mutationFn: async (payload) => {
+      return await botService.put(`/api/drops/config/${channelName}`, payload, {
+        params: { platform }
+      });
+    },
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey: ['drops-config', channelName, platform] });
+      const previousConfig = queryClient.getQueryData(['drops-config', channelName, platform]);
+      queryClient.setQueryData(['drops-config', channelName, platform], (old) => ({
+        ...old,
+        ...payload,
+      }));
+      return { previousConfig };
+    },
+    onError: (err, payload, context) => {
+      if (context?.previousConfig) {
+        queryClient.setQueryData(['drops-config', channelName, platform], context.previousConfig);
+      }
+      toast.error('Ошибка сохранения настроек');
+      logger.error('Error saving streak config:', err);
+    },
+    onSuccess: () => {
+      setSavedSuccessfully(true);
+      setTimeout(() => setSavedSuccessfully(false), 2000);
+      toast.success('Настройки стрика сохранены');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['drops-config', channelName, platform] });
+    },
+  });
 
   const handleSave = async () => {
     if (!user || !platform || !channelName) {
@@ -62,34 +89,36 @@ const StreakSettings = ({ user, platform, channelName, hasRewards = false }) => 
       return;
     }
 
-    try {
-      setSaving(true);
-      const payload = {
-        streak_enabled: formData.streak_enabled,
-        streak_days_common: formData.streak_days_common[0],
-        streak_days_rare: formData.streak_days_rare[0],
-        streak_days_epic: formData.streak_days_epic[0],
-        streak_days_legendary: formData.streak_days_legendary[0],
-        streak_messages_required: formData.streak_messages_required[0],
-        streak_reset_on_skip: formData.streak_reset_on_skip
-      };
-      const response = await botService.put(`/api/drops/config/${channelName}`, payload, {
+    const payload = {
+      streak_enabled: formData.streak_enabled,
+      streak_days_common: formData.streak_days_common[0],
+      streak_days_rare: formData.streak_days_rare[0],
+      streak_days_epic: formData.streak_days_epic[0],
+      streak_days_legendary: formData.streak_days_legendary[0],
+      streak_messages_required: formData.streak_messages_required[0],
+      streak_reset_on_skip: formData.streak_reset_on_skip
+    };
+
+    saveMutation.mutate(payload);
+  };
+
+  // React Query: мутация для сброса статистики
+  const resetStatsMutation = useMutation({
+    mutationFn: async () => {
+      return await botService.post(`/api/drops/streak/reset/${channelName}`, {}, {
         params: { platform }
       });
-      
-      if (response.data.success) {
-        toast.success('Настройки стрика сохранены');
-        setSavedSuccessfully(true);
-        setTimeout(() => setSavedSuccessfully(false), 2000);
-        await loadConfig();
-      }
-    } catch (error) {
-      logger.error('Error saving streak config:', error);
-      toast.error('Ошибка сохранения настроек');
-    } finally {
-      setSaving(false);
-    }
-  };
+    },
+    onSuccess: (response) => {
+      const deletedCount = response?.data?.data?.deleted_count || 0;
+      toast.success(`Статистика стриков сброшена (удалено ${deletedCount} записей)`);
+      queryClient.invalidateQueries({ queryKey: ['drops-streak-stats', channelName, platform] });
+    },
+    onError: (err) => {
+      toast.error('Ошибка сброса статистики');
+      logger.error('Error resetting streak statistics:', err);
+    },
+  });
 
   const handleResetStatistics = async () => {
     if (!user || !platform || !channelName) {
@@ -101,21 +130,7 @@ const StreakSettings = ({ user, platform, channelName, hasRewards = false }) => 
       return;
     }
 
-    try {
-      setResetting(true);
-      const response = await botService.post(`/api/drops/streak/reset/${channelName}`, {}, {
-        params: { platform }
-      });
-      
-      if (response.data.success) {
-        toast.success(`Статистика стриков сброшена (удалено ${response.data.data.deleted_count} записей)`);
-      }
-    } catch (error) {
-      logger.error('Error resetting streak statistics:', error);
-      toast.error('Ошибка сброса статистики');
-    } finally {
-      setResetting(false);
-    }
+    resetStatsMutation.mutate();
   };
 
   return (
@@ -213,28 +228,28 @@ const StreakSettings = ({ user, platform, channelName, hasRewards = false }) => 
       <div className="flex items-center gap-3 justify-end">
         <Button 
           onClick={handleResetStatistics}
-          disabled={resetting}
+          disabled={resetStatsMutation.isPending}
           size="sm"
           variant="destructive"
           className="gap-2"
         >
           <AlertTriangle className="w-4 h-4" />
-          {resetting ? 'Сброс...' : 'Сбросить статистику стриков'}
+          {resetStatsMutation.isPending ? 'Сброс...' : 'Сбросить статистику стриков'}
         </Button>
         <Button 
           onClick={handleSave}
-          disabled={saving}
+          disabled={saveMutation.isPending}
           size="sm"
           variant={savedSuccessfully ? "default" : "default"}
           className={`gap-2 px-6 transition-all duration-300 ${
             savedSuccessfully 
               ? 'bg-green-600 hover:bg-green-500 scale-105' 
-              : saving 
+              : saveMutation.isPending 
                 ? 'opacity-75' 
                 : ''
           }`}
         >
-          {saving ? (
+          {saveMutation.isPending ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
               Сохранение...

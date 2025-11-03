@@ -1,0 +1,123 @@
+/* design-system.css - Стандартизированные стили проекта */
+
+/* === Quality Colors (Drops система) === */
+.quality-common {
+  color: hsl(var(--quality-common));
+}
+
+.quality-rare {
+  color: hsl(var(--quality-rare));
+}
+
+.quality-epic {
+  color: hsl(var(--quality-epic));
+}
+
+.quality-legendary {
+  color: hsl(var(--quality-legendary));
+}
+
+.quality-mythical {
+  color: hsl(var(--quality-mythical));
+}
+
+.bg-quality-common {
+  background-color: hsl(var(--quality-common));
+}
+
+.bg-quality-rare {
+  background-color: hsl(var(--quality-rare));
+}
+
+.bg-quality-epic {
+  background-color: hsl(var(--quality-epic));
+}
+
+.bg-quality-legendary {
+  background-color: hsl(var(--quality-legendary));
+}
+
+.bg-quality-mythical {
+  background-color: hsl(var(--quality-mythical));
+}
+
+.border-quality-common {
+  border-color: hsl(var(--quality-common));
+}
+
+.border-quality-rare {
+  border-color: hsl(var(--quality-rare));
+}
+
+.border-quality-epic {
+  border-color: hsl(var(--quality-epic));
+}
+
+.border-quality-legendary {
+  border-color: hsl(var(--quality-legendary));
+}
+
+.border-quality-mythical {
+  border-color: hsl(var(--quality-mythical));
+}
+
+/* === Стандартизированные отступы === */
+/* Используем Tailwind spacing, но для консистентности добавляем утилиты */
+.spacing-xs { gap: 0.5rem; }
+.spacing-sm { gap: 0.75rem; }
+.spacing-md { gap: 1rem; }
+.spacing-lg { gap: 1.5rem; }
+.spacing-xl { gap: 2rem; }
+
+/* === Стандартизированные радиусы скругления === */
+.radius-card { border-radius: calc(var(--radius) + 2px); }
+.radius-button { border-radius: var(--radius); }
+.radius-input { border-radius: calc(var(--radius) - 2px); }
+
+/* === Стандартизированные тени === */
+.shadow-card {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+}
+
+.shadow-elevated {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* === Переходы === */
+.transition-standard {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+.transition-slow {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 300ms;
+}
+
+/* === Focus states === */
+.focus-ring {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* === Loading states === */
+.loading-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+

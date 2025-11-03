@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useTransition } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,7 +30,8 @@ import {
   Trash2, 
   Crown,
   Music,
-  Save
+  Save,
+  Loader2
 } from 'lucide-react';
 import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
@@ -74,8 +76,7 @@ const QUALITIES = [
 
 
 const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) => {
-  const [rewards, setRewards] = useState([]);
-  const [qualitiesData, setQualitiesData] = useState([]);
+  const queryClient = useQueryClient();
   const [rewardDialogOpen, setRewardDialogOpen] = useState(false);
   const [editingReward, setEditingReward] = useState(null);
   const [selectedQuality, setSelectedQuality] = useState(null);
@@ -91,10 +92,28 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
     is_active: true
   });
 
-  useEffect(() => {
-    loadQualities();
-    loadRewards();
-  }, [user, platform, channelName]);
+  // React Query: загружаем качества (кешируются глобально)
+  const { data: qualitiesData = [], isLoading: qualitiesLoading } = useQuery({
+    queryKey: ['drops-qualities'],
+    queryFn: async () => {
+      const response = await botService.get('/api/drops/qualities');
+      return response.data.success ? response.data.data : [];
+    },
+    staleTime: 10 * 60 * 1000, // 10 минут - качества редко меняются
+  });
+
+  // React Query: загружаем награды
+  const { data: rewards = [], isLoading: rewardsLoading } = useQuery({
+    queryKey: ['drops-rewards', channelName, platform],
+    queryFn: async () => {
+      if (!channelName) return [];
+      const response = await botService.get(`/api/drops/rewards/${channelName}`, {
+        params: { platform }
+      });
+      return response.data.success ? response.data.data : [];
+    },
+    enabled: !!channelName && !!platform, // Запрос только если есть channelName и platform
+  });
 
   // Уведомляем родителя об изменении количества наград
   useEffect(() => {
@@ -102,35 +121,6 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
       onRewardsCountChange(rewards.length);
     }
   }, [rewards.length, onRewardsCountChange]);
-
-  const loadQualities = async () => {
-    try {
-      const response = await botService.get('/api/drops/qualities');
-      if (response.data.success) {
-        setQualitiesData(response.data.data);
-      }
-    } catch (error) {
-      logger.error('Error loading qualities:', error);
-    }
-  };
-
-  const loadRewards = async () => {
-    if (!user || !platform || !channelName) {
-      return;
-    }
-
-    try {
-      const response = await botService.get(`/api/drops/rewards/${channelName}`, {
-        params: { platform }
-      });
-      
-      if (response.data.success) {
-        setRewards(response.data.data);
-      }
-    } catch (error) {
-      logger.error('Error loading rewards:', error);
-    }
-  };
 
   const handleOpenRewardDialog = (qualityId = null) => {
     setSelectedQuality(qualityId);
@@ -170,6 +160,87 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
     setRewardDialogOpen(true);
   };
 
+  // React Query: мутация для создания/обновления награды с optimistic updates
+  const saveRewardMutation = useMutation({
+    mutationFn: async ({ payload, isEdit, rewardId }) => {
+      if (isEdit) {
+        return await botService.put(`/api/drops/rewards/${rewardId}`, payload);
+      } else {
+        return await botService.post(`/api/drops/rewards/${channelName}`, payload, {
+          params: { platform }
+        });
+      }
+    },
+    onMutate: async ({ payload, isEdit }) => {
+      // Отменяем исходящие запросы
+      await queryClient.cancelQueries({ queryKey: ['drops-rewards', channelName, platform] });
+      
+      // Snapshot предыдущего значения
+      const previousRewards = queryClient.getQueryData(['drops-rewards', channelName, platform]);
+      
+      // Optimistically update
+      if (isEdit && editingReward) {
+        queryClient.setQueryData(['drops-rewards', channelName, platform], (old) => {
+          return old.map(reward => 
+            reward.id === editingReward.id 
+              ? { ...reward, ...payload, quality: qualitiesData.find(q => q.id === payload.quality_id) }
+              : reward
+          );
+        });
+      } else {
+        // Для новой награды добавляем временный ID
+        const newReward = {
+          id: `temp-${Date.now()}`,
+          ...payload,
+          quality: qualitiesData.find(q => q.id === payload.quality_id),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        queryClient.setQueryData(['drops-rewards', channelName, platform], (old) => [...(old || []), newReward]);
+      }
+      
+      return { previousRewards };
+    },
+    onError: (err, variables, context) => {
+      // Rollback при ошибке
+      if (context?.previousRewards) {
+        queryClient.setQueryData(['drops-rewards', channelName, platform], context.previousRewards);
+      }
+      
+      // Обрабатываем ошибки валидации
+      let errorMessage = 'Ошибка сохранения награды';
+      
+      if (err.response?.data) {
+        const errorData = err.response.data;
+        
+        if (Array.isArray(errorData.detail)) {
+          const messages = errorData.detail.map(e => {
+            if (typeof e === 'object' && e.msg) {
+              return `${e.loc?.join('.')}: ${e.msg}`;
+            }
+            return String(e);
+          });
+          errorMessage = messages.join(', ');
+        } else if (typeof errorData.detail === 'string') {
+          errorMessage = errorData.detail;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        }
+      }
+      
+      toast.error(errorMessage);
+      logger.error('Error saving reward:', err);
+    },
+    onSuccess: (response, variables) => {
+      toast.success(variables.isEdit ? 'Награда обновлена' : 'Награда создана');
+      setRewardDialogOpen(false);
+    },
+    onSettled: () => {
+      // Refetch для синхронизации
+      queryClient.invalidateQueries({ queryKey: ['drops-rewards', channelName, platform] });
+    },
+  });
+
   const handleSaveReward = async () => {
     if (!rewardForm.name) {
       toast.error('Укажите название награды');
@@ -188,68 +259,53 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
       weight: rewardForm.weight[0],
       reward_type: 'custom', // Всегда custom, так как награда - это просто сундук
       reward_value: '', // Пустое значение, так как награда - это просто показ сундука
-      image_url: rewardForm.image_url || null, // URL изображения для карточки в гача крутке
+      image_url: (rewardForm.image_url && rewardForm.image_url.trim()) || null, // URL изображения для карточки в гача крутке (null если пусто)
       sound_volume: 1.0, // Дефолтное значение, настройка звука в виджете
       is_active: rewardForm.is_active
     };
 
-    try {
-      if (editingReward) {
-        await botService.put(`/api/drops/rewards/${editingReward.id}`, payload);
-        toast.success('Награда обновлена');
-      } else {
-        await botService.post(`/api/drops/rewards/${channelName}`, payload, {
-          params: { platform }
-        });
-        toast.success('Награда создана');
-      }
-      
-      await loadRewards();
-      setRewardDialogOpen(false);
-    } catch (error) {
-      logger.error('Error saving reward:', error);
-      
-      // Обрабатываем ошибки валидации
-      let errorMessage = 'Ошибка сохранения награды';
-      
-      if (error.response?.data) {
-        const errorData = error.response.data;
-        
-        // Если это массив ошибок валидации
-        if (Array.isArray(errorData.detail)) {
-          const messages = errorData.detail.map(err => {
-            if (typeof err === 'object' && err.msg) {
-              return `${err.loc?.join('.')}: ${err.msg}`;
-            }
-            return String(err);
-          });
-          errorMessage = messages.join(', ');
-        } 
-        // Если это строка
-        else if (typeof errorData.detail === 'string') {
-          errorMessage = errorData.detail;
-        }
-        // Если есть message
-        else if (errorData.message) {
-          errorMessage = errorData.message;
-        }
-      }
-      
-      toast.error(errorMessage);
-    }
+    saveRewardMutation.mutate({
+      payload,
+      isEdit: !!editingReward,
+      rewardId: editingReward?.id,
+    });
   };
+
+  // React Query: мутация для удаления награды с optimistic updates
+  const deleteRewardMutation = useMutation({
+    mutationFn: async (rewardId) => {
+      return await botService.delete(`/api/drops/rewards/${rewardId}`);
+    },
+    onMutate: async (rewardId) => {
+      await queryClient.cancelQueries({ queryKey: ['drops-rewards', channelName, platform] });
+      
+      const previousRewards = queryClient.getQueryData(['drops-rewards', channelName, platform]);
+      
+      // Optimistically remove
+      queryClient.setQueryData(['drops-rewards', channelName, platform], (old) => 
+        old.filter(reward => reward.id !== rewardId)
+      );
+      
+      return { previousRewards };
+    },
+    onError: (err, rewardId, context) => {
+      if (context?.previousRewards) {
+        queryClient.setQueryData(['drops-rewards', channelName, platform], context.previousRewards);
+      }
+      toast.error('Ошибка удаления награды');
+      logger.error('Error deleting reward:', err);
+    },
+    onSuccess: () => {
+      toast.success('Награда удалена');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['drops-rewards', channelName, platform] });
+    },
+  });
 
   const handleDeleteReward = async (rewardId) => {
     if (!confirm('Удалить эту награду?')) return;
-
-    try {
-      await botService.delete(`/api/drops/rewards/${rewardId}`);
-      toast.success('Награда удалена');
-      await loadRewards();
-    } catch (error) {
-      logger.error('Error deleting reward:', error);
-      toast.error('Ошибка удаления награды');
-    }
+    deleteRewardMutation.mutate(rewardId);
   };
 
   const getRewardsForQuality = (qualityName) => {
@@ -272,44 +328,26 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
         return (
           <Card key={quality.id}>
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <img 
-                    src={quality.image} 
-                    alt={`${quality.label} chest`}
-                    className="w-8 h-8 object-contain"
-                  />
-                  <div>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <span style={{ color: qualityData?.color || quality.color }}>
-                        {quality.label}
-                      </span>
-                      <Badge 
-                        variant="secondary" 
-                        style={{ backgroundColor: qualityData?.color || quality.color }}
-                        className="text-white text-xs"
-                      >
-                        {qualityRewards.length}
-                      </Badge>
-                    </CardTitle>
-                  </div>
+              <div className="flex items-center gap-2">
+                <img 
+                  src={quality.image} 
+                  alt={`${quality.label} chest`}
+                  className="w-8 h-8 object-contain"
+                />
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <span style={{ color: qualityData?.color || quality.color }}>
+                      {quality.label}
+                    </span>
+                    <Badge 
+                      variant="secondary" 
+                      style={{ backgroundColor: qualityData?.color || quality.color }}
+                      className="text-white text-xs"
+                    >
+                      {qualityRewards.length}
+                    </Badge>
+                  </CardTitle>
                 </div>
-                <Button
-                  onClick={() => {
-                    // Пытаемся найти реальный ID качества из БД (сравниваем без учета регистра)
-                    // Если не найдено, используем статический ID из константы (fallback)
-                    const dbQuality = qualitiesData.find(q => 
-                      q.name.toLowerCase() === quality.name.toLowerCase()
-                    );
-                    const qualityId = dbQuality ? dbQuality.id : quality.id;
-                    handleOpenRewardDialog(qualityId);
-                  }}
-                  size="sm"
-                  className="gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Добавить
-                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -318,27 +356,66 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
                   <p className="text-sm font-medium text-orange-400">⚠️ Награды не настроены</p>
                   <p className="text-xs mt-2 text-muted-foreground">Добавьте награды в этот лутбокс, чтобы зрители могли их получить</p>
                   <p className="text-xs mt-1 text-yellow-500">Без наград система Drops не будет работать</p>
+                  <Button
+                    onClick={() => {
+                      // Пытаемся найти реальный ID качества из БД (сравниваем без учета регистра)
+                      // Если не найдено, используем статический ID из константы (fallback)
+                      const dbQuality = qualitiesData.find(q => 
+                        q.name.toLowerCase() === quality.name.toLowerCase()
+                      );
+                      const qualityId = dbQuality ? dbQuality.id : quality.id;
+                      handleOpenRewardDialog(qualityId);
+                    }}
+                    size="sm"
+                    className="gap-2 mt-3 text-xs sm:text-sm"
+                    variant="outline"
+                  >
+                    <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Добавить награду</span>
+                    <span className="sm:hidden">Добавить</span>
+                  </Button>
                 </div>
               ) : (
+                <div className="space-y-3">
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => {
+                        // Пытаемся найти реальный ID качества из БД (сравниваем без учета регистра)
+                        // Если не найдено, используем статический ID из константы (fallback)
+                        const dbQuality = qualitiesData.find(q => 
+                          q.name.toLowerCase() === quality.name.toLowerCase()
+                        );
+                        const qualityId = dbQuality ? dbQuality.id : quality.id;
+                        handleOpenRewardDialog(qualityId);
+                      }}
+                      size="sm"
+                      className="gap-2 text-xs sm:text-sm"
+                      variant="outline"
+                    >
+                      <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+                      <span className="hidden sm:inline">Добавить награду</span>
+                      <span className="sm:hidden">Добавить</span>
+                    </Button>
+                  </div>
                 <div className="space-y-2">
                   {qualityRewards.map((reward) => {
                     return (
                       <div 
                         key={reward.id} 
-                        className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                        className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg hover:bg-muted/50 transition-colors"
                       >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-sm font-medium">{reward.name}</h4>
+                        <div className="flex-1 min-w-0 w-full sm:w-auto">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="text-sm font-medium break-words">{reward.name}</h4>
                             {!reward.is_active && (
-                              <Badge variant="outline" className="text-xs">Отключено</Badge>
+                              <Badge variant="outline" className="text-xs flex-shrink-0">Отключено</Badge>
                             )}
                           </div>
                           {reward.description && (
-                            <p className="text-xs text-muted-foreground mt-1">{reward.description}</p>
+                            <p className="text-xs text-muted-foreground mt-1 break-words">{reward.description}</p>
                           )}
                           {reward.image_url && (
-                            <div className="mt-2 w-20 h-20 border rounded overflow-hidden">
+                            <div className="mt-2 w-16 h-16 sm:w-20 sm:h-20 border rounded overflow-hidden flex-shrink-0">
                               <img 
                                 src={reward.image_url} 
                                 alt={reward.name}
@@ -349,9 +426,9 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
                               />
                             </div>
                           )}
-                          <div className="flex items-center gap-3 mt-1.5">
+                          <div className="flex items-center gap-2 sm:gap-3 mt-1.5 flex-wrap">
                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <span>Шанс выпадения:</span>
+                              <span>Шанс:</span>
                               <span className="font-semibold">{reward.weight}</span>
                             </div>
                             {reward.sound_file && (
@@ -362,25 +439,30 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
                             )}
                           </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 self-end sm:self-auto flex-shrink-0">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleEditReward(reward)}
+                            className="h-8 w-8 sm:h-9 sm:w-auto p-0 sm:px-3"
                           >
                             <Edit className="w-4 h-4" />
+                            <span className="hidden sm:inline ml-2">Редактировать</span>
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteReward(reward.id)}
+                            className="h-8 w-8 sm:h-9 sm:w-auto p-0 sm:px-3 text-destructive"
                           >
-                            <Trash2 className="w-4 h-4 text-destructive" />
+                            <Trash2 className="w-4 h-4" />
+                            <span className="hidden sm:inline ml-2">Удалить</span>
                           </Button>
                         </div>
                       </div>
                     );
                   })}
+                </div>
                 </div>
               )}
             </CardContent>
@@ -390,7 +472,7 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
 
       {/* Диалог создания/редактирования награды */}
       <Dialog open={rewardDialogOpen} onOpenChange={setRewardDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>
               {editingReward ? 'Редактировать награду' : 'Создать награду'}
@@ -400,7 +482,7 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
+          <div className="space-y-4 sm:space-y-6 py-2 sm:py-4">
             {/* Название */}
             <div className="space-y-2">
               <Label htmlFor="reward_name">Название награды *</Label>
@@ -424,74 +506,65 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
               />
             </div>
 
-            {/* Изображение для карточки */}
-            <div className="space-y-2">
-              <Label htmlFor="reward_image">Изображение для карточки (гача)</Label>
+            {/* Изображение для карточки - только загрузка файла после сохранения */}
+            {editingReward && (
               <div className="space-y-2">
-                <Input
-                  id="reward_image_url"
-                  type="url"
-                  value={rewardForm.image_url || ''}
-                  onChange={(e) => setRewardForm({...rewardForm, image_url: e.target.value})}
-                  placeholder="URL изображения (или загрузите файл после сохранения)"
-                />
-                {editingReward && (
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="reward_image_file"
-                      type="file"
-                      accept="image/*"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
+                <Label htmlFor="reward_image">Изображение для карточки (гача)</Label>
+                <div className="space-y-2">
+                  <Input
+                    id="reward_image_file"
+                    type="file"
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      
+                      try {
+                        const formData = new FormData();
+                        formData.append('image_file', file);
                         
-                        try {
-                          const formData = new FormData();
-                          formData.append('image_file', file);
-                          
-                          const response = await botService.post(
-                            `/api/drops/rewards/${editingReward.id}/image`,
-                            formData,
-                            {
-                              headers: {
-                                'Content-Type': 'multipart/form-data'
-                              }
+                        const response = await botService.post(
+                          `/api/drops/rewards/${editingReward.id}/image`,
+                          formData,
+                          {
+                            headers: {
+                              'Content-Type': 'multipart/form-data'
                             }
-                          );
-                          
-                          if (response.data.success) {
-                            setRewardForm({...rewardForm, image_url: response.data.data.image_url});
-                            toast.success('Изображение загружено');
                           }
-                        } catch (error) {
-                          logger.error('Error uploading image:', error);
-                          toast.error('Ошибка загрузки изображения');
-                        } finally {
-                          // Сброс input
-                          e.target.value = '';
+                        );
+                        
+                        if (response.data.success) {
+                          setRewardForm({...rewardForm, image_url: response.data.data.image_url});
+                          toast.success('Изображение загружено');
                         }
-                      }}
-                      className="flex-1"
-                    />
-                  </div>
-                )}
-                {rewardForm.image_url && (
-                  <div className="w-24 h-24 border rounded overflow-hidden bg-muted">
-                    <img 
-                      src={rewardForm.image_url} 
-                      alt="Preview" 
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                      }}
-                    />
-                  </div>
-                )}
+                      } catch (error) {
+                        logger.error('Error uploading image:', error);
+                        toast.error('Ошибка загрузки изображения');
+                      } finally {
+                        // Сброс input
+                        e.target.value = '';
+                      }
+                    }}
+                    className="flex-1"
+                  />
+                  {rewardForm.image_url && (
+                    <div className="w-24 h-24 border rounded overflow-hidden bg-muted">
+                      <img 
+                        src={rewardForm.image_url} 
+                        alt="Preview" 
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Изображение будет показано на карточке при крутке сундука (как в гача-играх). Загрузите изображение после создания награды.
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Изображение будет показано на карточке при крутке сундука (как в гача-играх)
-              </p>
-            </div>
+            )}
 
             {/* Качество */}
             <div className="space-y-2">
@@ -550,9 +623,9 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
                 step={1}
                 className="w-full"
               />
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-2 sm:p-3">
                 <p className="text-xs text-blue-300 font-medium mb-1">💡 Как работает вес награды:</p>
-                <p className="text-xs text-blue-200/80">
+                <p className="text-xs text-blue-200/80 leading-relaxed">
                   Система случайно выбирает награду из всех наград того же качества. 
                   Награда с весом <span className="font-semibold">200</span> выпадет в <span className="font-semibold">2 раза чаще</span>, чем награда с весом <span className="font-semibold">100</span>.
                   Используйте вес для регулирования редкости наград.
@@ -562,27 +635,41 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
 
 
             {/* Активность */}
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div>
-                <h3 className="font-medium">Активна</h3>
-                <p className="text-sm text-muted-foreground">
+            <div className="flex items-center justify-between p-3 sm:p-4 border rounded-lg gap-3">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-medium text-sm sm:text-base">Активна</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   Награда доступна для выдачи
                 </p>
               </div>
               <Switch
                 checked={rewardForm.is_active}
                 onCheckedChange={(checked) => setRewardForm({...rewardForm, is_active: checked})}
+                className="flex-shrink-0"
               />
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRewardDialogOpen(false)}>
+          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setRewardDialogOpen(false)} className="w-full sm:w-auto">
               Отмена
             </Button>
-            <Button onClick={handleSaveReward} className="gap-2">
-              <Save className="w-4 h-4" />
-              {editingReward ? 'Сохранить' : 'Создать'}
+            <Button 
+              onClick={handleSaveReward} 
+              disabled={saveRewardMutation.isPending || deleteRewardMutation.isPending}
+              className="gap-2 w-full sm:w-auto"
+            >
+              {saveRewardMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Сохранение...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  {editingReward ? 'Сохранить' : 'Создать'}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

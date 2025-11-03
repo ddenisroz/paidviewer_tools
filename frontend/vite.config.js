@@ -17,58 +17,64 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Vendor chunks - библиотеки
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': ['lucide-react', 'sonner'],
+        manualChunks: (id) => {
+          // Vendor chunks - библиотеки разделены для параллельной загрузки
+          if (id.includes('node_modules')) {
+            // React core - критически важные
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+              return 'react-vendor';
+            }
+            // UI библиотеки
+            if (id.includes('lucide-react')) {
+              return 'ui-icons';
+            }
+            if (id.includes('sonner')) {
+              return 'ui-toast';
+            }
+            // Radix UI компоненты - большие, выносим отдельно
+            if (id.includes('@radix-ui')) {
+              return 'radix-ui';
+            }
+            // Тяжелые библиотеки
+            if (id.includes('recharts')) {
+              return 'charts';
+            }
+            if (id.includes('react-youtube')) {
+              return 'youtube';
+            }
+            if (id.includes('axios')) {
+              return 'http-client';
+            }
+            // Остальные vendor зависимости
+            return 'vendor';
+          }
           
-          // Context - все контексты в отдельный чанк
-          'contexts': [
-            './src/context/AuthContext.jsx',
-            './src/context/DataContext.jsx',
-            './src/context/IntegrationsContext.jsx',
-            './src/context/TtsContext.jsx',
-            './src/context/TtsHealthContext.jsx',
-            './src/context/PlayerContext.jsx',
-            './src/context/ChatContext.jsx',
-            './src/context/UserSettingsContext.jsx',
-            './src/context/DonationAlertsContext.jsx'
-          ],
+          // Context chunks - разделяем для lazy loading
+          if (id.includes('/context/')) {
+            if (id.includes('AuthContext') || id.includes('IntegrationsContext')) {
+              return 'contexts-core';
+            }
+            return 'contexts';
+          }
           
-          // UI components
-          'ui-components': [
-            './src/components/ui/button.jsx',
-            './src/components/ui/card.jsx',
-            './src/components/ui/input.jsx',
-            './src/components/ui/badge.jsx',
-            './src/components/ui/select.jsx',
-            './src/components/ui/switch.jsx',
-            './src/components/ui/slider.jsx',
-            './src/components/ui/dialog.jsx',
-            './src/components/ui/toast.jsx',
-            './src/components/ui/tabs.jsx',
-            './src/components/ui/checkbox.jsx',
-            './src/components/ui/separator.jsx',
-            './src/components/ui/label.jsx',
-            './src/components/ui/textarea.jsx',
-            './src/components/ui/alert.jsx',
-            './src/components/ui/popover.jsx',
-            './src/components/ui/dropdown-menu.jsx'
-          ],
+          // UI components - один чанк для всех
+          if (id.includes('/components/ui/')) {
+            return 'ui-components';
+          }
           
           // Admin pages отдельно (используются редко)
-          'admin': [
-            './src/pages/admin/AdminPage.jsx',
-            './src/pages/admin/UserManagementPage.jsx',
-            './src/pages/admin/MonitoringPage.jsx',
-            './src/pages/admin/BotManagementPage.jsx',
-            './src/pages/admin/SupportTicketsPage.jsx',
-            './src/pages/admin/BlockedChannelsPage.jsx'
-          ]
+          if (id.includes('/pages/admin/')) {
+            return 'admin';
+          }
+          
+          // Drops pages отдельно
+          if (id.includes('/pages/drops/') || id.includes('/pages/obs/')) {
+            return 'drops';
+          }
         }
       }
     },
-    // Увеличиваем лимит предупреждения до 1000 KB (было 500 KB)
+    // Оптимизация размера чанков
     chunkSizeWarningLimit: 1000,
     
     // Минификация (esbuild быстрее чем terser)
@@ -77,6 +83,27 @@ export default defineConfig({
     // Удаляем console и debugger в продакшене
     esbuild: {
       drop: ['console', 'debugger']
-    }
+    },
+    
+    // Увеличиваем производительность сборки
+    target: 'esnext',
+    cssCodeSplit: true,
+    
+    // Включаем source maps только для разработки
+    sourcemap: false,
+    
+    // Оптимизация ассетов
+    assetsInlineLimit: 4096, // Инлайним маленькие файлы
+  },
+  
+  // Оптимизация для разработки
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      'axios'
+    ],
+    exclude: ['recharts'] // Исключаем тяжелые библиотеки из предварительной оптимизации
   }
 })

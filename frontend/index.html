@@ -10,10 +10,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     
-    <!-- CRITICAL: Font loading with fallback to minimize visible swap -->
-    <!-- display=fallback shows fallback immediately, uses custom font only if loaded quickly -->
-    <!-- On repeat visits, font is cached and loads instantly, preventing visible expansion -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=fallback">
+    <!-- DNS prefetch для API -->
+    <link rel="dns-prefetch" href="//localhost:8000">
+    
+    <!-- CRITICAL: Font loading with optional display to prevent visible swap -->
+    <!-- display=optional shows fallback immediately, uses custom font only if already cached -->
+    <!-- This prevents visible font expansion on first load - system font stays, Inter loads silently -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=optional">
+    
+    <!-- Resource hints для ускорения загрузки -->
+    <link rel="modulepreload" href="/src/main.jsx">
     
     <!-- Fallback: if stylesheet fails, we already have inline CSS with system fonts -->
     
@@ -35,8 +41,9 @@
         margin: 0;
         padding: 0;
         overflow-x: hidden;
-        /* Fallback fonts with same metrics to prevent layout shift */
-        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        /* Use system fonts as primary - Inter will swap silently if cached */
+        /* This prevents visible font expansion - system font stays visible */
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
         font-size: 14px;
         line-height: 1.5;
         font-weight: 400;
@@ -47,6 +54,13 @@
         /* Show content immediately - fonts will load in background */
         visibility: visible;
         opacity: 1;
+      }
+      
+      /* Apply Inter font only after it's confirmed loaded to prevent expansion */
+      /* With font-display: optional, Inter only swaps if already cached */
+      body.fonts-ready .inter-font,
+      body.fonts-ready {
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
       }
       
       /* Fonts are preloaded, body is always visible */

@@ -12,9 +12,7 @@ import {
   DollarSign,
   Coins,
   Package,
-  Monitor,
-  AlertTriangle,
-  ArrowRight
+  Monitor
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useIntegrations } from '../../context/IntegrationsContext';
@@ -106,61 +104,32 @@ const DropsMainPage = () => {
       <PageWrapper 
         title="Drops система"
       >
-      {/* Критическое предупреждение если нет наград */}
-      {!hasRewards && (
-        <Card className="mb-6 border-2 border-red-500/50 bg-red-500/10">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-4">
-              <AlertTriangle className="h-6 w-6 text-red-400 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-red-400 mb-2">
-                  ⚠️ Система Drops не настроена
-                </h3>
-                <p className="text-sm text-red-200/90 mb-3">
-                  Для работы системы Drops необходимо настроить содержимое сундуков (items) на вкладке "Награды". 
-                  Без наград система не будет работать — зрители не смогут получить сундуки.
-                </p>
-                <Button 
-                  onClick={() => setActiveTab('rewards')}
-                  variant="destructive"
-                  size="sm"
-                  className="gap-2"
-                >
-                  Перейти к настройке наград
-                  <ArrowRight className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Основной контент */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="streak" className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            Стрик
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-1 sm:gap-2">
+          <TabsTrigger value="streak" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
+            <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Стрик</span>
           </TabsTrigger>
-          <TabsTrigger value="donation" className="flex items-center gap-2">
-            <DollarSign className="w-4 h-4" />
-            Донат
+          <TabsTrigger value="donation" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
+            <DollarSign className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Донат</span>
           </TabsTrigger>
-          <TabsTrigger value="points" className="flex items-center gap-2">
-            <Coins className="w-4 h-4" />
-            Баллы
+          <TabsTrigger value="points" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
+            <Coins className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Баллы</span>
           </TabsTrigger>
-          <TabsTrigger value="rewards" className="flex items-center gap-2">
-            <Package className="w-4 h-4" />
-            Награды
+          <TabsTrigger value="rewards" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
+            <Package className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Награды</span>
           </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-2">
-            <History className="w-4 h-4" />
-            История
+          <TabsTrigger value="history" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
+            <History className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">История</span>
           </TabsTrigger>
-          <TabsTrigger value="widget" className="flex items-center gap-2">
-            <Monitor className="w-4 h-4" />
-            Виджет
+          <TabsTrigger value="widget" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
+            <Monitor className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Виджет</span>
           </TabsTrigger>
         </TabsList>
 
@@ -171,6 +140,7 @@ const DropsMainPage = () => {
               user={user}
               platform={selectedPlatform}
               channelName={channelName}
+              hasRewards={hasRewards}
             />
             <StreakTracker 
               user={user}
