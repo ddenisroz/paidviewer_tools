@@ -6,6 +6,8 @@ from typing import Optional, Dict, Any
 import os
 from urllib.parse import urlparse, parse_qs
 
+from core.retry_utils import retry_async
+
 logger = logging.getLogger('bot_service')
 
 class YouTubeService:
@@ -29,28 +31,42 @@ class YouTubeService:
                 logger.warning("YouTube API key not configured, using fallback method")
                 return await self._get_video_info_fallback(video_id, video_url)
             
-            # Запрос к YouTube API
-            url = f"{self.base_url}/videos"
-            params = {
-                'part': 'snippet,contentDetails,statistics',
-                'id': video_id,
-                'key': self.api_key
-            }
+            # Запрос к YouTube API с retry
+            async def _do_request():
+                timeout = aiohttp.ClientTimeout(total=30, connect=10)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    url = f"{self.base_url}/videos"
+                    params = {
+                        'part': 'snippet,contentDetails,statistics',
+                        'id': video_id,
+                        'key': self.api_key
+                    }
+                    async with session.get(url, params=params) as response:
+                        return response
             
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, params=params) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        
-                        if not data.get('items'):
-                            logger.error(f"Video not found: {video_id}")
-                            return None
-                        
-                        video_data = data['items'][0]
-                        return self._parse_video_data(video_data, video_url)
-                    else:
-                        logger.error(f"YouTube API error: {response.status}")
-                        return await self._get_video_info_fallback(video_id, video_url)
+            response = await retry_async(
+                _do_request,
+                max_attempts=3,
+                initial_delay=2.0,
+                retry_on=(aiohttp.ClientError, aiohttp.ClientConnectorError)
+            )
+            
+            if not response:
+                logger.error(f"YouTube API request failed after retries for: {video_id}")
+                return await self._get_video_info_fallback(video_id, video_url)
+            
+            if response.status == 200:
+                data = await response.json()
+                
+                if not data.get('items'):
+                    logger.error(f"Video not found: {video_id}")
+                    return None
+                
+                video_data = data['items'][0]
+                return self._parse_video_data(video_data, video_url)
+            else:
+                logger.error(f"YouTube API error: {response.status}")
+                return await self._get_video_info_fallback(video_id, video_url)
                         
         except Exception as e:
             logger.error(f"Error getting video info: {e}")
