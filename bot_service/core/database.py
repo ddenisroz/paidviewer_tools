@@ -741,6 +741,7 @@ class DropsConfig(Base):
     widget_opening_duration_ms = Column(Integer, default=1000)  # Длительность открытия (мс)
     widget_result_duration_ms = Column(Integer, default=5500)  # Длительность показа результата (мс)
     widget_closing_duration_ms = Column(Integer, default=500)  # Длительность закрытия (мс)
+    widget_token = Column(String, nullable=True, unique=True, index=True)  # Уникальный токен для виджета OBS
     
     created_at = Column(DateTime, default=utcnow_naive)
     updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)

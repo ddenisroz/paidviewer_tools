@@ -27,8 +27,10 @@ const TtsMainPageContent = () => {
     const { isAuthenticated, user, isGuest } = useAuth();
     const { integrations } = useIntegrations();
     
-    // 🎬 Анимация страницы
-    const { shouldAnimate, contentLoaded } = usePageAnimation('tts', 100);
+    // УБРАНО: usePageAnimation - вызывает видимую отрисовку элементов
+    // Используем оптимистичный UI - контент виден сразу
+    const shouldAnimate = false;
+    const contentLoaded = true;
     
     // Логируем инициализацию компонента
     useEffect(() => {
@@ -79,27 +81,9 @@ const TtsMainPageContent = () => {
     const [localTtsConfig, setLocalTtsConfig] = useState(null);
     const [engineLoading, setEngineLoading] = useState(true); // Флаг загрузки данных движка
     
-    // Обёртки для сохранения настроек (используют мутации)
-    const saveAudioSettings = useCallback((newSettings) => {
-        saveAudioSettingsMutation.mutate(newSettings);
-    }, [saveAudioSettingsMutation]);
-
-    const saveTtsSettings = useCallback((newSettings) => {
-        saveTtsSettingsMutation.mutate(newSettings);
-    }, [saveTtsSettingsMutation]);
-
-    // Проверка подключения (гость всегда "подключен" к своему каналу)
-    // Для авторизованных пользователей TTS всегда доступен, даже без интеграций
-    const isConnected = isGuest || isAuthenticated || integrations.twitch?.connected || integrations.vk?.connected;
-    
-    // Логируем статус подключения
-    useEffect(() => {
-        ttsLogger.debug('TTS Connection status:', { isGuest, isAuthenticated, integrations, isConnected });
-    }, [isGuest, isAuthenticated, integrations, isConnected]);
-
     const queryClient = useQueryClient();
 
-    // React Query мутации - объявляем ДО использования в useQuery
+    // React Query мутации - объявляем ДО использования в useCallback и useQuery
     const switchEngineMutation = useMutation({
         mutationFn: async ({ engine_type }) => {
             return await botService.post('/api/tts/engine', { engine_type });
@@ -193,7 +177,7 @@ const TtsMainPageContent = () => {
             setIsSaving(false);
         },
     });
-
+            
     const saveTtsSettingsMutation = useMutation({
         mutationFn: async (newSettings) => {
             ttsLogger.api('POST', '/api/tts/settings', newSettings);
@@ -226,11 +210,29 @@ const TtsMainPageContent = () => {
         },
     });
 
+    // Обёртки для сохранения настроек (используют мутации) - объявляем ПОСЛЕ мутаций
+    const saveAudioSettings = useCallback((newSettings) => {
+        saveAudioSettingsMutation.mutate(newSettings);
+    }, [saveAudioSettingsMutation]);
+
+    const saveTtsSettings = useCallback((newSettings) => {
+        saveTtsSettingsMutation.mutate(newSettings);
+    }, [saveTtsSettingsMutation]);
+
+    // Проверка подключения (гость всегда "подключен" к своему каналу)
+    // Для авторизованных пользователей TTS всегда доступен, даже без интеграций
+    const isConnected = isGuest || isAuthenticated || integrations.twitch?.connected || integrations.vk?.connected;
+    
+    // Логируем статус подключения
+    useEffect(() => {
+        ttsLogger.debug('TTS Connection status:', { isGuest, isAuthenticated, integrations, isConnected });
+    }, [isGuest, isAuthenticated, integrations, isConnected]);
+
     // React Query: загружаем TTS статус
     const { data: ttsStatusData, isLoading: ttsStatusLoading } = useQuery({
         queryKey: ['tts-status'],
         queryFn: async () => {
-            const response = await botService.get('/api/tts/status');
+                        const response = await botService.get('/api/tts/status');
             return response.data;
         },
         enabled: !!isAuthenticated,
@@ -241,24 +243,24 @@ const TtsMainPageContent = () => {
             if (data) {
                 const isTtsEnabled = data.enabled || false;
                 const engineType = data.engine_type || 'gtts';
-                
-                setBasicTtsEnabled(isTtsEnabled);
+                    
+                    setBasicTtsEnabled(isTtsEnabled);
                 const hasLocalSetup = data.has_local_setup || false;
-                const canUseLocalTTS = hasLocalSetup || isWhitelisted;
-                
-                if (engineType === 'local' && !canUseLocalTTS) {
-                    ttsLogger.warning('User trying to use local TTS without setup, switching to cloud');
-                    setTtsEngine('cloud');
-                    setAiTtsEnabled(false);
+                    const canUseLocalTTS = hasLocalSetup || isWhitelisted;
+                    
+                    if (engineType === 'local' && !canUseLocalTTS) {
+                        ttsLogger.warning('User trying to use local TTS without setup, switching to cloud');
+                        setTtsEngine('cloud');
+                        setAiTtsEnabled(false);
                     // Переключаем на облачный через мутацию
                     switchEngineMutation.mutate({ engine_type: 'cloud' });
-                } else {
-                    setAiTtsEnabled(isTtsEnabled && isHealthy && canUseLocalTTS);
-                    setTtsEngine(engineType === 'local' && canUseLocalTTS ? 'local' : 'cloud');
+                    } else {
+                        setAiTtsEnabled(isTtsEnabled && isHealthy && canUseLocalTTS);
+                        setTtsEngine(engineType === 'local' && canUseLocalTTS ? 'local' : 'cloud');
+                    }
+                    
+                    ttsLogger.info('TTS engine loaded:', engineType);
                 }
-                
-                ttsLogger.info('TTS engine loaded:', engineType);
-            }
         },
     });
 
@@ -360,12 +362,12 @@ const TtsMainPageContent = () => {
     useEffect(() => {
         setEngineLoading(ttsStatusLoading);
     }, [ttsStatusLoading]);
-
+                
     // Режим прослушивания из user
     useEffect(() => {
-        if (user?.tts_listening_mode) {
-            setListeningMode(user.tts_listening_mode);
-        }
+                if (user?.tts_listening_mode) {
+                    setListeningMode(user.tts_listening_mode);
+                }
     }, [user?.tts_listening_mode]);
 
     // Слушаем изменения Basic TTS с главной страницы
@@ -438,23 +440,23 @@ const TtsMainPageContent = () => {
         const newEnabledPlatforms = currentPlatforms.includes(platform)
             ? currentPlatforms.filter(p => p !== platform)
             : [...currentPlatforms, platform];
-        
+            
         // Optimistic update
-        setPlatformSettings(prev => ({
-            ...prev,
-            enabled_platforms: newEnabledPlatforms
-        }));
-        
+            setPlatformSettings(prev => ({
+                ...prev,
+                enabled_platforms: newEnabledPlatforms
+            }));
+            
         // Сохраняем через мутацию
         savePlatformSettingsMutation.mutate(
             { enabled_platforms: newEnabledPlatforms },
             {
                 onSuccess: () => {
                     // Отправляем событие для синхронизации с другими компонентами
-                    window.dispatchEvent(new CustomEvent('tts-settings-changed', {
-                        detail: { enabledPlatforms: newEnabledPlatforms }
-                    }));
-                    logger.log(`Platform ${platform} toggled successfully`);
+            window.dispatchEvent(new CustomEvent('tts-settings-changed', {
+                detail: { enabledPlatforms: newEnabledPlatforms }
+            }));
+            logger.log(`Platform ${platform} toggled successfully`);
                 },
                 onError: () => {
                     // Rollback при ошибке - используем сохраненное значение
@@ -462,7 +464,7 @@ const TtsMainPageContent = () => {
                         ...prev,
                         enabled_platforms: currentPlatforms
                     }));
-                }
+        }
             }
         );
     }, [platformSettings.enabled_platforms, savePlatformSettingsMutation]);
@@ -518,25 +520,25 @@ const TtsMainPageContent = () => {
 
     // Функция для сохранения состояния ИИ TTS
     const saveAiTtsState = useCallback((enabled) => {
-        setEngineToggleLoading(true);
-        const engine = enabled ? 'local' : 'cloud';
+            setEngineToggleLoading(true);
+            const engine = enabled ? 'local' : 'cloud';
         
         switchEngineMutation.mutate(
             { engine_type: engine },
             {
                 onSuccess: () => {
-                    toast.success(`Движок: ${enabled ? '💻 Локальный F5-TTS' : '☁️ Облачный'}`);
+            toast.success(`Движок: ${enabled ? '💻 Локальный F5-TTS' : '☁️ Облачный'}`);
                     logger.log('AI TTS state saved:', enabled);
                 },
                 onError: (error) => {
-                    logger.error('Error saving AI TTS state:', error);
-                    toast.error('Ошибка переключения движка');
-                    // Откатываем состояние при ошибке
-                    setAiTtsEnabled(!enabled);
+            logger.error('Error saving AI TTS state:', error);
+            toast.error('Ошибка переключения движка');
+            // Откатываем состояние при ошибке
+            setAiTtsEnabled(!enabled);
                 },
                 onSettled: () => {
-                    setEngineToggleLoading(false);
-                }
+            setEngineToggleLoading(false);
+        }
             }
         );
     }, [switchEngineMutation]);
@@ -578,12 +580,12 @@ const TtsMainPageContent = () => {
             { listeningMode: mode },
             {
                 onSuccess: () => {
-                    logger.log('Listening mode saved:', mode);
+            logger.log('Listening mode saved:', mode);
                 },
                 onError: () => {
                     // Откатываем состояние при ошибке
                     setListeningMode(prev => prev);
-                }
+        }
             }
         );
     }, [setListeningModeMutation]);

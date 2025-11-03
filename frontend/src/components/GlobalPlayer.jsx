@@ -196,7 +196,7 @@ const GlobalPlayer = () => {
                                 </Button>
                                 <div className="w-20">
                                     <Slider
-                                        value={[isMuted ? 0 : volume]}
+                                        value={[isMuted ? 0 : (volume ?? 100)]}
                                         onValueChange={handleVolumeChange}
                                         max={100}
                                         step={1}

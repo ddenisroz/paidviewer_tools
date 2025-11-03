@@ -96,10 +96,9 @@ import { logger } from '../utils/prodLogger';
     // Но можно создать команды ТОЛЬКО для владельца (broadcaster role)
     const roleOptions = [
         { value: 'all', label: 'Все зрители', icon: <Users className="h-3 w-3" /> },
-        { value: 'broadcaster', label: 'Только владелец', icon: <Crown className="h-3 w-3" /> },
-        { value: 'moderator', label: 'Модераторы', icon: <ShieldCheck className="h-3 w-3" /> },
-        { value: 'vip', label: 'VIP (только Twitch)', icon: <Star className="h-3 w-3" /> },
-        { value: 'subscriber', label: 'Подписчики (только Twitch)', icon: <Star className="h-3 w-3" /> }
+        { value: 'vip', label: 'VIP и выше', icon: <Star className="h-3 w-3" /> },
+        { value: 'moderator', label: 'Модераторы и выше', icon: <ShieldCheck className="h-3 w-3" /> },
+        { value: 'broadcaster', label: 'Только владелец', icon: <Crown className="h-3 w-3" /> }
     ];
 
 
@@ -232,15 +231,43 @@ import { logger } from '../utils/prodLogger';
 
     const handleUpdateCommand = async (commandId) => {
         try {
-            await api.put(`/api/commands/${commandId}`, editForm);
-            toast.success('Команда обновлена!');
+            // Если редактируем global команду - создаем override
+            if (editingCommand?.command_type === 'global') {
+                try {
+                    await api.post('/api/commands/override', {
+                        command_name: editingCommand.command_name,
+                        is_enabled: editForm.is_enabled,
+                        platforms: editForm.platforms,
+                        allowed_roles: editForm.allowed_roles,
+                        cooldown_seconds: editForm.cooldown_seconds,
+                        alias: null
+                    });
+                    toast.success('Персональная настройка команды создана!');
+                } catch (createError) {
+                    // Если override уже существует - показываем специфичное сообщение
+                    if (createError.response?.status === 400 && 
+                        createError.response?.data?.detail?.includes('уже существует')) {
+                        toast.error('Персональная настройка уже существует. Перезагрузите список команд.');
+                        loadCommands(); // Перезагружаем чтобы увидеть override
+                        throw createError;
+                    }
+                    throw createError;
+                }
+            } else {
+                // Для override и custom команд - обычное обновление
+                await api.put(`/api/commands/${commandId}`, editForm);
+                toast.success('Команда обновлена!');
+            }
+            
             setIsEditDialogOpen(false);
             setEditingCommand(null);
             loadCommands();
         } catch (error) {
             logger.error('Error updating command:', error);
-            const errorMsg = error.response?.data?.detail || 'Ошибка обновления команды';
-            toast.error(errorMsg);
+            if (!error.response?.data?.detail?.includes('уже существует')) {
+                const errorMsg = error.response?.data?.detail || 'Ошибка обновления команды';
+                toast.error(errorMsg);
+            }
         }
     };
 
@@ -288,10 +315,14 @@ import { logger } from '../utils/prodLogger';
 
     const openEditDialog = (command) => {
         setEditingCommand(command);
+        // Если platforms пустое или не указано, используем 'twitch,vk' (Все платформы)
+        const platforms = command.platforms || 'twitch,vk';
+        // Если allowed_roles пустое или не указано, используем 'all'
+        const allowed_roles = (command.allowed_roles && command.allowed_roles.trim() !== '') ? command.allowed_roles : 'all';
         setEditForm({
             is_enabled: command.is_enabled,
-            platforms: command.platforms || 'twitch,vk',
-            allowed_roles: command.allowed_roles || 'all',
+            platforms: platforms,
+            allowed_roles: allowed_roles,
             cooldown_seconds: command.cooldown_seconds || 0,
             response_text: command.response_text || ''
         });
@@ -299,8 +330,11 @@ import { logger } from '../utils/prodLogger';
     };
 
     const getRoleLabel = (role) => {
+        if (!role || role.trim() === '') {
+            return 'Все зрители'; // По умолчанию если пусто
+        }
         // Нормализуем роль - сортируем для совместимости
-        const normalizedRole = role?.split(',').sort().join(',');
+        const normalizedRole = role.split(',').sort().join(',');
         const option = roleOptions.find(opt => {
             const normalizedValue = opt.value?.split(',').sort().join(',');
             return normalizedValue === normalizedRole;
@@ -309,7 +343,10 @@ import { logger } from '../utils/prodLogger';
     };
 
     const getRoleIcon = (role) => {
-        const normalizedRole = role?.split(',').sort().join(',');
+        if (!role || role.trim() === '') {
+            return <Users className="h-3 w-3" />; // По умолчанию если пусто
+        }
+        const normalizedRole = role.split(',').sort().join(',');
         const option = roleOptions.find(opt => {
             const normalizedValue = opt.value?.split(',').sort().join(',');
             return normalizedValue === normalizedRole;
@@ -742,9 +779,13 @@ import { logger } from '../utils/prodLogger';
                             Настройка команды !{editingCommand?.command_name}
                         </DialogTitle>
                         <DialogDescription>
-                            {editingCommand?.command_type === 'global' 
-                                ? '⚠️ Глобальные команды нельзя изменять напрямую. Создайте персональный override.'
-                                : 'Настройте параметры команды: платформы, роли и кулдаун'}
+                            {editingCommand?.command_type === 'global' ? (
+                                <span className="text-yellow-600 dark:text-yellow-500">
+                                    ⚠️ При сохранении будет создана ваша персональная настройка этой команды
+                                </span>
+                            ) : (
+                                'Настройте параметры команды: платформы, роли и кулдаун'
+                            )}
                         </DialogDescription>
                     </DialogHeader>
                     {editingCommand && (
@@ -785,7 +826,11 @@ import { logger } from '../utils/prodLogger';
                                         }))}
                                     >
                                         <SelectTrigger>
-                                            <SelectValue placeholder="Выберите платформы" />
+                                            <SelectValue placeholder="Выберите платформы">
+                                                {editForm.platforms === 'twitch,vk' || !editForm.platforms 
+                                                    ? 'Все платформы' 
+                                                    : getPlatformLabel(editForm.platforms)}
+                                            </SelectValue>
                                         </SelectTrigger>
                                         <SelectContent>
                                             {platformsToShow.map(option => (
@@ -839,14 +884,15 @@ import { logger } from '../utils/prodLogger';
                     )}
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                            {editingCommand?.command_type === 'global' ? 'Закрыть' : 'Отмена'}
+                            Отмена
                         </Button>
-                        {editingCommand?.command_type !== 'global' && (
-                            <Button onClick={() => handleUpdateCommand(editingCommand?.id)}>
-                                <Save className="h-4 w-4 mr-2" />
-                                Сохранить
-                            </Button>
-                        )}
+                        <Button onClick={() => handleUpdateCommand(editingCommand?.id)}>
+                            <Save className="h-4 w-4 mr-2" />
+                            {editingCommand?.command_type === 'global' 
+                                ? 'Создать персональную настройку' 
+                                : 'Сохранить'
+                            }
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

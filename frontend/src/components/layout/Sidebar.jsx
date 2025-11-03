@@ -61,11 +61,6 @@ const SidebarNavItem = ({ item, openSection, setOpenSection, onMobileMenuClose }
         }
     };
 
-    // Функция для закрытия
-    const handleMouseLeave = () => {
-        setOpenSection(null);
-    };
-
     // Keyboard navigation для accessibility
     const handleKeyDown = (e) => {
         if (hasSubmenu && (e.key === 'Enter' || e.key === ' ')) {
@@ -79,15 +74,15 @@ const SidebarNavItem = ({ item, openSection, setOpenSection, onMobileMenuClose }
             <div 
                 className="relative group"
                 onMouseEnter={handleMouseEnter}
-                onMouseLeave={handleMouseLeave}
+                onMouseLeave={() => setOpenSection(null)}
             >
                 <div 
-                    className={`rounded-lg px-4 py-2.5 text-lg font-semibold cursor-pointer transition-all relative ${
+                    className={`w-full px-4 py-2.5 text-lg font-semibold cursor-pointer transition-all relative ${
                         isOpen 
                             ? 'bg-primary/20 text-primary' 
                             : isParentActive 
                                 ? 'bg-primary/10 text-primary' 
-                                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                                : 'text-muted-foreground group-hover:bg-muted/50 group-hover:text-foreground'
                     }`}
                     onClick={() => setOpenSection(isOpen ? null : item.label)}
                     onKeyDown={handleKeyDown}
@@ -111,11 +106,16 @@ const SidebarNavItem = ({ item, openSection, setOpenSection, onMobileMenuClose }
                 
                 {/* Submenu появляется СПРАВА от родителя (GitHub-style, без gap) */}
                 {isOpen && (
-                    <div 
-                        className="absolute left-full top-0 w-64 bg-background border border-border rounded-lg shadow-lg z-50 py-2 animate-in fade-in slide-in-from-left-2 duration-200"
-                        onMouseEnter={handleMouseEnter}
-                        onMouseLeave={handleMouseLeave}
-                    >
+                    <>
+                        {/* Невидимый "мост" между родителем и submenu для плавного hover */}
+                        <div 
+                            className="absolute left-full top-0 w-2 h-full z-40"
+                            onMouseEnter={handleMouseEnter}
+                        />
+                        <div 
+                            className="absolute left-full top-0 w-64 bg-background border border-border rounded-lg shadow-lg z-50 py-2 animate-in fade-in slide-in-from-left-2 duration-200"
+                            onMouseEnter={handleMouseEnter}
+                        >
                         {item.submenu.map((subItem) => (
                             <NavLink
                                 key={subItem.to}
@@ -137,7 +137,8 @@ const SidebarNavItem = ({ item, openSection, setOpenSection, onMobileMenuClose }
                                 {subItem.label}
                             </NavLink>
                         ))}
-                    </div>
+                        </div>
+                    </>
                 )}
             </div>
         );
@@ -149,7 +150,7 @@ const SidebarNavItem = ({ item, openSection, setOpenSection, onMobileMenuClose }
             end
             onClick={onMobileMenuClose}
             className={({ isActive }) =>
-                `flex items-center gap-4 rounded-lg px-4 py-2.5 text-lg font-semibold transition-colors ${
+                `w-full flex items-center gap-4 px-4 py-2.5 text-lg font-semibold transition-colors ${
                     isActive
                         ? 'bg-primary/10 text-primary'
                         : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
@@ -249,7 +250,7 @@ const Sidebar = () => {
             
             {/* Sidebar */}
             <div className={`
-                fixed md:relative h-full w-64 bg-background z-50 transform transition-transform duration-300 ease-in-out
+                fixed md:relative h-full w-64 md:w-auto bg-background z-50 transform transition-transform duration-300 ease-in-out
                 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
                 md:block
             `}>
@@ -267,7 +268,7 @@ const Sidebar = () => {
                     </NavLink>
                 </div>
                 <div className="flex-1">
-                    <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
+                    <nav className="grid items-start text-sm font-medium">
                         {navItems.map((item) => (
                             <SidebarNavItem 
                                 key={item.to || item.label} 

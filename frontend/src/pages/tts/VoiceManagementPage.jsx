@@ -37,8 +37,9 @@ import { logger } from '../../utils/prodLogger';
 const VoiceManagementPageContent = () => {
     const { addToast } = useToast();
     const { getButtonPosition } = useButtonPosition();
-    const [globalVoices, setGlobalVoices] = useState([]);
-    const [userVoices, setUserVoices] = useState([]);
+    // УДАЛЕНО: useState для голосов - теперь используется напрямую из React Query
+    // const [globalVoices, setGlobalVoices] = useState([]); - УДАЛЕНО
+    // const [userVoices, setUserVoices] = useState([]); - УДАЛЕНО
     const [loading, setLoading] = useState(true);
     const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
     const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -52,7 +53,6 @@ const VoiceManagementPageContent = () => {
     const [isTranscribing, setIsTranscribing] = useState(false);
     const [isTestingVoice, setIsTestingVoice] = useState(false);
     const [voiceVolumes, setVoiceVolumes] = useState({}); // {voice_name: volume_level}
-    const [whitelistStatus, setWhitelistStatus] = useState(null); // Статус whitelist пользователя
     const fileInputRef = React.useRef(null);
     const voiceVolumeSaveTimeout = React.useRef({});
     
@@ -99,18 +99,6 @@ const VoiceManagementPageContent = () => {
         staleTime: 30 * 1000, // 30 секунд
         refetchOnMount: true,
         refetchOnWindowFocus: false,
-        onSuccess: (data) => {
-            setWhitelistStatus(data);
-        },
-        onError: (error) => {
-            logger.error('Error checking whitelist status:', error);
-            const errorStatus = {
-                is_whitelisted: false,
-                can_manage_voices: false,
-                message: "Ошибка проверки статуса доступа"
-            };
-            setWhitelistStatus(errorStatus);
-        },
     });
 
     // React Query: загружаем глобальные голоса
@@ -124,12 +112,8 @@ const VoiceManagementPageContent = () => {
         enabled: !!whitelistStatusData?.can_manage_voices,
         staleTime: 5 * 60 * 1000,
         refetchOnMount: true,
-        onSuccess: (data) => {
-            setGlobalVoices(data);
-        },
         onError: (error) => {
             logger.error('Error loading global voices:', error);
-            setGlobalVoices([]);
         },
     });
 
@@ -143,23 +127,25 @@ const VoiceManagementPageContent = () => {
             const data = response?.data || response || [];
             return Array.isArray(data) ? data : [];
         },
-        enabled: !!userId && !!whitelistStatusData?.can_manage_voices,
+        enabled: !!userId, // Загружаем пользовательские голоса всегда, если есть userId
         staleTime: 5 * 60 * 1000,
         refetchOnMount: true,
-        onSuccess: (data) => {
-            setUserVoices(data);
-        },
         onError: (error) => {
             logger.error('Error loading user voices:', error);
-            setUserVoices([]);
         },
     });
+
+    // Используем данные из React Query напрямую
+    // Важно: используем ?? для fallback, если данные еще не загружены
+    const globalVoices = globalVoicesData ?? [];
+    const userVoices = userVoicesData ?? [];
+    
+    // Используем whitelistStatusData напрямую из React Query
+    const whitelistStatus = whitelistStatusData;
 
     // Комбинированное состояние загрузки
     useEffect(() => {
         if (!whitelistStatusData?.can_manage_voices) {
-            setGlobalVoices([]);
-            setUserVoices([]);
             setLoading(false);
             return;
         }
@@ -310,15 +296,15 @@ const VoiceManagementPageContent = () => {
             reference_text: currentVoice.reference_text
         };
         
-        // Optimistic update
+        // Optimistic update через React Query
         if (currentVoice.voice_type === 'global') {
-            setGlobalVoices(prev => prev.map(voice => 
+            queryClient.setQueryData(['global-voices'], (prev = []) => prev.map(voice => 
                 voice.id === currentVoice.id 
                     ? {...voice, ...settings}
                     : voice
             ));
         } else {
-            setUserVoices(prev => prev.map(voice => 
+            queryClient.setQueryData(['user-voices', userId], (prev = []) => prev.map(voice => 
                 voice.id === currentVoice.id 
                     ? {...voice, ...settings}
                     : voice
@@ -514,14 +500,14 @@ const VoiceManagementPageContent = () => {
                 />
 
             {/* Уведомление для пользователей без whitelist */}
-            {!user?.isGuest && whitelistStatus && !whitelistStatus.can_manage_voices && (
+            {!user?.isGuest && !loading && whitelistStatus && whitelistStatus.can_manage_voices === false && (
                 <div className="mb-6 bg-orange-900/20 border border-orange-500/50 rounded-lg p-4 flex items-start gap-3">
                     <Lock className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                        <h3 className="text-orange-300 font-semibold mb-1">Доступ к F5-TTS ограничен</h3>
+                        <h3 className="text-orange-300 font-semibold mb-1">Вы не состоите в whitelist</h3>
                         <p className="text-orange-200/80 text-sm">
-                            Вы не находитесь в белом списке (whitelist) и не можете использовать F5-TTS для AI озвучки. 
-                            Для получения доступа обратитесь к администратору системы.
+                            Для доступа к управлению голосами необходимо быть в белом списке (whitelist). 
+                            Обратитесь к администратору для получения доступа.
                         </p>
                         <p className="text-orange-200/60 text-xs mt-2">
                             💡 Вам доступна только базовая озвучка (gTTS) через основные настройки TTS.
@@ -531,11 +517,11 @@ const VoiceManagementPageContent = () => {
             )}
             
             {/* Уведомление для гостевого режима */}
-            {user?.isGuest && whitelistStatus && !whitelistStatus.can_manage_voices && (
+            {user?.isGuest && !loading && whitelistStatus && whitelistStatus.can_manage_voices === false && (
                 <div className="mb-6 bg-blue-900/20 border border-blue-500/50 rounded-lg p-4 flex items-start gap-3">
                     <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                        <h3 className="text-blue-300 font-semibold mb-1">Гостевой режим - Канал не в whitelist</h3>
+                        <h3 className="text-blue-300 font-semibold mb-1">Канал не в whitelist</h3>
                         <p className="text-blue-200/80 text-sm">
                             Канал, к которому вы подключились, не находится в whitelist. F5-TTS (AI озвучка) недоступен.
                         </p>
@@ -549,14 +535,28 @@ const VoiceManagementPageContent = () => {
                 </div>
             )}
 
-                 {loading ? (
+            {loading ? (
                 <div className="col-span-full text-center py-12">
                     <p className="text-slate-400">Загрузка голосов...</p>
+                </div>
+            ) : whitelistStatus && whitelistStatus.can_manage_voices === false ? (
+                // Показываем плашку, если нет whitelist
+                <div className="col-span-full">
+                    <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700">
+                        <Lock className="h-16 w-16 mx-auto mb-4 text-orange-500" />
+                        <p className="text-slate-300 text-lg mb-2 font-semibold">Вы не состоите в whitelist</p>
+                        <p className="text-slate-400 text-sm mb-4">
+                            Для доступа к управлению голосами необходимо быть в белом списке (whitelist)
+                        </p>
+                        <p className="text-slate-500 text-xs">
+                            Обратитесь к администратору для получения доступа
+                        </p>
+                    </div>
                 </div>
             ) : (globalVoices.length === 0 && userVoices.length === 0) ? (
                      <div className="col-span-full text-center py-12">
                          <div className="text-slate-400 text-lg mb-4">
-                             {whitelistStatus && !whitelistStatus.can_manage_voices ? (
+                             {whitelistStatusData && !whitelistStatusData.can_manage_voices ? (
                                  <>
                                      <Lock className="h-12 w-12 mx-auto mb-4 text-orange-500" />
                                      <p>F5-TTS недоступен без whitelist</p>
@@ -576,18 +576,19 @@ const VoiceManagementPageContent = () => {
                      </div>
             ) : (
                 <div className="space-y-8">
-                    {/* Пользовательские голоса (верхняя секция) */}
-                    {whitelistStatus?.can_manage_voices && (
+                    {/* Пользовательские голоса (верхняя секция) - показываем только если есть whitelist */}
+                    {!user?.isGuest && whitelistStatus?.can_manage_voices && (
                         <div>
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-2">
                                     <User className="h-5 w-5 text-green-400" />
-                                    <h3 className="text-lg font-semibold text-white">{user?.isGuest ? 'Гостевые голоса' : 'Мои голоса'}</h3>
+                                    <h3 className="text-lg font-semibold text-white">Мои голоса</h3>
                                     <Badge variant="outline" className="text-green-400 border-green-400">
                                         {userVoices.length}
                                     </Badge>
                                 </div>
-                                {!user?.isGuest && (
+                                {/* Кнопка загрузки - только если есть whitelist */}
+                                {whitelistStatus?.can_manage_voices && (
                 <Dialog open={uploadDialogOpen} onOpenChange={(open) => {
                     setUploadDialogOpen(open);
                     if (!open) {
@@ -732,53 +733,55 @@ const VoiceManagementPageContent = () => {
                     )}
 
                     {/* Разделитель между секциями */}
-                    {whitelistStatus?.can_manage_voices && userVoices.length > 0 && globalVoices.length > 0 && (
+                    {!user?.isGuest && userVoices.length > 0 && whitelistStatus?.can_manage_voices && globalVoices.length > 0 && (
                         <hr className="border-slate-700" />
                     )}
 
-                    {/* Глобальные голоса (нижняя секция) */}
-                    <div>
-                        <div className="flex items-center gap-2 mb-4">
-                            <Globe className="h-5 w-5 text-blue-400" />
-                            <h3 className="text-lg font-semibold text-white">Глобальные голоса</h3>
-                            <Badge variant="outline" className="text-blue-400 border-blue-400">
-                                {globalVoices.length}
-                            </Badge>
+                    {/* Глобальные голоса (нижняя секция) - только для пользователей с whitelist */}
+                    {whitelistStatus?.can_manage_voices && (
+                        <div>
+                            <div className="flex items-center gap-2 mb-4">
+                                <Globe className="h-5 w-5 text-blue-400" />
+                                <h3 className="text-lg font-semibold text-white">Глобальные голоса</h3>
+                                <Badge variant="outline" className="text-blue-400 border-blue-400">
+                                    {globalVoices.length}
+                                </Badge>
+                            </div>
+                            {globalVoices.length === 0 ? (
+                                <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700 border-dashed">
+                                    <Globe className="h-16 w-16 mx-auto mb-4 text-slate-600" />
+                                    <p className="text-slate-400 text-lg mb-2">Глобальных голосов пока нет</p>
+                                    <p className="text-sm text-slate-500">Глобальные голоса доступны всем пользователям</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
+                                    {globalVoices.map((voice) => (
+                                        <Card key={voice.id} className="bg-slate-800 border-slate-700 flex flex-col">
+                                            <CardHeader className="pb-2 pt-3 px-3">
+                                                <div className="flex items-center justify-between">
+                                                    <CardTitle className="text-xs font-medium text-white flex items-center gap-1.5">
+                                                        <Globe className="h-3.5 w-3.5 text-blue-400 flex-shrink-0"/>
+                                                        <span className="truncate">{voice.name}</span>
+                                                    </CardTitle>
+                                                </div>
+                                            </CardHeader>
+                                            <CardContent className="flex-grow flex flex-col justify-end pt-0 px-3 pb-3">
+                                                <Button 
+                                                    className="w-full h-7 text-xs px-2" 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    onClick={() => handleEdit(voice)}
+                                                >
+                                                    <Settings className="h-3 w-3 mr-1"/>
+                                                    Настроить
+                                                </Button>
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                        {globalVoices.length === 0 ? (
-                            <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700 border-dashed">
-                                <Globe className="h-16 w-16 mx-auto mb-4 text-slate-600" />
-                                <p className="text-slate-400 text-lg mb-2">Глобальных голосов пока нет</p>
-                                <p className="text-sm text-slate-500">Глобальные голоса доступны всем пользователям</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
-                                {globalVoices.map((voice) => (
-                                    <Card key={voice.id} className="bg-slate-800 border-slate-700 flex flex-col">
-                                        <CardHeader className="pb-2 pt-3 px-3">
-                                            <div className="flex items-center justify-between">
-                                                <CardTitle className="text-xs font-medium text-white flex items-center gap-1.5">
-                                                    <Globe className="h-3.5 w-3.5 text-blue-400 flex-shrink-0"/>
-                                                    <span className="truncate">{voice.name}</span>
-                                                </CardTitle>
-                                            </div>
-                                        </CardHeader>
-                                        <CardContent className="flex-grow flex flex-col justify-end pt-0 px-3 pb-3">
-                                            <Button 
-                                                className="w-full h-7 text-xs px-2" 
-                                                variant="outline" 
-                                                size="sm" 
-                                                onClick={() => handleEdit(voice)}
-                                            >
-                                                <Settings className="h-3 w-3 mr-1"/>
-                                                Настроить
-                                            </Button>
-                                        </CardContent>
-                                    </Card>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                    )}
                 </div>
             )}
 
@@ -791,7 +794,7 @@ const VoiceManagementPageContent = () => {
                     onCloseAutoFocus={(e) => e.preventDefault()}
                 >
                     <DialogHeader>
-                        <DialogTitle>Настройки голоса "{currentVoice?.name}"</DialogTitle>
+                        <DialogTitle>{`Настройки голоса "${currentVoice?.name}"`}</DialogTitle>
                     </DialogHeader>
                     {currentVoice && (
                         <div className="space-y-4 py-4">

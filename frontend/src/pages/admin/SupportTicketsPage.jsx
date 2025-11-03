@@ -309,7 +309,7 @@ const SupportTicketsPage = () => {
                     </div>
 
                     <div className="bg-gray-800/50 border border-gray-600/30 p-3 rounded-lg mb-3">
-                      <p className="text-sm text-white whitespace-pre-wrap">{ticket.message}</p>
+                      <p className="text-sm text-white whitespace-pre-wrap break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{ticket.message}</p>
                     </div>
 
                     {ticket.admin_notes && (
@@ -386,7 +386,7 @@ const SupportTicketsPage = () => {
               <div>
                 <Label>Сообщение</Label>
                 <div className="bg-gray-800/50 border border-gray-600/30 p-3 rounded-lg">
-                  <p className="text-sm text-white whitespace-pre-wrap">{selectedTicket.message}</p>
+                  <p className="text-sm text-white whitespace-pre-wrap break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{selectedTicket.message}</p>
                 </div>
               </div>
 
@@ -408,7 +408,7 @@ const SupportTicketsPage = () => {
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm text-white">
-                            {response.is_admin_response ? '👨‍💼 Администрация' : '👤 Пользователь'}
+                            {response.is_admin_response ? 'Администрация' : 'Пользователь'}
                           </span>
                           <span className="text-xs text-gray-400">
                             {formatDate(response.created_at)}
@@ -420,7 +420,7 @@ const SupportTicketsPage = () => {
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-white whitespace-pre-wrap">{response.message}</p>
+                      <p className="text-sm text-white whitespace-pre-wrap break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{response.message}</p>
                     </div>
                   ))
                 )}

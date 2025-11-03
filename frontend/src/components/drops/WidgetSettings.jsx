@@ -14,6 +14,7 @@ const WidgetSettings = ({ user, platform, channelName }) => {
   const [widgetUrl, setWidgetUrl] = useState(null);
   const [saving, setSaving] = useState(false);
   const [savedSuccessfully, setSavedSuccessfully] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [formData, setFormData] = useState({
     widget_spinning_duration_ms: [1500],
     widget_opening_duration_ms: [1000],
@@ -46,14 +47,27 @@ const WidgetSettings = ({ user, platform, channelName }) => {
     }
   };
 
-  const generateWidgetUrl = async () => {
+  const generateWidgetUrl = async (regenerate = false) => {
     try {
-      const response = await botService.post('/api/drops/widget-url');
+      if (regenerate) {
+        setRegenerating(true);
+      }
+      const response = await botService.post('/api/drops/widget-url', null, {
+        params: { regenerate }
+      });
       if (response.data.success) {
         setWidgetUrl(response.data.data.url);
+        if (regenerate) {
+          toast.success('Токен виджета перегенерирован');
+        }
       }
     } catch (error) {
       logger.error('Error generating widget URL:', error);
+      toast.error('Ошибка генерации URL виджета');
+    } finally {
+      if (regenerate) {
+        setRegenerating(false);
+      }
     }
   };
 
@@ -229,7 +243,28 @@ const WidgetSettings = ({ user, platform, channelName }) => {
 
           {widgetUrl ? (
             <div className="space-y-2">
-              <Label className="text-sm">URL виджета</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">URL виджета</Label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => generateWidgetUrl(true)}
+                  disabled={regenerating}
+                  className="gap-2 text-xs"
+                >
+                  {regenerating ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Перегенерация...
+                    </>
+                  ) : (
+                    <>
+                      <Settings2 className="w-3 h-3" />
+                      Перегенерировать
+                    </>
+                  )}
+                </Button>
+              </div>
               <div className="flex gap-2">
                 <Input
                   value={widgetUrl}
@@ -255,9 +290,6 @@ const WidgetSettings = ({ user, platform, channelName }) => {
                   Открыть виджет
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                💡 Скопируйте этот URL или нажмите «Открыть виджет» для предпросмотра анимации
-              </p>
             </div>
           ) : (
             <div className="p-4 border rounded-lg bg-muted/50">
@@ -266,12 +298,6 @@ const WidgetSettings = ({ user, platform, channelName }) => {
               </p>
             </div>
           )}
-
-          <div className="p-4 border rounded-lg bg-muted/50">
-            <p className="text-sm text-muted-foreground">
-              <strong>💡 Совет:</strong> Виджет автоматически отображает анимацию когда зрители получают награды через систему Drops.
-            </p>
-          </div>
         </CardContent>
       </Card>
 

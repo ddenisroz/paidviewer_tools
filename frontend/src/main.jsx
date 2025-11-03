@@ -67,7 +67,7 @@ root.render(
 // Font loading detection - prevent FOUT (Flash of Unstyled Text)
 (function() {
   // Mark fonts as loaded immediately to prevent hiding content
-  // With font-display: optional, content is always visible
+  // With font-display: fallback, content is always visible with system font
   document.body.classList.add('fonts-loaded', 'loaded');
   
   // Force font load check to prevent layout shift

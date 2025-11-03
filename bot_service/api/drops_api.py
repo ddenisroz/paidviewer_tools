@@ -195,6 +195,11 @@ async def get_drops_config(
         if hasattr(config, 'streak_reset_on_skip'):
             streak_reset_on_skip = config.streak_reset_on_skip
         
+        # Безопасное получение widget_token (на случай если миграция не применена)
+        widget_token = None
+        if hasattr(config, 'widget_token'):
+            widget_token = config.widget_token
+        
         return {
             "success": True,
             "data": {
@@ -223,6 +228,7 @@ async def get_drops_config(
                 "widget_opening_duration_ms": config.widget_opening_duration_ms,
                 "widget_result_duration_ms": config.widget_result_duration_ms,
                 "widget_closing_duration_ms": config.widget_closing_duration_ms,
+                "widget_token": widget_token,
                 "created_at": config.created_at,
                 "updated_at": config.updated_at
             }
@@ -231,8 +237,8 @@ async def get_drops_config(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting drops config: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения конфигурации Drops")
+        logger.error(f"Error getting drops config: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Ошибка получения конфигурации Drops: {str(e)}")
 
 @router.put("/config/{channel_name}")
 async def update_drops_config(
@@ -295,13 +301,28 @@ async def get_drops_rewards(
     channel_name: str,
     platform: str = "twitch",
     quality: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
+    widget_token: Optional[str] = None,  # Для виджета без авторизации
+    current_user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """Получает награды лутбоксов для канала"""
     try:
+        # Проверяем токен виджета если нет авторизованного пользователя
+        user_id = None
+        if current_user and current_user.get("id"):
+            user_id = current_user["id"]
+        elif widget_token:
+            # Проверяем токен виджета
+            config = db.query(DropsConfig).filter(DropsConfig.widget_token == widget_token).first()
+            if config and config.channel_name == channel_name and config.platform == platform:
+                user_id = config.user_id
+            else:
+                raise HTTPException(status_code=403, detail="Invalid widget token or channel mismatch")
+        else:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        
         query = db.query(DropsReward).filter(
-            DropsReward.user_id == current_user["id"],
+            DropsReward.user_id == user_id,
             DropsReward.channel_name == channel_name,
             DropsReward.platform == platform
         )
@@ -922,59 +943,116 @@ async def get_user_from_token(
     token: str,
     db: Session = Depends(get_db)
 ):
-    """Получить user_id по OBS токену (для виджета, без авторизации)"""
+    """Получить user_id по токену виджета (для виджета, без авторизации)"""
     try:
-        from core.database import User
+        # Ищем конфигурацию по токену виджета
+        config = db.query(DropsConfig).filter(DropsConfig.widget_token == token).first()
         
-        user = db.query(User).filter(User.obs_token == token).first()
-        
-        if not user:
-            logger.warning(f"Drops widget: User not found for token: {token[:8]}...")
+        if not config or not config.user_id:
+            logger.warning(f"Drops widget: Config not found for token: {token[:8]}...")
             raise HTTPException(status_code=404, detail="Invalid widget token")
         
-        # Определяем канал и платформу
-        channel_name = None
-        platform = None
-        if user.twitch_username:
-            channel_name = user.twitch_username
-            platform = 'twitch'
-        elif user.vk_channel_name or user.vk_username:
-            channel_name = user.vk_channel_name or user.vk_username
-            platform = 'vk'
-        
         return {
-            "user_id": user.id,
-            "channel_name": channel_name,
-            "platform": platform,
+            "user_id": config.user_id,
+            "channel_name": config.channel_name,
+            "platform": config.platform,
             "success": True
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting user from token: {e}")
+        logger.error(f"Error getting user from token: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error validating widget token")
 
 @router.post("/widget-url")
 async def generate_widget_url(
+    regenerate: bool = False,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Генерирует URL для OBS виджета"""
+    """Генерирует или возвращает существующий URL для OBS виджета"""
     try:
         import secrets
         import os
-        from core.database import User
         
-        # Генерируем уникальный токен
+        # Ищем конфигурацию пользователя (берем первую, так как токен один на пользователя)
+        config = db.query(DropsConfig).filter(
+            DropsConfig.user_id == current_user["id"]
+        ).first()
+        
+        # Если есть токен и не требуется регенерация, возвращаем существующий
+        widget_token_value = None
+        if config and hasattr(config, 'widget_token'):
+            widget_token_value = config.widget_token
+        
+        if config and widget_token_value and not regenerate:
+            frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+            widget_url = f"{frontend_url}/drops-widget/{widget_token_value}"
+            return {
+                "success": True,
+                "data": {
+                    "url": widget_url,
+                    "token": widget_token_value
+                }
+            }
+        
+        # Генерируем новый токен
         token = secrets.token_urlsafe(32)
         
-        # Сохраняем токен в БД (можно использовать существующую таблицу или создать новую)
-        # Для простоты используем obs_token пользователя
-        user = db.query(User).filter(User.id == current_user["id"]).first()
-        if user:
-            user.obs_token = token
-            db.commit()
+        # Сохраняем токен в конфигурацию
+        if config:
+            try:
+                from sqlalchemy import text
+                db.execute(
+                    text("UPDATE drops_configs SET widget_token = :token WHERE id = :config_id"),
+                    {"token": token, "config_id": config.id}
+                )
+                # Обновляем объект в памяти
+                if hasattr(config, 'widget_token'):
+                    config.widget_token = token
+            except Exception as e:
+                logger.warning(f"Cannot set widget_token: {e}. Field may not exist in database. Creating migration needed.")
+        else:
+            # Если конфигурации нет, создаем базовую для хранения токена
+            # Но нужен channel_name и platform - берем из первого токена пользователя
+            user_token = db.query(UserToken).filter(
+                UserToken.user_id == current_user["id"]
+            ).first()
+            
+            if not user_token:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Необходимо подключить платформу (Twitch/VK) для создания виджета"
+                )
+            
+            # Используем DropsService для создания конфигурации
+            from services.drops_service import DropsService
+            drops_service = DropsService(db)
+            
+            config = drops_service.create_or_update_config(
+                user_id=current_user["id"],
+                session_id=None,
+                channel_name=user_token.platform_user_login or "unknown",
+                platform=user_token.platform,
+                config_data={}
+            )
+            
+            # Пытаемся сохранить токен через прямой SQL UPDATE если поле существует
+            # Это безопаснее, чем через ORM, если столбец еще не существует
+            try:
+                from sqlalchemy import text
+                result = db.execute(
+                    text("UPDATE drops_configs SET widget_token = :token WHERE id = :config_id"),
+                    {"token": token, "config_id": config.id}
+                )
+                # Обновляем объект в памяти
+                if hasattr(config, 'widget_token'):
+                    config.widget_token = token
+            except Exception as e:
+                logger.warning(f"Cannot set widget_token on new config: {e}. Field may not exist in database. Creating migration needed.")
+        
+        db.commit()
         
         frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
         widget_url = f"{frontend_url}/drops-widget/{token}"
@@ -987,9 +1065,12 @@ async def generate_widget_url(
             }
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error generating widget URL: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка генерации URL виджета")
+        logger.error(f"Error generating widget URL: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Ошибка генерации URL виджета: {str(e)}")
 
 @router.post("/donationalerts/webhook")
 async def donationalerts_webhook(

@@ -319,6 +319,19 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
 
   return (
     <div className="space-y-6">
+      {/* Общая кнопка создания награды */}
+      <div className="flex justify-end">
+        <Button
+          onClick={() => handleOpenRewardDialog(null)}
+          size="sm"
+          className="gap-2"
+          variant="outline"
+        >
+          <Plus className="w-4 h-4" />
+          Добавить награду
+        </Button>
+      </div>
+
       {/* Награды по качествам */}
       {QUALITIES.map((quality) => {
         const qualityRewards = getRewardsForQuality(quality.name);
@@ -356,47 +369,9 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
                   <p className="text-sm font-medium text-orange-400">⚠️ Награды не настроены</p>
                   <p className="text-xs mt-2 text-muted-foreground">Добавьте награды в этот лутбокс, чтобы зрители могли их получить</p>
                   <p className="text-xs mt-1 text-yellow-500">Без наград система Drops не будет работать</p>
-                  <Button
-                    onClick={() => {
-                      // Пытаемся найти реальный ID качества из БД (сравниваем без учета регистра)
-                      // Если не найдено, используем статический ID из константы (fallback)
-                      const dbQuality = qualitiesData.find(q => 
-                        q.name.toLowerCase() === quality.name.toLowerCase()
-                      );
-                      const qualityId = dbQuality ? dbQuality.id : quality.id;
-                      handleOpenRewardDialog(qualityId);
-                    }}
-                    size="sm"
-                    className="gap-2 mt-3 text-xs sm:text-sm"
-                    variant="outline"
-                  >
-                    <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span className="hidden sm:inline">Добавить награду</span>
-                    <span className="sm:hidden">Добавить</span>
-                  </Button>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="flex justify-end">
-                    <Button
-                      onClick={() => {
-                        // Пытаемся найти реальный ID качества из БД (сравниваем без учета регистра)
-                        // Если не найдено, используем статический ID из константы (fallback)
-                        const dbQuality = qualitiesData.find(q => 
-                          q.name.toLowerCase() === quality.name.toLowerCase()
-                        );
-                        const qualityId = dbQuality ? dbQuality.id : quality.id;
-                        handleOpenRewardDialog(qualityId);
-                      }}
-                      size="sm"
-                      className="gap-2 text-xs sm:text-sm"
-                      variant="outline"
-                    >
-                      <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
-                      <span className="hidden sm:inline">Добавить награду</span>
-                      <span className="sm:hidden">Добавить</span>
-                    </Button>
-                  </div>
                 <div className="space-y-2">
                   {qualityRewards.map((reward) => {
                     return (

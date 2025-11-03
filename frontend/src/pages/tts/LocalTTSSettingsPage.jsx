@@ -56,7 +56,7 @@ const LocalTTSSettingsPage = () => {
     const [currentTab, setCurrentTab] = useState('connection');
     const [isWhitelisted, setIsWhitelisted] = useState(true); // Локальный TTS доступен всем
     const [whitelistChecked, setWhitelistChecked] = useState(true);
-    
+
     const queryClient = useQueryClient();
 
     // React Query: загружаем конфигурацию локального TTS
@@ -128,7 +128,7 @@ const LocalTTSSettingsPage = () => {
 
     const testConnection = async () => {
         testConnectionMutation.mutate({
-            endpoint_url: config.endpoint_url,
+                endpoint_url: config.endpoint_url,
             api_key: config.api_key
         });
     };

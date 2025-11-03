@@ -17,7 +17,7 @@ const ChatWindow = () => {
     const { messages, isConnected } = useChat(); // ✅ Используем SHARED WebSocket через ChatContext
     
     const [settings, setSettings] = useState({
-        font_size: 16,
+        font_size: 14,  // Было 16 - уменьшаю на 2px
         font_family: 'Inter, sans-serif',
         text_color: '#FFFFFF',
         background_color: '#1a1a1a',
@@ -123,7 +123,7 @@ const ChatWindow = () => {
             <div style={{
                 flex: 1,
                 overflowY: 'auto',
-                padding: '8px 12px',
+                padding: '4px 8px',  // Было 8px 12px - сокращаю
                 display: 'flex',
                 flexDirection: 'column'
             }}>
@@ -151,8 +151,8 @@ const ChatWindow = () => {
                             <div 
                                 key={msg.id || `${msg.platform}-${msg.timestamp}-${msg.author_name || msg.author}`}
                                 style={{
-                                    marginTop: index > 0 ? '4px' : '0',
-                                    padding: '6px 10px',
+                                    marginTop: index > 0 ? '2px' : '0',  // Было 4px - сокращаю
+                                    padding: '4px 6px',  // Было 6px 10px - сокращаю
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                     borderRadius: '4px',
                                     wordBreak: 'break-word',

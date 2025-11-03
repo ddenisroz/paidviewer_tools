@@ -1,0 +1,236 @@
+:root {
+    /* Настраиваемые переменные */
+    --widget-width: 400px;
+    --widget-height: 300px;
+    --background-color: rgba(0, 0, 0, 0.8);
+    --border-radius: 8px;
+    --border-color: #333;
+    --border-width: 2px;
+    
+    /* Анимация */
+    --animation-duration: 2s;
+    --show-particles: 1;
+    --show-glow: 1;
+    
+    /* Цвета по редкости */
+    --common-color: #9CA3AF;
+    --rare-color: #3B82F6;
+    --epic-color: #8B5CF6;
+    --legendary-color: #F59E0B;
+    
+    /* Шрифты */
+    --font-family: 'Arial', sans-serif;
+    --font-size: 18px;
+    --text-color: #ffffff;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    font-family: var(--font-family);
+    overflow: hidden;
+}
+
+.lootbox-container {
+    position: relative;
+    width: var(--widget-width);
+    height: var(--widget-height);
+    background: var(--background-color);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--border-radius);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+.lootbox-animation {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.lootbox-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transition: all 0.3s ease;
+    z-index: 2;
+}
+
+.lootbox-glow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 120%;
+    height: 120%;
+    border-radius: 50%;
+    opacity: 0;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.lootbox-particles {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 3;
+}
+
+.lootbox-info {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    color: var(--text-color);
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+    z-index: 4;
+}
+
+.username {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.reward {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #FFD700;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+}
+
+.rarity {
+    font-size: 18px;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+/* Цвета по редкости */
+.rarity-common { color: var(--common-color); }
+.rarity-rare { color: var(--rare-color); }
+.rarity-epic { color: var(--epic-color); }
+.rarity-legendary { color: var(--legendary-color); }
+
+/* Эффекты свечения */
+.glow-common { 
+    background: radial-gradient(circle, rgba(156,163,175,0.3) 0%, transparent 70%);
+    display: var(--show-glow) ? block : none;
+}
+.glow-rare { 
+    background: radial-gradient(circle, rgba(59,130,246,0.4) 0%, transparent 70%);
+    display: var(--show-glow) ? block : none;
+}
+.glow-epic { 
+    background: radial-gradient(circle, rgba(139,92,246,0.5) 0%, transparent 70%);
+    display: var(--show-glow) ? block : none;
+}
+.glow-legendary { 
+    background: radial-gradient(circle, rgba(245,158,11,0.6) 0%, transparent 70%);
+    display: var(--show-glow) ? block : none;
+}
+
+/* Анимации */
+@keyframes lootbox-open {
+    0% { transform: scale(1) rotate(0deg); }
+    25% { transform: scale(1.1) rotate(-5deg); }
+    50% { transform: scale(1.2) rotate(5deg); }
+    75% { transform: scale(1.1) rotate(-3deg); }
+    100% { transform: scale(1) rotate(0deg); }
+}
+
+@keyframes glow-pulse {
+    0%, 100% { 
+        opacity: 0; 
+        transform: translate(-50%, -50%) scale(1); 
+    }
+    50% { 
+        opacity: 1; 
+        transform: translate(-50%, -50%) scale(1.2); 
+    }
+}
+
+@keyframes particle-burst {
+    0% { 
+        opacity: 1; 
+        transform: scale(0); 
+    }
+    50% { 
+        opacity: 1; 
+        transform: scale(1); 
+    }
+    100% { 
+        opacity: 0; 
+        transform: scale(1.5); 
+    }
+}
+
+@keyframes slide-up {
+    0% {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.lootbox-opening .lootbox-image {
+    animation: lootbox-open var(--animation-duration) ease-in-out;
+}
+
+.lootbox-opening .lootbox-glow {
+    animation: glow-pulse var(--animation-duration) ease-in-out;
+}
+
+.lootbox-opening .lootbox-info {
+    animation: slide-up 0.5s ease-out 0.5s both;
+}
+
+.particle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: gold;
+    border-radius: 50%;
+    animation: particle-burst 1.5s ease-out forwards;
+    display: var(--show-particles) ? block : none;
+}
+
+/* Скрытие виджета */
+.lootbox-container.hidden {
+    display: none;
+}
+
+/* Адаптивность */
+@media (max-width: 500px) {
+    .lootbox-container {
+        width: 300px;
+        height: 200px;
+    }
+    
+    .lootbox-animation {
+        width: 150px;
+        height: 150px;
+    }
+    
+    .username {
+        font-size: 20px;
+    }
+    
+    .rarity {
+        font-size: 16px;
+    }
+}

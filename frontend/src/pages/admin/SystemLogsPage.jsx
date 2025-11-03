@@ -188,6 +188,16 @@ const SystemLogsPage = () => {
     loadStats();
   }, [daysRange, pagination.offset, selectedActionType, selectedStatus]);
 
+  // Автообновление логов каждые 10 секунд
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadLogs(selectedActionType, selectedStatus);
+      loadStats();
+    }, 10000); // 10 секунд
+
+    return () => clearInterval(interval);
+  }, [selectedActionType, selectedStatus]);
+
   const getStatusIcon = (status) => {
     switch (status) {
       case 'success':
@@ -346,7 +356,7 @@ const SystemLogsPage = () => {
           ) : logs.length === 0 ? (
             <p className="text-center text-slate-400 py-8">Нет логов за выбранный период</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-[600px] overflow-y-auto">
               {logs.map((log) => (
                 <LogItem
                   key={log.id}

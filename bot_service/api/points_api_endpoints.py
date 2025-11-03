@@ -925,8 +925,9 @@ async def get_platform_rewards(
 ):
     """Получить награды напрямую с платформы (Twitch или VK Live)"""
     try:
-        from api.twitch_api import twitch_api
+        from api.twitch_api import TwitchAPI
         from api.vk_api import vk_api
+        from core.connection_manager import get_connection_manager
         from core.database import UserToken
         
         # Получаем токен пользователя
@@ -945,9 +946,16 @@ async def get_platform_rewards(
             if not broadcaster_id:
                 raise HTTPException(status_code=404, detail="Twitch broadcaster ID не найден")
             
+            # Создаем экземпляр TwitchAPI
+            connection_manager = get_connection_manager()
+            twitch_api = TwitchAPI(connection_manager)
+            
+            # Расшифровываем токен перед использованием
+            decrypted_token = _decrypt_access_token(user_token.access_token)
+            
             rewards = await twitch_api.get_custom_rewards(
                 broadcaster_id,
-                user_token.access_token,
+                decrypted_token,
                 only_manageable=True
             )
         
@@ -955,14 +963,17 @@ async def get_platform_rewards(
             # Получаем имя VK канала
             channel_name = _get_vk_channel_name(user["id"], db)
             
+            # Расшифровываем токен перед использованием
+            decrypted_token = _decrypt_access_token(user_token.access_token)
+            
             # Get channel rewards from VK Live API
             rewards = await vk_api.get_channel_rewards(
                 channel_name,
-                user_token.access_token
+                decrypted_token
             )
         
         if rewards is None:
-            raise HTTPException(status_code=500, detail="Ошибка получения использований")
+            raise HTTPException(status_code=500, detail=f"Ошибка получения наград с платформы {platform}")
         
         return {
             "success": True,
@@ -972,9 +983,26 @@ async def get_platform_rewards(
         
     except HTTPException:
         raise
+    except ValueError as e:
+        # Обрабатываем ошибки от Twitch API (например, 403)
+        error_msg = str(e)
+        if error_msg.startswith("403:"):
+            error_detail = error_msg.replace("403:", "").strip()
+            if "partner or affiliate" in error_detail.lower():
+                raise HTTPException(
+                    status_code=403,
+                    detail="Награды Twitch доступны только для партнёров и аффилейтов"
+                )
+            else:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Не удалось получить награды: {error_detail}"
+                )
+        else:
+            raise HTTPException(status_code=400, detail=f"Ошибка получения наград: {error_msg}")
     except Exception as e:
-        logger.error(f"Error getting platform rewards: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error getting platform rewards: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Ошибка получения наград: {str(e)}")
 
 @points_router.post("/platform/rewards/create")
 async def create_platform_reward(
@@ -985,8 +1013,9 @@ async def create_platform_reward(
 ):
     """Создать награду на платформе (Twitch или VK Live)"""
     try:
-        from api.twitch_api import twitch_api
+        from api.twitch_api import TwitchAPI
         from api.vk_api import vk_api
+        from core.connection_manager import get_connection_manager
         from core.database import UserToken
         
         user_token = db.query(UserToken).filter(
@@ -1002,6 +1031,10 @@ async def create_platform_reward(
             broadcaster_id = user_token.platform_user_id
             if not broadcaster_id:
                 raise HTTPException(status_code=404, detail="Twitch broadcaster ID не найден")
+            
+            # Создаем экземпляр TwitchAPI
+            connection_manager = get_connection_manager()
+            twitch_api = TwitchAPI(connection_manager)
             
             result = await twitch_api.create_custom_reward(
                 broadcaster_id,
@@ -1043,8 +1076,9 @@ async def delete_platform_reward(
 ):
     """Удалить награду на платформе"""
     try:
-        from api.twitch_api import twitch_api
+        from api.twitch_api import TwitchAPI
         from api.vk_api import vk_api
+        from core.connection_manager import get_connection_manager
         from core.database import UserToken
         
         user_token = db.query(UserToken).filter(
@@ -1060,6 +1094,10 @@ async def delete_platform_reward(
             broadcaster_id = user_token.platform_user_id
             if not broadcaster_id:
                 raise HTTPException(status_code=404, detail="Twitch broadcaster ID не найден")
+            
+            # Создаем экземпляр TwitchAPI
+            connection_manager = get_connection_manager()
+            twitch_api = TwitchAPI(connection_manager)
             
             success = await twitch_api.delete_custom_reward(
                 broadcaster_id,
@@ -1101,8 +1139,9 @@ async def get_platform_redemptions(
 ):
     """Получить список использований награды с платформы"""
     try:
-        from api.twitch_api import twitch_api
+        from api.twitch_api import TwitchAPI
         from api.vk_api import vk_api
+        from core.connection_manager import get_connection_manager
         from core.database import UserToken
         
         user_token = db.query(UserToken).filter(
@@ -1118,6 +1157,10 @@ async def get_platform_redemptions(
             broadcaster_id = user_token.platform_user_id
             if not broadcaster_id:
                 raise HTTPException(status_code=404, detail="Twitch broadcaster ID не найден")
+            
+            # Создаем экземпляр TwitchAPI
+            connection_manager = get_connection_manager()
+            twitch_api = TwitchAPI(connection_manager)
             
             redemptions = await twitch_api.get_custom_reward_redemptions(
                 broadcaster_id,
@@ -1161,8 +1204,9 @@ async def update_platform_redemption(
 ):
     """Обновить статус использования награды (одобрить/отклонить)"""
     try:
-        from api.twitch_api import twitch_api
+        from api.twitch_api import TwitchAPI
         from api.vk_api import vk_api
+        from core.connection_manager import get_connection_manager
         from core.database import UserToken
         
         user_token = db.query(UserToken).filter(
@@ -1178,6 +1222,10 @@ async def update_platform_redemption(
             broadcaster_id = user_token.platform_user_id
             if not broadcaster_id:
                 raise HTTPException(status_code=404, detail="Twitch broadcaster ID не найден")
+            
+            # Создаем экземпляр TwitchAPI
+            connection_manager = get_connection_manager()
+            twitch_api = TwitchAPI(connection_manager)
             
             success = await twitch_api.update_redemption_status(
                 broadcaster_id,

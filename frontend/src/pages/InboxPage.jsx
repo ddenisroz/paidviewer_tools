@@ -186,19 +186,16 @@ const InboxPage = () => {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <MessageCircle className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold mb-6 text-foreground">Мои тикеты</h1>
-            <p className="text-muted-foreground">
-              Ваши обращения в службу поддержки
-              {totalUnread > 0 && (
-                <span className="ml-2 text-primary font-semibold">
-                  ({totalUnread} непрочитанных)
-                </span>
-              )}
-            </p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold mb-6 text-foreground">Мои тикеты</h1>
+          <p className="text-muted-foreground">
+            Ваши обращения в службу поддержки
+            {totalUnread > 0 && (
+              <span className="ml-2 text-primary font-semibold">
+                ({totalUnread} непрочитанных)
+              </span>
+            )}
+          </p>
         </div>
         
         <Button 
@@ -220,7 +217,6 @@ const InboxPage = () => {
         ) : tickets.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center">
-              <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">Тикеты не найдены</h3>
               <p className="text-muted-foreground">
                 У вас пока нет тикетов поддержки. Создайте тикет, нажав кнопку в правом нижнем углу.
@@ -255,7 +251,7 @@ const InboxPage = () => {
                     </div>
 
                     <div className="bg-muted p-3 rounded-lg">
-                      <p className="text-sm whitespace-pre-wrap line-clamp-3">{ticket.message}</p>
+                      <p className="text-sm whitespace-pre-wrap line-clamp-3 break-words overflow-wrap-anywhere" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{ticket.message}</p>
                     </div>
                   </div>
 
@@ -274,8 +270,7 @@ const InboxPage = () => {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <MessageCircle className="h-5 w-5" />
+            <DialogTitle>
               Тикет #{selectedTicket?.id}
             </DialogTitle>
             <DialogDescription>
@@ -293,7 +288,7 @@ const InboxPage = () => {
                     Создан: {formatDate(selectedTicket.created_at)}
                   </span>
                 </div>
-                <p className="text-sm whitespace-pre-wrap">{selectedTicket.message}</p>
+                <p className="text-sm whitespace-pre-wrap break-words overflow-wrap-anywhere" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{selectedTicket.message}</p>
               </div>
 
               {/* Ответы */}
@@ -314,7 +309,7 @@ const InboxPage = () => {
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm">
-                            {response.is_admin_response ? '👨‍💼 Администрация' : '👤 Вы'}
+                            {response.is_admin_response ? 'Администрация' : 'Вы'}
                           </span>
                           <span className="text-xs text-muted-foreground">
                             {formatDate(response.created_at)}
@@ -326,7 +321,7 @@ const InboxPage = () => {
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm whitespace-pre-wrap">{response.message}</p>
+                      <p className="text-sm whitespace-pre-wrap break-words overflow-wrap-anywhere" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{response.message}</p>
                     </div>
                   ))
                 )}
@@ -379,8 +374,7 @@ const InboxPage = () => {
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <MessageCircle className="h-5 w-5" />
+            <DialogTitle>
               Написать тикет
             </DialogTitle>
             <DialogDescription>

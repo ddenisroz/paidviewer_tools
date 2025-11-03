@@ -141,18 +141,24 @@ const SettingsPage = () => {
             </Card>
 
             {/* User Info and Danger Zone */}
-            <div className="flex items-start gap-4">
-                {/* User Info - минималистичная версия */}
-                <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-card/50 text-sm">
-                    <span className="text-muted-foreground">ID:</span>
-                    <span className="font-mono font-medium text-foreground">{user?.id}</span>
+            <Card>
+                <CardContent className="pt-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* User Info */}
+                        <div className="flex flex-col gap-2 p-4 rounded-lg border border-border bg-card/50">
+                            <div className="flex items-center gap-2">
+                                <span className="text-muted-foreground text-sm">ID пользователя:</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="font-mono font-semibold text-lg text-foreground">{user?.id}</span>
+                            </div>
                 </div>
 
                 {/* Danger Zone - Delete Account */}
-                <div className="border border-red-500/20 bg-red-500/5 rounded-lg px-4 py-3">
+                        <div className="flex flex-col gap-3 p-4 rounded-lg border border-red-500/30 bg-red-500/10">
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
-                            <Trash2 className="h-4 w-4 text-red-500 flex-shrink-0" />
+                                    <Trash2 className="h-5 w-5 text-red-500 flex-shrink-0" />
                             <span className="text-sm font-semibold text-red-500">Опасная зона</span>
                         </div>
                         <Button
@@ -165,11 +171,16 @@ const SettingsPage = () => {
                             Удалить
                         </Button>
                     </div>
-                    <p className="text-xs text-red-400/70 mt-2">
-                        ⚠️ Необратимые действия. Удаление аккаунта приведет к полной потере всех данных.
+                            <div className="flex items-start gap-2">
+                                <AlertCircle className="h-4 w-4 text-red-400/80 flex-shrink-0 mt-0.5" />
+                                <p className="text-xs text-red-400/80 leading-relaxed">
+                                    Необратимые действия. Удаление аккаунта приведет к полной потере всех данных.
                     </p>
                 </div>
             </div>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Delete Account Modal */}
             <DeleteAccountModal 

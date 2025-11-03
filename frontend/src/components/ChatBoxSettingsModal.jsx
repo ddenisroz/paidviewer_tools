@@ -24,6 +24,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
         animation_type: 'fade',
         message_fade_seconds: 60,
         chat_direction: 'vertical',
+        chat_width: 100,
         show_platform_icons: true,
         show_badges: true,
         widget_url: ''
@@ -53,6 +54,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                 animation_type: 'fade',
                 message_fade_seconds: 60,
                 chat_direction: 'vertical',
+                chat_width: 100,
                 show_platform_icons: true,
                 show_badges: true,
                 widget_url: ''
@@ -459,6 +461,26 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                         → Горизонтальный
                                     </Button>
                                 </div>
+                            </div>
+                            
+                            {/* Chat Width */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-white">Ширина чата</Label>
+                                    <span className="text-sm text-gray-400">{settings.chat_width}%</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="20"
+                                    max="100"
+                                    step="5"
+                                    value={settings.chat_width}
+                                    onChange={(e) => handleChange('chat_width', parseInt(e.target.value))}
+                                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                    style={{
+                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((settings.chat_width - 20) / 80) * 100}%, #374151 ${((settings.chat_width - 20) / 80) * 100}%, #374151 100%)`
+                                    }}
+                                />
                             </div>
                             
                             {/* Toggles */}

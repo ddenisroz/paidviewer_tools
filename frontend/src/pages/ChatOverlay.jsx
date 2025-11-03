@@ -25,6 +25,7 @@ const ChatOverlay = () => {
     // ✅ ВСЕ useRef ПОСЛЕ useState!
     const messagesEndRef = useRef(null);
     const processedMessageIds = useRef(new Set()); // Для защиты от race condition
+    const historyLoadedRef = useRef(false); // Отслеживание загрузки истории
     
     // ✅ useMemo ПОСЛЕ useState и useRef!
     // 🎨 Применяем настройки к контейнеру (useMemo для пересчета при изменении settings)
@@ -34,7 +35,7 @@ const ChatOverlay = () => {
         logger.log('🎨 [STYLES] Recalculating containerStyle with font_family:', settings?.font_family);
         
         return {
-            width: '100vw',
+            width: `${settings?.chat_width || 100}vw`,
             height: '100vh',
             padding: '16px',
             fontFamily: settings?.font_family || 'Inter, sans-serif',
@@ -52,7 +53,7 @@ const ChatOverlay = () => {
             })(),
             overflow: 'hidden' // Скрываем скролл контейнера, чтобы работал внутренний
         };
-    }, [settings?.font_family, settings?.font_size, settings?.font_weight, settings?.text_color, settings?.background_color, settings?.background_opacity]);
+    }, [settings?.font_family, settings?.font_size, settings?.font_weight, settings?.text_color, settings?.background_color, settings?.background_opacity, settings?.chat_width]);
     
     // ✅ ВСЕ useEffect ПОСЛЕ useMemo!
     // CSS для горизонтального скролла
@@ -180,6 +181,54 @@ const ChatOverlay = () => {
         return () => clearInterval(pollInterval);
     }, [token]);
     
+    // Загрузка истории сообщений через API если WebSocket не пришла (fallback)
+    useEffect(() => {
+        if (!userId || !settings || historyLoadedRef.current) return;
+        
+        // Ждем 3 секунды после подключения WebSocket, если история не пришла - загружаем через API
+        const timeoutId = setTimeout(async () => {
+            if (messages.length === 0 && !historyLoadedRef.current) {
+                logger.log('📜 [CHATOVERLAY] WebSocket history not received, loading via API...');
+                try {
+                    const response = await botService.get('/api/chat/history', {
+                        params: {
+                            limit: settings.max_messages || 50
+                        }
+                    });
+                    
+                    if (response.data.success && response.data.messages && response.data.messages.length > 0) {
+                        const uniqueMessages = [];
+                        const seenIds = new Set();
+                        
+                        for (const msg of response.data.messages) {
+                            const uniqueKey = msg.id || `${msg.timestamp}-${msg.author}-${msg.message}`;
+                            if (!seenIds.has(uniqueKey)) {
+                                seenIds.add(uniqueKey);
+                                uniqueMessages.push(msg);
+                            }
+                        }
+                        
+                        setMessages(uniqueMessages);
+                        processedMessageIds.current = new Set(uniqueMessages.map(msg => 
+                            msg.id || `${msg.timestamp}-${msg.author}-${msg.message}`
+                        ));
+                        historyLoadedRef.current = true;
+                        
+                        setTimeout(() => {
+                            messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+                        }, 100);
+                        
+                        logger.log(`📜 [CHATOVERLAY] Loaded ${uniqueMessages.length} messages via API fallback`);
+                    }
+                } catch (error) {
+                    logger.error('❌ [CHATOVERLAY] Error loading history via API:', error);
+                }
+            }
+        }, 3000); // Ждем 3 секунды
+        
+        return () => clearTimeout(timeoutId);
+    }, [userId, settings, messages.length]);
+    
     const loadSettings = async (isPolling = false) => {
         try {
             const response = await botService.get(`/api/chatbox/settings/by-token/${token}`);
@@ -208,6 +257,14 @@ const ChatOverlay = () => {
             // Загружаем Twitch badges только при первой загрузке
             if (!isPolling) {
                 await twitchBadgesService.loadGlobalBadges();
+                
+                // Загружаем channel-specific badges если есть имя канала
+                if (response.data.channel_name) {
+                    setChannelName(response.data.channel_name);
+                    await twitchBadgesService.loadChannelBadges(response.data.channel_name);
+                    logger.log(`✅ [BADGES] Loaded badges for channel: ${response.data.channel_name}`);
+                }
+                
                 // Сохраняем userId для WebSocket (подключение через useSharedWebSocket)
                 setUserId(normalizedSettings.user_id);
             }
@@ -315,6 +372,7 @@ const ChatOverlay = () => {
             processedMessageIds.current = new Set(uniqueMessages.map(msg => 
                 msg.id || `${msg.timestamp}-${msg.author}-${msg.message}`
             ));
+            historyLoadedRef.current = true; // Помечаем что история загружена через WebSocket
             
             setTimeout(() => {
                 messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
@@ -608,8 +666,8 @@ const ChatOverlay = () => {
                             overflowX: settings.chat_direction === 'horizontal' ? 'auto' : 'hidden',
                             overflowY: settings.chat_direction === 'horizontal' ? 'hidden' : 'auto',
                             alignItems: settings.chat_direction === 'horizontal' ? 'center' : 'stretch',
-                            gap: settings.chat_direction === 'horizontal' ? '16px' : '0',
-                            paddingBottom: settings.chat_direction === 'horizontal' ? '16px' : '0'
+                            gap: settings.chat_direction === 'horizontal' ? '8px' : '0',
+                            paddingBottom: settings.chat_direction === 'horizontal' ? '8px' : '0'
                         }}
                     >
                         {/* Пустой элемент чтобы прижать сообщения к низу (только для вертикального режима) */}
@@ -622,11 +680,12 @@ const ChatOverlay = () => {
                                     ...getMessageStyle(msg), 
                                     ...getMessageSpacing(index),
                                     whiteSpace: settings.chat_direction === 'horizontal' ? 'nowrap' : 'normal',
-                                    wordBreak: settings.chat_direction === 'horizontal' ? 'normal' : 'break-word',
+                                    wordBreak: settings.chat_direction === 'horizontal' ? 'normal' : 'keep-all', // НЕ переносим слова
+                                    overflowWrap: 'anywhere', // Переносим только супер длинные слова/URL
                                     flexShrink: 0,
                                     minWidth: settings.chat_direction === 'horizontal' ? 'fit-content' : 'auto',
                                     maxWidth: settings.chat_direction === 'horizontal' ? '600px' : 'auto',
-                                    padding: settings.chat_direction === 'horizontal' ? '12px 16px' : '0',
+                                    padding: settings.chat_direction === 'horizontal' ? '6px 10px' : '0',
                                     backgroundColor: settings.chat_direction === 'horizontal' ? 'rgba(0, 0, 0, 0.3)' : 'transparent',
                                     borderRadius: settings.chat_direction === 'horizontal' ? `${settings?.border_radius || 8}px` : '0'
                                 }}
@@ -713,8 +772,6 @@ const ChatOverlay = () => {
                                 
                                 {/* Message Content */}
                                 <span style={{ 
-                                    overflowWrap: 'break-word',
-                                    wordWrap: 'break-word',
                                     ...(settings.text_stroke_width > 0 ? {
                                         WebkitTextStroke: `${settings.text_stroke_width}px ${settings.text_stroke_color || '#000000'}`,
                                         paintOrder: 'stroke fill'

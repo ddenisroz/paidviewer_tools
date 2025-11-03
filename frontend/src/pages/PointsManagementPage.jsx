@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Gift, Plus, Edit, Trash2, Loader2, Power, PowerOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useIntegrations } from '../context/IntegrationsContext';
 import { TwitchIcon, VKIcon } from '../components/PlatformIcons';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,12 +18,34 @@ import { logger } from '../utils/prodLogger';
 
 const PointsManagementPage = () => {
   const { user } = useAuth();
+  const { integrations } = useIntegrations();
   const [selectedPlatform, setSelectedPlatform] = useState('twitch'); // vk или twitch
   const [activeTab, setActiveTab] = useState('rewards'); // rewards или queue
   const [rewards, setRewards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingReward, setEditingReward] = useState(null);
+
+  // Определяем доступные платформы
+  const twitchEnabled = integrations?.twitch?.enabled || false;
+  const vkEnabled = integrations?.vk?.enabled || false;
+
+  // Устанавливаем дефолтную платформу на основе доступных интеграций
+  useEffect(() => {
+    if (twitchEnabled && selectedPlatform === 'twitch') {
+      // Twitch доступен и уже выбран - ничего не меняем
+      return;
+    } else if (vkEnabled && selectedPlatform === 'vk') {
+      // VK доступен и уже выбран - ничего не меняем
+      return;
+    } else if (twitchEnabled) {
+      // Twitch доступен - выбираем его
+      setSelectedPlatform('twitch');
+    } else if (vkEnabled) {
+      // VK доступен - выбираем его
+      setSelectedPlatform('vk');
+    }
+  }, [twitchEnabled, vkEnabled]);
 
   // Загрузка наград с выбранной платформы
   const loadRewards = async () => {
@@ -78,31 +101,37 @@ const PointsManagementPage = () => {
             <h1 className="text-2xl font-bold">Награды за баллы</h1>
           </div>
           
-          {/* Переключатель платформ */}
-          <div className="flex bg-muted rounded-lg p-1">
-            <Button
-              variant={selectedPlatform === 'twitch' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setSelectedPlatform('twitch')}
-              className="gap-1.5 h-8"
-            >
-              <TwitchIcon className="w-3.5 h-3.5" />
-              Twitch
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSelectedPlatform('vk')}
-              className={`gap-1.5 h-8 ${
-                selectedPlatform === 'vk' 
-                  ? 'bg-red-600 text-white hover:bg-red-700' 
-                  : 'hover:bg-muted'
-              }`}
-            >
-              <VKIcon className="w-3.5 h-3.5" />
-              VK Live
-            </Button>
-          </div>
+          {/* Переключатель платформ - показываем только подключенные */}
+          {(twitchEnabled || vkEnabled) && (
+            <div className="flex bg-muted rounded-lg p-1">
+              {twitchEnabled && (
+                <Button
+                  variant={selectedPlatform === 'twitch' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setSelectedPlatform('twitch')}
+                  className="gap-1.5 h-8"
+                >
+                  <TwitchIcon className="w-3.5 h-3.5" />
+                  Twitch
+                </Button>
+              )}
+              {vkEnabled && (
+                <Button
+                  variant={selectedPlatform === 'vk' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setSelectedPlatform('vk')}
+                  className={`gap-1.5 h-8 ${
+                    selectedPlatform === 'vk' 
+                      ? 'bg-red-600 text-white hover:bg-red-700' 
+                      : 'hover:bg-muted'
+                  }`}
+                >
+                  <VKIcon className="w-3.5 h-3.5" />
+                  VK Live
+                </Button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Вкладки */}
@@ -690,6 +719,8 @@ const RedemptionQueue = ({ platform }) => {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(new Set());
   const [rewardsMap, setRewardsMap] = useState(new Map());
+  const [selectedItems, setSelectedItems] = useState(new Set());
+  const [filterType, setFilterType] = useState('all'); // 'all', 'tts', 'other'
 
   // Загрузка очереди
   const loadRedemptions = useCallback(async () => {
@@ -755,11 +786,17 @@ const RedemptionQueue = ({ platform }) => {
     setProcessing(prev => new Set(prev).add(redemptionId));
     try {
       await pointsApi.processVKDemands('accept', [redemptionId]);
-      // Молча обновляем - не спамим уведомлениями
-      loadRedemptions();
+      toast.success('Награда принята');
+      // Optimistic update - удаляем из списка без перезагрузки
+      setRedemptions(prev => prev.filter(d => d.id !== redemptionId));
+      setSelectedItems(prev => {
+        const next = new Set(prev);
+        next.delete(redemptionId);
+        return next;
+      });
     } catch (err) {
       logger.error('Error accepting redemption:', err);
-      // apiClient.js уже показывает toast при ошибках
+      toast.error('Ошибка принятия награды');
     } finally {
       setProcessing(prev => {
         const next = new Set(prev);
@@ -773,11 +810,17 @@ const RedemptionQueue = ({ platform }) => {
     setProcessing(prev => new Set(prev).add(redemptionId));
     try {
       await pointsApi.processVKDemands('reject', [redemptionId]);
-      // Молча обновляем - не спамим уведомлениями
-      loadRedemptions();
+      toast.success('Награда отклонена');
+      // Optimistic update - удаляем из списка без перезагрузки
+      setRedemptions(prev => prev.filter(d => d.id !== redemptionId));
+      setSelectedItems(prev => {
+        const next = new Set(prev);
+        next.delete(redemptionId);
+        return next;
+      });
     } catch (err) {
       logger.error('Error rejecting redemption:', err);
-      // apiClient.js уже показывает toast при ошибках
+      toast.error('Ошибка отклонения награды');
     } finally {
       setProcessing(prev => {
         const next = new Set(prev);
@@ -786,6 +829,68 @@ const RedemptionQueue = ({ platform }) => {
       });
     }
   };
+
+  // Массовое принятие
+  const handleBulkAccept = async () => {
+    if (selectedItems.size === 0) return;
+    
+    const ids = Array.from(selectedItems);
+    setProcessing(prev => new Set([...prev, ...ids]));
+    try {
+      await pointsApi.processVKDemands('accept', ids);
+      toast.success(`Принято наград: ${ids.length}`);
+      // Optimistic update - удаляем из списка без перезагрузки
+      setRedemptions(prev => prev.filter(d => !ids.includes(d.id)));
+      setSelectedItems(new Set());
+    } catch (err) {
+      logger.error('Error bulk accepting:', err);
+      toast.error('Ошибка массового принятия');
+    } finally {
+      setProcessing(prev => {
+        const next = new Set(prev);
+        ids.forEach(id => next.delete(id));
+        return next;
+      });
+    }
+  };
+
+  // Массовое отклонение
+  const handleBulkReject = async () => {
+    if (selectedItems.size === 0) return;
+    
+    const ids = Array.from(selectedItems);
+    setProcessing(prev => new Set([...prev, ...ids]));
+    try {
+      await pointsApi.processVKDemands('reject', ids);
+      toast.success(`Отклонено наград: ${ids.length}`);
+      // Optimistic update - удаляем из списка без перезагрузки
+      setRedemptions(prev => prev.filter(d => !ids.includes(d.id)));
+      setSelectedItems(new Set());
+    } catch (err) {
+      logger.error('Error bulk rejecting:', err);
+      toast.error('Ошибка массового отклонения');
+    } finally {
+      setProcessing(prev => {
+        const next = new Set(prev);
+        ids.forEach(id => next.delete(id));
+        return next;
+      });
+    }
+  };
+
+  // Фильтрация наград
+  const filteredRedemptions = redemptions.filter((demand) => {
+    if (filterType === 'all') return true;
+    
+    const rewardData = rewardsMap.get(demand.reward?.id);
+    const rewardTitle = (rewardData?.name || rewardData?.title || '').toLowerCase();
+    
+    if (filterType === 'tts') {
+      return rewardTitle.includes('озвучка') || rewardTitle.includes('tts') || rewardTitle.includes('голос');
+    } else {
+      return !rewardTitle.includes('озвучка') && !rewardTitle.includes('tts') && !rewardTitle.includes('голос');
+    }
+  });
 
   if (loading) {
     return (
@@ -814,24 +919,132 @@ const RedemptionQueue = ({ platform }) => {
   }
 
   return (
-    <div className="space-y-3 min-h-[400px]">
-      {Array.isArray(redemptions) && redemptions.map((demand, index) => {
+    <div className="min-h-[400px]">
+      {/* Фильтры и массовые действия */}
+      <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Label className="text-sm">Фильтр:</Label>
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            className="px-3 py-1.5 text-sm border rounded-md bg-background"
+          >
+            <option value="all">Все награды</option>
+            <option value="tts">TTS Озвучка</option>
+            <option value="other">Другие</option>
+          </select>
+          {filteredRedemptions.length > 0 && (
+            <>
+              <span className="text-xs text-muted-foreground">
+                Найдено: {filteredRedemptions.length}
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  const allSelected = filteredRedemptions.every(d => selectedItems.has(d.id));
+                  if (allSelected) {
+                    setSelectedItems(new Set());
+                  } else {
+                    setSelectedItems(new Set(filteredRedemptions.map(d => d.id)));
+                  }
+                }}
+              >
+                {filteredRedemptions.every(d => selectedItems.has(d.id)) ? 'Снять всё' : 'Отметить всё'}
+              </Button>
+            </>
+          )}
+        </div>
+        
+        {selectedItems.size > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Выбрано: {selectedItems.size}</span>
+            <Button
+              size="sm"
+              variant="default"
+              onClick={handleBulkAccept}
+              disabled={Array.from(selectedItems).some(id => processing.has(id))}
+            >
+              Принять выбранные ({selectedItems.size})
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={handleBulkReject}
+              disabled={Array.from(selectedItems).some(id => processing.has(id))}
+            >
+              Отклонить выбранные ({selectedItems.size})
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {Array.isArray(filteredRedemptions) && filteredRedemptions.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Gift className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
+            <p className="text-sm text-muted-foreground">
+              Нет запросов по выбранному фильтру
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {filteredRedemptions.map((demand, index) => {
         const rewardData = rewardsMap.get(demand.reward?.id);
         const rewardTitle = rewardData?.name || rewardData?.title || 'Неизвестная награда';
         const rewardCost = rewardData?.price || rewardData?.cost || 0;
         
-        // Собираем сообщение из message_parts (если это массив)
+        // Собираем сообщение из message_parts (правильно обрабатываем объекты)
         let message = '';
         if (Array.isArray(demand.message_parts) && demand.message_parts.length > 0) {
-          message = demand.message_parts.join(' ');
+          message = demand.message_parts.map(part => {
+            // Если это объект, извлекаем текст по ключам VK API
+            if (typeof part === 'object' && part !== null) {
+              // VK API структура: { "text": { "content": "..." }, "mention": { "nick": "..." }, etc }
+              if (part.text && part.text.content) return part.text.content;
+              if (part.mention && part.mention.nick) return `@${part.mention.nick}`;
+              if (part.link && part.link.content) return part.link.content;
+              if (part.smile && part.smile.name) return part.smile.name;
+              // Fallback для неизвестных структур
+              return part.text || part.content || part.message || JSON.stringify(part);
+            }
+            // Если это строка, возвращаем как есть
+            return String(part);
+          }).join(' ').trim();
         } else if (typeof demand.message === 'string') {
           message = demand.message;
+        } else if (demand.message && typeof demand.message === 'object') {
+          // Если message это объект, пытаемся извлечь текст
+          message = demand.message.text || demand.message.content || JSON.stringify(demand.message);
         }
         
+        const isSelected = selectedItems.has(demand.id);
+        const isProcessing = processing.has(demand.id);
+        
         return (
-          <Card key={demand.id || index}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-4">
+          <Card key={demand.id || index} className={isSelected ? 'ring-2 ring-primary' : ''}>
+            <CardContent className="p-2">
+              <div className="flex items-start gap-3">
+                {/* Чекбокс для выбора */}
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={(e) => {
+                    setSelectedItems(prev => {
+                      const next = new Set(prev);
+                      if (e.target.checked) {
+                        next.add(demand.id);
+                      } else {
+                        next.delete(demand.id);
+                      }
+                      return next;
+                    });
+                  }}
+                  disabled={isProcessing}
+                  className="mt-1 w-4 h-4 rounded border-gray-300 cursor-pointer"
+                />
+                
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className="font-medium">{demand.user?.nick || demand.user?.name || 'Пользователь'}</span>
@@ -843,7 +1056,7 @@ const RedemptionQueue = ({ platform }) => {
                     </Badge>
                   </div>
                   {message && (
-                    <p className="text-sm text-muted-foreground mt-2">
+                    <p className="text-sm text-muted-foreground mt-2 break-words">
                       💬 {message}
                     </p>
                   )}
@@ -852,35 +1065,43 @@ const RedemptionQueue = ({ platform }) => {
                   </p>
                 </div>
 
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="default"
-                  onClick={() => handleAccept(demand.id)}
-                  disabled={processing.has(demand.id)}
-                  className="h-8"
-                >
-                  {processing.has(demand.id) ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    'Принять'
-                  )}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => handleReject(demand.id)}
-                  disabled={processing.has(demand.id)}
-                  className="h-8"
-                >
-                  Отклонить
-                </Button>
+                <div className="flex gap-2 flex-shrink-0">
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAccept(demand.id);
+                    }}
+                    disabled={isProcessing}
+                    className="h-8"
+                  >
+                    {isProcessing ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      'Принять'
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleReject(demand.id);
+                    }}
+                    disabled={isProcessing}
+                    className="h-8"
+                  >
+                    Отклонить
+                  </Button>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
         );
       })}
+        </div>
+      )}
     </div>
   );
 };

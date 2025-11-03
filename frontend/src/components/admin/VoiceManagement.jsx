@@ -20,10 +20,10 @@ import { logger } from '../../utils/prodLogger';
 const VoiceManagement = () => {
     const { addToast } = useToast();
     const { getButtonPosition } = useButtonPosition();
-    const [voices, setVoices] = useState([]);
-    const [users, setUsers] = useState([]);
+    // Старые состояния удалены - данные теперь из React Query
+    // const [voices, setVoices] = useState([]); - УДАЛЕНО, используется voicesData
+    // const [users, setUsers] = useState([]); - УДАЛЕНО, используется usersData
     const [loading, setLoading] = useState(true);
-    const [usersLoading, setUsersLoading] = useState(false);
     const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
     const [testText, setTestText] = useState("Привет, я бы хотел с тобой постримить, если честно, для меня бы это было честью. Постримить с таким великим стримером было бы реально круто.");
     const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -59,8 +59,16 @@ const VoiceManagement = () => {
     const { data: voicesData = [], isLoading: voicesLoading } = useQuery({
         queryKey: ['admin-voices'],
         queryFn: async () => {
+            logger.log('🔍 [ADMIN] Fetching voices...');
             const response = await getAdminVoices();
+            logger.log('🔍 [ADMIN] Raw response:', response);
+            
+            // Axios оборачивает ответ в response.data
             const data = response?.data || response;
+            logger.log('🔍 [ADMIN] Extracted data:', data);
+            logger.log('🔍 [ADMIN] Data type:', typeof data);
+            logger.log('🔍 [ADMIN] Is array:', Array.isArray(data));
+            logger.log('🔍 [ADMIN] Data keys:', data ? Object.keys(data) : 'null');
             
             // Проверяем предупреждение о недоступности TTS сервиса
             if (data?.warning) {
@@ -74,20 +82,36 @@ const VoiceManagement = () => {
             let voicesArray = [];
             if (Array.isArray(data)) {
                 voicesArray = data;
+                logger.log('✅ [ADMIN] Data is array, using directly');
             } else if (data?.status === 'success' && Array.isArray(data.voices)) {
                 voicesArray = data.voices;
+                logger.log('✅ [ADMIN] Found voices in data.voices (status: success)');
             } else if (Array.isArray(data?.voices)) {
                 voicesArray = data.voices;
-            } else if (Array.isArray(data?.data)) {
-                voicesArray = data.data;
+                logger.log('✅ [ADMIN] Found voices array in data.voices');
             } else if (data?.success && Array.isArray(data.voices)) {
                 voicesArray = data.voices;
+                logger.log('✅ [ADMIN] Found voices in success response');
+            } else if (Array.isArray(data?.data)) {
+                voicesArray = data.data;
+                logger.log('✅ [ADMIN] Found voices in data.data');
+            } else if (Array.isArray(data?.global_voices) || Array.isArray(data?.user_voices)) {
+                // Объединяем глобальные и пользовательские голоса
+                voicesArray = [
+                    ...(data.global_voices || []),
+                    ...(data.user_voices || [])
+                ];
+                logger.log('✅ [ADMIN] Combined global and user voices:', voicesArray.length);
             } else {
                 logger.warn('⚠️ [ADMIN] Could not extract voices array from response:', data);
+                logger.warn('⚠️ [ADMIN] Full response structure:', JSON.stringify(data, null, 2));
                 voicesArray = [];
             }
             
             logger.log('✅ [ADMIN] Loaded voices:', voicesArray.length, 'voices');
+            if (voicesArray.length > 0) {
+                logger.log('✅ [ADMIN] First voice sample:', voicesArray[0]);
+            }
             return voicesArray;
         },
         staleTime: 5 * 60 * 1000,
@@ -95,7 +119,6 @@ const VoiceManagement = () => {
         refetchOnWindowFocus: false,
         onError: (error) => {
             logger.error('❌ [ADMIN] Error loading voices:', error);
-            setVoices([]);
             
             // Показываем предупреждение если ошибка связана с подключением
             if (error.message?.includes('connection') || error.message?.includes('timeout') || error.code === 'ECONNREFUSED') {
@@ -104,13 +127,10 @@ const VoiceManagement = () => {
                 setTtsServiceWarning(error.response.data.detail);
             }
         },
-        onSuccess: (data) => {
-            setVoices(data);
-        },
     });
 
     // React Query: загружаем пользователей
-    const { data: usersData = [], isLoading: usersLoading } = useQuery({
+    const { data: usersData = [], isLoading: usersLoadingQuery } = useQuery({
         queryKey: ['admin-voice-users'],
         queryFn: async () => {
             const response = await getUsers();
@@ -133,13 +153,14 @@ const VoiceManagement = () => {
         onError: (error) => {
             logger.error('Error loading users:', error);
             addToast({ type: 'error', title: 'Ошибка', message: `Не удалось загрузить пользователей: ${error.message || 'Неизвестная ошибка'}` });
-            setUsers([]);
-        },
-        onSuccess: (data) => {
-            setUsers(data);
         },
     });
 
+    // Используем данные из React Query напрямую
+    // Важно: voicesData и usersData могут быть undefined до загрузки, используем ?? для fallback
+    const voices = voicesData ?? [];
+    const users = usersData ?? [];
+    
     // Комбинированное состояние загрузки
     useEffect(() => {
         setLoading(voicesLoading);
@@ -300,7 +321,8 @@ const VoiceManagement = () => {
             setCurrentVoice(prev => ({...prev, reference_text: newReferenceText}));
             
             // Обновляем в списке голосов
-            setVoices(prev => prev.map(voice => 
+            // Данные обновятся автоматически через React Query
+            queryClient.setQueryData(['admin-voices'], (prev = []) => prev.map(voice => 
                 voice.id === currentVoice.id 
                     ? {...voice, reference_text: newReferenceText}
                     : voice
@@ -329,7 +351,8 @@ const VoiceManagement = () => {
             await renameVoice(currentVoice.id, newName.trim());
             
             // Обновляем в списке голосов
-            setVoices(prev => prev.map(voice => 
+            // Данные обновятся автоматически через React Query
+            queryClient.setQueryData(['admin-voices'], (prev = []) => prev.map(voice => 
                 voice.id === currentVoice.id 
                     ? {...voice, name: newName.trim()}
                     : voice
@@ -359,7 +382,8 @@ const VoiceManagement = () => {
             await updateVoiceSettings(currentVoice.id, settings);
             
             // Обновляем в списке голосов
-            setVoices(prev => prev.map(voice => 
+            // Данные обновятся автоматически через React Query
+            queryClient.setQueryData(['admin-voices'], (prev = []) => prev.map(voice => 
                 voice.id === currentVoice.id 
                     ? {...voice, ...settings}
                     : voice
@@ -503,7 +527,8 @@ const VoiceManagement = () => {
             setCurrentVoice(prev => ({...prev, reference_text: response.data.reference_text}));
             
             // Обновляем в списке голосов
-            setVoices(prev => prev.map(voice => 
+            // Данные обновятся автоматически через React Query
+            queryClient.setQueryData(['admin-voices'], (prev = []) => prev.map(voice => 
                 voice.id === currentVoice.id 
                     ? {...voice, reference_text: response.data.reference_text}
                     : voice
@@ -530,7 +555,8 @@ const VoiceManagement = () => {
             setCurrentVoice(prev => ({...prev, reference_text: response.data.reference_text}));
             
             // Обновляем в списке голосов
-            setVoices(prev => prev.map(voice => 
+            // Данные обновятся автоматически через React Query
+            queryClient.setQueryData(['admin-voices'], (prev = []) => prev.map(voice => 
                 voice.id === currentVoice.id 
                     ? {...voice, reference_text: response.data.reference_text}
                     : voice
@@ -612,7 +638,7 @@ const VoiceManagement = () => {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={loadVoices}
+                                    onClick={() => queryClient.invalidateQueries({ queryKey: ['admin-voices'] })}
                                     className="text-yellow-300 hover:text-yellow-200"
                                 >
                                     <RefreshCw className="h-4 w-4" />
@@ -875,7 +901,7 @@ const VoiceManagement = () => {
                                                     <SelectValue placeholder="Выберите пользователя" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    {usersLoading ? (
+                                                    {usersLoadingQuery ? (
                                                         <div className="flex items-center justify-center p-4">
                                                             <Loader2 className="w-4 h-4 animate-spin" />
                                                             <span className="ml-2">Загрузка...</span>

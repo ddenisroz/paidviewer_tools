@@ -221,7 +221,7 @@ def check_user_whitelisted(user: dict = Depends(get_current_user), db: Session =
     # Проверяем whitelist с кешированием
     from utils.whitelist_cache import is_user_whitelisted_cached
     if is_user_whitelisted_cached(db_user, db):
-        return user
+            return user
     
     raise HTTPException(
         status_code=403, 

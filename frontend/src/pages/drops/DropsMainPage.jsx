@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Gift, 
   History, 
@@ -14,6 +15,7 @@ import {
   Package,
   Monitor
 } from 'lucide-react';
+import { TwitchIcon, VKIcon } from '../../components/PlatformIcons';
 import { useAuth } from '../../context/AuthContext';
 import { useIntegrations } from '../../context/IntegrationsContext';
 import StreakSettings from '../../components/drops/StreakSettings';
@@ -58,7 +60,7 @@ const DropsMainPage = () => {
     }
   }, []); // Только при монтировании
 
-  // Определяем доступную платформу
+  // Определяем доступные платформы и устанавливаем первую доступную как дефолт
   useEffect(() => {
     if (!isAuthenticated || !user) {
       setSelectedPlatform(null);
@@ -66,7 +68,12 @@ const DropsMainPage = () => {
       return;
     }
 
-    // Приоритет: Twitch -> VK
+    // Если платформа уже выбрана (из URL или пользовательского выбора), не меняем
+    if (selectedPlatform) {
+      return;
+    }
+
+    // Приоритет: Twitch -> VK (только при первой загрузке)
     if (integrations?.twitch?.enabled && user?.twitch_username) {
       setSelectedPlatform('twitch');
       setChannelName(user.twitch_username);
@@ -79,8 +86,17 @@ const DropsMainPage = () => {
     }
   }, [isAuthenticated, user, integrations]);
 
-  // Если пользователь не авторизован или нет подключенной платформы
-  if (!isAuthenticated || !selectedPlatform || !channelName) {
+  // Проверяем доступные платформы
+  const availablePlatforms = [];
+  if (integrations?.twitch?.enabled && user?.twitch_username) {
+    availablePlatforms.push({ value: 'twitch', label: 'Twitch', icon: TwitchIcon });
+  }
+  if (integrations?.vk?.enabled && (user?.vk_username || user?.vk_channel_name)) {
+    availablePlatforms.push({ value: 'vk', label: 'VK Live', icon: VKIcon });
+  }
+
+  // Если пользователь не авторизован или нет подключенных платформ
+  if (!isAuthenticated || availablePlatforms.length === 0) {
     return (
       <PageWrapper>
         <Card>
@@ -97,12 +113,47 @@ const DropsMainPage = () => {
     );
   }
 
+  // Обновляем selectedPlatform и channelName при изменении выбранной платформы
+  const handlePlatformChange = (platform) => {
+    setSelectedPlatform(platform);
+    if (platform === 'twitch' && user?.twitch_username) {
+      setChannelName(user.twitch_username);
+    } else if (platform === 'vk' && (user?.vk_username || user?.vk_channel_name)) {
+      setChannelName(user.vk_username || user.vk_channel_name);
+    }
+  };
+
+  // Убеждаемся что selectedPlatform установлена
+  if (!selectedPlatform && availablePlatforms.length > 0) {
+    handlePlatformChange(availablePlatforms[0].value);
+    return null; // Показываем loader пока устанавливается платформа
+  }
+
   // Проверяем, есть ли награды
   const hasRewards = rewardsCount > 0;
 
   return (
       <PageWrapper 
         title="Drops система"
+        actions={
+          availablePlatforms.length > 1 && (
+            <Select value={selectedPlatform} onValueChange={handlePlatformChange}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availablePlatforms.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>
+                    <div className="flex items-center gap-2">
+                      <p.icon className="w-4 h-4" />
+                      {p.label}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )
+        }
       >
       {/* Основной контент */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

@@ -10,12 +10,14 @@ import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
 import { logger } from '../../utils/prodLogger';
 import { useIntegrations } from '../../context/IntegrationsContext';
+import { useDonationAlerts } from '../../context/DonationAlertsContext';
 import DonationGrid from './DonationGrid';
 import DonationHistory from './DonationHistory';
 import MythycClosed from '../../images/lootboxes/mythyc/mythyc_closed.png';
 
 const DonationSettings = ({ user, platform, channelName, hasRewards = false }) => {
   const { integrations } = useIntegrations();
+  const { isConnected: daConnected, connect: daConnect } = useDonationAlerts();
   const queryClient = useQueryClient();
   const [savedSuccessfully, setSavedSuccessfully] = useState(false);
   const [formData, setFormData] = useState({
@@ -167,18 +169,27 @@ const DonationSettings = ({ user, platform, channelName, hasRewards = false }) =
             <div className="flex items-center gap-2">
               <Label className="text-sm font-medium">Включить donation drops</Label>
               <Switch
-                checked={formData.donation_enabled && hasRewards}
-                disabled={!hasRewards}
-                onCheckedChange={(checked) => {
-                  if (!hasRewards) {
-                    toast.error('Сначала настройте содержимое сундуков на вкладке "Награды"');
-                    return;
-                  }
+                checked={formData.donation_enabled}
+                onCheckedChange={async (checked) => {
                   if (checked) {
                     // Проверяем интеграцию с DonationAlerts
-                    const donationalertsConnected = integrations?.donationalerts?.enabled || false;
+                    const donationalertsConnected = integrations?.donationalerts?.enabled || daConnected || false;
+                    
                     if (!donationalertsConnected) {
-                      toast.error('Для использования donation drops необходимо подключить интеграцию DonationAlerts');
+                      // Автоматически включаем интеграцию DonationAlerts
+                      toast.info('Подключаем интеграцию DonationAlerts...');
+                      const connected = await daConnect();
+                      
+                      if (!connected) {
+                        toast.error('Не удалось подключить интеграцию DonationAlerts');
+                        return;
+                      }
+                      
+                      // Ждем немного, чтобы интеграция обновилась
+                      setTimeout(() => {
+                        setFormData({...formData, donation_enabled: checked});
+                        toast.success('Интеграция DonationAlerts подключена');
+                      }, 500);
                       return;
                     }
                   }

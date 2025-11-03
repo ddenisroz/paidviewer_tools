@@ -42,8 +42,10 @@ const HomePage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Пустой массив зависимостей - срабатывает ТОЛЬКО при монтировании
     
-    // 🎬 Анимация страницы: проигрывается только при первой загрузке
-    const { shouldAnimate, contentLoaded } = usePageAnimation('home', 100);
+    // УБРАНО: usePageAnimation - вызывает видимую отрисовку элементов
+    // Используем оптимистичный UI - контент виден сразу
+    const shouldAnimate = false;
+    const contentLoaded = true;
     
     // Состояние объединения полей для карточек
     const [titleLinked, setTitleLinked] = useState(false);

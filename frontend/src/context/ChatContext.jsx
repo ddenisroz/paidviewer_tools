@@ -76,30 +76,68 @@ export const ChatProvider = ({ children }) => {
     
     const [messages, dispatchMessages] = useReducer(messagesReducer, [], loadMessagesFromStorage);
     
+    // Ref для отслеживания загрузки истории (чтобы избежать дублирования)
+    const historyLoadedRef = useRef(false);
+    
     // Загрузка истории сообщений из API при инициализации
     useEffect(() => {
         const loadChatHistory = async () => {
+            // Проверяем что пользователь авторизован и интеграции загружены
             if (!isAuthenticated && !isGuest) return;
+            if (integrationsLoading) return; // Ждем загрузки интеграций
+            
+            // Предотвращаем повторную загрузку если уже загружали
+            if (historyLoadedRef.current) {
+                logger.debug('📜 History already loaded, skipping...');
+                return;
+            }
             
             try {
+                logger.info('📜 Loading chat history from API...');
                 const response = await api.get('/api/chat/history', {
                     params: {
                         limit: parseInt(import.meta.env.VITE_CHAT_MAX_MESSAGES || '200', 10)
                     }
                 });
                 
-                if (response.data.success && response.data.messages.length > 0) {
-                    logger.info(`📜 Loaded ${response.data.messages.length} messages from history`);
-                    dispatchMessages({ type: 'SET_MESSAGES', payload: response.data.messages });
+                if (response.data.success && response.data.messages && response.data.messages.length > 0) {
+                    // Фильтруем сообщения только от подключенных платформ (оптимизация)
+                    // Если интеграции еще не загружены - показываем все сообщения
+                    const twitchEnabled = integrations?.twitch?.enabled ?? true; // По умолчанию true если не загружено
+                    const vkEnabled = integrations?.vk?.enabled ?? true; // По умолчанию true если не загружено
+                    
+                    const filteredMessages = response.data.messages.filter(msg => {
+                        // Если интеграции еще не загружены - показываем все
+                        if (integrationsLoading || !integrations) return true;
+                        
+                        if (msg.platform === 'twitch' && !twitchEnabled) return false;
+                        if (msg.platform === 'vk' && !vkEnabled) return false;
+                        return true;
+                    });
+                    
+                    const filteredCount = response.data.messages.length - filteredMessages.length;
+                    if (filteredCount > 0) {
+                        logger.debug(`📜 Filtered ${filteredCount} messages from unconnected platforms`);
+                    }
+                    
+                    if (filteredMessages.length > 0) {
+                        logger.info(`📜 Loaded ${filteredMessages.length} messages from history`);
+                        dispatchMessages({ type: 'SET_MESSAGES', payload: filteredMessages });
+                        historyLoadedRef.current = true;
+                    } else {
+                        logger.debug('📜 No messages after filtering');
+                    }
+                } else {
+                    logger.debug('📜 No messages in history response');
                 }
             } catch (error) {
                 logger.error('Failed to load chat history:', error);
-                // Fallback на localStorage если API не доступно
+                // Fallback на localStorage если API не доступно - не ставим historyLoadedRef чтобы повторить попытку
             }
         };
         
         loadChatHistory();
-    }, [isAuthenticated, isGuest]);
+    }, [isAuthenticated, isGuest, integrationsLoading]); // Убрали integrations из зависимостей чтобы избежать повторных загрузок
     const [lastJsonMessage, setLastJsonMessage] = useState(null);
     const [error, setError] = useState(null);
     const [botStatus, setBotStatus] = useState('disconnected');
@@ -173,19 +211,47 @@ export const ChatProvider = ({ children }) => {
     const handleWebSocketMessage = useCallback((data) => {
             setLastJsonMessage(data);
             
-            // 🔍 DEBUG: Логируем ВСЕ входящие WebSocket сообщения
-            logger.log('🔌 [WS] Received message type:', data.type, 'Data:', data);
+            // 🔍 DEBUG: Логируем только важные типы сообщений (оптимизация)
+            if (data.type === 'chat_history' || data.type === 'error' || data.type === 'bot_status') {
+                logger.debug('🔌 [WS] Received:', data.type, data.type === 'chat_history' ? `(${data.messages?.length || 0} messages)` : '');
+            }
             
             if (data.type === 'message' || data.type === 'chat_message') {
+                // Фильтруем новые сообщения по подключенным платформам (оптимизация)
+                const twitchEnabled = integrations?.twitch?.enabled || false;
+                const vkEnabled = integrations?.vk?.enabled || false;
+                
+                if (data.platform === 'twitch' && !twitchEnabled) return;
+                if (data.platform === 'vk' && !vkEnabled) return;
+                
                 dispatchMessages({ type: 'ADD_MESSAGE', payload: data });
             } else if (data.type === 'chat_history') {
                 // Получили историю сообщений через WebSocket
-                logger.log('📜 [WS] Processing chat_history, messages:', data.messages?.length);
                 if (data.messages && Array.isArray(data.messages)) {
-                    logger.info(`📜 Loaded ${data.messages.length} messages from WebSocket history`);
-                    dispatchMessages({ type: 'SET_MESSAGES', payload: data.messages });
+                    // Фильтруем сообщения только от подключенных платформ (оптимизация)
+                    const twitchEnabled = integrations?.twitch?.enabled || false;
+                    const vkEnabled = integrations?.vk?.enabled || false;
+                    
+                    const filteredMessages = data.messages.filter(msg => {
+                        if (msg.platform === 'twitch' && !twitchEnabled) return false;
+                        if (msg.platform === 'vk' && !vkEnabled) return false;
+                        return true;
+                    });
+                    
+                    const filteredCount = data.messages.length - filteredMessages.length;
+                    if (filteredCount > 0) {
+                        logger.debug(`📜 [WS] Filtered ${filteredCount} messages from unconnected platforms`);
+                    }
+                    
+                    if (filteredMessages.length > 0) {
+                        logger.info(`📜 Loaded ${filteredMessages.length} messages from WebSocket history`);
+                        dispatchMessages({ type: 'SET_MESSAGES', payload: filteredMessages });
+                        historyLoadedRef.current = true; // Помечаем что история загружена
+                    } else {
+                        logger.debug('📜 [WS] No messages after filtering by connected platforms');
+                    }
                 } else {
-                    logger.warn('⚠️ [WS] chat_history received but messages is not an array:', data.messages);
+                    logger.warn('⚠️ [WS] chat_history received but messages is not an array');
                 }
             } else if (data.type === 'bot_status') {
                 setBotStatus(data.status);
@@ -289,7 +355,7 @@ export const ChatProvider = ({ children }) => {
             } else {
                 logger.debug('Unknown message type:', data.type);
             }
-    }, [addToast]);
+    }, [addToast, integrations]);
     
     // 🔌 Подключаем Shared WebSocket
     const { send: wsSendMessage } = useSharedWebSocket(userId, handleWebSocketMessage);

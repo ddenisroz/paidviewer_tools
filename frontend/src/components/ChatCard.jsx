@@ -117,6 +117,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
             // Предотвращаем повторную загрузку
             if (badgesLoadedRef.current) {
                 logger.log('⏭️ [BADGES] Already loaded, skipping...');
+                setBadgesLoaded(true); // Устанавливаем состояние если уже загружено
                 return;
             }
             

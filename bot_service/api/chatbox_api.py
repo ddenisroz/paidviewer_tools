@@ -243,8 +243,14 @@ async def get_settings_by_token(
     
     logger.info(f"📦 [CHATBOX] Settings found for user {settings.user_id}")
     
+    # Получаем информацию о пользователе для channel name
+    from core.database import User
+    user = db.query(User).filter(User.id == settings.user_id).first()
+    channel_name = user.twitch_username if user else None
+    
     return {
         "user_id": settings.user_id,
+        "channel_name": channel_name,  # Добавлено для загрузки channel-specific badges
         "font_family": settings.font_family,
         "font_size": settings.font_size,
         "font_weight": settings.font_weight,

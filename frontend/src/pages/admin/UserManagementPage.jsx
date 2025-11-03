@@ -78,7 +78,7 @@ const UserManagementPage = () => {
     });
 
     // React Query: загружаем пользователей
-    const { data: usersData = [], isLoading: usersLoading } = useQuery({
+    const { data: usersData = [], isLoading: usersLoading, refetch: loadUsers } = useQuery({
         queryKey: ['admin-users'],
         queryFn: async () => {
             const response = await botService.get('/api/admin/users');
@@ -354,9 +354,9 @@ const UserManagementPage = () => {
         }
         
         addToWhitelistMutation.mutate({
-            username: whitelistForm.channel_name.trim(),
-            platform: 'twitch' // По умолчанию Twitch, backend поддерживает оба
-        });
+                username: whitelistForm.channel_name.trim(),
+                platform: 'twitch' // По умолчанию Twitch, backend поддерживает оба
+            });
     };
 
     const handleToggleWhitelist = async (user) => {
@@ -407,7 +407,7 @@ const UserManagementPage = () => {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={loadUsers} disabled={loading}>
+                    <Button variant="outline" onClick={() => loadUsers()} disabled={usersLoading}>
                         <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                         Обновить
                     </Button>

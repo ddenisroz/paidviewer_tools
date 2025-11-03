@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { VolumeX } from 'lucide-react';
 
-const SwipeableMessage = ({ children, onSwipeAction, message }) => {
+const SwipeableMessage = React.memo(({ children, onSwipeAction, message }) => {
     const [touchStart, setTouchStart] = useState(null);
     const [touchEnd, setTouchEnd] = useState(null);
     const [swipeDistance, setSwipeDistance] = useState(0);
@@ -13,6 +13,8 @@ const SwipeableMessage = ({ children, onSwipeAction, message }) => {
     
     // Пороговое значение для заглушения TTS
     const muteThreshold = 80; // Заглушить TTS
+    const banThreshold = 150; // Для ban (если будет добавлено)
+    const timeoutThreshold = 200; // Максимальный свайп
     
     const handleTouchStart = (e) => {
         setTouchEnd(null);
@@ -102,7 +104,7 @@ const SwipeableMessage = ({ children, onSwipeAction, message }) => {
             
             {/* Контент сообщения */}
             <div 
-                className="relative transition-transform"
+                className="relative transition-transform w-full"
                 style={{ 
                     transform: `translateX(-${swipeDistance}px)`,
                     transition: isSwiping ? 'none' : 'transform 0.3s ease-out'
@@ -112,7 +114,15 @@ const SwipeableMessage = ({ children, onSwipeAction, message }) => {
             </div>
         </div>
     );
-};
+}, (prevProps, nextProps) => {
+    // Кастомная функция сравнения для оптимизации - ререндерим только если изменились критичные пропсы
+    return prevProps.message.id === nextProps.message.id &&
+           prevProps.message.timestamp === nextProps.message.timestamp &&
+           prevProps.message.author === nextProps.message.author &&
+           prevProps.message.message === nextProps.message.message;
+});
+
+SwipeableMessage.displayName = 'SwipeableMessage';
 
 export default SwipeableMessage;
 

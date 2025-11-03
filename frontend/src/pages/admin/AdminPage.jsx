@@ -60,7 +60,7 @@ const AdminPage = () => {
                            <Button
                                variant={activeTab === 'voices' ? 'default' : 'ghost'}
                                onClick={() => setActiveTab('voices')}
-                               className={`flex-1 ${activeTab === 'voices' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
+                               className={`whitespace-nowrap flex-shrink-0 ${activeTab === 'voices' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
                            >
                                <Mic className="h-4 w-4 mr-1 sm:mr-2" />
                                <span className="hidden sm:inline">Голоса</span>
@@ -69,7 +69,7 @@ const AdminPage = () => {
                            <Button
                                variant={activeTab === 'users' ? 'default' : 'ghost'}
                                onClick={() => setActiveTab('users')}
-                               className={`flex-1 ${activeTab === 'users' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
+                               className={`whitespace-nowrap flex-shrink-0 ${activeTab === 'users' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
                            >
                                <Users className="h-4 w-4 mr-1 sm:mr-2" />
                                <span className="hidden sm:inline">Пользователи</span>
@@ -78,7 +78,7 @@ const AdminPage = () => {
                            <Button
                                variant={activeTab === 'bots' ? 'default' : 'ghost'}
                                onClick={() => setActiveTab('bots')}
-                               className={`flex-1 ${activeTab === 'bots' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
+                               className={`whitespace-nowrap flex-shrink-0 ${activeTab === 'bots' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
                            >
                                <Settings className="h-4 w-4 mr-1 sm:mr-2" />
                                <span className="hidden sm:inline">Боты</span>
@@ -87,7 +87,7 @@ const AdminPage = () => {
                            <Button
                                variant={activeTab === 'tickets' ? 'default' : 'ghost'}
                                onClick={() => setActiveTab('tickets')}
-                               className={`flex-1 ${activeTab === 'tickets' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
+                               className={`whitespace-nowrap flex-shrink-0 ${activeTab === 'tickets' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
                            >
                                <MessageCircle className="h-4 w-4 mr-1 sm:mr-2" />
                                <span className="hidden sm:inline">Тикеты</span>
@@ -96,7 +96,7 @@ const AdminPage = () => {
                            <Button
                                variant={activeTab === 'storage' ? 'default' : 'ghost'}
                                onClick={() => setActiveTab('storage')}
-                               className={`flex-1 ${activeTab === 'storage' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
+                               className={`whitespace-nowrap flex-shrink-0 ${activeTab === 'storage' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
                            >
                                <HardDrive className="h-4 w-4 mr-1 sm:mr-2" />
                                <span className="hidden sm:inline">Хранилище</span>
@@ -105,7 +105,7 @@ const AdminPage = () => {
                            <Button
                                variant={activeTab === 'logs' ? 'default' : 'ghost'}
                                onClick={() => setActiveTab('logs')}
-                               className={`flex-1 ${activeTab === 'logs' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
+                               className={`whitespace-nowrap flex-shrink-0 ${activeTab === 'logs' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
                            >
                                <History className="h-4 w-4 mr-1 sm:mr-2" />
                                <span className="hidden sm:inline">Логи</span>
@@ -114,7 +114,7 @@ const AdminPage = () => {
                            <Button
                                variant={activeTab === 'error-logs' ? 'default' : 'ghost'}
                                onClick={() => setActiveTab('error-logs')}
-                               className={`flex-1 ${activeTab === 'error-logs' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
+                               className={`whitespace-nowrap flex-shrink-0 ${activeTab === 'error-logs' ? 'bg-purple-600' : 'text-slate-300 hover:text-white'}`}
                            >
                                <AlertTriangle className="h-4 w-4 mr-1 sm:mr-2" />
                                <span className="hidden sm:inline">Ошибки</span>

@@ -110,7 +110,13 @@ class CommandExecutor:
         is_broadcaster: bool = False
     ) -> bool:
         """
-        Проверить права пользователя на выполнение команды
+        Проверить права пользователя на выполнение команды с учетом иерархии ролей
+        
+        Иерархия:
+        - all/everyone: доступно всем (включая всех выше)
+        - vip: доступно VIP, модераторам, владельцу
+        - moderator: доступно модераторам, владельцу
+        - broadcaster/owner: только владелец
         
         Args:
             command: Команда для проверки
@@ -125,7 +131,7 @@ class CommandExecutor:
             if is_broadcaster:
                 return True
             
-            if not command.allowed_roles:
+            if not command.allowed_roles or command.allowed_roles.strip() == '':
                 return True  # Если не указано, доступна всем
             
             allowed = [r.strip().lower() for r in command.allowed_roles.split(',')]
@@ -134,11 +140,37 @@ class CommandExecutor:
             if 'all' in allowed or 'everyone' in allowed:
                 return True
             
-            # Проверяем роли пользователя
+            # Иерархия ролей
             user_roles_lower = [r.lower() for r in user_roles]
+            is_moderator = 'moderator' in user_roles_lower or 'mod' in user_roles_lower
+            is_vip = 'vip' in user_roles_lower
+            is_subscriber = 'subscriber' in user_roles_lower or 'sub' in user_roles_lower
             
+            # Проверка иерархии
             for role in allowed:
-                if role in user_roles_lower:
+                role_lower = role.lower()
+                
+                # Если команда для всех зрителей - доступна всем
+                if role_lower in ['all', 'everyone', 'viewer']:
+                    return True
+                
+                # Если команда для VIP - доступна VIP, модераторам, владельцу
+                if role_lower == 'vip':
+                    if is_vip or is_moderator:
+                        return True
+                
+                # Если команда для модератора - доступна модераторам, владельцу
+                if role_lower == 'moderator' or role_lower == 'mod':
+                    if is_moderator:
+                        return True
+                
+                # Если команда для подписчика - доступна подписчикам, VIP, модераторам, владельцу
+                if role_lower in ['subscriber', 'sub']:
+                    if is_subscriber or is_vip or is_moderator:
+                        return True
+                
+                # Прямое совпадение роли (для обратной совместимости)
+                if role_lower in user_roles_lower:
                     return True
             
             self.logger.debug(f"✗ Permission denied: command requires {allowed}, user has {user_roles_lower}")

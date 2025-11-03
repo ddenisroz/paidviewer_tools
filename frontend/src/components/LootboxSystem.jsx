@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Gift, Trophy, Star, Coins, Calendar, MessageSquare, TrendingUp, Check, X, Settings, BarChart3, Plus } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Gift, Trophy, Star, Coins, Calendar, MessageSquare, TrendingUp, Check, X, Settings, BarChart3, Plus, Sparkles } from 'lucide-react';
 import api from '../services/api';
 import { logger } from '../utils/prodLogger';
 import { CardSkeleton } from './ui/skeleton';
@@ -39,6 +40,10 @@ const LootboxSystem = ({ channelName }) => {
     // Состояние для анимированных лутбоксов
     const [imageLootboxes, setImageLootboxes] = useState([]);
     const [openingLootboxId, setOpeningLootboxId] = useState(null);
+    
+    // Состояние для модального окна результата
+    const [showResultModal, setShowResultModal] = useState(false);
+    const [lootboxResult, setLootboxResult] = useState(null);
 
     // Данные для игрового поля
     const [gameFieldData, setGameFieldData] = useState(() => {
@@ -135,10 +140,38 @@ const LootboxSystem = ({ channelName }) => {
         }
     };
 
-    const showLootboxResult = () => {
-        // Здесь можно добавить модальное окно с результатом
-        // Lootbox result:', result);
-        // TODO: Показать анимацию результата
+    const showLootboxResult = (result) => {
+        // Показываем модальное окно с результатом
+        setLootboxResult(result);
+        setShowResultModal(true);
+        
+        // Автоматически закрываем через 5 секунд
+        setTimeout(() => {
+            setShowResultModal(false);
+        }, 5000);
+    };
+    
+    // Функция для получения цвета по редкости
+    const getRarityColor = (rarity) => {
+        const colors = {
+            common: 'text-gray-500',
+            rare: 'text-blue-500',
+            epic: 'text-purple-500',
+            legendary: 'text-yellow-500',
+            mythical: 'text-pink-500'
+        };
+        return colors[rarity] || 'text-gray-500';
+    };
+    
+    // Функция для получения иконки по типу награды
+    const getRewardIcon = (rewardType) => {
+        const icons = {
+            coins: Coins,
+            items: Gift,
+            special: Star,
+            exclusive: Trophy
+        };
+        return icons[rewardType] || Gift;
     };
 
     // Функции для управления анимированными лутбоксами
@@ -911,6 +944,71 @@ const LootboxSystem = ({ channelName }) => {
                     </div>
                 </TabsContent>
             </Tabs>
+            
+            {/* Модальное окно с результатом открытия лутбокса */}
+            <Dialog open={showResultModal} onOpenChange={setShowResultModal}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Sparkles className="h-5 w-5 text-yellow-500 animate-pulse" />
+                            Поздравляем!
+                        </DialogTitle>
+                        <DialogDescription>
+                            Вы получили награду из лутбокса
+                        </DialogDescription>
+                    </DialogHeader>
+                    
+                    {lootboxResult && (
+                        <div className="space-y-4 py-4">
+                            {/* Визуализация редкости */}
+                            <div className="flex flex-col items-center justify-center space-y-3">
+                                <div className={`text-6xl ${getRarityColor(lootboxResult.rarity)}`}>
+                                    {React.createElement(getRewardIcon(lootboxResult.type), { 
+                                        className: "w-20 h-20 animate-bounce" 
+                                    })}
+                                </div>
+                                
+                                <Badge 
+                                    variant="outline" 
+                                    className={`text-lg px-4 py-1 ${getRarityColor(lootboxResult.rarity)}`}
+                                >
+                                    {lootboxResult.rarity?.toUpperCase()}
+                                </Badge>
+                            </div>
+                            
+                            {/* Информация о награде */}
+                            <div className="bg-muted p-4 rounded-lg space-y-2">
+                                <h3 className="font-semibold text-lg text-center">
+                                    {lootboxResult.name || 'Неизвестная награда'}
+                                </h3>
+                                
+                                {lootboxResult.description && (
+                                    <p className="text-sm text-muted-foreground text-center">
+                                        {lootboxResult.description}
+                                    </p>
+                                )}
+                                
+                                {lootboxResult.value && (
+                                    <div className="flex items-center justify-center gap-2 text-sm">
+                                        <Coins className="h-4 w-4 text-yellow-500" />
+                                        <span className="font-medium">
+                                            {lootboxResult.value} монет
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            {/* Кнопка закрытия */}
+                            <Button 
+                                className="w-full" 
+                                onClick={() => setShowResultModal(false)}
+                            >
+                                Отлично!
+                            </Button>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

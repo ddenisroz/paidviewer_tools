@@ -111,8 +111,13 @@ body {
     --quality-mythical: 310 70% 55%;    /* Мифический */
     
     /* Typography - стандартизированные шрифты */
+    /* Font families with consistent fallbacks to prevent layout shift */
     --font-family-base: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
     --font-family-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+    
+    /* Font rendering optimization */
+    --font-smoothing: antialiased;
+    --font-feature-settings: 'cv11', 'ss01';
   }
  
   .dark {
@@ -146,6 +151,26 @@ body {
     --ring: 266 90% 65%;
   }
 }
+
+/* Правильный перенос эмоджи и Unicode символов */
+@layer base {
+  /* Улучшенная обработка переноса для эмоджи и Unicode */
+  p, span, div, textarea {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    /* Для эмоджи и других Unicode символов */
+  }
+  
+  /* Специально для сообщений в тикетах и чате */
+  .ticket-message,
+  .chat-message,
+  [class*="whitespace-pre-wrap"] {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    /* Сохраняем переносы строк, но правильно обрабатываем эмоджи */
+    white-space: pre-wrap;
+  }
+}
  
 @layer base {
   * {
@@ -153,11 +178,15 @@ body {
   }
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-family-base);
-    font-size: 14px; /* Базовый размер по умолчанию */
-    line-height: 1.5;
-    -webkit-font-smoothing: antialiased;
+    font-family: var(--font-family-base) !important;
+    font-size: 14px !important; /* Базовый размер по умолчанию */
+    line-height: 1.5 !important;
+    -webkit-font-smoothing: var(--font-smoothing);
     -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: var(--font-feature-settings);
+    /* Prevent font size changes during render */
+    text-size-adjust: 100%;
+    -webkit-text-size-adjust: 100%;
   }
   
   /* Устанавливаем базовые размеры для предотвращения FOUT */

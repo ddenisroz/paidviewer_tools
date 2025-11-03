@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Play, SkipForward, Trash2, Plus, Search, Clock, User, ExternalLink } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { botService } from '../services/microservices';
+import { logger } from '../utils/prodLogger';
 
 const YouTubeQueueCarousel = () => {
   const { user } = useAuth();
@@ -18,8 +19,8 @@ const YouTubeQueueCarousel = () => {
         withCredentials: true
       });
       const data = response.data;
-      // Обрабатываем новый формат ответа
-      if (data.current_video && data.queue) {
+        // Обрабатываем новый формат ответа
+        if (data.current_video && data.queue) {
         return [data.current_video, ...data.queue];
       } else {
         return Array.isArray(data) ? data : [];
@@ -30,7 +31,7 @@ const YouTubeQueueCarousel = () => {
     refetchOnMount: true,
     refetchOnWindowFocus: false,
     onError: (err) => {
-      console.error('Error loading queue:', err);
+      logger.error('Error loading queue:', err);
     },
   });
 
@@ -47,7 +48,7 @@ const YouTubeQueueCarousel = () => {
       setShowAddForm(false);
     },
     onError: (error) => {
-      console.error('Error adding video:', error);
+      logger.error('Error adding video:', error);
     },
   });
 
@@ -68,7 +69,7 @@ const YouTubeQueueCarousel = () => {
       queryClient.invalidateQueries({ queryKey: ['youtube-queue'] });
     },
     onError: (error) => {
-      console.error('Error removing video:', error);
+      logger.error('Error removing video:', error);
     },
   });
 
@@ -80,16 +81,16 @@ const YouTubeQueueCarousel = () => {
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['youtube-queue'] });
-      // Уведомляем другие вкладки
-      window.dispatchEvent(new CustomEvent('youtube_event', {
-        detail: {
-          event: 'video_played',
+        // Уведомляем другие вкладки
+        window.dispatchEvent(new CustomEvent('youtube_event', {
+          detail: {
+            event: 'video_played',
           data: { video: variables }
-        }
-      }));
+          }
+        }));
     },
     onError: (error) => {
-      console.error('Error playing video:', error);
+      logger.error('Error playing video:', error);
     },
   });
 
@@ -103,7 +104,7 @@ const YouTubeQueueCarousel = () => {
       queryClient.invalidateQueries({ queryKey: ['youtube-queue'] });
     },
     onError: (error) => {
-      console.error('Error marking as played:', error);
+      logger.error('Error marking as played:', error);
     },
   });
 
@@ -117,7 +118,7 @@ const YouTubeQueueCarousel = () => {
       queryClient.invalidateQueries({ queryKey: ['youtube-queue'] });
     },
     onError: (error) => {
-      console.error('Error clearing queue:', error);
+      logger.error('Error clearing queue:', error);
     },
   });
 

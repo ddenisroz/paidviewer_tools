@@ -61,15 +61,8 @@ export const usePageAnimation = (pageKey, delay = 100) => {
  * @returns {{ className: string, style: object }} Объект с className и style
  */
 export const getAnimationClasses = (shouldAnimate, contentLoaded, delay = 0) => {
-    if (!shouldAnimate) {
-        // Если анимация отключена, сразу показываем контент
-        return { className: 'opacity-100 translate-y-0', style: {} };
-    }
-    
-    // Если анимация включена, используем transition
-    const className = `transition-all duration-500 ${contentLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`;
-    const style = delay > 0 ? { transitionDelay: `${delay}ms` } : {};
-    
-    return { className, style };
+    // ВСЕГДА показываем контент сразу - никаких анимаций появления
+    // Это предотвращает видимую отрисовку элементов
+    return { className: '', style: {} };
 };
 
