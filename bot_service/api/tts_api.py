@@ -218,21 +218,10 @@ def check_user_whitelisted(user: dict = Depends(get_current_user), db: Session =
     if not db_user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
     
-    # Проверяем по Twitch username
-    if db_user.twitch_username:
-        twitch_whitelisted = db.query(WhitelistedChannel).filter(
-            WhitelistedChannel.channel_name == db_user.twitch_username.lower()
-        ).first()
-        if twitch_whitelisted:
-            return user
-    
-    # Проверяем по VK username
-    if db_user.vk_username:
-        vk_whitelisted = db.query(WhitelistedChannel).filter(
-            WhitelistedChannel.channel_name == db_user.vk_username.lower()
-        ).first()
-        if vk_whitelisted:
-            return user
+    # Проверяем whitelist с кешированием
+    from utils.whitelist_cache import is_user_whitelisted_cached
+    if is_user_whitelisted_cached(db_user, db):
+        return user
     
     raise HTTPException(
         status_code=403, 
@@ -433,22 +422,9 @@ async def update_tts_engine(
             if not db_user:
                 raise HTTPException(status_code=404, detail="Пользователь не найден")
             
-            login_platform = current_user.get('login_platform')
-            is_whitelisted = False
-            
-            if login_platform == 'twitch' and db_user.twitch_username:
-                twitch_whitelisted = db.query(WhitelistedChannel).filter(
-                    WhitelistedChannel.channel_name == db_user.twitch_username.lower(),
-                    WhitelistedChannel.platform == 'twitch'
-                ).first()
-                is_whitelisted = bool(twitch_whitelisted)
-                
-            elif login_platform == 'vk' and db_user.vk_username:
-                vk_whitelisted = db.query(WhitelistedChannel).filter(
-                    WhitelistedChannel.channel_name == db_user.vk_username.lower(),
-                    WhitelistedChannel.platform == 'vk'
-                ).first()
-                is_whitelisted = bool(vk_whitelisted)
+            # Проверяем whitelist с кешированием (независимо от login_platform)
+            from utils.whitelist_cache import is_user_whitelisted_cached
+            is_whitelisted = is_user_whitelisted_cached(db_user, db)
             
             if not is_whitelisted:
                 channel_name = db_user.twitch_username or db_user.vk_username or 'неизвестен'
@@ -672,32 +648,16 @@ async def get_tts_status(
         # Если есть локальный endpoint, считаем что пользователь может использовать локальный TTS без whitelist
         has_local_setup = local_endpoint and local_endpoint.is_healthy
         
-        # Проверяем whitelist статус
+        # Проверяем whitelist статус (с кешированием)
         # ВАЖНО: Проверяем обе платформы, так как пользователь может быть в whitelist на любой из них
+        from utils.whitelist_cache import is_user_whitelisted_cached
         login_platform = current_user.get('login_platform')
-        is_whitelisted = False
+        is_whitelisted = is_user_whitelisted_cached(user, db)
         
-        # Проверяем Twitch whitelist
-        if user.twitch_username:
-            twitch_whitelisted = db.query(WhitelistedChannel).filter(
-                WhitelistedChannel.channel_name == user.twitch_username.lower(),
-                WhitelistedChannel.platform == 'twitch'
-            ).first()
-            if twitch_whitelisted:
-                is_whitelisted = True
-                logger.info(f"✅ [TTS STATUS] User {user_id} ({user.twitch_username}) whitelisted on Twitch")
-        
-        # Проверяем VK whitelist (если не найден в Twitch)
-        if not is_whitelisted and user.vk_username:
-            vk_whitelisted = db.query(WhitelistedChannel).filter(
-                WhitelistedChannel.channel_name == user.vk_username.lower(),
-                WhitelistedChannel.platform == 'vk'
-            ).first()
-            if vk_whitelisted:
-                is_whitelisted = True
-                logger.info(f"✅ [TTS STATUS] User {user_id} ({user.vk_username}) whitelisted on VK")
-        
-        if not is_whitelisted and not has_local_setup:
+        if is_whitelisted:
+            platform_name = user.twitch_username if user.twitch_username else user.vk_username
+            logger.info(f"✅ [TTS STATUS] User {user_id} ({platform_name}) whitelisted")
+        elif not has_local_setup:
             logger.warning(f"❌ [TTS STATUS] User {user_id} (twitch: {user.twitch_username}, vk: {user.vk_username}) NOT whitelisted, login_platform: {login_platform}")
         
         return JSONResponse(content={
@@ -1329,41 +1289,34 @@ async def check_whitelist_status(
             }
         
         # Проверяем whitelist ТОЛЬКО для платформы авторизации
-        if login_platform == 'twitch':
-            if not db_user.twitch_username:
-                return {"is_whitelisted": False, "can_manage_voices": False}
-                
-            twitch_whitelisted = db.query(WhitelistedChannel).filter(
-                WhitelistedChannel.channel_name == db_user.twitch_username.lower(),
-                WhitelistedChannel.platform == 'twitch'
-            ).first()
-            
-            if twitch_whitelisted:
-                logger.info(f"✅ User {db_user.twitch_username} whitelisted on Twitch")
-                return {"is_whitelisted": True, "can_manage_voices": True, "platform": "twitch"}
-            else:
-                logger.warning(f"❌ User {db_user.twitch_username} NOT whitelisted on Twitch")
-                return {"is_whitelisted": False, "can_manage_voices": False}
+        # Проверяем whitelist с кешированием (проверяем обе платформы)
+        from utils.whitelist_cache import is_user_whitelisted_cached
+        is_whitelisted = is_user_whitelisted_cached(db_user, db)
         
-        elif login_platform == 'vk':
-            if not db_user.vk_username:
-                return {"is_whitelisted": False, "can_manage_voices": False}
-                
-            vk_whitelisted = db.query(WhitelistedChannel).filter(
-                WhitelistedChannel.channel_name == db_user.vk_username.lower(),
-                WhitelistedChannel.platform == 'vk'
-            ).first()
+        if is_whitelisted:
+            # Определяем платформу
+            platform = None
+            channel_name = None
+            if db_user.twitch_username:
+                # Проверяем конкретно Twitch whitelist
+                from utils.whitelist_cache import is_channel_whitelisted_cached
+                if is_channel_whitelisted_cached(db_user.twitch_username.lower(), 'twitch', db):
+                    platform = "twitch"
+                    channel_name = db_user.twitch_username
+                elif db_user.vk_username and is_channel_whitelisted_cached(db_user.vk_username.lower(), 'vk', db):
+                    platform = "vk"
+                    channel_name = db_user.vk_username
+            elif db_user.vk_username:
+                platform = "vk"
+                channel_name = db_user.vk_username
             
-            if vk_whitelisted:
-                logger.info(f"✅ User {db_user.vk_username} whitelisted on VK")
-                return {"is_whitelisted": True, "can_manage_voices": True, "platform": "vk"}
-            else:
-                logger.warning(f"❌ User {db_user.vk_username} NOT whitelisted on VK")
-                return {"is_whitelisted": False, "can_manage_voices": False}
+            if platform:
+                logger.info(f"✅ User {channel_name} whitelisted on {platform}")
+                return {"is_whitelisted": True, "can_manage_voices": True, "platform": platform}
         
-        else:
-            logger.error(f"Unknown login_platform: {login_platform}")
-            return {"is_whitelisted": False, "can_manage_voices": False}
+        channel_name = db_user.twitch_username or db_user.vk_username or 'неизвестен'
+        logger.warning(f"❌ User {channel_name} NOT whitelisted")
+        return {"is_whitelisted": False, "can_manage_voices": False}
             
     except Exception as e:
         logger.error(f"Error checking whitelist status: {e}")

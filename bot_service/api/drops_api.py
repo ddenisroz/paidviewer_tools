@@ -314,8 +314,16 @@ async def get_drops_rewards(
         
         rewards = query.all()
         
-        # Получаем информацию о качествах
-        qualities = {q.id: {"name": q.name, "color": q.color} for q in db.query(DropsQuality).all()}
+        # Получаем информацию о качествах одним запросом (оптимизация N+1)
+        # Используем только те quality_id, которые реально используются в rewards
+        quality_ids = {reward.quality_id for reward in rewards if reward.quality_id}
+        if quality_ids:
+            qualities = {
+                q.id: {"name": q.name, "color": q.color, "id": q.id}
+                for q in db.query(DropsQuality).filter(DropsQuality.id.in_(quality_ids)).all()
+            }
+        else:
+            qualities = {}
         
         return {
             "success": True,
@@ -630,8 +638,16 @@ async def get_drops_history(
             DropsHistory.platform == platform
         ).order_by(DropsHistory.created_at.desc()).offset(offset).limit(limit).all()
         
-        # Получаем информацию о качествах
-        qualities = {q.id: {"name": q.name, "color": q.color} for q in db.query(DropsQuality).all()}
+        # Получаем информацию о качествах одним запросом (оптимизация N+1)
+        # Используем только те quality_id, которые реально используются в истории
+        quality_ids = {entry.quality_id for entry in history if entry.quality_id}
+        if quality_ids:
+            qualities = {
+                q.id: {"name": q.name, "color": q.color, "id": q.id}
+                for q in db.query(DropsQuality).filter(DropsQuality.id.in_(quality_ids)).all()
+            }
+        else:
+            qualities = {}
         
         return {
             "success": True,
@@ -639,7 +655,7 @@ async def get_drops_history(
                 {
                     "id": entry.id,
                     "viewer_name": entry.viewer_name,
-                    "drops_type": entry.drops_type,
+                    "drops_type": entry.lootbox_type,  # Поле в БД называется lootbox_type
                     "quality": qualities.get(entry.quality_id, {}),
                     "reward_name": entry.reward_name,
                     "reward_type": entry.reward_type,

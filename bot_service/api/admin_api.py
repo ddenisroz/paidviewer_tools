@@ -64,27 +64,10 @@ async def get_admin_list(
         return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
 
 def _is_user_whitelisted(user: User, db: Session) -> bool:
-    """Проверяет, находится ли пользователь в whitelist"""
+    """Проверяет, находится ли пользователь в whitelist (с кешированием)"""
     try:
-        from core.database import WhitelistedChannel
-        
-        # Проверяем по Twitch username
-        if user.twitch_username:
-            twitch_whitelisted = db.query(WhitelistedChannel).filter(
-                WhitelistedChannel.channel_name == user.twitch_username.lower()
-            ).first()
-            if twitch_whitelisted:
-                return True
-        
-        # Проверяем по VK username
-        if user.vk_username:
-            vk_whitelisted = db.query(WhitelistedChannel).filter(
-                WhitelistedChannel.channel_name == user.vk_username.lower()
-            ).first()
-            if vk_whitelisted:
-                return True
-        
-        return False
+        from utils.whitelist_cache import is_user_whitelisted_cached
+        return is_user_whitelisted_cached(user, db)
     except Exception as e:
         logger.error(f"Error checking whitelist status: {e}")
         return False
@@ -457,6 +440,10 @@ async def add_to_whitelist(
         db.add(whitelist_user)
         db.commit()
         
+        # Инвалидируем кеш whitelist
+        from utils.whitelist_cache import invalidate_whitelist_cache
+        invalidate_whitelist_cache(username, platform)
+        
         logger.info(f"✅ WHITELIST: Канал '{username}' добавлен в белый список")
         return JSONResponse(content={"success": True, "message": f"User {username} added to whitelist"})
     except Exception as e:
@@ -515,8 +502,13 @@ async def remove_from_whitelist(
         if not whitelist_user:
             return JSONResponse(content={"success": False, "error": f"User {username} not found in whitelist"}, status_code=404)
         
+        platform = whitelist_user.platform
         db.delete(whitelist_user)
         db.commit()
+        
+        # Инвалидируем кеш whitelist
+        from utils.whitelist_cache import invalidate_whitelist_cache
+        invalidate_whitelist_cache(username, platform)
         
         logger.info(f"🗑️ WHITELIST: Канал '{username}' удален из белого списка")
         return JSONResponse(content={"success": True, "message": f"User {username} removed from whitelist"})
