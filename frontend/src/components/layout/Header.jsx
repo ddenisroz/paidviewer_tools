@@ -98,7 +98,7 @@ const Header = () => {
     };
 
     return (
-        <header className="hidden">
+        <header className="flex h-16 items-center justify-end gap-2 sm:gap-4 px-3 sm:px-6 lg:h-[70px] bg-muted/40">
             {/* Кнопка интеграций (для всех авторизованных пользователей, включая гостей) */}
             {isAuthenticated && (
                 <div className="relative integrations-menu">
