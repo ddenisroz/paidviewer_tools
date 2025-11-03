@@ -294,34 +294,46 @@ class TokenRefreshService:
                 logger.error("DonationAlerts credentials not configured")
                 return False
             
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                logger.info(f"📡 Requesting new DonationAlerts token for user {token.user_id}")
+            # Запрос к DonationAlerts OAuth с retry
+            async def _do_refresh():
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    return await client.post(
+                        "https://www.donationalerts.com/oauth/token",
+                        data={
+                            "client_id": client_id,
+                            "client_secret": client_secret,
+                            "grant_type": "refresh_token",
+                            "refresh_token": refresh_token
+                        }
+                    )
+            
+            logger.info(f"📡 Requesting new DonationAlerts token for user {token.user_id}")
+            response = await retry_async(
+                _do_refresh,
+                max_attempts=3,
+                initial_delay=2.0,
+                retry_on=(httpx.NetworkError, httpx.TimeoutException, aiohttp.ClientError)
+            )
+            
+            if not response:
+                logger.error("❌ Failed to refresh DonationAlerts token after retries")
+                return False
+            
+            if response.status_code == 200:
+                data = response.json()
                 
-                response = await client.post(
-                    "https://www.donationalerts.com/oauth/token",
-                    data={
-                        "client_id": client_id,
-                        "client_secret": client_secret,
-                        "grant_type": "refresh_token",
-                        "refresh_token": refresh_token
-                    }
-                )
+                token.access_token = encrypt_token(data["access_token"])
+                token.refresh_token = encrypt_token(data["refresh_token"])
+                token.expires_at = utcnow_naive() + timedelta(seconds=data["expires_in"])
+                token.updated_at = utcnow_naive()
                 
-                if response.status_code == 200:
-                    data = response.json()
-                    
-                    token.access_token = encrypt_token(data["access_token"])
-                    token.refresh_token = encrypt_token(data["refresh_token"])
-                    token.expires_at = utcnow_naive() + timedelta(seconds=data["expires_in"])
-                    token.updated_at = utcnow_naive()
-                    
-                    db.commit()
-                    
-                    logger.info(f"✅ DonationAlerts token refreshed for user {token.user_id}")
-                    return True
-                else:
-                    logger.error(f"❌ Failed to refresh DA token: {response.status_code}")
-                    return False
+                db.commit()
+                
+                logger.info(f"✅ DonationAlerts token refreshed for user {token.user_id}")
+                return True
+            else:
+                logger.error(f"❌ Failed to refresh DA token: {response.status_code}")
+                return False
                     
         except Exception as e:
             logger.error(f"Error refreshing DonationAlerts token: {e}", exc_info=True)
