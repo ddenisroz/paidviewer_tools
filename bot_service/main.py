@@ -723,6 +723,13 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
                 if history_data:
                     sample_msg = history_data[0]
                     logger.info(f"📜 [WS HISTORY] Sample message: author={sample_msg.get('author')}, badges={sample_msg.get('badges')}, role={sample_msg.get('role')}")
+                    # DEBUG: Проверяем все поля сообщения из БД
+                    if messages:
+                        raw_msg = messages[-1]  # Первое сообщение из БД
+                        import json
+                        logger.info(f"🔍 [DEBUG] Raw DB message badges type: {type(raw_msg.badges)}, value: {raw_msg.badges}")
+                        if raw_msg.badges:
+                            logger.info(f"🔍 [DEBUG] Raw DB message badges JSON: {json.dumps(raw_msg.badges) if not isinstance(raw_msg.badges, str) else raw_msg.badges}")
                 
                 logger.info(f"📜 Sent {len(history_data)} messages history to ChatOverlay")
         finally:
