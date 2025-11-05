@@ -29,21 +29,21 @@ const TtsSettings = ({
     };
 
     return (
-        <Card className="mt-0">
+        <Card className="mt-0 h-full">
             <CardHeader 
-                className="cursor-pointer hover:bg-gray-800/30 transition-colors"
+                className="cursor-pointer hover:bg-gray-800/30 transition-colors pb-2"
                 onClick={() => setIsExpanded(!isExpanded)}
             >
                 <div className="flex items-center justify-between">
-                    <CardTitle>Дополнительные настройки TTS</CardTitle>
+                    <CardTitle className="text-sm">⚙️ Настройки</CardTitle>
                     <ChevronDown 
                         className={`h-5 w-5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
                     />
                 </div>
             </CardHeader>
             {isExpanded && (
-            <CardContent className="pt-4">
-                <div className="space-y-4">
+            <CardContent className="pt-0">
+                <div className="space-y-2">
                     {/* Настройки смайлов в 2 колонки */}
                     <div className="grid grid-cols-2 gap-2">
                         <div className="flex items-center gap-3 p-2.5 bg-gray-800/50 rounded-lg">

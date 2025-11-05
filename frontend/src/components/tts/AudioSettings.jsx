@@ -50,14 +50,14 @@ const AudioSettings = ({
     }
     
     return (
-        <Card className="mt-0">
+        <Card className="mt-0 h-full">
             <CardHeader className="pb-2">
-                <CardTitle className="text-base">Громкость</CardTitle>
+                <CardTitle className="text-sm">🔊 Громкость</CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-                <div className="space-y-3">
+                <div className="space-y-2">
                     {/* Громкость для сайта */}
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                         <div className="flex items-center gap-3 px-1">
                             <Slider
                                 id="volume-slider"
