@@ -38,27 +38,25 @@ const AudioSettings = ({
             <CardHeader>
                 <CardTitle className="text-base font-semibold text-white">Аудио</CardTitle>
             </CardHeader>
-            <CardContent className="pt-4">
-                <div className="space-y-3">
+            <CardContent className="pt-3">
+                <div className="space-y-2">
                     {/* Громкость для сайта */}
                     <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Громкость сайта</label>
-                        <div className="flex items-center gap-4">
-                            <Slider
-                                id="volume-slider"
-                                min={0}
-                                max={100}
-                                step={1}
-                                value={[localVolume]}
-                                onValueChange={(value) => handleVolumeChange(value[0])}
-                                className="flex-1"
-                            />
-                            <div className="min-w-fit">
-                                <span className="text-sm font-bold text-purple-300 bg-purple-500/20 px-3 py-1 rounded border border-purple-500/40">
-                                    {localVolume}%
-                                </span>
-                            </div>
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="text-xs font-semibold text-gray-400">Громкость</label>
+                            <span className="text-xs font-bold text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded">
+                                {localVolume}%
+                            </span>
                         </div>
+                        <Slider
+                            id="volume-slider"
+                            min={0}
+                            max={100}
+                            step={1}
+                            value={[localVolume]}
+                            onValueChange={(value) => handleVolumeChange(value[0])}
+                            className="flex-1"
+                        />
                     </div>
                 </div>
             </CardContent>
