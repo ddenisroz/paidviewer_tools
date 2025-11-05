@@ -299,9 +299,14 @@ async def block_user(
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
+        # ✅ NULL CHECK: Запрашиваем пользователя
         target_user = db.query(User).filter(User.id == user_id).first()
         if not target_user:
             raise HTTPException(status_code=404, detail="User not found")
+        
+        # ✅ SAFETY CHECK: Убеждаемся что user объект корректен
+        if not hasattr(target_user, 'is_blocked') or not hasattr(target_user, 'blocked_reason'):
+            raise HTTPException(status_code=500, detail="User object corrupted")
         
         blocked_channels = []
         
@@ -400,9 +405,14 @@ async def unblock_user(
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
+        # ✅ NULL CHECK: Запрашиваем пользователя
         target_user = db.query(User).filter(User.id == user_id).first()
         if not target_user:
             raise HTTPException(status_code=404, detail="User not found")
+        
+        # ✅ SAFETY CHECK: Убеждаемся что user объект корректен
+        if not hasattr(target_user, 'is_blocked') or not hasattr(target_user, 'blocked_reason'):
+            raise HTTPException(status_code=500, detail="User object corrupted")
         
         unblocked_channels = []
         
@@ -572,7 +582,7 @@ async def add_to_whitelist(
         if platform not in ("twitch", "vk"):
             platform = "twitch"
         
-        # Проверяем, не добавлен ли уже
+        # ✅ NULL CHECK: Проверяем, не добавлен ли уже
         from core.database import WhitelistedChannel
         existing = db.query(WhitelistedChannel).filter(
             WhitelistedChannel.channel_name == username,
@@ -581,15 +591,27 @@ async def add_to_whitelist(
         
         if existing:
             logger.warning(f"⚠️ WHITELIST: Попытка добавить уже существующий канал '{username}'")
-            return JSONResponse(content={"success": False, "error": f"User {username} is already in whitelist"}, status_code=400)
+            return JSONResponse(
+                content={"success": False, "error": f"User {username} is already in whitelist"}, 
+                status_code=400
+            )
         
-        # Добавляем в whitelist
-        whitelist_user = WhitelistedChannel(
-            channel_name=username,
-            platform=platform
-        )
-        db.add(whitelist_user)
-        db.commit()
+        # ✅ SAFETY: Добавляем в whitelist с обработкой ошибок
+        try:
+            whitelist_user = WhitelistedChannel(
+                channel_name=username,
+                platform=platform
+            )
+            if not whitelist_user:
+                raise ValueError("Failed to create WhitelistedChannel object")
+            
+            db.add(whitelist_user)
+            db.commit()
+            db.refresh(whitelist_user)  # ✅ Обновляем объект из БД
+        except Exception as db_error:
+            db.rollback()
+            logger.error(f"❌ WHITELIST: Error creating whitelist entry: {db_error}")
+            raise
         
         # Инвалидируем кеш whitelist (передаем db для точной инвалидации кеша пользователей)
         from utils.whitelist_cache import invalidate_whitelist_cache

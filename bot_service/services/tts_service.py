@@ -267,7 +267,13 @@ class TTSService:
                                filter_replies: bool = None, filter_mentions: bool = None) -> bool:
         """Сохранить базовые настройки TTS пользователя"""
         try:
-            # Ищем настройки по user_id или session_id
+            # ✅ VALIDATION: Проверяем что хотя бы один идентификатор передан
+            if user_id is None and session_id is None:
+                logger.error("❌ Either user_id or session_id must be provided")
+                raise ValueError("Either user_id or session_id must be provided")
+            
+            # ✅ NULL CHECK: Ищем настройки по user_id или session_id
+            settings = None
             if user_id is not None:
                 settings = self.db.query(TTSUserSettings).filter(
                     TTSUserSettings.user_id == user_id
@@ -276,8 +282,6 @@ class TTSService:
                 settings = self.db.query(TTSUserSettings).filter(
                     TTSUserSettings.session_id == session_id
                 ).first()
-            else:
-                raise ValueError("Either user_id or session_id must be provided")
             
             if settings:
                 # Обновляем существующие настройки
@@ -431,14 +435,22 @@ class TTSService:
                 return False
             
             from core.database import User
+            # ✅ NULL CHECK: Запрашиваем пользователя
             user = self.db.query(User).filter(User.id == user_id).first()
             if not user:
                 logger.error(f"❌ [TTS Service] User {user_id} not found in database")
+                # Создаем запись если нужно или возвращаем ошибку
+                return False
+            
+            # ✅ SAFETY CHECK: Убеждаемся что user объект корректен
+            if not hasattr(user, 'tts_enabled'):
+                logger.error(f"❌ [TTS Service] User object missing tts_enabled attribute")
                 return False
             
             # Сохраняем состояние TTS в БД
             user.tts_enabled = True
             self.db.commit()
+            self.db.refresh(user)  # ✅ Обновляем объект из БД
             
             # Добавляем канал в connection manager
             from core.connection_manager import get_connection_manager
@@ -483,14 +495,21 @@ class TTSService:
                 return False
             
             from core.database import User
+            # ✅ NULL CHECK: Запрашиваем пользователя
             user = self.db.query(User).filter(User.id == user_id).first()
             if not user:
                 logger.error(f"❌ [TTS Service] User {user_id} not found in database")
                 return False
             
+            # ✅ SAFETY CHECK: Убеждаемся что user объект корректен
+            if not hasattr(user, 'tts_enabled'):
+                logger.error(f"❌ [TTS Service] User object missing tts_enabled attribute")
+                return False
+            
             # Сохраняем состояние TTS в БД
             user.tts_enabled = False
             self.db.commit()
+            self.db.refresh(user)  # ✅ Обновляем объект из БД
             
             # Удаляем канал из connection manager
             from core.connection_manager import get_connection_manager
@@ -522,14 +541,26 @@ class TTSService:
     async def save_listening_mode(self, user_id: int, listening_mode: str) -> bool:
         """Сохранить режим прослушивания пользователя"""
         try:
+            # ✅ VALIDATION: Проверяем входные данные
+            if not user_id or not listening_mode:
+                logger.error(f"Invalid parameters: user_id={user_id}, listening_mode={listening_mode}")
+                return False
+            
             from core.database import User
+            # ✅ NULL CHECK: Запрашиваем пользователя
             user = self.db.query(User).filter(User.id == user_id).first()
             if not user:
                 logger.error(f"User {user_id} not found")
                 return False
             
+            # ✅ SAFETY CHECK: Убеждаемся что user объект имеет нужное поле
+            if not hasattr(user, 'tts_listening_mode'):
+                logger.error(f"User object missing tts_listening_mode attribute")
+                return False
+            
             user.tts_listening_mode = listening_mode
             self.db.commit()
+            self.db.refresh(user)  # ✅ Обновляем объект из БД
             
             logger.info(f"Listening mode saved for user {user_id}: {listening_mode}")
             return True

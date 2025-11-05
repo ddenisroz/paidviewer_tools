@@ -495,8 +495,20 @@ async def update_tts_engine(
         tts_service = TTSService(db)
         user_filters = UserIdentityService.get_database_filters(current_user)
         
-        # Получаем текущие настройки
+        # ✅ NULL CHECK: Получаем текущие настройки
         settings = await tts_service.get_tts_settings(**user_filters)
+        if not settings or not isinstance(settings, dict):
+            logger.warning(f"⚠️ [TTS ENGINE] Got invalid settings: {settings}, using defaults")
+            settings = {
+                'enable_7tv': True,
+                'enable_twitch': True,
+                'enable_lexicon_filter': True,
+                'enable_custom_lexicon': False,
+                'voice': 'female_1',
+                'listening_mode': 'website',
+                'max_message_length': 500,
+                'skip_commands': True
+            }
         
         # Обновляем только engine и use_local_tts
         success = await tts_service.save_tts_settings(

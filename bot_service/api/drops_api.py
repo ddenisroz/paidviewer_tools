@@ -396,7 +396,7 @@ async def create_drops_reward(
 ):
     """Создает новую награду в лутбоксе"""
     try:
-        # Проверяем существование качества
+        # ✅ NULL CHECK: Проверяем существование качества
         quality = db.query(DropsQuality).filter(DropsQuality.id == reward_data.quality_id).first()
         if not quality:
             # Логируем для отладки - какие качества есть в БД
@@ -405,29 +405,46 @@ async def create_drops_reward(
             logger.warning(f"Quality with id {reward_data.quality_id} not found. Available quality IDs: {available_ids}")
             raise HTTPException(status_code=400, detail=f"Качество с ID {reward_data.quality_id} не найдено. Доступные ID: {available_ids}")
         
+        # ✅ SAFETY CHECK: Убеждаемся что quality объект корректен
+        if not hasattr(quality, 'id') or not hasattr(quality, 'name'):
+            raise HTTPException(status_code=500, detail="Quality object corrupted")
+        
         # Санитизируем входные данные
         reward_data.name = sanitize_html(reward_data.name)
         if reward_data.description:
             reward_data.description = sanitize_html(reward_data.description)
         
-        reward = DropsReward(
-            user_id=current_user["id"],
-            channel_name=channel_name,
-            platform=platform,
-            name=reward_data.name,
-            description=reward_data.description,
-            quality_id=reward_data.quality_id,
-            weight=reward_data.weight,
-            reward_type=reward_data.reward_type,
-            reward_value=reward_data.reward_value,
-            image_url=reward_data.image_url,
-            sound_volume=reward_data.sound_volume,
-            is_active=reward_data.is_active
-        )
+        # ✅ SAFETY: Создаем reward с проверкой
+        try:
+            reward = DropsReward(
+                user_id=current_user["id"],
+                channel_name=channel_name,
+                platform=platform,
+                name=reward_data.name,
+                description=reward_data.description,
+                quality_id=reward_data.quality_id,
+                weight=reward_data.weight,
+                reward_type=reward_data.reward_type,
+                reward_value=reward_data.reward_value,
+                image_url=reward_data.image_url,
+                sound_volume=reward_data.sound_volume,
+                is_active=reward_data.is_active
+            )
+            if not reward:
+                raise ValueError("Failed to create DropsReward object")
+        except Exception as creation_error:
+            logger.error(f"❌ Error creating DropsReward object: {creation_error}")
+            raise HTTPException(status_code=500, detail="Ошибка создания объекта награды")
         
-        db.add(reward)
-        db.commit()
-        db.refresh(reward)
+        # ✅ TRANSACTION: Добавляем reward в БД
+        try:
+            db.add(reward)
+            db.commit()
+            db.refresh(reward)  # ✅ Обновляем объект из БД
+        except Exception as db_error:
+            db.rollback()
+            logger.error(f"❌ Error saving DropsReward to DB: {db_error}")
+            raise HTTPException(status_code=500, detail="Ошибка сохранения награды в базу данных")
         
         # Отправляем WebSocket уведомление для синхронизации фронтенда
         try:
@@ -471,6 +488,7 @@ async def update_drops_reward(
 ):
     """Обновляет награду в лутбоксе"""
     try:
+        # ✅ NULL CHECK: Запрашиваем reward
         reward = db.query(DropsReward).filter(
             DropsReward.id == reward_id,
             DropsReward.user_id == current_user["id"]
@@ -479,15 +497,25 @@ async def update_drops_reward(
         if not reward:
             raise HTTPException(status_code=404, detail="Награда не найдена")
         
-        # Обновляем только переданные поля
-        update_data = reward_data.dict(exclude_unset=True)
-        for field, value in update_data.items():
-            if field in ["name", "description"] and value:
-                value = sanitize_html(value)
-            setattr(reward, field, value)
+        # ✅ SAFETY CHECK: Убеждаемся что reward объект корректен
+        if not hasattr(reward, 'id'):
+            raise HTTPException(status_code=500, detail="Reward object corrupted")
         
-        reward.updated_at = utcnow_naive()
-        db.commit()
+        # ✅ SAFETY: Обновляем только переданные поля с обработкой ошибок
+        try:
+            update_data = reward_data.dict(exclude_unset=True)
+            for field, value in update_data.items():
+                if field in ["name", "description"] and value:
+                    value = sanitize_html(value)
+                setattr(reward, field, value)
+            
+            reward.updated_at = utcnow_naive()
+            db.commit()
+            db.refresh(reward)  # ✅ Обновляем объект из БД
+        except Exception as update_error:
+            db.rollback()
+            logger.error(f"❌ Error updating DropsReward: {update_error}")
+            raise HTTPException(status_code=500, detail="Ошибка обновления награды")
         
         # Отправляем WebSocket уведомление для синхронизации фронтенда
         try:
