@@ -19,9 +19,8 @@ structlog
 psutil
 
 # === DATABASE ===
-# PostgreSQL driver (для production)
+# PostgreSQL driver (required)
 psycopg2-binary>=2.9.9
-# SQLite встроен в Python, дополнительный драйвер не нужен
 
 # Modern security and configuration libraries
 cryptography==41.0.7
