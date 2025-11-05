@@ -264,7 +264,8 @@ class TTSService:
                                engine: str = None, voice: str = None, listening_mode: str = None,
                                max_message_length: int = None, skip_commands: bool = None,
                                use_local_tts: bool = None,
-                               filter_replies: bool = None, filter_mentions: bool = None) -> bool:
+                               filter_replies: bool = None, filter_mentions: bool = None,
+                               client_version: int = None) -> dict:
         """Сохранить базовые настройки TTS пользователя"""
         try:
             # ✅ VALIDATION: Проверяем что хотя бы один идентификатор передан
@@ -284,6 +285,13 @@ class TTSService:
                 ).first()
             
             if settings:
+                # ✅ VERSION CHECK: Проверяем что версия совпадает (защита от race conditions)
+                if client_version is not None and hasattr(settings, 'version'):
+                    if settings.version != client_version:
+                        logger.warning(f"Version conflict: DB version={settings.version}, client version={client_version}")
+                        # Возвращаем специальный статус для 409 Conflict
+                        return {"success": False, "error": "Version conflict", "current_version": settings.version}
+                
                 # Обновляем существующие настройки
                 settings.enable_7tv = enable_7tv
                 settings.enable_twitch = enable_twitch
@@ -308,6 +316,10 @@ class TTSService:
                     settings.filter_replies = filter_replies
                 if filter_mentions is not None:
                     settings.filter_mentions = filter_mentions
+                
+                # ✅ INCREMENT VERSION: Инкрементируем версию после обновления
+                if hasattr(settings, 'version'):
+                    settings.version += 1
             else:
                 # Создаем новые настройки для любого пользователя (включая гостей)
                 settings = TTSUserSettings(
@@ -328,13 +340,15 @@ class TTSService:
                 self.db.add(settings)
             
             self.db.commit()
+            self.db.refresh(settings)  # ✅ Получаем свежие данные из БД
             logger.info(f"TTS settings saved for user {user_id}: engine={settings.engine}, voice={settings.voice}, "
                        f"mode={settings.listening_mode}, 7TV={enable_7tv}, Twitch={enable_twitch}")
-            return True
+            # ✅ Возвращаем успех с новой версией
+            return {"success": True, "version": settings.version if hasattr(settings, 'version') else 1}
         except Exception as e:
             logger.error(f"Error saving TTS settings: {e}")
             self.db.rollback()
-            return False
+            return {"success": False, "error": str(e)}
 
     async def get_blocked_users(self, user_id: int) -> List[dict]:
         """Получить список заблокированных пользователей"""

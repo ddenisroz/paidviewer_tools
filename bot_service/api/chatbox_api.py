@@ -49,6 +49,9 @@ class ChatBoxSettingsCreate(BaseModel):
     show_7tv_emotes: bool = Field(default=True)  # Показывать смайлики 7TV
     show_links: bool = Field(default=True)  # Показывать ссылки из чата
     auto_load_images: bool = Field(default=True)  # Загружать картинки/гифки сразу или как ссылки
+    
+    # Version для защиты от race conditions
+    version: int = Field(default=1, ge=1)  # Инкрементируется при каждом обновлении
 
 
 class ChatBoxSettingsResponse(ChatBoxSettingsCreate):
@@ -155,10 +158,26 @@ async def save_chatbox_settings(
         )
         db.add(settings)
     else:
+        # ✅ VERSION CHECK: Проверяем что версия совпадает (защита от race conditions)
+        client_version = settings_data.version if hasattr(settings_data, 'version') else None
+        if client_version is not None and hasattr(settings, 'version'):
+            if settings.version != client_version:
+                logger.warning(f"Version conflict for user {user_id}: DB version={settings.version}, client version={client_version}")
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Data was updated. Current version: {settings.version}"
+                )
+        
         # Обновляем существующие настройки
         logger.info(f"📦 [CHATBOX] Updating settings for user {user_id}")
-        for key, value in settings_data.dict().items():
+        # Исключаем версию из обновления (обновляем отдельно)
+        update_dict = {k: v for k, v in settings_data.dict().items() if k != 'version'}
+        for key, value in update_dict.items():
             setattr(settings, key, value)
+        
+        # ✅ INCREMENT VERSION: Инкрементируем версию после обновления
+        if hasattr(settings, 'version'):
+            settings.version += 1
         
         # Перегенерация токена если запрошено
         if regenerate_token:

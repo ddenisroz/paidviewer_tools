@@ -64,6 +64,10 @@ try:
         id = Column(Integer, primary_key=True, index=True)
         is_admin = Column(Boolean, default=False)
         is_active = Column(Boolean, default=True)
+
+        # Versioning for race condition protection
+        version = Column(Integer, default=1)  # Incremented on each update
+
         obs_token = Column(String, nullable=True)  # OBS ╤В╨╛╨║╨╡╨╜ ╨┤╨╗╤П ╨┐╨╛╤Б╤В╨╛╤П╨╜╨╜╨╛╨╣ ╤Б╤Б╤Л╨╗╨║╨╕
         is_blocked = Column(Boolean, default=False)  # ╨Ч╨░╨▒╨╗╨╛╨║╨╕╤А╨╛╨▓╨░╨╜ ╨╗╨╕ ╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╤М
         blocked_reason = Column(String, nullable=True)  # ╨Я╤А╨╕╤З╨╕╨╜╨░ ╨▒╨╗╨╛╨║╨╕╤А╨╛╨▓╨║╨╕
@@ -202,6 +206,10 @@ try:
         reason = Column(String, nullable=True)
         blocked_by = Column(String, nullable=True)  # ╨Ъ╤В╨╛ ╨╖╨░╨▒╨╗╨╛╨║╨╕╤А╨╛╨▓╨░╨╗
         is_active = Column(Boolean, default=True)
+
+        # Versioning for race condition protection
+        version = Column(Integer, default=1)  # Incremented on each update
+
         created_at = Column(DateTime, default=utcnow_naive)
 
     class UserToken(Base):
@@ -221,7 +229,11 @@ try:
         refresh_token = Column(String, nullable=True)
         expires_at = Column(DateTime, nullable=True)
         scopes = Column(JSON, nullable=True) # ╨Я╤А╨░╨▓╨░ ╨┤╨╛╤Б╤В╤Г╨┐╨░ (scopes)
-        is_active = Column(Boolean, default=True)  # ╨Р╨║╤В╨╕╨▓╨╡╨╜ ╨╗╨╕ ╤В╨╛╨║╨╡╨╜ (╨┤╨╗╤П ╨╗╨╛╨│╨░╤Г╤В╨░ ╨▒╨╡╨╖ ╤Г╨┤╨░╨╗╨╡╨╜╨╕╤П)
+        is_active = Column(Boolean, default=True)
+
+        # Versioning for race condition protection
+        version = Column(Integer, default=1)  # Incremented on each update
+  # ╨Р╨║╤В╨╕╨▓╨╡╨╜ ╨╗╨╕ ╤В╨╛╨║╨╡╨╜ (╨┤╨╗╤П ╨╗╨╛╨│╨░╤Г╤В╨░ ╨▒╨╡╨╖ ╤Г╨┤╨░╨╗╨╡╨╜╨╕╤П)
         created_at = Column(DateTime, default=utcnow_naive)
         updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
@@ -236,6 +248,10 @@ try:
         created_at = Column(DateTime, default=utcnow_naive)
         last_activity = Column(DateTime, default=utcnow_naive)
         is_active = Column(Boolean, default=True)
+
+        # Versioning for race condition protection
+        version = Column(Integer, default=1)  # Incremented on each update
+
 
     class GuestSession(Base):
         """Модель гостевых сессий (без привязки к user_id)
@@ -305,7 +321,11 @@ try:
         word = Column(String, nullable=False, index=True)  # ╨Ч╨░╨▒╨╗╨╛╨║╨╕╤А╨╛╨▓╨░╨╜╨╜╨╛╨╡ ╤Б╨╗╨╛╨▓╨╛
         platform = Column(String, nullable=False, default='all')  # ╨Я╨╗╨░╤В╤Д╨╛╤А╨╝╨░: all, twitch, vk
         created_at = Column(DateTime, default=utcnow_naive, index=True)
-        is_active = Column(Boolean, default=True)  # ╨Р╨║╤В╨╕╨▓╨╡╨╜ ╨╗╨╕ ╤Д╨╕╨╗╤М╤В╤А
+        is_active = Column(Boolean, default=True)
+
+        # Versioning for race condition protection
+        version = Column(Integer, default=1)  # Incremented on each update
+  # ╨Р╨║╤В╨╕╨▓╨╡╨╜ ╨╗╨╕ ╤Д╨╕╨╗╤М╤В╤А
 
     class YouTubeQueue(Base):
         """╨Ь╨╛╨┤╨╡╨╗╤М ╨╛╤З╨╡╤А╨╡╨┤╨╕ YouTube ╨▓╨╕╨┤╨╡╨╛"""
@@ -504,7 +524,11 @@ try:
         # ╨Ъ╨╛╨╜╤Д╨╕╨│╤Г╤А╨░╤Ж╨╕╤П endpoint
         endpoint_url = Column(String, nullable=False)  # URL ╨╗╨╛╨║╨░╨╗╤М╨╜╨╛╨│╨╛ TTS ╤Б╨╡╤А╨▓╨╕╤Б╨░ (╨╜╨░╨┐╤А╨╕╨╝╨╡╤А: http://localhost:8001)
         api_key = Column(String, nullable=True)  # ╨Ю╨┐╤Ж╨╕╨╛╨╜╨░╨╗╤М╨╜╤Л╨╣ API ╨║╨╗╤О╤З ╨┤╨╗╤П ╨▒╨╡╨╖╨╛╨┐╨░╤Б╨╜╨╛╤Б╤В╨╕
-        is_active = Column(Boolean, default=True)  # ╨Р╨║╤В╨╕╨▓╨╡╨╜ ╨╗╨╕ endpoint
+        is_active = Column(Boolean, default=True)
+
+        # Versioning for race condition protection
+        version = Column(Integer, default=1)  # Incremented on each update
+  # ╨Р╨║╤В╨╕╨▓╨╡╨╜ ╨╗╨╕ endpoint
         use_local = Column(Boolean, default=False)  # ╨Ш╤Б╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╤М ╨╗╨╛╨║╨░╨╗╤М╨╜╤Л╨╣ ╨▓╨╝╨╡╤Б╤В╨╛ ╤Ж╨╡╨╜╤В╤А╨░╨╗╨╕╨╖╨╛╨▓╨░╨╜╨╜╨╛╨│╨╛
         
         # ╨б╤В╨░╤В╤Г╤Б ╨╕ ╨╝╨╛╨╜╨╕╤В╨╛╤А╨╕╨╜╨│
@@ -516,6 +540,9 @@ try:
         tts_version = Column(String, nullable=True)  # ╨Т╨╡╤А╤Б╨╕╤П TTS ╨┤╨▓╨╕╨╢╨║╨░
         gpu_info = Column(JSON, nullable=True)  # ╨Ш╨╜╤Д╨╛╤А╨╝╨░╤Ж╨╕╤П ╨╛ GPU
         
+        
+        # Versioning for race condition protection
+        version = Column(Integer, default=1)
         created_at = Column(DateTime, default=utcnow_naive)
         updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
@@ -552,7 +579,11 @@ try:
         platform = Column(String, nullable=False)  # 'twitch', 'vk', etc.
         platform_user_id = Column(String, nullable=False)  # ID ╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╤П ╨╜╨░ ╨┐╨╗╨░╤В╤Д╨╛╤А╨╝╨╡
         username = Column(String, nullable=True)  # ╨Ш╨╝╤П ╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╤П ╨╜╨░ ╨┐╨╗╨░╤В╤Д╨╛╤А╨╝╨╡
-        is_active = Column(Boolean, default=True)  # ╨Р╨║╤В╨╕╨▓╨╡╨╜ ╨╗╨╕ ╨░╨┤╨╝╨╕╨╜
+        is_active = Column(Boolean, default=True)
+
+        # Versioning for race condition protection
+        version = Column(Integer, default=1)  # Incremented on each update
+  # ╨Р╨║╤В╨╕╨▓╨╡╨╜ ╨╗╨╕ ╨░╨┤╨╝╨╕╨╜
         permissions = Column(JSON, nullable=True)  # ╨Ф╨╛╨┐╨╛╨╗╨╜╨╕╤В╨╡╨╗╤М╨╜╤Л╨╡ ╨┐╤А╨░╨▓╨░
         created_by = Column(Integer, ForeignKey('users.id'), nullable=True)  # ╨Ъ╤В╨╛ ╤Б╨╛╨╖╨┤╨░╨╗ ╨░╨┤╨╝╨╕╨╜╨░
         created_at = Column(DateTime, default=utcnow_naive)
@@ -668,6 +699,10 @@ class Achievement(Base):
     reward_type = Column(String, nullable=False)  # free_lootbox, paid_lootbox, special
     reward_value = Column(Integer, default=1)  # ╨Ъ╨╛╨╗╨╕╤З╨╡╤Б╤В╨▓╨╛ ╨╜╨░╨│╤А╨░╨┤
     is_active = Column(Boolean, default=True)
+
+        # Versioning for race condition protection
+        version = Column(Integer, default=1)  # Incremented on each update
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class UserAchievement(Base):
@@ -708,6 +743,10 @@ class DropsType(Base):
     name = Column(String, nullable=False)  # "╨б╤В╤А╨╕╨║", "╨Ф╨╛╨╜╨░╤В", "╨Ь╨╕╤Д╨╕╤З╨╡╤Б╨║╨╕╨╣"
     description = Column(Text)
     is_active = Column(Boolean, default=True)
+
+        # Versioning for race condition protection
+        version = Column(Integer, default=1)  # Incremented on each update
+
     created_at = Column(DateTime, default=utcnow_naive)
 
 class DropsQuality(Base):
@@ -800,6 +839,10 @@ class DropsReward(Base):
     sound_volume = Column(Float, default=1.0)
     
     is_active = Column(Boolean, default=True)
+
+        # Versioning for race condition protection
+        version = Column(Integer, default=1)  # Incremented on each update
+
     created_at = Column(DateTime, default=utcnow_naive)
     updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
@@ -886,6 +929,10 @@ class MythicalDropsSession(Base):
     
     # ╨б╤В╨░╤В╤Г╤Б
     is_active = Column(Boolean, default=True)
+
+        # Versioning for race condition protection
+        version = Column(Integer, default=1)  # Incremented on each update
+
     started_at = Column(DateTime, default=utcnow_naive)
     expires_at = Column(DateTime, nullable=False)
     winner_viewer_id = Column(String, nullable=True)
@@ -1017,5 +1064,8 @@ class ChatBoxSettings(Base):
     show_links = Column(Boolean, default=True)  # ╨Я╨╛╨║╨░╨╖╤Л╨▓╨░╤В╤М ╤Ж╤Г╨║╨╛╨▓ ╨╕╨╖ ╤Ж╨░╤В╨░
     auto_load_images = Column(Boolean, default=True)  # ╨Х╨░╨│╤А╤Г╨╞╨░╤В╤М ╨║╨░╤А╤В╨╕╨╜╨║╨╕/╨│╨╕╤Д╨║╨╕ ╤Б╤А╨░╨╖╤Г ╨╕╨╗╨╕ ╨║╨░╨║ ╤Ж╤Г╨║╨╕
     
+    
+    # Versioning for race condition protection
+    version = Column(Integer, default=1)
     created_at = Column(DateTime, default=utcnow_naive)
     updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)

@@ -90,6 +90,7 @@ class TtsSettingsRequest(BaseModel):
     useLocalTTS: bool = Field(False)
     filterReplies: bool = Field(False)  # Фильтровать ответы
     filterMentions: bool = Field(False)  # Фильтровать упоминания
+    version: int = Field(1, ge=1)  # ✅ Version для защиты от race conditions
     
     @validator('engine')
     def validate_engine(cls, v):
@@ -558,7 +559,7 @@ async def save_tts_settings(
         tts_service = TTSService(db)
         user_filters = UserIdentityService.get_database_filters(current_user)
         
-        success = await tts_service.save_tts_settings(
+        result = await tts_service.save_tts_settings(
             enable_7tv=request.enable7TV,
             enable_twitch=request.enableTwitch,
             enable_lexicon_filter=request.enableLexiconFilter,
@@ -571,28 +572,39 @@ async def save_tts_settings(
             use_local_tts=request.useLocalTTS,
             filter_replies=request.filterReplies,
             filter_mentions=request.filterMentions,
+            client_version=getattr(request, 'version', None),  # ✅ Получаем версию от клиента
             **user_filters
         )
         
-        if success:
-            # Отправляем WebSocket уведомление для синхронизации фронтенда
-            try:
-                from services.memory_websocket_manager import memory_websocket_manager
-                user_id = current_user.get('id')
-                if user_id and user_id != -1:  # Только для авторизованных пользователей
-                    cache_invalidation_event = {
-                        "type": "cache_invalidate",
-                        "cache_key": "tts_settings",
-                        "reason": "tts_settings_updated"
-                    }
-                    await memory_websocket_manager.send_to_user(user_id, cache_invalidation_event)
-                    logger.debug(f"🔄 [TTS SETTINGS] Sent cache invalidation to user {user_id}")
-            except Exception as ws_error:
-                logger.warning(f"Failed to send WebSocket notification for TTS settings: {ws_error}")
-            
-            return {"success": True, "message": "Настройки TTS сохранены"}
-        else:
-            raise HTTPException(status_code=400, detail="Ошибка сохранения настроек TTS")
+        # ✅ Проверяем есть ли конфликт версии
+        if not result.get("success", False):
+            if result.get("error") == "Version conflict":
+                # Возвращаем 409 Conflict
+                logger.warning(f"Version conflict for user {user_filters}: {result}")
+                raise HTTPException(
+                    status_code=409, 
+                    detail=f"Data was updated. Current version: {result.get('current_version', 1)}"
+                )
+            else:
+                raise HTTPException(status_code=400, detail=result.get("error", "Ошибка сохранения настроек TTS"))
+        
+        # Отправляем WebSocket уведомление для синхронизации фронтенда
+        try:
+            from services.memory_websocket_manager import memory_websocket_manager
+            user_id = current_user.get('id')
+            if user_id and user_id != -1:  # Только для авторизованных пользователей
+                cache_invalidation_event = {
+                    "type": "cache_invalidate",
+                    "cache_key": "tts_settings",
+                    "reason": "tts_settings_updated",
+                    "version": result.get("version", 1)  # ✅ Отправляем новую версию
+                }
+                await memory_websocket_manager.send_to_user(user_id, cache_invalidation_event)
+                logger.debug(f"🔄 [TTS SETTINGS] Sent cache invalidation to user {user_id} with version {result.get('version')}")
+        except Exception as ws_error:
+            logger.warning(f"Failed to send WebSocket notification for TTS settings: {ws_error}")
+        
+        return {"success": True, "message": "Настройки TTS сохранены", "version": result.get("version", 1)}
             
     except Exception as e:
         logger.error(f"Error saving TTS settings: {e}")
