@@ -1,6 +1,6 @@
 // src/components/tts/TtsControlPanel.jsx
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import React, { useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { TwitchIcon, VKIcon } from '../PlatformIcons';
 import { toast } from 'sonner';
@@ -26,194 +26,207 @@ const TtsControlPanel = ({
     user,
     isGuest
 }) => {
-    // Проверяем, подключена ли платформа (через OAuth или как гость)
+    const [ttsGlobalEnabled, setTtsGlobalEnabled] = useState(basicTtsEnabled || aiTtsEnabled);
+    
     const isTwitchConnected = integrations.twitch?.enabled || (isGuest && user?.platform === 'twitch');
     const isVkConnected = integrations.vk?.enabled || (isGuest && user?.platform === 'vk');
-    
-    // Проверяем есть ли локальный TTS setup
     const hasLocalSetup = localStorage.getItem('tts_has_local_setup') === 'true';
-    // Обрабатываем случай когда isWhitelisted еще не проверен (null)
-    // Если isWhitelisted === null, считаем что проверка еще не выполнена, но не блокируем доступ
-    // (проверка будет выполнена на бэкенде)
     const canUseF5TTS = hasLocalSetup || isWhitelisted === true;
+    const isAnyTtsEnabled = basicTtsEnabled || aiTtsEnabled;
+    
+    const handleGlobalTtsToggle = (enabled) => {
+        setTtsGlobalEnabled(enabled);
+        if (enabled) {
+            // Включаем TTS (по умолчанию базовую)
+            if (!basicTtsEnabled && !aiTtsEnabled) {
+                setBasicTtsEnabled(true);
+            }
+        } else {
+            // Отключаем обе
+            setBasicTtsEnabled(false);
+            setAiTtsEnabled(false);
+        }
+    };
     
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Управление озвучкой</CardTitle>
-                <CardDescription>
-                    {!isAuthenticated && !isConnected && <span className="text-yellow-500">Сначала подключите бота к каналу.</span>}
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="space-y-5">
-                    {/* ✅ НОВЫЙ UX: Единый выбор режима озвучки с radio buttons */}
-                    <div>
-                        <h3 className="text-sm font-semibold text-gray-300 mb-3">Выбрать режим озвучки</h3>
-                        <div className="grid grid-cols-1 gap-3">
-                            {/* Режим 1: Базовая озвучка */}
-                            <label className={`flex items-center space-x-4 p-4 rounded-2xl border-2 transition-all duration-200 cursor-pointer ${
+        <div className="space-y-4">
+            {/* Главный переключатель озвучки */}
+            <Card>
+                <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="font-semibold text-white">Озвучка</h3>
+                            <p className="text-sm text-gray-400 mt-1">
+                                {isAnyTtsEnabled ? (
+                                    aiTtsEnabled ? 'F5-TTS с fallback на Google' : 'Google TTS'
+                                ) : (
+                                    'Отключена'
+                                )}
+                            </p>
+                        </div>
+                        <Switch
+                            checked={isAnyTtsEnabled}
+                            onCheckedChange={handleGlobalTtsToggle}
+                            disabled={!isAuthenticated || !isConnected}
+                            className="scale-110"
+                        />
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Режимы озвучки (видны только если включена) */}
+            {isAnyTtsEnabled && isAuthenticated && (
+                <Card>
+                    <CardContent className="pt-6">
+                        <div className="space-y-3">
+                            <p className="text-xs font-semibold text-gray-400 uppercase">Выбрать режим</p>
+                            
+                            {/* Режим: Базовая озвучка */}
+                            <label className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
                                 basicTtsEnabled && !aiTtsEnabled
-                                    ? 'bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/50 hover:border-blue-500/70'
-                                    : 'bg-gray-500/10 border-gray-500/30 hover:border-gray-500/50'
-                            } ${!isAuthenticated || !isConnected ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                    ? 'border-blue-500/50 bg-blue-500/10'
+                                    : 'border-gray-700 hover:border-gray-600'
+                            }`}>
                                 <input 
                                     type="radio"
                                     name="tts_mode"
                                     value="basic"
                                     checked={basicTtsEnabled && !aiTtsEnabled}
                                     onChange={() => {
-                                        if (isAuthenticated && isConnected) {
-                                            setBasicTtsEnabled(true);
-                                            setAiTtsEnabled(false); // ✅ Отключаем F5 при выборе базовой
-                                        }
+                                        setBasicTtsEnabled(true);
+                                        setAiTtsEnabled(false);
                                     }}
-                                    disabled={!isAuthenticated || !isConnected}
-                                    className="w-5 h-5 pointer-events-none accent-blue-500"
+                                    className="w-4 h-4 pointer-events-none accent-blue-500"
                                 />
-                                <div className="flex-1">
-                                    <h4 className="text-base font-bold text-white">🎤 Google TTS (Базовая озвучка)</h4>
-                                    <p className="text-sm text-gray-400 mt-1">Всегда работает, но менее натуральна. Хороша как fallback.</p>
+                                <div className="ml-3 flex-1">
+                                    <p className="text-sm font-medium text-white">Google TTS</p>
+                                    <p className="text-xs text-gray-400">Всегда работает</p>
                                 </div>
-                                <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded font-semibold">✓ Всегда работает</span>
                             </label>
 
-                            {/* Режим 2: ИИ озвучка F5-TTS */}
-                            <label className={`flex items-center space-x-4 p-4 rounded-2xl border-2 transition-all duration-200 cursor-pointer ${
-                                aiTtsEnabled
-                                    ? 'bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/50 hover:border-purple-500/70'
-                                    : 'bg-gray-500/10 border-gray-500/30 hover:border-gray-500/50'
-                            } ${!isHealthy || !canUseF5TTS ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                            {/* Режим: F5-TTS */}
+                            <label className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
+                                !isHealthy || !canUseF5TTS
+                                    ? 'opacity-50 cursor-not-allowed'
+                                    : aiTtsEnabled
+                                        ? 'border-purple-500/50 bg-purple-500/10'
+                                        : 'border-gray-700 hover:border-gray-600'
+                            }`}>
                                 <input 
                                     type="radio"
                                     name="tts_mode"
                                     value="ai"
                                     checked={aiTtsEnabled}
                                     onChange={() => {
-                                        if (isHealthy && canUseF5TTS && isAuthenticated && isConnected) {
+                                        if (isHealthy && canUseF5TTS) {
                                             setAiTtsEnabled(true);
-                                            setBasicTtsEnabled(false); // ✅ Отключаем базовую при выборе F5
+                                            setBasicTtsEnabled(false);
                                         }
                                     }}
-                                    disabled={!isHealthy || !isAuthenticated || !isConnected || (isWhitelisted === false && !hasLocalSetup) || engineToggleLoading}
-                                    className="w-5 h-5 pointer-events-none accent-purple-500"
+                                    disabled={!isHealthy || !canUseF5TTS || engineToggleLoading}
+                                    className="w-4 h-4 pointer-events-none accent-purple-500"
                                 />
-                                <div className="flex-1">
-                                    <h4 className="text-base font-bold text-white">⚡ F5-TTS (ИИ озвучка)</h4>
-                                    <p className="text-sm text-gray-400 mt-1">Натуральная речь, автоматический fallback на Google TTS.</p>
+                                <div className="ml-3 flex-1">
+                                    <p className="text-sm font-medium text-white">F5-TTS</p>
+                                    <p className="text-xs text-gray-400">Натуральная речь</p>
                                 </div>
-                                <div className="text-xs font-semibold">
-                                    {!isHealthy && <span className="bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded">⚠ Недоступен</span>}
-                                    {isHealthy && canUseF5TTS && <span className="bg-purple-500/20 text-purple-400 px-2 py-1 rounded">⚡ Доступен</span>}
-                                    {isHealthy && !canUseF5TTS && <span className="bg-orange-500/20 text-orange-400 px-2 py-1 rounded">🔒 Whitelist</span>}
-                                </div>
+                                <span className={`text-xs px-2 py-1 rounded ${
+                                    !isHealthy ? 'bg-yellow-500/20 text-yellow-400' :
+                                    canUseF5TTS ? 'bg-purple-500/20 text-purple-400' :
+                                    'bg-gray-500/20 text-gray-400'
+                                }`}>
+                                    {!isHealthy ? 'Недоступен' : canUseF5TTS ? 'Доступен' : 'Нет доступа'}
+                                </span>
                             </label>
-
-                            {/* Информация о fallback */}
-                            <div className="p-3 bg-blue-900/20 border border-blue-700/50 rounded-lg text-xs text-blue-300">
-                                <strong>ℹ️ Совет:</strong> При ошибке F5-TTS система автоматически переключится на Google TTS без потери озвучки.
-                            </div>
                         </div>
-                    </div>
-                    
-                    {/* Способ озвучки */}
-                    {isAuthenticated && (
-                        <div className="border-t border-gray-700/50 pt-5">
-                            <div className="space-y-3">
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Способ озвучки */}
+            {isAuthenticated && isConnected && isAnyTtsEnabled && (
+                <Card>
+                    <CardContent className="pt-6">
+                        <div className="space-y-3">
+                            <p className="text-xs font-semibold text-gray-400 uppercase">Способ воспроизведения</p>
+                            
                             <div className="grid grid-cols-2 gap-2">
                                 <button
                                     onClick={() => setListeningMode('website')}
-                                    className={`p-3 rounded-xl border-2 transition-all duration-200 text-left ${
+                                    className={`p-2.5 rounded-lg border transition-all text-sm ${
                                         listeningMode === 'website'
-                                            ? 'border-primary bg-primary/10'
-                                            : 'border-border hover:border-primary/50 hover:bg-primary/5'
+                                            ? 'border-blue-500/50 bg-blue-500/10 text-white font-medium'
+                                            : 'border-gray-700 hover:border-gray-600 text-gray-400'
                                     }`}
                                 >
-                                    <div className="font-semibold text-sm mb-0.5">Сайт</div>
-                                    <div className="text-xs text-muted-foreground">Источник воспроизведения веб-страница</div>
+                                    На сайте
                                 </button>
                                 <button
                                     onClick={() => setListeningMode('obs')}
-                                    className={`p-3 rounded-xl border-2 transition-all duration-200 text-left ${
+                                    className={`p-2.5 rounded-lg border transition-all text-sm ${
                                         listeningMode === 'obs'
-                                            ? 'border-primary bg-primary/10'
-                                            : 'border-border hover:border-primary/50 hover:bg-primary/5'
+                                            ? 'border-blue-500/50 bg-blue-500/10 text-white font-medium'
+                                            : 'border-gray-700 hover:border-gray-600 text-gray-400'
                                     }`}
                                 >
-                                    <div className="font-semibold text-sm mb-0.5">OBS</div>
-                                    <div className="text-xs text-muted-foreground">Browser Source</div>
+                                    В OBS
                                 </button>
                             </div>
-                            
-                            {/* URL для OBS - под кнопками */}
+
+                            {/* URL для OBS */}
                             {listeningMode === 'obs' && (
-                                <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700 space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm text-gray-400">URL для OBS:</span>
+                                <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700 space-y-2 text-sm">
+                                    <div className="flex items-center gap-2">
                                         {obsUrl && typeof obsUrl === 'string' ? (
-                                            <div className="flex items-center gap-2">
+                                            <>
                                                 <button
                                                     onClick={() => {
                                                         navigator.clipboard.writeText(obsUrl);
-                                                        toast.success('URL скопирован в буфер обмена');
+                                                        toast.success('URL скопирован');
                                                     }}
-                                                    className="text-blue-400 hover:text-blue-300 px-3 py-1.5 rounded bg-blue-900/20 text-xs font-medium transition-colors"
-                                                    title="Копировать URL"
+                                                    className="px-2 py-1 rounded bg-blue-900/30 hover:bg-blue-900/50 text-blue-400 text-xs font-medium transition-colors"
                                                 >
-                                                    📋 Копировать
+                                                    Копировать
                                                 </button>
                                                 <button
-                                                    onClick={() => {
-                                                        if (onRegenerateObsUrl) {
-                                                            onRegenerateObsUrl();
-                                                            // handleRegenerateObsUrl в TtsMainPage.jsx уже показывает toast
-                                                        }
-                                                    }}
-                                                    className="text-yellow-400 hover:text-yellow-300 px-3 py-1.5 rounded bg-yellow-900/20 text-xs font-medium transition-colors"
-                                                    title="Перегенерировать URL"
+                                                    onClick={onRegenerateObsUrl}
+                                                    className="px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs font-medium transition-colors"
                                                 >
-                                                    🔄 Перегенерировать
+                                                    Обновить
                                                 </button>
-                                            </div>
+                                            </>
                                         ) : (
                                             <span className="text-gray-500 text-xs">Генерируется...</span>
                                         )}
                                     </div>
-                                    {obsUrl && typeof obsUrl === 'string' && (
-                                        <div className="bg-gray-900 p-3 rounded border border-gray-700">
-                                            <code className="text-green-400 font-mono text-xs break-all">
-                                                {obsUrl.length > 80 ? `${obsUrl.substring(0, 77)}...` : obsUrl}
-                                            </code>
-                                        </div>
+                                    {obsUrl && (
+                                        <code className="block bg-gray-900 p-2 rounded border border-gray-700 text-green-400 text-xs overflow-auto break-all max-h-16">
+                                            {obsUrl}
+                                        </code>
                                     )}
                                 </div>
                             )}
-                            </div>
                         </div>
-                    )}
-                    
-                    {/* Выбор платформ */}
-                    {isAuthenticated && (
-                        <div className="border-t border-gray-700/50 pt-5">
-                            <div className="space-y-3">
-                            <div className="grid grid-cols-2 gap-2">
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Выбор платформ */}
+            {isAuthenticated && isConnected && isAnyTtsEnabled && (
+                <Card>
+                    <CardContent className="pt-6">
+                        <div className="space-y-3">
+                            <p className="text-xs font-semibold text-gray-400 uppercase">Платформы</p>
+                            
+                            <div className="space-y-2">
                                 {/* Twitch */}
-                                <div className={`flex items-center justify-between p-2.5 rounded-lg border ${
-                                    isTwitchConnected 
-                                        ? 'bg-gray-800 border-gray-700' 
-                                        : 'bg-gray-900 border-gray-800'
-                                }`}>
-                                    <div className="flex items-center space-x-2">
-                                        <TwitchIcon className={`w-4 h-4 ${
-                                            isTwitchConnected ? 'text-white' : 'text-gray-500'
-                                        }`} />
+                                <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700">
+                                    <div className="flex items-center gap-2">
+                                        <TwitchIcon className="w-4 h-4 text-white" />
                                         <div>
                                             <p className="text-sm font-medium text-white">Twitch</p>
                                             <p className="text-xs text-gray-400">
-                                                {isTwitchConnected 
-                                                    ? `@${integrations.twitch?.username || user?.twitch_username || user?.username || 'загрузка...'}` 
-                                                    : 'Не подключен'
-                                                }
+                                                {isTwitchConnected ? `@${integrations.twitch?.username || user?.twitch_username || 'загрузка...'}` : 'Не подключен'}
                                             </p>
                                         </div>
                                     </div>
@@ -221,26 +234,18 @@ const TtsControlPanel = ({
                                         checked={isTwitchConnected && (platformSettings.enabled_platforms?.includes('twitch') || false)}
                                         onCheckedChange={() => onPlatformToggle('twitch')}
                                         disabled={!isTwitchConnected}
+                                        className="scale-90"
                                     />
                                 </div>
-                                
-                                {/* VK Live */}
-                                <div className={`flex items-center justify-between p-2.5 rounded-lg border ${
-                                    isVkConnected 
-                                        ? 'bg-gray-800 border-gray-700' 
-                                        : 'bg-gray-900 border-gray-800'
-                                }`}>
-                                    <div className="flex items-center space-x-2">
-                                        <VKIcon className={`w-4 h-4 ${
-                                            isVkConnected ? 'text-white' : 'text-gray-500'
-                                        }`} />
+
+                                {/* VK */}
+                                <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700">
+                                    <div className="flex items-center gap-2">
+                                        <VKIcon className="w-4 h-4 text-white" />
                                         <div>
-                                            <p className="text-sm font-medium text-white">VK Live</p>
+                                            <p className="text-sm font-medium text-white">VK</p>
                                             <p className="text-xs text-gray-400">
-                                                {isVkConnected 
-                                                    ? `@${integrations.vk?.username || user?.vk_username || user?.username || 'загрузка...'}` 
-                                                    : 'Не подключен'
-                                                }
+                                                {isVkConnected ? `@${integrations.vk?.username || user?.vk_username || 'загрузка...'}` : 'Не подключен'}
                                             </p>
                                         </div>
                                     </div>
@@ -248,24 +253,23 @@ const TtsControlPanel = ({
                                         checked={isVkConnected && (platformSettings.enabled_platforms?.includes('vk') || false)}
                                         onCheckedChange={() => onPlatformToggle('vk')}
                                         disabled={!isVkConnected}
+                                        className="scale-90"
                                     />
                                 </div>
                             </div>
-                            </div>
                         </div>
-                    )}
-                    
-                    {/* Режим озвучки (все сообщения / за баллы) */}
-                    {isAuthenticated && (
-                        <div className="border-t border-gray-700/50 pt-5">
-                            <TtsChannelPointsMode asSection={true} />
-                        </div>
-                    )}
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Режим озвучки (все сообщения / за баллы) */}
+            {isAuthenticated && isConnected && isAnyTtsEnabled && (
+                <div className="border-t border-gray-700/50 pt-4">
+                    <TtsChannelPointsMode asSection={true} />
                 </div>
-            </CardContent>
-        </Card>
+            )}
+        </div>
     );
 };
 
 export default TtsControlPanel;
-

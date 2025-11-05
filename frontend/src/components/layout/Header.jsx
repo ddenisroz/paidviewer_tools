@@ -143,7 +143,7 @@ const Header = () => {
     };
 
     return (
-        <header className="relative flex h-16 items-center gap-2 sm:gap-4 px-3 sm:px-6 lg:h-[70px] bg-muted/40">
+        <header className="relative flex h-14 items-center gap-2 sm:gap-4 px-3 sm:px-6 lg:h-16 bg-muted/40">
             {/* Левая часть - пустая для баланса */}
             <div className="flex-1"></div>
             

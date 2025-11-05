@@ -14,12 +14,12 @@ export const PageWrapper = ({
     // Заголовок теперь показывается в Header, поэтому здесь не показываем title
     // Оставляем только description и actions если они нужны
     return (
-        <div className={`container mx-auto p-6 space-y-6 min-h-[600px] ${className}`} style={{ scrollbarGutter: 'stable' }}>
+        <div className={`container mx-auto px-6 py-4 space-y-6 min-h-[600px] ${className}`} style={{ scrollbarGutter: 'stable' }}>
             {/* Description и actions (без title, так как он в Header) */}
             {(description || actions) && (
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     {description && (
-                        <p className="text-slate-400">
+                        <p className="text-slate-400 text-sm">
                             {description}
                         </p>
                     )}
