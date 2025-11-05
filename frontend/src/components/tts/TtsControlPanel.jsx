@@ -59,16 +59,18 @@ const TtsControlPanel = ({
             </CardHeader>
             <CardContent className="space-y-6">
                 {/* Main Enable Button */}
-                <Button
-                    onClick={handleGlobalTtsToggle}
-                    className={`w-full py-6 rounded-lg font-bold text-base transition-all duration-300 ${
-                        isAnyTtsEnabled
-                            ? 'bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 text-white shadow-lg shadow-purple-500/50'
-                            : 'bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 shadow-lg shadow-gray-900/50'
-                    }`}
-                >
-                    {isAnyTtsEnabled ? '✓ Озвучка включена' : '✕ Озвучка отключена'}
-                </Button>
+                <div className="flex items-center justify-center">
+                    <button
+                        onClick={handleGlobalTtsToggle}
+                        className={`px-8 py-3 rounded-xl font-semibold text-sm transition-all duration-300 border-2 ${
+                            isAnyTtsEnabled
+                                ? 'border-purple-500 bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 hover:border-purple-400'
+                                : 'border-gray-600 bg-gray-800/50 text-gray-400 hover:bg-gray-800/70 hover:border-gray-500'
+                        }`}
+                    >
+                        {isAnyTtsEnabled ? 'Озвучка ВКЛ' : 'Озвучка ВЫКЛ'}
+                    </button>
+                </div>
 
                 {isAnyTtsEnabled && (
                     <>
