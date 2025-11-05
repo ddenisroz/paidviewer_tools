@@ -50,12 +50,11 @@ const AudioSettings = ({
     }
     
     return (
-        <Card className="h-full border-gray-700/50 bg-gray-800/20">
-            <CardHeader className="pb-2.5 border-b border-gray-700/30">
-                <CardTitle className="text-sm font-semibold">Volume <span className="text-gray-400 font-normal">- Sound level</span></CardTitle>
+        <Card className="border-gray-700 bg-gray-900/50">
+            <CardHeader>
+                <CardTitle className="text-base font-semibold">Volume</CardTitle>
             </CardHeader>
-            <CardContent className="pt-3">
-                <div className="space-y-3">
+            <CardContent className="space-y-3">
                     {/* Громкость для сайта */}
                     <div className="space-y-2">
                         <div className="flex items-center gap-3 px-1">

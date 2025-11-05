@@ -244,7 +244,7 @@ const TtsFilterManager = React.memo(() => {
     const availablePlatforms = getAvailablePlatforms();
 
     return (
-        <Card className="mt-0" data-testid="tts-filter-card">
+        <Card className="border-gray-700 bg-gray-900/50" data-testid="tts-filter-card">
             <CardHeader 
                 className="cursor-pointer hover:bg-gray-800/30 transition-colors"
                 onClick={toggleExpanded}

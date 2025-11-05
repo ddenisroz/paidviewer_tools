@@ -29,21 +29,20 @@ const TtsSettings = ({
     };
 
     return (
-        <Card className="h-full border-gray-700/50 bg-gray-800/20">
+        <Card className="border-gray-700 bg-gray-900/50">
             <CardHeader 
-                className="cursor-pointer hover:bg-gray-800/40 transition-colors pb-2.5 border-b border-gray-700/30"
+                className="cursor-pointer hover:bg-gray-800/50 transition-colors"
                 onClick={() => setIsExpanded(!isExpanded)}
             >
                 <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-semibold">Settings <span className="text-gray-400 font-normal">- Additional options</span></CardTitle>
+                    <CardTitle className="text-base font-semibold">Settings</CardTitle>
                     <ChevronDown 
-                        className={`h-5 w-5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                        className={`h-5 w-5 transition-transform duration-200 text-gray-400 ${isExpanded ? 'rotate-180' : ''}`}
                     />
                 </div>
             </CardHeader>
             {isExpanded && (
-            <CardContent className="pt-3">
-                <div className="space-y-3">
+            <CardContent className="space-y-3">
                     {/* Настройки смайлов в 2 колонки */}
                     <div className="grid grid-cols-2 gap-2">
                         <div className="flex items-center gap-3 p-2.5 bg-gray-800/50 rounded-lg">
