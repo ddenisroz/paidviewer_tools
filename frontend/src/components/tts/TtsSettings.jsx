@@ -42,8 +42,8 @@ const TtsSettings = ({
                 </div>
             </CardHeader>
             {isExpanded && (
-            <CardContent className="pt-6">
-                <div className="space-y-6">
+            <CardContent className="pt-4">
+                <div className="space-y-4">
                     {/* Настройки смайлов в 2 колонки */}
                     <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Смайлы</label>

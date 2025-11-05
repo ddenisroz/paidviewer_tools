@@ -38,8 +38,8 @@ const AudioSettings = ({
             <CardHeader>
                 <CardTitle className="text-base font-semibold text-white">Аудио</CardTitle>
             </CardHeader>
-            <CardContent className="pt-6">
-                <div className="space-y-4">
+            <CardContent className="pt-4">
+                <div className="space-y-3">
                     {/* Громкость для сайта */}
                     <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Громкость сайта</label>

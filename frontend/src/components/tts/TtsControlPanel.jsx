@@ -57,9 +57,9 @@ const TtsControlPanel = ({
             <CardHeader>
                 <CardTitle className="text-base font-semibold text-white">Озвучка</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4 pt-4">
                 {/* Main Enable Button */}
-                <div className="flex items-center justify-center">
+                <div className="flex items-center justify-center mb-2">
                     <button
                         onClick={handleGlobalTtsToggle}
                         className={`px-8 py-3 rounded-xl font-semibold text-sm transition-all duration-300 border-2 ${
@@ -75,7 +75,7 @@ const TtsControlPanel = ({
                 {isAnyTtsEnabled && (
                     <>
                         {/* Engine - 2 columns */}
-                        <div>
+                        <div className="pt-2">
                             <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Движок</label>
                             <div className="grid grid-cols-2 gap-3">
                                 <button
