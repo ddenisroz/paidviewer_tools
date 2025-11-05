@@ -329,9 +329,9 @@ async def handle_tts_for_message(
                 
                 logger.info(f"✅ [{platform.upper()} TTS] Message from correct TTS reward! Processing...")
             
-            # Определяем использовать AI TTS или базовую
+            # ✅ НОВАЯ ЛОГИКА: Определяем главный engine, но ВСЕГДА включаем fallback
             use_ai_tts = (tts_user_settings.engine == 'f5tts')
-            use_basic_tts = (tts_user_settings.engine == 'gtts')
+            use_basic_tts = True  # ✅ ВСЕГДА включаем базовую TTS как fallback (даже если engine='f5tts')
             
             # ✅ ПРИОРИТЕТ: use_ai_tts_requested из connection_manager может ОТКЛЮЧИТЬ AI TTS
             # Это позволяет включить/отключить AI в реальном времени для канала

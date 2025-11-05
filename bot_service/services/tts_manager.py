@@ -141,76 +141,82 @@ class TTSManager:
         db_session=None
     ) -> Dict:
         """
-        Синтезирует речь с автоматическим выбором TTS системы.
+        Синтезирует речь с автоматическим fallback на базовую TTS.
         
-        Args:
-            channel_name: Имя канала
-            text: Текст для озвучки
-            author: Автор сообщения
-            user_id: ID пользователя для изоляции настроек
-            volume_level: Уровень громкости (0-100)
-            use_ai_tts: Использовать AI TTS (F5-TTS)
-            use_basic_tts: Использовать базовую TTS (gTTS)
-            connection_manager: ConnectionManager для проверки приоритетных голосов
-            tts_settings: Настройки TTS (enable7TV, enableTwitch, enableProfanity, profanityLevel)
-            word_filter: Список заблокированных слов
-            blocked_users: Список заблокированных пользователей
-            db_session: Сессия БД для проверки локального endpoint
-        
-        Returns:
-            Dict с результатом: {"success": bool, "voice": str, "volume": float, "tts_type": str}
+        ✅ НОВАЯ ЛОГИКА: 
+        - Если use_ai_tts=True, пытаемся F5-TTS ДО 3 раз
+        - Если F5-TTS падает или недоступен → автоматический fallback на gTTS
+        - Базовая TTS ВСЕГДА включена как резервная система
         """
-        logger.info(f"🎙️ TTS запрос: канал={channel_name}, автор={author}, текст='{text[:50]}...', volume={volume_level}%, AI={use_ai_tts}, Basic={use_basic_tts}")
+        logger.info(f"🎙️ TTS запрос: канал={channel_name}, текст='{text[:50]}...', AI={use_ai_tts}")
         
-        # Приоритет 1: AI TTS (F5-TTS) через HTTP
+        # ✅ ВСЕГДА включаем базовую TTS как fallback (по умолчанию)
+        # Переопределяем: если use_ai_tts=True, пытаемся AI, но fallback=gTTS
+        final_use_basic_tts = True  # ВСЕГДА используем gTTS как fallback
+        
+        # Приоритет 1: AI TTS (F5-TTS) через HTTP с retry логикой
         if use_ai_tts:
-            logger.info(f"🎙️ [DECISION] Trying AI TTS (F5-TTS) first")
-            # Определяем endpoint: локальный или централизованный
+            logger.info(f"🎙️ [PRIORITY 1] Trying AI TTS (F5-TTS) with fallback support")
+            max_retries = 2
             tts_endpoint = self.tts_service_url
+            
             if user_id and db_session:
                 local_endpoint = await self.get_user_tts_endpoint(user_id, db_session)
                 if local_endpoint:
                     tts_endpoint = local_endpoint
+                    logger.info(f"🏠 Using local TTS endpoint: {local_endpoint}")
             
-            # Проверяем доступность TTS сервиса
-            is_tts_service_healthy = await self.check_tts_service_health()
-            
-            if is_tts_service_healthy:
+            # Проверяем доступность TTS сервиса с retry
+            for attempt in range(1, max_retries + 1):
                 try:
-                    result = await self._synthesize_via_tts_service(
-                        channel_name, text, author, user_id, volume_level, connection_manager,
-                        tts_settings, word_filter, blocked_users, tts_endpoint=tts_endpoint
-                    )
-                    if result["success"]:
-                        logger.info(f"✅ AI TTS (F5-TTS) синтез успешен: voice={result.get('voice')}")
-                        return result
+                    is_tts_service_healthy = await self.check_tts_service_health()
+                    
+                    if is_tts_service_healthy:
+                        result = await self._synthesize_via_tts_service(
+                            channel_name, text, author, user_id, volume_level, connection_manager,
+                            tts_settings, word_filter, blocked_users, tts_endpoint=tts_endpoint
+                        )
+                        if result.get("success"):
+                            logger.info(f"✅ AI TTS (F5-TTS) синтез успешен (попытка {attempt}/{max_retries})")
+                            return result
+                        else:
+                            logger.warning(f"⚠️ AI TTS попытка {attempt}/{max_retries} не удалась: {result.get('error')}")
+                            if attempt < max_retries:
+                                import asyncio
+                                await asyncio.sleep(0.5)  # Небольшая задержка перед retry
                     else:
-                        logger.warning(f"⚠️ AI TTS (F5-TTS) синтез не удался, fallback на базовую TTS")
+                        logger.warning(f"⚠️ TTS Service недоступен (попытка {attempt}/{max_retries}), пытаемся снова...")
+                        if attempt < max_retries:
+                            import asyncio
+                            await asyncio.sleep(0.5)
+                            
                 except Exception as e:
-                    logger.error(f"❌ Ошибка AI TTS (F5-TTS): {e}, fallback на базовую TTS")
-            else:
-                logger.warning("⚠️ TTS Service недоступен, используем fallback базовую TTS")
+                    logger.error(f"❌ Ошибка AI TTS (попытка {attempt}/{max_retries}): {e}")
+                    if attempt < max_retries:
+                        import asyncio
+                        await asyncio.sleep(0.5)
+                    else:
+                        logger.error(f"❌ Все попытки AI TTS исчерпаны, используем fallback на gTTS")
+            
+            logger.warning(f"⚠️ AI TTS (F5-TTS) недоступен после {max_retries} попыток, fallback на базовую TTS (gTTS)")
         
-        # Приоритет 2: Базовая TTS (gTTS) - локальная fallback система
-        if use_basic_tts:
-            logger.info(f"🎙️ [DECISION] Using basic TTS (gTTS) - ALWAYS AVAILABLE AS FALLBACK")
+        # Приоритет 2: Базовая TTS (gTTS) - ВСЕГДА доступна как fallback
+        if final_use_basic_tts:
+            logger.info(f"🎙️ [PRIORITY 2] Using basic TTS (gTTS) - ALWAYS AVAILABLE AS FALLBACK")
             try:
-                result = await self._synthesize_via_basic_tts(
-                    text, volume_level
-                )
-                if result["success"]:
+                result = await self._synthesize_via_basic_tts(text, volume_level)
+                if result.get("success"):
                     logger.info(f"✅ Базовая TTS (gTTS) синтез успешен")
-                    # Периодическая очистка старых файлов
                     self.cleanup_old_files_if_needed()
                     return result
                 else:
-                    logger.error("❌ Базовая TTS (gTTS) синтез не удался")
+                    logger.error(f"❌ Базовая TTS (gTTS) синтез не удался: {result.get('error')}")
                     return {"success": False, "error": "Basic TTS synthesis failed"}
             except Exception as e:
                 logger.error(f"❌ Ошибка базовой TTS (gTTS): {e}")
                 return {"success": False, "error": f"Basic TTS error: {e}"}
         
-        # Если ничего не сработало
+        # Если ничего не сработало (почти невозможно)
         logger.error("❌ Ни одна TTS система не смогла выполнить синтез")
         return {"success": False, "error": "No TTS system available"}
     

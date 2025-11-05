@@ -693,18 +693,27 @@ const TtsMainPageContent = () => {
         });
     }, [switchEngineMutation, isWhitelisted, basicTtsEnabled]);
 
-    // Обработчики для переключения TTS с сохранением
+    // ✅ НОВАЯ ЛОГИКА: Обработчики для переключения режимов озвучки
+    // Теперь это radio buttons, а не независимые тоглы
     const handleBasicTtsToggle = (enabled) => {
-        setBasicTtsEnabled(enabled);
-        saveBasicTtsState(enabled);
+        if (!enabled) return; // Radio button, нельзя отключить если это выбранный режим
+        
+        setBasicTtsEnabled(true);
+        setAiTtsEnabled(false); // ✅ Отключаем AI TTS когда выбираем базовую
+        saveBasicTtsState(true);
+        
+        ttsLogger.info('Switched to Basic TTS mode');
+        toast.success('Режим озвучки: Google TTS (Базовая)');
         
         // Уведомляем shortcuts на главной странице
         window.dispatchEvent(new CustomEvent('tts-status-changed', { 
-            detail: { enabled } 
+            detail: { enabled: true, mode: 'basic' } 
         }));
     };
 
     const handleAiTtsToggle = (enabled) => {
+        if (!enabled) return; // Radio button, нельзя отключить если это выбранный режим
+        
         // Предотвращаем спам переключений
         if (engineToggleLoading) {
             return;
@@ -712,9 +721,6 @@ const TtsMainPageContent = () => {
         
         // Проверяем возможность использования F5-TTS (локальный setup ИЛИ whitelist)
         const hasLocalSetup = localStorage.getItem('tts_has_local_setup') === 'true';
-        // Обрабатываем случай когда isWhitelisted еще не проверен (null)
-        // Если isWhitelisted === null, считаем что проверка еще не выполнена, но не блокируем доступ
-        // (проверка будет выполнена на бэкенде при включении)
         const canUseF5TTS = hasLocalSetup || isWhitelisted === true;
         
         ttsLogger.info('F5-TTS toggle attempt:', { 
@@ -725,7 +731,7 @@ const TtsMainPageContent = () => {
         });
         
         // Если isWhitelisted === false (явно проверено и не в whitelist), блокируем
-        if (enabled && !canUseF5TTS && isWhitelisted === false) {
+        if (!canUseF5TTS && isWhitelisted === false) {
             ttsLogger.warning('F5-TTS blocked: user not whitelisted and no local setup');
             toast.error('Для использования F5-TTS настройте локальный TTS (tts_service_simple) или обратитесь к администратору для whitelist.');
             return;
@@ -737,8 +743,16 @@ const TtsMainPageContent = () => {
             ttsLogger.info('F5-TTS whitelist status unknown, allowing toggle - backend will check');
         }
         
+        // ✅ НОВАЯ ЛОГИКА: Отключаем базовую TTS когда включаем F5
+        if (enabled) {
+            setBasicTtsEnabled(false);
+        }
+        
         setAiTtsEnabled(enabled);
         saveAiTtsState(enabled);
+        
+        ttsLogger.info('Switched to AI TTS (F5-TTS) mode');
+        toast.success('Режим озвучки: F5-TTS (ИИ озвучка с fallback на Google TTS)');
     };
 
     // Обработчик для изменения режима прослушивания

@@ -47,55 +47,71 @@ const TtsControlPanel = ({
             </CardHeader>
             <CardContent>
                 <div className="space-y-5">
-                    {/* Типы озвучки */}
-                    <div className="grid grid-cols-2 gap-4">
-                        {/* Базовая озвучка */}
-                        <div className={`flex items-center space-x-4 p-4 rounded-2xl border-2 transition-all duration-200 ${
-                            basicTtsEnabled
-                                ? 'bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/50 hover:border-blue-500/70 cursor-pointer'
-                                : 'bg-gray-500/10 border-gray-500/30 hover:border-gray-500/50 cursor-pointer'
-                        }`}>
-                            <Switch
-                                checked={basicTtsEnabled}
-                                onCheckedChange={(checked) => setBasicTtsEnabled(checked)}
-                                disabled={!isAuthenticated || !isConnected}
-                                className="scale-125"
-                            />
-                            <div className="flex-1">
-                                <h3 className={`text-lg font-bold ${basicTtsEnabled ? 'text-white' : 'text-gray-400'}`}>Базовая озвучка</h3>
-                                <p className="text-sm text-gray-400 mt-0.5">Google TTS</p>
-                                {(!isAuthenticated || !isConnected) && (
-                                    <p className="text-xs text-yellow-500 mt-1">⚠ Требуется канал</p>
-                                )}
-                            </div>
-                        </div>
+                    {/* ✅ НОВЫЙ UX: Единый выбор режима озвучки с radio buttons */}
+                    <div>
+                        <h3 className="text-sm font-semibold text-gray-300 mb-3">Выбрать режим озвучки</h3>
+                        <div className="grid grid-cols-1 gap-3">
+                            {/* Режим 1: Базовая озвучка */}
+                            <label className={`flex items-center space-x-4 p-4 rounded-2xl border-2 transition-all duration-200 cursor-pointer ${
+                                basicTtsEnabled && !aiTtsEnabled
+                                    ? 'bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/50 hover:border-blue-500/70'
+                                    : 'bg-gray-500/10 border-gray-500/30 hover:border-gray-500/50'
+                            } ${!isAuthenticated || !isConnected ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                <input 
+                                    type="radio"
+                                    name="tts_mode"
+                                    value="basic"
+                                    checked={basicTtsEnabled && !aiTtsEnabled}
+                                    onChange={() => {
+                                        if (isAuthenticated && isConnected) {
+                                            setBasicTtsEnabled(true);
+                                            setAiTtsEnabled(false); // ✅ Отключаем F5 при выборе базовой
+                                        }
+                                    }}
+                                    disabled={!isAuthenticated || !isConnected}
+                                    className="w-5 h-5 pointer-events-none accent-blue-500"
+                                />
+                                <div className="flex-1">
+                                    <h4 className="text-base font-bold text-white">🎤 Google TTS (Базовая озвучка)</h4>
+                                    <p className="text-sm text-gray-400 mt-1">Всегда работает, но менее натуральна. Хороша как fallback.</p>
+                                </div>
+                                <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded font-semibold">✓ Всегда работает</span>
+                            </label>
 
-                        {/* ИИ озвучка F5-TTS */}
-                        <div className={`flex items-center space-x-4 p-4 rounded-2xl border-2 transition-all duration-200 ${
-                            !isHealthy || !canUseF5TTS
-                                ? 'bg-gray-500/10 border-gray-500/30 opacity-50'
-                                : aiTtsEnabled
-                                    ? 'bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/50 hover:border-purple-500/70 cursor-pointer'
-                                    : 'bg-gray-500/10 border-gray-500/30 hover:border-gray-500/50 cursor-pointer'
-                        }`}>
-                            <Switch
-                                checked={aiTtsEnabled}
-                                onCheckedChange={(checked) => setAiTtsEnabled(checked)}
-                                disabled={!isHealthy || !isAuthenticated || !isConnected || (isWhitelisted === false && !hasLocalSetup) || engineToggleLoading}
-                                className="scale-125"
-                            />
-                            <div className="flex-1">
-                                <h3 className={`text-lg font-bold ${aiTtsEnabled ? 'text-white' : 'text-gray-400'}`}>ИИ озвучка</h3>
-                                <p className="text-sm text-gray-400 mt-0.5">F5-TTS</p>
-                                {(!isAuthenticated || !isConnected) && (
-                                    <p className="text-xs text-yellow-500 mt-1">⚠ Требуется канал</p>
-                                )}
-                                {!isHealthy && (
-                                    <p className="text-xs text-yellow-400 mt-1">⚠ Сервер недоступен</p>
-                                )}
-                                {isHealthy && !isWhitelisted && !hasLocalSetup && (
-                                    <p className="text-xs text-orange-400 mt-1">⚠ Только для whitelist</p>
-                                )}
+                            {/* Режим 2: ИИ озвучка F5-TTS */}
+                            <label className={`flex items-center space-x-4 p-4 rounded-2xl border-2 transition-all duration-200 cursor-pointer ${
+                                aiTtsEnabled
+                                    ? 'bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/50 hover:border-purple-500/70'
+                                    : 'bg-gray-500/10 border-gray-500/30 hover:border-gray-500/50'
+                            } ${!isHealthy || !canUseF5TTS ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                <input 
+                                    type="radio"
+                                    name="tts_mode"
+                                    value="ai"
+                                    checked={aiTtsEnabled}
+                                    onChange={() => {
+                                        if (isHealthy && canUseF5TTS && isAuthenticated && isConnected) {
+                                            setAiTtsEnabled(true);
+                                            setBasicTtsEnabled(false); // ✅ Отключаем базовую при выборе F5
+                                        }
+                                    }}
+                                    disabled={!isHealthy || !isAuthenticated || !isConnected || (isWhitelisted === false && !hasLocalSetup) || engineToggleLoading}
+                                    className="w-5 h-5 pointer-events-none accent-purple-500"
+                                />
+                                <div className="flex-1">
+                                    <h4 className="text-base font-bold text-white">⚡ F5-TTS (ИИ озвучка)</h4>
+                                    <p className="text-sm text-gray-400 mt-1">Натуральная речь, автоматический fallback на Google TTS.</p>
+                                </div>
+                                <div className="text-xs font-semibold">
+                                    {!isHealthy && <span className="bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded">⚠ Недоступен</span>}
+                                    {isHealthy && canUseF5TTS && <span className="bg-purple-500/20 text-purple-400 px-2 py-1 rounded">⚡ Доступен</span>}
+                                    {isHealthy && !canUseF5TTS && <span className="bg-orange-500/20 text-orange-400 px-2 py-1 rounded">🔒 Whitelist</span>}
+                                </div>
+                            </label>
+
+                            {/* Информация о fallback */}
+                            <div className="p-3 bg-blue-900/20 border border-blue-700/50 rounded-lg text-xs text-blue-300">
+                                <strong>ℹ️ Совет:</strong> При ошибке F5-TTS система автоматически переключится на Google TTS без потери озвучки.
                             </div>
                         </div>
                     </div>
