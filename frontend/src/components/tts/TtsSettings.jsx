@@ -69,6 +69,7 @@ const TtsSettings = ({
                                     Twitch
                                 </Label>
                             </div>
+                        </div>
                     </div>
                     
                     {/* Фильтры сообщений в 2 колонки */}
