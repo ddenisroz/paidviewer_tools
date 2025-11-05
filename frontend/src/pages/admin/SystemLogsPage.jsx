@@ -241,7 +241,7 @@ const SystemLogsPage = () => {
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-slate-800/50 border-slate-700">
-            <CardContent className="pt-6">
+            <CardContent className="pt-0">
               <div className="text-sm text-slate-400">Всего действий</div>
               <div className="text-2xl font-bold mt-2">{stats.total_logs}</div>
               <div className="text-xs text-slate-500 mt-1">за последние {stats.days} дней</div>
@@ -249,7 +249,7 @@ const SystemLogsPage = () => {
           </Card>
 
           <Card className="bg-slate-800/50 border-slate-700">
-            <CardContent className="pt-6">
+            <CardContent className="pt-0">
               <div className="text-sm text-slate-400">Типов действий</div>
               <div className="text-2xl font-bold mt-2">{stats.actions_by_type?.length || 0}</div>
               <div className="text-xs text-slate-500 mt-1">различных операций</div>
@@ -257,7 +257,7 @@ const SystemLogsPage = () => {
           </Card>
 
           <Card className="bg-slate-800/50 border-slate-700">
-            <CardContent className="pt-6">
+            <CardContent className="pt-0">
               <div className="text-sm text-slate-400">Активных админов</div>
               <div className="text-2xl font-bold mt-2">{stats.top_admins?.length || 0}</div>
               <div className="text-xs text-slate-500 mt-1">в этом периоде</div>

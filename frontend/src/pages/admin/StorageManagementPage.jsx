@@ -147,7 +147,7 @@ const StorageManagementPage = () => {
   if (!stats) {
     return (
       <Card className="bg-slate-800/50 border-slate-700">
-        <CardContent className="pt-6">
+        <CardContent className="pt-0">
           <p className="text-slate-400">Не удалось загрузить статистику</p>
           <Button onClick={loadStats} className="mt-4">
             Попробовать еще раз

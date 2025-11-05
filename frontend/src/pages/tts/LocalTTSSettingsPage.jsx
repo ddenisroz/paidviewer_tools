@@ -337,7 +337,7 @@ const LocalTTSSettingsPage = () => {
                     </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="connection" className="space-y-6 mt-6">
+                <TabsContent value="connection" className="space-y-4 mt-0">
             {/* Инструкция по установке */}
             <Card className="bg-blue-500/10 border-blue-500/30">
                 <CardHeader>
@@ -632,7 +632,7 @@ const LocalTTSSettingsPage = () => {
                 </TabsContent>
 
                 {/* Voice Management Tab */}
-                <TabsContent value="voices" className="space-y-6 mt-6">
+                <TabsContent value="voices" className="space-y-4 mt-0">
                     <Card>
                         <CardHeader>
                             <div className="flex items-center justify-between">

@@ -184,8 +184,8 @@ const DropsMainPage = () => {
         </TabsList>
 
         {/* Стрик */}
-        <TabsContent value="streak" className="mt-6">
-          <div className="space-y-6">
+        <TabsContent value="streak" className="mt-0">
+          <div className="space-y-4">
             <StreakSettings 
               user={user}
               platform={selectedPlatform}
@@ -201,7 +201,7 @@ const DropsMainPage = () => {
         </TabsContent>
 
         {/* Донат */}
-        <TabsContent value="donation" className="mt-6">
+        <TabsContent value="donation" className="mt-0">
           <DonationSettings 
             user={user}
             platform={selectedPlatform}
@@ -211,7 +211,7 @@ const DropsMainPage = () => {
         </TabsContent>
 
         {/* Баллы */}
-        <TabsContent value="points" className="mt-6">
+        <TabsContent value="points" className="mt-0">
           <PointsRewards 
             user={user}
             platform={selectedPlatform}
@@ -220,7 +220,7 @@ const DropsMainPage = () => {
         </TabsContent>
 
         {/* Награды */}
-        <TabsContent value="rewards" className="mt-6">
+        <TabsContent value="rewards" className="mt-0">
           <RewardsManager 
             user={user}
             platform={selectedPlatform}
@@ -230,7 +230,7 @@ const DropsMainPage = () => {
         </TabsContent>
 
         {/* История */}
-        <TabsContent value="history" className="mt-6">
+        <TabsContent value="history" className="mt-0">
           <DropsHistory 
             user={user}
             platform={selectedPlatform}
@@ -239,7 +239,7 @@ const DropsMainPage = () => {
         </TabsContent>
 
         {/* Виджет */}
-        <TabsContent value="widget" className="mt-6">
+        <TabsContent value="widget" className="mt-0">
           <WidgetSettings 
             user={user}
             platform={selectedPlatform}

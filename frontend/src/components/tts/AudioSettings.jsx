@@ -50,7 +50,7 @@ const AudioSettings = ({
     }
     
     return (
-        <Card className="mt-6">
+        <Card className="mt-0">
             <CardHeader className="pb-2">
                 <CardTitle className="text-base">Громкость</CardTitle>
             </CardHeader>

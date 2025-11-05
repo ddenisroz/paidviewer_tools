@@ -29,7 +29,7 @@ const TtsSettings = ({
     };
 
     return (
-        <Card className="mt-6">
+        <Card className="mt-0">
             <CardHeader 
                 className="cursor-pointer hover:bg-gray-800/30 transition-colors"
                 onClick={() => setIsExpanded(!isExpanded)}

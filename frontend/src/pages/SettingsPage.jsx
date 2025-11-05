@@ -79,7 +79,7 @@ const SettingsPage = () => {
             {activeTab === 'settings' && (
             <>
             <Card>
-                <CardContent className="pt-6">
+                <CardContent className="pt-0">
                     <div className="grid grid-cols-3 gap-4">
                         {/* Twitch Integration */}
                         <div className="flex flex-col items-center justify-between gap-3 p-4 rounded-lg border border-gray-700 bg-gray-800/50">
@@ -142,7 +142,7 @@ const SettingsPage = () => {
 
             {/* User Info and Danger Zone */}
             <Card>
-                <CardContent className="pt-6">
+                <CardContent className="pt-0">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* User Info */}
                         <div className="flex flex-col gap-2 p-4 rounded-lg border border-border bg-card/50">

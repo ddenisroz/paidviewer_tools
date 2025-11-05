@@ -811,7 +811,7 @@ const TtsMainPageContent = () => {
 
     return (
         <PageWrapper>
-            <div className="relative space-y-6">
+            <div className="relative space-y-4">
                     {/* CSS для слайдера */}
                     <style>
                     {`
@@ -834,122 +834,6 @@ const TtsMainPageContent = () => {
                         }
                     `}
                 </style>
-                
-                {/* Выбор движка TTS - ВСЕГДА показываем */}
-                <div className="mb-6 p-5 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-blue-600/5 rounded-2xl border-2 border-blue-500/30">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold">Выбор движка озвучки</h3>
-                        {!localTtsConfig?.configured && (
-                            <a 
-                                href="/dashboard/tts/local" 
-                                className="text-xs text-blue-400 hover:text-blue-300 underline"
-                            >
-                                Настроить локальный TTS →
-                            </a>
-                        )}
-                    </div>
-                    <div className="flex gap-3">
-                        <label 
-                            className={`flex-1 flex items-center gap-3 cursor-pointer px-4 py-3 rounded-xl border-2 transition-all duration-200 ${
-                                ttsEngine === 'cloud' 
-                                    ? 'border-blue-500 bg-blue-500/10 text-blue-400' 
-                                    : 'border-gray-700 hover:border-blue-500 text-gray-400'
-                            }`}
-                            onClick={() => {
-                                if (ttsEngine !== 'cloud') {
-                                    setTtsEngine('cloud');
-                                    botService.post('/api/tts/engine', { engine_type: 'gtts' }).catch(err => ttsLogger.error('Error setting TTS engine:', err));
-                                    
-                                    // Уведомляем shortcuts на главной странице
-                                    window.dispatchEvent(new CustomEvent('ai-tts-changed', { 
-                                        detail: { 
-                                            enabled: false,
-                                            engineType: 'gtts',
-                                            isWhitelisted: isWhitelisted
-                                        } 
-                                    }));
-                                }
-                            }}
-                        >
-                            <input 
-                                type="radio"
-                                name="tts_engine"
-                                value="cloud"
-                                checked={ttsEngine === 'cloud'}
-                                onChange={() => {}} // Логика в onClick label
-                                className="w-4 h-4 pointer-events-none"
-                            />
-                            <div className="flex-1">
-                                <div className="text-sm font-medium">☁️ Облачный</div>
-                                {isChecking && (
-                                    <div className="text-xs text-blue-400 mt-0.5">⏳ Проверяем...</div>
-                                )}
-                                {!isChecking && !isHealthy && (
-                                    <div className="text-xs text-yellow-400 mt-0.5">⚠️ Сервер недоступен</div>
-                                )}
-                                {!isChecking && isHealthy && !isWhitelisted && (
-                                    <div className="text-xs text-orange-400 mt-0.5">⚠️ Только whitelist</div>
-                                )}
-                                {!isChecking && isHealthy && isWhitelisted && (
-                                    <div className="text-xs text-green-400 mt-0.5">✅ Доступен</div>
-                                )}
-                            </div>
-                        </label>
-                        
-                        <label 
-                            className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-200 ${
-                                !localTtsConfig?.configured || !isWhitelisted
-                                    ? 'opacity-40 cursor-not-allowed border-gray-700 text-gray-500'
-                                    : ttsEngine === 'local'
-                                        ? 'border-green-500 bg-green-500/10 text-green-400 cursor-pointer'
-                                        : 'border-gray-700 hover:border-green-500 text-gray-400 cursor-pointer'
-                            }`}
-                            onClick={() => {
-                                if (localTtsConfig?.configured && isWhitelisted && ttsEngine !== 'local') {
-                                    setTtsEngine('local');
-                                    botService.post('/api/tts/engine', { engine_type: 'local' }).catch(err => {
-                                        ttsLogger.error('Error setting TTS engine:', err);
-                                        // Откатываем изменение при ошибке
-                                        if (err.response?.status === 403) {
-                                            toast.error('F5-TTS доступен только для пользователей из whitelist');
-                                            setTtsEngine('cloud');
-                                        }
-                                    });
-                                    
-                                    // Уведомляем shortcuts на главной странице
-                                    window.dispatchEvent(new CustomEvent('ai-tts-changed', { 
-                                        detail: { 
-                                            enabled: true,
-                                            engineType: 'local',
-                                            isWhitelisted: isWhitelisted
-                                        } 
-                                    }));
-                                }
-                            }}
-                        >
-                            <input 
-                                type="radio"
-                                name="tts_engine"
-                                value="local"
-                                checked={ttsEngine === 'local'}
-                                onChange={() => {}} // Логика в onClick label
-                                className="w-4 h-4 pointer-events-none"
-                                disabled={!localTtsConfig?.configured || !isWhitelisted}
-                            />
-                            <div className="text-sm font-medium">💻 Локальный</div>
-                            {!localTtsConfig?.configured && (
-                                <span className="text-xs bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded ml-auto">
-                                    Не настроен
-                                </span>
-                            )}
-                            {localTtsConfig?.configured && !isWhitelisted && (
-                                <span className="text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded ml-auto">
-                                    Только whitelist
-                                </span>
-                            )}
-                        </label>
-                    </div>
-                </div>
                 
                 {/* Основной контент */}
                 <TtsControlPanel
