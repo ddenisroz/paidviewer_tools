@@ -1,145 +1,96 @@
 // src/pages/tts/TtsMainPage.jsx
-import React, { useContext, useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTts } from '../../context/TtsContext';
 import { useTtsHealth } from '../../context/TtsHealthContext';
 import { useAuth } from '../../context/AuthContext';
 import { useIntegrations } from '../../context/IntegrationsContext';
 import { generateObsUrl, botService, ttsService } from '../../services/microservices';
-import TtsErrorCard from '../../components/TtsErrorCard';
 import PageWrapper from '../../components/PageWrapper';
 import { getTtsWebSocketUrl } from '../../utils/urlUtils';
 import { toast } from 'sonner';
-
-// Импорты компонентов
-import TtsControlPanel from '../../components/tts/TtsControlPanel';
-import AudioSettings from '../../components/tts/AudioSettings';
-import TtsSettings from '../../components/tts/TtsSettings';
-import HealthStatus from '../../components/tts/HealthStatus';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
+import { TwitchIcon, VKIcon } from '../../components/PlatformIcons';
 import TtsFilterManager from '../../components/tts/TtsFilterManager';
+import HealthStatus from '../../components/tts/HealthStatus';
 import { ttsLogger } from '../../utils/logger';
 import { logger } from '../../utils/prodLogger';
 
 const TtsMainPageContent = () => {
-    const { ttsEnabled, toggleTts, isWhitelisted, setIsWhitelisted, engineStatus, isToggling, initializeTts, setNotificationHandler, syncWithHealthContext } = useTts();
-    const { isHealthy, isChecking, lastCheck, checkTtsHealth } = useTtsHealth();
+    const { ttsEnabled, isWhitelisted, setIsWhitelisted, initializeTts } = useTts();
+    const { isHealthy, checkTtsHealth } = useTtsHealth();
     const { isAuthenticated, user, isGuest } = useAuth();
     const { integrations } = useIntegrations();
     
-    useEffect(() => {
-        ttsLogger.info('TTS Main Page initialized', { 
-            ttsEnabled, 
-            isWhitelisted, 
-            isAuthenticated, 
-            isGuest,
-            user: user?.id
-        });
-    }, []);
-    
+    const [basicTtsEnabled, setBasicTtsEnabled] = useState(false);
+    const [aiTtsEnabled, setAiTtsEnabled] = useState(false);
+    const [ttsTriggerMode, setTtsTriggerMode] = useState('all_messages');
+    const [ttsEngine, setTtsEngine] = useState('cloud');
     const [listeningMode, setListeningMode] = useState('website');
     const [obsUrl, setObsUrl] = useState('');
+    const [volume, setVolume] = useState(50);
+    
     const [platformSettings, setPlatformSettings] = useState({
         enabled_platforms: ['twitch', 'vk'],
         global_enabled: true
-    });
-    const [platformLoading, setPlatformLoading] = useState(false);
-    const [engineToggleLoading, setEngineToggleLoading] = useState(false);
-    
-    const [basicTtsEnabled, setBasicTtsEnabled] = useState(false);
-    const [aiTtsEnabled, setAiTtsEnabled] = useState(false);
-    
-    const [audioSettings, setAudioSettings] = useState({
-        websiteVolume: 50
     });
     
     const [ttsSettings, setTtsSettings] = useState({
         enable7TV: true,
         enableTwitch: true,
-        enableLexiconFilter: true,
-        enableCustomLexicon: false,
         filterReplies: false,
         filterMentions: false,
         version: 1,
     });
     
-    const [isSaving, setIsSaving] = useState(false);
-    const [saveStatus, setSaveStatus] = useState('');
-    
-    const [ttsEngine, setTtsEngine] = useState('cloud');
     const [localTtsConfig, setLocalTtsConfig] = useState(null);
-    const [engineLoading, setEngineLoading] = useState(true);
     
     const queryClient = useQueryClient();
+    const isTwitchConnected = integrations.twitch?.enabled || (isGuest && user?.platform === 'twitch');
+    const isVkConnected = integrations.vk?.enabled || (isGuest && user?.platform === 'vk');
+    const hasLocalSetup = localStorage.getItem('tts_has_local_setup') === 'true';
+    const canUseF5TTS = hasLocalSetup || isWhitelisted === true;
+    const isAnyTtsEnabled = basicTtsEnabled || aiTtsEnabled;
 
-    const switchEngineMutation = useMutation({
-        mutationFn: async ({ engine_type }) => {
-            return await botService.post('/api/tts/engine', { engine_type });
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['tts-status'] });
-            ttsLogger.success('TTS engine switched successfully');
-        },
-        onError: (error) => {
-            ttsLogger.error('Error switching TTS engine:', error);
-        },
-    });
-
+    // Mutations
     const toggleBasicTtsMutation = useMutation({
         mutationFn: async (enabled) => {
-            if (enabled) {
-                return await botService.post('/api/tts/enable');
-            } else {
-                return await botService.post('/api/tts/disable');
-            }
+            return enabled ? await botService.post('/api/tts/enable') : await botService.post('/api/tts/disable');
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tts-status'] });
             logger.log('Basic TTS state saved');
-        },
-        onError: (error) => {
-            logger.error('Error saving basic TTS state:', error);
-        },
+        }
     });
 
     const toggleAiTtsMutation = useMutation({
         mutationFn: async (enabled) => {
-            if (enabled) {
-                return await botService.post('/api/tts/ai/enable');
-            } else {
-                return await botService.post('/api/tts/ai/disable');
-            }
+            return enabled ? await botService.post('/api/tts/ai/enable') : await botService.post('/api/tts/ai/disable');
         },
-        onSuccess: (data) => {
+        onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tts-status'] });
-            logger.log('AI TTS state saved:', data);
-        },
-        onError: (error) => {
-            logger.error('Error saving AI TTS state:', error);
-        },
+            logger.log('AI TTS state saved');
+        }
     });
 
     const savePlatformSettingsMutation = useMutation({
-        mutationFn: async (data) => {
-            return await ttsService.post('/save-settings', data);
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['tts-settings'] });
-        },
-        onError: (error) => {
-            ttsLogger.error('Error saving platform settings:', error);
-        },
+        mutationFn: async (data) => await ttsService.post('/save-settings', data),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tts-settings'] })
     });
 
-    const { data: ttsStatusData, isLoading: isTtsStatusLoading } = useQuery({
+    const switchEngineMutation = useMutation({
+        mutationFn: async ({ engine_type }) => await botService.post('/api/tts/engine', { engine_type }),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tts-status'] })
+    });
+
+    // Load TTS status
+    const { data: ttsStatusData } = useQuery({
         queryKey: ['tts-status'],
         queryFn: async () => {
-            try {
-                const response = await botService.get('/api/tts/status');
-                return response.data;
-            } catch (error) {
-                ttsLogger.error('Error fetching TTS status:', error);
-                return null;
-            }
+            const response = await botService.get('/api/tts/status');
+            return response.data;
         },
         enabled: isAuthenticated,
         refetchInterval: 30000,
@@ -147,101 +98,108 @@ const TtsMainPageContent = () => {
 
     useEffect(() => {
         if (ttsStatusData) {
-            ttsLogger.info('TTS status API response:', ttsStatusData);
-            
             setBasicTtsEnabled(ttsStatusData.basic_tts_enabled || false);
             setAiTtsEnabled(ttsStatusData.ai_tts_enabled || false);
-            
-            if (ttsStatusData.tts_engine) {
-                setTtsEngine(ttsStatusData.tts_engine);
-            }
-            
-            if (ttsStatusData.listening_mode) {
-                setListeningMode(ttsStatusData.listening_mode);
-            }
-            
-            if (ttsStatusData.platform_settings) {
-                setPlatformSettings(ttsStatusData.platform_settings);
-            }
-            
-            if (ttsStatusData.audio_settings?.website_volume) {
-                setAudioSettings(prev => ({
-                    ...prev,
-                    websiteVolume: ttsStatusData.audio_settings.website_volume
-                }));
-            }
+            if (ttsStatusData.tts_engine) setTtsEngine(ttsStatusData.tts_engine);
+            if (ttsStatusData.listening_mode) setListeningMode(ttsStatusData.listening_mode);
+            if (ttsStatusData.platform_settings) setPlatformSettings(ttsStatusData.platform_settings);
+            if (ttsStatusData.audio_settings?.website_volume) setVolume(ttsStatusData.audio_settings.website_volume);
         }
     }, [ttsStatusData]);
 
+    // Load TTS trigger mode
     useEffect(() => {
-        if (user?.tts_listening_mode) {
-            setListeningMode(user.tts_listening_mode);
+        if (isAuthenticated) {
+            botService.get('/api/tts/mode')
+                .then(res => res.data?.tts_mode && setTtsTriggerMode(res.data.tts_mode))
+                .catch(err => console.error('Error loading TTS mode:', err));
         }
-    }, [user?.tts_listening_mode]);
+    }, [isAuthenticated]);
 
+    // Generate OBS URL
     useEffect(() => {
-        const handleTtsStatusChange = (event) => {
-            ttsLogger.info('TtsMainPage: Received tts-status-changed event', event.detail);
-            setBasicTtsEnabled(event.detail.enabled);
-        };
-
-        window.addEventListener('tts-status-changed', handleTtsStatusChange);
-        return () => window.removeEventListener('tts-status-changed', handleTtsStatusChange);
-    }, []);
-
-    useEffect(() => {
-        const handleAiTtsChange = (event) => {
-            ttsLogger.info('TtsMainPage: Received ai-tts-changed event', event.detail);
-            const { enabled, engineType, isWhitelisted } = event.detail;
-            
-            if (enabled) {
-                setTtsEngine(engineType || 'local');
-            } else {
-                setTtsEngine('gtts');
-            }
-        };
-
-        window.addEventListener('ai-tts-changed', handleAiTtsChange);
-        return () => window.removeEventListener('ai-tts-changed', handleAiTtsChange);
-    }, []);
-
-    useEffect(() => {
-        const handlePlatformSettingsChange = (event) => {
-            const { enabledPlatforms } = event.detail;
-            ttsLogger.info('TtsMainPage: Received tts-settings-changed event', enabledPlatforms);
-            setPlatformSettings(prev => ({
-                ...prev,
-                enabled_platforms: enabledPlatforms
-            }));
-        };
-
-        window.addEventListener('tts-settings-changed', handlePlatformSettingsChange);
-        return () => window.removeEventListener('tts-settings-changed', handlePlatformSettingsChange);
-    }, []);
-
-    useEffect(() => {
-        const generateUrl = async () => {
-            if (listeningMode === 'obs' && isAuthenticated && user?.id) {
-                try {
-                    const response = await generateObsUrl();
+        if (listeningMode === 'obs' && isAuthenticated && user?.id) {
+            generateObsUrl()
+                .then(response => {
                     const token = response.data?.obs_token;
-                    if (token) {
-                        const obsUrl = getTtsWebSocketUrl(token);
-                        setObsUrl(obsUrl);
-                    } else {
-                        setObsUrl('');
-                    }
-                } catch (error) {
-                    logger.error('Error generating OBS URL:', error);
-                    if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
-                        toast.error('Error generating OBS URL');
-                    }
-                    setObsUrl('');
-                }
-            }
-        };
-        generateUrl();
+                    if (token) setObsUrl(getTtsWebSocketUrl(token));
+                })
+                .catch(err => logger.error('Error generating OBS URL:', err));
+        }
     }, [listeningMode, isAuthenticated, user?.id]);
+
+    useEffect(() => {
+        if (isAuthenticated) checkTtsHealth();
+    }, [isAuthenticated, checkTtsHealth]);
+
+    useEffect(() => {
+        initializeTts();
+    }, []);
+
+    // Handlers
+    const handleGlobalTtsToggle = () => {
+        const newState = !isAnyTtsEnabled;
+        if (newState) {
+            toggleBasicTtsMutation.mutate(true);
+            setBasicTtsEnabled(true);
+            window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
+        } else {
+            toggleBasicTtsMutation.mutate(false);
+            toggleAiTtsMutation.mutate(false);
+            setBasicTtsEnabled(false);
+            setAiTtsEnabled(false);
+            window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: false } }));
+        }
+    };
+
+    const handleTtsModeChange = async (mode) => {
+        try {
+            await botService.post('/api/tts/mode', { tts_mode: mode });
+            setTtsTriggerMode(mode);
+            toast.success('Режим изменён');
+        } catch (error) {
+            toast.error('Ошибка изменения режима');
+        }
+    };
+
+    const handleBasicTtsToggle = () => {
+        const newValue = !basicTtsEnabled;
+        if (newValue) {
+            toggleBasicTtsMutation.mutate(true);
+            setBasicTtsEnabled(true);
+            setAiTtsEnabled(false);
+            window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
+        } else {
+            toggleBasicTtsMutation.mutate(false);
+            setBasicTtsEnabled(false);
+            window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: false } }));
+        }
+    };
+
+    const handleAiTtsToggle = () => {
+        if (!canUseF5TTS || !isHealthy) {
+            toast.error('F5-TTS недоступен');
+            return;
+        }
+        const newValue = !aiTtsEnabled;
+        if (newValue) {
+            botService.post('/api/tts/ai/enable', { engine: ttsEngine })
+                .then(() => {
+                    setAiTtsEnabled(true);
+                    setBasicTtsEnabled(true);
+                    toast.success('F5-TTS включён');
+                    window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
+                })
+                .catch(() => toast.error('Ошибка включения F5-TTS'));
+        } else {
+            switchEngineMutation.mutate({ engine_type: 'gtts' }, {
+                onSuccess: () => {
+                    setAiTtsEnabled(false);
+                    toast.success('Переключено на Google TTS');
+                }
+            });
+        }
+    };
 
     const handlePlatformToggle = useCallback((platform) => {
         const currentPlatforms = platformSettings.enabled_platforms;
@@ -249,180 +207,355 @@ const TtsMainPageContent = () => {
             ? currentPlatforms.filter(p => p !== platform)
             : [...currentPlatforms, platform];
             
-        setPlatformSettings(prev => ({
-            ...prev,
-            enabled_platforms: newEnabledPlatforms
-        }));
+        setPlatformSettings(prev => ({ ...prev, enabled_platforms: newEnabledPlatforms }));
         
-        savePlatformSettingsMutation.mutate(
-            { enabled_platforms: newEnabledPlatforms },
-            {
-                onSuccess: () => {
-                    window.dispatchEvent(new CustomEvent('tts-settings-changed', {
-                        detail: { enabledPlatforms: newEnabledPlatforms }
-                    }));
-                    logger.log(`Platform ${platform} toggled successfully`);
-                },
-                onError: () => {
-                    setPlatformSettings(prev => ({
-                        ...prev,
-                        enabled_platforms: currentPlatforms
-                    }));
-                }
-            }
-        );
+        savePlatformSettingsMutation.mutate({ enabled_platforms: newEnabledPlatforms }, {
+            onSuccess: () => {
+                window.dispatchEvent(new CustomEvent('tts-settings-changed', {
+                    detail: { enabledPlatforms: newEnabledPlatforms }
+                }));
+            },
+            onError: () => setPlatformSettings(prev => ({ ...prev, enabled_platforms: currentPlatforms }))
+        });
     }, [platformSettings.enabled_platforms, savePlatformSettingsMutation]);
-
-    const handleSaveSettings = useCallback(async () => {
-        try {
-            setIsSaving(true);
-            setSaveStatus('Saving...');
-            
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            setSaveStatus('Saved');
-            setTimeout(() => setSaveStatus(''), 2000);
-        } catch (error) {
-            logger.error('Error saving settings:', error);
-            setSaveStatus('Save error');
-        } finally {
-            setIsSaving(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        if (isAuthenticated === true) {
-            const timeoutId = setTimeout(() => {
-                handleSaveSettings();
-            }, 1000);
-            
-            return () => clearTimeout(timeoutId);
-        }
-    }, [audioSettings, ttsSettings, handleSaveSettings, isAuthenticated]);
-
-    useEffect(() => {
-        if (isAuthenticated === true) {
-            checkTtsHealth();
-        }
-    }, [isAuthenticated, checkTtsHealth]);
-
-    useEffect(() => {
-        initializeTts();
-    }, []);
-
-    const saveBasicTtsState = useCallback((enabled) => {
-        toggleBasicTtsMutation.mutate(enabled);
-    }, [toggleBasicTtsMutation]);
-
-    const saveAiTtsState = useCallback((enabled) => {
-        if (!enabled) {
-            setEngineToggleLoading(true);
-            switchEngineMutation.mutate(
-                { engine_type: 'gtts' },
-                {
-                    onSuccess: () => {
-                        toast.success('Switched to Google TTS');
-                        logger.log('AI TTS disabled, switched to gtts');
-                        setEngineToggleLoading(false);
-                    },
-                    onError: () => {
-                        toast.error('Failed to switch engine');
-                        setEngineToggleLoading(false);
-                    }
-                }
-            );
-        } else {
-            setEngineToggleLoading(true);
-            const targetEngine = ttsEngine === 'cloud' ? 'cloud' : 'local';
-            botService.post('/api/tts/ai/enable', { engine: targetEngine })
-                .then(() => {
-                    logger.log('AI TTS state saved: true engine: ' + targetEngine);
-                    setEngineToggleLoading(false);
-                    toast.success('F5-TTS enabled');
-                })
-                .catch((error) => {
-                    logger.error('Error enabling AI TTS:', error);
-                    toast.error('Failed to enable F5-TTS');
-                    setEngineToggleLoading(false);
-                });
-        }
-    }, [ttsEngine, switchEngineMutation]);
-
-    if (!isAuthenticated) {
-        return (
-            <PageWrapper title="Text to Speech">
-                <div className="text-center text-gray-400">
-                    Please log in to access TTS settings
-                </div>
-            </PageWrapper>
-        );
-    }
 
     const handleRegenerateObsUrl = async () => {
         try {
             const response = await generateObsUrl();
             const token = response.data?.obs_token;
             if (token) {
-                const newUrl = getTtsWebSocketUrl(token);
-                setObsUrl(newUrl);
-                toast.success('OBS URL regenerated');
+                setObsUrl(getTtsWebSocketUrl(token));
+                toast.success('URL обновлён');
             }
         } catch (error) {
-            logger.error('Error regenerating OBS URL:', error);
-            toast.error('Failed to regenerate OBS URL');
+            toast.error('Ошибка обновления URL');
         }
     };
 
+    if (!isAuthenticated) {
+        return (
+            <PageWrapper title="Text to Speech">
+                <div className="text-center text-gray-400">
+                    Войдите, чтобы настроить TTS
+                </div>
+            </PageWrapper>
+        );
+    }
+
     return (
         <PageWrapper title="Text to Speech">
-            <div className="space-y-3">
-                {/* TTS Control Panel - Compact Controls */}
-                <TtsControlPanel
-                    basicTtsEnabled={basicTtsEnabled}
-                    setBasicTtsEnabled={saveBasicTtsState}
-                    aiTtsEnabled={aiTtsEnabled}
-                    setAiTtsEnabled={saveAiTtsState}
-                    isHealthy={isHealthy}
-                    isAuthenticated={isAuthenticated}
-                    isConnected={ttsEnabled}
-                    isWhitelisted={isWhitelisted}
-                    engineToggleLoading={engineToggleLoading}
-                    listeningMode={listeningMode}
-                    setListeningMode={setListeningMode}
-                    obsUrl={obsUrl}
-                    onRegenerateObsUrl={handleRegenerateObsUrl}
-                    platformSettings={platformSettings}
-                    integrations={integrations}
-                    onPlatformToggle={handlePlatformToggle}
-                    user={user}
-                    isGuest={isGuest}
-                    ttsEngine={ttsEngine}
-                    setTtsEngine={setTtsEngine}
-                    localTtsConfig={localTtsConfig}
-                />
+            <div className="space-y-4 max-w-5xl mx-auto">
+                {/* Main TTS Toggle */}
+                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-700/50 bg-gradient-to-br from-gray-900/80 to-gray-800/50 backdrop-blur-sm">
+                    <div className="flex items-center gap-3">
+                        <div className={`w-3 h-3 rounded-full transition-all duration-300 ${isAnyTtsEnabled ? 'bg-green-500 shadow-lg shadow-green-500/50' : 'bg-gray-600'}`} />
+                        <div>
+                            <div className="text-sm font-bold text-white">Озвучка сообщений</div>
+                            <div className="text-xs text-gray-400">
+                                {isAnyTtsEnabled ? 'Активна' : 'Отключена'}
+                            </div>
+                        </div>
+                    </div>
+                    <Switch
+                        checked={isAnyTtsEnabled}
+                        onCheckedChange={handleGlobalTtsToggle}
+                        className="data-[state=checked]:bg-green-600"
+                    />
+                </div>
 
-                {/* Audio Settings & Additional Settings - Side by side */}
-                {(basicTtsEnabled || aiTtsEnabled) && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                        <AudioSettings
-                            audioSettings={audioSettings}
-                            setAudioSettings={setAudioSettings}
-                            listeningMode={listeningMode}
-                            onSaveSettings={handleSaveSettings}
-                        />
-                        <TtsSettings
+                {isAnyTtsEnabled && (
+                    <>
+                        {/* Settings Grid */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            {/* Left Column: Main Controls */}
+                            <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-base font-bold text-white">Управление</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {/* Trigger Mode */}
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-400 mb-2">Режим включения</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button
+                                                onClick={() => handleTtsModeChange('all_messages')}
+                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                                                    ttsTriggerMode === 'all_messages'
+                                                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                                                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50 border border-gray-700/50'
+                                                }`}
+                                            >
+                                                Все сообщения
+                                            </button>
+                                            <button
+                                                onClick={() => handleTtsModeChange('channel_points')}
+                                                disabled={!isTwitchConnected}
+                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                                                    !isTwitchConnected
+                                                        ? 'opacity-40 cursor-not-allowed bg-gray-800/30 text-gray-600'
+                                                        : ttsTriggerMode === 'channel_points'
+                                                            ? 'bg-green-600 text-white shadow-lg shadow-green-600/30'
+                                                            : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50 border border-gray-700/50'
+                                                }`}
+                                            >
+                                                За баллы канала
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* TTS Engine */}
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-400 mb-2">Алгоритм озвучки</label>
+                                        <div className="space-y-2">
+                                            <div
+                                                onClick={handleBasicTtsToggle}
+                                                className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${
+                                                    basicTtsEnabled && !aiTtsEnabled
+                                                        ? 'bg-green-600/20 border-2 border-green-500'
+                                                        : 'bg-gray-800/30 border border-gray-700/50 hover:bg-gray-700/30'
+                                                }`}
+                                            >
+                                                <div>
+                                                    <div className="text-sm font-semibold text-white">Google TTS</div>
+                                                    <div className="text-xs text-gray-400">Быстрый, стабильный</div>
+                                                </div>
+                                                <Switch
+                                                    checked={basicTtsEnabled && !aiTtsEnabled}
+                                                    onCheckedChange={handleBasicTtsToggle}
+                                                    className="data-[state=checked]:bg-green-600"
+                                                />
+                                            </div>
+                                            <div
+                                                onClick={handleAiTtsToggle}
+                                                className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${
+                                                    !isHealthy || !canUseF5TTS
+                                                        ? 'opacity-40 cursor-not-allowed bg-gray-800/20'
+                                                        : aiTtsEnabled
+                                                            ? 'bg-purple-600/20 border-2 border-purple-500'
+                                                            : 'bg-gray-800/30 border border-gray-700/50 hover:bg-gray-700/30'
+                                                }`}
+                                            >
+                                                <div>
+                                                    <div className="text-sm font-semibold text-white">F5-TTS (AI)</div>
+                                                    <div className="text-xs text-gray-400">
+                                                        {!isHealthy ? 'Сервис недоступен' : !canUseF5TTS ? 'Требуется whitelist' : 'Качественная озвучка'}
+                                                    </div>
+                                                </div>
+                                                <Switch
+                                                    checked={aiTtsEnabled}
+                                                    onCheckedChange={handleAiTtsToggle}
+                                                    disabled={!isHealthy || !canUseF5TTS}
+                                                    className="data-[state=checked]:bg-purple-600"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Engine Type */}
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-400 mb-2">Движок</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button
+                                                onClick={() => setTtsEngine('cloud')}
+                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                                                    ttsEngine === 'cloud'
+                                                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                                                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50 border border-gray-700/50'
+                                                }`}
+                                            >
+                                                Cloud
+                                            </button>
+                                            <button
+                                                onClick={() => setTtsEngine('local')}
+                                                disabled={!hasLocalSetup}
+                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                                                    !hasLocalSetup
+                                                        ? 'opacity-40 cursor-not-allowed bg-gray-800/30 text-gray-600'
+                                                        : ttsEngine === 'local'
+                                                            ? 'bg-green-600 text-white shadow-lg shadow-green-600/30'
+                                                            : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50 border border-gray-700/50'
+                                                }`}
+                                            >
+                                                Local
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Output Mode */}
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-400 mb-2">Вывод звука</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button
+                                                onClick={() => setListeningMode('website')}
+                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                                                    listeningMode === 'website'
+                                                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                                                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50 border border-gray-700/50'
+                                                }`}
+                                            >
+                                                Сайт
+                                            </button>
+                                            <button
+                                                onClick={() => setListeningMode('obs')}
+                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                                                    listeningMode === 'obs'
+                                                        ? 'bg-green-600 text-white shadow-lg shadow-green-600/30'
+                                                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50 border border-gray-700/50'
+                                                }`}
+                                            >
+                                                OBS
+                                            </button>
+                                        </div>
+                                        {listeningMode === 'obs' && (
+                                            <div className="mt-3 p-3 bg-gray-800/30 rounded-lg border border-gray-700/50">
+                                                <div className="text-xs text-gray-400 mb-2">OBS Browser Source URL:</div>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={obsUrl}
+                                                        readOnly
+                                                        className="flex-1 bg-gray-900/50 border border-gray-700/50 text-gray-300 text-xs px-3 py-2 rounded focus:outline-none focus:border-purple-500"
+                                                    />
+                                                    <button
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(obsUrl);
+                                                            toast.success('Скопировано');
+                                                        }}
+                                                        className="px-3 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-300 rounded text-xs font-semibold border border-green-600/50"
+                                                    >
+                                                        Copy
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Right Column: Audio & Additional Settings */}
+                            <div className="space-y-4">
+                                {/* Audio Settings */}
+                                {listeningMode === 'website' && (
+                                    <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
+                                        <CardHeader className="pb-3">
+                                            <CardTitle className="text-base font-bold text-white">Аудио</CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div>
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <label className="text-xs font-semibold text-gray-400">Громкость</label>
+                                                    <span className="text-sm font-bold text-purple-300 bg-purple-600/20 px-3 py-1 rounded-lg">
+                                                        {volume}%
+                                                    </span>
+                                                </div>
+                                                <Slider
+                                                    value={[volume]}
+                                                    onValueChange={(val) => setVolume(val[0])}
+                                                    min={0}
+                                                    max={100}
+                                                    step={1}
+                                                    className="w-full"
+                                                />
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {/* Additional Settings */}
+                                <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-base font-bold text-white">Дополнительно</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-400 mb-2">Смайлы</label>
+                                            <div className="space-y-2">
+                                                <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
+                                                    <span className="text-xs text-gray-300 font-medium">7TV</span>
+                                                    <Switch
+                                                        checked={ttsSettings.enable7TV}
+                                                        onCheckedChange={() => setTtsSettings(prev => ({ ...prev, enable7TV: !prev.enable7TV }))}
+                                                        className="scale-90 data-[state=checked]:bg-purple-600"
+                                                    />
+                                                </div>
+                                                <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
+                                                    <span className="text-xs text-gray-300 font-medium">Twitch</span>
+                                                    <Switch
+                                                        checked={ttsSettings.enableTwitch}
+                                                        onCheckedChange={() => setTtsSettings(prev => ({ ...prev, enableTwitch: !prev.enableTwitch }))}
+                                                        className="scale-90 data-[state=checked]:bg-purple-600"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-400 mb-2">Фильтры</label>
+                                            <div className="space-y-2">
+                                                <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
+                                                    <span className="text-xs text-gray-300 font-medium">Пропускать ответы</span>
+                                                    <Switch
+                                                        checked={ttsSettings.filterReplies}
+                                                        onCheckedChange={() => setTtsSettings(prev => ({ ...prev, filterReplies: !prev.filterReplies }))}
+                                                        className="scale-90 data-[state=checked]:bg-purple-600"
+                                                    />
+                                                </div>
+                                                <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
+                                                    <span className="text-xs text-gray-300 font-medium">Пропускать упоминания</span>
+                                                    <Switch
+                                                        checked={ttsSettings.filterMentions}
+                                                        onCheckedChange={() => setTtsSettings(prev => ({ ...prev, filterMentions: !prev.filterMentions }))}
+                                                        className="scale-90 data-[state=checked]:bg-purple-600"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Platforms */}
+                                        {(isTwitchConnected || isVkConnected) && (
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-400 mb-2">Платформы</label>
+                                                <div className="space-y-2">
+                                                    {isTwitchConnected && (
+                                                        <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
+                                                            <div className="flex items-center gap-2">
+                                                                <TwitchIcon className="w-4 h-4 text-purple-400" />
+                                                                <span className="text-xs text-gray-300 font-medium">Twitch</span>
+                                                            </div>
+                                                            <Switch
+                                                                checked={platformSettings.enabled_platforms?.includes('twitch')}
+                                                                onCheckedChange={() => handlePlatformToggle('twitch')}
+                                                                className="scale-90 data-[state=checked]:bg-purple-600"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    {isVkConnected && (
+                                                        <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
+                                                            <div className="flex items-center gap-2">
+                                                                <VKIcon className="w-4 h-4 text-blue-400" />
+                                                                <span className="text-xs text-gray-300 font-medium">VK</span>
+                                                            </div>
+                                                            <Switch
+                                                                checked={platformSettings.enabled_platforms?.includes('vk')}
+                                                                onCheckedChange={() => handlePlatformToggle('vk')}
+                                                                className="scale-90 data-[state=checked]:bg-purple-600"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        </div>
+
+                        {/* Filters */}
+                        <TtsFilterManager
                             ttsSettings={ttsSettings}
                             setTtsSettings={setTtsSettings}
                         />
-                    </div>
-                )}
-
-                {/* Filters - Collapsible */}
-                {(basicTtsEnabled || aiTtsEnabled) && (
-                    <TtsFilterManager
-                        ttsSettings={ttsSettings}
-                        setTtsSettings={setTtsSettings}
-                    />
+                    </>
                 )}
 
                 {/* Health Status */}
