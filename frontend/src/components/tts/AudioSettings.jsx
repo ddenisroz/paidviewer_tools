@@ -36,13 +36,13 @@ const AudioSettings = ({
     return (
         <Card className="border-gray-700 bg-gray-900/30">
             <CardHeader>
-                <CardTitle className="text-base font-semibold text-white">Audio</CardTitle>
+                <CardTitle className="text-base font-semibold text-white">Аудио</CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
                 <div className="space-y-4">
                     {/* Громкость для сайта */}
                     <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Website Volume</label>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Громкость сайта</label>
                         <div className="flex items-center gap-4">
                             <Slider
                                 id="volume-slider"

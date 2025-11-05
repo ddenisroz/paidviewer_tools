@@ -252,7 +252,7 @@ const TtsFilterManager = React.memo(() => {
             >
                 <div className="flex items-center justify-between">
                     <CardTitle className="text-base font-semibold text-white">
-                        Filters & Blocked Users
+                        Фильтры и заблокированные
                     </CardTitle>
                     <ChevronDown 
                         className={`h-5 w-5 transition-transform duration-300 text-gray-400 ${isExpanded ? 'rotate-180' : ''}`} 

@@ -35,7 +35,7 @@ const TtsSettings = ({
                 onClick={() => setIsExpanded(!isExpanded)}
             >
                 <div className="flex items-center justify-between">
-                    <CardTitle className="text-base font-semibold text-white">Settings</CardTitle>
+                    <CardTitle className="text-base font-semibold text-white">Настройки</CardTitle>
                     <ChevronDown 
                         className={`h-5 w-5 transition-transform duration-300 text-gray-400 ${isExpanded ? 'rotate-180' : ''}`}
                     />
@@ -46,7 +46,7 @@ const TtsSettings = ({
                 <div className="space-y-6">
                     {/* Настройки смайлов в 2 колонки */}
                     <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Emotes</label>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Смайлы</label>
                         <div className="grid grid-cols-2 gap-3">
                             <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-700/50 bg-gray-800/30">
                                 <Switch
@@ -74,7 +74,7 @@ const TtsSettings = ({
                     
                     {/* Фильтры сообщений в 2 колонки */}
                     <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Filters</label>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Фильтры</label>
                         <div className="grid grid-cols-2 gap-3">
                             <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-700/50 bg-gray-800/30">
                                 <Switch
@@ -83,7 +83,7 @@ const TtsSettings = ({
                                     onCheckedChange={(checked) => handleSettingChange('filterReplies', checked)}
                                 />
                                 <Label htmlFor="filterReplies" className="text-sm font-semibold text-gray-300 cursor-pointer">
-                                    Skip replies
+                                    Пропускать ответы
                                 </Label>
                             </div>
                             
@@ -94,7 +94,7 @@ const TtsSettings = ({
                                     onCheckedChange={(checked) => handleSettingChange('filterMentions', checked)}
                                 />
                                 <Label htmlFor="filterMentions" className="text-sm font-semibold text-gray-300 cursor-pointer">
-                                    Skip mentions
+                                    Пропускать упоминания
                                 </Label>
                             </div>
                         </div>
