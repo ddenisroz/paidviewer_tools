@@ -27,6 +27,10 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
         chat_width: 100,
         show_platform_icons: true,
         show_badges: true,
+        // v0.03 - новые настройки для 7TV эмодзи, ссылок и загрузки картинок
+        show_7tv_emotes: true,
+        show_links: true,
+        auto_load_images: true,
         widget_url: ''
     });
     const [loading, setLoading] = useState(false); // ✅ Начальное состояние false - не показываем loading при первом рендере
@@ -57,6 +61,9 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                 chat_width: 100,
                 show_platform_icons: true,
                 show_badges: true,
+                show_7tv_emotes: true,
+                show_links: true,
+                auto_load_images: true,
                 widget_url: ''
             });
             setLoading(false);
@@ -499,6 +506,35 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                         checked={settings.show_badges ?? true}
                                         onCheckedChange={(checked) => handleChange('show_badges', checked)}
                                     />
+                                </div>
+                                
+                                {/* v0.03 - новые настройки для 7TV эмодзи, ссылок и картинок */}
+                                <div className="border-t border-gray-700 pt-3 mt-3">
+                                    <div className="text-xs text-gray-400 mb-3 font-semibold">📝 Контент и элементы</div>
+                                    
+                                    <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800">
+                                        <Label className="text-white cursor-pointer">Показывать 7TV смайлики</Label>
+                                        <Switch
+                                            checked={settings.show_7tv_emotes ?? true}
+                                            onCheckedChange={(checked) => handleChange('show_7tv_emotes', checked)}
+                                        />
+                                    </div>
+                                    
+                                    <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800">
+                                        <Label className="text-white cursor-pointer">Показывать ссылки из чата</Label>
+                                        <Switch
+                                            checked={settings.show_links ?? true}
+                                            onCheckedChange={(checked) => handleChange('show_links', checked)}
+                                        />
+                                    </div>
+                                    
+                                    <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800">
+                                        <Label className="text-white cursor-pointer">Загружать картинки сразу</Label>
+                                        <Switch
+                                            checked={settings.auto_load_images ?? true}
+                                            onCheckedChange={(checked) => handleChange('auto_load_images', checked)}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>
