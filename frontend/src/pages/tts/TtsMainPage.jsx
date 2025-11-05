@@ -1,4 +1,4 @@
-// src/pages/tts/TtsMainPage_new.jsx
+// src/pages/tts/TtsMainPage.jsx
 import React, { useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTts } from '../../context/TtsContext';
@@ -11,7 +11,7 @@ import PageWrapper from '../../components/PageWrapper';
 import { getTtsWebSocketUrl } from '../../utils/urlUtils';
 import { toast } from 'sonner';
 
-// Импорты новых компонентов
+// Импорты компонентов
 import TtsControlPanel from '../../components/tts/TtsControlPanel';
 import AudioSettings from '../../components/tts/AudioSettings';
 import TtsSettings from '../../components/tts/TtsSettings';
@@ -101,302 +101,78 @@ const TtsMainPageContent = () => {
         },
     });
 
-    const setListeningModeMutation = useMutation({
-        mutationFn: async ({ listeningMode }) => {
-            return await botService.post('/api/tts/listening-mode', { listeningMode });
+    const toggleAiTtsMutation = useMutation({
+        mutationFn: async (enabled) => {
+            if (enabled) {
+                return await botService.post('/api/tts/ai/enable');
+            } else {
+                return await botService.post('/api/tts/ai/disable');
+            }
         },
-        onSuccess: () => {
-            ttsLogger.success('Listening mode saved successfully');
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['tts-status'] });
+            logger.log('AI TTS state saved:', data);
         },
         onError: (error) => {
-            ttsLogger.error('Error saving listening mode:', error);
+            logger.error('Error saving AI TTS state:', error);
         },
     });
 
     const savePlatformSettingsMutation = useMutation({
-        mutationFn: async ({ enabled_platforms }) => {
-            return await botService.post('/api/tts/platform-settings', { enabled_platforms });
-        },
-        onMutate: () => {
-            setPlatformLoading(true);
+        mutationFn: async (data) => {
+            return await ttsService.post('/save-settings', data);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['tts-platform-settings'] });
-            logger.log('Platform settings saved successfully');
-        },
-        onError: (error) => {
-            logger.error('Error saving platform settings:', error);
-            toast.error('Failed to switch platform');
-        },
-        onSettled: () => {
-            setPlatformLoading(false);
-        },
-    });
-
-    const saveAudioSettingsMutation = useMutation({
-        mutationFn: async (newSettings) => {
-            ttsLogger.api('POST', '/api/tts/audio-settings', newSettings);
-            const response = await botService.post('/api/tts/audio-settings', newSettings);
-            ttsLogger.apiResponse(200, '/api/tts/audio-settings', response.data);
-            return response.data;
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['tts-audio-settings'] });
-            setSaveStatus('Saved');
-            ttsLogger.success('Audio settings saved successfully');
-            setTimeout(() => setSaveStatus(''), 2000);
-        },
-        onError: (error) => {
-            ttsLogger.error('Error saving audio settings:', error);
-            if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
-                setSaveStatus('Save error');
-                setTimeout(() => setSaveStatus(''), 3000);
-            } else {
-                setSaveStatus('TTS service unavailable');
-                setTimeout(() => setSaveStatus(''), 3000);
-            }
-        },
-        onMutate: () => {
-            setIsSaving(true);
-            setSaveStatus('Saving...');
-        },
-        onSettled: () => {
-            setIsSaving(false);
-        },
-    });
-            
-    const saveTtsSettingsMutation = useMutation({
-        mutationFn: async (newSettings) => {
-            ttsLogger.api('POST', '/api/tts/settings', newSettings);
-            const response = await botService.post('/api/tts/settings', newSettings);
-            ttsLogger.apiResponse(200, '/api/tts/settings', response.data);
-            return response.data;
-        },
-        onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['tts-settings'] });
-            if (data.version) {
-                setTtsSettings(prev => ({...prev, version: data.version}));
-            }
-            setSaveStatus('Saved');
-            ttsLogger.success('TTS settings saved successfully', {version: data.version});
-            setTimeout(() => setSaveStatus(''), 2000);
         },
         onError: (error) => {
-            ttsLogger.error('Error saving TTS settings:', error);
-            
-            if (error.response?.status === 409) {
-                setSaveStatus('Data updated. Reloading...');
-                ttsLogger.warning('Version conflict detected, reloading settings');
-                setTimeout(() => {
-                    queryClient.invalidateQueries({ queryKey: ['tts-settings'] });
-                    setSaveStatus('');
-                }, 1500);
-            } else if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
-                setSaveStatus('Save error');
-                setTimeout(() => setSaveStatus(''), 3000);
-            } else {
-                setSaveStatus('TTS service unavailable');
-                setTimeout(() => setSaveStatus(''), 3000);
-            }
-        },
-        onMutate: () => {
-            setIsSaving(true);
-            setSaveStatus('Saving...');
-        },
-        onSettled: () => {
-            setIsSaving(false);
+            ttsLogger.error('Error saving platform settings:', error);
         },
     });
 
-    const saveAudioSettings = useCallback((newSettings) => {
-        saveAudioSettingsMutation.mutate(newSettings);
-    }, [saveAudioSettingsMutation]);
-
-    const saveTtsSettings = useCallback((newSettings) => {
-        saveTtsSettingsMutation.mutate(newSettings);
-    }, [saveTtsSettingsMutation]);
-
-    const isConnected = isGuest || isAuthenticated || integrations.twitch?.connected || integrations.vk?.connected;
-    
-    useEffect(() => {
-        ttsLogger.debug('TTS Connection status:', { isGuest, isAuthenticated, integrations, isConnected });
-    }, [isGuest, isAuthenticated, integrations, isConnected]);
-
-    const { data: ttsStatusData, isLoading: ttsStatusLoading } = useQuery({
+    const { data: ttsStatusData, isLoading: isTtsStatusLoading } = useQuery({
         queryKey: ['tts-status'],
         queryFn: async () => {
-            ttsLogger.info('Fetching TTS status from API...');
-            const response = await botService.get('/api/tts/status');
-            ttsLogger.info('TTS status API response:', response.data);
-            return response.data;
+            try {
+                const response = await botService.get('/api/tts/status');
+                return response.data;
+            } catch (error) {
+                ttsLogger.error('Error fetching TTS status:', error);
+                return null;
+            }
         },
-        enabled: !!isAuthenticated,
-        staleTime: 30 * 1000,
-        refetchOnMount: true,
-        refetchOnWindowFocus: false,
-    });
-
-    const lastProcessedRef = useRef({
-        enabled: null,
-        engineType: null,
-        isWhitelisted: null,
-        hasLocalSetup: null
+        enabled: isAuthenticated,
+        refetchInterval: 30000,
     });
 
     useEffect(() => {
         if (ttsStatusData) {
-            const isTtsEnabled = ttsStatusData.enabled || false;
-            const engineType = ttsStatusData.engine_type || 'cloud';
-            const newIsWhitelisted = ttsStatusData.is_whitelisted || false;
-            const hasLocalSetup = ttsStatusData.has_local_setup || false;
+            ttsLogger.info('TTS status API response:', ttsStatusData);
             
-            const lastProcessed = lastProcessedRef.current;
-            const hasChanged = 
-                lastProcessed.enabled !== isTtsEnabled ||
-                lastProcessed.engineType !== engineType ||
-                lastProcessed.isWhitelisted !== newIsWhitelisted ||
-                lastProcessed.hasLocalSetup !== hasLocalSetup;
+            setBasicTtsEnabled(ttsStatusData.basic_tts_enabled || false);
+            setAiTtsEnabled(ttsStatusData.ai_tts_enabled || false);
             
-            if (!hasChanged) {
-                return;
+            if (ttsStatusData.tts_engine) {
+                setTtsEngine(ttsStatusData.tts_engine);
             }
             
-            ttsLogger.info('TTS status data changed:', {
-                enabled: isTtsEnabled,
-                engineType,
-                isWhitelisted: newIsWhitelisted,
-                hasLocalSetup,
-                previous: lastProcessed
-            });
-            
-            lastProcessedRef.current = {
-                enabled: isTtsEnabled,
-                engineType,
-                isWhitelisted: newIsWhitelisted,
-                hasLocalSetup
-            };
-                    
-            setBasicTtsEnabled(isTtsEnabled);
-            
-            if (setIsWhitelisted && isWhitelisted !== newIsWhitelisted) {
-                ttsLogger.info('Updating isWhitelisted:', newIsWhitelisted, '(was:', isWhitelisted, ')');
-                setIsWhitelisted(newIsWhitelisted);
+            if (ttsStatusData.listening_mode) {
+                setListeningMode(ttsStatusData.listening_mode);
             }
             
-            const canUseLocalTTS = hasLocalSetup || newIsWhitelisted;
-            
-            const isF5TtsEnabled = (engineType === 'local' && canUseLocalTTS) || 
-                                   (engineType === 'cloud' && newIsWhitelisted);
-            
-            setAiTtsEnabled(isF5TtsEnabled);
-            
-            if (engineType === 'local' && canUseLocalTTS) {
-                setTtsEngine('local');
-            } else if (engineType === 'cloud' && newIsWhitelisted) {
-                setTtsEngine('cloud');
-            } else {
-                setTtsEngine('cloud');
+            if (ttsStatusData.platform_settings) {
+                setPlatformSettings(ttsStatusData.platform_settings);
             }
-                    
-            ttsLogger.info('TTS engine processed:', engineType, 'isWhitelisted:', newIsWhitelisted, 'canUseLocalTTS:', canUseLocalTTS, 'basicTtsEnabled:', isTtsEnabled, 'aiTtsEnabled:', isF5TtsEnabled);
+            
+            if (ttsStatusData.audio_settings?.website_volume) {
+                setAudioSettings(prev => ({
+                    ...prev,
+                    websiteVolume: ttsStatusData.audio_settings.website_volume
+                }));
+            }
         }
-    }, [ttsStatusData, isHealthy, setIsWhitelisted, isWhitelisted, switchEngineMutation]);
+    }, [ttsStatusData]);
 
-    const { data: audioSettingsData } = useQuery({
-        queryKey: ['tts-audio-settings'],
-        queryFn: async () => {
-            const response = await botService.get('/api/tts/audio-settings');
-            return response.data;
-        },
-        enabled: !!isAuthenticated,
-        staleTime: 5 * 60 * 1000,
-        refetchOnMount: true,
-        onSuccess: (data) => {
-            if (data) {
-                const audioData = {
-                    websiteVolume: data.websiteVolume || 50
-                };
-                setAudioSettings(audioData);
-                ttsLogger.success('Audio settings loaded:', audioData);
-            }
-        },
-    });
-
-    const { data: ttsSettingsData } = useQuery({
-        queryKey: ['tts-settings'],
-        queryFn: async () => {
-            const response = await botService.get('/api/tts/settings');
-            return response.data;
-        },
-        enabled: !!isAuthenticated,
-        staleTime: 5 * 60 * 1000,
-        refetchOnMount: true,
-        onSuccess: (data) => {
-            if (data) {
-                const ttsData = {
-                    enable7TV: data.enable7TV ?? true,
-                    enableTwitch: data.enableTwitch ?? true,
-                    enableLexiconFilter: data.enableLexiconFilter ?? true,
-                    enableCustomLexicon: data.enableCustomLexicon ?? false,
-                    filterReplies: data.filterReplies ?? false,
-                    filterMentions: data.filterMentions ?? false,
-                    version: data.version ?? 1
-                };
-                setTtsSettings(ttsData);
-                ttsLogger.success('TTS settings loaded:', ttsData);
-            }
-        },
-    });
-
-    const { data: platformSettingsData } = useQuery({
-        queryKey: ['tts-platform-settings'],
-        queryFn: async () => {
-            const response = await botService.get('/api/tts/platform-settings');
-            return response.data;
-        },
-        enabled: !!isAuthenticated,
-        staleTime: 5 * 60 * 1000,
-        refetchOnMount: true,
-        onSuccess: (data) => {
-            if (data) {
-                const platformData = {
-                    enabled_platforms: data.enabled_platforms || ['twitch', 'vk'],
-                    global_enabled: data.global_enabled ?? true
-                };
-                setPlatformSettings(platformData);
-                ttsLogger.success('Platform settings loaded:', platformData);
-            }
-        },
-    });
-
-    const { data: localTtsConfigData } = useQuery({
-        queryKey: ['tts-local-config'],
-        queryFn: async () => {
-            const response = await botService.get('/api/tts/local-config');
-            return response.data || null;
-        },
-        enabled: !!isAuthenticated,
-        staleTime: 5 * 60 * 1000,
-        refetchOnMount: true,
-        onSuccess: (data) => {
-            if (data) {
-                setLocalTtsConfig(data);
-                ttsLogger.success('Local TTS config loaded:', data);
-            } else {
-                setLocalTtsConfig(null);
-                ttsLogger.debug('No local TTS config found.');
-            }
-        },
-        onError: (error) => {
-            ttsLogger.error('Error loading local TTS config:', error);
-            setLocalTtsConfig(null);
-        },
-    });
-
-    useEffect(() => {
-        setEngineLoading(ttsStatusLoading);
-    }, [ttsStatusLoading]);
-                
     useEffect(() => {
         if (user?.tts_listening_mode) {
             setListeningMode(user.tts_listening_mode);
@@ -547,206 +323,72 @@ const TtsMainPageContent = () => {
                     onSuccess: () => {
                         toast.success('Switched to Google TTS');
                         logger.log('AI TTS disabled, switched to gtts');
-                        
-                        window.dispatchEvent(new CustomEvent('ai-tts-changed', { 
-                            detail: { 
-                                enabled: false,
-                                engineType: 'gtts',
-                                isWhitelisted: isWhitelisted
-                            } 
-                        }));
-                        
-                        queryClient.invalidateQueries({ queryKey: ['tts-status'] });
+                        setEngineToggleLoading(false);
                     },
-                    onError: (error) => {
-                        logger.error('Error switching to gtts:', error);
-                        toast.error('Engine switch failed');
-                        setAiTtsEnabled(true);
-                    },
-                    onSettled: () => {
+                    onError: () => {
+                        toast.error('Failed to switch engine');
                         setEngineToggleLoading(false);
                     }
                 }
             );
-            return;
+        } else {
+            setEngineToggleLoading(true);
+            const targetEngine = ttsEngine === 'cloud' ? 'cloud' : 'local';
+            botService.post('/api/tts/ai/enable', { engine: targetEngine })
+                .then(() => {
+                    logger.log('AI TTS state saved: true engine: ' + targetEngine);
+                    setEngineToggleLoading(false);
+                    toast.success('F5-TTS enabled');
+                })
+                .catch((error) => {
+                    logger.error('Error enabling AI TTS:', error);
+                    toast.error('Failed to enable F5-TTS');
+                    setEngineToggleLoading(false);
+                });
         }
-        
-        setEngineToggleLoading(true);
-        const hasLocalSetup = localStorage.getItem('tts_has_local_setup') === 'true';
-        
-        const engine = hasLocalSetup ? 'local' : 'cloud';
-        
-        ttsLogger.info('Enabling F5-TTS with engine:', engine, 'hasLocalSetup:', hasLocalSetup, 'isWhitelisted:', isWhitelisted);
-        
-        const enableBasicTtsFirst = async () => {
-            if (!basicTtsEnabled) {
-                try {
-                    await botService.post('/api/tts/enable');
-                    setBasicTtsEnabled(true);
-                    logger.log('Basic TTS enabled as fallback for F5-TTS');
-                } catch (error) {
-                    logger.error('Failed to enable basic TTS as fallback:', error);
-                }
-            }
-        };
-        
-        enableBasicTtsFirst().then(() => {
-            switchEngineMutation.mutate(
-                { engine_type: engine },
-                {
-                    onSuccess: () => {
-                        toast.success(`Engine: ${engine === 'local' ? 'Local F5-TTS' : 'Cloud F5-TTS'}`);
-                        logger.log('AI TTS state saved:', enabled, 'engine:', engine);
-                        
-                        window.dispatchEvent(new CustomEvent('ai-tts-changed', { 
-                            detail: { 
-                                enabled: true,
-                                engineType: engine,
-                                isWhitelisted: isWhitelisted
-                            } 
-                        }));
-                        
-                        queryClient.invalidateQueries({ queryKey: ['tts-status'] });
-                    },
-                    onError: (error) => {
-                        logger.error('Error saving AI TTS state:', error);
-                        const errorMessage = error.response?.data?.detail || 'Engine switch failed';
-                        toast.error(errorMessage);
-                        setAiTtsEnabled(false);
-                    },
-                    onSettled: () => {
-                        setEngineToggleLoading(false);
-                    }
-                }
-            );
-        });
-    }, [switchEngineMutation, isWhitelisted, basicTtsEnabled]);
+    }, [ttsEngine, switchEngineMutation]);
 
-    const handleBasicTtsToggle = (enabled) => {
-        if (!enabled) return;
-        
-        setBasicTtsEnabled(true);
-        setAiTtsEnabled(false);
-        saveBasicTtsState(true);
-        
-        ttsLogger.info('Switched to Basic TTS mode');
-        toast.success('Mode: Google TTS (Basic)');
-        
-        window.dispatchEvent(new CustomEvent('tts-status-changed', { 
-            detail: { enabled: true, mode: 'basic' } 
-        }));
-    };
-
-    const handleAiTtsToggle = (enabled) => {
-        if (!enabled) return;
-        
-        if (engineToggleLoading) {
-            return;
-        }
-        
-        const hasLocalSetup = localStorage.getItem('tts_has_local_setup') === 'true';
-        const canUseF5TTS = hasLocalSetup || isWhitelisted === true;
-        
-        ttsLogger.info('F5-TTS toggle attempt:', { 
-            enabled, 
-            isWhitelisted, 
-            hasLocalSetup, 
-            canUseF5TTS 
-        });
-        
-        if (!canUseF5TTS && isWhitelisted === false) {
-            ttsLogger.warning('F5-TTS blocked: user not whitelisted and no local setup');
-            toast.error('F5-TTS requires local setup or whitelist access');
-            return;
-        }
-        
-        if (enabled && isWhitelisted === null) {
-            ttsLogger.info('F5-TTS whitelist status unknown, allowing toggle - backend will check');
-        }
-        
-        if (enabled) {
-            setBasicTtsEnabled(false);
-        }
-        
-        setAiTtsEnabled(enabled);
-        saveAiTtsState(enabled);
-        
-        ttsLogger.info('Switched to AI TTS (F5-TTS) mode');
-        toast.success('Mode: F5-TTS with Google TTS fallback');
-    };
-
-    const handleListeningModeChange = useCallback((mode) => {
-        setListeningMode(mode);
-        setListeningModeMutation.mutate(
-            { listeningMode: mode },
-            {
-                onSuccess: () => {
-                    logger.log('Listening mode saved:', mode);
-                },
-                onError: () => {
-                    setListeningMode(prev => prev);
-                }
-            }
+    if (!isAuthenticated) {
+        return (
+            <PageWrapper title="Text to Speech">
+                <div className="text-center text-gray-400">
+                    Please log in to access TTS settings
+                </div>
+            </PageWrapper>
         );
-    }, [setListeningModeMutation]);
+    }
 
     const handleRegenerateObsUrl = async () => {
         try {
             const response = await generateObsUrl();
             const token = response.data?.obs_token;
             if (token) {
-                const obsUrl = getTtsWebSocketUrl(token);
-                setObsUrl(obsUrl);
-                toast.success('URL updated');
-            } else {
-                setObsUrl('');
-                toast.error('Failed to get token');
+                const newUrl = getTtsWebSocketUrl(token);
+                setObsUrl(newUrl);
+                toast.success('OBS URL regenerated');
             }
         } catch (error) {
             logger.error('Error regenerating OBS URL:', error);
-            setObsUrl('');
+            toast.error('Failed to regenerate OBS URL');
         }
     };
 
     return (
-        <PageWrapper>
-            <div className="space-y-4">
-                {/* Style */}
-                <style>
-                {`
-                    .slider::-webkit-slider-thumb {
-                        appearance: none;
-                        height: 16px;
-                        width: 16px;
-                        border-radius: 50%;
-                        background: #3b82f6;
-                        cursor: pointer;
-                        border: 2px solid #1f2937;
-                    }
-                    .slider::-moz-range-thumb {
-                        height: 16px;
-                        width: 16px;
-                        border-radius: 50%;
-                        background: #3b82f6;
-                        cursor: pointer;
-                        border: 2px solid #1f2937;
-                    }
-                `}
-            </style>
-
-                {/* TTS Control Panel */}
+        <PageWrapper title="Text to Speech">
+            <div className="space-y-3">
+                {/* TTS Control Panel - Compact Controls */}
                 <TtsControlPanel
                     basicTtsEnabled={basicTtsEnabled}
-                    setBasicTtsEnabled={handleBasicTtsToggle}
+                    setBasicTtsEnabled={saveBasicTtsState}
                     aiTtsEnabled={aiTtsEnabled}
-                    setAiTtsEnabled={handleAiTtsToggle}
+                    setAiTtsEnabled={saveAiTtsState}
                     isHealthy={isHealthy}
                     isAuthenticated={isAuthenticated}
-                    isConnected={isConnected}
+                    isConnected={ttsEnabled}
                     isWhitelisted={isWhitelisted}
                     engineToggleLoading={engineToggleLoading}
                     listeningMode={listeningMode}
-                    setListeningMode={handleListeningModeChange}
+                    setListeningMode={setListeningMode}
                     obsUrl={obsUrl}
                     onRegenerateObsUrl={handleRegenerateObsUrl}
                     platformSettings={platformSettings}
@@ -758,30 +400,33 @@ const TtsMainPageContent = () => {
                     setTtsEngine={setTtsEngine}
                     localTtsConfig={localTtsConfig}
                 />
-                
-                {/* Audio + Additional Settings - 2 columns, compact */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    {/* Audio Settings - compact */}
-                    <AudioSettings
-                        audioSettings={audioSettings}
-                        setAudioSettings={setAudioSettings}
-                        listeningMode={listeningMode}
-                        setListeningMode={handleListeningModeChange}
-                        onSaveSettings={saveAudioSettings}
-                        obsUrl={obsUrl}
-                        onRegenerateObsUrl={handleRegenerateObsUrl}
-                    />
-                    
-                    {/* TTS Settings - compact */}
-                    <TtsSettings
+
+                {/* Audio Settings & Additional Settings - Side by side */}
+                {(basicTtsEnabled || aiTtsEnabled) && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        <AudioSettings
+                            audioSettings={audioSettings}
+                            setAudioSettings={setAudioSettings}
+                            listeningMode={listeningMode}
+                            onSaveSettings={handleSaveSettings}
+                        />
+                        <TtsSettings
+                            ttsSettings={ttsSettings}
+                            setTtsSettings={setTtsSettings}
+                        />
+                    </div>
+                )}
+
+                {/* Filters - Collapsible */}
+                {(basicTtsEnabled || aiTtsEnabled) && (
+                    <TtsFilterManager
                         ttsSettings={ttsSettings}
                         setTtsSettings={setTtsSettings}
-                        onSaveSettings={saveTtsSettings}
                     />
-                </div>
-                
-                {/* Filters */}
-                <TtsFilterManager />
+                )}
+
+                {/* Health Status */}
+                <HealthStatus />
             </div>
         </PageWrapper>
     );
