@@ -13,7 +13,7 @@ import StreamTitleCard from '../components/StreamTitleCard';
 import StreamCategoryCard from '../components/StreamCategoryCard';
 import GuestStubs from '../components/GuestStubs';
 import IntegrationsDisabledPlaceholder from '../components/IntegrationsDisabledPlaceholder';
-import QuickActionsBar from '../components/QuickActionsBar';
+import TtsQuickSettings from '../components/TtsQuickSettings';
 import { getAndClearReturnUrl } from '../utils/oauthRedirect';
 import { logger } from '../utils/prodLogger';
 
@@ -149,8 +149,8 @@ const HomePage = () => {
                             isOnHomePage={true}
                         />
                         
-                        {/* Быстрые действия - под чатом */}
-                        <QuickActionsBar />
+                        {/* Быстрые настройки TTS - под чатом */}
+                        <TtsQuickSettings />
                     </>
                 )}
             </div>
