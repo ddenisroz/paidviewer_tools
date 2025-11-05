@@ -759,23 +759,26 @@ const TtsMainPageContent = () => {
                     localTtsConfig={localTtsConfig}
                 />
                 
-                {/* Audio Settings */}
-                <AudioSettings
-                    audioSettings={audioSettings}
-                    setAudioSettings={setAudioSettings}
-                    listeningMode={listeningMode}
-                    setListeningMode={handleListeningModeChange}
-                    onSaveSettings={saveAudioSettings}
-                    obsUrl={obsUrl}
-                    onRegenerateObsUrl={handleRegenerateObsUrl}
-                />
-                
-                {/* TTS Settings */}
-                <TtsSettings
-                    ttsSettings={ttsSettings}
-                    setTtsSettings={setTtsSettings}
-                    onSaveSettings={saveTtsSettings}
-                />
+                {/* Audio Settings + Additional Settings - 2 columns */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Audio Settings */}
+                    <AudioSettings
+                        audioSettings={audioSettings}
+                        setAudioSettings={setAudioSettings}
+                        listeningMode={listeningMode}
+                        setListeningMode={handleListeningModeChange}
+                        onSaveSettings={saveAudioSettings}
+                        obsUrl={obsUrl}
+                        onRegenerateObsUrl={handleRegenerateObsUrl}
+                    />
+                    
+                    {/* TTS Settings */}
+                    <TtsSettings
+                        ttsSettings={ttsSettings}
+                        setTtsSettings={setTtsSettings}
+                        onSaveSettings={saveTtsSettings}
+                    />
+                </div>
                 
                 {/* Filters */}
                 <TtsFilterManager />

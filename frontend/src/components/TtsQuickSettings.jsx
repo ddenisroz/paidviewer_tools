@@ -302,29 +302,17 @@ const TtsQuickSettings = () => {
                     </span>
                 </div>
 
-                {/* Toggles */}
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                        <Switch
-                            id="main-tts-toggle"
-                            checked={ttsEnabled}
-                            onCheckedChange={handleToggleTts}
-                            disabled={loading}
-                        />
-                        <span className="text-xs text-muted-foreground">Базовая</span>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                        <Switch
-                            id="main-ai-toggle"
-                            checked={aiTtsEnabled}
-                            onCheckedChange={handleToggleAiTts}
-                            disabled={loading || (!aiTtsAvailable && !isWhitelisted)}
-                        />
-                        <span className={`text-xs ${(!aiTtsAvailable && !isWhitelisted) ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
-                            ИИ (F5){(!aiTtsAvailable && !isWhitelisted) && ' (недоступна)'}
-                        </span>
-                    </div>
+                {/* Main Toggle */}
+                <div className="flex items-center gap-2">
+                    <Switch
+                        id="main-tts-toggle"
+                        checked={ttsEnabled}
+                        onCheckedChange={handleToggleTts}
+                        disabled={loading}
+                    />
+                    <span className="text-xs text-muted-foreground">
+                        {ttsEnabled ? 'ВКЛ' : 'ВЫКЛ'}
+                    </span>
                 </div>
 
                 {/* Кнопка настроек */}
