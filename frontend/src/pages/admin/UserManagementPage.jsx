@@ -881,8 +881,11 @@ const UserManagementPage = () => {
                         <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
                             Отмена
                         </Button>
-                        <Button onClick={handleEditUser}>
-                            Сохранить
+                        <Button 
+                            onClick={handleEditUser}
+                            disabled={updateUserMutation.isPending}
+                        >
+                            {updateUserMutation.isPending ? 'Сохранение...' : 'Сохранить'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -915,9 +918,10 @@ const UserManagementPage = () => {
                         </Button>
                         <Button 
                             onClick={handleBlockUser}
+                            disabled={blockUserMutation.isPending}
                             className="bg-red-600 hover:bg-red-700"
                         >
-                            Заблокировать
+                            {blockUserMutation.isPending ? 'Блокировка...' : 'Заблокировать'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
