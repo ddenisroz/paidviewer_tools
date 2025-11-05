@@ -42,54 +42,58 @@ const TtsSettings = ({
                 </div>
             </CardHeader>
             {isExpanded && (
-            <CardContent className="space-y-3">
+            <CardContent>
+                <div className="space-y-4">
                     {/* Настройки смайлов в 2 колонки */}
-                    <div className="grid grid-cols-2 gap-2">
-                        <div className="flex items-center gap-3 p-2.5 bg-gray-800/50 rounded-lg">
-                            <Switch
-                                id="enable7TV"
-                                checked={ttsSettings.enable7TV}
-                                onCheckedChange={(checked) => handleSettingChange('enable7TV', checked)}
-                            />
-                            <Label htmlFor="enable7TV" className="text-sm font-medium cursor-pointer">
-                                7TV смайлы
-                            </Label>
-                        </div>
-                        
-                        <div className="flex items-center gap-3 p-2.5 bg-gray-800/50 rounded-lg">
-                            <Switch
-                                id="enableTwitch"
-                                checked={ttsSettings.enableTwitch}
-                                onCheckedChange={(checked) => handleSettingChange('enableTwitch', checked)}
-                            />
-                            <Label htmlFor="enableTwitch" className="text-sm font-medium cursor-pointer">
-                                Twitch смайлы
-                            </Label>
-                        </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Emotes</label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="flex items-center gap-3 p-2.5 bg-gray-800/50 rounded">
+                                <Switch
+                                    id="enable7TV"
+                                    checked={ttsSettings.enable7TV}
+                                    onCheckedChange={(checked) => handleSettingChange('enable7TV', checked)}
+                                />
+                                <Label htmlFor="enable7TV" className="text-sm font-medium cursor-pointer">
+                                    7TV
+                                </Label>
+                            </div>
+                            
+                            <div className="flex items-center gap-3 p-2.5 bg-gray-800/50 rounded">
+                                <Switch
+                                    id="enableTwitch"
+                                    checked={ttsSettings.enableTwitch}
+                                    onCheckedChange={(checked) => handleSettingChange('enableTwitch', checked)}
+                                />
+                                <Label htmlFor="enableTwitch" className="text-sm font-medium cursor-pointer">
+                                    Twitch
+                                </Label>
+                            </div>
                     </div>
                     
                     {/* Фильтры сообщений в 2 колонки */}
-                    <div className="border-t border-gray-700/50 pt-4">
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Filters</label>
                         <div className="grid grid-cols-2 gap-2">
-                            <div className="flex items-center gap-3 p-2.5 bg-gray-800/50 rounded-lg">
+                            <div className="flex items-center gap-3 p-2.5 bg-gray-800/50 rounded">
                                 <Switch
                                     id="filterReplies"
                                     checked={ttsSettings.filterReplies || false}
                                     onCheckedChange={(checked) => handleSettingChange('filterReplies', checked)}
                                 />
                                 <Label htmlFor="filterReplies" className="text-sm font-medium cursor-pointer">
-                                    Игнорировать ответы
+                                    Skip replies
                                 </Label>
                             </div>
                             
-                            <div className="flex items-center gap-3 p-2.5 bg-gray-800/50 rounded-lg">
+                            <div className="flex items-center gap-3 p-2.5 bg-gray-800/50 rounded">
                                 <Switch
                                     id="filterMentions"
                                     checked={ttsSettings.filterMentions || false}
                                     onCheckedChange={(checked) => handleSettingChange('filterMentions', checked)}
                                 />
                                 <Label htmlFor="filterMentions" className="text-sm font-medium cursor-pointer">
-                                    Игнорировать упоминания
+                                    Skip mentions
                                 </Label>
                             </div>
                         </div>

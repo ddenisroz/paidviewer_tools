@@ -38,168 +38,167 @@ const TtsControlPanel = ({
     return (
         <Card className="border-gray-700 bg-gray-900/50">
             <CardHeader>
-                <CardTitle className="text-base font-semibold">Text to Speech</CardTitle>
+                <CardTitle className="text-base font-semibold">TTS Settings</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-                {/* Engine Selection */}
-                <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-300">Engine</span>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => setTtsEngine('cloud')}
-                            className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
-                                ttsEngine === 'cloud'
-                                    ? 'bg-gray-700 text-white'
-                                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                            }`}
-                        >
-                            Cloud
-                        </button>
-                        <button
-                            onClick={() => setTtsEngine('local')}
-                            disabled={!localTtsConfig?.configured || !isWhitelisted}
-                            className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
-                                !localTtsConfig?.configured || !isWhitelisted
-                                    ? 'opacity-40 cursor-not-allowed bg-gray-800 text-gray-400'
-                                    : ttsEngine === 'local'
-                                        ? 'bg-gray-700 text-white'
-                                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                            }`}
-                        >
-                            Local
-                        </button>
-                    </div>
-                </div>
-
-                {/* Mode Selection */}
-                <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-300">Mode</span>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => setBasicTtsEnabled(true)}
-                            className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
-                                basicTtsEnabled && !aiTtsEnabled
-                                    ? 'bg-gray-700 text-white'
-                                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                            }`}
-                        >
-                            Google
-                        </button>
-                        <button
-                            onClick={() => {
-                                if (isHealthy && canUseF5TTS) {
-                                    setAiTtsEnabled(true);
-                                }
-                            }}
-                            disabled={!isHealthy || !canUseF5TTS}
-                            className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
-                                !isHealthy || !canUseF5TTS
-                                    ? 'opacity-40 cursor-not-allowed bg-gray-800 text-gray-400'
-                                    : aiTtsEnabled
-                                        ? 'bg-gray-700 text-white'
-                                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                            }`}
-                        >
-                            F5-TTS
-                        </button>
-                    </div>
-                </div>
-
-                {/* Output */}
-                {isAnyTtsEnabled && isAuthenticated && (
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-300">Output</span>
-                        <div className="flex gap-2">
+            <CardContent>
+                <div className="space-y-6">
+                    {/* Engine - 2 columns */}
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Engine</label>
+                        <div className="grid grid-cols-2 gap-2">
                             <button
-                                onClick={() => setListeningMode('website')}
-                                className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
-                                    listeningMode === 'website'
+                                onClick={() => setTtsEngine('cloud')}
+                                className={`py-2 px-3 rounded text-xs font-medium transition-all ${
+                                    ttsEngine === 'cloud'
                                         ? 'bg-gray-700 text-white'
-                                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                                        : 'bg-gray-800 text-gray-400 hover:bg-gray-750'
                                 }`}
                             >
-                                Website
+                                Cloud
                             </button>
                             <button
-                                onClick={() => setListeningMode('obs')}
-                                className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
-                                    listeningMode === 'obs'
-                                        ? 'bg-gray-700 text-white'
-                                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                                onClick={() => setTtsEngine('local')}
+                                disabled={!localTtsConfig?.configured || !isWhitelisted}
+                                className={`py-2 px-3 rounded text-xs font-medium transition-all ${
+                                    !localTtsConfig?.configured || !isWhitelisted
+                                        ? 'opacity-40 cursor-not-allowed bg-gray-800 text-gray-400'
+                                        : ttsEngine === 'local'
+                                            ? 'bg-gray-700 text-white'
+                                            : 'bg-gray-800 text-gray-400 hover:bg-gray-750'
                                 }`}
                             >
-                                OBS
+                                Local
                             </button>
                         </div>
                     </div>
-                )}
 
-                {/* OBS URL */}
-                {listeningMode === 'obs' && isAnyTtsEnabled && (
-                    <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm text-gray-300 truncate">URL</span>
-                        <div className="flex gap-1">
-                            {obsUrl ? (
-                                <>
-                                    <button
-                                        onClick={() => {
-                                            navigator.clipboard.writeText(obsUrl);
-                                            toast.success('Copied');
-                                        }}
-                                        className="px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs font-medium"
-                                    >
-                                        Copy
-                                    </button>
-                                    <button
-                                        onClick={onRegenerateObsUrl}
-                                        className="px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs font-medium"
-                                    >
-                                        Refresh
-                                    </button>
-                                </>
-                            ) : (
-                                <span className="text-gray-500 text-xs">Generating...</span>
-                            )}
+                    {/* Mode - 2 columns */}
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">TTS Mode</label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                onClick={() => setBasicTtsEnabled(true)}
+                                className={`py-2 px-3 rounded text-xs font-medium transition-all ${
+                                    basicTtsEnabled && !aiTtsEnabled
+                                        ? 'bg-gray-700 text-white'
+                                        : 'bg-gray-800 text-gray-400 hover:bg-gray-750'
+                                }`}
+                            >
+                                Google
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (isHealthy && canUseF5TTS) {
+                                        setAiTtsEnabled(true);
+                                    }
+                                }}
+                                disabled={!isHealthy || !canUseF5TTS}
+                                className={`py-2 px-3 rounded text-xs font-medium transition-all ${
+                                    !isHealthy || !canUseF5TTS
+                                        ? 'opacity-40 cursor-not-allowed bg-gray-800 text-gray-400'
+                                        : aiTtsEnabled
+                                            ? 'bg-gray-700 text-white'
+                                            : 'bg-gray-800 text-gray-400 hover:bg-gray-750'
+                                }`}
+                            >
+                                F5-TTS
+                            </button>
                         </div>
                     </div>
-                )}
 
-                {/* Twitch */}
-                {isAnyTtsEnabled && isAuthenticated && (
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <TwitchIcon className="w-4 h-4 text-gray-400" />
-                            <span className="text-sm text-gray-300">Twitch</span>
+                    {/* Output - 2 columns */}
+                    {isAnyTtsEnabled && isAuthenticated && (
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Output</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    onClick={() => setListeningMode('website')}
+                                    className={`py-2 px-3 rounded text-xs font-medium transition-all ${
+                                        listeningMode === 'website'
+                                            ? 'bg-gray-700 text-white'
+                                            : 'bg-gray-800 text-gray-400 hover:bg-gray-750'
+                                    }`}
+                                >
+                                    Website
+                                </button>
+                                <button
+                                    onClick={() => setListeningMode('obs')}
+                                    className={`py-2 px-3 rounded text-xs font-medium transition-all ${
+                                        listeningMode === 'obs'
+                                            ? 'bg-gray-700 text-white'
+                                            : 'bg-gray-800 text-gray-400 hover:bg-gray-750'
+                                    }`}
+                                >
+                                    OBS
+                                </button>
+                            </div>
                         </div>
-                        <Switch
-                            checked={isTwitchConnected && (platformSettings.enabled_platforms?.includes('twitch') || false)}
-                            onCheckedChange={() => onPlatformToggle('twitch')}
-                            disabled={!isTwitchConnected}
-                            className="scale-90"
-                        />
-                    </div>
-                )}
+                    )}
 
-                {/* VK */}
-                {isAnyTtsEnabled && isAuthenticated && (
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <VKIcon className="w-4 h-4 text-gray-400" />
-                            <span className="text-sm text-gray-300">VK</span>
+                    {/* OBS URL */}
+                    {listeningMode === 'obs' && isAnyTtsEnabled && (
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">OBS URL</label>
+                            <div className="flex gap-1">
+                                {obsUrl ? (
+                                    <>
+                                        <button
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(obsUrl);
+                                                toast.success('Copied');
+                                            }}
+                                            className="flex-1 py-2 px-2 rounded bg-gray-800 hover:bg-gray-750 text-gray-400 text-xs font-medium"
+                                        >
+                                            Copy
+                                        </button>
+                                        <button
+                                            onClick={onRegenerateObsUrl}
+                                            className="flex-1 py-2 px-2 rounded bg-gray-800 hover:bg-gray-750 text-gray-400 text-xs font-medium"
+                                        >
+                                            Refresh
+                                        </button>
+                                    </>
+                                ) : (
+                                    <span className="text-gray-500 text-xs py-2">Generating...</span>
+                                )}
+                            </div>
                         </div>
-                        <Switch
-                            checked={isVkConnected && (platformSettings.enabled_platforms?.includes('vk') || false)}
-                            onCheckedChange={() => onPlatformToggle('vk')}
-                            disabled={!isVkConnected}
-                            className="scale-90"
-                        />
-                    </div>
-                )}
+                    )}
 
-                {/* Channel Points Mode */}
-                {isAnyTtsEnabled && isAuthenticated && (
-                    <TtsChannelPointsMode asSection={true} />
-                )}
+                    {/* Platforms - 2 columns */}
+                    {isAnyTtsEnabled && isAuthenticated && (isTwitchConnected || isVkConnected) && (
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Platforms</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {isTwitchConnected && (
+                                    <div className="flex items-center justify-between px-3 py-2 bg-gray-800/50 rounded">
+                                        <TwitchIcon className="w-4 h-4 text-gray-400" />
+                                        <Switch
+                                            checked={platformSettings.enabled_platforms?.includes('twitch') || false}
+                                            onCheckedChange={() => onPlatformToggle('twitch')}
+                                            className="scale-75"
+                                        />
+                                    </div>
+                                )}
+                                {isVkConnected && (
+                                    <div className="flex items-center justify-between px-3 py-2 bg-gray-800/50 rounded">
+                                        <VKIcon className="w-4 h-4 text-gray-400" />
+                                        <Switch
+                                            checked={isVkConnected && (platformSettings.enabled_platforms?.includes('vk') || false)}
+                                            onCheckedChange={() => onPlatformToggle('vk')}
+                                            className="scale-75"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Channel Points Mode */}
+                    {isAnyTtsEnabled && isAuthenticated && (
+                        <TtsChannelPointsMode asSection={true} />
+                    )}
+                </div>
             </CardContent>
         </Card>
     );
