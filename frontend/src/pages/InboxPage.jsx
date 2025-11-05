@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { toast } from 'sonner';
 import { logger } from '../utils/prodLogger';
 import { getErrorMessage, getOperationMessage } from '../services/microservices';
+import { validators, createFormErrors, isFormValid } from '../utils/formValidation';
 
 const InboxPage = () => {
   const [tickets, setTickets] = useState([]);
@@ -27,7 +28,31 @@ const InboxPage = () => {
     subject: '',
     message: ''
   });
+  const [createFormErrors, setCreateFormErrors] = useState({});
   const [isCreating, setIsCreating] = useState(false);
+
+  // ✅ Валидация формы в реальном времени
+  const validateCreateForm = (data) => {
+    const errors = {};
+    
+    if (!data.subject.trim()) {
+      errors.subject = 'Тема обязательна';
+    } else if (data.subject.length < 3) {
+      errors.subject = 'Минимум 3 символа';
+    } else if (data.subject.length > 100) {
+      errors.subject = 'Максимум 100 символов';
+    }
+
+    if (!data.message.trim()) {
+      errors.message = 'Сообщение обязательно';
+    } else if (data.message.length < 10) {
+      errors.message = 'Минимум 10 символов';
+    } else if (data.message.length > 5000) {
+      errors.message = 'Максимум 5000 символов';
+    }
+
+    return errors;
+  };
 
   const loadTickets = async () => {
     try {
@@ -185,10 +210,12 @@ const InboxPage = () => {
   };
 
   const handleCreateInputChange = (field, value) => {
-    setCreateFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    const newData = { ...createFormData, [field]: value };
+    setCreateFormData(newData);
+    
+    // ✅ Real-time validation
+    const errors = validateCreateForm(newData);
+    setCreateFormErrors(errors);
   };
 
   useEffect(() => {
@@ -439,7 +466,11 @@ const InboxPage = () => {
                 onChange={(e) => handleCreateInputChange('subject', e.target.value)}
                 maxLength={100}
                 required
+                className={createFormErrors.subject ? 'border-red-500' : ''}
               />
+              {createFormErrors.subject && (
+                <p className="text-red-500 text-sm">{createFormErrors.subject}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -449,12 +480,16 @@ const InboxPage = () => {
                 placeholder="Подробно опишите проблему, как её воспроизвести и с чем нужна помощь..."
                 value={createFormData.message}
                 onChange={(e) => handleCreateInputChange('message', e.target.value)}
-                maxLength={500}
+                maxLength={5000}
                 rows={6}
                 required
+                className={createFormErrors.message ? 'border-red-500' : ''}
               />
+              {createFormErrors.message && (
+                <p className="text-red-500 text-sm">{createFormErrors.message}</p>
+              )}
               <div className="text-sm text-muted-foreground text-right">
-                {createFormData.message.length}/500 символов
+                {createFormData.message.length}/5000 символов
               </div>
             </div>
 
@@ -469,14 +504,17 @@ const InboxPage = () => {
               </Button>
               <Button
                 type="submit"
-                disabled={isCreating}
+                disabled={isCreating || Object.keys(createFormErrors).length > 0}
                 className="min-w-[100px]"
+                title={Object.keys(createFormErrors).length > 0 ? 'Исправьте ошибки перед отправкой' : ''}
               >
                 {isCreating ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
                     Отправка...
                   </>
+                ) : Object.keys(createFormErrors).length > 0 ? (
+                  'Исправьте ошибки'
                 ) : (
                   'Отправить'
                 )}
