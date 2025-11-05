@@ -28,37 +28,31 @@ const AudioSettings = ({
         onSaveSettings(newSettings);
     };
 
-    // Скрываем карточку если выбран OBS
     if (listeningMode === 'obs') {
         return null;
     }
     
     return (
-        <Card className="border-gray-700 bg-gray-900/30">
-            <CardHeader>
-                <CardTitle className="text-base font-semibold text-white">Аудио</CardTitle>
+        <Card className="border-gray-700 bg-gray-900/30 h-fit">
+            <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold text-white">Аудио</CardTitle>
             </CardHeader>
-            <CardContent className="pt-4">
-                <div className="space-y-3">
-                    {/* Громкость для сайта */}
-                    <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Громкость сайта</label>
-                        <div className="flex items-center gap-4">
-                            <Slider
-                                id="volume-slider"
-                                min={0}
-                                max={100}
-                                step={1}
-                                value={[localVolume]}
-                                onValueChange={(value) => handleVolumeChange(value[0])}
-                                className="flex-1"
-                            />
-                            <div className="min-w-fit">
-                                <span className="text-sm font-bold text-purple-300 bg-purple-500/20 px-3 py-1 rounded border border-purple-500/40">
-                                    {localVolume}%
-                                </span>
-                            </div>
-                        </div>
+            <CardContent className="pt-2">
+                <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                        <div className="text-xs text-gray-400 mb-2">Громкость</div>
+                        <Slider
+                            id="volume-slider"
+                            min={0}
+                            max={100}
+                            step={1}
+                            value={[localVolume]}
+                            onValueChange={(value) => handleVolumeChange(value[0])}
+                            className="flex-1"
+                        />
+                    </div>
+                    <div className="text-sm font-semibold text-purple-300 bg-purple-500/20 px-2.5 py-1 rounded border border-purple-500/40 min-w-fit">
+                        {localVolume}%
                     </div>
                 </div>
             </CardContent>

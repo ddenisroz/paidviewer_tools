@@ -53,14 +53,14 @@ const TtsControlPanel = ({
     return (
         <>
             {/* Compact Enable/Disable Button */}
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-700 bg-gray-800/30">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-700 bg-gray-800/30 w-fit">
                 <Switch
                     checked={isAnyTtsEnabled}
                     onCheckedChange={handleGlobalTtsToggle}
-                    className="scale-100"
+                    className="scale-90"
                 />
-                <span className="text-sm font-semibold text-white">
-                    {isAnyTtsEnabled ? 'Озвучка ВКЛ' : 'Озвучка ВЫКЛ'}
+                <span className="text-xs font-semibold text-white">
+                    {isAnyTtsEnabled ? 'ВКЛ' : 'ВЫКЛ'}
                 </span>
             </div>
 

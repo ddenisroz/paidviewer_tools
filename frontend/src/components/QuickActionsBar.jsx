@@ -1,9 +1,8 @@
 // src/components/QuickActionsBar.jsx
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { Volume2, VolumeX, Settings, Zap, DollarSign } from 'lucide-react';
+import { Volume2, Zap, DollarSign } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { botService } from '../services/microservices';
 import { toast } from 'sonner';
@@ -24,21 +23,22 @@ const QuickActionsBar = () => {
         return () => window.removeEventListener('tts-status-changed', handleTtsStatusChange);
     }, []);
 
-    const handleToggleTts = async (checked) => {
+    const handleToggleTts = async () => {
         setLoading(true);
         try {
-            if (checked) {
+            const newState = !ttsEnabled;
+            if (newState) {
                 await botService.post('/api/tts/enable');
             } else {
                 await botService.post('/api/tts/disable');
             }
-            setTtsEnabled(checked);
+            setTtsEnabled(newState);
             window.dispatchEvent(new CustomEvent('tts-status-changed', { 
-                detail: { enabled: checked } 
+                detail: { enabled: newState } 
             }));
         } catch (error) {
             toast.error('Ошибка');
-            setTtsEnabled(!checked);
+            setTtsEnabled(!ttsEnabled);
         } finally {
             setLoading(false);
         }
@@ -50,56 +50,49 @@ const QuickActionsBar = () => {
 
     return (
         <Card className="border-gray-700 bg-gray-900/30">
-            <div className="flex items-center justify-between px-4 py-2.5 gap-4">
-                {/* TTS Quick Control */}
-                <div className="flex items-center gap-2">
-                    {ttsEnabled ? (
-                        <Volume2 className="w-4 h-4 text-purple-400" />
-                    ) : (
-                        <VolumeX className="w-4 h-4 text-gray-500" />
-                    )}
-                    <Switch
-                        id="quick-tts-toggle"
-                        checked={ttsEnabled}
-                        onCheckedChange={handleToggleTts}
-                        disabled={loading}
-                        className="scale-90"
-                    />
-                    <span className="text-xs font-medium text-gray-400">
-                        {ttsEnabled ? 'Озвучка' : 'Выкл'}
-                    </span>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => navigate('/dashboard/tts')}
-                        className="h-6 px-1.5 text-gray-500 hover:text-white ml-0.5"
-                    >
-                        <Settings className="w-3.5 h-3.5" />
-                    </Button>
-                </div>
+            <div className="flex items-center justify-between px-4 py-3 gap-4">
+                {/* TTS Action Button */}
+                <Button
+                    onClick={handleToggleTts}
+                    disabled={loading}
+                    variant="ghost"
+                    className={`flex items-center gap-2 h-9 px-3 rounded-lg transition-all border ${
+                        ttsEnabled
+                            ? 'border-green-500/50 bg-green-500/10 text-green-400 hover:bg-green-500/20'
+                            : 'border-gray-600/50 bg-gray-800/30 text-gray-400 hover:bg-gray-800/50'
+                    }`}
+                >
+                    <Volume2 className="w-4 h-4" />
+                    <span className="text-xs font-semibold">Озвучка</span>
+                </Button>
 
                 {/* Divider */}
-                <div className="w-px h-4 bg-gray-700/50" />
+                <div className="w-px h-5 bg-gray-700/50" />
 
-                {/* Quick Actions */}
-                <div className="flex items-center gap-1">
+                {/* Navigation Buttons */}
+                <div className="flex items-center gap-2">
                     <Button
+                        onClick={() => navigate('/dashboard/tts')}
                         variant="ghost"
-                        size="sm"
-                        onClick={() => navigate('/dashboard/drops?tab=streak')}
-                        className="h-6 px-2 text-gray-500 hover:text-purple-400 flex items-center gap-1"
+                        className="h-9 px-2.5 text-gray-400 hover:text-white text-xs font-medium"
                     >
-                        <Zap className="w-3.5 h-3.5" />
-                        <span className="text-xs">Стрик</span>
+                        Настройки
                     </Button>
                     <Button
+                        onClick={() => navigate('/dashboard/drops?tab=streak')}
                         variant="ghost"
-                        size="sm"
+                        className="h-9 px-2.5 text-gray-400 hover:text-purple-400 flex items-center gap-1 text-xs font-medium"
+                    >
+                        <Zap className="w-3.5 h-3.5" />
+                        Стрик
+                    </Button>
+                    <Button
                         onClick={() => navigate('/dashboard/drops?tab=donation')}
-                        className="h-6 px-2 text-gray-500 hover:text-green-400 flex items-center gap-1"
+                        variant="ghost"
+                        className="h-9 px-2.5 text-gray-400 hover:text-green-400 flex items-center gap-1 text-xs font-medium"
                     >
                         <DollarSign className="w-3.5 h-3.5" />
-                        <span className="text-xs">Донат</span>
+                        Донат
                     </Button>
                 </div>
             </div>
@@ -108,4 +101,3 @@ const QuickActionsBar = () => {
 };
 
 export default QuickActionsBar;
-
