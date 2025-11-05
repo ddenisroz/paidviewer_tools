@@ -26,7 +26,6 @@ const TtsMainPageContent = () => {
     const { isAuthenticated, user, isGuest } = useAuth();
     const { integrations } = useIntegrations();
     
-    // Логируем инициализацию компонента
     useEffect(() => {
         ttsLogger.info('TTS Main Page initialized', { 
             ttsEnabled, 
@@ -37,7 +36,6 @@ const TtsMainPageContent = () => {
         });
     }, []);
     
-    // Состояния
     const [listeningMode, setListeningMode] = useState('website');
     const [obsUrl, setObsUrl] = useState('');
     const [platformSettings, setPlatformSettings] = useState({
@@ -45,18 +43,15 @@ const TtsMainPageContent = () => {
         global_enabled: true
     });
     const [platformLoading, setPlatformLoading] = useState(false);
-    const [engineToggleLoading, setEngineToggleLoading] = useState(false); // Флаг для переключения движка
+    const [engineToggleLoading, setEngineToggleLoading] = useState(false);
     
-    // Состояния для двухуровневой системы TTS
     const [basicTtsEnabled, setBasicTtsEnabled] = useState(false);
     const [aiTtsEnabled, setAiTtsEnabled] = useState(false);
     
-    // Громкость - загружаем с сервера
     const [audioSettings, setAudioSettings] = useState({
         websiteVolume: 50
     });
     
-    // Дополнительные настройки TTS - загружаем с сервера
     const [ttsSettings, setTtsSettings] = useState({
         enable7TV: true,
         enableTwitch: true,
@@ -64,21 +59,18 @@ const TtsMainPageContent = () => {
         enableCustomLexicon: false,
         filterReplies: false,
         filterMentions: false,
-        version: 1,  // ✅ Версия для защиты от race conditions
+        version: 1,
     });
     
-    // Состояния сохранения
     const [isSaving, setIsSaving] = useState(false);
     const [saveStatus, setSaveStatus] = useState('');
     
-    // Выбор движка TTS
-    const [ttsEngine, setTtsEngine] = useState('cloud'); // 'cloud' или 'local'
+    const [ttsEngine, setTtsEngine] = useState('cloud');
     const [localTtsConfig, setLocalTtsConfig] = useState(null);
-    const [engineLoading, setEngineLoading] = useState(true); // Флаг загрузки данных движка
+    const [engineLoading, setEngineLoading] = useState(true);
     
     const queryClient = useQueryClient();
 
-    // React Query мутации - объявляем ДО использования в useCallback и useQuery
     const switchEngineMutation = useMutation({
         mutationFn: async ({ engine_type }) => {
             return await botService.post('/api/tts/engine', { engine_type });
@@ -134,7 +126,7 @@ const TtsMainPageContent = () => {
         },
         onError: (error) => {
             logger.error('Error saving platform settings:', error);
-            toast.error('Не удалось переключить платформу');
+            toast.error('Failed to switch platform');
         },
         onSettled: () => {
             setPlatformLoading(false);
@@ -150,23 +142,23 @@ const TtsMainPageContent = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tts-audio-settings'] });
-            setSaveStatus('Сохранено');
+            setSaveStatus('Saved');
             ttsLogger.success('Audio settings saved successfully');
             setTimeout(() => setSaveStatus(''), 2000);
         },
         onError: (error) => {
             ttsLogger.error('Error saving audio settings:', error);
             if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
-                setSaveStatus('Ошибка сохранения');
+                setSaveStatus('Save error');
                 setTimeout(() => setSaveStatus(''), 3000);
             } else {
-                setSaveStatus('TTS сервис недоступен');
+                setSaveStatus('TTS service unavailable');
                 setTimeout(() => setSaveStatus(''), 3000);
             }
         },
         onMutate: () => {
             setIsSaving(true);
-            setSaveStatus('Сохранение...');
+            setSaveStatus('Saving...');
         },
         onSettled: () => {
             setIsSaving(false);
@@ -182,44 +174,40 @@ const TtsMainPageContent = () => {
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['tts-settings'] });
-            // ✅ Обновляем версию в локальном state
             if (data.version) {
                 setTtsSettings(prev => ({...prev, version: data.version}));
             }
-            setSaveStatus('Сохранено');
+            setSaveStatus('Saved');
             ttsLogger.success('TTS settings saved successfully', {version: data.version});
             setTimeout(() => setSaveStatus(''), 2000);
         },
         onError: (error) => {
             ttsLogger.error('Error saving TTS settings:', error);
             
-            // ✅ Обработка 409 Conflict - данные были обновлены
             if (error.response?.status === 409) {
-                setSaveStatus('Данные обновлены. Перезагружаю...');
+                setSaveStatus('Data updated. Reloading...');
                 ttsLogger.warning('Version conflict detected, reloading settings');
-                // Перезагружаем настройки с сервера
                 setTimeout(() => {
                     queryClient.invalidateQueries({ queryKey: ['tts-settings'] });
                     setSaveStatus('');
                 }, 1500);
             } else if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
-                setSaveStatus('Ошибка сохранения');
+                setSaveStatus('Save error');
                 setTimeout(() => setSaveStatus(''), 3000);
             } else {
-                setSaveStatus('TTS сервис недоступен');
+                setSaveStatus('TTS service unavailable');
                 setTimeout(() => setSaveStatus(''), 3000);
             }
         },
         onMutate: () => {
             setIsSaving(true);
-            setSaveStatus('Сохранение...');
+            setSaveStatus('Saving...');
         },
         onSettled: () => {
             setIsSaving(false);
         },
     });
 
-    // Обёртки для сохранения настроек (используют мутации) - объявляем ПОСЛЕ мутаций
     const saveAudioSettings = useCallback((newSettings) => {
         saveAudioSettingsMutation.mutate(newSettings);
     }, [saveAudioSettingsMutation]);
@@ -228,32 +216,26 @@ const TtsMainPageContent = () => {
         saveTtsSettingsMutation.mutate(newSettings);
     }, [saveTtsSettingsMutation]);
 
-    // Проверка подключения (гость всегда "подключен" к своему каналу)
-    // Для авторизованных пользователей TTS всегда доступен, даже без интеграций
     const isConnected = isGuest || isAuthenticated || integrations.twitch?.connected || integrations.vk?.connected;
     
-    // Логируем статус подключения
     useEffect(() => {
         ttsLogger.debug('TTS Connection status:', { isGuest, isAuthenticated, integrations, isConnected });
     }, [isGuest, isAuthenticated, integrations, isConnected]);
 
-    // React Query: загружаем TTS статус
     const { data: ttsStatusData, isLoading: ttsStatusLoading } = useQuery({
         queryKey: ['tts-status'],
         queryFn: async () => {
             ttsLogger.info('Fetching TTS status from API...');
-                        const response = await botService.get('/api/tts/status');
+            const response = await botService.get('/api/tts/status');
             ttsLogger.info('TTS status API response:', response.data);
             return response.data;
         },
         enabled: !!isAuthenticated,
-        staleTime: 30 * 1000, // 30 секунд
+        staleTime: 30 * 1000,
         refetchOnMount: true,
         refetchOnWindowFocus: false,
     });
 
-    // Обрабатываем изменения данных TTS статуса через useEffect (более надежно чем onSuccess)
-    // Используем useRef для отслеживания последних обработанных значений, чтобы избежать лишних обновлений
     const lastProcessedRef = useRef({
         enabled: null,
         engineType: null,
@@ -268,7 +250,6 @@ const TtsMainPageContent = () => {
             const newIsWhitelisted = ttsStatusData.is_whitelisted || false;
             const hasLocalSetup = ttsStatusData.has_local_setup || false;
             
-            // Проверяем, изменились ли значения, чтобы избежать лишних обновлений
             const lastProcessed = lastProcessedRef.current;
             const hasChanged = 
                 lastProcessed.enabled !== isTtsEnabled ||
@@ -277,7 +258,6 @@ const TtsMainPageContent = () => {
                 lastProcessed.hasLocalSetup !== hasLocalSetup;
             
             if (!hasChanged) {
-                // Значения не изменились, пропускаем обработку
                 return;
             }
             
@@ -289,7 +269,6 @@ const TtsMainPageContent = () => {
                 previous: lastProcessed
             });
             
-            // Обновляем ref с новыми значениями
             lastProcessedRef.current = {
                 enabled: isTtsEnabled,
                 engineType,
@@ -297,11 +276,8 @@ const TtsMainPageContent = () => {
                 hasLocalSetup
             };
                     
-            // Базовая TTS всегда равна isTtsEnabled (независимо от F5-TTS)
             setBasicTtsEnabled(isTtsEnabled);
             
-            // Обновляем isWhitelisted в контексте на основе свежих данных из API
-            // ВАЖНО: Обновляем только если значение действительно изменилось
             if (setIsWhitelisted && isWhitelisted !== newIsWhitelisted) {
                 ttsLogger.info('Updating isWhitelisted:', newIsWhitelisted, '(was:', isWhitelisted, ')');
                 setIsWhitelisted(newIsWhitelisted);
@@ -309,29 +285,23 @@ const TtsMainPageContent = () => {
             
             const canUseLocalTTS = hasLocalSetup || newIsWhitelisted;
             
-            // Определяем состояние F5-TTS независимо от базовой TTS:
-            // F5-TTS включен если engine_type === 'local' ИЛИ (engine_type === 'cloud' И в whitelist)
-            // НЕ зависит от isTtsEnabled - базовая TTS и F5-TTS работают независимо
             const isF5TtsEnabled = (engineType === 'local' && canUseLocalTTS) || 
                                    (engineType === 'cloud' && newIsWhitelisted);
             
             setAiTtsEnabled(isF5TtsEnabled);
             
-            // Устанавливаем правильный движок для отображения
             if (engineType === 'local' && canUseLocalTTS) {
                 setTtsEngine('local');
             } else if (engineType === 'cloud' && newIsWhitelisted) {
                 setTtsEngine('cloud');
             } else {
-                // Если engine_type === 'gtts' или недоступен F5-TTS, используем cloud (gtts)
                 setTtsEngine('cloud');
             }
                     
             ttsLogger.info('TTS engine processed:', engineType, 'isWhitelisted:', newIsWhitelisted, 'canUseLocalTTS:', canUseLocalTTS, 'basicTtsEnabled:', isTtsEnabled, 'aiTtsEnabled:', isF5TtsEnabled);
-                }
+        }
     }, [ttsStatusData, isHealthy, setIsWhitelisted, isWhitelisted, switchEngineMutation]);
 
-    // React Query: загружаем настройки звука
     const { data: audioSettingsData } = useQuery({
         queryKey: ['tts-audio-settings'],
         queryFn: async () => {
@@ -352,7 +322,6 @@ const TtsMainPageContent = () => {
         },
     });
 
-    // React Query: загружаем настройки TTS
     const { data: ttsSettingsData } = useQuery({
         queryKey: ['tts-settings'],
         queryFn: async () => {
@@ -371,7 +340,7 @@ const TtsMainPageContent = () => {
                     enableCustomLexicon: data.enableCustomLexicon ?? false,
                     filterReplies: data.filterReplies ?? false,
                     filterMentions: data.filterMentions ?? false,
-                    version: data.version ?? 1  // ✅ Загружаем версию с сервера
+                    version: data.version ?? 1
                 };
                 setTtsSettings(ttsData);
                 ttsLogger.success('TTS settings loaded:', ttsData);
@@ -379,7 +348,6 @@ const TtsMainPageContent = () => {
         },
     });
 
-    // React Query: загружаем настройки платформ
     const { data: platformSettingsData } = useQuery({
         queryKey: ['tts-platform-settings'],
         queryFn: async () => {
@@ -401,7 +369,6 @@ const TtsMainPageContent = () => {
         },
     });
 
-    // React Query: загружаем локальную конфигурацию TTS
     const { data: localTtsConfigData } = useQuery({
         queryKey: ['tts-local-config'],
         queryFn: async () => {
@@ -426,19 +393,16 @@ const TtsMainPageContent = () => {
         },
     });
 
-    // Комбинированный loading состояние
     useEffect(() => {
         setEngineLoading(ttsStatusLoading);
     }, [ttsStatusLoading]);
                 
-    // Режим прослушивания из user
     useEffect(() => {
-                if (user?.tts_listening_mode) {
-                    setListeningMode(user.tts_listening_mode);
-                }
+        if (user?.tts_listening_mode) {
+            setListeningMode(user.tts_listening_mode);
+        }
     }, [user?.tts_listening_mode]);
 
-    // Слушаем изменения Basic TTS с главной страницы
     useEffect(() => {
         const handleTtsStatusChange = (event) => {
             ttsLogger.info('TtsMainPage: Received tts-status-changed event', event.detail);
@@ -449,14 +413,11 @@ const TtsMainPageContent = () => {
         return () => window.removeEventListener('tts-status-changed', handleTtsStatusChange);
     }, []);
 
-    // Слушаем изменения AI TTS с главной страницы
     useEffect(() => {
         const handleAiTtsChange = (event) => {
             ttsLogger.info('TtsMainPage: Received ai-tts-changed event', event.detail);
             const { enabled, engineType, isWhitelisted } = event.detail;
             
-            // Если enabled=true, используем engineType из события (cloud или local)
-            // Если enabled=false, используем gtts (базовый TTS)
             if (enabled) {
                 setTtsEngine(engineType || 'local');
             } else {
@@ -468,7 +429,6 @@ const TtsMainPageContent = () => {
         return () => window.removeEventListener('ai-tts-changed', handleAiTtsChange);
     }, []);
 
-    // 🔄 Слушаем изменения platform settings из ChatCard
     useEffect(() => {
         const handlePlatformSettingsChange = (event) => {
             const { enabledPlatforms } = event.detail;
@@ -483,7 +443,6 @@ const TtsMainPageContent = () => {
         return () => window.removeEventListener('tts-settings-changed', handlePlatformSettingsChange);
     }, []);
 
-    // Генерация OBS URL
     useEffect(() => {
         const generateUrl = async () => {
             if (listeningMode === 'obs' && isAuthenticated && user?.id) {
@@ -491,7 +450,6 @@ const TtsMainPageContent = () => {
                     const response = await generateObsUrl();
                     const token = response.data?.obs_token;
                     if (token) {
-                        // Формируем URL для OBS WebSocket
                         const obsUrl = getTtsWebSocketUrl(token);
                         setObsUrl(obsUrl);
                     } else {
@@ -500,7 +458,7 @@ const TtsMainPageContent = () => {
                 } catch (error) {
                     logger.error('Error generating OBS URL:', error);
                     if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
-                        toast.error('Ошибка генерации OBS URL');
+                        toast.error('Error generating OBS URL');
                     }
                     setObsUrl('');
                 }
@@ -509,38 +467,32 @@ const TtsMainPageContent = () => {
         generateUrl();
     }, [listeningMode, isAuthenticated, user?.id]);
 
-    // Обработчики
     const handlePlatformToggle = useCallback((platform) => {
-        // Вычисляем newEnabledPlatforms ОДИН РАЗ, чтобы избежать race condition
         const currentPlatforms = platformSettings.enabled_platforms;
         const newEnabledPlatforms = currentPlatforms.includes(platform)
             ? currentPlatforms.filter(p => p !== platform)
             : [...currentPlatforms, platform];
             
-        // Optimistic update
-            setPlatformSettings(prev => ({
-                ...prev,
-                enabled_platforms: newEnabledPlatforms
-            }));
-            
-        // Сохраняем через мутацию
+        setPlatformSettings(prev => ({
+            ...prev,
+            enabled_platforms: newEnabledPlatforms
+        }));
+        
         savePlatformSettingsMutation.mutate(
             { enabled_platforms: newEnabledPlatforms },
             {
                 onSuccess: () => {
-                    // Отправляем событие для синхронизации с другими компонентами
-            window.dispatchEvent(new CustomEvent('tts-settings-changed', {
-                detail: { enabledPlatforms: newEnabledPlatforms }
-            }));
-            logger.log(`Platform ${platform} toggled successfully`);
+                    window.dispatchEvent(new CustomEvent('tts-settings-changed', {
+                        detail: { enabledPlatforms: newEnabledPlatforms }
+                    }));
+                    logger.log(`Platform ${platform} toggled successfully`);
                 },
                 onError: () => {
-                    // Rollback при ошибке - используем сохраненное значение
                     setPlatformSettings(prev => ({
                         ...prev,
                         enabled_platforms: currentPlatforms
                     }));
-        }
+                }
             }
         );
     }, [platformSettings.enabled_platforms, savePlatformSettingsMutation]);
@@ -548,22 +500,20 @@ const TtsMainPageContent = () => {
     const handleSaveSettings = useCallback(async () => {
         try {
             setIsSaving(true);
-            setSaveStatus('Сохранение...');
+            setSaveStatus('Saving...');
             
-            // Здесь должна быть логика сохранения настроек
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Имитация сохранения
+            await new Promise(resolve => setTimeout(resolve, 1000));
             
-            setSaveStatus('Сохранено');
+            setSaveStatus('Saved');
             setTimeout(() => setSaveStatus(''), 2000);
         } catch (error) {
             logger.error('Error saving settings:', error);
-            setSaveStatus('Ошибка сохранения');
+            setSaveStatus('Save error');
         } finally {
             setIsSaving(false);
         }
     }, []);
 
-    // Автосохранение при изменении настроек
     useEffect(() => {
         if (isAuthenticated === true) {
             const timeoutId = setTimeout(() => {
@@ -574,40 +524,30 @@ const TtsMainPageContent = () => {
         }
     }, [audioSettings, ttsSettings, handleSaveSettings, isAuthenticated]);
 
-    // Проверка здоровья TTS
     useEffect(() => {
         if (isAuthenticated === true) {
             checkTtsHealth();
         }
     }, [isAuthenticated, checkTtsHealth]);
 
-    // Загруженые статусы при первой загрузке страницы
     useEffect(() => {
         initializeTts();
     }, []);
 
-    // Загрузка локальной конфигурации уже через React Query выше
-
-
-    // Функция для сохранения состояния базовой TTS
     const saveBasicTtsState = useCallback((enabled) => {
         toggleBasicTtsMutation.mutate(enabled);
     }, [toggleBasicTtsMutation]);
 
-    // Функция для сохранения состояния ИИ TTS
     const saveAiTtsState = useCallback((enabled) => {
         if (!enabled) {
-            // При выключении F5-TTS переключаем на gtts (базовый TTS)
-            // НО НЕ ВЫКЛЮЧАЕМ базовую TTS - она должна остаться включенной если была включена
             setEngineToggleLoading(true);
             switchEngineMutation.mutate(
                 { engine_type: 'gtts' },
                 {
                     onSuccess: () => {
-                        toast.success('☁️ Переключено на базовый TTS');
+                        toast.success('Switched to Google TTS');
                         logger.log('AI TTS disabled, switched to gtts');
                         
-                        // Уведомляем TtsQuickSettings о выключении F5-TTS
                         window.dispatchEvent(new CustomEvent('ai-tts-changed', { 
                             detail: { 
                                 enabled: false,
@@ -616,12 +556,11 @@ const TtsMainPageContent = () => {
                             } 
                         }));
                         
-                        // Базовая TTS остается включенной, обновляем статус
                         queryClient.invalidateQueries({ queryKey: ['tts-status'] });
                     },
                     onError: (error) => {
                         logger.error('Error switching to gtts:', error);
-                        toast.error('Ошибка переключения движка');
+                        toast.error('Engine switch failed');
                         setAiTtsEnabled(true);
                     },
                     onSettled: () => {
@@ -632,25 +571,19 @@ const TtsMainPageContent = () => {
             return;
         }
         
-        // При включении F5-TTS:
-        // 1. Сначала убеждаемся что базовая TTS включена (как fallback)
-        // 2. Потом переключаемся на F5-TTS
-        
         setEngineToggleLoading(true);
         const hasLocalSetup = localStorage.getItem('tts_has_local_setup') === 'true';
         
-        // ВАЖНО: Если есть локальный setup - используем local, иначе cloud (для whitelist)
         const engine = hasLocalSetup ? 'local' : 'cloud';
         
         ttsLogger.info('Enabling F5-TTS with engine:', engine, 'hasLocalSetup:', hasLocalSetup, 'isWhitelisted:', isWhitelisted);
         
-        // Сначала включаем базовую TTS если она еще не включена
         const enableBasicTtsFirst = async () => {
             if (!basicTtsEnabled) {
                 try {
                     await botService.post('/api/tts/enable');
                     setBasicTtsEnabled(true);
-                    logger.log('✅ Базовая TTS включена как fallback для F5-TTS');
+                    logger.log('Basic TTS enabled as fallback for F5-TTS');
                 } catch (error) {
                     logger.error('Failed to enable basic TTS as fallback:', error);
                 }
@@ -658,15 +591,13 @@ const TtsMainPageContent = () => {
         };
         
         enableBasicTtsFirst().then(() => {
-            // Теперь переключаемся на F5-TTS
             switchEngineMutation.mutate(
                 { engine_type: engine },
                 {
                     onSuccess: () => {
-                        toast.success(`Движок: ${engine === 'local' ? '💻 Локальный F5-TTS' : '☁️ Облачный F5-TTS'}`);
+                        toast.success(`Engine: ${engine === 'local' ? 'Local F5-TTS' : 'Cloud F5-TTS'}`);
                         logger.log('AI TTS state saved:', enabled, 'engine:', engine);
                         
-                        // Уведомляем TtsQuickSettings о включении F5-TTS с указанием engine_type
                         window.dispatchEvent(new CustomEvent('ai-tts-changed', { 
                             detail: { 
                                 enabled: true,
@@ -675,14 +606,12 @@ const TtsMainPageContent = () => {
                             } 
                         }));
                         
-                        // Обновляем состояние
                         queryClient.invalidateQueries({ queryKey: ['tts-status'] });
                     },
                     onError: (error) => {
                         logger.error('Error saving AI TTS state:', error);
-                        const errorMessage = error.response?.data?.detail || 'Ошибка переключения движка';
+                        const errorMessage = error.response?.data?.detail || 'Engine switch failed';
                         toast.error(errorMessage);
-                        // Откатываем состояние при ошибке
                         setAiTtsEnabled(false);
                     },
                     onSettled: () => {
@@ -693,33 +622,28 @@ const TtsMainPageContent = () => {
         });
     }, [switchEngineMutation, isWhitelisted, basicTtsEnabled]);
 
-    // ✅ НОВАЯ ЛОГИКА: Обработчики для переключения режимов озвучки
-    // Теперь это radio buttons, а не независимые тоглы
     const handleBasicTtsToggle = (enabled) => {
-        if (!enabled) return; // Radio button, нельзя отключить если это выбранный режим
+        if (!enabled) return;
         
         setBasicTtsEnabled(true);
-        setAiTtsEnabled(false); // ✅ Отключаем AI TTS когда выбираем базовую
+        setAiTtsEnabled(false);
         saveBasicTtsState(true);
         
         ttsLogger.info('Switched to Basic TTS mode');
-        toast.success('Режим озвучки: Google TTS (Базовая)');
+        toast.success('Mode: Google TTS (Basic)');
         
-        // Уведомляем shortcuts на главной странице
         window.dispatchEvent(new CustomEvent('tts-status-changed', { 
             detail: { enabled: true, mode: 'basic' } 
         }));
     };
 
     const handleAiTtsToggle = (enabled) => {
-        if (!enabled) return; // Radio button, нельзя отключить если это выбранный режим
+        if (!enabled) return;
         
-        // Предотвращаем спам переключений
         if (engineToggleLoading) {
             return;
         }
         
-        // Проверяем возможность использования F5-TTS (локальный setup ИЛИ whitelist)
         const hasLocalSetup = localStorage.getItem('tts_has_local_setup') === 'true';
         const canUseF5TTS = hasLocalSetup || isWhitelisted === true;
         
@@ -730,20 +654,16 @@ const TtsMainPageContent = () => {
             canUseF5TTS 
         });
         
-        // Если isWhitelisted === false (явно проверено и не в whitelist), блокируем
         if (!canUseF5TTS && isWhitelisted === false) {
             ttsLogger.warning('F5-TTS blocked: user not whitelisted and no local setup');
-            toast.error('Для использования F5-TTS настройте локальный TTS (tts_service_simple) или обратитесь к администратору для whitelist.');
+            toast.error('F5-TTS requires local setup or whitelist access');
             return;
         }
         
-        // Если isWhitelisted === null, не блокируем - проверка будет на бэкенде
-        // Если enabled и isWhitelisted === null, попробуем включить - бэкенд проверит
         if (enabled && isWhitelisted === null) {
             ttsLogger.info('F5-TTS whitelist status unknown, allowing toggle - backend will check');
         }
         
-        // ✅ НОВАЯ ЛОГИКА: Отключаем базовую TTS когда включаем F5
         if (enabled) {
             setBasicTtsEnabled(false);
         }
@@ -752,149 +672,69 @@ const TtsMainPageContent = () => {
         saveAiTtsState(enabled);
         
         ttsLogger.info('Switched to AI TTS (F5-TTS) mode');
-        toast.success('Режим озвучки: F5-TTS (ИИ озвучка с fallback на Google TTS)');
+        toast.success('Mode: F5-TTS with Google TTS fallback');
     };
 
-    // Обработчик для изменения режима прослушивания
     const handleListeningModeChange = useCallback((mode) => {
         setListeningMode(mode);
         setListeningModeMutation.mutate(
             { listeningMode: mode },
             {
                 onSuccess: () => {
-            logger.log('Listening mode saved:', mode);
+                    logger.log('Listening mode saved:', mode);
                 },
                 onError: () => {
-                    // Откатываем состояние при ошибке
                     setListeningMode(prev => prev);
-        }
+                }
             }
         );
     }, [setListeningModeMutation]);
 
-    // Функция для перегенерации OBS URL
     const handleRegenerateObsUrl = async () => {
         try {
             const response = await generateObsUrl();
             const token = response.data?.obs_token;
             if (token) {
-                // Формируем URL для OBS WebSocket
                 const obsUrl = getTtsWebSocketUrl(token);
                 setObsUrl(obsUrl);
-                toast.success('URL обновлен');
+                toast.success('URL updated');
             } else {
                 setObsUrl('');
-                toast.error('Не удалось получить токен');
+                toast.error('Failed to get token');
             }
         } catch (error) {
             logger.error('Error regenerating OBS URL:', error);
-            // apiClient.js уже показывает toast при ошибках
             setObsUrl('');
         }
     };
 
-    // Убираем заглушку TTS - базовая озвучка работает без TTS сервера
-    // if (!isHealthy && !isChecking && lastCheck) {
-    //     return (
-    //         <PageWrapper 
-    //             title="Озвучка сообщений"
-    //             description="Настройте озвучку чата и управляйте голосами"
-    //         >
-    //             <TtsErrorCard
-    //                 title="TTS сервер недоступен"
-    //                 description="В данный момент сервис TTS недоступен. Базовая озвучка продолжает работать."
-    //                 suggestion="Попробуйте обновить страницу через несколько минут."
-    //             />
-    //         </PageWrapper>
-    //     );
-    // }
-
     return (
         <PageWrapper>
-            <div className="space-y-3">
-                    {/* CSS для слайдера */}
-                    <style>
-                    {`
-                        .slider::-webkit-slider-thumb {
-                            appearance: none;
-                            height: 16px;
-                            width: 16px;
-                            border-radius: 50%;
-                            background: #3b82f6;
-                            cursor: pointer;
-                            border: 2px solid #1f2937;
-                        }
-                        .slider::-moz-range-thumb {
-                            height: 16px;
-                            width: 16px;
-                            border-radius: 50%;
-                            background: #3b82f6;
-                            cursor: pointer;
-                            border: 2px solid #1f2937;
-                        }
-                    `}
-                </style>
-                
-                {/* 1. Выбор движка TTS - компактный селектор */}
-                <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-300 uppercase tracking-wide px-1">Engine:</label>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-                        <button 
-                            onClick={() => {
-                                if (ttsEngine !== 'cloud') {
-                                    setTtsEngine('cloud');
-                                    botService.post('/api/tts/engine', { engine_type: 'gtts' }).catch(err => ttsLogger.error('Error:', err));
-                                    window.dispatchEvent(new CustomEvent('ai-tts-changed', { 
-                                        detail: { enabled: false, engineType: 'gtts', isWhitelisted: isWhitelisted } 
-                                    }));
-                                }
-                            }}
-                            className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
-                                ttsEngine === 'cloud' 
-                                    ? 'border-blue-500/50 bg-blue-500/10 text-blue-400' 
-                                    : 'border-gray-700 hover:border-gray-600 text-gray-400'
-                            }`}
-                        >
-                            <span>Cloud</span>
-                            <span className="text-xs ml-2 px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
-                                {isHealthy ? 'Active' : 'Offline'}
-                            </span>
-                        </button>
-                        
-                        <button 
-                            onClick={() => {
-                                if (localTtsConfig?.configured && isWhitelisted && ttsEngine !== 'local') {
-                                    setTtsEngine('local');
-                                    botService.post('/api/tts/engine', { engine_type: 'local' }).catch(err => {
-                                        ttsLogger.error('Error:', err);
-                                        if (err.response?.status === 403) {
-                                            toast.error('F5-TTS only for whitelist');
-                                            setTtsEngine('cloud');
-                                        }
-                                    });
-                                    window.dispatchEvent(new CustomEvent('ai-tts-changed', { 
-                                        detail: { enabled: true, engineType: 'local', isWhitelisted: isWhitelisted } 
-                                    }));
-                                }
-                            }}
-                            disabled={!localTtsConfig?.configured || !isWhitelisted}
-                            className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
-                                !localTtsConfig?.configured || !isWhitelisted
-                                    ? 'opacity-40 cursor-not-allowed border-gray-700 text-gray-500'
-                                    : ttsEngine === 'local'
-                                        ? 'border-purple-500/50 bg-purple-500/10 text-purple-400'
-                                        : 'border-gray-700 hover:border-gray-600 text-gray-400'
-                            }`}
-                        >
-                            <span>Local</span>
-                            <span className="text-xs ml-2 px-2 py-0.5 rounded bg-purple-500/20 text-purple-400">
-                                {localTtsConfig?.configured ? 'Ready' : 'Setup'}
-                            </span>
-                        </button>
-                    </div>
-                </div>
+            <div className="space-y-6">
+                {/* Style */}
+                <style>
+                {`
+                    .slider::-webkit-slider-thumb {
+                        appearance: none;
+                        height: 16px;
+                        width: 16px;
+                        border-radius: 50%;
+                        background: #3b82f6;
+                        cursor: pointer;
+                        border: 2px solid #1f2937;
+                    }
+                    .slider::-moz-range-thumb {
+                        height: 16px;
+                        width: 16px;
+                        border-radius: 50%;
+                        background: #3b82f6;
+                        cursor: pointer;
+                        border: 2px solid #1f2937;
+                    }
+                `}
+            </style>
 
-                {/* 2. Основные управления */}
+                {/* TTS Control Panel */}
                 <TtsControlPanel
                     basicTtsEnabled={basicTtsEnabled}
                     setBasicTtsEnabled={handleBasicTtsToggle}
@@ -914,30 +754,30 @@ const TtsMainPageContent = () => {
                     onPlatformToggle={handlePlatformToggle}
                     user={user}
                     isGuest={isGuest}
+                    ttsEngine={ttsEngine}
+                    setTtsEngine={setTtsEngine}
+                    localTtsConfig={localTtsConfig}
                 />
                 
-                {/* 3. Две колонки для громкости и дополнительных настроек */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    {/* Громкость */}
-                    <AudioSettings
-                        audioSettings={audioSettings}
-                        setAudioSettings={setAudioSettings}
-                        listeningMode={listeningMode}
-                        setListeningMode={handleListeningModeChange}
-                        onSaveSettings={saveAudioSettings}
-                        obsUrl={obsUrl}
-                        onRegenerateObsUrl={handleRegenerateObsUrl}
-                    />
-                    
-                    {/* Дополнительные настройки TTS */}
-                    <TtsSettings
-                        ttsSettings={ttsSettings}
-                        setTtsSettings={setTtsSettings}
-                        onSaveSettings={saveTtsSettings}
-                    />
-                </div>
+                {/* Audio Settings */}
+                <AudioSettings
+                    audioSettings={audioSettings}
+                    setAudioSettings={setAudioSettings}
+                    listeningMode={listeningMode}
+                    setListeningMode={handleListeningModeChange}
+                    onSaveSettings={saveAudioSettings}
+                    obsUrl={obsUrl}
+                    onRegenerateObsUrl={handleRegenerateObsUrl}
+                />
                 
-                {/* 4. Фильтрация TTS */}
+                {/* TTS Settings */}
+                <TtsSettings
+                    ttsSettings={ttsSettings}
+                    setTtsSettings={setTtsSettings}
+                    onSaveSettings={saveTtsSettings}
+                />
+                
+                {/* Filters */}
                 <TtsFilterManager />
             </div>
         </PageWrapper>
