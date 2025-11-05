@@ -16,34 +16,27 @@ logger = logging.getLogger(__name__)
 # ╨Ш╨╝╨┐╨╛╤А╤В╨╕╤А╤Г╨╡╨╝ ╤Ж╨╡╨╜╤В╤А╨░╨╗╨╕╨╖╨╛╨▓╨░╨╜╨╜╤Л╨╡ ╨┐╤Г╤В╨╕
 from .project_paths import DATA_DIR
 
-# ╨Ю╨┐╤А╨╡╨┤╨╡╨╗╤П╨╡╨╝ URL ╨▒╨░╨╖╤Л ╨┤╨░╨╜╨╜╤Л╤Е ╨╕╨╖ ╨┐╨╡╤А╨╡╨╝╨╡╨╜╨╜╨╛╨╣ ╨╛╨║╤А╤Г╨╢╨╡╨╜╨╕╤П ╨╕╨╗╨╕ ╨╕╤Б╨┐╨╛╨╗╤М╨╖╤Г╨╡╨╝ SQLite ╨┐╨╛ ╤Г╨╝╨╛╨╗╤З╨░╨╜╨╕╤О
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    f"sqlite:///{os.path.join(DATA_DIR, 'app_data.db')}"  # Fallback ╨╜╨░ SQLite ╨┤╨╗╤П ╤Б╨╛╨▓╨╝╨╡╤Б╤В╨╕╨╝╨╛╤Б╤В╨╕
-)
+# ╨Ю╨┐╤А╨╡╨┤╨╡╨╗╤П╨╡╨╝ URL ╨▒╨░╨╖╤Л ╨┤╨░╨╜╨╜╤Л╤Е ╨╕╨╖ ╨┐╨╡╤А╨╡╨╝╨╡╨╜╨╜╨╛╨╣ ╨╛╨║╤А╤Г╨╢╨╡╨╜╨╕╤П
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable is required. Please set it in .env file.")
 
-# ╨Ю╨┐╤А╨╡╨┤╨╡╨╗╤П╨╡╨╝, ╨╕╤Б╨┐╨╛╨╗╤М╨╖╤Г╨╡╤В╤Б╤П ╨╗╨╕ PostgreSQL ╨╕╨╗╨╕ SQLite
+# ╨Ю╨┐╤А╨╡╨┤╨╡╨╗╤П╨╡╨╝, ╨╕╤Б╨┐╨╛╨╗╤М╨╖╤Г╨╡╤В╤Б╤П ╨╗╨╕ PostgreSQL
 IS_POSTGRESQL = DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgresql+psycopg2://")
+if not IS_POSTGRESQL:
+    raise ValueError(f"Only PostgreSQL is supported. Current DATABASE_URL: {DATABASE_URL[:50]}...")
 
 try:
-    # ╨б╨╛╨╖╨┤╨░╨╡╨╝ ╨┤╨▓╨╕╨╢╨╛╨║ SQLAlchemy
-    if IS_POSTGRESQL:
-        # PostgreSQL: connection pooling ╨┤╨╗╤П ╨╗╤Г╤З╤И╨╡╨╣ ╨┐╤А╨╛╨╕╨╖╨▓╨╛╨┤╨╕╤В╨╡╨╗╤М╨╜╨╛╤Б╤В╨╕
-        engine = create_engine(
-            DATABASE_URL,
-            pool_size=20,          # ╨С╨░╨╖╨╛╨▓╤Л╨╣ ╤А╨░╨╖╨╝╨╡╤А ╨┐╤Г╨╗╨░ ╤Б╨╛╨╡╨┤╨╕╨╜╨╡╨╜╨╕╨╣
-            max_overflow=40,       # ╨Ф╨╛╨┐╨╛╨╗╨╜╨╕╤В╨╡╨╗╤М╨╜╤Л╨╡ ╤Б╨╛╨╡╨┤╨╕╨╜╨╡╨╜╨╕╤П ╨┐╤А╨╕ ╨╜╨░╨│╤А╤Г╨╖╨║╨╡
-            pool_pre_ping=True,    # ╨Я╤А╨╛╨▓╨╡╤А╨║╨░ ╤Б╨╛╨╡╨┤╨╕╨╜╨╡╨╜╨╕╨╣ ╨┐╨╡╤А╨╡╨┤ ╨╕╤Б╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╨╜╨╕╨╡╨╝
-            pool_recycle=3600,     # ╨Я╨╡╤А╨╡╨╕╤Б╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╨╜╨╕╨╡ ╤Б╨╛╨╡╨┤╨╕╨╜╨╡╨╜╨╕╨╣ ╨║╨░╨╢╨┤╤Л╨╣ ╤З╨░╤Б
-            echo=False
-        )
-    else:
-        # SQLite: check_same_thread=False ╤В╤А╨╡╨▒╤Г╨╡╤В╤Б╤П ╨┤╨╗╤П FastAPI
-        engine = create_engine(
-            DATABASE_URL,
-            connect_args={"check_same_thread": False},
-            echo=False
-        )
+    # ╨б╨╛╨╖╨┤╨░╨╡╨╝ ╨┤╨▓╨╕╨╢╨╛╨║ SQLAlchemy для PostgreSQL
+    # PostgreSQL: connection pooling ╨┤╨╗╤П ╨╗╤Г╤З╤И╨╡╨╣ ╨┐╤А╨╛╨╕╨╖╨▓╨╛╨┤╨╕╤В╨╡╨╗╤М╨╜╨╛╤Б╤В╨╕
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=20,          # ╨С╨░╨╖╨╛╨▓╤Л╨╣ ╤А╨░╨╖╨╝╨╡╤А ╨┐╤Г╨╗╨░ ╤Б╨╛╨╡╨┤╨╕╨╜╨╡╨╜╨╕╨╣
+        max_overflow=40,       # ╨Ф╨╛╨┐╨╛╨╗╨╜╨╕╤В╨╡╨╗╤М╨╜╤Л╨╡ ╤Б╨╛╨╡╨┤╨╕╨╜╨╡╨╜╨╕╤П ╨┐╤А╨╕ ╨╜╨░╨│╤А╤Г╨╖╨║╨╡
+        pool_pre_ping=True,    # ╨Я╤А╨╛╨▓╨╡╤А╨║╨░ ╤Б╨╛╨╡╨┤╨╕╨╜╨╡╨╜╨╕╨╣ ╨┐╨╡╤А╨╡╨┤ ╨╕╤Б╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╨╜╨╕╨╡╨╝
+        pool_recycle=3600,     # ╨Я╨╡╤А╨╡╨╕╤Б╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╨╜╨╕╨╡ ╤Б╨╛╨╡╨┤╨╕╨╜╨╡╨╜╨╕╨╣ ╨║╨░╨╢╨┤╤Л╨╣ ╤З╨░╤Б
+        echo=False
+    )
 
     # ╨б╨╛╨╖╨┤╨░╨╡╨╝ ╤Б╨╡╤Б╤Б╨╕╤О ╨┤╨╗╤П ╨▓╨╖╨░╨╕╨╝╨╛╨┤╨╡╨╣╤Б╤В╨▓╨╕╤П ╤Б ╨С╨Ф
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
