@@ -34,17 +34,15 @@ const AudioSettings = ({
     }
     
     return (
-        <Card className="border-green-500/30 bg-gradient-to-br from-green-950/40 to-gray-900/40 shadow-lg shadow-green-500/10">
-            <CardHeader className="border-b border-green-500/20 pb-4">
-                <CardTitle className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-purple-400">
-                    Audio
-                </CardTitle>
+        <Card className="border-gray-700 bg-gray-900/30">
+            <CardHeader>
+                <CardTitle className="text-base font-semibold text-white">Audio</CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
                 <div className="space-y-4">
                     {/* Громкость для сайта */}
                     <div>
-                        <label className="block text-xs font-bold text-green-300 uppercase tracking-wider mb-4">Website Volume</label>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Website Volume</label>
                         <div className="flex items-center gap-4">
                             <Slider
                                 id="volume-slider"
@@ -56,7 +54,7 @@ const AudioSettings = ({
                                 className="flex-1"
                             />
                             <div className="min-w-fit">
-                                <span className="text-sm font-bold text-green-300 bg-green-500/20 px-3 py-1 rounded border border-green-500/50">
+                                <span className="text-sm font-bold text-purple-300 bg-purple-500/20 px-3 py-1 rounded border border-purple-500/40">
                                     {localVolume}%
                                 </span>
                             </div>

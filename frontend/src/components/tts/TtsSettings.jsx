@@ -29,17 +29,15 @@ const TtsSettings = ({
     };
 
     return (
-        <Card className="border-purple-500/30 bg-gradient-to-br from-purple-950/40 to-gray-900/40 shadow-lg shadow-purple-500/10">
+        <Card className="border-gray-700 bg-gray-900/30">
             <CardHeader 
-                className="cursor-pointer hover:bg-purple-500/10 transition-colors border-b border-purple-500/20 pb-4"
+                className="cursor-pointer hover:bg-gray-800/20 transition-colors"
                 onClick={() => setIsExpanded(!isExpanded)}
             >
                 <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-green-400">
-                        Settings
-                    </CardTitle>
+                    <CardTitle className="text-base font-semibold text-white">Settings</CardTitle>
                     <ChevronDown 
-                        className={`h-5 w-5 transition-transform duration-300 text-purple-300 ${isExpanded ? 'rotate-180' : ''}`}
+                        className={`h-5 w-5 transition-transform duration-300 text-gray-400 ${isExpanded ? 'rotate-180' : ''}`}
                     />
                 </div>
             </CardHeader>
@@ -48,9 +46,9 @@ const TtsSettings = ({
                 <div className="space-y-6">
                     {/* Настройки смайлов в 2 колонки */}
                     <div>
-                        <label className="block text-xs font-bold text-purple-300 uppercase tracking-wider mb-3">Emotes</label>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Emotes</label>
                         <div className="grid grid-cols-2 gap-3">
-                            <div className="flex items-center gap-3 p-3 rounded-lg border border-purple-500/30 bg-purple-900/20 hover:bg-purple-900/40 transition-all">
+                            <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-700/50 bg-gray-800/30">
                                 <Switch
                                     id="enable7TV"
                                     checked={ttsSettings.enable7TV}
@@ -61,7 +59,7 @@ const TtsSettings = ({
                                 </Label>
                             </div>
                             
-                            <div className="flex items-center gap-3 p-3 rounded-lg border border-green-500/30 bg-green-900/20 hover:bg-green-900/40 transition-all">
+                            <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-700/50 bg-gray-800/30">
                                 <Switch
                                     id="enableTwitch"
                                     checked={ttsSettings.enableTwitch}
@@ -76,9 +74,9 @@ const TtsSettings = ({
                     
                     {/* Фильтры сообщений в 2 колонки */}
                     <div>
-                        <label className="block text-xs font-bold text-purple-300 uppercase tracking-wider mb-3">Filters</label>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Filters</label>
                         <div className="grid grid-cols-2 gap-3">
-                            <div className="flex items-center gap-3 p-3 rounded-lg border border-purple-500/30 bg-purple-900/20 hover:bg-purple-900/40 transition-all">
+                            <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-700/50 bg-gray-800/30">
                                 <Switch
                                     id="filterReplies"
                                     checked={ttsSettings.filterReplies || false}
@@ -89,7 +87,7 @@ const TtsSettings = ({
                                 </Label>
                             </div>
                             
-                            <div className="flex items-center gap-3 p-3 rounded-lg border border-green-500/30 bg-green-900/20 hover:bg-green-900/40 transition-all">
+                            <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-700/50 bg-gray-800/30">
                                 <Switch
                                     id="filterMentions"
                                     checked={ttsSettings.filterMentions || false}

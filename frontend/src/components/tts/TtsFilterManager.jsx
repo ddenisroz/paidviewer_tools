@@ -244,18 +244,18 @@ const TtsFilterManager = React.memo(() => {
     const availablePlatforms = getAvailablePlatforms();
 
     return (
-        <Card className="border-green-500/30 bg-gradient-to-br from-green-950/40 to-gray-900/40 shadow-lg shadow-green-500/10" data-testid="tts-filter-card">
+        <Card className="border-gray-700 bg-gray-900/30" data-testid="tts-filter-card">
             <CardHeader 
-                className="cursor-pointer hover:bg-green-500/10 transition-colors border-b border-green-500/20 pb-4"
+                className="cursor-pointer hover:bg-gray-800/20 transition-colors"
                 onClick={toggleExpanded}
                 data-testid="tts-filter-header"
             >
                 <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-purple-400">
+                    <CardTitle className="text-base font-semibold text-white">
                         Filters & Blocked Users
                     </CardTitle>
                     <ChevronDown 
-                        className={`h-5 w-5 transition-transform duration-300 text-green-300 ${isExpanded ? 'rotate-180' : ''}`} 
+                        className={`h-5 w-5 transition-transform duration-300 text-gray-400 ${isExpanded ? 'rotate-180' : ''}`} 
                     />
                 </div>
             </CardHeader>
