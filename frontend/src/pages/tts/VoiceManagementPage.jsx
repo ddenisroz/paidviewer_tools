@@ -142,6 +142,20 @@ const VoiceManagementPageContent = () => {
     
     // Используем whitelistStatusData напрямую из React Query
     const whitelistStatus = whitelistStatusData;
+    
+    // Логируем статус whitelist для диагностики
+    useEffect(() => {
+        if (whitelistStatus) {
+            logger.info('Voice management whitelist status:', {
+                isWhitelisted: whitelistStatus.is_whitelisted,
+                canManageVoices: whitelistStatus.can_manage_voices,
+                platform: whitelistStatus.platform,
+                message: whitelistStatus.message,
+                user: user?.id,
+                isGuest: user?.isGuest
+            });
+        }
+    }, [whitelistStatus, user]);
 
     // Комбинированное состояние загрузки
     useEffect(() => {
@@ -553,60 +567,141 @@ const VoiceManagementPageContent = () => {
                         </p>
                     </div>
                 </div>
-            ) : (globalVoices.length === 0 && userVoices.length === 0) ? (
-                     <div className="col-span-full text-center py-12">
-                         <div className="text-slate-400 text-lg mb-4">
-                             {whitelistStatusData && !whitelistStatusData.can_manage_voices ? (
-                                 <>
-                                     <Lock className="h-12 w-12 mx-auto mb-4 text-orange-500" />
-                                     <p>F5-TTS недоступен без whitelist</p>
-                                     <p className="text-sm text-slate-500 mt-2">
-                                         {user?.isGuest 
-                                             ? 'Канал не в whitelist. Используйте базовую озвучку (gTTS)'
-                                             : 'Используйте базовую озвучку (gTTS)'}
-                                     </p>
-                                 </>
-                             ) : (
-                                 <>
-                                     <User className="h-12 w-12 mx-auto mb-4 text-slate-500" />
-                                     <p>{user?.isGuest ? 'Голоса доступны для использования' : 'Загрузите свой первый голос'}</p>
-                                 </>
-                             )}
-                         </div>
-                     </div>
+            ) : !user?.isGuest && whitelistStatus?.can_manage_voices && globalVoices.length === 0 && userVoices.length === 0 ? (
+                // Показываем кнопку загрузки даже если нет голосов, но есть whitelist
+                <div className="col-span-full">
+                    <div className="text-center py-12">
+                        <User className="h-16 w-16 mx-auto mb-4 text-slate-500" />
+                        <p className="text-slate-300 text-lg mb-4">Загрузите свой первый голос</p>
+                        <Dialog open={uploadDialogOpen} onOpenChange={(open) => {
+                            setUploadDialogOpen(open);
+                            if (!open) {
+                                setUploadFile(null);
+                                setVoiceName('');
+                                if (fileInputRef.current) {
+                                    fileInputRef.current.value = '';
+                                }
+                            }
+                        }}>
+                            <DialogTrigger asChild>
+                                <Button className="bg-purple-600 hover:bg-purple-700">
+                                    <Upload className="h-4 w-4 mr-2" />
+                                    Загрузить свой голос
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent 
+                                key="upload-dialog"
+                                className="max-w-md" 
+                                onOpenAutoFocus={(e) => e.preventDefault()}
+                                onCloseAutoFocus={(e) => e.preventDefault()}
+                            >
+                                <DialogHeader>
+                                    <DialogTitle>Загрузка нового голоса</DialogTitle>
+                                    <DialogDescription>
+                                        Загрузите аудио файл для создания вашего голоса
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    <div>
+                                        <Label>Аудио файл (WAV, MP3, FLAC, OGG, M4A, AAC, WMA, AIFF, AU)</Label>
+                                        <div className="mt-1">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    if (fileInputRef.current) {
+                                                        fileInputRef.current.click();
+                                                    }
+                                                }}
+                                                className="w-full"
+                                            >
+                                                <Upload className="h-4 w-4 mr-2" />
+                                                {uploadFile ? uploadFile.name : 'Выбрать файл'}
+                                            </Button>
+                                        </div>
+                                        {uploadFile && (
+                                            <p className="text-xs text-green-400 mt-1">
+                                                ✓ Файл выбран: {uploadFile.name}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="voice-name">Имя голоса</Label>
+                                        <Input 
+                                            id="voice-name"
+                                            type="text"
+                                            value={voiceName} 
+                                            onChange={(e) => setVoiceName(e.target.value)} 
+                                            placeholder="Введите имя голоса"
+                                            className="mt-1" 
+                                        />
+                                        <p className="text-xs text-slate-400 mt-1">
+                                            Имя будет использоваться для выбора голоса в TTS
+                                        </p>
+                                    </div>
+                                    <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-3">
+                                        <p className="text-sm text-slate-300">
+                                            Голос будет доступен только вам и загружен в вашу личную папку голосов.
+                                        </p>
+                                    </div>
+                                </div>
+                                <DialogFooter className="flex justify-center gap-4">
+                                    <Button 
+                                        onClick={() => setUploadDialogOpen(false)} 
+                                        variant="outline"
+                                        className="w-28"
+                                    >
+                                        Отмена
+                                    </Button>
+                                    <Button 
+                                        onClick={(e) => handleUpload(e)} 
+                                        disabled={isUploading || !uploadFile || !voiceName.trim()}
+                                        className="w-36 bg-green-600 hover:bg-green-700"
+                                    >
+                                        {isUploading ? 'Загрузка...' : 'Загрузить'}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+                </div>
             ) : (
                 <div className="space-y-8">
                     {/* Пользовательские голоса (верхняя секция) - показываем только если есть whitelist */}
+                    {/* Показываем секцию даже если нет голосов, но есть whitelist */}
                     {!user?.isGuest && whitelistStatus?.can_manage_voices && (
                         <div>
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-2">
                                     <User className="h-5 w-5 text-green-400" />
                                     <h3 className="text-lg font-semibold text-white">Мои голоса</h3>
-                                    <Badge variant="outline" className="text-green-400 border-green-400">
-                                        {userVoices.length}
-                                    </Badge>
+                                    {userVoices.length > 0 && (
+                                        <Badge variant="outline" className="text-green-400 border-green-400">
+                                            {userVoices.length}
+                                        </Badge>
+                                    )}
                                 </div>
-                                {/* Кнопка загрузки - только если есть whitelist */}
-                                {whitelistStatus?.can_manage_voices && (
-                <Dialog open={uploadDialogOpen} onOpenChange={(open) => {
-                    setUploadDialogOpen(open);
-                    if (!open) {
-                        // Сбрасываем состояние только при закрытии диалога
-                        setUploadFile(null);
-                        setVoiceName('');
-                        if (fileInputRef.current) {
-                            fileInputRef.current.value = '';
-                        }
-                    }
-                }}>
-                        <DialogTrigger asChild>
-                            <Button className="bg-purple-600 hover:bg-purple-700">
-                                <Upload className="h-4 w-4 mr-2" />
-                                Загрузить свой голос
-                            </Button>
-                        </DialogTrigger>
-                    <DialogContent 
+                                {/* Кнопка загрузки - всегда показываем если есть whitelist */}
+                                <Dialog open={uploadDialogOpen} onOpenChange={(open) => {
+                                    setUploadDialogOpen(open);
+                                    if (!open) {
+                                        // Сбрасываем состояние только при закрытии диалога
+                                        setUploadFile(null);
+                                        setVoiceName('');
+                                        if (fileInputRef.current) {
+                                            fileInputRef.current.value = '';
+                                        }
+                                    }
+                                }}>
+                                    <DialogTrigger asChild>
+                                        <Button className="bg-purple-600 hover:bg-purple-700">
+                                            <Upload className="h-4 w-4 mr-2" />
+                                            Загрузить свой голос
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent 
                         key="upload-dialog"
                         className="max-w-md" 
                         onOpenAutoFocus={(e) => e.preventDefault()}
@@ -682,7 +777,6 @@ const VoiceManagementPageContent = () => {
                         </DialogFooter>
                    </DialogContent>
                </Dialog>
-                                )}
                             </div>
                             {userVoices.length === 0 ? (
                                 <div className="text-center py-8 bg-slate-800/50 rounded-lg border border-slate-700 border-dashed">
@@ -713,16 +807,15 @@ const VoiceManagementPageContent = () => {
                                                         <Settings className="h-3 w-3 mr-1"/>
                                                         Настроить
                                                     </Button>
-                                                    {whitelistStatus?.can_manage_voices && (
-                                                        <Button 
-                                                            variant="destructive" 
-                                                            size="icon" 
-                                                            onClick={() => handleDelete(voice.id, voice.voice_type)}
-                                                            className="h-7 w-7"
-                                                        >
-                                                            <Trash2 className="h-3 w-3"/>
-                                                        </Button>
-                                                    )}
+                                                    <Button 
+                                                        className="h-7 w-7 p-0 text-red-400 hover:text-red-300 hover:bg-red-900/20" 
+                                                        variant="ghost" 
+                                                        size="sm" 
+                                                        onClick={() => handleDelete(voice.id)}
+                                                        title="Удалить голос"
+                                                    >
+                                                        <Trash2 className="h-3 w-3"/>
+                                                    </Button>
                                                 </div>
                                             </CardContent>
                                         </Card>

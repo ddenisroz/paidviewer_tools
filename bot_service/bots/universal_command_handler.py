@@ -264,11 +264,49 @@ class UniversalCommandHandler:
     
     async def _handle_sr_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
         """Handler для !sr в VK"""
-        # Используем существующую логику из VKLiveCommandHandler
-        if hasattr(vk_bot, 'command_handler'):
-            await vk_bot.command_handler._cmd_song_request(
-                channel_name, author_name, author_id, [args], message_data
+        try:
+            if not args:
+                await vk_bot.send_message(channel_name, f"@{author_name} ❌ Использование: !sr <YouTube URL>")
+                return
+            
+            video_url = args
+            
+            # Импортируем сервисы
+            from services.queue_service import QueueService
+            queue_service = QueueService()
+            
+            # Получаем user_id владельца канала из базы данных
+            channel_owner_id = await self._get_channel_owner_id_vk(channel_name)
+            
+            if not channel_owner_id:
+                await vk_bot.send_message(channel_name, f"@{author_name} ❌ Канал не зарегистрирован в системе")
+                return
+            
+            # Добавляем видео в очередь
+            result = await queue_service.add_video_to_queue(
+                user_id=channel_owner_id,
+                video_url=video_url,
+                channel_name=channel_name,
+                platform='vk',
+                requester_name=author_name,
+                requester_id=author_id,
+                is_paid=False,
+                db=db
             )
+            
+            if result['success']:
+                queue_item = result['queue_item']
+                await vk_bot.send_message(
+                    channel_name,
+                    f"✅ @{author_name} Добавлено в очередь: {queue_item['title']} "
+                    f"(позиция {queue_item['position']}, {queue_item.get('duration', 'Unknown')})"
+                )
+            else:
+                await vk_bot.send_message(channel_name, f"❌ @{author_name} {result['error']}")
+                
+        except Exception as e:
+            self.logger.error(f"Error in VK song request: {e}")
+            await vk_bot.send_message(channel_name, f"@{author_name} ❌ Ошибка добавления видео")
     
     async def _handle_game(self, ctx, bot, args, platform, db):
         """Handler для !game (Twitch)"""
@@ -1527,7 +1565,15 @@ class UniversalCommandHandler:
             from core.database import User
             db = next(get_db())
             try:
-                # Ищем пользователя по vk_username
+                # Сначала ищем по vk_channel_name (правильное поле)
+                user = db.query(User).filter(
+                    User.vk_channel_name == channel_name.lower()
+                ).first()
+                
+                if user:
+                    return user.id
+                
+                # Fallback: ищем по vk_username для обратной совместимости
                 user = db.query(User).filter(
                     User.vk_username == channel_name.lower()
                 ).first()

@@ -14,7 +14,6 @@ from tts_service.models import *
 from tts_service.tts_engine import tts_engine_manager
 from tts_service.file_manager import file_manager
 from tts_service.background_tasks import background_task_manager
-from tts_service.prometheus_metrics import tts_prometheus_metrics
 from tts_service.tts_limits_service import tts_limits_service
 
 logger = logging.getLogger(__name__)
@@ -110,16 +109,6 @@ class TTSAPIEndpoints:
             import redis
             redis_client = redis.from_url(os.getenv('REDIS_URL', 'redis://localhost:6379/0'), decode_responses=True)
             redis_client.xadd('tts_requests', {'data': json.dumps(task_data)})
-            
-            # Записываем метрики
-            tts_prometheus_metrics.record_tts_request(
-                voice=request.voice_name,
-                platform="api",
-                status="submitted",
-                processing_type="async"
-            )
-            if request.user_id:
-                tts_prometheus_metrics.record_tts_request_by_user(request.user_id, "api")
             
             return {
                 "task_id": task_data['task_id'],
@@ -623,8 +612,6 @@ async def synthesize_channel(request: dict):
         )
         
         if result.get("success"):
-            # Обновляем метрики
-            tts_prometheus_metrics.tts_synthesis_success.inc()
             logger.info(f"✅ [CHANNEL TTS] Синтез успешен для {channel_name}")
             
             return {
@@ -635,7 +622,6 @@ async def synthesize_channel(request: dict):
                 "tts_type": result.get("tts_type", "f5")
             }
         else:
-            tts_prometheus_metrics.tts_synthesis_errors.inc()
             logger.error(f"❌ [CHANNEL TTS] Синтез не удался: {result.get('error')}")
             raise HTTPException(status_code=500, detail=result.get("error", "Synthesis failed"))
             
@@ -643,7 +629,6 @@ async def synthesize_channel(request: dict):
         raise
     except Exception as e:
         logger.error(f"❌ [CHANNEL TTS] Ошибка: {e}")
-        tts_prometheus_metrics.tts_synthesis_errors.inc()
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 # Глобальный экземпляр класса (для совместимости)

@@ -120,12 +120,20 @@ class TTSService:
             logger.error(f"Error checking text filter: {e}")
             return False
 
-    async def get_audio_settings(self, user_id: int) -> dict:
-        """Получить настройки звука пользователя"""
+    async def get_audio_settings(self, user_id: int = None, session_id: str = None) -> dict:
+        """Получить настройки звука пользователя (поддерживает гостей и авторизованных)"""
         try:
-            settings = self.db.query(AudioSettings).filter(
-                AudioSettings.user_id == user_id
-            ).first()
+            # Ищем настройки по user_id или session_id
+            if user_id is not None:
+                settings = self.db.query(AudioSettings).filter(
+                    AudioSettings.user_id == user_id
+                ).first()
+            elif session_id is not None:
+                settings = self.db.query(AudioSettings).filter(
+                    AudioSettings.session_id == session_id
+                ).first()
+            else:
+                raise ValueError("Either user_id or session_id must be provided")
             
             if settings:
                 return {
@@ -135,6 +143,7 @@ class TTSService:
                 # Создаем настройки по умолчанию для любого пользователя (включая гостей)
                 default_settings = AudioSettings(
                     user_id=user_id,
+                    session_id=session_id,
                     website_volume=50
                 )
                 self.db.add(default_settings)
@@ -146,12 +155,20 @@ class TTSService:
             logger.error(f"Error getting audio settings: {e}")
             return {"websiteVolume": 50}
 
-    async def save_audio_settings(self, user_id: int, website_volume: int) -> bool:
-        """Сохранить настройки звука пользователя"""
+    async def save_audio_settings(self, website_volume: int, user_id: int = None, session_id: str = None) -> bool:
+        """Сохранить настройки звука пользователя (поддерживает гостей и авторизованных)"""
         try:
-            settings = self.db.query(AudioSettings).filter(
-                AudioSettings.user_id == user_id
-            ).first()
+            # Ищем настройки по user_id или session_id
+            if user_id is not None:
+                settings = self.db.query(AudioSettings).filter(
+                    AudioSettings.user_id == user_id
+                ).first()
+            elif session_id is not None:
+                settings = self.db.query(AudioSettings).filter(
+                    AudioSettings.session_id == session_id
+                ).first()
+            else:
+                raise ValueError("Either user_id or session_id must be provided")
             
             if settings:
                 # Обновляем существующие настройки
@@ -161,12 +178,14 @@ class TTSService:
                 # Создаем новые настройки для любого пользователя (включая гостей)
                 settings = AudioSettings(
                     user_id=user_id,
+                    session_id=session_id,
                     website_volume=website_volume
                 )
                 self.db.add(settings)
             
             self.db.commit()
-            logger.info(f"Audio settings saved for user {user_id}: website={website_volume}")
+            user_identifier = f"user_id={user_id}" if user_id else f"session_id={session_id}"
+            logger.info(f"Audio settings saved for {user_identifier}: website={website_volume}")
             return True
         except Exception as e:
             logger.error(f"Error saving audio settings: {e}")

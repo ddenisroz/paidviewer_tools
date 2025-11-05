@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 
 from tts_service.database import User, UserTTSUsage
-from tts_service.prometheus_metrics import tts_prometheus_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -225,9 +224,6 @@ class TTSLimitsService:
             
             usage.updated_at = datetime.now()
             db.commit()
-            
-            # Записываем метрики в Prometheus
-            tts_prometheus_metrics.record_tts_request_by_user(user_id, "api")
             
             logger.info(f"Logged TTS request for user {user_id}: {len(text)} chars, "
                        f"{processing_time:.2f}s {processing_type}, priority {priority}, success: {success}")

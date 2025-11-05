@@ -7,6 +7,7 @@ import MessageContent from '../components/MessageContent';
 import { twitchBadgesService } from '../services/twitchBadges';
 import useSharedWebSocket from '../hooks/useSharedWebSocket';
 import { logger } from '../utils/prodLogger';
+import { getAllEmotesForChannel } from '../utils/emotes';
 
 const ChatOverlay = () => {
     const [searchParams] = useSearchParams();
@@ -21,6 +22,9 @@ const ChatOverlay = () => {
     const [channelName, setChannelName] = useState(null); // Имя канала для API запросов
     const [lastAddedMessageId, setLastAddedMessageId] = useState(null); // ID последнего добавленного сообщения для анимации
     const [userId, setUserId] = useState(null); // ID пользователя для WebSocket
+    
+    // 7TV эмодзи
+    const [emotes, setEmotes] = useState({ channelEmotes: new Map(), globalEmotes: new Map() });
     
     // ✅ ВСЕ useRef ПОСЛЕ useState!
     const messagesEndRef = useRef(null);
@@ -263,6 +267,17 @@ const ChatOverlay = () => {
                     setChannelName(response.data.channel_name);
                     await twitchBadgesService.loadChannelBadges(response.data.channel_name);
                     logger.log(`✅ [BADGES] Loaded badges for channel: ${response.data.channel_name}`);
+                    
+                    // Загружаем 7TV эмодзи если включена настройка show_7tv_emotes
+                    if (normalizedSettings.show_7tv_emotes !== false) {
+                        try {
+                            const emotesData = await getAllEmotesForChannel(response.data.channel_name);
+                            setEmotes(emotesData);
+                            logger.log(`✅ [7TV] Loaded emotes for channel: ${response.data.channel_name}`);
+                        } catch (error) {
+                            logger.error('Error loading 7TV emotes:', error);
+                        }
+                    }
                 }
                 
                 // Сохраняем userId для WebSocket (подключение через useSharedWebSocket)
@@ -794,7 +809,12 @@ const ChatOverlay = () => {
                                         {settings.chat_direction === 'horizontal' ? (
                                             truncateWords(msg.message, 6)
                                         ) : (
-                                            <MessageContent message={msg.message} emotes={{}} />
+                                            <MessageContent 
+                                                message={msg.message} 
+                                                channelEmotes={settings?.show_7tv_emotes !== false ? emotes.channelEmotes : new Map()}
+                                                globalEmotes={settings?.show_7tv_emotes !== false ? emotes.globalEmotes : new Map()}
+                                                showLinks={settings?.show_links !== false}
+                                            />
                                         )}
                                     </span>
                                 </span>

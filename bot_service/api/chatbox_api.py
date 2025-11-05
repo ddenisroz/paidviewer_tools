@@ -44,6 +44,11 @@ class ChatBoxSettingsCreate(BaseModel):
     animation_type: str = Field(default='fade')  # fade, slide-right, slide-left, scale, bounce
     chat_direction: str = Field(default='vertical')  # vertical или horizontal
     message_fade_seconds: int = Field(default=60, ge=10, le=60)  # 10-60 сек, 60 = не исчезают
+    
+    # v0.03 - Поддержка 7TV эмодзи, ссылок и загрузки изображений
+    show_7tv_emotes: bool = Field(default=True)  # Показывать смайлики 7TV
+    show_links: bool = Field(default=True)  # Показывать ссылки из чата
+    auto_load_images: bool = Field(default=True)  # Загружать картинки/гифки сразу или как ссылки
 
 
 class ChatBoxSettingsResponse(ChatBoxSettingsCreate):
@@ -110,7 +115,10 @@ async def get_chatbox_settings(
         animation_duration=settings.animation_duration,
         animation_type=settings.animation_type,
         chat_direction=settings.chat_direction,
-        message_fade_seconds=settings.message_fade_seconds
+        message_fade_seconds=settings.message_fade_seconds,
+        show_7tv_emotes=settings.show_7tv_emotes,
+        show_links=settings.show_links,
+        auto_load_images=settings.auto_load_images
     )
     
     logger.info(f"📦 [CHATBOX] Settings retrieved for user {user_id}")
@@ -187,7 +195,10 @@ async def save_chatbox_settings(
         animation_duration=settings.animation_duration,
         animation_type=settings.animation_type,
         chat_direction=settings.chat_direction,
-        message_fade_seconds=settings.message_fade_seconds
+        message_fade_seconds=settings.message_fade_seconds,
+        show_7tv_emotes=settings.show_7tv_emotes,
+        show_links=settings.show_links,
+        auto_load_images=settings.auto_load_images
     )
     
     logger.info(f"📦 [CHATBOX] Settings saved for user {user_id}")
@@ -217,7 +228,10 @@ async def save_chatbox_settings(
             "animation_duration": settings.animation_duration,
             "animation_type": settings.animation_type,
             "chat_direction": settings.chat_direction,
-            "message_fade_seconds": settings.message_fade_seconds
+            "message_fade_seconds": settings.message_fade_seconds,
+            "show_7tv_emotes": settings.show_7tv_emotes,
+            "show_links": settings.show_links,
+            "auto_load_images": settings.auto_load_images
         }
     }
     
@@ -266,6 +280,11 @@ async def get_settings_by_token(
         "message_spacing": settings.message_spacing,
         "border_radius": settings.border_radius,
         "animation_duration": settings.animation_duration,
-        "animation_type": settings.animation_type
+        "animation_type": settings.animation_type,
+        "chat_direction": settings.chat_direction,
+        "message_fade_seconds": settings.message_fade_seconds,
+        "show_7tv_emotes": settings.show_7tv_emotes,
+        "show_links": settings.show_links,
+        "auto_load_images": settings.auto_load_images
     }
 

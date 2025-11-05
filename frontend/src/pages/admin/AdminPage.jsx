@@ -44,17 +44,6 @@ const AdminPage = () => {
     return (
         <div className="min-h-screen p-4">
             <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
-                       {/* Заголовок */}
-                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                           <div>
-                               <h1 className="text-2xl sm:text-3xl font-bold text-white flex items-center gap-2 sm:gap-3">
-                                   <Shield className="h-8 w-8 text-purple-400" />
-                                   <span className="hidden sm:inline">Админ панель</span>
-                                   <span className="sm:hidden">Админка</span>
-                               </h1>
-                           </div>
-                       </div>
-
                        {/* Табы */}
                        <div className="flex flex-wrap gap-1 bg-slate-800/50 p-1 rounded-lg">
                            <Button

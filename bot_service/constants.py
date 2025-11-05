@@ -32,8 +32,8 @@ FRONTEND_REDIRECTS = {
 }
 
 # === ВРЕМЕННЫЕ КОНСТАНТЫ (в секундах) ===
-SESSION_TIMEOUT_DAYS = 30
-SESSION_MAX_AGE_SECONDS = 86400 * SESSION_TIMEOUT_DAYS  # 30 дней
+# Бесконечная сессия - сессия живет до явного логаута или логина с другого устройства
+SESSION_MAX_AGE_SECONDS = 315360000  # 10 лет (315360000 секунд) - практически бесконечно
 VERIFICATION_TIMEOUT_SECONDS = 60  # Таймаут верификации для гостей
 MESSAGE_CHECK_INTERVAL = 5  # Интервал проверки сообщений VK (сек)
 BOT_CONNECTION_WAIT = 2  # Время ожидания подключения бота (сек)

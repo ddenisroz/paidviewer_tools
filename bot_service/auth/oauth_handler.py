@@ -132,10 +132,10 @@ class OAuthHandler:
             # session_id уже получен из cookie на строке 116
             # Если создается новая сессия, он будет переопределен
             
-            # Ищем активную гостевую сессию
-            guest_session = db.query(UserSession).filter(
-                UserSession.user_id == -1,
-                UserSession.is_active == True
+            # Ищем активную гостевую сессию (теперь в таблице GuestSession)
+            from core.database import GuestSession
+            guest_session = db.query(GuestSession).filter(
+                GuestSession.is_active == True
             ).first()
             
             # === СТРОГАЯ ЛОГИКА ЗАМЕЩЕНИЯ СЕССИЙ БЕЗ ДУБЛИРОВАНИЯ ===
@@ -144,26 +144,29 @@ class OAuthHandler:
             # Для Twitch используем username вместо ID
             channel_name = user_data.username.lower() if user_data.username else user_data.platform_user_id.lower()
             from sqlalchemy import text
-            from core.database import IS_POSTGRESQL
-            
-            # PostgreSQL использует оператор ->>, SQLite использует JSON_EXTRACT
-            json_query = "device_info->>'monitored_channel' = :channel" if IS_POSTGRESQL else "JSON_EXTRACT(device_info, '$.monitored_channel') = :channel"
+            # PostgreSQL использует оператор ->> для извлечения JSON значений
+            json_query = "device_info->>'monitored_channel' = :channel"
             
             active_session = db.query(UserSession).filter(
                 UserSession.is_active == True,
                 text(json_query)
             ).params(channel=channel_name).first()
             
-            if active_session:
-                logger.info(f"Found active session {active_session.session_id} for channel {channel_name}")
-                
-                # Если активная сессия принадлежит гостю (user_id = -1)
-                if active_session.user_id == -1:
+            # Также проверяем гостевые сессии для этого канала
+            guest_session_for_channel = db.query(GuestSession).filter(
+                GuestSession.channel_name == channel_name,
+                GuestSession.is_active == True
+            ).first()
+            
+            if guest_session_for_channel:
+                logger.info(f"Found active GUEST session {guest_session_for_channel.session_id} for channel {channel_name}")
+                # Конвертируем гостевую сессию в авторизованную
+                if True:  # Всегда конвертируем
                     logger.info(f"Active session is guest session, converting to authenticated")
                     
                     # Конвертируем гостевую сессию в авторизованную
                     unified_user = session_manager.convert_guest_to_authenticated(
-                        guest_session_id=active_session.session_id,
+                        guest_session_id=guest_session_for_channel.session_id,
                         platform=platform,
                         platform_user_id=user_data.platform_user_id,
                         avatar_url=user_data.avatar_url,
@@ -177,9 +180,12 @@ class OAuthHandler:
                     # 🔒 БЕЗОПАСНОСТЬ: Деактивируем все другие токены при логине (если пользователь уже существовал)
                     if unified_user and unified_user.id:
                         self._deactivate_other_platform_tokens(unified_user.id, platform, db)
-                    
-                # Если активная сессия принадлежит авторизованному пользователю
-                else:
+            
+            # Проверяем авторизованные сессии для этого канала
+            elif active_session:
+                logger.info(f"Found active session {active_session.session_id} for channel {channel_name}")
+                # Активная сессия принадлежит авторизованному пользователю
+                if True:
                     existing_user = db.query(User).filter(User.id == active_session.user_id).first()
                     
                     if is_linking and current_user and existing_user.id != current_user['id']:

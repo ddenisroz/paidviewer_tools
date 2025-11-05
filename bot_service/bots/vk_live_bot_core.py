@@ -40,11 +40,7 @@ class VKLiveBotCore:
         from api.tts_api import TTSAPI
         self.tts_api = TTSAPI()
         
-        # Инициализируем обработчик команд (старая система для обратной совместимости)
-        from vk_live_command_handler import VKLiveCommandHandler
-        self.command_handler = VKLiveCommandHandler(self)
-        
-        # Новая универсальная система команд
+        # Универсальная система команд
         from bots.universal_command_handler import UniversalCommandHandler
         self.universal_command_handler = UniversalCommandHandler()
 

@@ -8,7 +8,6 @@ import {
   Trash2, 
   RotateCcw, 
   Download, 
-  AlertCircle,
   CheckCircle,
   Loader,
   RefreshCw,
@@ -44,9 +43,7 @@ const StorageManagementPage = () => {
     const typeNames = {
       logs: 'Логи',
       cache: 'Кеш',
-      backup: 'Резервная копия',
-      restore: 'Восстановление',
-      all: 'Все компоненты'
+      backup: 'Резервная копия'
     };
     
     const typeName = typeNames[type] || type;
@@ -58,62 +55,19 @@ const StorageManagementPage = () => {
       });
       
       if (response.data?.success) {
-        const data = response.data.data || {};
-        let message = `✅ ${typeName} обработан успешно`;
-        
-        // Добавляем детали если есть
-        if (type === 'logs' && data.logs) {
-          const deleted = data.logs.messages_deleted || 0;
-          const oldDeleted = data.logs.old_messages_deleted || 0;
-          const limitDeleted = data.logs.limit_based_deleted || 0;
-          
-          if (deleted > 0) {
-            message += `\n🗑️ Удалено записей: ${deleted.toLocaleString()}`;
-            if (oldDeleted > 0) {
-              message += `\n   └─ Старше 30 дней: ${oldDeleted.toLocaleString()}`;
-            }
-            if (limitDeleted > 0) {
-              message += `\n   └─ По лимитам: ${limitDeleted.toLocaleString()}`;
-            }
-          } else {
-            message += `\n✅ Нет записей для удаления (все записи новее 30 дней и в пределах лимитов)`;
-          }
-          
-          if (data.logs.error) {
-            message += `\n⚠️ Ошибка: ${data.logs.error}`;
-          }
-        } else if (type === 'voices' && data.voices) {
-          const freed = formatBytes(data.voices.freed_bytes || 0);
-          message += `\nОсвобождено: ${freed}`;
-          if (data.voices.deleted_files) {
-            message += `, удалено файлов: ${data.voices.deleted_files}`;
-          }
-        } else if (type === 'cache' && data.cache) {
-          const freed = formatBytes(data.cache.freed_bytes || 0);
-          message += `\nОсвобождено: ${freed}`;
-          if (data.cache.deleted_files) {
-            message += `, удалено файлов: ${data.cache.deleted_files}`;
-          }
-        } else if (type === 'backup' && data.backup) {
-          message += `\nФайл: ${data.backup.backup_file?.split(/[/\\]/).pop() || 'создан'}`;
-          if (data.backup.size_bytes) {
-            message += ` (${formatBytes(data.backup.size_bytes)})`;
-          }
-        }
-        
-        toast.success(message, { duration: 5000 });
+        toast.success(`${typeName} обработан успешно`);
         await loadStats();
         if (type === 'backup') {
           await loadBackups();
         }
       } else {
         const errorMsg = response.data?.error || response.data?.message || 'Неизвестная ошибка';
-        toast.error(`Ошибка обработки ${typeName}:\n${errorMsg}`, { duration: 6000 });
+        toast.error(`Ошибка: ${errorMsg}`);
       }
     } catch (error) {
       logger.error(`Error cleaning ${type}:`, error);
       const errorMsg = error.response?.data?.detail || error.message || 'Неизвестная ошибка';
-      toast.error(`Ошибка при обработке ${typeName}:\n${errorMsg}`, { duration: 6000 });
+      toast.error(`Ошибка: ${errorMsg}`);
     } finally {
       setCleaning(false);
     }
@@ -135,7 +89,7 @@ const StorageManagementPage = () => {
   };
 
   const handleDeleteBackup = async (filename) => {
-    if (!confirm(`Вы уверены, что хотите удалить бэкап "${filename}"?`)) return;
+    if (!confirm(`Удалить бэкап "${filename}"?`)) return;
     
     try {
       const response = await botService.delete(`/api/database/backups/${filename}`);
@@ -151,17 +105,16 @@ const StorageManagementPage = () => {
   };
 
   const handleRestoreBackup = async (filename) => {
-    if (!confirm(`⚠️ ВНИМАНИЕ: Это действие восстановит базу данных из бэкапа "${filename}".\n\nТекущее состояние будет сохранено автоматически, но операция необратима.\n\nПродолжить?`)) return;
+    if (!confirm(`⚠️ ВНИМАНИЕ: Восстановить БД из "${filename}"?\n\nТекущее состояние будет сохранено автоматически, но операция необратима.\n\nПродолжить?`)) return;
     
     try {
       const response = await botService.post(`/api/database/backups/${filename}/restore`);
       if (response.data?.success) {
-        toast.success(response.data.message || `База данных восстановлена из ${filename}`);
+        toast.success(`База данных восстановлена из ${filename}`);
         await loadBackups();
         await loadStats();
-        // Предупреждаем что нужно перезагрузить страницу
         setTimeout(() => {
-          toast.info('Рекомендуется перезагрузить страницу для применения изменений');
+          toast.info('Рекомендуется перезагрузить страницу');
         }, 2000);
       }
     } catch (error) {
@@ -181,14 +134,6 @@ const StorageManagementPage = () => {
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-  };
-
-  const getHealthStatus = (used, total) => {
-    if (!total) return 'unknown';
-    const percent = (used / total) * 100;
-    if (percent > 90) return { status: 'critical', color: 'bg-red-500', text: 'text-red-500' };
-    if (percent > 70) return { status: 'warning', color: 'bg-yellow-500', text: 'text-yellow-500' };
-    return { status: 'healthy', color: 'bg-green-500', text: 'text-green-500' };
   };
 
   if (loading) {
@@ -212,30 +157,36 @@ const StorageManagementPage = () => {
     );
   }
 
-  const dbHealth = getHealthStatus(
-    stats.database_size_bytes || 0,
-    (stats.database_size_bytes || 0) * 2
-  );
-
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">📦 Управление хранилищем</h1>
-        <p className="text-slate-400 mt-2">Мониторинг и управление размером БД, логов и кеша</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <HardDrive className="w-6 h-6 text-purple-400" />
+            Хранилище
+          </h1>
+          <p className="text-slate-400 text-sm mt-1">
+            Мониторинг и управление размером БД, логов и кеша
+          </p>
+        </div>
+        <Button onClick={() => { loadStats(); loadBackups(); }} variant="outline" size="sm" disabled={loading || loadingBackups}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${(loading || loadingBackups) ? 'animate-spin' : ''}`} />
+          Обновить
+        </Button>
       </div>
 
-      {/* Обзор общего использования */}
-      <Card className="bg-gradient-to-r from-slate-800/50 to-slate-700/50 border-slate-600">
+      {/* Общая статистика */}
+      <Card className="bg-slate-800/50 border-slate-700">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <HardDrive className="w-5 h-5" />
             Общая статистика
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <p className="text-sm text-slate-400 mb-2">Размер базы данных</p>
+              <p className="text-sm text-slate-400 mb-1">Размер базы данных</p>
               <p className="text-2xl font-bold text-white">
                 {formatBytes(stats.database_size_bytes)}
               </p>
@@ -244,31 +195,27 @@ const StorageManagementPage = () => {
               </p>
             </div>
             <div>
-              <p className="text-sm text-slate-400 mb-2">Состояние</p>
+              <p className="text-sm text-slate-400 mb-1">Состояние</p>
               <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${dbHealth.color}`}></div>
-                <span className="text-lg font-semibold capitalize">
-                  {dbHealth.status === 'healthy' && '✅ Здорово'}
-                  {dbHealth.status === 'warning' && '⚠️ Требует внимания'}
-                  {dbHealth.status === 'critical' && '🚨 Критично'}
-                </span>
+                <CheckCircle className="w-5 h-5 text-green-400" />
+                <span className="text-lg font-semibold text-green-400">Здорово</span>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Детальная информация */}
+      {/* Основные разделы */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Логи */}
         <Card className="bg-slate-800/50 border-slate-700">
           <CardHeader>
-            <CardTitle className="text-base">📝 Логи</CardTitle>
-            <CardDescription>Системные и API логи</CardDescription>
+            <CardTitle className="text-base">Логи</CardTitle>
+            <CardDescription className="text-xs">Системные и API логи</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             <div>
-              <div className="flex justify-between mb-2">
+              <div className="flex justify-between mb-1">
                 <span className="text-sm text-slate-300">Использовано</span>
                 <span className="text-sm font-semibold">
                   {formatBytes(stats.logs_size_bytes || 0)}
@@ -295,40 +242,15 @@ const StorageManagementPage = () => {
           </CardContent>
         </Card>
 
-        {/* Голоса */}
-        <Card className="bg-slate-800/50 border-slate-700">
-          <CardHeader>
-            <CardTitle className="text-base">🎙️ Голоса</CardTitle>
-            <CardDescription>Загруженные пользовательские голоса</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <div className="flex justify-between mb-2">
-                <span className="text-sm text-slate-300">Использовано</span>
-                <span className="text-sm font-semibold">
-                  {formatBytes(stats.voices_size_bytes || 0)}
-                </span>
-              </div>
-              <Progress 
-                value={Math.min(((stats.voices_size_bytes || 0) / 1024 / 1024) / 500 * 100, 100)}
-                className="h-2"
-              />
-            </div>
-            <p className="text-xs text-slate-500">
-              Голосов: {stats.voices_count?.toLocaleString() || 'N/A'}
-            </p>
-          </CardContent>
-        </Card>
-
         {/* Кеш */}
         <Card className="bg-slate-800/50 border-slate-700">
           <CardHeader>
-            <CardTitle className="text-base">💾 Кеш</CardTitle>
-            <CardDescription>Временные файлы и кеш</CardDescription>
+            <CardTitle className="text-base">Кеш</CardTitle>
+            <CardDescription className="text-xs">Временные файлы и кеш</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             <div>
-              <div className="flex justify-between mb-2">
+              <div className="flex justify-between mb-1">
                 <span className="text-sm text-slate-300">Использовано</span>
                 <span className="text-sm font-semibold">
                   {formatBytes(stats.cache_size_bytes || 0)}
@@ -355,13 +277,41 @@ const StorageManagementPage = () => {
           </CardContent>
         </Card>
 
-        {/* Резервные копии */}
+        {/* Голоса */}
         <Card className="bg-slate-800/50 border-slate-700">
+          <CardHeader>
+            <CardTitle className="text-base">Голоса</CardTitle>
+            <CardDescription className="text-xs">Загруженные пользовательские голоса</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <div className="flex justify-between mb-1">
+                <span className="text-sm text-slate-300">Использовано</span>
+                <span className="text-sm font-semibold">
+                  {formatBytes(stats.voices_size_bytes || 0)}
+                </span>
+              </div>
+              <Progress 
+                value={Math.min(((stats.voices_size_bytes || 0) / 1024 / 1024) / 500 * 100, 100)}
+                className="h-2"
+              />
+            </div>
+            <p className="text-xs text-slate-500">
+              Голосов: {stats.voices_count?.toLocaleString() || 'N/A'}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Резервные копии - главное */}
+        <Card className="bg-gradient-to-br from-purple-900/20 to-blue-900/20 border-purple-500/30">
           <CardHeader>
             <div className="flex justify-between items-center">
               <div>
-                <CardTitle className="text-base">🔐 Резервные копии</CardTitle>
-                <CardDescription>Управление бэкапами БД</CardDescription>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Download className="w-5 h-5 text-purple-400" />
+                  Резервные копии
+                </CardTitle>
+                <CardDescription className="text-xs">Управление бэкапами БД</CardDescription>
               </div>
               <Button 
                 variant="ghost" 
@@ -374,32 +324,30 @@ const StorageManagementPage = () => {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Статистика */}
+            {/* Статистика бэкапов */}
             <div className="bg-slate-900/50 p-3 rounded-lg">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-slate-300">Всего бэкапов</span>
-                <Badge variant="outline">{backups.length}</Badge>
+                <Badge variant="outline" className="text-purple-400 border-purple-400">
+                  {backups.length}
+                </Badge>
               </div>
-              {stats && (
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-300">Последний бэкап</span>
-                  <span className="text-sm font-semibold">
-                    {stats.last_backup_time ? new Date(stats.last_backup_time).toLocaleString('ru-RU') : 'Нет'}
-                  </span>
-                </div>
-              )}
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-300">Последний бэкап</span>
+                <span className="text-sm font-semibold text-slate-200">
+                  {stats.last_backup_time ? new Date(stats.last_backup_time).toLocaleString('ru-RU') : 'Нет'}
+                </span>
+              </div>
             </div>
 
-            {/* Кнопка создания бэкапа */}
+            {/* Кнопка создания бэкапа - главная */}
             <Button 
-              variant="outline" 
-              size="sm" 
-              className="w-full"
+              className="w-full bg-purple-600 hover:bg-purple-700"
               onClick={() => handleCleanup('backup').then(() => loadBackups())}
               disabled={cleaning}
             >
-              <Download className="w-3 h-3 mr-2" />
-              Создать резервную копию
+              <Download className="w-4 h-4 mr-2" />
+              {cleaning ? 'Создание...' : 'Создать резервную копию'}
             </Button>
 
             {/* Список бэкапов */}
@@ -412,7 +360,7 @@ const StorageManagementPage = () => {
                 Бэкапы не найдены
               </div>
             ) : (
-              <div className="space-y-2 max-h-96 overflow-y-auto">
+              <div className="space-y-2 max-h-64 overflow-y-auto">
                 {backups.map((backup, idx) => (
                   <div 
                     key={backup.filename || idx}
@@ -437,7 +385,7 @@ const StorageManagementPage = () => {
                           size="sm"
                           onClick={() => handleRestoreBackup(backup.filename)}
                           className="h-7 px-2 text-xs"
-                          title="Восстановить из этого бэкапа"
+                          title="Восстановить"
                         >
                           <RotateCcw className="w-3 h-3" />
                         </Button>
@@ -446,7 +394,7 @@ const StorageManagementPage = () => {
                           size="sm"
                           onClick={() => handleDeleteBackup(backup.filename)}
                           className="h-7 px-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                          title="Удалить бэкап"
+                          title="Удалить"
                         >
                           <Trash2 className="w-3 h-3" />
                         </Button>
@@ -458,18 +406,6 @@ const StorageManagementPage = () => {
             )}
           </CardContent>
         </Card>
-      </div>
-
-      {/* Кнопка обновления */}
-      <div className="flex justify-end">
-        <Button 
-          onClick={loadStats}
-          disabled={loading}
-          variant="outline"
-        >
-          <RotateCcw className="w-4 h-4 mr-2" />
-          Обновить статистику
-        </Button>
       </div>
     </div>
   );

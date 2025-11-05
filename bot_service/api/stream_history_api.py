@@ -44,36 +44,25 @@ async def get_stream_history(
             
             try:
                 from sqlalchemy import text
-                from core.database import IS_POSTGRESQL
-                
-                # RAW SQL для старой БД - используем правильные placeholders
+                # RAW SQL для PostgreSQL - используем $1, $2, ... placeholders
                 sql_query = "SELECT * FROM chat_messages WHERE 1=1"
                 params = []
                 param_index = 1
                 
                 if channel_name:
-                    if IS_POSTGRESQL:
-                        sql_query += f" AND channel_name = ${param_index}"
-                    else:
-                        sql_query += " AND channel_name = ?"
+                    sql_query += f" AND channel_name = ${param_index}"
                     params.append(channel_name)
                     param_index += 1
                 if platform:
-                    if IS_POSTGRESQL:
-                        sql_query += f" AND platform = ${param_index}"
-                    else:
-                        sql_query += " AND platform = ?"
+                    sql_query += f" AND platform = ${param_index}"
                     params.append(platform)
                     param_index += 1
                 
                 # LIMIT и OFFSET
-                if IS_POSTGRESQL:
-                    sql_query += f" ORDER BY timestamp DESC LIMIT ${param_index} OFFSET ${param_index + 1}"
-                else:
-                    sql_query += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+                sql_query += f" ORDER BY timestamp DESC LIMIT ${param_index} OFFSET ${param_index + 1}"
                 params.extend([limit, offset])
                 
-                result = db.execute(text(sql_query), tuple(params) if IS_POSTGRESQL else params)
+                result = db.execute(text(sql_query), tuple(params))
                 messages = []
                 for row in result:
                     messages.append(type('Message', (), {
@@ -94,20 +83,15 @@ async def get_stream_history(
                 count_index = 1
                 
                 if channel_name:
-                    if IS_POSTGRESQL:
-                        count_sql += f" AND channel_name = ${count_index}"
-                    else:
-                        count_sql += " AND channel_name = ?"
+                    count_sql += f" AND channel_name = ${count_index}"
                     count_params.append(channel_name)
                     count_index += 1
                 if platform:
-                    if IS_POSTGRESQL:
-                        count_sql += f" AND platform = ${count_index}"
-                    else:
-                        count_sql += " AND platform = ?"
+                    count_sql += f" AND platform = ${count_index}"
                     count_params.append(platform)
+                    count_index += 1
                 
-                count_result = db.execute(text(count_sql), tuple(count_params) if IS_POSTGRESQL else count_params)
+                count_result = db.execute(text(count_sql), tuple(count_params))
                 total_messages = list(count_result)[0][0]
                 
             except Exception as fallback_error:

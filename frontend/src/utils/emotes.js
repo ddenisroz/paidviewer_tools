@@ -1,4 +1,5 @@
 import { logger } from '../utils/prodLogger';
+import { API_BASE_URL } from '../constants';
 
 // frontend/src/utils/emotes.js
 // Утилиты для обработки эмодзи и смайлов
@@ -8,6 +9,28 @@ const SEVENTV_GQL_ENDPOINT = 'https://api.7tv.app/v4/gql';
 
 // Кэш для смайлов
 const emotesCache = new Map();
+
+/**
+ * Проксирует URL 7TV эмодзи через backend для обхода блокировок
+ */
+function proxy7tvUrl(url) {
+    try {
+        // Если URL уже проксированный или не является 7TV URL, возвращаем как есть
+        if (!url || url.startsWith('/api/proxy/')) {
+            return url;
+        }
+        
+        // Извлекаем путь из URL (например, из https://cdn.7tv.app/emotes/... получаем cdn.7tv.app/emotes/...)
+        const urlObj = new URL(url);
+        const proxyPath = `${urlObj.host}${urlObj.pathname}${urlObj.search}`;
+        
+        // Формируем проксированный URL
+        return `${API_BASE_URL}/api/proxy/7tv/${proxyPath}`;
+    } catch (error) {
+        logger.error('Error proxying 7TV URL:', error);
+        return url; // Возвращаем оригинальный URL в случае ошибки
+    }
+}
 
 /**
  * Получает смайлы канала с 7TV через GraphQL API v4
@@ -126,7 +149,7 @@ export async function getChannelEmotes(channelName) {
                 emotesMap.set(emote.name, {
                     id: emote.id,
                     name: emote.name,
-                    url: url,
+                    url: proxy7tvUrl(url),
                     animated: emote.data?.animated || false
                 });
             }

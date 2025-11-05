@@ -82,6 +82,7 @@ from api.stream_history_api import router as stream_history_router
 from api.donationalerts_api import router as donationalerts_router
 from api.guest_api import router as guest_router
 from api.system_logs_api import router as system_logs_router
+from api.proxy_api import router as proxy_router
 
 from core.token_utils import get_user_token_from_db, validate_platform_token
 
@@ -344,27 +345,25 @@ async def lifespan(app: FastAPI):
                     
                     # Проверяем, есть ли активные гостевые сессии и подключаемся к их каналам
                     try:
-                        from core.database import SessionLocal, UserSession
+                        from core.database import SessionLocal, GuestSession
                         db = SessionLocal()
-                        guest_sessions = db.query(UserSession).filter(
-                            UserSession.user_id == -1,
-                            UserSession.is_active == True
+                        guest_sessions = db.query(GuestSession).filter(
+                            GuestSession.is_active == True
                         ).all()
                         db.close()
                         
                         for session in guest_sessions:
-                            device_info = session.device_info
-                            if device_info and 'monitored_channel' in device_info:
-                                channel_name = device_info['monitored_channel']
-                                platform = device_info.get('platform', 'twitch')
-                                
-                                if platform == 'twitch' and channel_name:
-                                    logger.info(f"🔌 Connecting bot to guest channel: {channel_name}")
-                                    try:
-                                        await bot_instance.join_channel(channel_name)
-                                        logger.info(f"✅ Bot connected to guest channel: {channel_name}")
-                                    except Exception as e:
-                                        logger.error(f"❌ Failed to connect to guest channel {channel_name}: {e}")
+                            # Теперь channel_name и platform - это прямые поля в GuestSession
+                            channel_name = session.channel_name
+                            platform = session.platform
+                            
+                            if platform == 'twitch' and channel_name:
+                                logger.info(f"🔌 Connecting bot to guest channel: {channel_name}")
+                                try:
+                                    await bot_instance.join_channel(channel_name)
+                                    logger.info(f"✅ Bot connected to guest channel: {channel_name}")
+                                except Exception as e:
+                                    logger.error(f"❌ Failed to connect to guest channel {channel_name}: {e}")
                     except Exception as e:
                         logger.error(f"❌ Error connecting to guest channels: {e}")
                     
@@ -951,6 +950,7 @@ app.include_router(stream_history_router)
 app.include_router(donationalerts_router)
 app.include_router(guest_router)
 app.include_router(system_logs_router)
+app.include_router(proxy_router)
 
 # Static files - настроены в create_app()
 

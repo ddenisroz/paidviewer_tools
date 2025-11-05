@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { AlertCircle, Zap, RefreshCw, Filter, Loader, XCircle, AlertTriangle } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Loader } from 'lucide-react';
 import { toast } from 'sonner';
 import { botService } from '../../services/microservices';
 import { logger } from '../../utils/prodLogger';
@@ -10,29 +9,23 @@ import { logger } from '../../utils/prodLogger';
 const ErrorLogsPage = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [selectedLevel, setSelectedLevel] = useState('all');
-  const [selectedModule, setSelectedModule] = useState('all');
-  const [lines, setLines] = useState(100);
+  const [filterLevel, setFilterLevel] = useState('error'); // По умолчанию только ошибки
 
   const loadLogs = async () => {
     try {
       setLoading(true);
-      const response = await botService.get(`/api/system/logs?lines=${lines}`);
+      const response = await botService.get('/api/system/logs?lines=200');
       if (response.data?.success) {
         let filtered = response.data.logs || [];
         
-        if (selectedLevel !== 'all') {
+        // Фильтруем по уровню
+        if (filterLevel !== 'all') {
           filtered = filtered.filter(log => {
             const upper = log.toUpperCase();
-            if (selectedLevel === 'error') return upper.includes('ERROR');
-            if (selectedLevel === 'warning') return upper.includes('WARNING');
-            if (selectedLevel === 'info') return upper.includes('INFO');
+            if (filterLevel === 'error') return upper.includes('ERROR');
+            if (filterLevel === 'warning') return upper.includes('WARNING');
             return true;
           });
-        }
-
-        if (selectedModule !== 'all') {
-          filtered = filtered.filter(log => log.includes(selectedModule));
         }
 
         setLogs(filtered);
@@ -47,7 +40,7 @@ const ErrorLogsPage = () => {
 
   useEffect(() => {
     loadLogs();
-  }, [lines, selectedLevel, selectedModule]);
+  }, [filterLevel]);
 
   const getLevelBadge = (logLine) => {
     const upper = logLine.toUpperCase();
@@ -57,110 +50,58 @@ const ErrorLogsPage = () => {
     if (upper.includes('WARNING')) {
       return { bg: 'bg-yellow-500/20', text: 'text-yellow-400', icon: '⚠️', label: 'WARNING' };
     }
-    if (upper.includes('INFO')) {
-      return { bg: 'bg-blue-500/20', text: 'text-blue-400', icon: 'ℹ️', label: 'INFO' };
-    }
     return { bg: 'bg-slate-500/20', text: 'text-slate-400', icon: '•', label: 'LOG' };
   };
 
+  const errorCount = logs.filter(l => l.toUpperCase().includes('ERROR')).length;
+  const warningCount = logs.filter(l => l.toUpperCase().includes('WARNING')).length;
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">⚠️ Ошибки и логи API</h1>
-        <p className="text-slate-400 mt-2">Мониторинг ошибок системы и запросов API</p>
-        <div className="mt-4 p-4 bg-blue-900/20 border border-blue-700/50 rounded-lg text-sm">
-          <p className="text-blue-300 mb-2"><strong>📖 Как работают логи:</strong></p>
-          <ul className="list-disc list-inside space-y-1 text-blue-200/80 ml-2">
-            <li><strong>Источник:</strong> Логи записываются в файлы <code className="bg-slate-800 px-1 rounded">logs/app/bot_service.log</code> и <code className="bg-slate-800 px-1 rounded">logs/errors/bot_service_errors.log</code></li>
-            <li><strong>Формат:</strong> Каждая строка содержит время, уровень (INFO/WARNING/ERROR), модуль и сообщение</li>
-            <li><strong>Уровни:</strong> <span className="text-blue-400">INFO</span> - информация, <span className="text-yellow-400">WARNING</span> - предупреждения, <span className="text-red-400">ERROR</span> - ошибки</li>
-            <li><strong>Фильтры:</strong> Используйте фильтры для поиска ошибок конкретного модуля или уровня важности</li>
-            <li><strong>Обновление:</strong> Нажмите "Обновить" для загрузки последних логов из файлов</li>
-          </ul>
+    <div className="space-y-4">
+      {/* Заголовок и фильтры */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <AlertTriangle className="w-6 h-6 text-red-400" />
+            Ошибки
+          </h1>
+          <p className="text-slate-400 text-sm mt-1">
+            {errorCount > 0 && <span className="text-red-400">{errorCount} ошибок</span>}
+            {errorCount > 0 && warningCount > 0 && <span className="mx-2">•</span>}
+            {warningCount > 0 && <span className="text-yellow-400">{warningCount} предупреждений</span>}
+            {errorCount === 0 && warningCount === 0 && <span className="text-green-400">Ошибок не найдено</span>}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={filterLevel}
+            onChange={(e) => setFilterLevel(e.target.value)}
+            className="bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm"
+          >
+            <option value="error">Только ошибки</option>
+            <option value="warning">Предупреждения</option>
+            <option value="all">Все</option>
+          </select>
+          <Button onClick={loadLogs} disabled={loading} size="sm" variant="outline">
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Обновить
+          </Button>
         </div>
       </div>
 
-      {/* Фильтры */}
-      <Card className="bg-slate-800/50 border-slate-700">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Filter className="w-4 h-4" />
-            Фильтры
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="text-sm text-slate-300 mb-2 block">Уровень</label>
-              <select
-                value={selectedLevel}
-                onChange={(e) => setSelectedLevel(e.target.value)}
-                className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white"
-              >
-                <option value="all">Все</option>
-                <option value="error">Ошибки (ERROR)</option>
-                <option value="warning">Предупреждения (WARNING)</option>
-                <option value="info">Информация (INFO)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-sm text-slate-300 mb-2 block">Модуль</label>
-              <select
-                value={selectedModule}
-                onChange={(e) => setSelectedModule(e.target.value)}
-                className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white"
-              >
-                <option value="all">Все</option>
-                <option value="API">API</option>
-                <option value="AUTH">Аутентификация</option>
-                <option value="TTS">TTS</option>
-                <option value="DATABASE">БД</option>
-                <option value="WEBSOCKET">WebSocket</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-sm text-slate-300 mb-2 block">Строк</label>
-              <select
-                value={lines}
-                onChange={(e) => setLines(Number(e.target.value))}
-                className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white"
-              >
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-                <option value={200}>200</option>
-                <option value={500}>500</option>
-              </select>
-            </div>
-
-            <div className="flex items-end">
-              <Button onClick={loadLogs} disabled={loading} className="w-full">
-                <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                Обновить
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Логи */}
       <Card className="bg-slate-800/50 border-slate-700">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Zap className="w-4 h-4" />
-            Системные логи ({logs.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="p-4">
           {loading ? (
             <div className="flex justify-center py-8">
               <Loader className="w-6 h-6 animate-spin text-purple-500" />
             </div>
           ) : logs.length === 0 ? (
-            <p className="text-center text-slate-400 py-8">Нет логов с выбранными фильтрами</p>
+            <div className="text-center py-8">
+              <p className="text-slate-400">Нет записей с выбранными фильтрами</p>
+            </div>
           ) : (
-            <div className="space-y-1 font-mono text-xs overflow-auto max-h-96">
+            <div className="space-y-1 font-mono text-xs overflow-auto max-h-[600px]">
               {logs.map((log, idx) => {
                 const badge = getLevelBadge(log);
                 return (
@@ -176,52 +117,6 @@ const ErrorLogsPage = () => {
               })}
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Статистика */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-slate-800/50 border-slate-700">
-          <CardContent className="pt-6">
-            <div className="text-sm text-slate-400 mb-2">Ошибок</div>
-            <div className="text-3xl font-bold text-red-400">
-              {logs.filter(l => l.toUpperCase().includes('ERROR')).length}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-slate-800/50 border-slate-700">
-          <CardContent className="pt-6">
-            <div className="text-sm text-slate-400 mb-2">Предупреждений</div>
-            <div className="text-3xl font-bold text-yellow-400">
-              {logs.filter(l => l.toUpperCase().includes('WARNING')).length}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-slate-800/50 border-slate-700">
-          <CardContent className="pt-6">
-            <div className="text-sm text-slate-400 mb-2">Информационных</div>
-            <div className="text-3xl font-bold text-blue-400">
-              {logs.filter(l => l.toUpperCase().includes('INFO')).length}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Рекомендации */}
-      <Card className="bg-red-900/20 border-red-800/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base text-red-300">
-            <AlertTriangle className="w-4 h-4" />
-            Важно
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-red-200 space-y-2">
-          <p>• Регулярно проверяйте ошибки (ERROR)</p>
-          <p>• Предупреждения (WARNING) требуют внимания в течение дня</p>
-          <p>• Используйте фильтры для поиска конкретных проблем</p>
-          <p>• Экспортируйте логи при обращении в поддержку</p>
         </CardContent>
       </Card>
     </div>

@@ -1,5 +1,6 @@
 """
 Утилиты для работы с БД - централизованные функции для предотвращения дублирования кода
+PostgreSQL only
 """
 import logging
 from typing import List, Dict, Any, Optional, Tuple
@@ -7,40 +8,33 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc, asc, func, text
 from datetime import datetime, timedelta
 from contextlib import contextmanager
-from core.database import IS_POSTGRESQL
 
 logger = logging.getLogger(__name__)
 
 
 class DatabaseUtils:
-    """Утилиты для безопасной работы с БД"""
+    """Утилиты для безопасной работы с PostgreSQL"""
     
     @staticmethod
     def get_param_placeholder(index: int = None) -> str:
         """
-        Возвращает правильный placeholder для параметров в зависимости от БД
+        Возвращает placeholder для параметров PostgreSQL
         PostgreSQL: :param или $1, $2, ...
-        SQLite: ?
         """
-        if IS_POSTGRESQL:
-            if index is not None:
-                return f"${index + 1}"
-            return ":param"
-        return "?"
+        if index is not None:
+            return f"${index + 1}"
+        return ":param"
     
     @staticmethod
     def build_where_clause(filters: Dict[str, Any]) -> Tuple[str, List[Any]]:
         """
-        Строит WHERE условие с правильными placeholders
+        Строит WHERE условие с PostgreSQL placeholders ($1, $2, ...)
         """
         conditions = []
         params = []
         
         for key, value in filters.items():
-            if IS_POSTGRESQL:
-                conditions.append(f"{key} = ${len(params) + 1}")
-            else:
-                conditions.append(f"{key} = ?")
+            conditions.append(f"{key} = ${len(params) + 1}")
             params.append(value)
         
         where_clause = " AND ".join(conditions) if conditions else "1=1"
@@ -54,12 +48,11 @@ class DatabaseUtils:
         fetch_one: bool = False
     ) -> Any:
         """
-        Безопасное выполнение SQL запроса с параметрами
-        Автоматически адаптирует запрос для PostgreSQL или SQLite
+        Безопасное выполнение SQL запроса с параметрами (PostgreSQL)
         
         Args:
             db: Сессия БД
-            query_str: SQL запрос (может использовать ? или :param)
+            query_str: SQL запрос (использует $1, $2, ... или :param)
             params: Параметры запроса
             fetch_one: Получить один результат или все
         
@@ -70,14 +63,7 @@ class DatabaseUtils:
             if params is None:
                 params = []
             
-            # Преобразуем ? в правильные placeholders для текущей БД
-            if IS_POSTGRESQL and "?" in query_str:
-                # Заменяем ? на $1, $2, ...
-                query_str = query_str.replace("?", f"${{index}}")
-                for i in range(len(params)):
-                    query_str = query_str.replace("${{index}}", f"${i+1}", 1)
-            
-            result = db.execute(text(query_str), params if IS_POSTGRESQL else tuple(params))
+            result = db.execute(text(query_str), params)
             
             if fetch_one:
                 return result.first()
@@ -94,30 +80,22 @@ class DatabaseUtils:
         filters: Dict[str, Any]
     ) -> Optional[Any]:
         """
-        Получает запись с пессимистической блокировкой (FOR UPDATE)
+        Получает запись с пессимистической блокировкой (FOR UPDATE) - PostgreSQL
         """
         query = db.query(model_class)
         
         for key, value in filters.items():
             query = query.filter(getattr(model_class, key) == value)
         
-        if IS_POSTGRESQL:
-            return query.with_for_update().first()
-        else:
-            return query.first()
+        return query.with_for_update().first()
     
     @staticmethod
     def json_extract_query(json_column: str, json_path: str, alias: str = None) -> str:
         """
-        Возвращает правильный синтаксис для извлечения значения из JSON
+        Возвращает PostgreSQL синтаксис для извлечения значения из JSON
         PostgreSQL: column->>'path'
-        SQLite: JSON_EXTRACT(column, '$.path')
         """
-        if IS_POSTGRESQL:
-            # PostgreSQL: device_info->>'monitored_channel'
-            if json_path.startswith('$.'):
-                json_path = json_path[2:]  # Убираем $.
-            return f"{json_column}->>'{json_path}'"
-        else:
-            # SQLite: JSON_EXTRACT(device_info, '$.monitored_channel')
-            return f"JSON_EXTRACT({json_column}, '{json_path}')"
+        # PostgreSQL: device_info->>'monitored_channel'
+        if json_path.startswith('$.'):
+            json_path = json_path[2:]  # Убираем $.
+        return f"{json_column}->>'{json_path}'"

@@ -320,10 +320,14 @@ async def get_audio_settings(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить настройки звука"""
+    """Получить настройки звука (поддерживает гостей и авторизованных)"""
     try:
+        if not UserIdentityService.validate_user_data(current_user):
+            raise HTTPException(status_code=400, detail="Invalid user data")
+        
         tts_service = TTSService(db)
-        settings = await tts_service.get_audio_settings(current_user['id'])
+        user_filters = UserIdentityService.get_database_filters(current_user)
+        settings = await tts_service.get_audio_settings(**user_filters)
         return {"success": True, **settings}
     except Exception as e:
         logger.error(f"Error getting audio settings: {e}")
@@ -335,15 +339,35 @@ async def save_audio_settings(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Сохранить настройки звука"""
+    """Сохранить настройки звука (поддерживает гостей и авторизованных)"""
     try:
+        if not UserIdentityService.validate_user_data(current_user):
+            raise HTTPException(status_code=400, detail="Invalid user data")
+        
         tts_service = TTSService(db)
+        user_filters = UserIdentityService.get_database_filters(current_user)
+        
         success = await tts_service.save_audio_settings(
-            current_user['id'],
-            request.websiteVolume
+            request.websiteVolume,
+            **user_filters
         )
         
         if success:
+            # Отправляем WebSocket уведомление для синхронизации фронтенда
+            try:
+                from services.memory_websocket_manager import memory_websocket_manager
+                user_id = current_user.get('id')
+                if user_id and user_id != -1:  # Только для авторизованных пользователей
+                    cache_invalidation_event = {
+                        "type": "cache_invalidate",
+                        "cache_key": "tts_audio_settings",
+                        "reason": "audio_settings_updated"
+                    }
+                    await memory_websocket_manager.send_to_user(user_id, cache_invalidation_event)
+                    logger.debug(f"🔄 [AUDIO SETTINGS] Sent cache invalidation to user {user_id}")
+            except Exception as ws_error:
+                logger.warning(f"Failed to send WebSocket notification for audio settings: {ws_error}")
+            
             return {"success": True, "message": "Настройки звука сохранены"}
         else:
             raise HTTPException(status_code=400, detail="Ошибка сохранения настроек звука")
@@ -385,10 +409,13 @@ async def update_tts_engine(
     
     try:
         body = await request.json()
-        engine_type = body.get('engine_type', 'cloud')
+        engine_type = body.get('engine_type', 'gtts')
         
-        # Конвертируем engine_type в формат backend
-        engine = 'f5tts' if engine_type == 'local' else 'gtts'
+        # Конвертируем engine_type в формат backend:
+        # - 'local' -> f5tts (локальный F5-TTS через tts_service_simple)
+        # - 'cloud' -> f5tts (облачный F5-TTS через основной tts_service, только для whitelist)
+        # - 'gtts' -> gtts (базовый TTS через gTTS)
+        engine = 'f5tts' if engine_type in ('local', 'cloud') else 'gtts'
         use_local_tts = engine_type == 'local'
         
         logger.info(f"🎙️ [TTS ENGINE] Switching to {engine_type} (engine={engine}, use_local_tts={use_local_tts})")
@@ -424,15 +451,46 @@ async def update_tts_engine(
             
             # Проверяем whitelist с кешированием (независимо от login_platform)
             from utils.whitelist_cache import is_user_whitelisted_cached
+            logger.info(f"🔍 [TTS ENGINE] Checking whitelist for cloud F5-TTS: user_id={db_user.id}, twitch={db_user.twitch_username}, vk={db_user.vk_username}, vk_channel={db_user.vk_channel_name}")
             is_whitelisted = is_user_whitelisted_cached(db_user, db)
             
+            # Сохраняем is_whitelisted для использования после сохранения настроек
+            is_whitelisted_engine = is_whitelisted
+            
             if not is_whitelisted:
-                channel_name = db_user.twitch_username or db_user.vk_username or 'неизвестен'
-                logger.warning(f"❌ User {channel_name} NOT whitelisted, cannot enable cloud F5-TTS")
+                channel_name = db_user.twitch_username or db_user.vk_username or db_user.vk_channel_name or 'неизвестен'
+                logger.warning(f"❌ [TTS ENGINE] User {current_user['id']} ({channel_name}) NOT whitelisted, cannot enable cloud F5-TTS")
+                
+                # Дополнительная диагностика
+                from core.database import WhitelistedChannel
+                if db_user.twitch_username:
+                    twitch_check = db.query(WhitelistedChannel).filter(
+                        WhitelistedChannel.channel_name == db_user.twitch_username.lower(),
+                        WhitelistedChannel.platform == 'twitch'
+                    ).first()
+                    logger.warning(f"🔍 [TTS ENGINE DEBUG] Direct DB check Twitch '{db_user.twitch_username.lower()}': found={twitch_check is not None}")
+                if db_user.vk_username:
+                    vk_check = db.query(WhitelistedChannel).filter(
+                        WhitelistedChannel.channel_name == db_user.vk_username.lower(),
+                        WhitelistedChannel.platform == 'vk'
+                    ).first()
+                    logger.warning(f"🔍 [TTS ENGINE DEBUG] Direct DB check VK username '{db_user.vk_username.lower()}': found={vk_check is not None}")
+                if db_user.vk_channel_name:
+                    vk_channel_check = db.query(WhitelistedChannel).filter(
+                        WhitelistedChannel.channel_name == db_user.vk_channel_name.lower(),
+                        WhitelistedChannel.platform == 'vk'
+                    ).first()
+                    logger.warning(f"🔍 [TTS ENGINE DEBUG] Direct DB check VK channel '{db_user.vk_channel_name.lower()}': found={vk_channel_check is not None}")
+                
                 raise HTTPException(
                     status_code=403,
                     detail="Облачный F5-TTS доступен только для пользователей из whitelist. Для использования локального TTS настройте tts_service_simple."
                 )
+            
+            logger.info(f"✅ [TTS ENGINE] User {current_user['id']} whitelisted, enabling cloud F5-TTS")
+        else:
+            # Для local режима is_whitelisted_engine не нужен
+            is_whitelisted_engine = False
         
         tts_service = TTSService(db)
         user_filters = UserIdentityService.get_database_filters(current_user)
@@ -456,7 +514,12 @@ async def update_tts_engine(
         )
         
         if success:
+            # ВАЖНО: При переключении на F5-TTS (local или cloud) НЕ включаем TTS автоматически
+            # Базовая TTS должна быть включена отдельно через /enable
+            # Это позволяет работать F5-TTS и базовой TTS независимо
+            # F5-TTS использует базовую TTS как fallback при ошибках
             logger.info(f"✅ [TTS ENGINE] Successfully switched to {engine_type}")
+            
             return JSONResponse(content={"success": True, "message": f"Движок переключен на {engine_type}"})
         else:
             raise HTTPException(status_code=400, detail="Ошибка переключения движка")
@@ -500,6 +563,21 @@ async def save_tts_settings(
         )
         
         if success:
+            # Отправляем WebSocket уведомление для синхронизации фронтенда
+            try:
+                from services.memory_websocket_manager import memory_websocket_manager
+                user_id = current_user.get('id')
+                if user_id and user_id != -1:  # Только для авторизованных пользователей
+                    cache_invalidation_event = {
+                        "type": "cache_invalidate",
+                        "cache_key": "tts_settings",
+                        "reason": "tts_settings_updated"
+                    }
+                    await memory_websocket_manager.send_to_user(user_id, cache_invalidation_event)
+                    logger.debug(f"🔄 [TTS SETTINGS] Sent cache invalidation to user {user_id}")
+            except Exception as ws_error:
+                logger.warning(f"Failed to send WebSocket notification for TTS settings: {ws_error}")
+            
             return {"success": True, "message": "Настройки TTS сохранены"}
         else:
             raise HTTPException(status_code=400, detail="Ошибка сохранения настроек TTS")
@@ -639,11 +717,18 @@ async def get_tts_status(
         ).first()
         
         if tts_settings:
-            # Если use_local_tts = True, значит используется локальный движок (F5-TTS)
-            # Если engine = 'f5tts', тоже означает локальный
-            engine_type = 'local' if (tts_settings.use_local_tts or tts_settings.engine == 'f5tts') else 'cloud'
+            # Определяем engine_type на основе настроек:
+            # - use_local_tts = True → 'local' (локальный F5-TTS через tts_service_simple)
+            # - engine = 'f5tts' И use_local_tts = False → 'cloud' (облачный F5-TTS, только для whitelist)
+            # - engine = 'gtts' → 'gtts' (базовый gTTS)
+            if tts_settings.use_local_tts:
+                engine_type = 'local'
+            elif tts_settings.engine == 'f5tts':
+                engine_type = 'cloud'  # Облачный F5-TTS (для whitelisted пользователей)
+            else:
+                engine_type = 'gtts'  # Базовый gTTS
         else:
-            engine_type = 'cloud'  # По умолчанию облачный
+            engine_type = 'gtts'  # По умолчанию базовый gTTS
         
         # Если есть локальный endpoint, считаем что пользователь может использовать локальный TTS без whitelist
         has_local_setup = local_endpoint and local_endpoint.is_healthy
@@ -652,13 +737,41 @@ async def get_tts_status(
         # ВАЖНО: Проверяем обе платформы, так как пользователь может быть в whitelist на любой из них
         from utils.whitelist_cache import is_user_whitelisted_cached
         login_platform = current_user.get('login_platform')
+        
+        # Детальная проверка whitelist для логирования
+        logger.debug(f"🔍 [TTS STATUS] Checking whitelist for user {user_id}: twitch={user.twitch_username}, vk={user.vk_username}, login_platform={login_platform}")
+        
         is_whitelisted = is_user_whitelisted_cached(user, db)
         
+        # Детальное логирование для диагностики
+        logger.info(f"🔍 [TTS STATUS] User {user_id} whitelist check: twitch={user.twitch_username}, vk={user.vk_username}, vk_channel={user.vk_channel_name}, is_whitelisted={is_whitelisted}, has_local_setup={has_local_setup}")
+        
         if is_whitelisted:
-            platform_name = user.twitch_username if user.twitch_username else user.vk_username
+            platform_name = user.twitch_username if user.twitch_username else (user.vk_username or user.vk_channel_name)
             logger.info(f"✅ [TTS STATUS] User {user_id} ({platform_name}) whitelisted")
         elif not has_local_setup:
-            logger.warning(f"❌ [TTS STATUS] User {user_id} (twitch: {user.twitch_username}, vk: {user.vk_username}) NOT whitelisted, login_platform: {login_platform}")
+            logger.warning(f"❌ [TTS STATUS] User {user_id} (twitch: {user.twitch_username}, vk: {user.vk_username}, vk_channel: {user.vk_channel_name}) NOT whitelisted, login_platform: {login_platform}")
+            
+            # Дополнительная диагностика: проверяем напрямую в БД (без кеша)
+            from core.database import WhitelistedChannel
+            if user.twitch_username:
+                twitch_check = db.query(WhitelistedChannel).filter(
+                    WhitelistedChannel.channel_name == user.twitch_username.lower(),
+                    WhitelistedChannel.platform == 'twitch'
+                ).first()
+                logger.warning(f"🔍 [TTS STATUS DEBUG] Direct DB check Twitch '{user.twitch_username.lower()}': found={twitch_check is not None}, platform={twitch_check.platform if twitch_check else None}")
+            if user.vk_username:
+                vk_check = db.query(WhitelistedChannel).filter(
+                    WhitelistedChannel.channel_name == user.vk_username.lower(),
+                    WhitelistedChannel.platform == 'vk'
+                ).first()
+                logger.warning(f"🔍 [TTS STATUS DEBUG] Direct DB check VK username '{user.vk_username.lower()}': found={vk_check is not None}, platform={vk_check.platform if vk_check else None}")
+            if user.vk_channel_name:
+                vk_channel_check = db.query(WhitelistedChannel).filter(
+                    WhitelistedChannel.channel_name == user.vk_channel_name.lower(),
+                    WhitelistedChannel.platform == 'vk'
+                ).first()
+                logger.warning(f"🔍 [TTS STATUS DEBUG] Direct DB check VK channel '{user.vk_channel_name.lower()}': found={vk_channel_check is not None}, platform={vk_channel_check.platform if vk_channel_check else None}")
         
         return JSONResponse(content={
             "enabled": user.tts_enabled or False, 
@@ -923,15 +1036,19 @@ async def save_youtube_settings(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Сохранить настройки YouTube"""
+    """Сохранить настройки YouTube (поддерживает гостей и авторизованных)"""
     try:
-        user_id = current_user.get('id')
+        if not UserIdentityService.validate_user_data(current_user):
+            raise HTTPException(status_code=400, detail="Invalid user data")
+        
+        user_filters = UserIdentityService.get_database_filters(current_user)
         
         from core.database import UserSettings
-        user_settings = db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
+        user_settings = db.query(UserSettings).filter_by(**user_filters).first()
         
         if not user_settings:
-            user_settings = UserSettings(user_id=user_id)
+            settings_data = UserIdentityService.create_settings_record_data(current_user)
+            user_settings = UserSettings(**settings_data)
             db.add(user_settings)
         
         # Сохраняем настройки YouTube
@@ -944,6 +1061,21 @@ async def save_youtube_settings(
         
         user_settings.youtube_settings = youtube_settings
         db.commit()
+        
+        # Отправляем WebSocket уведомление для синхронизации фронтенда
+        try:
+            from services.memory_websocket_manager import memory_websocket_manager
+            user_id = current_user.get('id')
+            if user_id and user_id != -1:  # Только для авторизованных пользователей
+                cache_invalidation_event = {
+                    "type": "cache_invalidate",
+                    "cache_key": "youtube_settings",
+                    "reason": "youtube_settings_updated"
+                }
+                await memory_websocket_manager.send_to_user(user_id, cache_invalidation_event)
+                logger.debug(f"🔄 [YOUTUBE SETTINGS] Sent cache invalidation to user {user_id}")
+        except Exception as ws_error:
+            logger.warning(f"Failed to send WebSocket notification for YouTube settings: {ws_error}")
         
         return {
             "success": True,
@@ -1152,6 +1284,21 @@ async def set_platform_settings(
         
         logger.info(f"✅ [TTS SETTINGS] User {user_id} set enabled platforms to: {enabled_platforms}")
         logger.info(f"✅ [TTS SETTINGS] Saved to DB: {tts_settings.enabled_platforms}")
+        
+        # Отправляем WebSocket уведомление для синхронизации фронтенда
+        try:
+            from services.memory_websocket_manager import memory_websocket_manager
+            if user_id != -1:  # Только для авторизованных пользователей
+                cache_invalidation_event = {
+                    "type": "cache_invalidate",
+                    "cache_key": "tts_platform_settings",
+                    "reason": "platform_settings_updated"
+                }
+                await memory_websocket_manager.send_to_user(user_id, cache_invalidation_event)
+                logger.debug(f"🔄 [PLATFORM SETTINGS] Sent cache invalidation to user {user_id}")
+        except Exception as ws_error:
+            logger.warning(f"Failed to send WebSocket notification for platform settings: {ws_error}")
+        
         return {
             "success": True,
             "message": "Платформы для озвучки обновлены",
@@ -1294,28 +1441,37 @@ async def check_whitelist_status(
         is_whitelisted = is_user_whitelisted_cached(db_user, db)
         
         if is_whitelisted:
-            # Определяем платформу
+            # Определяем платформу для которой пользователь в whitelist
             platform = None
             channel_name = None
+            
+            # Проверяем Twitch whitelist
             if db_user.twitch_username:
-                # Проверяем конкретно Twitch whitelist
                 from utils.whitelist_cache import is_channel_whitelisted_cached
                 if is_channel_whitelisted_cached(db_user.twitch_username.lower(), 'twitch', db):
                     platform = "twitch"
                     channel_name = db_user.twitch_username
-                elif db_user.vk_username and is_channel_whitelisted_cached(db_user.vk_username.lower(), 'vk', db):
-                    platform = "vk"
-                    channel_name = db_user.vk_username
-            elif db_user.vk_username:
-                platform = "vk"
-                channel_name = db_user.vk_username
+                    logger.info(f"✅ User {user['id']} ({channel_name}) whitelisted on Twitch")
+                    return {"is_whitelisted": True, "can_manage_voices": True, "platform": platform}
             
-            if platform:
-                logger.info(f"✅ User {channel_name} whitelisted on {platform}")
-                return {"is_whitelisted": True, "can_manage_voices": True, "platform": platform}
+            # Проверяем VK whitelist (username или channel_name)
+            if db_user.vk_username or db_user.vk_channel_name:
+                from utils.whitelist_cache import is_channel_whitelisted_cached
+                vk_channel = db_user.vk_channel_name or db_user.vk_username
+                if vk_channel and is_channel_whitelisted_cached(vk_channel.lower(), 'vk', db):
+                    platform = "vk"
+                    channel_name = vk_channel
+                    logger.info(f"✅ User {user['id']} ({channel_name}) whitelisted on VK")
+                    return {"is_whitelisted": True, "can_manage_voices": True, "platform": platform}
+            
+            # Если is_whitelisted вернул True, но platform не определился - все равно разрешаем
+            # (может быть ситуация когда пользователь в whitelist, но username не совпадает)
+            channel_name = db_user.twitch_username or db_user.vk_username or db_user.vk_channel_name or 'неизвестен'
+            logger.warning(f"⚠️ User {user['id']} ({channel_name}) is_whitelisted=True but platform not found, allowing access anyway")
+            return {"is_whitelisted": True, "can_manage_voices": True, "platform": login_platform or "unknown"}
         
-        channel_name = db_user.twitch_username or db_user.vk_username or 'неизвестен'
-        logger.warning(f"❌ User {channel_name} NOT whitelisted")
+        channel_name = db_user.twitch_username or db_user.vk_username or db_user.vk_channel_name or 'неизвестен'
+        logger.warning(f"❌ User {user['id']} ({channel_name}) NOT whitelisted")
         return {"is_whitelisted": False, "can_manage_voices": False}
             
     except Exception as e:

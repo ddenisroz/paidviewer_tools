@@ -21,7 +21,7 @@ class ModernConfig(BaseSettings):
     )
     
     # === DATABASE ===
-    database_url: str = Field(default="sqlite:///./data/app_data.db", description="Database URL")
+    database_url: str = Field(default="", description="PostgreSQL database URL (required, format: postgresql://user:password@host:port/database)")
     
     # === SECURITY ===
     secret_key: str = Field(default="your-super-secret-jwt-key-here", description="Secret key for JWT")

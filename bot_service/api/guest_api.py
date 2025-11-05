@@ -248,28 +248,31 @@ async def guest_finalize(request: GuestVerifyRequest, http_request: Request):
             "guest_mode": True
         }
         
-        # Ищем существующую гостевую сессию для этого канала
+        # Ищем существующую гостевую сессию для этого канала в таблице GuestSession
         existing_session = None
         try:
-            from core.database import SessionLocal, UserSession
+            from core.database import SessionLocal, GuestSession
             db = SessionLocal()
-            existing_session = db.query(UserSession).filter(
-                UserSession.user_id == -1,
-                UserSession.is_active == True,
-                UserSession.device_info.contains({"monitored_channel": channel_name})
+            existing_session = db.query(GuestSession).filter(
+                GuestSession.channel_name == channel_name,
+                GuestSession.platform == platform,
+                GuestSession.is_active == True
             ).first()
             db.close()
         except Exception as e:
             logger.warning(f"Error checking existing guest session: {e}")
         
         if existing_session:
-            # Обновляем существующую сессию
-            logger.info(f"🔄 Updating existing guest session for {channel_name}")
-            session_manager.update_session(existing_session.id, device_info=device_info)
-            session_id = existing_session.id
+            # Гостевая сессия уже существует - используем её session_id
+            logger.info(f"🔄 Guest session already exists for {channel_name} ({platform})")
+            session_id = existing_session.session_id
         else:
-            # Создаем новую гостевую сессию
-            session_id = session_manager.create_session(user_id=-1, device_info=device_info)
+            # Создаем новую гостевую сессию через SessionManager
+            session_id = session_manager.create_guest_session(
+                channel_name=channel_name,
+                platform=platform,
+                device_info=device_info
+            )
             logger.info(f"✅ New guest session created: {channel_name} ({platform}) -> {session_id}")
             
             # Создаем настройки для гостя

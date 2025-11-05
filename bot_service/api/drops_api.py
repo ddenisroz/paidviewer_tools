@@ -279,6 +279,20 @@ async def update_drops_config(
             config_data=update_data
         )
         
+        # Отправляем WebSocket уведомление для синхронизации фронтенда
+        try:
+            from services.memory_websocket_manager import memory_websocket_manager
+            if user_id and user_id != -1:  # Только для авторизованных пользователей
+                cache_invalidation_event = {
+                    "type": "cache_invalidate",
+                    "cache_key": f"drops_config_{channel_name}_{platform}",
+                    "reason": "drops_config_updated"
+                }
+                await memory_websocket_manager.send_to_user(user_id, cache_invalidation_event)
+                logger.debug(f"🔄 [DROPS CONFIG] Sent cache invalidation to user {user_id}")
+        except Exception as ws_error:
+            logger.warning(f"Failed to send WebSocket notification for drops config: {ws_error}")
+        
         return {
             "success": True,
             "message": "Конфигурация лутбоксов обновлена",
@@ -415,6 +429,21 @@ async def create_drops_reward(
         db.commit()
         db.refresh(reward)
         
+        # Отправляем WebSocket уведомление для синхронизации фронтенда
+        try:
+            from services.memory_websocket_manager import memory_websocket_manager
+            user_id = current_user.get('id')
+            if user_id and user_id != -1:
+                cache_invalidation_event = {
+                    "type": "cache_invalidate",
+                    "cache_key": f"drops_rewards_{channel_name}_{platform}",
+                    "reason": "drops_reward_created"
+                }
+                await memory_websocket_manager.send_to_user(user_id, cache_invalidation_event)
+                logger.debug(f"🔄 [DROPS REWARD] Sent cache invalidation to user {user_id}")
+        except Exception as ws_error:
+            logger.warning(f"Failed to send WebSocket notification for drops reward: {ws_error}")
+        
         return {
             "success": True,
             "message": "Награда создана",
@@ -460,6 +489,21 @@ async def update_drops_reward(
         reward.updated_at = utcnow_naive()
         db.commit()
         
+        # Отправляем WebSocket уведомление для синхронизации фронтенда
+        try:
+            from services.memory_websocket_manager import memory_websocket_manager
+            user_id = current_user.get('id')
+            if user_id and user_id != -1:
+                cache_invalidation_event = {
+                    "type": "cache_invalidate",
+                    "cache_key": f"drops_rewards_{reward.channel_name}_{reward.platform}",
+                    "reason": "drops_reward_updated"
+                }
+                await memory_websocket_manager.send_to_user(user_id, cache_invalidation_event)
+                logger.debug(f"🔄 [DROPS REWARD] Sent cache invalidation to user {user_id}")
+        except Exception as ws_error:
+            logger.warning(f"Failed to send WebSocket notification for drops reward: {ws_error}")
+        
         return {
             "success": True,
             "message": "Награда обновлена",
@@ -492,8 +536,26 @@ async def delete_drops_reward(
         if not reward:
             raise HTTPException(status_code=404, detail="Награда не найдена")
         
+        channel_name = reward.channel_name;
+        platform = reward.platform;
+        
         db.delete(reward)
         db.commit()
+        
+        # Отправляем WebSocket уведомление для синхронизации фронтенда
+        try:
+            from services.memory_websocket_manager import memory_websocket_manager
+            user_id = current_user.get('id')
+            if user_id and user_id != -1:
+                cache_invalidation_event = {
+                    "type": "cache_invalidate",
+                    "cache_key": f"drops_rewards_{channel_name}_{platform}",
+                    "reason": "drops_reward_deleted"
+                }
+                await memory_websocket_manager.send_to_user(user_id, cache_invalidation_event)
+                logger.debug(f"🔄 [DROPS REWARD] Sent cache invalidation to user {user_id}")
+        except Exception as ws_error:
+            logger.warning(f"Failed to send WebSocket notification for drops reward: {ws_error}")
         
         return {
             "success": True,

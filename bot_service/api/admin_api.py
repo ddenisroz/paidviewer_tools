@@ -1,6 +1,6 @@
 # bot_service/api/admin_api.py
 """API для админ-панели"""
-from fastapi import APIRouter, Depends, HTTPException, Request, Body, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Request, Body, UploadFile, File, Form, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -100,17 +100,34 @@ def is_channel_blocked(channel_name: str, db: Session) -> tuple[bool, Optional[s
 async def get_admin_users(
     page: int = 1,
     limit: int = 50,
+    include_guests: bool = True,  # По умолчанию включаем гостей
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список пользователей для админки"""
+    """Получить список пользователей для админки (включая гостевые сессии)"""
     try:
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
+        from core.database import WhitelistedChannel, GuestSession
+        
         offset = (page - 1) * limit
+        
+        # Загружаем обычных пользователей
         users = db.query(User).offset(offset).limit(limit).all()
         total_users = db.query(User).count()
+        
+        # Загружаем гостевые сессии (если включено) из таблицы GuestSession
+        guest_sessions = []
+        total_guest_sessions = 0
+        if include_guests:
+            # Активные гостевые сессии из отдельной таблицы
+            guest_sessions = db.query(GuestSession).filter(
+                GuestSession.is_active == True
+            ).all()
+            total_guest_sessions = db.query(GuestSession).filter(
+                GuestSession.is_active == True
+            ).count()
         
         user_data = []
         for u in users:
@@ -136,8 +153,35 @@ async def get_admin_users(
             twitch_display_name = u.twitch_username or (twitch_token.platform_user_id if twitch_token else None)
             vk_display_name = u.vk_username or u.vk_channel_name or (vk_token.platform_user_id if vk_token else None)
             
+            # Проверяем whitelist статус по платформам
+            whitelisted_platforms = []
+            whitelisted_channels = {}
+            
+            # Проверяем Twitch whitelist
+            if u.twitch_username:
+                twitch_whitelisted = db.query(WhitelistedChannel).filter(
+                    WhitelistedChannel.channel_name == u.twitch_username.lower(),
+                    WhitelistedChannel.platform == 'twitch'
+                ).first()
+                if twitch_whitelisted:
+                    whitelisted_platforms.append('twitch')
+                    whitelisted_channels['twitch'] = u.twitch_username
+            
+            # Проверяем VK whitelist
+            if u.vk_username:
+                vk_whitelisted = db.query(WhitelistedChannel).filter(
+                    WhitelistedChannel.channel_name == u.vk_username.lower(),
+                    WhitelistedChannel.platform == 'vk'
+                ).first()
+                if vk_whitelisted:
+                    whitelisted_platforms.append('vk')
+                    whitelisted_channels['vk'] = u.vk_username
+            
+            is_whitelisted = len(whitelisted_platforms) > 0
+            
             user_data.append({
                 'id': u.id,
+                'is_guest': False,
                 'is_admin': u.is_admin,
                 'is_active': u.is_active,
                 'is_blocked': u.is_blocked,
@@ -159,8 +203,68 @@ async def get_admin_users(
                     }
                 },
                 'total_integrations': (1 if twitch_connected else 0) + (1 if vk_connected else 0),
-                'is_whitelisted': _is_user_whitelisted(u, db)
+                'is_whitelisted': is_whitelisted,
+                'whitelisted_platforms': whitelisted_platforms,  # Список платформ: ['twitch', 'vk']
+                'whitelisted_channels': whitelisted_channels  # Объект: {'twitch': 'channel_name', 'vk': 'channel_name'}
             })
+        
+        # Добавляем гостевые сессии из GuestSession
+        for guest_session in guest_sessions:
+            # Теперь channel_name и platform хранятся прямо в таблице, не в JSON
+            monitored_channel = guest_session.channel_name
+            platform = guest_session.platform
+            
+            # Проверяем whitelist для гостевого канала
+            whitelisted_platforms = []
+            whitelisted_channels = {}
+            
+            if monitored_channel and platform:
+                whitelisted = db.query(WhitelistedChannel).filter(
+                    WhitelistedChannel.channel_name == monitored_channel.lower(),
+                    WhitelistedChannel.platform == platform
+                ).first()
+                if whitelisted:
+                    whitelisted_platforms.append(platform)
+                    whitelisted_channels[platform] = monitored_channel
+            
+            # Определяем username в зависимости от платформы
+            twitch_username = monitored_channel if platform == 'twitch' else None
+            vk_username = monitored_channel if platform == 'vk' else None
+            vk_channel_name = monitored_channel if platform == 'vk' else None
+            
+            user_data.append({
+                'id': -1,  # Специальный ID для гостей
+                'is_guest': True,
+                'session_id': guest_session.session_id,
+                'is_admin': False,
+                'is_active': True,
+                'is_blocked': False,
+                'blocked_reason': None,
+                'created_at': guest_session.created_at.isoformat() if guest_session.created_at else None,
+                'last_activity': guest_session.last_activity.isoformat() if guest_session.last_activity else None,
+                'twitch_username': twitch_username,
+                'vk_username': vk_username,
+                'vk_channel_name': vk_channel_name,
+                'integrations': {
+                    'twitch': {
+                        'connected': platform == 'twitch',
+                        'username': twitch_username,
+                        'enabled': platform == 'twitch'
+                    },
+                    'vk': {
+                        'connected': platform == 'vk',
+                        'username': vk_username,
+                        'enabled': platform == 'vk'
+                    }
+                },
+                'total_integrations': 1 if platform else 0,
+                'is_whitelisted': len(whitelisted_platforms) > 0,
+                'whitelisted_platforms': whitelisted_platforms,
+                'whitelisted_channels': whitelisted_channels
+            })
+        
+        # Общее количество (обычные пользователи + гостевые сессии)
+        total_count = total_users + total_guest_sessions
         
         return {
             "success": True,
@@ -168,8 +272,10 @@ async def get_admin_users(
             "pagination": {
                 "page": page,
                 "limit": limit,
-                "total": total_users,
-                "pages": (total_users + limit - 1) // limit
+                "total": total_count,
+                "total_users": total_users,
+                "total_guests": total_guest_sessions,
+                "pages": (total_count + limit - 1) // limit
             }
         }
     except Exception as e:
@@ -353,20 +459,35 @@ async def unblock_user(
 async def get_sessions(
     page: int = 1,
     limit: int = 50,
+    include_guests: bool = True,
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список активных сессий"""
+    """Получить список активных сессий (включая гостевые)"""
     try:
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
+        from core.database import GuestSession
+        
         offset = (page - 1) * limit
-        # Оптимизация: загружаем все сессии и связанных пользователей одним запросом
+        
+        # Загружаем авторизованные сессии
         sessions = db.query(UserSession).offset(offset).limit(limit).all()
         total_sessions = db.query(UserSession).count()
         
-        # Получаем все уникальные user_id из сессий
+        # Загружаем гостевые сессии
+        guest_sessions = []
+        total_guest_sessions = 0
+        if include_guests:
+            guest_sessions = db.query(GuestSession).filter(
+                GuestSession.is_active == True
+            ).all()
+            total_guest_sessions = db.query(GuestSession).filter(
+                GuestSession.is_active == True
+            ).count()
+        
+        # Получаем все уникальные user_id из авторизованных сессий
         user_ids = {session.user_id for session in sessions if session.user_id}
         
         # Загружаем всех пользователей одним запросом (оптимизация N+1)
@@ -376,6 +497,8 @@ async def get_sessions(
             users_dict = {user.id: user for user in users}
         
         sessions_data = []
+        
+        # Добавляем авторизованные сессии
         for session in sessions:
             session_user = users_dict.get(session.user_id)
             sessions_data.append({
@@ -385,8 +508,24 @@ async def get_sessions(
                 'session_id': session.session_id,
                 'created_at': session.created_at.isoformat() if session.created_at else None,
                 'last_activity': session.last_activity.isoformat() if session.last_activity else None,
-                'is_active': session.is_active
+                'is_active': session.is_active,
+                'is_guest': False
             })
+        
+        # Добавляем гостевые сессии
+        for guest_session in guest_sessions:
+            sessions_data.append({
+                'id': f"guest_{guest_session.id}",
+                'user_id': -1,
+                'username': f"{guest_session.channel_name} (guest, {guest_session.platform})",
+                'session_id': guest_session.session_id,
+                'created_at': guest_session.created_at.isoformat() if guest_session.created_at else None,
+                'last_activity': guest_session.last_activity.isoformat() if guest_session.last_activity else None,
+                'is_active': guest_session.is_active,
+                'is_guest': True
+            })
+        
+        total_count = total_sessions + total_guest_sessions
         
         return {
             "success": True,
@@ -394,8 +533,10 @@ async def get_sessions(
             "pagination": {
                 "page": page,
                 "limit": limit,
-                "total": total_sessions,
-                "pages": (total_sessions + limit - 1) // limit
+                "total": total_count,
+                "total_authenticated": total_sessions,
+                "total_guest": total_guest_sessions,
+                "pages": (total_count + limit - 1) // limit
             }
         }
     except Exception as e:
@@ -450,9 +591,9 @@ async def add_to_whitelist(
         db.add(whitelist_user)
         db.commit()
         
-        # Инвалидируем кеш whitelist
+        # Инвалидируем кеш whitelist (передаем db для точной инвалидации кеша пользователей)
         from utils.whitelist_cache import invalidate_whitelist_cache
-        invalidate_whitelist_cache(username, platform)
+        invalidate_whitelist_cache(username, platform, db)
         
         logger.info(f"✅ WHITELIST: Канал '{username}' добавлен в белый список")
         return JSONResponse(content={"success": True, "message": f"User {username} added to whitelist"})
@@ -475,11 +616,12 @@ async def get_whitelist(
         whitelist_users = db.query(WhitelistedChannel).all()
         
         whitelist_data = []
-        for user in whitelist_users:
+        for wl_entry in whitelist_users:
             whitelist_data.append({
-                'id': user.id,
-                'channel_name': user.channel_name,
-                'created_at': user.created_at.isoformat() if user.created_at else None
+                'id': wl_entry.id,
+                'channel_name': wl_entry.channel_name,
+                'platform': wl_entry.platform,
+                'created_at': wl_entry.created_at.isoformat() if wl_entry.created_at else None
             })
         
         return JSONResponse(content={
@@ -494,6 +636,7 @@ async def get_whitelist(
 @router.delete("/whitelist/{username}")
 async def remove_from_whitelist(
     username: str,
+    platform: Optional[str] = Query(None, description="Platform to remove from (twitch or vk). If not specified, removes from all platforms."),
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -505,23 +648,52 @@ async def remove_from_whitelist(
         from core.database import WhitelistedChannel
         username = username.lower().strip()
         
-        whitelist_user = db.query(WhitelistedChannel).filter(
-            WhitelistedChannel.channel_name == username
-        ).first()
-        
-        if not whitelist_user:
-            return JSONResponse(content={"success": False, "error": f"User {username} not found in whitelist"}, status_code=404)
-        
-        platform = whitelist_user.platform
-        db.delete(whitelist_user)
-        db.commit()
-        
-        # Инвалидируем кеш whitelist
-        from utils.whitelist_cache import invalidate_whitelist_cache
-        invalidate_whitelist_cache(username, platform)
-        
-        logger.info(f"🗑️ WHITELIST: Канал '{username}' удален из белого списка")
-        return JSONResponse(content={"success": True, "message": f"User {username} removed from whitelist"})
+        # Если указана платформа, удаляем только с неё
+        if platform:
+            platform = platform.lower().strip()
+            if platform not in ("twitch", "vk"):
+                return JSONResponse(content={"success": False, "error": "Invalid platform. Must be 'twitch' or 'vk'"}, status_code=400)
+            
+            whitelist_user = db.query(WhitelistedChannel).filter(
+                WhitelistedChannel.channel_name == username,
+                WhitelistedChannel.platform == platform
+            ).first()
+            
+            if not whitelist_user:
+                return JSONResponse(content={"success": False, "error": f"User {username} not found in whitelist for platform {platform}"}, status_code=404)
+            
+            db.delete(whitelist_user)
+            db.commit()
+            
+            # Инвалидируем кеш whitelist (передаем db для точной инвалидации кеша пользователей)
+            from utils.whitelist_cache import invalidate_whitelist_cache
+            invalidate_whitelist_cache(username, platform, db)
+            
+            logger.info(f"🗑️ WHITELIST: Канал '{username}' удален из белого списка (платформа: {platform})")
+            return JSONResponse(content={"success": True, "message": f"User {username} removed from whitelist (platform: {platform})"})
+        else:
+            # Если платформа не указана, удаляем все записи этого канала (для обратной совместимости)
+            whitelist_users = db.query(WhitelistedChannel).filter(
+                WhitelistedChannel.channel_name == username
+            ).all()
+            
+            if not whitelist_users:
+                return JSONResponse(content={"success": False, "error": f"User {username} not found in whitelist"}, status_code=404)
+            
+            platforms = []
+            for wl_user in whitelist_users:
+                platforms.append(wl_user.platform)
+                db.delete(wl_user)
+            
+            db.commit()
+            
+            # Инвалидируем кеш для всех платформ (передаем db для точной инвалидации)
+            from utils.whitelist_cache import invalidate_whitelist_cache
+            for p in platforms:
+                invalidate_whitelist_cache(username, p, db)
+            
+            logger.info(f"🗑️ WHITELIST: Канал '{username}' удален из белого списка (платформы: {', '.join(platforms)})")
+            return JSONResponse(content={"success": True, "message": f"User {username} removed from whitelist (platforms: {', '.join(platforms)})"})
     except Exception as e:
         logger.error(f"Error removing from whitelist: {e}")
         db.rollback()

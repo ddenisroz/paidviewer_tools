@@ -112,41 +112,35 @@ async def broadcast_chat_message(
                             db.rollback()
                             
                             # Исправляем sequence для PostgreSQL
-                            from core.database import IS_POSTGRESQL
-                            if IS_POSTGRESQL:
-                                try:
-                                    # Получаем максимальный ID из таблицы
-                                    from sqlalchemy import func, text
-                                    max_id_result = db.execute(text("SELECT COALESCE(MAX(id), 0) FROM chat_messages"))
-                                    max_id = max_id_result.scalar() or 0
-                                    
-                                    # Обновляем sequence до максимального ID + 1
-                                    db.execute(text(f"SELECT setval('chat_messages_id_seq', {max_id + 1}, false)"))
-                                    db.commit()
-                                    
-                                    logger.info(f"✅ [DB] Sequence fixed: set to {max_id + 1}")
-                                    
-                                    # Повторяем попытку сохранения
-                                    chat_message = ChatMessage(
-                                        user_id=user_id,
-                                        channel_name=channel,
-                                        platform=platform,
-                                        author_username=username,
-                                        message=content,
-                                        role=role,
-                                        badges=badges
-                                    )
-                                    db.add(chat_message)
-                                    db.commit()
-                                    logger.info(f"💾 [DB] Message saved after retry: ID={chat_message.id}, {platform}:{channel} from {username}")
-                                except Exception as seq_error:
-                                    logger.error(f"❌ [DB] Failed to fix sequence: {seq_error}")
-                                    db.rollback()
-                                    # Продолжаем без сохранения в БД, но отправляем сообщение
-                            else:
-                                # Для SQLite просто rollback и продолжаем
+                            try:
+                                # Получаем максимальный ID из таблицы
+                                from sqlalchemy import func, text
+                                max_id_result = db.execute(text("SELECT COALESCE(MAX(id), 0) FROM chat_messages"))
+                                max_id = max_id_result.scalar() or 0
+                                
+                                # Обновляем sequence до максимального ID + 1
+                                db.execute(text(f"SELECT setval('chat_messages_id_seq', {max_id + 1}, false)"))
+                                db.commit()
+                                
+                                logger.info(f"✅ [DB] Sequence fixed: set to {max_id + 1}")
+                                
+                                # Повторяем попытку сохранения
+                                chat_message = ChatMessage(
+                                    user_id=user_id,
+                                    channel_name=channel,
+                                    platform=platform,
+                                    author_username=username,
+                                    message=content,
+                                    role=role,
+                                    badges=badges
+                                )
+                                db.add(chat_message)
+                                db.commit()
+                                logger.info(f"💾 [DB] Message saved after retry: ID={chat_message.id}, {platform}:{channel} from {username}")
+                            except Exception as seq_error:
+                                logger.error(f"❌ [DB] Failed to fix sequence: {seq_error}")
                                 db.rollback()
-                                logger.warning(f"⚠️ [DB] ID conflict in SQLite, skipping DB save")
+                                # Продолжаем без сохранения в БД, но отправляем сообщение
                         else:
                             # Другая ошибка - логируем и продолжаем
                             logger.error(f"❌ [DB] Unexpected error saving message: {db_error}")

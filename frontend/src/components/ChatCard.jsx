@@ -1,5 +1,5 @@
 // src/components/ChatCard.jsx
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -375,20 +375,41 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
 
     // Автоматический скролл при ПЕРВОЙ загрузке (показываем новые сообщения)
     const hasScrolledOnLoad = useRef(false);
-    useEffect(() => {
-        if (chatMessages.length > 0 && !hasScrolledOnLoad.current) {
-            // При первой загрузке ВСЕГДА скроллим вниз (мгновенно)
-            setTimeout(() => {
-                const container = messagesContainerRef.current;
-                if (container) {
-                    // Используем scrollTop - НЕ вызывает скролл страницы!
-                    container.scrollTop = container.scrollHeight;
-                    logger.log('⬇️ Auto-scrolled to bottom on initial load');
+    const previousIsOnHomePage = useRef(isOnHomePage);
+    
+    // Используем useLayoutEffect для установки позиции ДО отрисовки (синхронно)
+    // Это предотвращает видимый скролл при переключении на главную страницу
+    useLayoutEffect(() => {
+        if (isOnHomePage && filteredMessages.length > 0) {
+            const container = messagesContainerRef.current;
+            if (container) {
+                // Устанавливаем позицию синхронно ДО отрисовки - пользователь не увидит скролл
+                container.scrollTop = container.scrollHeight;
+                if (!hasScrolledOnLoad.current) {
+                    logger.log('⬇️ Auto-scrolled to bottom on initial load (instant, before render)');
+                    hasScrolledOnLoad.current = true;
                 }
-            }, 100);
-            hasScrolledOnLoad.current = true;
+            }
         }
-    }, [chatMessages.length]);
+    }, [isOnHomePage, filteredMessages.length]);
+    
+    // Скролл при переключении на главную страницу (дополнительная проверка)
+    useEffect(() => {
+        // Если только что переключились на главную страницу
+        if (isOnHomePage && !previousIsOnHomePage.current && filteredMessages.length > 0) {
+            // Дополнительная установка позиции после рендера (на случай если layoutEffect не сработал)
+            const container = messagesContainerRef.current;
+            if (container) {
+                // Используем микро-задержку чтобы гарантировать что DOM обновлен
+                const timeoutId = setTimeout(() => {
+                    container.scrollTop = container.scrollHeight;
+                    logger.log('⬇️ Scrolled to bottom on page switch (fallback)');
+                }, 0);
+                return () => clearTimeout(timeoutId);
+            }
+        }
+        previousIsOnHomePage.current = isOnHomePage;
+    }, [isOnHomePage, filteredMessages.length]);
     
     // Автоматический скролл при новых сообщениях (только если пользователь внизу)
     const lastMessageId = filteredMessages.length > 0 ? filteredMessages[filteredMessages.length - 1]?.id : null;
@@ -457,9 +478,24 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
             // Убеждаемся что badges загружены ДО загрузки истории
             try {
                 await twitchBadgesService.loadGlobalBadges();
+                // Загружаем channel badges если есть Twitch username
+                if (integrations?.twitch?.enabled && user?.twitch_username) {
+                    try {
+                        // Получаем broadcaster_id из API для загрузки channel badges
+                        const channelResponse = await microservicesAPI.get('/api/chatbox/settings', {
+                            params: { channel_name: user.twitch_username }
+                        });
+                        if (channelResponse.data?.channel_name) {
+                            await twitchBadgesService.loadChannelBadges(channelResponse.data.channel_name);
+                            logger.log('✅ [CHAT] Channel badges loaded for:', channelResponse.data.channel_name);
+                        }
+                    } catch (err) {
+                        logger.warn('⚠️ [CHAT] Failed to load channel badges:', err);
+                    }
+                }
                 setBadgesLoaded(true); // Устанавливаем СРАЗУ чтобы badges рендерились
                 logger.log('✅ [CHAT] Twitch badges loaded before history');
-                                } catch (error) {
+            } catch (error) {
                 logger.warn('⚠️ [CHAT] Failed to load badges, continuing anyway:', error);
             }
             
@@ -478,12 +514,17 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                         }
                     });
                     
-                    if (response.data.success && response.data.messages) {
+                        if (response.data.success && response.data.messages) {
                         logger.log(`✅ [CHAT] Loaded ${response.data.messages.length} Twitch messages`);
-                        // Отладка: проверяем первое сообщение на badges
-                        if (response.data.messages[0]) {
-                            logger.log('🎖️ [CHAT HISTORY] First message badges:', response.data.messages[0].badges, 'type:', typeof response.data.messages[0].badges);
-                            logger.log('🎖️ [CHAT HISTORY] First message role:', response.data.messages[0].role);
+                        // Отладка: проверяем сообщения на badges
+                        const messagesWithBadges = response.data.messages.filter(m => m.badges && Array.isArray(m.badges) && m.badges.length > 0);
+                        logger.log(`🎖️ [CHAT HISTORY] Messages with badges: ${messagesWithBadges.length}/${response.data.messages.length}`);
+                        if (messagesWithBadges.length > 0) {
+                            logger.log('🎖️ [CHAT HISTORY] Sample badge message:', {
+                                author: messagesWithBadges[0].author,
+                                badges: messagesWithBadges[0].badges,
+                                badgesType: typeof messagesWithBadges[0].badges
+                            });
                         }
                         historyMessages.push(...response.data.messages);
                     } else {
@@ -1186,15 +1227,42 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                                                             })}
                                                         </span>
                                                         
-                                                        {/* Badges (значки Twitch) - только если badges загружены */}
-                                                        {badgesLoaded && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (
+                                                        {/* Badges (значки Twitch) */}
+                                                        {msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (
                                                             <>
                                                                 {msg.badges.map((badge, idx) => {
+                                                                    // Проверяем формат badge
+                                                                    if (!badge || typeof badge !== 'string' || !badge.includes('/')) {
+                                                                        logger.warn('Invalid badge format:', badge);
+                                                                        return null;
+                                                                    }
+                                                                    
                                                                     const [badgeId, version] = badge.split('/');
+                                                                    if (!badgeId || !version) {
+                                                                        logger.warn('Badge missing id or version:', badge);
+                                                                        return null;
+                                                                    }
+                                                                    
+                                                                    // Пытаемся получить URL badge (даже если badges еще не загружены полностью)
                                                                     const badgeUrl = twitchBadgesService.getBadgeUrl(badgeId, version, '1x');
                                                                     
-                                                                    // Пропускаем badge если URL не найден
-                                                                    if (!badgeUrl) return null;
+                                                                    // Если URL не найден, но badges загружены - пропускаем
+                                                                    // Если URL не найден, но badges еще не загружены - показываем placeholder
+                                                                    if (!badgeUrl) {
+                                                                        if (badgesLoaded) {
+                                                                            // Badges загружены, но URL не найден - пропускаем
+                                                                            return null;
+                                                                        } else {
+                                                                            // Badges еще не загружены - показываем placeholder
+                                                                            return (
+                                                                                <span 
+                                                                                    key={idx} 
+                                                                                    className="inline-block align-text-bottom mr-0.5 w-[18px] h-[18px] bg-gray-600 rounded"
+                                                                                    title={badge}
+                                                                                />
+                                                                            );
+                                                                        }
+                                                                    }
                                                                     
                                                                     return (
                                                                         <img 

@@ -6,6 +6,7 @@ import MessageContent from '../components/MessageContent';
 import { twitchBadgesService } from '../services/twitchBadges';
 import { useChat } from '../context/ChatContext';
 import { logger } from '../utils/prodLogger';
+import { getAllEmotesForChannel } from '../utils/emotes';
 
 /**
  * Чат в отдельном окне
@@ -24,20 +25,31 @@ const ChatWindow = () => {
         show_platform_icons: true,
         show_badges: true,
         show_avatars: true,
-        max_messages: 50
+        max_messages: 50,
+        show_7tv_emotes: true,
+        show_links: true,
+        auto_load_images: true  // Загружать картинки/гифки сразу или ссылкой
     });
     
     const messagesEndRef = useRef(null);
     const [badgesLoaded, setBadgesLoaded] = useState(false);
+    const [emotes, setEmotes] = useState({ channelEmotes: new Map(), globalEmotes: new Map() });
     
-    // Загрузка Twitch badges при монтировании
+    // Загрузка Twitch badges и 7TV эмодзи при монтировании
     useEffect(() => {
         if (!badgesLoaded) {
             twitchBadgesService.loadGlobalBadges()
                 .then(() => setBadgesLoaded(true))
                 .catch(err => logger.error('Failed to load badges:', err));
         }
-    }, [badgesLoaded]);
+        
+        // Загружаем 7TV эмодзи если включена настройка
+        if (settings.show_7tv_emotes && user?.twitch_username) {
+            getAllEmotesForChannel(user.twitch_username)
+                .then(data => setEmotes(data))
+                .catch(err => logger.error('Failed to load 7TV emotes:', err));
+        }
+    }, [badgesLoaded, settings.show_7tv_emotes, user?.twitch_username]);
     
     // Автопрокрутка к последнему сообщению
     useEffect(() => {
@@ -239,7 +251,12 @@ const ChatWindow = () => {
                                 
                                 {/* Message Content */}
                                 <span style={{ color: settings.text_color, flex: 1 }}>
-                                    <MessageContent message={msg.message} emotes={{}} />
+                                    <MessageContent 
+                                        message={msg.message} 
+                                        channelEmotes={settings.show_7tv_emotes ? emotes.channelEmotes : new Map()}
+                                        globalEmotes={settings.show_7tv_emotes ? emotes.globalEmotes : new Map()}
+                                        showLinks={settings.show_links}
+                                    />
                                 </span>
                             </div>
                         ))}

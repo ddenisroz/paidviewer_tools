@@ -94,12 +94,9 @@ const PointsManagementPage = () => {
 
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-5xl">
-      {/* Header */}
+      {/* Header - заголовок теперь в Header компоненте */}
       <div className="flex flex-col gap-4 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Награды за баллы</h1>
-          </div>
           
           {/* Переключатель платформ - показываем только подключенные */}
           {(twitchEnabled || vkEnabled) && (

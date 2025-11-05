@@ -32,7 +32,10 @@ const TtsControlPanel = ({
     
     // Проверяем есть ли локальный TTS setup
     const hasLocalSetup = localStorage.getItem('tts_has_local_setup') === 'true';
-    const canUseF5TTS = hasLocalSetup || isWhitelisted;
+    // Обрабатываем случай когда isWhitelisted еще не проверен (null)
+    // Если isWhitelisted === null, считаем что проверка еще не выполнена, но не блокируем доступ
+    // (проверка будет выполнена на бэкенде)
+    const canUseF5TTS = hasLocalSetup || isWhitelisted === true;
     
     return (
         <Card>
@@ -47,7 +50,11 @@ const TtsControlPanel = ({
                     {/* Типы озвучки */}
                     <div className="grid grid-cols-2 gap-4">
                         {/* Базовая озвучка */}
-                        <div className="flex items-center space-x-4 p-4 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-2 border-blue-500/30 rounded-2xl hover:border-blue-500/50 transition-all duration-200 cursor-pointer">
+                        <div className={`flex items-center space-x-4 p-4 rounded-2xl border-2 transition-all duration-200 ${
+                            basicTtsEnabled
+                                ? 'bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/50 hover:border-blue-500/70 cursor-pointer'
+                                : 'bg-gray-500/10 border-gray-500/30 hover:border-gray-500/50 cursor-pointer'
+                        }`}>
                             <Switch
                                 checked={basicTtsEnabled}
                                 onCheckedChange={(checked) => setBasicTtsEnabled(checked)}
@@ -55,7 +62,7 @@ const TtsControlPanel = ({
                                 className="scale-125"
                             />
                             <div className="flex-1">
-                                <h3 className="text-lg font-bold text-white">Базовая озвучка</h3>
+                                <h3 className={`text-lg font-bold ${basicTtsEnabled ? 'text-white' : 'text-gray-400'}`}>Базовая озвучка</h3>
                                 <p className="text-sm text-gray-400 mt-0.5">Google TTS</p>
                                 {(!isAuthenticated || !isConnected) && (
                                     <p className="text-xs text-yellow-500 mt-1">⚠ Требуется канал</p>
@@ -65,18 +72,20 @@ const TtsControlPanel = ({
 
                         {/* ИИ озвучка F5-TTS */}
                         <div className={`flex items-center space-x-4 p-4 rounded-2xl border-2 transition-all duration-200 ${
-                            isHealthy && canUseF5TTS
-                                ? 'bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/30 hover:border-purple-500/50 cursor-pointer' 
-                                : 'bg-gray-500/10 border-gray-500/30 opacity-50'
+                            !isHealthy || !canUseF5TTS
+                                ? 'bg-gray-500/10 border-gray-500/30 opacity-50'
+                                : aiTtsEnabled
+                                    ? 'bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/50 hover:border-purple-500/70 cursor-pointer'
+                                    : 'bg-gray-500/10 border-gray-500/30 hover:border-gray-500/50 cursor-pointer'
                         }`}>
                             <Switch
                                 checked={aiTtsEnabled}
                                 onCheckedChange={(checked) => setAiTtsEnabled(checked)}
-                                disabled={!isHealthy || !isAuthenticated || !isConnected || !canUseF5TTS || engineToggleLoading}
+                                disabled={!isHealthy || !isAuthenticated || !isConnected || (isWhitelisted === false && !hasLocalSetup) || engineToggleLoading}
                                 className="scale-125"
                             />
                             <div className="flex-1">
-                                <h3 className="text-lg font-bold text-white">ИИ озвучка</h3>
+                                <h3 className={`text-lg font-bold ${aiTtsEnabled ? 'text-white' : 'text-gray-400'}`}>ИИ озвучка</h3>
                                 <p className="text-sm text-gray-400 mt-0.5">F5-TTS</p>
                                 {(!isAuthenticated || !isConnected) && (
                                     <p className="text-xs text-yellow-500 mt-1">⚠ Требуется канал</p>

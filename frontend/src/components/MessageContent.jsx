@@ -2,29 +2,71 @@
 import React from 'react';
 import { processEmotes } from '../utils/emotes';
 
-const MessageContent = ({ message, channelEmotes, globalEmotes }) => {
+const MessageContent = ({ message, channelEmotes, globalEmotes, showLinks = true }) => {
     if (!message) return null;
 
+    // Обрабатываем ссылки
+    let processedMessage = message;
+    if (!showLinks) {
+        // Скрываем ссылки, заменяя их на текст
+        const urlRegex = /(https?:\/\/[^\s]+)/gi;
+        processedMessage = processedMessage.replace(urlRegex, (url) => {
+            try {
+                const urlObj = new URL(url);
+                return urlObj.hostname + (urlObj.pathname.length > 20 ? urlObj.pathname.substring(0, 20) + '...' : urlObj.pathname);
+            } catch {
+                return '[ссылка]';
+            }
+        });
+    }
+
     // 🎭 Processing message:', message, 'Channel emotes:', channelEmotes.size, 'Global emotes:', globalEmotes.size);
-    const processedMessage = processEmotes(message, channelEmotes, globalEmotes);
-    // 🎭 Processed message:', processedMessage);
+    const processedMessageWithEmotes = processEmotes(processedMessage, channelEmotes, globalEmotes);
+    // 🎭 Processed message:', processedMessageWithEmotes);
     
     // Если есть HTML теги (эмодзи), создаем элементы безопасно
-    if (processedMessage.includes('<img')) {
+    if (processedMessageWithEmotes.includes('<img')) {
         return (
             <span className="break-words">
-                {renderMessageWithEmotes(processedMessage)}
+                {renderMessageWithEmotes(processedMessageWithEmotes, showLinks)}
             </span>
         );
     }
     
-    // Иначе обычный текст
-    return <span className="break-words">{message}</span>;
+    // Иначе обычный текст с возможными ссылками
+    if (showLinks) {
+        // Делаем ссылки кликабельными
+        const urlRegex = /(https?:\/\/[^\s]+)/gi;
+        const parts = processedMessage.split(urlRegex);
+        return (
+            <span className="break-words">
+                {parts.map((part, index) => {
+                    if (part.match(urlRegex)) {
+                        return (
+                            <a
+                                key={index}
+                                href={part}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: '#00d4ff', textDecoration: 'underline' }}
+                            >
+                                {part}
+                            </a>
+                        );
+                    }
+                    return part;
+                })}
+            </span>
+        );
+    }
+    
+    return <span className="break-words">{processedMessage}</span>;
 };
 
 // Безопасная функция для рендеринга сообщений с эмодзи
-const renderMessageWithEmotes = (processedMessage) => {
-    // Разбиваем сообщение на части по тегам img
+const renderMessageWithEmotes = (processedMessage, showLinks = true) => {
+    // Разбиваем сообщение на части по тегам img и ссылкам
+    const urlRegex = /(https?:\/\/[^\s]+)/gi;
     const parts = processedMessage.split(/(<img[^>]*\/>)/);
     
     return parts.map((part, index) => {
@@ -45,8 +87,23 @@ const renderMessageWithEmotes = (processedMessage) => {
             }
         }
         
+        // Если это ссылка и showLinks=true, делаем её кликабельной
+        if (showLinks && part.match(urlRegex)) {
+            return (
+                <a
+                    key={index}
+                    href={part}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#00d4ff', textDecoration: 'underline' }}
+                >
+                    {part}
+                </a>
+            );
+        }
+        
         // Обычный текст
-        return part;
+        return <span key={index}>{part}</span>;
     });
 };
 

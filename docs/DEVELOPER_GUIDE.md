@@ -1,10 +1,10 @@
-# 👨‍💻 Developer Guide - TTS_TTV_0.02
+# Developer Guide - TTS_TTV_0.02
 
 **Last Updated**: Oct 21, 2025 | **Status**: Session 5 Complete
 
 ---
 
-## 🚀 **Quick Start (5 min)**
+## Quick Start (5 min)
 
 ```bash
 # 1. Setup environment
@@ -26,32 +26,32 @@ python -m uvicorn main:app --reload
 
 ---
 
-## 🎯 **Critical Issues Found in Session 5**
+## Critical Issues Found in Session 5
 
-### **Issue #1: TTS Was Completely Silent** ❌→ ✅
+### **Issue #1: TTS Was Completely Silent**
 **Root Cause**: `/api/tts/enable` endpoint returned Python `dict` instead of `JSONResponse`
 - **Files Affected**: `bot_service/api/tts_api.py` (lines 512-592)
 - **Impact**: CORS errors + 500 responses prevented TTS from being enabled
 - **Fix**: Changed all TTS endpoints to return `JSONResponse(content={...})`
-- **Status**: FIXED ✅
+- **Status**: FIXED
 
-### **Issue #2: Global TTS Flag Not Checked** ❌→ ✅
+### **Issue #2: Global TTS Flag Not Checked**
 **Root Cause**: `handle_tts_for_message()` didn't verify `user.tts_enabled`
 - **Files Affected**: `bot_service/utils/websocket_helper.py` (line 198-201)
 - **Impact**: Even if enabled via API, TTS would fail silently
 - **Fix**: Added check: `if not channel_owner.tts_enabled: return`
-- **Status**: FIXED ✅
+- **Status**: FIXED
 
-### **Issue #3: Mocked UI Elements** ❌→ ✅
+### **Issue #3: Mocked UI Elements**
 **Root Cause**: Local/Cloud TTS selector showed even when non-functional
 - **Files Affected**: `frontend/src/pages/tts/TtsMainPage.jsx` (lines 496-544)
 - **Impact**: Confusing UX - users see broken UI
 - **Fix**: Hidden selector behind `{localTtsConfig?.configured && (...)}`
-- **Status**: FIXED ✅
+- **Status**: FIXED
 
 ---
 
-## 📋 **Code Architecture - Key Files**
+## Code Architecture - Key Files
 
 ### **Backend Flow**
 
@@ -133,20 +133,20 @@ print(cm.is_tts_enabled("yourchy"))  # Should return True
 ```bash
 # Look for these prefixes:
 🎙️ [TWITCH TTS]       # Message processing started
-✅ [BASIC TTS]        # gTTS synthesis
-ℹ️ [TTS is DISABLED]   # User hasn't enabled TTS
-❌ [TTS Service]      # Error in synthesis
+[BASIC TTS]        # gTTS synthesis
+[TTS is DISABLED]   # User hasn't enabled TTS
+[TTS Service Error]      # Error in synthesis
 ```
 
 ---
 
-## 🚨 **Common Problems & Solutions**
+## Common Problems & Solutions
 
 ### **Problem: Audio Not Playing**
-1. ✅ Check `/api/tts/enable` returns 200 OK
-2. ✅ Verify `user.tts_enabled = True` in database
-3. ✅ Check logs for `🎙️ [TWITCH TTS]` prefix
-4. ✅ Verify `/api/tts/audio/{filename}` returns 200 with WAV file
+1. Check `/api/tts/enable` returns 200 OK
+2. Verify `user.tts_enabled = True` in database
+3. Check logs for `[TWITCH TTS]` prefix
+4. Verify `/api/tts/audio/{filename}` returns 200 with WAV file
 
 ### **Problem: 500 Error on /api/tts/enable**
 1. Check `bot_service/services/tts_service.py:392` for exceptions
@@ -160,7 +160,7 @@ print(cm.is_tts_enabled("yourchy"))  # Should return True
 
 ---
 
-## 📚 **Documentation Files**
+## Documentation Files
 
 | File | Purpose |
 |------|---------|
@@ -174,7 +174,7 @@ print(cm.is_tts_enabled("yourchy"))  # Should return True
 
 ---
 
-## 🔑 **Key Endpoints**
+## Key Endpoints
 
 ```
 # TTS Control
@@ -194,7 +194,7 @@ GET  /api/tts/local-config   # Check local TTS setup
 
 ---
 
-## 🎯 **Next Steps for Developers**
+## Next Steps for Developers
 
 1. **Understand TTS Flow** - Read websocket_helper.py:126
 2. **Test Manually** - Toggle TTS, write message, check logs

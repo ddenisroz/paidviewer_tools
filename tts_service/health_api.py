@@ -26,6 +26,14 @@ async def health_check():
         "tts_engine_loaded": tts_engine_loaded
     }
 
+# Создаем отдельный роутер для /api/health
+api_health_router = APIRouter(tags=["health"])
+
+@api_health_router.get("/health")
+async def api_health_check_alias():
+    """Алиас для /health для совместимости с bot_service"""
+    return await health_check()
+
 @health_router.get("/detailed")
 async def detailed_health_check(db: Session = Depends(get_db)):
     """Детальная проверка здоровья"""

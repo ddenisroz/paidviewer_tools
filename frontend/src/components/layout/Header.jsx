@@ -18,24 +18,46 @@ const Header = () => {
     const [integrationsOpen, setIntegrationsOpen] = useState(false);
     
     // Маппинг путей к заголовкам страниц
+    // Порядок важен: сначала более специфичные пути, потом общие
     const pageTitles = useMemo(() => ({
-        '/dashboard': '',
+        '/dashboard/tts/voices': 'Управление голосами',
+        '/dashboard/tts/local': 'Локальный TTS',
         '/dashboard/tts': 'Озвучка сообщений',
         '/dashboard/youtube': 'Youtube заказы',
         '/dashboard/drops': 'Drops система',
         '/dashboard/commands': 'Команды',
         '/dashboard/points': 'Управление наградами',
         '/dashboard/settings': 'Настройки',
-        '/dashboard/admin': 'Панель администратора',
+        '/dashboard/chat-analysis': 'Анализ и модерация чата',
+        '/dashboard/dolbaebadmintts': 'Панель администратора',
+        '/dashboard': '',
     }), []);
     
     const pageTitle = useMemo(() => {
         // Ищем заголовок для текущего пути
-        for (const [path, title] of Object.entries(pageTitles)) {
-            if (location.pathname === path || location.pathname.startsWith(`${path}/`)) {
+        // Проверяем сначала точные совпадения, потом подпути
+        // Убираем query параметры и trailing slash для корректного сравнения
+        const currentPath = location.pathname.replace(/\/$/, '') || '/';
+        
+        // Сначала проверяем точное совпадение
+        if (pageTitles[currentPath] !== undefined) {
+            return pageTitles[currentPath];
+        }
+        
+        // Затем проверяем подпути (более специфичные пути идут первыми)
+        // Сортируем пути по длине (от длинных к коротким) для правильного приоритета
+        const sortedPaths = Object.entries(pageTitles).sort((a, b) => b[0].length - a[0].length);
+        
+        for (const [path, title] of sortedPaths) {
+            // Пропускаем пустые заголовки
+            if (!title) continue;
+            
+            // Если текущий путь начинается с базового пути + '/' (подстраница)
+            if (currentPath.startsWith(path + '/')) {
                 return title;
             }
         }
+        
         return '';
     }, [location.pathname, pageTitles]);
 
@@ -121,16 +143,24 @@ const Header = () => {
     };
 
     return (
-        <header className="flex h-16 items-center justify-between gap-2 sm:gap-4 px-3 sm:px-6 lg:h-[70px] bg-muted/40">
-            {/* Заголовок страницы */}
+        <header className="relative flex h-16 items-center gap-2 sm:gap-4 px-3 sm:px-6 lg:h-[70px] bg-muted/40">
+            {/* Левая часть - пустая для баланса */}
+            <div className="flex-1"></div>
+            
+            {/* Заголовок страницы - центрированный и стилизованный */}
             {pageTitle && (
-                <h1 className="text-xl sm:text-2xl font-bold text-foreground">
+                <h1 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl sm:text-3xl lg:text-4xl font-extrabold bg-gradient-to-r from-blue-400 via-emerald-400 to-green-500 bg-clip-text text-transparent tracking-wide drop-shadow-lg" 
+                    style={{ 
+                        fontFamily: "'Orbitron', 'Rajdhani', 'Exo 2', 'Inter', sans-serif",
+                        letterSpacing: '0.08em',
+                        textShadow: '0 0 20px rgba(16, 185, 129, 0.4)'
+                    }}>
                     {pageTitle}
                 </h1>
             )}
             
-            {/* Правая часть: кнопки */}
-            <div className="flex items-center justify-end gap-2 sm:gap-4">
+            {/* Правая часть: кнопки (в правом углу) */}
+            <div className="flex-1 flex items-center justify-end gap-2 sm:gap-4">
                 {/* Кнопка интеграций (для всех авторизованных пользователей, включая гостей) */}
             {isAuthenticated && (
                 <div className="relative integrations-menu">

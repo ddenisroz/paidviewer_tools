@@ -23,27 +23,69 @@ class TTSEngineManager:
             # RussianTTS инициализируется в __init__, поэтому await не нужен
             
             # Инициализация транскрипции с faster-whisper для лучшей производительности
-            try:
-                from faster_whisper import WhisperModel
-                # Используем faster-whisper с turbo моделью для максимальной скорости
-                self.transcriber = WhisperModel("turbo", device="auto", compute_type="auto")
-                logger.info("Faster-Whisper turbo transcriber loaded successfully")
-            except Exception as e:
-                logger.warning(f"Failed to load Faster-Whisper turbo model, trying base: {e}")
+            # Можно отключить через переменную окружения DISABLE_TRANSCRIPTION=true
+            import os
+            if os.getenv("DISABLE_TRANSCRIPTION", "false").lower() == "true":
+                logger.info("Transcription disabled via DISABLE_TRANSCRIPTION env variable")
+                self.transcriber = None
+            else:
                 try:
-                    # Fallback на base модель если medium не загрузится
-                    self.transcriber = WhisperModel("base", device="auto", compute_type="auto")
-                    logger.info("Faster-Whisper base transcriber loaded as fallback")
-                except Exception as e2:
-                    logger.warning(f"Failed to load Faster-Whisper, trying original Whisper: {e2}")
+                    from faster_whisper import WhisperModel
+                    
+                    # Путь к кешу для faster-whisper
+                    cache_dir = Path(__file__).parent / "f5_tts_cache"
+                    cache_dir.mkdir(exist_ok=True)
+                    
+                    # Пытаемся загрузить из локального кеша сначала
                     try:
-                        # Fallback на оригинальный Whisper
-                        import whisper
-                        self.transcriber = whisper.load_model("base")
-                        logger.info("Original Whisper base transcriber loaded as final fallback")
-                    except Exception as e3:
-                        logger.warning(f"Failed to load any transcriber: {e3}")
+                        # Используем faster-whisper с turbo моделью для максимальной скорости
+                        self.transcriber = WhisperModel(
+                            "turbo", 
+                            device="auto", 
+                            compute_type="auto",
+                            download_root=str(cache_dir),
+                            local_files_only=True  # Сначала пытаемся использовать только локальные файлы
+                        )
+                        logger.info("Faster-Whisper turbo transcriber loaded from cache")
+                    except Exception as cache_error:
+                        logger.info(f"Turbo model not in cache, downloading: {cache_error}")
+                        # Если в кеше нет, загружаем
+                        self.transcriber = WhisperModel(
+                            "turbo", 
+                            device="auto", 
+                            compute_type="auto",
+                            download_root=str(cache_dir)
+                        )
+                        logger.info("Faster-Whisper turbo transcriber downloaded and loaded")
+                except Exception as e:
+                    logger.warning(f"Failed to load Faster-Whisper turbo model, trying base: {e}")
+                    try:
+                        # Fallback на base модель если turbo не загрузится
+                        cache_dir = Path(__file__).parent / "f5_tts_cache"
+                        cache_dir.mkdir(exist_ok=True)
+                        
+                        try:
+                            self.transcriber = WhisperModel(
+                                "base", 
+                                device="auto", 
+                                compute_type="auto",
+                                download_root=str(cache_dir),
+                                local_files_only=True
+                            )
+                            logger.info("Faster-Whisper base transcriber loaded from cache")
+                        except Exception as cache_error:
+                            self.transcriber = WhisperModel(
+                                "base", 
+                                device="auto", 
+                                compute_type="auto",
+                                download_root=str(cache_dir)
+                            )
+                            logger.info("Faster-Whisper base transcriber downloaded and loaded")
+                    except Exception as e2:
+                        logger.warning(f"Failed to load Faster-Whisper, disabling transcription: {e2}")
+                        # Транскрипция не критична для TTS, можно работать без неё
                         self.transcriber = None
+                        logger.info("TTS will work without transcription support")
             
             self.is_initialized = True
             logger.info("TTS engine initialized successfully")

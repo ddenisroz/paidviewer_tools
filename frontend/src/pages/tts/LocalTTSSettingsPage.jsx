@@ -321,15 +321,7 @@ const LocalTTSSettingsPage = () => {
 
     return (
         <div className="container mx-auto p-6 space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                        <Server className="w-8 h-8" />
-                        Локальный TTS сервис
-                    </h1>
-                </div>
-            </div>
+            {/* Header - заголовок теперь в Header компоненте */}
 
 
             {/* Tabs для Connection и Voices */}

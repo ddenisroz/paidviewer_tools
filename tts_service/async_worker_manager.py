@@ -148,10 +148,8 @@ class AsyncWorkerManager:
         try:
             # Инициализируем TTS движок
             from tts_service.tts_engine import tts_engine_manager
-            from tts_service.prometheus_metrics import tts_prometheus_metrics
             from tts_service.tts_limits_service import tts_limits_service
             self.tts_engine_manager = tts_engine_manager
-            self.prometheus_metrics = tts_prometheus_metrics
             self.tts_limits_service = tts_limits_service
             
             # Инициализируем GPU Worker Pool если доступен
@@ -326,18 +324,6 @@ class AsyncWorkerManager:
                         stats.tasks_processed += 1
                         self.global_stats['completed_tasks'] += 1
                         
-                        # Записываем метрики
-                        self.prometheus_metrics.record_async_task(
-                            status="success",
-                            processing_type="gpu" if task.use_gpu else "cpu",
-                            priority=task.priority.name
-                        )
-                        self.prometheus_metrics.record_async_task_time(
-                            duration=processing_time,
-                            priority=task.priority.name,
-                            processing_type="gpu" if task.use_gpu else "cpu"
-                        )
-                        
                         # Логируем использование пользователя
                         if task.user_id:
                             try:
@@ -358,18 +344,6 @@ class AsyncWorkerManager:
                     else:
                         stats.tasks_failed += 1
                         self.global_stats['failed_tasks'] += 1
-                        
-                        # Записываем метрики ошибки
-                        self.prometheus_metrics.record_async_task(
-                            status="failed",
-                            processing_type="gpu" if task.use_gpu else "cpu",
-                            priority=task.priority.name
-                        )
-                        self.prometheus_metrics.record_error(
-                            service="async_worker",
-                            error_type="task_processing",
-                            component="worker"
-                        )
                         
                         # Логируем неудачный запрос
                         if task.user_id:

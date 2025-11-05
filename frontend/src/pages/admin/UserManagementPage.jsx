@@ -53,6 +53,7 @@ const UserManagementPage = () => {
     
     // Фильтры и поиск
     const [searchTerm, setSearchTerm] = useState('');
+    const [userTypeFilter, setUserTypeFilter] = useState('all'); // NEW: гость/авторизованный
     const [roleFilter, setRoleFilter] = useState('all');
     const [statusFilter, setStatusFilter] = useState('all');
     const [integrationFilter, setIntegrationFilter] = useState('all');
@@ -74,7 +75,8 @@ const UserManagementPage = () => {
         reason: ''
     });
     const [whitelistForm, setWhitelistForm] = useState({
-        channel_name: ''
+        twitch_channel: '',
+        vk_channel: ''
     });
 
     // React Query: загружаем пользователей
@@ -171,35 +173,150 @@ const UserManagementPage = () => {
     });
 
     const addToWhitelistMutation = useMutation({
-        mutationFn: async ({ username, platform }) => {
-            return await botService.post('/api/admin/whitelist/add', { username, platform });
+        mutationFn: async ({ twitchChannel, vkChannel }) => {
+            const results = [];
+            const errors = [];
+            
+            // Добавляем Twitch канал если указан
+            if (twitchChannel && twitchChannel.trim()) {
+                try {
+                    await botService.post('/api/admin/whitelist/add', { 
+                        username: twitchChannel.trim(), 
+                        platform: 'twitch' 
+                    });
+                    results.push(`Twitch: ${twitchChannel.trim()}`);
+                } catch (err) {
+                    const errorMsg = err.response?.data?.error || err.message || 'Ошибка добавления Twitch';
+                    errors.push(`Twitch: ${errorMsg}`);
+                    logger.error('Error adding Twitch to whitelist:', err);
+                }
+            }
+            
+            // Добавляем VK канал если указан
+            if (vkChannel && vkChannel.trim()) {
+                try {
+                    await botService.post('/api/admin/whitelist/add', { 
+                        username: vkChannel.trim(), 
+                        platform: 'vk' 
+                    });
+                    results.push(`VK: ${vkChannel.trim()}`);
+                } catch (err) {
+                    const errorMsg = err.response?.data?.error || err.message || 'Ошибка добавления VK';
+                    errors.push(`VK: ${errorMsg}`);
+                    logger.error('Error adding VK to whitelist:', err);
+                }
+            }
+            
+            // Если ничего не было добавлено
+            if (results.length === 0) {
+                if (errors.length > 0) {
+                    throw new Error(errors.join('; '));
+                } else {
+                    throw new Error('Укажите хотя бы один канал');
+                }
+            }
+            
+            return { success: true, platforms: results, errors: errors.length > 0 ? errors : null };
         },
         onSuccess: (data, variables) => {
+            // Инвалидируем все связанные запросы после изменения whitelist
             queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-            toast.success(`Канал ${variables.username} добавлен в whitelist`);
+            queryClient.invalidateQueries({ queryKey: ['tts-status'] }); // Обновляем статус TTS
+            queryClient.invalidateQueries({ queryKey: ['voices-whitelist-status'] }); // Обновляем whitelist статус для голосов
+            
+            // Отправляем событие для обновления компонентов, которые не используют React Query
+            window.dispatchEvent(new CustomEvent('whitelist-changed', { detail: { platforms: data.platforms } }));
+            
+            if (data.errors) {
+                toast.success(`Добавлено: ${data.platforms.join(', ')}. Ошибки: ${data.errors.join('; ')}`, { duration: 5000 });
+            } else {
+                toast.success(`Добавлено в whitelist: ${data.platforms.join(', ')}`);
+            }
             setWhitelistDialogOpen(false);
-            setWhitelistForm({ channel_name: '' });
+            setWhitelistForm({ twitch_channel: '', vk_channel: '' });
         },
         onError: (error) => {
             logger.error('Error adding to whitelist:', error);
+            const errorMessage = error.response?.data?.error || error.message || 'Ошибка добавления в whitelist';
+            toast.error(errorMessage);
         },
     });
 
     const toggleWhitelistMutation = useMutation({
-        mutationFn: async ({ channelName, platform, isWhitelisted }) => {
+        mutationFn: async ({ channelName, platform, isWhitelisted, addBoth = false }) => {
             if (isWhitelisted) {
-                return await botService.delete(`/api/admin/whitelist/${channelName}`);
+                // Удаляем с указанной платформы или с обеих если нужно
+                if (addBoth) {
+                    // Удаляем с обеих платформ
+                    const results = [];
+                    try {
+                        await botService.delete(`/api/admin/whitelist/${channelName}?platform=twitch`);
+                        results.push('Twitch');
+                    } catch (err) {
+                        logger.warn('Error removing Twitch from whitelist:', err);
+                    }
+                    try {
+                        await botService.delete(`/api/admin/whitelist/${channelName}?platform=vk`);
+                        results.push('VK');
+                    } catch (err) {
+                        logger.warn('Error removing VK from whitelist:', err);
+                    }
+                    return { success: true, platforms: results };
+                } else {
+                    // Удаляем с одной платформы
+                    return await botService.delete(`/api/admin/whitelist/${channelName}?platform=${platform}`);
+                }
             } else {
-                return await botService.post('/api/admin/whitelist/add', { username: channelName, platform });
+                // Добавляем в whitelist
+                if (addBoth) {
+                    // Добавляем на обе платформы
+                    const results = [];
+                    try {
+                        await botService.post('/api/admin/whitelist/add', { username: channelName, platform: 'twitch' });
+                        results.push('Twitch');
+                    } catch (err) {
+                        logger.warn('Error adding Twitch to whitelist:', err);
+                    }
+                    try {
+                        await botService.post('/api/admin/whitelist/add', { username: channelName, platform: 'vk' });
+                        results.push('VK');
+                    } catch (err) {
+                        logger.warn('Error adding VK to whitelist:', err);
+                    }
+                    return { success: true, platforms: results };
+                } else {
+                    return await botService.post('/api/admin/whitelist/add', { username: channelName, platform });
+                }
             }
         },
         onSuccess: (data, variables) => {
+            // Инвалидируем все связанные запросы после изменения whitelist
             queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-            toast.success(
-                variables.isWhitelisted 
-                    ? `${variables.channelName} удален из whitelist`
-                    : `${variables.channelName} добавлен в whitelist`
-            );
+            queryClient.invalidateQueries({ queryKey: ['tts-status'] }); // Обновляем статус TTS
+            queryClient.invalidateQueries({ queryKey: ['voices-whitelist-status'] }); // Обновляем whitelist статус для голосов
+            
+            // Отправляем событие для обновления компонентов, которые не используют React Query
+            window.dispatchEvent(new CustomEvent('whitelist-changed', { 
+                detail: { 
+                    channelName: variables.channelName,
+                    platform: variables.platform,
+                    isWhitelisted: !variables.isWhitelisted
+                } 
+            }));
+            
+            if (variables.addBoth && data.platforms && data.platforms.length > 0) {
+                toast.success(
+                    variables.isWhitelisted 
+                        ? `${variables.channelName} удален из whitelist на платформах: ${data.platforms.join(', ')}`
+                        : `${variables.channelName} добавлен в whitelist на платформах: ${data.platforms.join(', ')}`
+                );
+            } else {
+                toast.success(
+                    variables.isWhitelisted 
+                        ? `${variables.channelName} удален из whitelist (${variables.platform})`
+                        : `${variables.channelName} добавлен в whitelist (${variables.platform})`
+                );
+            }
         },
         onError: (error) => {
             logger.error('Error toggling whitelist:', error);
@@ -218,22 +335,48 @@ const UserManagementPage = () => {
         const integrationsArray = Array.isArray(integrations) ? integrations : [];
         
         let filtered = botsArray.filter(user => {
-            // Поиск по ID пользователя
-            const matchesUserId = `User_${user.id}`.toLowerCase().includes(searchTerm.toLowerCase());
+            if (!searchTerm.trim()) {
+                // Если поиск пустой, показываем всех
+                return true;
+            }
             
-            // Поиск по никнеймам платформ
+            const searchLower = searchTerm.toLowerCase().trim();
+            
+            // Поиск по ID пользователя
+            const matchesUserId = `User_${user.id}`.toLowerCase().includes(searchLower) || 
+                                  `#${user.id}`.toLowerCase().includes(searchLower);
+            
+            // Поиск по никнеймам платформ из integrations
             const matchesPlatformUsername = user.integrations ? 
                 Object.values(user.integrations).some(integration => 
-                    integration.username?.toLowerCase().includes(searchTerm.toLowerCase())
+                    integration.username?.toLowerCase().includes(searchLower) ||
+                    integration.channel_name?.toLowerCase().includes(searchLower)
                 ) : false;
             
-            // Поиск по Twitch username
-            const matchesTwitchUsername = user.twitch_username?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
+            // Поиск по Twitch username (прямое поле и из integrations)
+            const matchesTwitchUsername = 
+                (user.twitch_username?.toLowerCase().includes(searchLower)) || 
+                (user.integrations?.twitch?.username?.toLowerCase().includes(searchLower)) ||
+                (user.integrations?.twitch?.channel_name?.toLowerCase().includes(searchLower)) ||
+                false;
             
-            // Поиск по VK username
-            const matchesVkUsername = user.vk_username?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
+            // Поиск по VK username (прямое поле и из integrations)
+            const matchesVkUsername = 
+                (user.vk_username?.toLowerCase().includes(searchLower)) || 
+                (user.vk_channel_name?.toLowerCase().includes(searchLower)) ||
+                (user.integrations?.vk?.username?.toLowerCase().includes(searchLower)) ||
+                (user.integrations?.vk?.channel_name?.toLowerCase().includes(searchLower)) ||
+                false;
             
-            const matchesSearch = matchesUserId || matchesPlatformUsername || matchesTwitchUsername || matchesVkUsername;
+            // Поиск по whitelisted channels
+            const whitelistedChannels = user.whitelisted_channels || {};
+            const matchesWhitelistedChannels = 
+                Object.values(whitelistedChannels).some(channel => 
+                    channel?.toLowerCase().includes(searchLower)
+                ) || false;
+            
+            const matchesSearch = matchesUserId || matchesPlatformUsername || matchesTwitchUsername || 
+                                 matchesVkUsername || matchesWhitelistedChannels;
             
             // Фильтр по роли
             const matchesRole = roleFilter === 'all' || 
@@ -256,7 +399,12 @@ const UserManagementPage = () => {
                 (whitelistFilter === 'whitelisted' && user.is_whitelisted) ||
                 (whitelistFilter === 'not_whitelisted' && !user.is_whitelisted);
             
-            return matchesSearch && matchesRole && matchesStatus && matchesIntegration && matchesWhitelist;
+            // Фильтр по типу пользователя (гость/авторизованный)
+            const matchesUserType = userTypeFilter === 'all' ||
+                (userTypeFilter === 'guest' && user.is_guest) ||
+                (userTypeFilter === 'authenticated' && !user.is_guest);
+            
+            return matchesSearch && matchesRole && matchesStatus && matchesIntegration && matchesWhitelist && matchesUserType;
         });
         
         // Сортировка
@@ -286,7 +434,7 @@ const UserManagementPage = () => {
         });
         
         return filtered;
-    }, [users, sessions, integrations, searchTerm, roleFilter, statusFilter, integrationFilter, whitelistFilter, sortField, sortDirection]);
+    }, [users, sessions, integrations, searchTerm, userTypeFilter, roleFilter, statusFilter, integrationFilter, whitelistFilter, sortField, sortDirection]);
 
     const handleSort = (field) => {
         if (sortField === field) {
@@ -348,15 +496,15 @@ const UserManagementPage = () => {
     };
 
     const handleAddToWhitelist = async () => {
-        if (!whitelistForm.channel_name.trim()) {
-            toast.error('Введите название канала');
+        if (!whitelistForm.twitch_channel.trim() && !whitelistForm.vk_channel.trim()) {
+            toast.error('Введите хотя бы один канал (Twitch или VK Live)');
             return;
         }
         
         addToWhitelistMutation.mutate({
-                username: whitelistForm.channel_name.trim(),
-                platform: 'twitch' // По умолчанию Twitch, backend поддерживает оба
-            });
+            twitchChannel: whitelistForm.twitch_channel,
+            vkChannel: whitelistForm.vk_channel
+        });
     };
 
     const handleToggleWhitelist = async (user) => {
@@ -395,15 +543,11 @@ const UserManagementPage = () => {
 
     return (
         <div className="container mx-auto p-6 space-y-6">
-            {/* Заголовок */}
+            {/* Заголовок и действия */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-                        <Users className="w-8 h-8 text-purple-400" />
-                        Управление пользователями
-                    </h1>
-                    <p className="text-slate-400 mt-2">
-                        Управление пользователями, их ролями и интеграциями
+                    <p className="text-slate-400 text-sm">
+                        Всего: {filteredAndSortedUsers.length} пользователей
                     </p>
                 </div>
                 <div className="flex gap-2">
@@ -420,21 +564,36 @@ const UserManagementPage = () => {
                         </DialogTrigger>
                         <DialogContent>
                             <DialogHeader>
-                                <DialogTitle>Добавить канал в whitelist</DialogTitle>
+                                <DialogTitle>Добавить каналы в whitelist</DialogTitle>
                                 <DialogDescription>
-                                    Добавьте канал в whitelist для доступа к TTS
+                                    Укажите Twitch и/или VK Live каналы для добавления в whitelist. Каналы добавляются независимо друг от друга.
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="space-y-4">
                                 <div>
-                                    <Label htmlFor="channel_name">Название канала</Label>
+                                    <Label htmlFor="twitch_channel">Twitch канал</Label>
                                     <Input
-                                        id="channel_name"
-                                        value={whitelistForm.channel_name}
-                                        onChange={(e) => setWhitelistForm({ ...whitelistForm, channel_name: e.target.value })}
-                                        placeholder="Введите название канала..."
+                                        id="twitch_channel"
+                                        value={whitelistForm.twitch_channel}
+                                        onChange={(e) => setWhitelistForm({ ...whitelistForm, twitch_channel: e.target.value })}
+                                        placeholder="Введите название Twitch канала..."
                                         className="mt-1"
                                     />
+                                    <p className="text-xs text-slate-400 mt-1">Оставьте пустым, если не нужно добавлять Twitch</p>
+                                </div>
+                                <div>
+                                    <Label htmlFor="vk_channel">VK Live канал</Label>
+                                    <Input
+                                        id="vk_channel"
+                                        value={whitelistForm.vk_channel}
+                                        onChange={(e) => setWhitelistForm({ ...whitelistForm, vk_channel: e.target.value })}
+                                        placeholder="Введите название VK Live канала..."
+                                        className="mt-1"
+                                    />
+                                    <p className="text-xs text-slate-400 mt-1">Оставьте пустым, если не нужно добавлять VK Live</p>
+                                </div>
+                                <div className="text-xs text-slate-400 bg-slate-800/50 p-2 rounded">
+                                    💡 Можно указать один или оба канала. Каналы добавляются независимо друг от друга.
                                 </div>
                             </div>
                             <DialogFooter>
@@ -449,6 +608,35 @@ const UserManagementPage = () => {
                     </Dialog>
                 </div>
             </div>
+
+            {/* Поиск по нику */}
+            <Card className="bg-slate-800/50 border-slate-700">
+                <CardContent className="pt-6">
+                    <div className="flex items-center gap-4">
+                        <div className="flex-1 relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <Input
+                                type="text"
+                                placeholder="Поиск по нику (Twitch, VK Live)..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-10 bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
+                            />
+                        </div>
+                        {searchTerm && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSearchTerm('')}
+                                className="text-slate-400 hover:text-white"
+                            >
+                                <XCircle className="w-4 h-4 mr-1" />
+                                Очистить
+                            </Button>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Таблица пользователей */}
             <Card className="bg-slate-800/50 border-slate-700">
@@ -468,12 +656,16 @@ const UserManagementPage = () => {
                             <thead>
                                 <tr className="border-b-2 border-slate-600 bg-slate-900/50">
                                     <th className="text-left p-2 whitespace-nowrap">
-                                        <button 
-                                            onClick={() => handleSort('id')}
-                                            className="flex items-center gap-1 hover:text-purple-400 font-semibold"
-                                        >
-                                            ID {getSortIcon('id')}
-                                        </button>
+                                        <Select value={userTypeFilter} onValueChange={setUserTypeFilter}>
+                                            <SelectTrigger className="h-8 w-32 bg-slate-700 border-slate-600">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">ID: Все</SelectItem>
+                                                <SelectItem value="authenticated">🔑 Авториз.</SelectItem>
+                                                <SelectItem value="guest">👤 Гости</SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                     </th>
                                     <th className="text-left p-2">
                                         <button 
@@ -539,11 +731,26 @@ const UserManagementPage = () => {
                                     );
                                     
                                     return (
-                                        <tr key={user.id} className="border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors">
+                                        <tr key={user.id || user.session_id} className="border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors">
                                             <td className="p-2">
-                                                <div className="flex items-center gap-1">
-                                                    <span className="font-mono text-xs">#{user.id}</span>
-                                                    {hasActiveSession && <Wifi className="w-3 h-3 text-blue-400" />}
+                                                <div className="flex items-center gap-2">
+                                                    {user.is_guest ? (
+                                                        <>
+                                                            <Badge variant="outline" className="text-xs bg-orange-900/40 text-orange-300 border-orange-600 font-semibold">
+                                                                👤 Гость
+                                                            </Badge>
+                                                            <span className="font-mono text-xs text-slate-500">
+                                                                {user.session_id?.substring(0, 8) || 'N/A'}
+                                                            </span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Badge variant="outline" className="text-xs bg-green-900/40 text-green-300 border-green-600 font-semibold">
+                                                                🔑 #{user.id}
+                                                            </Badge>
+                                                        </>
+                                                    )}
+                                                    {hasActiveSession && <Wifi className="w-3 h-3 text-blue-400" title="Онлайн" />}
                                                 </div>
                                             </td>
                                             <td className="p-2">
@@ -576,11 +783,22 @@ const UserManagementPage = () => {
                                                 </div>
                                             </td>
                                             <td className="p-2">
-                                                {user.is_whitelisted ? (
-                                                    <Badge className="bg-green-900/50 text-green-200 text-xs">
-                                                        <CheckCircle className="w-3 h-3 mr-1" />
-                                                        Да
-                                                    </Badge>
+                                                {user.is_whitelisted && user.whitelisted_platforms && user.whitelisted_platforms.length > 0 ? (
+                                                    <div className="flex flex-col gap-1">
+                                                        {user.whitelisted_platforms.map((platform) => {
+                                                            const channelName = user.whitelisted_channels?.[platform] || 
+                                                                               (platform === 'twitch' ? user.twitch_username : user.vk_username);
+                                                            return (
+                                                                <Badge 
+                                                                    key={platform}
+                                                                    className="bg-green-900/50 text-green-200 text-xs w-fit"
+                                                                >
+                                                                    <CheckCircle className="w-3 h-3 mr-1" />
+                                                                    {platform === 'twitch' ? 'Twitch' : 'VK'}: {channelName}
+                                                                </Badge>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 ) : (
                                                     <span className="text-xs text-slate-500">Нет</span>
                                                 )}
@@ -615,15 +833,37 @@ const UserManagementPage = () => {
                                             </td>
                                             <td className="p-2">
                                                 <div className="flex items-center gap-1">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        className="h-7 w-7 p-0"
-                                                        onClick={() => openEditDialog(user)}
-                                                        title="Редактировать"
-                                                    >
-                                                        <Edit className="w-3 h-3" />
-                                                    </Button>
+                                                    {!user.is_guest && (
+                                                        <>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="h-7 w-7 p-0"
+                                                                onClick={() => openEditDialog(user)}
+                                                                title="Редактировать"
+                                                            >
+                                                                <Edit className="w-3 h-3" />
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="h-7 w-7 p-0"
+                                                                onClick={() => openBlockDialog(user)}
+                                                                title={user.is_blocked ? "Разблокировать" : "Заблокировать"}
+                                                            >
+                                                                {user.is_blocked ? <CheckCircle className="w-3 h-3 text-green-400" /> : <Ban className="w-3 h-3 text-red-400" />}
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="h-7 w-7 p-0"
+                                                                onClick={() => handleDeleteUser(user.id)}
+                                                                title="Удалить"
+                                                            >
+                                                                <Trash2 className="w-3 h-3 text-red-500" />
+                                                            </Button>
+                                                        </>
+                                                    )}
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
@@ -632,24 +872,6 @@ const UserManagementPage = () => {
                                                         title={user.is_whitelisted ? "Удалить из whitelist" : "Добавить в whitelist"}
                                                     >
                                                         {user.is_whitelisted ? <UserX className="w-3 h-3 text-red-400" /> : <UserCheck className="w-3 h-3 text-green-400" />}
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        className="h-7 w-7 p-0"
-                                                        onClick={() => openBlockDialog(user)}
-                                                        title={user.is_blocked ? "Разблокировать" : "Заблокировать"}
-                                                    >
-                                                        {user.is_blocked ? <CheckCircle className="w-3 h-3 text-green-400" /> : <Ban className="w-3 h-3 text-red-400" />}
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        className="h-7 w-7 p-0"
-                                                        onClick={() => handleDeleteUser(user.id)}
-                                                        title="Удалить"
-                                                    >
-                                                        <Trash2 className="w-3 h-3 text-red-500" />
                                                     </Button>
                                                 </div>
                                             </td>

@@ -1,45 +1,45 @@
-# 📚 Документация TTS_TTV_0.02
+# Документация TTS_TTV_0.02
 
 **Последнее обновление:** 3 ноября 2025  
 **Версия проекта:** 0.02
 
 ---
 
-## 🚀 Быстрый старт
+## Быстрый старт
 
 ### Для обычных пользователей (стримеры):
-1. 📖 **[README.md](../README.md)** - Главный README (5 минут)
-2. 🎯 **[QUICK_START.md](QUICK_START.md)** - Полная установка
+1. **[README.md](../README.md)** - Главный README (5 минут)
+2. **[QUICK_START.md](QUICK_START.md)** - Полная установка
 
 ### Для разработчиков:
-1. 📖 **[README.md](../README.md)** - Обзор проекта
-2. 🏗️ **[ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md)** - Архитектура (1 страница)
-3. 👨‍💻 **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - Паттерны и примеры
+1. **[README.md](../README.md)** - Обзор проекта
+2. **[ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md)** - Архитектура (1 страница)
+3. **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - Паттерны и примеры
 
 ### Для AI-агентов (Claude, GPT):
-1. ⚠️ **[LLM_DEVELOPMENT_RULES.md](LLM_DEVELOPMENT_RULES.md)** - ОБЯЗАТЕЛЬНО! Правила
-2. 🚨 **[CURRENT_STATUS.md](CURRENT_STATUS.md)** - ЧТО РАБОТАЕТ/НЕ РАБОТАЕТ
-3. 🚫 **[DO_NOT_TOUCH.md](DO_NOT_TOUCH.md)** - Что нельзя менять
+1. **[LLM_DEVELOPMENT_RULES.md](LLM_DEVELOPMENT_RULES.md)** - ОБЯЗАТЕЛЬНО! Правила
+2. **[CURRENT_STATUS.md](CURRENT_STATUS.md)** - ЧТО РАБОТАЕТ/НЕ РАБОТАЕТ
+3. **[DO_NOT_TOUCH.md](DO_NOT_TOUCH.md)** - Что нельзя менять
 
 ---
 
-## 📚 Организованная структура
+## Организованная структура
 
-### ⚡ БЫСТРЫЕ
+### БЫСТРЫЕ
 | Файл | Время | Для кого |
 |------|-------|----------|
 | **[README.md](../README.md)** | 5 мин | Все |
 | **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** | 10 мин | Разработчики |
 | **[ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md)** | 10 мин | Разработчики |
 
-### 🔴 КРИТИЧЕСКИЕ
+### КРИТИЧЕСКИЕ
 | Файл | Для кого |
 |------|----------|
 | **[DO_NOT_TOUCH.md](DO_NOT_TOUCH.md)** | AI-агенты, разработчики |
 | **[CURRENT_STATUS.md](CURRENT_STATUS.md)** | AI-агенты, разработчики |
 | **[LLM_DEVELOPMENT_RULES.md](LLM_DEVELOPMENT_RULES.md)** | AI-агенты |
 
-### 🟢 ОСНОВНАЯ
+### ОСНОВНАЯ
 | Файл | Описание |
 |------|----------|
 | [QUICK_START.md](QUICK_START.md) | Установка и первый запуск |
@@ -47,23 +47,23 @@
 | [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) | Паттерны, best practices |
 | [CHANGELOG.md](CHANGELOG.md) | История изменений |
 
-### 🔵 СПЕЦИАЛИЗИРОВАННЫЕ
+### СПЕЦИАЛИЗИРОВАННЫЕ
 | Файл | Тема |
 |------|------|
-| [TTS_ARCHITECTURE.md](TTS_ARCHITECTURE.md) | 🎙️ TTS система |
-| [SHARED_WEBSOCKET.md](SHARED_WEBSOCKET.md) | 🔌 WebSocket |
-| [DROPS_SYSTEM.md](DROPS_SYSTEM.md) | 🎁 Drops система |
-| [GUEST_MODE_SUPPORT.md](GUEST_MODE_SUPPORT.md) | 👤 Гостевой режим |
-| [SECURITY_LOGIC.md](SECURITY_LOGIC.md) | 🔐 Безопасность |
-| [DEPLOYMENT.md](DEPLOYMENT.md) | 🚀 Деплой |
+| [TTS_ARCHITECTURE.md](TTS_ARCHITECTURE.md) | TTS система |
+| [SHARED_WEBSOCKET.md](SHARED_WEBSOCKET.md) | WebSocket |
+| [DROPS_SYSTEM.md](DROPS_SYSTEM.md) | Drops система |
+| [GUEST_MODE_SUPPORT.md](GUEST_MODE_SUPPORT.md) | Гостевой режим |
+| [SECURITY_LOGIC.md](SECURITY_LOGIC.md) | Безопасность |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Деплой |
 
-### 📂 VK Live API Reference
+### VK Live API Reference
 
 Документация VK Live API находится в папке `vk/` (19 файлов).
 
 ---
 
-## 🔍 Поиск информации
+## Поиск информации
 
 | Вопрос | Файл |
 |--------|------|
@@ -76,9 +76,9 @@
 
 ---
 
-## 📊 Статус проекта
+## Статус проекта
 
-### ✅ Работает
+### Работает
 - Multi-platform (Twitch, VK Live, DonationAlerts)
 - TTS (Cloud gTTS + Local F5-TTS)
 - ChatBox (OBS overlay)
@@ -90,7 +90,7 @@
 
 ---
 
-## 🔧 Технический стек
+## Технический стек
 
 **Backend:** FastAPI, SQLAlchemy, Alembic, WebSocket, TwitchIO  
 **Frontend:** React 18, Vite, Tailwind, shadcn/ui, React Query  

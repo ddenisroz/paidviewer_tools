@@ -50,6 +50,13 @@ class TTSPrometheusMetrics:
             ['voice', 'platform', 'processing_type']
         )
         
+        # Счетчик ошибок синтеза
+        self.tts_synthesis_errors = Counter(
+            'tts_synthesis_errors_total',
+            'Total number of TTS synthesis errors',
+            ['voice', 'platform', 'error_type']
+        )
+        
         # === GPU Метрики ===
         
         # GPU использование

@@ -16,7 +16,6 @@ import IntegrationsDisabledPlaceholder from '../components/IntegrationsDisabledP
 import TtsQuickSettings from '../components/TtsQuickSettings';
 import { getAndClearReturnUrl } from '../utils/oauthRedirect';
 import { logger } from '../utils/prodLogger';
-import { usePageAnimation, getAnimationClasses } from '../hooks/usePageAnimation';
 
 
 
@@ -42,10 +41,6 @@ const HomePage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Пустой массив зависимостей - срабатывает ТОЛЬКО при монтировании
     
-    // УБРАНО: usePageAnimation - вызывает видимую отрисовку элементов
-    // Используем оптимистичный UI - контент виден сразу
-    const shouldAnimate = false;
-    const contentLoaded = true;
     
     // Состояние объединения полей для карточек
     const [titleLinked, setTitleLinked] = useState(false);
@@ -117,13 +112,11 @@ const HomePage = () => {
         <div className="space-y-8 pb-20">
             {/* Статусы стримов - скрываем для гостей */}
             {!isGuest && (
-                <div {...getAnimationClasses(shouldAnimate, contentLoaded, 0)}>
-                    <StreamStatus 
-                        integrations={integrations}
-                        streamData={streamData}
-                        isLoading={isLoading}
-                    />
-                </div>
+                <StreamStatus 
+                    integrations={integrations}
+                    streamData={streamData}
+                    isLoading={isLoading}
+                />
             )}
             
             <div className="space-y-6 max-w-6xl mx-auto overflow-visible">
@@ -144,28 +137,20 @@ const HomePage = () => {
                         {/* Настройки стрима - в две колонки */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Карточка названия */}
-                            <div {...getAnimationClasses(shouldAnimate, contentLoaded, 0)}>
-                                <StreamTitleCard onLinkStateChange={setTitleLinked} />
-                            </div>
+                            <StreamTitleCard onLinkStateChange={setTitleLinked} />
                             
                             {/* Карточка категории */}
-                            <div {...getAnimationClasses(shouldAnimate, contentLoaded, 100)}>
-                                <StreamCategoryCard onLinkStateChange={setCategoryLinked} />
-                            </div>
+                            <StreamCategoryCard onLinkStateChange={setCategoryLinked} />
                         </div>
                         
                         {/* Чат - на всю ширину */}
-                        <div {...getAnimationClasses(shouldAnimate, contentLoaded, 200)}>
-                            <ChatCard 
-                                integrations={integrations}
-                                isOnHomePage={true}
-                            />
-                        </div>
+                        <ChatCard 
+                            integrations={integrations}
+                            isOnHomePage={true}
+                        />
                         
                         {/* Быстрые настройки TTS - под чатом */}
-                        <div {...getAnimationClasses(shouldAnimate, contentLoaded, 300)}>
-                            <TtsQuickSettings />
-                        </div>
+                        <TtsQuickSettings />
                     </>
                 )}
             </div>

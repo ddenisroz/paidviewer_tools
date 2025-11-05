@@ -69,7 +69,8 @@ def is_development() -> bool:
 
 
 # Константы для session cookies
-SESSION_MAX_AGE_SECONDS = int(os.getenv("SESSION_MAX_AGE_SECONDS", "86400"))  # 24 часа
+# Бесконечная сессия (10 лет) - сессия живет до явного логаута или логина с другого устройства
+SESSION_MAX_AGE_SECONDS = int(os.getenv("SESSION_MAX_AGE_SECONDS", "315360000"))  # 10 лет (315360000 секунд)
 
 def get_session_cookie_settings(session_id: str) -> dict:
     """

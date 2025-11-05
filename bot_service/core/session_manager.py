@@ -7,7 +7,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
-from core.database import User, UserToken, UserSession
+from core.database import User, UserToken, UserSession, GuestSession
 from core.database import get_db
 from core.project_paths import PROJECT_ROOT
 import logging
@@ -18,12 +18,18 @@ class SessionManager:
     """Менеджер для управления мультиплатформенными сессиями на основе единой учетной записи."""
     
     def __init__(self):
-        self.session_timeout = timedelta(days=30)  # 30 дней бездействия
+        # Бесконечная сессия - сессия живет до явного логаута или логина с другого устройства
+        # Устанавливаем очень большой таймаут (10 лет) для проверки, но фактически сессия бесконечна
+        self.session_timeout = timedelta(days=3650)  # 10 лет (практически бесконечно)
         # НЕ разлогиниваем пользователей при:
         # - сворачивании браузера
         # - смене вкладки  
         # - закрытии браузера
         # - потере фокуса окна
+        # - долгом перерыве в использовании
+        # Сессия завершается ТОЛЬКО при:
+        # - явном логауте пользователя
+        # - логине с другого устройства (все старые сессии завершаются)
 
     def create_or_get_user_by_platform(self, platform: str, platform_user_id: str, avatar_url: str, db: Session, current_user_id: int = None, username: str = None) -> User:
         """Находит пользователя по ID платформы или создает нового, если он не найден."""
@@ -107,10 +113,10 @@ class SessionManager:
         """Превращает гостевую сессию в авторизованную с переносом настроек"""
         db = next(get_db())
         try:
-            # Получаем гостевую сессию
-            guest_session = db.query(UserSession).filter(
-                UserSession.session_id == guest_session_id,
-                UserSession.user_id == -1
+            # Получаем гостевую сессию из таблицы GuestSession
+            guest_session = db.query(GuestSession).filter(
+                GuestSession.session_id == guest_session_id,
+                GuestSession.is_active == True
             ).first()
             
             if not guest_session:
@@ -409,34 +415,22 @@ class SessionManager:
         """Завершает все гостевые сессии для канала при конвертации в авторизованную"""
         db = next(get_db())
         try:
-            from sqlalchemy import text
-            from core.database import IS_POSTGRESQL
-            
-            # PostgreSQL использует оператор ->>, SQLite использует JSON_EXTRACT
-            json_query = "device_info->>'monitored_channel' = :channel" if IS_POSTGRESQL else "JSON_EXTRACT(device_info, '$.monitored_channel') = :channel"
-            
-            guest_sessions = db.query(UserSession).filter(
-                UserSession.user_id == -1,
-                UserSession.is_active == True,
-                text(json_query)
-            ).params(channel=channel_name).all()
+            # Находим все гостевые сессии для этого канала из таблицы GuestSession
+            guest_sessions = db.query(GuestSession).filter(
+                GuestSession.channel_name == channel_name,
+                GuestSession.is_active == True
+            ).all()
             
             for session in guest_sessions:
                 session.is_active = False
-                session.ended_at = datetime.utcnow()
-                session.device_info = {
-                    **session.device_info,
-                    "termination_reason": reason,
-                    "terminated_at": datetime.utcnow().isoformat()
-                }
-                logger.info(f"Terminated guest session {session.session_id} for channel {channel_name}: {reason}")
+                logger.info(f"🔴 Terminated guest session {session.session_id} for channel {channel_name}: {reason}")
             
             db.commit()
-            logger.info(f"Terminated {len(guest_sessions)} guest sessions for channel {channel_name}")
+            logger.info(f"✅ Terminated {len(guest_sessions)} guest sessions for channel {channel_name}")
             
         except Exception as e:
             db.rollback()
-            logger.error(f"Error terminating guest sessions: {e}")
+            logger.error(f"❌ Error terminating guest sessions: {e}")
             raise
         finally:
             db.close()
@@ -446,10 +440,9 @@ class SessionManager:
         db = next(get_db())
         try:
             from sqlalchemy import text
-            from core.database import IS_POSTGRESQL
             
-            # PostgreSQL использует оператор ->>, SQLite использует JSON_EXTRACT
-            json_query = "device_info->>'monitored_channel' = :channel" if IS_POSTGRESQL else "JSON_EXTRACT(device_info, '$.monitored_channel') = :channel"
+            # PostgreSQL использует оператор ->> для извлечения JSON значений
+            json_query = "device_info->>'monitored_channel' = :channel"
             
             user_sessions = db.query(UserSession).filter(
                 UserSession.user_id == user_id,
@@ -669,7 +662,7 @@ class SessionManager:
             db.close()
 
     def create_guest_session(self, channel_name: str, platform: str, device_info: Optional[Dict] = None) -> str:
-        """Создает гостевую сессию, завершая все предыдущие гостевые сессии для этого канала."""
+        """Создает гостевую сессию в отдельной таблице GuestSession, завершая все предыдущие гостевые сессии для этого канала."""
         db = next(get_db())
         try:
             # Завершаем все предыдущие гостевые сессии для этого канала
@@ -677,25 +670,21 @@ class SessionManager:
             
             session_id = str(uuid.uuid4())
             
-            # Создаем гостевую сессию (используем user_id = -1 для гостей)
-            new_session = UserSession(
-                user_id=-1,  # Специальный ID для гостевых сессий
+            # Создаем гостевую сессию в отдельной таблице GuestSession
+            new_session = GuestSession(
                 session_id=session_id,
-                device_info={
-                    **(device_info or {}),
-                    "monitored_channel": channel_name,
-                    "monitored_platform": platform
-                },
+                channel_name=channel_name,
+                platform=platform,
+                device_info=device_info or {},
                 is_active=True
             )
             db.add(new_session)
             db.commit()
             
-            logger.info(f"Created new guest session {session_id} for channel {channel_name} on {platform}")
+            logger.info(f"✅ Created new guest session {session_id} for channel {channel_name} on {platform}")
             
             # Уведомляем connection_manager о новой активной сессии
             try:
-                from core.connection_manager import get_connection_manager
                 from core.connection_manager import get_connection_manager
                 connection_manager = get_connection_manager()
                 connection_manager.add_active_session(channel_name, session_id)
@@ -705,38 +694,64 @@ class SessionManager:
             return session_id
         except Exception as e:
             db.rollback()
-            logger.error(f"Error creating guest session for channel {channel_name}: {e}")
+            logger.error(f"❌ Error creating guest session for channel {channel_name}: {e}")
             raise
         finally:
             db.close()
 
     def terminate_guest_sessions(self, channel_name: str, reason: str = "logout", db: Optional[Session] = None) -> None:
-        """Завершает все гостевые сессии для указанного канала."""
+        """Завершает все гостевые сессии для указанного канала из таблицы GuestSession."""
         close_db = False
         if db is None:
             db = next(get_db())
             close_db = True
         
         try:
-            # Находим все гостевые сессии для этого канала
-            sessions = db.query(UserSession).filter(
-                UserSession.user_id == -1,  # Гостевые сессии
-                UserSession.is_active == True
+            # Находим все гостевые сессии для этого канала из таблицы GuestSession
+            guest_sessions = db.query(GuestSession).filter(
+                GuestSession.channel_name == channel_name,
+                GuestSession.is_active == True
             ).all()
-            
-            # Фильтруем по каналу в device_info
-            guest_sessions = []
-            for session in sessions:
-                if (session.device_info and 
-                    session.device_info.get("monitored_channel") == channel_name):
-                    guest_sessions.append(session)
             
             if not guest_sessions:
                 return
 
             for session in guest_sessions:
+                session_id = session.session_id
                 session.is_active = False
-                logger.info(f"Terminated guest session {session.session_id} for channel {channel_name}, reason: {reason}")
+                logger.info(f"🔴 Terminated guest session {session_id} for channel {channel_name}, reason: {reason}")
+                
+                # Очищаем настройки гостя при завершении сессии
+                if reason in ["logout", "user_logout", "disconnect"]:
+                    try:
+                        from core.database import (
+                            UserSettings, TTSUserSettings, AudioSettings,
+                            LocalTTSEndpoint, FilteredWord, TTSBlockedUser,
+                            YouTubeQueue, UserToken, DropsConfig, DropsReward,
+                            UserStreak, DropsHistory, MythicalDropsSession
+                        )
+                        
+                        # Удаляем настройки гостя
+                        deleted_count = 0
+                        deleted_count += db.query(UserSettings).filter(UserSettings.session_id == session_id).delete()
+                        deleted_count += db.query(TTSUserSettings).filter(TTSUserSettings.session_id == session_id).delete()
+                        deleted_count += db.query(AudioSettings).filter(AudioSettings.session_id == session_id).delete()
+                        deleted_count += db.query(LocalTTSEndpoint).filter(LocalTTSEndpoint.session_id == session_id).delete()
+                        deleted_count += db.query(FilteredWord).filter(FilteredWord.session_id == session_id).delete()
+                        deleted_count += db.query(TTSBlockedUser).filter(TTSBlockedUser.session_id == session_id).delete()
+                        deleted_count += db.query(YouTubeQueue).filter(YouTubeQueue.session_id == session_id).delete()
+                        deleted_count += db.query(UserToken).filter(UserToken.session_id == session_id).delete()
+                        deleted_count += db.query(DropsConfig).filter(DropsConfig.session_id == session_id).delete()
+                        deleted_count += db.query(DropsReward).filter(DropsReward.session_id == session_id).delete()
+                        deleted_count += db.query(UserStreak).filter(UserStreak.session_id == session_id).delete()
+                        deleted_count += db.query(DropsHistory).filter(DropsHistory.session_id == session_id).delete()
+                        deleted_count += db.query(MythicalDropsSession).filter(MythicalDropsSession.session_id == session_id).delete()
+                        
+                        if deleted_count > 0:
+                            logger.info(f"🧹 Cleaned up {deleted_count} guest settings records for session {session_id}")
+                    except Exception as e:
+                        logger.error(f"Error cleaning up guest settings for session {session_id}: {e}")
+                        # Не прерываем процесс завершения сессии из-за ошибки очистки
             
             db.commit()
             
@@ -763,7 +778,17 @@ class SessionManager:
             close_db = True
         
         try:
-            # Находим все активные сессии
+            # Завершаем гостевые сессии из GuestSession
+            guest_sessions = db.query(GuestSession).filter(
+                GuestSession.channel_name == channel_name,
+                GuestSession.is_active == True
+            ).all()
+            
+            for session in guest_sessions:
+                session.is_active = False
+                logger.info(f"🔴 Terminated guest session {session.session_id} for channel {channel_name}, reason: {reason}")
+            
+            # Завершаем авторизованные сессии из UserSession
             all_sessions = db.query(UserSession).filter(
                 UserSession.is_active == True
             ).all()
@@ -775,15 +800,14 @@ class SessionManager:
                     session.device_info.get("monitored_channel") == channel_name):
                     channel_sessions.append(session)
             
-            if not channel_sessions:
-                return
-
             for session in channel_sessions:
                 session.is_active = False
-                session_type = "guest" if session.user_id == -1 else "authorized"
-                logger.info(f"Terminated {session_type} session {session.session_id} for channel {channel_name}, reason: {reason}")
+                logger.info(f"🔴 Terminated authorized session {session.session_id} for channel {channel_name}, reason: {reason}")
             
             db.commit()
+            
+            total_terminated = len(guest_sessions) + len(channel_sessions)
+            logger.info(f"✅ Terminated {total_terminated} sessions ({len(guest_sessions)} guest + {len(channel_sessions)} authorized) for channel {channel_name}")
             
             # Отправка WebSocket уведомлений о завершении сессий
             try:
@@ -793,7 +817,7 @@ class SessionManager:
                 logger.error(f"Error sending WebSocket notification for channel {channel_name}: {e}")
         except Exception as e:
             db.rollback()
-            logger.error(f"Error terminating all sessions for channel {channel_name}: {e}")
+            logger.error(f"❌ Error terminating all sessions for channel {channel_name}: {e}")
         finally:
             if close_db:
                 db.close()
@@ -936,32 +960,18 @@ class SessionManager:
             db.expire_all()
             db.commit()
             
-            session = db.query(UserSession).filter_by(session_id=session_id, is_active=True).first()
+            # Сначала проверяем в таблице GuestSession
+            guest_session = db.query(GuestSession).filter_by(session_id=session_id, is_active=True).first()
             
-            if not session:
-                logger.debug(f"Invalid or inactive session: {session_id[:20]}...")
-                return None
-            
-            # Проверяем таймаут только для очень старых сессий (30 дней)
-            time_since_activity = datetime.utcnow() - session.last_activity
-            if time_since_activity > self.session_timeout:
-                logger.info(f"Session {session_id} expired after {time_since_activity.days} days of inactivity")
-                self.terminate_session(session_id, "timeout")
-                return None
-            
-            # Обновляем last_activity только если прошло больше 1 часа
-            # Это предотвращает постоянные обновления базы данных
-            # Сессия остается активной даже после закрытия браузера
-            if time_since_activity > timedelta(hours=1):
-                session.last_activity = datetime.utcnow()
-                db.commit()
-            
-            # Обработка гостевых сессий (user_id = -1)
-            if session.user_id == -1:
-                # Извлекаем платформу из device_info
-                login_platform = None
-                if session.device_info and isinstance(session.device_info, dict):
-                    login_platform = session.device_info.get('platform')
+            if guest_session:
+                # Обновляем last_activity только если прошло больше 1 часа
+                time_since_activity = datetime.utcnow() - guest_session.last_activity
+                if time_since_activity > timedelta(hours=1):
+                    guest_session.last_activity = datetime.utcnow()
+                    db.commit()
+                
+                # Извлекаем платформу из GuestSession
+                login_platform = guest_session.platform
                     
                 return {
                     "user_id": -1,
@@ -973,9 +983,28 @@ class SessionManager:
                     "blocked_at": None,
                     "integrations": {},
                     "is_guest": True,
-                    "device_info": session.device_info,
+                    "device_info": guest_session.device_info,
                     "login_platform": login_platform
                 }
+            
+            # Проверяем в таблице UserSession для авторизованных пользователей
+            session = db.query(UserSession).filter_by(session_id=session_id, is_active=True).first()
+            
+            if not session:
+                logger.debug(f"Invalid or inactive session: {session_id[:20]}...")
+                return None
+            
+            # Сессия бесконечна - проверка таймаута отключена
+            # Сессия завершается ТОЛЬКО при явном логауте или логине с другого устройства
+            # Обновляем last_activity для статистики, но не проверяем таймаут
+            time_since_activity = datetime.utcnow() - session.last_activity
+            
+            # Обновляем last_activity только если прошло больше 1 часа
+            # Это предотвращает постоянные обновления базы данных
+            # Сессия остается активной даже после закрытия браузера
+            if time_since_activity > timedelta(hours=1):
+                session.last_activity = datetime.utcnow()
+                db.commit()
             
             user = db.query(User).filter_by(id=session.user_id).first()
             if not user:
@@ -1096,7 +1125,7 @@ class SessionManager:
             logger.error(f"Error in _notify_all_sessions_terminated_for_channel: {e}")
 
     def cleanup_old_sessions(self, days_old: int = 7) -> int:
-        """Удаляет старые неактивные сессии старше указанного количества дней."""
+        """Удаляет старые неактивные сессии старше указанного количества дней и связанные настройки."""
         db = next(get_db())
         try:
             cutoff_date = datetime.utcnow() - timedelta(days=days_old)
@@ -1109,12 +1138,43 @@ class SessionManager:
             
             count = len(old_sessions)
             if count > 0:
-                # Удаляем старые сессии
+                from core.database import (
+                    UserSettings, TTSUserSettings, AudioSettings,
+                    LocalTTSEndpoint, FilteredWord, TTSBlockedUser,
+                    YouTubeQueue, UserToken, DropsConfig, DropsReward,
+                    UserStreak, DropsHistory, MythicalDropsSession
+                )
+                
+                total_settings_deleted = 0
+                
+                # Удаляем старые сессии и связанные настройки
                 for session in old_sessions:
+                    session_id = session.session_id
+                    is_guest = session.user_id == -1
+                    
+                    # Для гостевых сессий удаляем все связанные настройки
+                    if is_guest:
+                        total_settings_deleted += db.query(UserSettings).filter(UserSettings.session_id == session_id).delete()
+                        total_settings_deleted += db.query(TTSUserSettings).filter(TTSUserSettings.session_id == session_id).delete()
+                        total_settings_deleted += db.query(AudioSettings).filter(AudioSettings.session_id == session_id).delete()
+                        total_settings_deleted += db.query(LocalTTSEndpoint).filter(LocalTTSEndpoint.session_id == session_id).delete()
+                        total_settings_deleted += db.query(FilteredWord).filter(FilteredWord.session_id == session_id).delete()
+                        total_settings_deleted += db.query(TTSBlockedUser).filter(TTSBlockedUser.session_id == session_id).delete()
+                        total_settings_deleted += db.query(YouTubeQueue).filter(YouTubeQueue.session_id == session_id).delete()
+                        total_settings_deleted += db.query(UserToken).filter(UserToken.session_id == session_id).delete()
+                        total_settings_deleted += db.query(DropsConfig).filter(DropsConfig.session_id == session_id).delete()
+                        total_settings_deleted += db.query(DropsReward).filter(DropsReward.session_id == session_id).delete()
+                        total_settings_deleted += db.query(UserStreak).filter(UserStreak.session_id == session_id).delete()
+                        total_settings_deleted += db.query(DropsHistory).filter(DropsHistory.session_id == session_id).delete()
+                        total_settings_deleted += db.query(MythicalDropsSession).filter(MythicalDropsSession.session_id == session_id).delete()
+                    
+                    # Удаляем саму сессию
                     db.delete(session)
                 
                 db.commit()
                 logger.info(f"[BROOM] Cleaned up {count} old inactive sessions (older than {days_old} days)")
+                if total_settings_deleted > 0:
+                    logger.info(f"[BROOM] Also deleted {total_settings_deleted} associated guest settings records")
             else:
                 logger.debug(f"No old sessions to clean up (older than {days_old} days)")
             
