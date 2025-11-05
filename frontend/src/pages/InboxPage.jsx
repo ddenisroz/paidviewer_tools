@@ -81,10 +81,25 @@ const InboxPage = () => {
   const handleSendResponse = async () => {
     if (!newResponse.trim() || !selectedTicket) return;
 
+    const messageText = newResponse;
+    
+    // ✅ OPTIMISTIC UPDATE: Добавляем ответ в UI сразу
+    const optimisticResponse = {
+      id: Date.now(),
+      message: messageText,
+      is_admin_response: false,
+      is_read: true,
+      created_at: new Date().toISOString()
+    };
+    
+    setResponses(prev => [...prev, optimisticResponse]);
+    setNewResponse('');
+    toast.success('Ответ отправлен');
+
     setIsSubmitting(true);
     try {
       const formData = new FormData();
-      formData.append('message', newResponse);
+      formData.append('message', messageText);
 
       const response = await fetch(`${API_BASE_URL}/api/support/tickets/${selectedTicket.id}/respond`, {
         method: 'POST',
@@ -93,14 +108,17 @@ const InboxPage = () => {
       });
 
       if (response.ok) {
-        toast.success('Ответ отправлен');
-        setNewResponse('');
-        loadTicketResponses(selectedTicket.id);
-        loadTickets(); // Обновляем список тикетов
+        // ✅ Успешно отправлено - перезагружаем реальные данные
+        await loadTicketResponses(selectedTicket.id);
+        await loadTickets();
       } else {
+        // ❌ Ошибка - откатываем optimistic update
+        setResponses(prev => prev.filter(r => r.id !== optimisticResponse.id));
         toast.error('Ошибка при отправке ответа');
       }
     } catch (error) {
+      // ❌ Ошибка сети - откатываем optimistic update
+      setResponses(prev => prev.filter(r => r.id !== optimisticResponse.id));
       logger.error('Error sending response:', error);
       toast.error('Ошибка при отправке ответа');
     } finally {
@@ -116,6 +134,22 @@ const InboxPage = () => {
       return;
     }
 
+    // ✅ OPTIMISTIC UPDATE: Создаем новый тикет в UI сразу
+    const optimisticTicket = {
+      id: Date.now(),
+      subject: createFormData.subject,
+      message: createFormData.message,
+      status: 'open',
+      unread_responses: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    setTickets(prev => [optimisticTicket, ...prev]);
+    setIsCreateDialogOpen(false);
+    setCreateFormData({ subject: '', message: '' });
+    toast.success('Тикет создан');
+
     setIsCreating(true);
 
     try {
@@ -130,16 +164,19 @@ const InboxPage = () => {
       });
 
       if (response.ok) {
+        // ✅ Успешно создано - перезагружаем реальные данные
         const result = await response.json();
-        toast.success(`Тикет #${result.ticket_id} создан успешно!`);
-        setIsCreateDialogOpen(false);
-        setCreateFormData({ subject: '', message: '' });
-        loadTickets(); // Обновляем список тикетов
+        toast.success(`Тикет #${result.ticket_id} успешно создан!`);
+        await loadTickets();
       } else {
+        // ❌ Ошибка - откатываем optimistic update
+        setTickets(prev => prev.filter(t => t.id !== optimisticTicket.id));
         const error = await response.json();
         toast.error(error.detail || 'Ошибка при создании тикета');
       }
     } catch (error) {
+      // ❌ Ошибка сети - откатываем optimistic update
+      setTickets(prev => prev.filter(t => t.id !== optimisticTicket.id));
       logger.error('Error creating ticket:', error);
       toast.error('Ошибка при создании тикета');
     } finally {

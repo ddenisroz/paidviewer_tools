@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useDebounce } from '../../hooks/useDebounce';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -53,7 +54,7 @@ const UserManagementPage = () => {
     
     // Фильтры и поиск
     const [searchTerm, setSearchTerm] = useState('');
-    const [debouncedSearch, setDebouncedSearch] = useState('');  // ✅ Debounced version
+    const debouncedSearch = useDebounce(searchTerm, 500);  // ✅ Используем hook для debounce
     // ✅ Остальные фильтры УДАЛЕНЫ - они теперь на сервере!
     // Клиент только отправляет поиск, все остальное фильтрует backend
     
@@ -81,15 +82,10 @@ const UserManagementPage = () => {
         vk_channel: ''
     });
 
-    // ✅ Debounce для поиска (500ms)
+    // ✅ Сброс на первую страницу при изменении поиска
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedSearch(searchTerm);
-            setPage(1);  // Сброс на первую страницу при новом поиске
-        }, 500);
-        
-        return () => clearTimeout(timer);
-    }, [searchTerm]);
+        setPage(1);
+    }, [debouncedSearch]);
 
     // React Query: загружаем пользователей с СЕРВЕРНОЙ пагинацией
     const { data: usersResponse = { users: [], pagination: {} }, isLoading: usersLoading, refetch: loadUsers } = useQuery({
