@@ -100,6 +100,7 @@ def is_channel_blocked(channel_name: str, db: Session) -> tuple[bool, Optional[s
 async def get_admin_users(
     page: int = 1,
     limit: int = 50,
+    search: str = None,  # ✅ Добавлена поддержка поиска
     include_guests: bool = True,  # По умолчанию включаем гостей
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -113,21 +114,42 @@ async def get_admin_users(
         
         offset = (page - 1) * limit
         
-        # Загружаем обычных пользователей
-        users = db.query(User).offset(offset).limit(limit).all()
-        total_users = db.query(User).count()
+        # ✅ ОПТИМИЗАЦИЯ: Ищем пользователей с фильтром и пагинацией
+        users_query = db.query(User)
+        
+        # Добавляем фильтр поиска если есть
+        if search:
+            search_term = f"%{search.lower()}%"
+            users_query = users_query.filter(
+                (User.twitch_username.ilike(search_term)) |
+                (User.vk_username.ilike(search_term)) |
+                (User.vk_channel_name.ilike(search_term))
+            )
+        
+        # Загружаем обычных пользователей с пагинацией
+        users = users_query.offset(offset).limit(limit).all()
+        total_users = users_query.count()  # ✅ Считаем ПОСЛЕ фильтра
         
         # Загружаем гостевые сессии (если включено) из таблицы GuestSession
         guest_sessions = []
         total_guest_sessions = 0
         if include_guests:
-            # Активные гостевые сессии из отдельной таблицы
-            guest_sessions = db.query(GuestSession).filter(
+            # ✅ ОПТИМИЗАЦИЯ: Гостевые сессии ТОЖЕ с пагинацией
+            guest_query = db.query(GuestSession).filter(
                 GuestSession.is_active == True
-            ).all()
-            total_guest_sessions = db.query(GuestSession).filter(
-                GuestSession.is_active == True
-            ).count()
+            )
+            
+            # Добавляем фильтр поиска для гостей
+            if search:
+                search_term = f"%{search.lower()}%"
+                guest_query = guest_query.filter(
+                    GuestSession.channel_name.ilike(search_term) |
+                    GuestSession.platform.ilike(search_term)
+                )
+            
+            # Загружаем с пагинацией
+            guest_sessions = guest_query.offset(offset).limit(limit).all()
+            total_guest_sessions = guest_query.count()  # ✅ Считаем ПОСЛЕ фильтра
         
         user_data = []
         for u in users:

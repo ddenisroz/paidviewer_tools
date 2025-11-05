@@ -53,11 +53,13 @@ const UserManagementPage = () => {
     
     // Фильтры и поиск
     const [searchTerm, setSearchTerm] = useState('');
-    const [userTypeFilter, setUserTypeFilter] = useState('all'); // NEW: гость/авторизованный
-    const [roleFilter, setRoleFilter] = useState('all');
-    const [statusFilter, setStatusFilter] = useState('all');
-    const [integrationFilter, setIntegrationFilter] = useState('all');
-    const [whitelistFilter, setWhitelistFilter] = useState('all');
+    const [debouncedSearch, setDebouncedSearch] = useState('');  // ✅ Debounced version
+    // ✅ Остальные фильтры УДАЛЕНЫ - они теперь на сервере!
+    // Клиент только отправляет поиск, все остальное фильтрует backend
+    
+    // Пагинация
+    const [page, setPage] = useState(1);  // ✅ Добавлена пагинация
+    const [limit] = useState(50);  // ✅ Размер страницы
     
     // Сортировка
     const [sortField, setSortField] = useState('id');
@@ -79,12 +81,28 @@ const UserManagementPage = () => {
         vk_channel: ''
     });
 
-    // React Query: загружаем пользователей
-    const { data: usersData = [], isLoading: usersLoading, refetch: loadUsers } = useQuery({
-        queryKey: ['admin-users'],
+    // ✅ Debounce для поиска (500ms)
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setPage(1);  // Сброс на первую страницу при новом поиске
+        }, 500);
+        
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    // React Query: загружаем пользователей с СЕРВЕРНОЙ пагинацией
+    const { data: usersResponse = { users: [], pagination: {} }, isLoading: usersLoading, refetch: loadUsers } = useQuery({
+        queryKey: ['admin-users', page, debouncedSearch],  // ✅ Пересчитываем при изменении page/search
         queryFn: async () => {
-            const response = await botService.get('/api/admin/users');
-            return response.data?.users || [];
+            const response = await botService.get('/api/admin/users', {
+                params: {
+                    page,
+                    limit,
+                    search: debouncedSearch  // ✅ Отправляем поиск на сервер
+                }
+            });
+            return response.data || { users: [], pagination: {} };
         },
         staleTime: 30 * 1000, // 30 секунд
         refetchOnMount: true,
@@ -94,6 +112,10 @@ const UserManagementPage = () => {
             toast.error('Ошибка загрузки пользователей');
         },
     });
+
+    // ✅ Получаем данные из ответа
+    const usersData = usersResponse.users || [];
+    const pagination = usersResponse.pagination || {};
 
     // React Query: загружаем сессии
     const { data: sessionsData = [], isLoading: sessionsLoading } = useQuery({
@@ -328,113 +350,10 @@ const UserManagementPage = () => {
     const integrations = integrationsData;
     const loading = usersLoading;
 
-    // Фильтрация и сортировка пользователей
-    const filteredAndSortedUsers = useMemo(() => {
-        const botsArray = Array.isArray(users) ? users : [];
-        const sessionsArray = Array.isArray(sessions) ? sessions : [];
-        const integrationsArray = Array.isArray(integrations) ? integrations : [];
-        
-        let filtered = botsArray.filter(user => {
-            if (!searchTerm.trim()) {
-                // Если поиск пустой, показываем всех
-                return true;
-            }
-            
-            const searchLower = searchTerm.toLowerCase().trim();
-            
-            // Поиск по ID пользователя
-            const matchesUserId = `User_${user.id}`.toLowerCase().includes(searchLower) || 
-                                  `#${user.id}`.toLowerCase().includes(searchLower);
-            
-            // Поиск по никнеймам платформ из integrations
-            const matchesPlatformUsername = user.integrations ? 
-                Object.values(user.integrations).some(integration => 
-                    integration.username?.toLowerCase().includes(searchLower) ||
-                    integration.channel_name?.toLowerCase().includes(searchLower)
-                ) : false;
-            
-            // Поиск по Twitch username (прямое поле и из integrations)
-            const matchesTwitchUsername = 
-                (user.twitch_username?.toLowerCase().includes(searchLower)) || 
-                (user.integrations?.twitch?.username?.toLowerCase().includes(searchLower)) ||
-                (user.integrations?.twitch?.channel_name?.toLowerCase().includes(searchLower)) ||
-                false;
-            
-            // Поиск по VK username (прямое поле и из integrations)
-            const matchesVkUsername = 
-                (user.vk_username?.toLowerCase().includes(searchLower)) || 
-                (user.vk_channel_name?.toLowerCase().includes(searchLower)) ||
-                (user.integrations?.vk?.username?.toLowerCase().includes(searchLower)) ||
-                (user.integrations?.vk?.channel_name?.toLowerCase().includes(searchLower)) ||
-                false;
-            
-            // Поиск по whitelisted channels
-            const whitelistedChannels = user.whitelisted_channels || {};
-            const matchesWhitelistedChannels = 
-                Object.values(whitelistedChannels).some(channel => 
-                    channel?.toLowerCase().includes(searchLower)
-                ) || false;
-            
-            const matchesSearch = matchesUserId || matchesPlatformUsername || matchesTwitchUsername || 
-                                 matchesVkUsername || matchesWhitelistedChannels;
-            
-            // Фильтр по роли
-            const matchesRole = roleFilter === 'all' || 
-                (roleFilter === 'admin' && user.is_admin) ||
-                (roleFilter === 'user' && !user.is_admin);
-            
-            // Фильтр по статусу
-            const matchesStatus = statusFilter === 'all' ||
-                (statusFilter === 'active' && !user.is_blocked) ||
-                (statusFilter === 'blocked' && user.is_blocked);
-            
-            // Фильтр по интеграциям
-            const matchesIntegration = integrationFilter === 'all' ||
-                (integrationFilter === 'twitch' && user.integrations?.twitch?.connected) ||
-                (integrationFilter === 'vk' && user.integrations?.vk?.connected) ||
-                (integrationFilter === 'none' && user.total_integrations === 0);
-            
-            // Фильтр по whitelist
-            const matchesWhitelist = whitelistFilter === 'all' ||
-                (whitelistFilter === 'whitelisted' && user.is_whitelisted) ||
-                (whitelistFilter === 'not_whitelisted' && !user.is_whitelisted);
-            
-            // Фильтр по типу пользователя (гость/авторизованный)
-            const matchesUserType = userTypeFilter === 'all' ||
-                (userTypeFilter === 'guest' && user.is_guest) ||
-                (userTypeFilter === 'authenticated' && !user.is_guest);
-            
-            return matchesSearch && matchesRole && matchesStatus && matchesIntegration && matchesWhitelist && matchesUserType;
-        });
-        
-        // Сортировка
-        filtered.sort((a, b) => {
-            let aValue = a[sortField];
-            let bValue = b[sortField];
-            
-            // Обработка специальных полей
-            if (sortField === 'total_integrations') {
-                aValue = a.total_integrations || 0;
-                bValue = b.total_integrations || 0;
-            } else if (sortField === 'created_at') {
-                aValue = new Date(a.created_at || 0);
-                bValue = new Date(b.created_at || 0);
-            }
-            
-            if (typeof aValue === 'string') {
-                aValue = aValue.toLowerCase();
-                bValue = bValue.toLowerCase();
-            }
-            
-            if (sortDirection === 'asc') {
-                return aValue > bValue ? 1 : -1;
-            } else {
-                return aValue < bValue ? 1 : -1;
-            }
-        });
-        
-        return filtered;
-    }, [users, sessions, integrations, searchTerm, userTypeFilter, roleFilter, statusFilter, integrationFilter, whitelistFilter, sortField, sortDirection]);
+    // ✅ УПРОЩЕНО: Фильтрация уже происходит на сервере!
+    // Клиент просто получает отфильтрованные данные и показывает их
+    // Никаких useMemo больше не нужно!
+    const filteredAndSortedUsers = usersData;
 
     const handleSort = (field) => {
         if (sortField === field) {
@@ -547,7 +466,12 @@ const UserManagementPage = () => {
             <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-400 text-sm">
-                        Всего: {filteredAndSortedUsers.length} пользователей
+                        Всего: {pagination.total || 0} пользователей
+                        {pagination.total_users !== undefined && pagination.total_guests !== undefined && (
+                            <span className="ml-2 text-xs text-slate-500">
+                                (Авториз: {pagination.total_users}, Гостей: {pagination.total_guests})
+                            </span>
+                        )}
                     </p>
                 </div>
                 <div className="flex gap-2">
@@ -888,6 +812,51 @@ const UserManagementPage = () => {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* ✅ КОМПОНЕНТ ПАГИНАЦИИ */}
+            {filteredAndSortedUsers.length > 0 && (
+                <div className="flex items-center justify-center gap-2 p-4">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage(Math.max(1, page - 1))}
+                        disabled={page === 1 || usersLoading}
+                    >
+                        ← Назад
+                    </Button>
+                    
+                    <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.min(5, pagination.pages || 1) }).map((_, i) => {
+                            const pageNum = i + 1;
+                            return (
+                                <Button
+                                    key={pageNum}
+                                    variant={pageNum === page ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setPage(pageNum)}
+                                    disabled={usersLoading}
+                                    className="w-8 h-8 p-0"
+                                >
+                                    {pageNum}
+                                </Button>
+                            );
+                        })}
+                    </div>
+                    
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage(Math.min(pagination.pages || 1, page + 1))}
+                        disabled={page >= (pagination.pages || 1) || usersLoading}
+                    >
+                        Вперед →
+                    </Button>
+                    
+                    <span className="text-xs text-slate-400 ml-4">
+                        Страница {page} из {pagination.pages || 1}
+                    </span>
+                </div>
+            )}
 
             {/* Диалог редактирования */}
             <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
