@@ -805,8 +805,12 @@ const UserManagementPage = () => {
                             </tbody>
                         </table>
                         {filteredAndSortedUsers.length === 0 && (
-                            <div className="text-center py-8 text-slate-400">
-                                Пользователи не найдены
+                            <div className="text-center py-12 text-slate-400">
+                                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                <h3 className="text-lg font-semibold mb-2 text-slate-200">Пользователи не найдены</h3>
+                                <p className="text-slate-500">
+                                    {debouncedSearch ? 'Попробуйте изменить критерии поиска' : 'Пока нет зарегистрированных пользователей'}
+                                </p>
                             </div>
                         )}
                     </div>

@@ -215,12 +215,17 @@ const InboxPage = () => {
             <p className="mt-2 text-muted-foreground">Загрузка тикетов...</p>
           </div>
         ) : tickets.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <h3 className="text-lg font-semibold mb-2">Тикеты не найдены</h3>
-              <p className="text-muted-foreground">
-                У вас пока нет тикетов поддержки. Создайте тикет, нажав кнопку в правом нижнем углу.
+          <Card className="border-dashed border-2">
+            <CardContent className="p-12 text-center">
+              <MessageCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <h3 className="text-xl font-semibold mb-2">Нет тикетов поддержки</h3>
+              <p className="text-muted-foreground mb-6">
+                Все хорошо! 🎉 У вас пока нет обращений в службу поддержки.
               </p>
+              <Button onClick={() => setIsCreateDialogOpen(true)} size="lg">
+                <Plus className="h-4 w-4 mr-2" />
+                Создать первый тикет
+              </Button>
             </CardContent>
           </Card>
         ) : (

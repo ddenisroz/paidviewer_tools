@@ -745,13 +745,17 @@ import { logger } from '../utils/prodLogger';
                                 </CardHeader>
                         <CardContent>
                             {!loading && customCommands.length === 0 ? (
-                                <div className="text-center py-8 space-y-4">
-                                    <MessageSquare className="h-16 w-16 mx-auto text-muted-foreground" />
+                                <div className="text-center py-12 space-y-4">
+                                    <Terminal className="h-16 w-16 mx-auto text-muted-foreground opacity-50" />
                                     <div>
-                                        <p className="text-muted-foreground">Кастомных команд пока нет</p>
-                                        <p className="text-sm text-muted-foreground">
-                                            Создайте первую команду, чтобы начать
+                                        <h4 className="text-lg font-semibold mb-2">Нет кастомных команд</h4>
+                                        <p className="text-muted-foreground mb-6">
+                                            Создайте первую команду для взаимодействия с вашей аудиторией
                                         </p>
+                                        <Button onClick={() => setIsCreateDialogOpen(true)} size="lg">
+                                            <Plus className="h-4 w-4 mr-2" />
+                                            Создать команду
+                                        </Button>
                                     </div>
                     </div>
                 ) : (
