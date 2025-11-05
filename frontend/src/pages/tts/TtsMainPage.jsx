@@ -759,9 +759,9 @@ const TtsMainPageContent = () => {
                     localTtsConfig={localTtsConfig}
                 />
                 
-                {/* Audio Settings + Additional Settings - 2 columns */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* Audio Settings */}
+                {/* Audio + Additional Settings - 2 columns, compact */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {/* Audio Settings - compact */}
                     <AudioSettings
                         audioSettings={audioSettings}
                         setAudioSettings={setAudioSettings}
@@ -772,7 +772,7 @@ const TtsMainPageContent = () => {
                         onRegenerateObsUrl={handleRegenerateObsUrl}
                     />
                     
-                    {/* TTS Settings */}
+                    {/* TTS Settings - compact */}
                     <TtsSettings
                         ttsSettings={ttsSettings}
                         setTtsSettings={setTtsSettings}
