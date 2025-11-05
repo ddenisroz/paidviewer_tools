@@ -31,7 +31,8 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
         show_7tv_emotes: true,
         show_links: true,
         auto_load_images: true,
-        widget_url: ''
+        widget_url: '',
+        version: 1  // ✅ Версия для защиты от race conditions
     });
     const [loading, setLoading] = useState(false); // ✅ Начальное состояние false - не показываем loading при первом рендере
     const [saving, setSaving] = useState(false);
@@ -64,7 +65,8 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                 show_7tv_emotes: true,
                 show_links: true,
                 auto_load_images: true,
-                widget_url: ''
+                widget_url: '',
+                version: 1  // ✅ Версия для защиты от race conditions
             });
             setLoading(false);
         }
@@ -128,9 +130,16 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
     const handleSave = async (regenerateToken = false) => {
         try {
             setSaving(true);
+            
+            // ✅ Отправляем версию с запросом
+            const requestData = {
+                ...settings,
+                version: settings.version || 1
+            };
+            
             const response = await botService.post(
                 `/api/chatbox/settings?regenerate_token=${regenerateToken}`,
-                settings
+                requestData
             );
             
             // ✅ Нормализуем данные после сохранения
@@ -142,7 +151,8 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                 max_messages: parseInt(response.data.max_messages) || 20,
                 message_fade_seconds: parseInt(response.data.message_fade_seconds) || 60,
                 message_spacing: parseInt(response.data.message_spacing) || 4,
-                animation_type: response.data.animation_type || 'fade'
+                animation_type: response.data.animation_type || 'fade',
+                version: response.data.version || 1  // ✅ Обновляем версию
             };
             
             setSettings(normalizedSettings);
@@ -154,8 +164,18 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                 toast.success('Настройки ChatBox сохранены!');
             }
         } catch (error) {
-            logger.error('Ошибка сохранения настроек:', error);
-            toast.error('Не удалось сохранить настройки');
+            // ✅ Обработка 409 Conflict - данные были обновлены
+            if (error.response?.status === 409) {
+                logger.warning('Version conflict detected', error.response.data);
+                toast.warning('Данные обновлены. Перезагружаю...');
+                // Перезагружаем модальное окно или обновляем версию
+                setTimeout(() => {
+                    window.location.reload();  // Простой способ пересинхронизировать
+                }, 1500);
+            } else {
+                logger.error('Ошибка сохранения настроек:', error);
+                toast.error('Не удалось сохранить настройки');
+            }
         } finally {
             setSaving(false);
         }

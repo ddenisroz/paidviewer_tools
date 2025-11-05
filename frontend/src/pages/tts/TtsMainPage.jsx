@@ -64,6 +64,7 @@ const TtsMainPageContent = () => {
         enableCustomLexicon: false,
         filterReplies: false,
         filterMentions: false,
+        version: 1,  // ✅ Версия для защиты от race conditions
     });
     
     // Состояния сохранения
@@ -179,15 +180,29 @@ const TtsMainPageContent = () => {
             ttsLogger.apiResponse(200, '/api/tts/settings', response.data);
             return response.data;
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['tts-settings'] });
+            // ✅ Обновляем версию в локальном state
+            if (data.version) {
+                setTtsSettings(prev => ({...prev, version: data.version}));
+            }
             setSaveStatus('Сохранено');
-            ttsLogger.success('TTS settings saved successfully');
+            ttsLogger.success('TTS settings saved successfully', {version: data.version});
             setTimeout(() => setSaveStatus(''), 2000);
         },
         onError: (error) => {
             ttsLogger.error('Error saving TTS settings:', error);
-            if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
+            
+            // ✅ Обработка 409 Conflict - данные были обновлены
+            if (error.response?.status === 409) {
+                setSaveStatus('Данные обновлены. Перезагружаю...');
+                ttsLogger.warning('Version conflict detected, reloading settings');
+                // Перезагружаем настройки с сервера
+                setTimeout(() => {
+                    queryClient.invalidateQueries({ queryKey: ['tts-settings'] });
+                    setSaveStatus('');
+                }, 1500);
+            } else if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
                 setSaveStatus('Ошибка сохранения');
                 setTimeout(() => setSaveStatus(''), 3000);
             } else {
@@ -355,7 +370,8 @@ const TtsMainPageContent = () => {
                     enableLexiconFilter: data.enableLexiconFilter ?? true,
                     enableCustomLexicon: data.enableCustomLexicon ?? false,
                     filterReplies: data.filterReplies ?? false,
-                    filterMentions: data.filterMentions ?? false
+                    filterMentions: data.filterMentions ?? false,
+                    version: data.version ?? 1  // ✅ Загружаем версию с сервера
                 };
                 setTtsSettings(ttsData);
                 ttsLogger.success('TTS settings loaded:', ttsData);
