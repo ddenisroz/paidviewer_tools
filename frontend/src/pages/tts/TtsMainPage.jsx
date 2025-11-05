@@ -835,76 +835,63 @@ const TtsMainPageContent = () => {
                     `}
                 </style>
                 
-                {/* 1. Выбор движка TTS - компактный селектор без отступа сверху */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-                    <label 
-                        className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer transition-all font-medium ${
-                            ttsEngine === 'cloud' 
-                                ? 'border-blue-500/50 bg-blue-500/10 text-blue-400' 
-                                : 'border-gray-700 hover:border-blue-500/30 text-gray-400'
-                        }`}
-                        onClick={() => {
-                            if (ttsEngine !== 'cloud') {
-                                setTtsEngine('cloud');
-                                botService.post('/api/tts/engine', { engine_type: 'gtts' }).catch(err => ttsLogger.error('Error:', err));
-                                window.dispatchEvent(new CustomEvent('ai-tts-changed', { 
-                                    detail: { enabled: false, engineType: 'gtts', isWhitelisted: isWhitelisted } 
-                                }));
-                            }
-                        }}
-                    >
-                        <input 
-                            type="radio"
-                            name="tts_engine"
-                            value="cloud"
-                            checked={ttsEngine === 'cloud'}
-                            onChange={() => {}}
-                            className="w-4 h-4 pointer-events-none"
-                        />
-                        <span className="text-sm">☁️ Cloud</span>
-                        <span className="text-xs ml-auto px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
-                            {isHealthy ? '✓ Active' : '⚠ Offline'}
-                        </span>
-                    </label>
-                    
-                    <label 
-                        className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer transition-all font-medium ${
-                            !localTtsConfig?.configured || !isWhitelisted
-                                ? 'opacity-40 cursor-not-allowed border-gray-700 text-gray-500'
-                                : ttsEngine === 'local'
-                                    ? 'border-purple-500/50 bg-purple-500/10 text-purple-400'
-                                    : 'border-gray-700 hover:border-purple-500/30 text-gray-400'
-                        }`}
-                        onClick={() => {
-                            if (localTtsConfig?.configured && isWhitelisted && ttsEngine !== 'local') {
-                                setTtsEngine('local');
-                                botService.post('/api/tts/engine', { engine_type: 'local' }).catch(err => {
-                                    ttsLogger.error('Error:', err);
-                                    if (err.response?.status === 403) {
-                                        toast.error('F5-TTS only for whitelist');
-                                        setTtsEngine('cloud');
-                                    }
-                                });
-                                window.dispatchEvent(new CustomEvent('ai-tts-changed', { 
-                                    detail: { enabled: true, engineType: 'local', isWhitelisted: isWhitelisted } 
-                                }));
-                            }
-                        }}
-                    >
-                        <input 
-                            type="radio"
-                            name="tts_engine"
-                            value="local"
-                            checked={ttsEngine === 'local'}
-                            onChange={() => {}}
+                {/* 1. Выбор движка TTS - компактный селектор */}
+                <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-gray-300 uppercase tracking-wide px-1">Engine:</label>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                        <button 
+                            onClick={() => {
+                                if (ttsEngine !== 'cloud') {
+                                    setTtsEngine('cloud');
+                                    botService.post('/api/tts/engine', { engine_type: 'gtts' }).catch(err => ttsLogger.error('Error:', err));
+                                    window.dispatchEvent(new CustomEvent('ai-tts-changed', { 
+                                        detail: { enabled: false, engineType: 'gtts', isWhitelisted: isWhitelisted } 
+                                    }));
+                                }
+                            }}
+                            className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
+                                ttsEngine === 'cloud' 
+                                    ? 'border-blue-500/50 bg-blue-500/10 text-blue-400' 
+                                    : 'border-gray-700 hover:border-gray-600 text-gray-400'
+                            }`}
+                        >
+                            <span>Cloud</span>
+                            <span className="text-xs ml-2 px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                                {isHealthy ? 'Active' : 'Offline'}
+                            </span>
+                        </button>
+                        
+                        <button 
+                            onClick={() => {
+                                if (localTtsConfig?.configured && isWhitelisted && ttsEngine !== 'local') {
+                                    setTtsEngine('local');
+                                    botService.post('/api/tts/engine', { engine_type: 'local' }).catch(err => {
+                                        ttsLogger.error('Error:', err);
+                                        if (err.response?.status === 403) {
+                                            toast.error('F5-TTS only for whitelist');
+                                            setTtsEngine('cloud');
+                                        }
+                                    });
+                                    window.dispatchEvent(new CustomEvent('ai-tts-changed', { 
+                                        detail: { enabled: true, engineType: 'local', isWhitelisted: isWhitelisted } 
+                                    }));
+                                }
+                            }}
                             disabled={!localTtsConfig?.configured || !isWhitelisted}
-                            className="w-4 h-4 pointer-events-none"
-                        />
-                        <span className="text-sm">💻 Local</span>
-                        <span className="text-xs ml-auto px-2 py-0.5 rounded bg-purple-500/20 text-purple-400">
-                            {localTtsConfig?.configured ? '✓ Ready' : '✕ Setup'}
-                        </span>
-                    </label>
+                            className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
+                                !localTtsConfig?.configured || !isWhitelisted
+                                    ? 'opacity-40 cursor-not-allowed border-gray-700 text-gray-500'
+                                    : ttsEngine === 'local'
+                                        ? 'border-purple-500/50 bg-purple-500/10 text-purple-400'
+                                        : 'border-gray-700 hover:border-gray-600 text-gray-400'
+                            }`}
+                        >
+                            <span>Local</span>
+                            <span className="text-xs ml-2 px-2 py-0.5 rounded bg-purple-500/20 text-purple-400">
+                                {localTtsConfig?.configured ? 'Ready' : 'Setup'}
+                            </span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* 2. Основные управления */}

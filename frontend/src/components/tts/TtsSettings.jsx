@@ -35,7 +35,7 @@ const TtsSettings = ({
                 onClick={() => setIsExpanded(!isExpanded)}
             >
                 <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-semibold">⚙️ Settings</CardTitle>
+                    <CardTitle className="text-sm font-semibold">Settings <span className="text-gray-400 font-normal">- Additional options</span></CardTitle>
                     <ChevronDown 
                         className={`h-5 w-5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
                     />
