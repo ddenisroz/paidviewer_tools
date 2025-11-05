@@ -10,6 +10,7 @@ import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
 import { toast } from 'sonner';
 import { logger } from '../utils/prodLogger';
+import { getErrorMessage, getOperationMessage } from '../services/microservices';
 
 const InboxPage = () => {
   const [tickets, setTickets] = useState([]);
@@ -39,11 +40,15 @@ const InboxPage = () => {
         const data = await response.json();
         setTickets(data.tickets || []);
       } else {
-        toast.error('Ошибка при загрузке тикетов');
+        const errorMsg = getOperationMessage('load_tickets', { response });
+        toast.error(errorMsg);
       }
     } catch (error) {
       logger.error('Error loading tickets:', error);
-      toast.error('Ошибка при загрузке тикетов');
+      const errorMsg = error.status === 503 
+        ? 'Сервис на обслуживании. Попробуйте позже.'
+        : 'Не удалось загрузить тикеты. Проверьте интернет-соединение.';
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }

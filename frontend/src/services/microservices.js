@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 
 import { TTS_SERVICE_URL, API_BASE_URL } from '../constants';
 import { logger } from '../utils/prodLogger';
+import { getErrorMessage, getOperationMessage } from '../utils/errorMessages';
 
 export { TTS_SERVICE_URL };
 
@@ -329,3 +330,6 @@ export const getTtsHealth = async () => {
 
 // Экспорт botService как microservicesAPI для совместимости
 export const microservicesAPI = botService;
+
+// Export error handling utilities
+export { getErrorMessage, getOperationMessage };
