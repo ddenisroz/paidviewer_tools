@@ -34,6 +34,22 @@ const DonationSettings = ({ user, platform, channelName, hasRewards = false }) =
     mythical_donation_amount: [2000.0]
   });
 
+  // Listen to drops config changes from QuickActionsBar
+  useEffect(() => {
+    const handleDropsConfigChange = (event) => {
+      const { donation_enabled, channel, platform: eventPlatform } = event.detail;
+      // Only update if it's for the same channel and platform
+      if (channel === channelName && eventPlatform === platform && donation_enabled !== undefined) {
+        setFormData(prev => ({ ...prev, donation_enabled }));
+        // Invalidate query to refetch
+        queryClient.invalidateQueries({ queryKey: ['drops-config', channelName, platform] });
+      }
+    };
+
+    window.addEventListener('drops-config-changed', handleDropsConfigChange);
+    return () => window.removeEventListener('drops-config-changed', handleDropsConfigChange);
+  }, [channelName, platform, queryClient]);
+
   // React Query: загружаем конфигурацию (используем тот же queryKey что и в StreakSettings)
   const { data: config, isLoading } = useQuery({
     queryKey: ['drops-config', channelName, platform],
@@ -207,7 +223,13 @@ const DonationSettings = ({ user, platform, channelName, hasRewards = false }) =
                       return;
                     }
                   }
+                  // Update local state immediately
                   setFormData({...formData, donation_enabled: checked});
+                  // Auto-save when toggling
+                  const payload = {
+                    donation_enabled: checked
+                  };
+                  saveMutation.mutate(payload);
                 }}
               />
             </div>
@@ -249,7 +271,13 @@ const DonationSettings = ({ user, platform, channelName, hasRewards = false }) =
                     // После возврата с OAuth интеграция будет подключена
                     return;
                   }
+                  // Update local state immediately
                   setFormData({...formData, mythical_enabled: checked});
+                  // Auto-save when toggling
+                  const payload = {
+                    mythical_enabled: checked
+                  };
+                  saveMutation.mutate(payload);
                 }}
               />
             </div>

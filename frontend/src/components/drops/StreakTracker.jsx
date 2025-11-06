@@ -33,16 +33,23 @@ const StreakTracker = ({ user, platform, channelName }) => {
   const streakEnabled = config?.streak_enabled ?? false;
 
   useEffect(() => {
-    if (streakEnabled) {
+    // ALWAYS check streakEnabled before loading
+    if (streakEnabled && user && platform && channelName) {
       loadStreaks(true);
     } else {
-      // Clear streaks if disabled
+      // Clear streaks if disabled or missing required data
       setStreaks([]);
+      setHasMore(false);
     }
   }, [user, platform, channelName, streakEnabled]);
 
   const loadStreaks = async (reset = false) => {
-    if (!user || !platform || !channelName) return;
+    // DOUBLE CHECK: Do not load if streak is disabled
+    if (!user || !platform || !channelName || !streakEnabled) {
+      setStreaks([]);
+      setHasMore(false);
+      return;
+    }
 
     const currentOffset = reset ? 0 : offset;
 
@@ -57,14 +64,22 @@ const StreakTracker = ({ user, platform, channelName }) => {
       });
       
       if (response.data.success) {
-        const newStreaks = response.data.data;
-        setStreaks(reset ? newStreaks : [...streaks, ...newStreaks]);
-        setHasMore(newStreaks.length === limit);
+        const newStreaks = response.data.data || [];
+        // EXTRA SAFETY: Clear if empty or streak disabled
+        if (newStreaks.length === 0 || !streakEnabled) {
+          setStreaks([]);
+          setHasMore(false);
+        } else {
+          setStreaks(reset ? newStreaks : [...streaks, ...newStreaks]);
+          setHasMore(newStreaks.length === limit);
+        }
         if (reset) setOffset(0);
       }
     } catch (error) {
       logger.error('Error loading streaks:', error);
       toast.error('Ошибка загрузки стриков');
+      setStreaks([]);
+      setHasMore(false);
     } finally {
       setLoading(false);
     }

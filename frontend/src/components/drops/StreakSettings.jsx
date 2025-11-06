@@ -24,6 +24,22 @@ const StreakSettings = ({ user, platform, channelName, hasRewards = false }) => 
     streak_reset_on_skip: true
   });
 
+  // Listen to drops config changes from QuickActionsBar
+  React.useEffect(() => {
+    const handleDropsConfigChange = (event) => {
+      const { streak_enabled, channel, platform: eventPlatform } = event.detail;
+      // Only update if it's for the same channel and platform
+      if (channel === channelName && eventPlatform === platform && streak_enabled !== undefined) {
+        setFormData(prev => ({ ...prev, streak_enabled }));
+        // Invalidate query to refetch
+        queryClient.invalidateQueries({ queryKey: ['drops-config', channelName, platform] });
+      }
+    };
+
+    window.addEventListener('drops-config-changed', handleDropsConfigChange);
+    return () => window.removeEventListener('drops-config-changed', handleDropsConfigChange);
+  }, [channelName, platform, queryClient]);
+
   // React Query: загружаем конфигурацию
   const { data: config, isLoading } = useQuery({
     queryKey: ['drops-config', channelName, platform],
@@ -174,11 +190,23 @@ const StreakSettings = ({ user, platform, channelName, hasRewards = false }) => 
                 checked={formData.streak_enabled && hasRewards}
                 disabled={!hasRewards}
                 onCheckedChange={(checked) => {
-                  if (!hasRewards) {
+                  if (!hasRewards && checked) {
                     toast.error('Сначала настройте содержимое сундуков на вкладке "Награды"');
                     return;
                   }
+                  // Update local state immediately
                   setFormData({...formData, streak_enabled: checked});
+                  // Auto-save when toggling
+                  const payload = {
+                    ...formData,
+                    streak_enabled: checked,
+                    streak_days_common: formData.streak_days_common[0],
+                    streak_days_rare: formData.streak_days_rare[0],
+                    streak_days_epic: formData.streak_days_epic[0],
+                    streak_days_legendary: formData.streak_days_legendary[0],
+                    streak_messages_required: formData.streak_messages_required[0],
+                  };
+                  saveMutation.mutate(payload);
                 }}
               />
             </div>

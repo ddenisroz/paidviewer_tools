@@ -418,28 +418,28 @@ const TtsMainPageContent = () => {
     const handleVolumeChange = useCallback((value) => {
         setLocalVolume(value);
         
-        // Debounce save (1000ms)
+        // Debounce save (300ms for faster response)
         if (volumeDebounceRef.current) {
             clearTimeout(volumeDebounceRef.current);
         }
         
         volumeDebounceRef.current = setTimeout(() => {
             saveAudioSettingsMutation.mutate({ websiteVolume: value });
-        }, 1000);
+        }, 300);
     }, [saveAudioSettingsMutation]);
 
     const handleTtsSettingChange = useCallback((key, value) => {
         const newSettings = { ...ttsSettings, [key]: value };
         setTtsSettings(newSettings);
         
-        // Debounce save (500ms)
+        // Debounce save (200ms for faster response)
         if (settingsDebounceRef.current) {
             clearTimeout(settingsDebounceRef.current);
         }
         
         settingsDebounceRef.current = setTimeout(() => {
             saveTtsSettingsMutation.mutate(newSettings);
-        }, 500);
+        }, 200);
     }, [ttsSettings, saveTtsSettingsMutation]);
 
     const handlePlatformToggle = useCallback((platform) => {
@@ -516,10 +516,10 @@ const TtsMainPageContent = () => {
 
                 {isAnyTtsEnabled && (
                     <>
-                        {/* Settings Grid */}
+                        {/* Settings Grid - EQUAL HEIGHT */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             {/* Left Column: Main Controls */}
-                            <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
+                            <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm flex flex-col">
                                 <CardHeader className="pb-3">
                                     <div className="flex items-center justify-between">
                                         <CardTitle className="text-base font-bold text-white">Управление</CardTitle>
@@ -544,7 +544,7 @@ const TtsMainPageContent = () => {
                                         </div>
                                     </div>
                                 </CardHeader>
-                                <CardContent className="space-y-4">
+                                <CardContent className="space-y-4 flex-1 flex flex-col">
                                     {/* Trigger Mode */}
                                     <div>
                                         <label className="block text-xs font-semibold text-gray-400 mb-2">Режим включения</label>
@@ -552,6 +552,8 @@ const TtsMainPageContent = () => {
                                             ttsMode={ttsTriggerMode}
                                             onModeChange={handleTtsModeChange}
                                             isSaving={isSavingMode}
+                                            showModeSelector={true}
+                                            showRewards={false}
                                         />
                                     </div>
 
@@ -561,10 +563,10 @@ const TtsMainPageContent = () => {
                                         <div className="space-y-2">
                                             <div
                                                 onClick={handleBasicTtsToggle}
-                                                className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${
+                                                className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200 ${
                                                     basicTtsEnabled && !aiTtsEnabled
-                                                        ? 'bg-green-600/20 border-2 border-green-500'
-                                                        : 'bg-gray-800/30 border border-gray-700/50 hover:bg-gray-700/30'
+                                                        ? 'bg-purple-600/15 border-2 border-purple-500 shadow-sm shadow-purple-500/20'
+                                                        : 'bg-gray-800/30 border border-gray-700/50 hover:bg-gray-700/40 hover:border-gray-600/50'
                                                 }`}
                                             >
                                                 <div>
@@ -574,17 +576,18 @@ const TtsMainPageContent = () => {
                                                 <Switch
                                                     checked={basicTtsEnabled && !aiTtsEnabled}
                                                     onCheckedChange={handleBasicTtsToggle}
-                                                    className="data-[state=checked]:bg-green-600"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="data-[state=checked]:bg-purple-600"
                                                 />
                                             </div>
                                             <div
-                                                onClick={handleAiTtsToggle}
-                                                className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${
+                                                onClick={!isHealthy || !canUseF5TTS ? undefined : handleAiTtsToggle}
+                                                className={`group flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${
                                                     !isHealthy || !canUseF5TTS
-                                                        ? 'opacity-40 cursor-not-allowed bg-gray-800/20'
+                                                        ? 'opacity-50 cursor-not-allowed bg-gray-800/20 border border-gray-700/30'
                                                         : aiTtsEnabled
-                                                            ? 'bg-purple-600/20 border-2 border-purple-500'
-                                                            : 'bg-gray-800/30 border border-gray-700/50 hover:bg-gray-700/30'
+                                                            ? 'cursor-pointer bg-purple-600/15 border-2 border-purple-500 shadow-sm shadow-purple-500/20'
+                                                            : 'cursor-pointer bg-gray-800/30 border border-gray-700/50 hover:bg-gray-700/40 hover:border-gray-600/50'
                                                 }`}
                                             >
                                                 <div>
@@ -596,6 +599,7 @@ const TtsMainPageContent = () => {
                                                 <Switch
                                                     checked={aiTtsEnabled}
                                                     onCheckedChange={handleAiTtsToggle}
+                                                    onClick={(e) => e.stopPropagation()}
                                                     disabled={!isHealthy || !canUseF5TTS}
                                                     className="data-[state=checked]:bg-purple-600"
                                                 />
@@ -609,10 +613,10 @@ const TtsMainPageContent = () => {
                                         <div className="grid grid-cols-2 gap-2">
                                             <button
                                                 onClick={() => handleEngineChange('cloud')}
-                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${
                                                     ttsEngine === 'cloud'
                                                         ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-                                                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50 border border-gray-700/50'
+                                                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
                                                 }`}
                                             >
                                                 Cloud
@@ -620,12 +624,12 @@ const TtsMainPageContent = () => {
                                             <button
                                                 onClick={() => handleEngineChange('local')}
                                                 disabled={!hasLocalSetup}
-                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${
                                                     !hasLocalSetup
                                                         ? 'opacity-40 cursor-not-allowed bg-gray-800/30 text-gray-600'
                                                         : ttsEngine === 'local'
-                                                            ? 'bg-green-600 text-white shadow-lg shadow-green-600/30'
-                                                            : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50 border border-gray-700/50'
+                                                            ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                                                            : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
                                                 }`}
                                             >
                                                 Local
@@ -634,115 +638,125 @@ const TtsMainPageContent = () => {
                                     </div>
 
                                     {/* Output Mode */}
-                                    <div>
+                                    <div className="flex-1 flex flex-col">
                                         <label className="block text-xs font-semibold text-gray-400 mb-2">Вывод звука</label>
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-2 gap-2 mb-3">
                                             <button
                                                 onClick={() => handleListeningModeChange('website')}
-                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${
                                                     listeningMode === 'website'
                                                         ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-                                                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50 border border-gray-700/50'
+                                                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
                                                 }`}
                                             >
                                                 Сайт
                                             </button>
                                             <button
                                                 onClick={() => handleListeningModeChange('obs')}
-                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${
                                                     listeningMode === 'obs'
-                                                        ? 'bg-green-600 text-white shadow-lg shadow-green-600/30'
-                                                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50 border border-gray-700/50'
+                                                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                                                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
                                                 }`}
                                             >
                                                 OBS
                                             </button>
                                         </div>
+                                        
+                                        {/* Settings based on mode - centered vertically */}
+                                        <div className="flex-1 flex items-center justify-center pt-4 border-t border-gray-700/30">
+                                            {listeningMode === 'website' ? (
+                                                /* Volume slider for Website mode */
+                                                <div className="w-full">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <label className="text-xs font-semibold text-gray-400">Громкость</label>
+                                                        <span className="text-sm font-bold text-purple-300 bg-purple-600/20 px-3 py-1 rounded-lg">
+                                                            {localVolume}%
+                                                        </span>
+                                                    </div>
+                                                    <Slider
+                                                        value={[localVolume]}
+                                                        onValueChange={(val) => handleVolumeChange(val[0])}
+                                                        min={0}
+                                                        max={100}
+                                                        step={1}
+                                                        className="w-full"
+                                                    />
+                                                </div>
+                                            ) : (
+                                                /* OBS Browser Source URL for OBS mode */
+                                                <div className="w-full space-y-2">
+                                                    <label className="text-xs text-gray-400 block font-semibold">OBS Browser Source:</label>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="text"
+                                                            value={obsUrl || 'Загрузка...'}
+                                                            readOnly
+                                                            className="flex-1 bg-gray-900/50 border border-gray-700/50 text-gray-300 text-xs px-3 py-2 rounded focus:outline-none focus:border-purple-500"
+                                                        />
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => {
+                                                                if (obsUrl) {
+                                                                    navigator.clipboard.writeText(obsUrl);
+                                                                    toast.success('Скопировано');
+                                                                }
+                                                            }}
+                                                            disabled={!obsUrl}
+                                                            className="px-3 text-xs border-purple-600/50 text-purple-300 hover:bg-purple-600/20 disabled:opacity-50"
+                                                        >
+                                                            Copy
+                                                        </Button>
+                                                    </div>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={handleRegenerateObsUrl}
+                                                        disabled={isRegeneratingUrl}
+                                                        className="w-full text-xs border-purple-600/50 text-purple-300 hover:bg-purple-600/20"
+                                                    >
+                                                        <RefreshCw className={`w-3 h-3 mr-1 ${isRegeneratingUrl ? 'animate-spin' : ''}`} />
+                                                        Обновить токен
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>
 
-                            {/* Right Column: Audio/OBS & Additional Settings */}
-                            <div className="space-y-4">
-                                {/* Audio Settings for Website */}
-                                {listeningMode === 'website' && (
-                                    <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
-                                        <CardHeader className="pb-3">
-                                            <CardTitle className="text-base font-bold text-white">Аудио</CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div>
-                                                <div className="flex items-center justify-between mb-3">
-                                                    <label className="text-xs font-semibold text-gray-400">Громкость</label>
-                                                    <span className="text-sm font-bold text-purple-300 bg-purple-600/20 px-3 py-1 rounded-lg">
-                                                        {localVolume}%
-                                                    </span>
-                                                </div>
-                                                <Slider
-                                                    value={[localVolume]}
-                                                    onValueChange={(val) => handleVolumeChange(val[0])}
-                                                    min={0}
-                                                    max={100}
-                                                    step={1}
-                                                    className="w-full"
+                            {/* Right Column: Rewards & Additional Settings */}
+                            <div className="space-y-4 flex flex-col">
+                                {/* Rewards Creation */}
+                                <Card className={`border-gray-700/50 bg-gray-900/50 backdrop-blur-sm transition-all ${ttsTriggerMode === 'all_messages' ? 'opacity-50' : ''}`}>
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-base font-bold text-white">Награды за озвучку</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="h-[160px] flex items-center p-0">
+                                        {ttsTriggerMode === 'channel_points' ? (
+                                            <div className="w-full px-6">
+                                                <TtsChannelPointsMode
+                                                    ttsMode={ttsTriggerMode}
+                                                    onModeChange={handleTtsModeChange}
+                                                    isSaving={isSavingMode}
+                                                    showModeSelector={false}
                                                 />
                                             </div>
-                                        </CardContent>
-                                    </Card>
-                                )}
-
-                                {/* OBS Settings */}
-                                {listeningMode === 'obs' && (
-                                    <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
-                                        <CardHeader className="pb-3">
-                                            <CardTitle className="text-base font-bold text-white">OBS Browser Source</CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="space-y-3">
-                                            <div>
-                                                <label className="text-xs text-gray-400 mb-2 block">OBS Browser Source URL:</label>
-                                                <div className="flex gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={obsUrl || 'Загрузка...'}
-                                                        readOnly
-                                                        className="flex-1 bg-gray-900/50 border border-gray-700/50 text-gray-300 text-xs px-3 py-2 rounded focus:outline-none focus:border-green-500"
-                                                    />
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => {
-                                                            if (obsUrl) {
-                                                                navigator.clipboard.writeText(obsUrl);
-                                                                toast.success('Скопировано');
-                                                            }
-                                                        }}
-                                                        disabled={!obsUrl}
-                                                        className="px-3 text-xs border-green-600/50 text-green-300 hover:bg-green-600/20 disabled:opacity-50"
-                                                    >
-                                                        Copy
-                                                    </Button>
-                                                </div>
+                                        ) : (
+                                            <div className="w-full text-center px-6">
+                                                <p className="text-sm text-gray-400">Выберите режим "За баллы канала" для настройки наград</p>
                                             </div>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={handleRegenerateObsUrl}
-                                                disabled={isRegeneratingUrl}
-                                                className="w-full text-xs border-purple-600/50 text-purple-300 hover:bg-purple-600/20"
-                                            >
-                                                <RefreshCw className={`w-3 h-3 mr-1 ${isRegeneratingUrl ? 'animate-spin' : ''}`} />
-                                                Обновить токен
-                                            </Button>
-                                        </CardContent>
-                                    </Card>
-                                )}
+                                        )}
+                                    </CardContent>
+                                </Card>
 
                                 {/* Additional Settings */}
-                                <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
+                                <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm flex-1 flex flex-col">
                                     <CardHeader className="pb-3">
                                         <CardTitle className="text-base font-bold text-white">Дополнительно</CardTitle>
                                     </CardHeader>
-                                    <CardContent className="space-y-4">
+                                    <CardContent className="space-y-4 flex-1">
                                             <div>
                                                 <label className="block text-xs font-semibold text-gray-400 mb-2">Смайлы</label>
                                                 <div className="space-y-2">

@@ -39,15 +39,16 @@ export const TtsProvider = ({ children }) => {
 
     // Дополнительная инициализация при появлении пользователя
     useEffect(() => {
-        if (isInitialized && engineStatus.loaded && user) {
+        if (isInitialized && user) {
             // Вызываем функции напрямую, без зависимости
             const initUserTts = async () => {
                 try {
-                    // Проверяем статус TTS
+                    // CRITICAL: Проверяем статус TTS и whitelist ВСЕГДА (независимо от engineStatus)
                     const channelName = user?.isGuest ? user.username : null;
                     const response = await getTtsStatus(channelName);
                     if (response.data) {
                         setTtsEnabled(response.data.enabled);
+                        // IMPORTANT: Set isWhitelisted from API response
                         setIsWhitelisted(response.data.is_whitelisted || false);
                         // Сохраняем has_local_setup в localStorage для других компонентов
                         if (response.data.has_local_setup) {
@@ -60,14 +61,16 @@ export const TtsProvider = ({ children }) => {
                     logger.error('Failed to get TTS status:', error);
                 }
                 
-                try {
-                    // Загружаем голоса
-                    const voicesResponse = await getGlobalVoices();
-                    if (voicesResponse.success) {
-                        setVoices(voicesResponse.voices || []);
+                // Загружаем голоса только если движок готов
+                if (engineStatus.loaded) {
+                    try {
+                        const voicesResponse = await getGlobalVoices();
+                        if (voicesResponse.success) {
+                            setVoices(voicesResponse.voices || []);
+                        }
+                    } catch (error) {
+                        logger.error('Failed to load voices:', error);
                     }
-                } catch (error) {
-                    logger.error('Failed to load voices:', error);
                 }
             };
             
@@ -256,10 +259,10 @@ export const TtsProvider = ({ children }) => {
                 // showNotification(message, 'error', 4000, position); // This line was removed from imports
             }
         } finally {
-            // Сбрасываем флаг с небольшой задержкой для предотвращения спама
+            // Сбрасываем флаг с минимальной задержкой для предотвращения спама
             setTimeout(() => {
                 setIsToggling(false);
-            }, 500); // 500ms задержка
+            }, 200); // 200ms задержка
         }
     }, [engineStatus.loaded, isWhitelisted, ttsEnabled, notificationCallback, getButtonPosition, isToggling]);
 
@@ -273,21 +276,32 @@ export const TtsProvider = ({ children }) => {
             return;
         }
         
-        // Проверяем статус TTS только если есть пользователь
-        if (engineStatus.loaded && user) {
-            // TtsContext: Engine loaded and user exists, checking TTS status...');
+        // CRITICAL: Check TTS status and whitelist ALWAYS (independently of engine status)
+        // This fixes the issue where isWhitelisted stays null until engine loads
+        if (user) {
             try {
-                // Проверяем статус TTS
+                // Проверяем статус TTS и whitelist
                 const channelName = user?.isGuest ? user.username : null;
                 const response = await getTtsStatus(channelName);
                 if (response.data) {
                     setTtsEnabled(response.data.enabled);
+                    // IMPORTANT: Set isWhitelisted from API response
+                    // Backend returns: is_whitelisted OR has_local_setup
                     setIsWhitelisted(response.data.is_whitelisted || false);
+                    // Save has_local_setup to localStorage for other components
+                    if (response.data.has_local_setup) {
+                        localStorage.setItem('tts_has_local_setup', 'true');
+                    } else {
+                        localStorage.setItem('tts_has_local_setup', 'false');
+                    }
                 }
             } catch (error) {
                 logger.error('Failed to get TTS status:', error);
             }
-            
+        }
+        
+        // Загружаем голоса только если движок готов
+        if (engineStatus.loaded && user) {
             try {
                 // Загружаем голоса
                 const voicesResponse = await getGlobalVoices();

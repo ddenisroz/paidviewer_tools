@@ -576,16 +576,7 @@ const UserManagementPage = () => {
                             <thead>
                                 <tr className="border-b-2 border-slate-600 bg-slate-900/50">
                                     <th className="text-left p-2 whitespace-nowrap">
-                                        <Select value={userTypeFilter} onValueChange={setUserTypeFilter}>
-                                            <SelectTrigger className="h-8 w-32 bg-slate-700 border-slate-600">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">ID: Все</SelectItem>
-                                                <SelectItem value="authenticated">🔑 Авториз.</SelectItem>
-                                                <SelectItem value="guest">👤 Гости</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        <span className="text-sm font-semibold">ID / Тип</span>
                                     </th>
                                     <th className="text-left p-2">
                                         <button 
@@ -596,40 +587,13 @@ const UserManagementPage = () => {
                                         </button>
                                     </th>
                                     <th className="text-left p-2 whitespace-nowrap">
-                                        <Select value={whitelistFilter} onValueChange={setWhitelistFilter}>
-                                            <SelectTrigger className="h-8 bg-slate-700 border-slate-600">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">Whitelist: Все</SelectItem>
-                                                <SelectItem value="whitelisted">✓ В whitelist</SelectItem>
-                                                <SelectItem value="not_whitelisted">✗ Не в whitelist</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        <span className="text-sm font-semibold">Whitelist</span>
                                     </th>
                                     <th className="text-left p-2 whitespace-nowrap">
-                                        <Select value={roleFilter} onValueChange={setRoleFilter}>
-                                            <SelectTrigger className="h-8 bg-slate-700 border-slate-600">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">Роль: Все</SelectItem>
-                                                <SelectItem value="admin">👑 Админ</SelectItem>
-                                                <SelectItem value="user">👤 Пользователь</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        <span className="text-sm font-semibold">Роль</span>
                                     </th>
                                     <th className="text-left p-2 whitespace-nowrap">
-                                        <Select value={statusFilter} onValueChange={setStatusFilter}>
-                                            <SelectTrigger className="h-8 bg-slate-700 border-slate-600">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">Статус: Все</SelectItem>
-                                                <SelectItem value="active">🟢 Активный</SelectItem>
-                                                <SelectItem value="blocked">🔴 Заблокирован</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        <span className="text-sm font-semibold">Статус</span>
                                     </th>
                                     <th className="text-left p-2 whitespace-nowrap">
                                         <button 

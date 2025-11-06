@@ -21,7 +21,9 @@ const QuickActionsBar = () => {
     const [ttsState, setTtsState] = useState(false);
     const [streakEnabled, setStreakEnabled] = useState(false);
     const [donationEnabled, setDonationEnabled] = useState(false);
+    const [mythicalEnabled, setMythicalEnabled] = useState(false);
     const [isToggling, setIsToggling] = useState(false);
+    const [hasRewards, setHasRewards] = useState(false); // Track if rewards are configured
 
     // Get channel name from integrations
     const channelName = integrations.twitch?.username || integrations.vk?.username || user?.twitch_username || user?.vk_username || user?.username;
@@ -48,10 +50,14 @@ const QuickActionsBar = () => {
 
     const loadStates = async () => {
         try {
-            // Load TTS state
+            // Load TTS state - SYNC WITH TTS MAIN PAGE LOGIC
             const ttsRes = await botService.get('/api/tts/status');
-            const isEnabled = ttsRes.data?.basic_tts_enabled || ttsRes.data?.ai_tts_enabled || false;
-            setTtsState(isEnabled);
+            // TTS enabled if: enabled=true AND (engine is gtts, cloud, or local)
+            const enabled = ttsRes.data?.enabled || false;
+            const engineType = ttsRes.data?.engine_type || 'gtts';
+            // TTS is ON if enabled and has any valid engine
+            const isTtsOn = enabled && ['gtts', 'cloud', 'local'].includes(engineType);
+            setTtsState(isTtsOn);
 
             // Load Drops config
             if (isDropsEnabled && channelName) {
@@ -59,6 +65,19 @@ const QuickActionsBar = () => {
                 if (dropsRes.data?.success) {
                     setStreakEnabled(dropsRes.data.data?.streak_enabled || false);
                     setDonationEnabled(dropsRes.data.data?.donation_enabled || false);
+                    setMythicalEnabled(dropsRes.data.data?.mythical_enabled || false);
+                }
+
+                // Load rewards to check if any exist
+                try {
+                    const rewardsRes = await botService.get(`/api/drops/rewards/${channelName}?platform=${platform}`);
+                    if (rewardsRes.data?.success) {
+                        const rewards = rewardsRes.data.data || [];
+                        setHasRewards(rewards.length > 0);
+                    }
+                } catch (error) {
+                    logger.error('Error loading rewards:', error);
+                    setHasRewards(false);
                 }
             }
         } catch (error) {
@@ -69,8 +88,12 @@ const QuickActionsBar = () => {
     const handleTtsToggle = async () => {
         if (isToggling) return;
         setIsToggling(true);
+        // Optimistic update
+        const previousState = ttsState;
+        setTtsState(!ttsState);
+        
         try {
-            const newState = !ttsState;
+            const newState = !previousState;
             if (newState) {
                 await botService.post('/api/tts/enable');
                 toast.success('Озвучка включена');
@@ -78,13 +101,14 @@ const QuickActionsBar = () => {
                 await botService.post('/api/tts/disable');
                 toast.success('Озвучка отключена');
             }
-            setTtsState(newState);
             window.dispatchEvent(new CustomEvent('tts-status-changed', { 
                 detail: { enabled: newState } 
             }));
         } catch (error) {
             logger.error('Error toggling TTS:', error);
             toast.error('Ошибка переключения озвучки');
+            // Rollback on error
+            setTtsState(previousState);
         } finally {
             setIsToggling(false);
         }
@@ -92,17 +116,36 @@ const QuickActionsBar = () => {
 
     const handleStreakToggle = async () => {
         if (isToggling || !channelName) return;
+        
+        // IMPORTANT: Check if rewards exist before enabling streak
+        if (!streakEnabled && !hasRewards) {
+            toast.error('Сначала настройте содержимое сундуков на вкладке "Награды"', {
+                description: 'Перейдите в Drops → Награды',
+                duration: 4000
+            });
+            return;
+        }
+        
         setIsToggling(true);
+        // Optimistic update
+        const previousState = streakEnabled;
+        setStreakEnabled(!streakEnabled);
+        
         try {
-            const newState = !streakEnabled;
+            const newState = !previousState;
             await botService.put(`/api/drops/config/${channelName}?platform=${platform}`, {
                 streak_enabled: newState
             });
-            setStreakEnabled(newState);
             toast.success(newState ? 'Стрик включен' : 'Стрик отключен');
+            // Dispatch event to sync with DropsMainPage
+            window.dispatchEvent(new CustomEvent('drops-config-changed', {
+                detail: { streak_enabled: newState, channel: channelName, platform }
+            }));
         } catch (error) {
             logger.error('Error toggling streak:', error);
             toast.error('Ошибка переключения стрика');
+            // Rollback on error
+            setStreakEnabled(previousState);
         } finally {
             setIsToggling(false);
         }
@@ -111,9 +154,9 @@ const QuickActionsBar = () => {
     const handleDonationToggle = async () => {
         if (isToggling || !channelName) return;
         
-        // Check DonationAlerts integration - если не подключен, перенаправляем на подключение
-        if (!isDonationAlertsConnected) {
-            toast.info('Требуется подключение DonationAlerts', {
+        // IMPORTANT: Check DonationAlerts integration before enabling
+        if (!donationEnabled && !isDonationAlertsConnected) {
+            toast.error('Требуется подключение DonationAlerts', {
                 description: 'Перенаправление на страницу настроек...',
                 duration: 2000
             });
@@ -124,19 +167,35 @@ const QuickActionsBar = () => {
             return;
         }
         
+        // IMPORTANT: Check if rewards exist before enabling
+        if (!donationEnabled && !hasRewards) {
+            toast.error('Сначала настройте содержимое сундуков на вкладке "Награды"', {
+                description: 'Перейдите в Drops → Награды',
+                duration: 4000
+            });
+            return;
+        }
+        
         setIsToggling(true);
+        // Optimistic update
+        const previousState = donationEnabled;
+        setDonationEnabled(!donationEnabled);
+        
         try {
-            const newState = !donationEnabled;
+            const newState = !previousState;
             await botService.put(`/api/drops/config/${channelName}?platform=${platform}`, {
                 donation_enabled: newState
             });
-            setDonationEnabled(newState);
             toast.success(newState ? 'Донаты включены' : 'Донаты отключены');
-            // Обновляем состояние через React Query
-            loadStates();
+            // Dispatch event to sync with DropsMainPage
+            window.dispatchEvent(new CustomEvent('drops-config-changed', {
+                detail: { donation_enabled: newState, channel: channelName, platform }
+            }));
         } catch (error) {
             logger.error('Error toggling donation:', error);
             toast.error('Ошибка переключения донатов');
+            // Rollback on error
+            setDonationEnabled(previousState);
         } finally {
             setIsToggling(false);
         }
@@ -153,20 +212,20 @@ const QuickActionsBar = () => {
                 <button
                     onClick={handleTtsToggle}
                     disabled={isToggling}
-                    className={`w-40 h-10 flex items-center justify-center gap-2 px-4 rounded-xl text-sm font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    className={`w-40 h-10 flex items-center justify-center gap-1.5 px-3 rounded-xl text-sm font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
                         ttsState
                             ? 'bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 text-white shadow-lg shadow-purple-600/40'
                             : 'bg-gray-800/60 hover:bg-gray-700/60 text-gray-400 hover:text-gray-300 border border-gray-700/50'
                     }`}
                 >
-                    {ttsState ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-                    <span>Озвучка</span>
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                    {ttsState ? <Volume2 className="w-4 h-4 flex-shrink-0" /> : <VolumeX className="w-4 h-4 flex-shrink-0" />}
+                    <span className="truncate">TTS чата</span>
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
                         ttsState 
                             ? 'bg-white/20 text-white' 
                             : 'bg-gray-700/50 text-gray-500'
                     }`}>
-                        {ttsState ? 'ВКЛ' : 'ВЫКЛ'}
+                        {ttsState ? 'ON' : 'OFF'}
                     </span>
                 </button>
 
@@ -175,20 +234,20 @@ const QuickActionsBar = () => {
                     <button
                         onClick={handleStreakToggle}
                         disabled={isToggling || !channelName}
-                        className={`w-40 h-10 flex items-center justify-center gap-2 px-4 rounded-xl text-sm font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${
+                        className={`w-40 h-10 flex items-center justify-center gap-1.5 px-3 rounded-xl text-sm font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
                             streakEnabled
-                                ? 'bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-700 hover:to-yellow-600 text-white shadow-lg shadow-yellow-600/40'
+                                ? 'bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 text-white shadow-lg shadow-orange-600/40'
                                 : 'bg-gray-800/60 hover:bg-gray-700/60 text-gray-400 hover:text-gray-300 border border-gray-700/50'
                         }`}
                     >
-                        <Zap className="w-4 h-4" />
-                        <span>Стрик</span>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                        <Zap className="w-4 h-4 flex-shrink-0" />
+                        <span className="truncate">Стрик drops</span>
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
                             streakEnabled 
                                 ? 'bg-white/20 text-white' 
                                 : 'bg-gray-700/50 text-gray-500'
                         }`}>
-                            {streakEnabled ? 'ВКЛ' : 'ВЫКЛ'}
+                            {streakEnabled ? 'ON' : 'OFF'}
                         </span>
                     </button>
                 )}
@@ -198,7 +257,7 @@ const QuickActionsBar = () => {
                     <button
                         onClick={handleDonationToggle}
                         disabled={isToggling || !channelName || !isDonationAlertsConnected}
-                        className={`w-40 h-10 flex items-center justify-center gap-2 px-4 rounded-xl text-sm font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${
+                        className={`w-40 h-10 flex items-center justify-center gap-1.5 px-3 rounded-xl text-sm font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
                             !isDonationAlertsConnected
                                 ? 'bg-gray-800/30 text-gray-600 border border-gray-700/30'
                                 : donationEnabled
@@ -206,14 +265,14 @@ const QuickActionsBar = () => {
                                     : 'bg-gray-800/60 hover:bg-gray-700/60 text-gray-400 hover:text-gray-300 border border-gray-700/50'
                         }`}
                     >
-                        <DollarSign className="w-4 h-4" />
-                        <span>Донаты</span>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                        <DollarSign className="w-4 h-4 flex-shrink-0" />
+                        <span className="truncate">Donate drops</span>
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
                             donationEnabled 
                                 ? 'bg-white/20 text-white' 
                                 : 'bg-gray-700/50 text-gray-500'
                         }`}>
-                            {donationEnabled ? 'ВКЛ' : 'ВЫКЛ'}
+                            {donationEnabled ? 'ON' : 'OFF'}
                         </span>
                     </button>
                 )}

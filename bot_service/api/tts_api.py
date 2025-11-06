@@ -2318,7 +2318,7 @@ async def create_tts_reward(
             from api.points_api_endpoints import CreateRewardRequest
             
             reward_request = CreateRewardRequest(**reward_data)
-            result = await create_vk_reward(reward_request, user, db)
+            result = await create_vk_reward(starlette_request, reward_request, user, db)
         elif platform == 'twitch':
             from api.points_api_endpoints import CreateRewardRequest
             

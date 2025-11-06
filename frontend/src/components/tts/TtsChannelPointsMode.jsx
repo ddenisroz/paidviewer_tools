@@ -16,7 +16,7 @@ import { logger } from '../../utils/prodLogger';
 /**
  * Компонент для управления режимом TTS (все сообщения / за баллы канала)
  */
-const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving }) => {
+const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving, showModeSelector = true, showRewards = true }) => {
   const { user, isGuest } = useAuth();
   const { integrations } = useIntegrations();
   const queryClient = useQueryClient();
@@ -108,8 +108,9 @@ const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving }) => {
 
   return (
     <div className="space-y-3">
-      {/* Выбор режима */}
-      <div className="grid grid-cols-2 gap-2">
+      {/* Выбор режима - показываем только если showModeSelector=true */}
+      {showModeSelector && (
+        <div className="grid grid-cols-2 gap-2">
         <button
           onClick={() => onModeChange('all_messages')}
           disabled={isSaving}
@@ -139,11 +140,13 @@ const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving }) => {
             {!isTwitchConnected ? 'Требуется Twitch' : 'Только с наградой'}
           </div>
         </button>
-      </div>
+        </div>
+      )}
 
-      {/* Настройка наград (показываем только если выбран режим channel_points) */}
-      {ttsMode === 'channel_points' && (
-        <div className="space-y-2 pt-3 border-t border-gray-700/30">
+      {/* Настройка наград */}
+      {ttsMode === 'channel_points' && showRewards && (
+        <div className={showModeSelector ? "pt-3 border-t border-gray-700/30" : "py-0"}>
+          <div className="space-y-2">
           <div className="grid grid-cols-2 gap-2">
             {connectedPlatforms.map(platform => (
               <Card key={platform} className="border-gray-700 bg-gray-800/30">
@@ -199,11 +202,12 @@ const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving }) => {
             ))}
           </div>
 
-          {connectedPlatforms.length === 0 && (
-            <div className="text-sm text-gray-400 p-4 border rounded-lg bg-gray-800/30 border-gray-700">
-              Подключите хотя бы одну платформу (Twitch или VK Live)
-            </div>
-          )}
+            {connectedPlatforms.length === 0 && (
+              <div className="text-sm text-gray-400 p-4 border rounded-lg bg-gray-800/30 border-gray-700">
+                Подключите хотя бы одну платформу (Twitch или VK Live)
+              </div>
+            )}
+          </div>
         </div>
       )}
 

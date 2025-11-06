@@ -27,10 +27,9 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
         chat_width: 100,
         show_platform_icons: true,
         show_badges: true,
-        // v0.03 - новые настройки для 7TV эмодзи, ссылок и загрузки картинок
+        // v0.03 - новые настройки для 7TV эмодзи и ссылок
         show_7tv_emotes: true,
         show_links: true,
-        auto_load_images: true,
         widget_url: '',
         version: 1  // ✅ Версия для защиты от race conditions
     });
@@ -64,7 +63,6 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                 show_badges: true,
                 show_7tv_emotes: true,
                 show_links: true,
-                auto_load_images: true,
                 widget_url: '',
                 version: 1  // ✅ Версия для защиты от race conditions
             });
@@ -116,7 +114,13 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                 max_messages: parseInt(response.data.max_messages) || 20,
                 message_spacing: parseInt(response.data.message_spacing) || 4,
                 animation_type: response.data.animation_type || 'fade',
-                message_fade_seconds: parseInt(response.data.message_fade_seconds) || 60
+                message_fade_seconds: parseInt(response.data.message_fade_seconds) || 60,
+                chat_width: parseInt(response.data.chat_width) || 100,
+                chat_direction: response.data.chat_direction || 'vertical',
+                show_platform_icons: response.data.show_platform_icons ?? true,
+                show_badges: response.data.show_badges ?? true,
+                show_7tv_emotes: response.data.show_7tv_emotes ?? true,
+                show_links: response.data.show_links ?? true
             };
             
             setSettings(normalizedSettings);
@@ -359,11 +363,11 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                     type="range"
                                     min="8"
                                     max="32"
-                                    value={settings.font_size}
-                                    onChange={(e) => handleChange('font_size', parseInt(e.target.value))}
+                                    value={settings.font_size || 16}
+                                    onChange={(e) => handleChange('font_size', parseInt(e.target.value) || 16)}
                                     className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                                     style={{
-                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((settings.font_size - 8) / 24) * 100}%, #374151 ${((settings.font_size - 8) / 24) * 100}%, #374151 100%)`
+                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${(((settings.font_size || 16) - 8) / 24) * 100}%, #374151 ${(((settings.font_size || 16) - 8) / 24) * 100}%, #374151 100%)`
                                     }}
                                 />
                             </div>
@@ -397,11 +401,11 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                     min="10"
                                     max="60"
                                     step="10"
-                                    value={settings.message_fade_seconds}
-                                    onChange={(e) => handleChange('message_fade_seconds', parseInt(e.target.value))}
+                                    value={settings.message_fade_seconds || 60}
+                                    onChange={(e) => handleChange('message_fade_seconds', parseInt(e.target.value) || 60)}
                                     className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                                     style={{
-                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((settings.message_fade_seconds - 10) / 50) * 100}%, #374151 ${((settings.message_fade_seconds - 10) / 50) * 100}%, #374151 100%)`
+                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${(((settings.message_fade_seconds || 60) - 10) / 50) * 100}%, #374151 ${(((settings.message_fade_seconds || 60) - 10) / 50) * 100}%, #374151 100%)`
                                     }}
                                 />
                             </div>
@@ -419,11 +423,11 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                     min="0"
                                     max="3"
                                     step="0.5"
-                                    value={settings.text_stroke_width}
-                                    onChange={(e) => handleChange('text_stroke_width', parseFloat(e.target.value))}
+                                    value={settings.text_stroke_width ?? 0}
+                                    onChange={(e) => handleChange('text_stroke_width', parseFloat(e.target.value) || 0)}
                                     className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                                     style={{
-                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((settings.text_stroke_width) / 3) * 100}%, #374151 ${((settings.text_stroke_width) / 3) * 100}%, #374151 100%)`
+                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${(((settings.text_stroke_width ?? 0)) / 3) * 100}%, #374151 ${(((settings.text_stroke_width ?? 0)) / 3) * 100}%, #374151 100%)`
                                     }}
                                 />
                             </div>
@@ -458,11 +462,11 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                     type="range"
                                     min="1"
                                     max="50"
-                                    value={settings.max_messages}
-                                    onChange={(e) => handleChange('max_messages', parseInt(e.target.value))}
+                                    value={settings.max_messages || 20}
+                                    onChange={(e) => handleChange('max_messages', parseInt(e.target.value) || 20)}
                                     className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                                     style={{
-                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((settings.max_messages - 1) / 49) * 100}%, #374151 ${((settings.max_messages - 1) / 49) * 100}%, #374151 100%)`
+                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${(((settings.max_messages || 20) - 1) / 49) * 100}%, #374151 ${(((settings.max_messages || 20) - 1) / 49) * 100}%, #374151 100%)`
                                     }}
                                 />
                             </div>
@@ -494,74 +498,28 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
                                     <Label className="text-white">Ширина чата</Label>
-                                    <span className="text-sm text-gray-400">{settings.chat_width}%</span>
+                                    <span className="text-sm text-gray-400">{settings.chat_width ?? 100}%</span>
                                 </div>
                                 <input
                                     type="range"
                                     min="20"
                                     max="100"
                                     step="5"
-                                    value={settings.chat_width}
-                                    onChange={(e) => handleChange('chat_width', parseInt(e.target.value))}
+                                    value={settings.chat_width ?? 100}
+                                    onChange={(e) => handleChange('chat_width', parseInt(e.target.value) || 100)}
                                     className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                                     style={{
-                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((settings.chat_width - 20) / 80) * 100}%, #374151 ${((settings.chat_width - 20) / 80) * 100}%, #374151 100%)`
+                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${(((settings.chat_width ?? 100) - 20) / 80) * 100}%, #374151 ${(((settings.chat_width ?? 100) - 20) / 80) * 100}%, #374151 100%)`
                                     }}
                                 />
                             </div>
-                            
-                            {/* Toggles */}
-                            <div className="space-y-3 pt-2">
-                                <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800">
-                                    <Label className="text-white cursor-pointer">Показывать иконки платформ</Label>
-                                    <Switch
-                                        checked={settings.show_platform_icons ?? true}
-                                        onCheckedChange={(checked) => handleChange('show_platform_icons', checked)}
-                                    />
-                                </div>
-                                
-                                <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800">
-                                    <Label className="text-white cursor-pointer">Показывать значки</Label>
-                                    <Switch
-                                        checked={settings.show_badges ?? true}
-                                        onCheckedChange={(checked) => handleChange('show_badges', checked)}
-                                    />
-                                </div>
-                                
-                                {/* v0.03 - новые настройки для 7TV эмодзи, ссылок и картинок */}
-                                <div className="border-t border-gray-700 pt-3 mt-3">
-                                    <div className="text-xs text-gray-400 mb-3 font-semibold">📝 Контент и элементы</div>
-                                    
-                                    <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800">
-                                        <Label className="text-white cursor-pointer">Показывать 7TV смайлики</Label>
-                                        <Switch
-                                            checked={settings.show_7tv_emotes ?? true}
-                                            onCheckedChange={(checked) => handleChange('show_7tv_emotes', checked)}
-                                        />
-                                    </div>
-                                    
-                                    <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800">
-                                        <Label className="text-white cursor-pointer">Показывать ссылки из чата</Label>
-                                        <Switch
-                                            checked={settings.show_links ?? true}
-                                            onCheckedChange={(checked) => handleChange('show_links', checked)}
-                                        />
-                                    </div>
-                                    
-                                    <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800">
-                                        <Label className="text-white cursor-pointer">Загружать картинки сразу</Label>
-                                        <Switch
-                                            checked={settings.auto_load_images ?? true}
-                                            onCheckedChange={(checked) => handleChange('auto_load_images', checked)}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                         
-                        {/* Right: Live Preview */}
-                        <div className="space-y-2">
-                            <Label className="text-white font-semibold">Предпросмотр</Label>
+                        {/* Right: Live Preview + Additional Settings */}
+                        <div className="space-y-4">
+                            {/* Preview */}
+                            <div className="space-y-2">
+                                <Label className="text-white font-semibold">Предпросмотр</Label>
                             <div 
                                 className="rounded-lg p-4 h-[400px] chatbox-preview-scroll"
                                 style={{
@@ -574,6 +532,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                         const b = parseInt(hex.slice(5, 7), 16);
                                         return `rgba(${r}, ${g}, ${b}, ${opacity})`;
                                     })(),
+                                    width: `${settings?.chat_width ?? 100}%`,
                                     overflowY: settings?.chat_direction === 'horizontal' ? 'hidden' : 'auto',
                                     overflowX: settings?.chat_direction === 'horizontal' ? 'auto' : 'hidden',
                                     scrollbarWidth: 'thin',
@@ -581,10 +540,10 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                 }}
                             >
                                 <div 
-                                    className={settings?.chat_direction === 'horizontal' ? 'flex' : 'space-y-2'}
+                                    className={settings?.chat_direction === 'horizontal' ? 'flex' : ''}
                                     style={{
                                         flexDirection: settings?.chat_direction === 'horizontal' ? 'row' : 'column',
-                                        gap: settings?.chat_direction === 'horizontal' ? '16px' : '0',
+                                        gap: settings?.chat_direction === 'horizontal' ? '16px' : `${settings?.message_spacing || 4}px`,
                                         alignItems: settings?.chat_direction === 'horizontal' ? 'center' : 'stretch'
                                     }}
                                 >
@@ -686,12 +645,12 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                                 style={{
                                                     overflowWrap: 'break-word',
                                                     wordWrap: 'break-word',
-                                                    ...(settings?.text_stroke_width > 0 ? {
+                                                    ...((settings?.text_stroke_width ?? 0) > 0 ? {
                                                         textShadow: `
-                                                            -${settings.text_stroke_width}px -${settings.text_stroke_width}px 0 ${settings?.text_stroke_color || '#000000'},
-                                                            ${settings.text_stroke_width}px -${settings.text_stroke_width}px 0 ${settings?.text_stroke_color || '#000000'},
-                                                            -${settings.text_stroke_width}px ${settings.text_stroke_width}px 0 ${settings?.text_stroke_color || '#000000'},
-                                                            ${settings.text_stroke_width}px ${settings.text_stroke_width}px 0 ${settings?.text_stroke_color || '#000000'}
+                                                            -${settings.text_stroke_width ?? 0}px -${settings.text_stroke_width ?? 0}px 0 ${settings?.text_stroke_color || '#000000'},
+                                                            ${settings.text_stroke_width ?? 0}px -${settings.text_stroke_width ?? 0}px 0 ${settings?.text_stroke_color || '#000000'},
+                                                            -${settings.text_stroke_width ?? 0}px ${settings.text_stroke_width ?? 0}px 0 ${settings?.text_stroke_color || '#000000'},
+                                                            ${settings.text_stroke_width ?? 0}px ${settings.text_stroke_width ?? 0}px 0 ${settings?.text_stroke_color || '#000000'}
                                                         `
                                                     } : {})
                                                 }}
@@ -714,6 +673,49 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                             <p className="text-xs text-gray-500 text-center">
                                 Изменения применяются в реальном времени
                             </p>
+                            </div>
+
+                            {/* Additional Settings - Moved to right column */}
+                            <div className="space-y-3 pt-2 border-t border-gray-700">
+                                <div className="text-xs text-gray-400 mb-3 font-semibold">📝 Дополнительные настройки</div>
+                                
+                                <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
+                                    <Label className="text-white cursor-pointer">Показывать иконки платформ</Label>
+                                    <Switch
+                                        checked={settings.show_platform_icons ?? true}
+                                        onCheckedChange={(checked) => handleChange('show_platform_icons', checked)}
+                                    />
+                                </div>
+                                
+                                <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
+                                    <Label className="text-white cursor-pointer">Показывать значки</Label>
+                                    <Switch
+                                        checked={settings.show_badges ?? true}
+                                        onCheckedChange={(checked) => handleChange('show_badges', checked)}
+                                    />
+                                </div>
+                                
+                                {/* v0.03 - новые настройки для 7TV эмодзи и ссылок */}
+                                <div className="border-t border-gray-700/50 pt-3 mt-3">
+                                    <div className="text-xs text-gray-400 mb-3 font-semibold">📝 Контент и элементы</div>
+                                    
+                                    <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
+                                        <Label className="text-white cursor-pointer">Показывать 7TV смайлики</Label>
+                                        <Switch
+                                            checked={settings.show_7tv_emotes ?? true}
+                                            onCheckedChange={(checked) => handleChange('show_7tv_emotes', checked)}
+                                        />
+                                    </div>
+                                    
+                                    <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
+                                        <Label className="text-white cursor-pointer">Показывать ссылки из чата</Label>
+                                        <Switch
+                                            checked={settings.show_links ?? true}
+                                            onCheckedChange={(checked) => handleChange('show_links', checked)}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
