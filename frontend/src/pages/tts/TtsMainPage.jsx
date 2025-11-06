@@ -18,8 +18,8 @@ import { ttsLogger } from '../../utils/logger';
 import { logger } from '../../utils/prodLogger';
 
 const TtsMainPageContent = () => {
-    const { ttsEnabled, isWhitelisted, setIsWhitelisted, initializeTts } = useTts();
-    const { isHealthy, checkTtsHealth } = useTtsHealth();
+    const { ttsEnabled, isWhitelisted, initializeTts } = useTts();
+    const { isHealthy } = useTtsHealth();
     const { isAuthenticated, user, isGuest } = useAuth();
     const { integrations } = useIntegrations();
     
@@ -45,6 +45,7 @@ const TtsMainPageContent = () => {
     });
     
     const [localTtsConfig, setLocalTtsConfig] = useState(null);
+    const [isSavingMode, setIsSavingMode] = useState(false);
     
     const queryClient = useQueryClient();
     const isTwitchConnected = integrations.twitch?.enabled || (isGuest && user?.platform === 'twitch');
@@ -106,8 +107,18 @@ const TtsMainPageContent = () => {
         }
     }, [ttsStatusData]);
 
-    // Load TTS trigger mode - TODO: implement /api/tts/mode endpoint
-    // For now using default 'all_messages'
+    // Load TTS trigger mode from backend
+    useEffect(() => {
+        if (isAuthenticated) {
+            botService.get('/api/tts/mode-settings')
+                .then(res => {
+                    if (res.data?.tts_mode) {
+                        setTtsTriggerMode(res.data.tts_mode);
+                    }
+                })
+                .catch(err => logger.error('Error loading TTS mode:', err));
+        }
+    }, [isAuthenticated]);
 
     // Generate OBS URL
     useEffect(() => {
@@ -120,10 +131,6 @@ const TtsMainPageContent = () => {
                 .catch(err => logger.error('Error generating OBS URL:', err));
         }
     }, [listeningMode, isAuthenticated, user?.id]);
-
-    useEffect(() => {
-        if (isAuthenticated) checkTtsHealth();
-    }, [isAuthenticated, checkTtsHealth]);
 
     useEffect(() => {
         initializeTts();
@@ -146,9 +153,17 @@ const TtsMainPageContent = () => {
     };
 
     const handleTtsModeChange = async (mode) => {
-        // TODO: implement /api/tts/mode endpoint
-        setTtsTriggerMode(mode);
-        toast.info('Эндпоинт режима TTS ещё не реализован');
+        setIsSavingMode(true);
+        try {
+            const response = await botService.post('/api/tts/mode-settings', { tts_mode: mode });
+            setTtsTriggerMode(mode);
+            toast.success(response.data?.message || 'Режим изменён');
+        } catch (error) {
+            logger.error('Error changing TTS mode:', error);
+            toast.error('Ошибка изменения режима');
+        } finally {
+            setIsSavingMode(false);
+        }
     };
 
     const handleBasicTtsToggle = () => {
@@ -268,6 +283,7 @@ const TtsMainPageContent = () => {
                                         <div className="grid grid-cols-2 gap-2">
                                             <button
                                                 onClick={() => handleTtsModeChange('all_messages')}
+                                                disabled={isSavingMode}
                                                 className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
                                                     ttsTriggerMode === 'all_messages'
                                                         ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
@@ -278,10 +294,10 @@ const TtsMainPageContent = () => {
                                             </button>
                                             <button
                                                 onClick={() => handleTtsModeChange('channel_points')}
-                                                disabled={!isTwitchConnected}
+                                                disabled={isSavingMode || !isTwitchConnected}
                                                 className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
                                                     !isTwitchConnected
-                                                        ? 'opacity-40 cursor-not-allowed bg-gray-800/30 text-gray-600'
+                                                        ? 'opacity-40 cursor-not-allowed bg-gray-800/20 text-gray-500'
                                                         : ttsTriggerMode === 'channel_points'
                                                             ? 'bg-green-600 text-white shadow-lg shadow-green-600/30'
                                                             : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50 border border-gray-700/50'
@@ -546,7 +562,6 @@ const TtsMainPageContent = () => {
                         />
                     </>
                 )}
-
             </div>
         </PageWrapper>
     );
