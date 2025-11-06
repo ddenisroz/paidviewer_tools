@@ -916,6 +916,25 @@ async def get_user_streaks(
 ):
     """Получает список стриков пользователей"""
     try:
+        # Check if streak is enabled
+        from services.drops_service import DropsService
+        drops_service = DropsService(db)
+        user_id, session_id, is_guest = get_user_or_session_filters(current_user)
+        
+        config = drops_service.get_config(
+            user_id=user_id,
+            session_id=session_id,
+            channel_name=channel_name,
+            platform=platform
+        )
+        
+        # If streak is disabled, return empty list
+        if not config or not config.streak_enabled:
+            return {
+                "success": True,
+                "data": []
+            }
+        
         streaks = db.query(UserStreak).filter(
             UserStreak.user_id == current_user["id"],
             UserStreak.channel_name == channel_name,

@@ -52,13 +52,17 @@ const DonationSettings = ({ user, platform, channelName, hasRewards = false }) =
         // Если интеграция не подключена, принудительно ставим false
         const donationEnabled = donationalertsConnected ? donationEnabledFromServer : false;
         
+        // Проверяем интеграцию DonationAlerts для mythical
+        const mythicalEnabledFromServer = data.mythical_enabled ?? false;
+        const mythicalEnabled = donationalertsConnected ? mythicalEnabledFromServer : false;
+        
         setFormData({
           donation_enabled: donationEnabled,
           donation_amount_common: [data.donation_amount_common ?? 50.0],
           donation_amount_rare: [data.donation_amount_rare ?? 100.0],
           donation_amount_epic: [data.donation_amount_epic ?? 500.0],
           donation_amount_legendary: [data.donation_amount_legendary ?? 1000.0],
-          mythical_enabled: data.mythical_enabled ?? true,
+          mythical_enabled: mythicalEnabled,
           mythical_min_interval_hours: [data.mythical_min_interval_hours ?? 2],
           mythical_max_interval_hours: [data.mythical_max_interval_hours ?? 8],
           mythical_window_duration_minutes: [data.mythical_window_duration_minutes ?? 5],
@@ -101,9 +105,20 @@ const DonationSettings = ({ user, platform, channelName, hasRewards = false }) =
     },
   });
 
-  const handleSave = async () => {
+    const handleSave = async () => {
     if (!user || !platform || !channelName) {
       toast.error('Недостаточно данных для сохранения');
+      return;
+    }
+
+    // Проверка интеграции DonationAlerts для donation и mythical
+    const donationalertsConnected = integrations?.donationalerts?.enabled || false;
+    if (formData.donation_enabled && !donationalertsConnected) {
+      toast.error('Для включения donation drops требуется подключение DonationAlerts');
+      return;
+    }
+    if (formData.mythical_enabled && !donationalertsConnected) {
+      toast.error('Для включения mythical drops требуется подключение DonationAlerts');
       return;
     }
 
@@ -217,9 +232,21 @@ const DonationSettings = ({ user, platform, channelName, hasRewards = false }) =
               <Label className="text-sm font-medium text-pink-300">Включить mythyc drops</Label>
               <Switch
                 checked={formData.mythical_enabled}
-                onCheckedChange={(checked) => setFormData({...formData, mythical_enabled: checked})}
+                disabled={!donationalertsConnected}
+                onCheckedChange={(checked) => {
+                  if (checked && !donationalertsConnected) {
+                    toast.error('Требуется подключение DonationAlerts');
+                    return;
+                  }
+                  setFormData({...formData, mythical_enabled: checked});
+                }}
               />
             </div>
+            {!donationalertsConnected && (
+              <div className="text-xs text-orange-400 mt-1">
+                Требуется подключение DonationAlerts
+              </div>
+            )}
           </div>
         </CardHeader>
         {formData.mythical_enabled && (

@@ -157,28 +157,29 @@ const TtsMainPageContent = () => {
             const basicEnabled = ttsStatusData.basic_tts_enabled || false;
             const aiEnabled = ttsStatusData.ai_tts_enabled || false;
             
-            // Only update if values actually changed to prevent loops
-            if (basicTtsEnabled !== basicEnabled) setBasicTtsEnabled(basicEnabled);
-            if (aiTtsEnabled !== aiEnabled) setAiTtsEnabled(aiEnabled);
+            // Update states - use functional updates to avoid dependency issues
+            setBasicTtsEnabled(prev => prev !== basicEnabled ? basicEnabled : prev);
+            setAiTtsEnabled(prev => prev !== aiEnabled ? aiEnabled : prev);
             
-            if (ttsStatusData.tts_engine && ttsStatusData.tts_engine !== ttsEngine) {
-                setTtsEngine(ttsStatusData.tts_engine);
+            if (ttsStatusData.tts_engine) {
+                setTtsEngine(prev => prev !== ttsStatusData.tts_engine ? ttsStatusData.tts_engine : prev);
             }
-            if (ttsStatusData.listening_mode && ttsStatusData.listening_mode !== listeningMode) {
-                setListeningMode(ttsStatusData.listening_mode);
+            if (ttsStatusData.listening_mode) {
+                setListeningMode(prev => prev !== ttsStatusData.listening_mode ? ttsStatusData.listening_mode : prev);
             }
             if (ttsStatusData.platform_settings) {
                 setPlatformSettings(prev => {
                     const newPlatforms = ttsStatusData.platform_settings.enabled_platforms || [];
-                    if (JSON.stringify(prev.enabled_platforms) !== JSON.stringify(newPlatforms)) {
+                    const currentPlatforms = prev.enabled_platforms || [];
+                    if (JSON.stringify(currentPlatforms) !== JSON.stringify(newPlatforms)) {
                         return ttsStatusData.platform_settings;
                     }
                     return prev;
                 });
             }
             const volume = ttsStatusData.audio_settings?.website_volume;
-            if (volume !== undefined && volume !== localVolume) {
-                setLocalVolume(volume);
+            if (volume !== undefined) {
+                setLocalVolume(prev => prev !== volume ? volume : prev);
             }
         }
     }, [ttsStatusData]);
