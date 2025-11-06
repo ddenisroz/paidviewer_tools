@@ -411,28 +411,32 @@ const TtsMainPageContent = () => {
                                                 OBS
                                             </button>
                                         </div>
-                                        {listeningMode === 'obs' && (
-                                            <div className="mt-3 p-3 bg-gray-800/30 rounded-lg border border-gray-700/50">
-                                                <div className="text-xs text-gray-400 mb-2">OBS Browser Source URL:</div>
-                                                <div className="flex gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={obsUrl}
-                                                        readOnly
-                                                        className="flex-1 bg-gray-900/50 border border-gray-700/50 text-gray-300 text-xs px-3 py-2 rounded focus:outline-none focus:border-purple-500"
-                                                    />
-                                                    <button
-                                                        onClick={() => {
-                                                            navigator.clipboard.writeText(obsUrl);
-                                                            toast.success('Скопировано');
-                                                        }}
-                                                        className="px-3 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-300 rounded text-xs font-semibold border border-green-600/50"
-                                                    >
-                                                        Copy
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )}
+                                        <div className="mt-3 p-3 rounded-lg border bg-gray-800/30 border-gray-700/50 min-h-[56px]">
+                                            {listeningMode === 'obs' ? (
+                                                <>
+                                                    <div className="text-xs text-gray-400 mb-2">OBS Browser Source URL:</div>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="text"
+                                                            value={obsUrl}
+                                                            readOnly
+                                                            className="flex-1 bg-gray-900/50 border border-gray-700/50 text-gray-300 text-xs px-3 py-2 rounded focus:outline-none focus:border-purple-500"
+                                                        />
+                                                        <button
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(obsUrl);
+                                                                toast.success('Скопировано');
+                                                            }}
+                                                            className="px-3 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-300 rounded text-xs font-semibold border border-green-600/50"
+                                                        >
+                                                            Copy
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="text-xs text-gray-500">Выбран вывод на сайт</div>
+                                            )}
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>
