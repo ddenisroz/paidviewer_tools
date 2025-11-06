@@ -19,6 +19,7 @@ const DonationSettings = ({ user, platform, channelName, hasRewards = false }) =
   const { integrations } = useIntegrations();
   const { isConnected: daConnected, connect: daConnect } = useDonationAlerts();
   const queryClient = useQueryClient();
+  const donationalertsConnected = integrations?.donationalerts?.enabled || daConnected || false;
   const [savedSuccessfully, setSavedSuccessfully] = useState(false);
   const [formData, setFormData] = useState({
     donation_enabled: true,
@@ -185,14 +186,15 @@ const DonationSettings = ({ user, platform, channelName, hasRewards = false }) =
               <Label className="text-sm font-medium">Включить donation drops</Label>
               <Switch
                 checked={formData.donation_enabled}
+                disabled={!donationalertsConnected && formData.donation_enabled}
                 onCheckedChange={async (checked) => {
                   if (checked) {
                     // Проверяем интеграцию с DonationAlerts
-                    const donationalertsConnected = integrations?.donationalerts?.enabled || daConnected || false;
-                    
                     if (!donationalertsConnected) {
                       // Автоматически включаем интеграцию DonationAlerts
-                      toast.info('Подключаем интеграцию DonationAlerts...');
+                      toast.info('Подключаем интеграцию DonationAlerts...', {
+                        description: 'Вы будете перенаправлены на страницу авторизации'
+                      });
                       const connected = await daConnect();
                       
                       if (!connected) {
@@ -200,11 +202,8 @@ const DonationSettings = ({ user, platform, channelName, hasRewards = false }) =
                         return;
                       }
                       
-                      // Ждем немного, чтобы интеграция обновилась
-                      setTimeout(() => {
-                        setFormData({...formData, donation_enabled: checked});
-                        toast.success('Интеграция DonationAlerts подключена');
-                      }, 500);
+                      // Если подключение успешно, daConnect() перенаправит на OAuth
+                      // После возврата с OAuth интеграция будет подключена
                       return;
                     }
                   }
@@ -233,9 +232,21 @@ const DonationSettings = ({ user, platform, channelName, hasRewards = false }) =
               <Switch
                 checked={formData.mythical_enabled}
                 disabled={!donationalertsConnected}
-                onCheckedChange={(checked) => {
+                onCheckedChange={async (checked) => {
                   if (checked && !donationalertsConnected) {
-                    toast.error('Требуется подключение DonationAlerts');
+                    // Автоматически включаем интеграцию DonationAlerts
+                    toast.info('Подключаем интеграцию DonationAlerts...', {
+                      description: 'Вы будете перенаправлены на страницу авторизации'
+                    });
+                    const connected = await daConnect();
+                    
+                    if (!connected) {
+                      toast.error('Не удалось подключить интеграцию DonationAlerts');
+                      return;
+                    }
+                    
+                    // Если подключение успешно, daConnect() перенаправит на OAuth
+                    // После возврата с OAuth интеграция будет подключена
                     return;
                   }
                   setFormData({...formData, mythical_enabled: checked});

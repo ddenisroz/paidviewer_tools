@@ -79,7 +79,7 @@ const TtsMainPageContent = () => {
     const savePlatformSettingsMutation = useMutation({
         mutationFn: async (data) => await botService.post('/api/tts/platform-settings', data),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['tts-settings'] });
+            queryClient.invalidateQueries({ queryKey: ['tts-platform-settings'] });
             queryClient.invalidateQueries({ queryKey: ['tts-status'] });
             logger.log('Platform settings saved');
         },
@@ -121,6 +121,7 @@ const TtsMainPageContent = () => {
     const saveListeningModeMutation = useMutation({
         mutationFn: async (mode) => await botService.post('/api/tts/listening-mode', { listeningMode: mode }),
         onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['tts-settings'] });
             queryClient.invalidateQueries({ queryKey: ['tts-status'] });
             logger.log('Listening mode saved');
         }
@@ -152,38 +153,60 @@ const TtsMainPageContent = () => {
         enabled: isAuthenticated,
     });
 
+    // Load audio settings
+    const { data: audioSettingsData } = useQuery({
+        queryKey: ['tts-audio-settings'],
+        queryFn: async () => {
+            const response = await botService.get('/api/tts/audio-settings');
+            return response.data;
+        },
+        enabled: isAuthenticated,
+    });
+
+    // Load platform settings
+    const { data: platformSettingsData } = useQuery({
+        queryKey: ['tts-platform-settings'],
+        queryFn: async () => {
+            const response = await botService.get('/api/tts/platform-settings');
+            return response.data;
+        },
+        enabled: isAuthenticated,
+    });
+
+    // Load TTS mode settings
+    const { data: modeSettingsData } = useQuery({
+        queryKey: ['tts-mode-settings'],
+        queryFn: async () => {
+            const response = await botService.get('/api/tts/mode-settings');
+            return response.data;
+        },
+        enabled: isAuthenticated,
+    });
+
+    // Update state from TTS status
     useEffect(() => {
         if (ttsStatusData) {
-            const basicEnabled = ttsStatusData.basic_tts_enabled || false;
-            const aiEnabled = ttsStatusData.ai_tts_enabled || false;
+            const enabled = ttsStatusData.enabled || false;
+            const engineType = ttsStatusData.engine_type || 'gtts';
+            
+            // Determine basic and AI TTS states based on enabled and engine_type
+            const basicEnabled = enabled && engineType === 'gtts';
+            const aiEnabled = enabled && (engineType === 'cloud' || engineType === 'local');
             
             // Update states - use functional updates to avoid dependency issues
             setBasicTtsEnabled(prev => prev !== basicEnabled ? basicEnabled : prev);
             setAiTtsEnabled(prev => prev !== aiEnabled ? aiEnabled : prev);
             
-            if (ttsStatusData.tts_engine) {
-                setTtsEngine(prev => prev !== ttsStatusData.tts_engine ? ttsStatusData.tts_engine : prev);
-            }
-            if (ttsStatusData.listening_mode) {
-                setListeningMode(prev => prev !== ttsStatusData.listening_mode ? ttsStatusData.listening_mode : prev);
-            }
-            if (ttsStatusData.platform_settings) {
-                setPlatformSettings(prev => {
-                    const newPlatforms = ttsStatusData.platform_settings.enabled_platforms || [];
-                    const currentPlatforms = prev.enabled_platforms || [];
-                    if (JSON.stringify(currentPlatforms) !== JSON.stringify(newPlatforms)) {
-                        return ttsStatusData.platform_settings;
-                    }
-                    return prev;
-                });
-            }
-            const volume = ttsStatusData.audio_settings?.website_volume;
-            if (volume !== undefined) {
-                setLocalVolume(prev => prev !== volume ? volume : prev);
+            // Update engine type (cloud or local)
+            if (engineType === 'local' || engineType === 'cloud') {
+                setTtsEngine(prev => prev !== engineType ? engineType : prev);
+            } else {
+                setTtsEngine(prev => prev !== 'cloud' ? 'cloud' : prev);
             }
         }
     }, [ttsStatusData]);
 
+    // Update state from TTS settings
     useEffect(() => {
         if (ttsSettingsData) {
             setTtsSettings(prev => ({
@@ -194,21 +217,45 @@ const TtsMainPageContent = () => {
                 filterMentions: ttsSettingsData.filterMentions ?? prev.filterMentions,
                 version: ttsSettingsData.version ?? prev.version,
             }));
+            
+            // Update listening mode from settings
+            if (ttsSettingsData.listeningMode) {
+                setListeningMode(prev => prev !== ttsSettingsData.listeningMode ? ttsSettingsData.listeningMode : prev);
+            }
         }
     }, [ttsSettingsData]);
 
-    // Load TTS trigger mode from backend
+    // Update state from audio settings
     useEffect(() => {
-        if (isAuthenticated) {
-            botService.get('/api/tts/mode-settings')
-                .then(res => {
-                    if (res.data?.tts_mode) {
-                        setTtsTriggerMode(res.data.tts_mode);
-                    }
-                })
-                .catch(err => logger.error('Error loading TTS mode:', err));
+        if (audioSettingsData?.websiteVolume !== undefined) {
+            setLocalVolume(prev => prev !== audioSettingsData.websiteVolume ? audioSettingsData.websiteVolume : prev);
         }
-    }, [isAuthenticated]);
+    }, [audioSettingsData]);
+
+    // Update state from platform settings
+    useEffect(() => {
+        if (platformSettingsData?.enabled_platforms) {
+            setPlatformSettings(prev => {
+                const newPlatforms = platformSettingsData.enabled_platforms || [];
+                const currentPlatforms = prev.enabled_platforms || [];
+                if (JSON.stringify(currentPlatforms) !== JSON.stringify(newPlatforms)) {
+                    return {
+                        ...prev,
+                        enabled_platforms: newPlatforms,
+                        global_enabled: platformSettingsData.global_enabled ?? prev.global_enabled
+                    };
+                }
+                return prev;
+            });
+        }
+    }, [platformSettingsData]);
+
+    // Update state from mode settings
+    useEffect(() => {
+        if (modeSettingsData?.tts_mode) {
+            setTtsTriggerMode(prev => prev !== modeSettingsData.tts_mode ? modeSettingsData.tts_mode : prev);
+        }
+    }, [modeSettingsData]);
 
     // Generate OBS URL
     useEffect(() => {
@@ -216,9 +263,18 @@ const TtsMainPageContent = () => {
             generateObsUrl()
                 .then(response => {
                     const token = response.data?.obs_token;
-                    if (token) setObsUrl(getTtsWebSocketUrl(token));
+                    if (token) {
+                        const url = getTtsWebSocketUrl(token);
+                        setObsUrl(url);
+                        logger.log('OBS URL generated:', url);
+                    }
                 })
-                .catch(err => logger.error('Error generating OBS URL:', err));
+                .catch(err => {
+                    logger.error('Error generating OBS URL:', err);
+                    toast.error('Ошибка генерации OBS URL');
+                });
+        } else if (listeningMode === 'website') {
+            setObsUrl('');
         }
     }, [listeningMode, isAuthenticated, user?.id]);
 
@@ -266,6 +322,7 @@ const TtsMainPageContent = () => {
         try {
             const response = await botService.post('/api/tts/mode-settings', { tts_mode: mode });
             setTtsTriggerMode(mode);
+            queryClient.invalidateQueries({ queryKey: ['tts-mode-settings'] });
             toast.success(response.data?.message || 'Режим изменён');
         } catch (error) {
             logger.error('Error changing TTS mode:', error);
@@ -275,22 +332,42 @@ const TtsMainPageContent = () => {
         }
     };
 
-    const handleBasicTtsToggle = () => {
+    const handleBasicTtsToggle = async () => {
         const newValue = !basicTtsEnabled;
         
-        if (newValue) {
-            setBasicTtsEnabled(true);
-            setAiTtsEnabled(false);
-            toggleBasicTtsMutation.mutate(true);
-            window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
-        } else {
-            setBasicTtsEnabled(false);
-            toggleBasicTtsMutation.mutate(false);
-            window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: false } }));
+        try {
+            // Optimistically update UI
+            if (newValue) {
+                setBasicTtsEnabled(true);
+                setAiTtsEnabled(false);
+            } else {
+                setBasicTtsEnabled(false);
+            }
+            
+            // Make API call
+            if (newValue) {
+                await botService.post('/api/tts/enable');
+                // Переключаем на Google TTS если был F5-TTS
+                if (aiTtsEnabled) {
+                    await switchEngineMutation.mutateAsync({ engine_type: 'gtts' });
+                    setAiTtsEnabled(false);
+                }
+            } else {
+                await botService.post('/api/tts/disable');
+            }
+            
+            queryClient.invalidateQueries({ queryKey: ['tts-status'] });
+            window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: newValue } }));
+            toast.success(newValue ? 'Google TTS включён' : 'TTS отключён');
+        } catch (error) {
+            // Rollback on error
+            setBasicTtsEnabled(!newValue);
+            logger.error('Error toggling basic TTS:', error);
+            toast.error('Ошибка переключения TTS');
         }
     };
 
-    const handleAiTtsToggle = () => {
+    const handleAiTtsToggle = async () => {
         if (!canUseF5TTS || !isHealthy) {
             toast.error('F5-TTS недоступен');
             return;
@@ -298,22 +375,31 @@ const TtsMainPageContent = () => {
         
         const newValue = !aiTtsEnabled;
         
-        if (newValue) {
-            switchEngineMutation.mutate({ engine_type: ttsEngine === 'local' ? 'local' : 'cloud' }, {
-                onSuccess: () => {
-                    setAiTtsEnabled(true);
-                    setBasicTtsEnabled(true);
-                    toast.success('F5-TTS включён');
-                    window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
-                }
-            });
-        } else {
-            switchEngineMutation.mutate({ engine_type: 'gtts' }, {
-                onSuccess: () => {
-                    setAiTtsEnabled(false);
-                    toast.success('Переключено на Google TTS');
-                }
-            });
+        try {
+            // Сначала включаем TTS, если он выключен
+            if (newValue && !isAnyTtsEnabled) {
+                await botService.post('/api/tts/enable');
+                setBasicTtsEnabled(true);
+            }
+            
+            // Затем переключаем движок
+            const engineType = newValue ? (ttsEngine === 'local' ? 'local' : 'cloud') : 'gtts';
+            await switchEngineMutation.mutateAsync({ engine_type: engineType });
+            
+            if (newValue) {
+                setAiTtsEnabled(true);
+                setBasicTtsEnabled(true);
+                toast.success('F5-TTS включён');
+                window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
+            } else {
+                setAiTtsEnabled(false);
+                toast.success('Переключено на Google TTS');
+            }
+            
+            queryClient.invalidateQueries({ queryKey: ['tts-status'] });
+        } catch (error) {
+            logger.error('Error toggling AI TTS:', error);
+            toast.error('Ошибка переключения F5-TTS');
         }
     };
 
@@ -377,11 +463,17 @@ const TtsMainPageContent = () => {
     const handleRegenerateObsUrl = async () => {
         setIsRegeneratingUrl(true);
         try {
-            const response = await generateObsUrl();
+            // Используем специальный endpoint для перегенерации
+            const response = await botService.post('/api/tts/regenerate-obs-url');
             const token = response.data?.obs_token;
             if (token) {
-                setObsUrl(getTtsWebSocketUrl(token));
-                toast.success('URL обновлён');
+                const url = getTtsWebSocketUrl(token);
+                setObsUrl(url);
+                toast.success('Токен обновлён, URL скопирован в буфер обмена');
+                navigator.clipboard.writeText(url);
+                logger.log('OBS URL regenerated:', url);
+            } else {
+                toast.error('Токен не получен');
             }
         } catch (error) {
             logger.error('Error regenerating OBS URL:', error);
@@ -566,51 +658,13 @@ const TtsMainPageContent = () => {
                                                 OBS
                                             </button>
                                         </div>
-                                        <div className="mt-3 p-3 rounded-lg border bg-gray-800/30 border-gray-700/50 min-h-[88px]">
-                                            {listeningMode === 'obs' ? (
-                                                <>
-                                                    <div className="text-xs text-gray-400 mb-2">OBS Browser Source URL:</div>
-                                                    <div className="flex gap-2">
-                                                        <input
-                                                            type="text"
-                                                            value={obsUrl}
-                                                            readOnly
-                                                            className="flex-1 bg-gray-900/50 border border-gray-700/50 text-gray-300 text-xs px-3 py-2 rounded focus:outline-none focus:border-purple-500"
-                                                        />
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => {
-                                                                navigator.clipboard.writeText(obsUrl);
-                                                                toast.success('Скопировано');
-                                                            }}
-                                                            className="px-3 text-xs border-green-600/50 text-green-300 hover:bg-green-600/20"
-                                                        >
-                                                            Copy
-                                                        </Button>
-                                                    </div>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={handleRegenerateObsUrl}
-                                                        disabled={isRegeneratingUrl}
-                                                        className="w-full mt-2 text-xs border-purple-600/50 text-purple-300 hover:bg-purple-600/20"
-                                                    >
-                                                        <RefreshCw className={`w-3 h-3 mr-1 ${isRegeneratingUrl ? 'animate-spin' : ''}`} />
-                                                        Обновить токен
-                                                    </Button>
-                                                </>
-                                            ) : (
-                                                <div className="text-xs text-gray-500">Выбран вывод на сайт</div>
-                                            )}
-                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>
 
-                            {/* Right Column: Audio & Additional Settings */}
+                            {/* Right Column: Audio/OBS & Additional Settings */}
                             <div className="space-y-4">
-                                {/* Audio Settings */}
+                                {/* Audio Settings for Website */}
                                 {listeningMode === 'website' && (
                                     <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
                                         <CardHeader className="pb-3">
@@ -633,6 +687,52 @@ const TtsMainPageContent = () => {
                                                     className="w-full"
                                                 />
                                             </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {/* OBS Settings */}
+                                {listeningMode === 'obs' && (
+                                    <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
+                                        <CardHeader className="pb-3">
+                                            <CardTitle className="text-base font-bold text-white">OBS Browser Source</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-3">
+                                            <div>
+                                                <label className="text-xs text-gray-400 mb-2 block">OBS Browser Source URL:</label>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={obsUrl || 'Загрузка...'}
+                                                        readOnly
+                                                        className="flex-1 bg-gray-900/50 border border-gray-700/50 text-gray-300 text-xs px-3 py-2 rounded focus:outline-none focus:border-green-500"
+                                                    />
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => {
+                                                            if (obsUrl) {
+                                                                navigator.clipboard.writeText(obsUrl);
+                                                                toast.success('Скопировано');
+                                                            }
+                                                        }}
+                                                        disabled={!obsUrl}
+                                                        className="px-3 text-xs border-green-600/50 text-green-300 hover:bg-green-600/20 disabled:opacity-50"
+                                                    >
+                                                        Copy
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={handleRegenerateObsUrl}
+                                                disabled={isRegeneratingUrl}
+                                                className="w-full text-xs border-purple-600/50 text-purple-300 hover:bg-purple-600/20"
+                                            >
+                                                <RefreshCw className={`w-3 h-3 mr-1 ${isRegeneratingUrl ? 'animate-spin' : ''}`} />
+                                                Обновить токен
+                                            </Button>
                                         </CardContent>
                                     </Card>
                                 )}

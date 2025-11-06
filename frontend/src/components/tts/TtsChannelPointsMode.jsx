@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,7 +19,7 @@ import { logger } from '../../utils/prodLogger';
 const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving }) => {
   const { user, isGuest } = useAuth();
   const { integrations } = useIntegrations();
-  const [ttsRewardIds, setTtsRewardIds] = useState({});
+  const queryClient = useQueryClient();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -30,19 +31,17 @@ const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving }) => {
     cooldown: 0
   });
 
-  // Загрузка текущих настроек
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
-    try {
+  // Load mode settings using React Query
+  const { data: modeSettingsData } = useQuery({
+    queryKey: ['tts-mode-settings'],
+    queryFn: async () => {
       const response = await botService.get('/api/tts/mode-settings');
-      setTtsRewardIds(response.data.tts_reward_ids || {});
-    } catch (error) {
-      logger.error('Error loading TTS mode settings:', error);
-    }
-  };
+      return response.data;
+    },
+    enabled: !!user,
+  });
+
+  const ttsRewardIds = modeSettingsData?.tts_reward_ids || {};
 
   // Открыть диалог создания награды
   const openCreateDialog = (platform) => {
@@ -74,7 +73,7 @@ const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving }) => {
       
       toast.success('Награда создана');
       setShowCreateDialog(false);
-      await loadSettings();
+      queryClient.invalidateQueries({ queryKey: ['tts-mode-settings'] });
     } catch (error) {
       logger.error('Error creating TTS reward:', error);
       toast.error('Ошибка создания награды');
@@ -93,7 +92,7 @@ const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving }) => {
       await botService.delete(`/api/tts/reward/${platform}`);
       
       toast.success('Награда удалена');
-      await loadSettings();
+      queryClient.invalidateQueries({ queryKey: ['tts-mode-settings'] });
     } catch (error) {
       logger.error('Error deleting TTS reward:', error);
       toast.error('Ошибка удаления награды');

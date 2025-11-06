@@ -11,7 +11,7 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import cacheManager from '../utils/cacheManager';
+import cacheManager, { CACHE_CONFIG } from '../utils/cacheManager';
 import useSharedWebSocket from './useSharedWebSocket';
 import Logger from '../utils/logger';
 
@@ -85,7 +85,6 @@ export const useCacheWebSocketSync = () => {
         logger.info(`[CACHE] Received invalidation for: ${data.cache_key}`);
         
         // 1. Инвалидируем cacheManager (localStorage кеш)
-        const { CACHE_CONFIG } = require('../utils/cacheManager');
         const cacheType = Object.values(CACHE_CONFIG).find(
           config => config.key === data.cache_key
         );

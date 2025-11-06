@@ -218,7 +218,10 @@ class TTSService:
                     "enableCustomLexicon": settings.enable_custom_lexicon,
                     "maxMessageLength": settings.max_message_length,
                     "skipCommands": settings.skip_commands,
-                    "useLocalTTS": settings.use_local_tts
+                    "useLocalTTS": settings.use_local_tts,
+                    "filterReplies": settings.filter_replies,
+                    "filterMentions": settings.filter_mentions,
+                    "version": getattr(settings, 'version', 1)
                 }
             else:
                 # Создаем настройки по умолчанию для любого пользователя (включая гостей)
@@ -247,7 +250,10 @@ class TTSService:
                     "enableCustomLexicon": False,
                     "maxMessageLength": 500,
                     "skipCommands": True,
-                    "useLocalTTS": False
+                    "useLocalTTS": False,
+                    "filterReplies": False,
+                    "filterMentions": False,
+                    "version": 1
                 }
         except Exception as e:
             logger.error(f"Error getting TTS settings: {e}")

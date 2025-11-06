@@ -1,18 +1,22 @@
 // src/components/QuickActionsBar.jsx
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Volume2, VolumeX, Zap, DollarSign } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useTts } from '../context/TtsContext';
+import { useDonationAlerts } from '../context/DonationAlertsContext';
 import { botService } from '../services/microservices';
 import { toast } from 'sonner';
 import { logger } from '../utils/prodLogger';
 
 const QuickActionsBar = () => {
+    const navigate = useNavigate();
     const { isAuthenticated, user, isGuest } = useAuth();
     const { integrations } = useIntegrations();
     const { ttsEnabled } = useTts();
+    const { isConnected: daConnected, connect: daConnect } = useDonationAlerts();
     
     const [ttsState, setTtsState] = useState(false);
     const [streakEnabled, setStreakEnabled] = useState(false);
@@ -23,7 +27,7 @@ const QuickActionsBar = () => {
     const channelName = integrations.twitch?.username || integrations.vk?.username || user?.twitch_username || user?.vk_username || user?.username;
     const platform = integrations.twitch?.enabled ? 'twitch' : (integrations.vk?.enabled ? 'vk' : 'twitch');
     const isDropsEnabled = integrations.twitch?.enabled || integrations.vk?.enabled || (isGuest && user?.platform);
-    const isDonationAlertsConnected = integrations.donationalerts?.enabled || false;
+    const isDonationAlertsConnected = integrations?.donationalerts?.enabled || daConnected || false;
 
     // Load initial states from backend
     useEffect(() => {
@@ -107,9 +111,16 @@ const QuickActionsBar = () => {
     const handleDonationToggle = async () => {
         if (isToggling || !channelName) return;
         
-        // Check DonationAlerts integration
+        // Check DonationAlerts integration - если не подключен, перенаправляем на подключение
         if (!isDonationAlertsConnected) {
-            toast.error('Требуется подключение DonationAlerts');
+            toast.info('Требуется подключение DonationAlerts', {
+                description: 'Перенаправление на страницу настроек...',
+                duration: 2000
+            });
+            // Перенаправляем на страницу настроек для подключения DonationAlerts
+            setTimeout(() => {
+                navigate('/dashboard/settings');
+            }, 500);
             return;
         }
         
@@ -121,6 +132,8 @@ const QuickActionsBar = () => {
             });
             setDonationEnabled(newState);
             toast.success(newState ? 'Донаты включены' : 'Донаты отключены');
+            // Обновляем состояние через React Query
+            loadStates();
         } catch (error) {
             logger.error('Error toggling donation:', error);
             toast.error('Ошибка переключения донатов');
