@@ -39,12 +39,9 @@ const QuickActionsBar = () => {
             const ttsRes = await botService.get('/api/tts/status');
             setTtsEnabled(ttsRes.data?.basic_tts_enabled || ttsRes.data?.ai_tts_enabled || false);
 
-            // Load Drops settings
-            const dropsRes = await botService.get('/api/drops/settings');
-            if (dropsRes.data) {
-                setStreakEnabled(dropsRes.data.streak_enabled || false);
-                setDonationEnabled(dropsRes.data.donation_enabled || false);
-            }
+            // Note: Drops settings endpoints don't exist yet, using default false
+            setStreakEnabled(false);
+            setDonationEnabled(false);
         } catch (error) {
             console.error('Error loading states:', error);
         }
@@ -77,13 +74,10 @@ const QuickActionsBar = () => {
         if (isTogglingStreak) return;
         setIsTogglingStreak(true);
         try {
+            // TODO: Implement drops settings endpoint
             const newState = !streakEnabled;
-            await botService.post('/api/drops/settings', {
-                streak_enabled: newState,
-                donation_enabled: donationEnabled
-            });
             setStreakEnabled(newState);
-            toast.success(newState ? 'Стрик включён' : 'Стрик отключён');
+            toast.info('Эндпоинт Drops ещё не реализован');
         } catch (error) {
             toast.error('Ошибка переключения стрика');
         } finally {
@@ -95,13 +89,10 @@ const QuickActionsBar = () => {
         if (isTogglingDonation) return;
         setIsTogglingDonation(true);
         try {
+            // TODO: Implement drops settings endpoint
             const newState = !donationEnabled;
-            await botService.post('/api/drops/settings', {
-                streak_enabled: streakEnabled,
-                donation_enabled: newState
-            });
             setDonationEnabled(newState);
-            toast.success(newState ? 'Донаты включены' : 'Донаты отключены');
+            toast.info('Эндпоинт Drops ещё не реализован');
         } catch (error) {
             toast.error('Ошибка переключения донатов');
         } finally {

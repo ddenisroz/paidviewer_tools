@@ -14,7 +14,6 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { TwitchIcon, VKIcon } from '../../components/PlatformIcons';
 import TtsFilterManager from '../../components/tts/TtsFilterManager';
-import HealthStatus from '../../components/tts/HealthStatus';
 import { ttsLogger } from '../../utils/logger';
 import { logger } from '../../utils/prodLogger';
 
@@ -107,14 +106,8 @@ const TtsMainPageContent = () => {
         }
     }, [ttsStatusData]);
 
-    // Load TTS trigger mode
-    useEffect(() => {
-        if (isAuthenticated) {
-            botService.get('/api/tts/mode')
-                .then(res => res.data?.tts_mode && setTtsTriggerMode(res.data.tts_mode))
-                .catch(err => console.error('Error loading TTS mode:', err));
-        }
-    }, [isAuthenticated]);
+    // Load TTS trigger mode - TODO: implement /api/tts/mode endpoint
+    // For now using default 'all_messages'
 
     // Generate OBS URL
     useEffect(() => {
@@ -153,13 +146,9 @@ const TtsMainPageContent = () => {
     };
 
     const handleTtsModeChange = async (mode) => {
-        try {
-            await botService.post('/api/tts/mode', { tts_mode: mode });
-            setTtsTriggerMode(mode);
-            toast.success('Режим изменён');
-        } catch (error) {
-            toast.error('Ошибка изменения режима');
-        }
+        // TODO: implement /api/tts/mode endpoint
+        setTtsTriggerMode(mode);
+        toast.info('Эндпоинт режима TTS ещё не реализован');
     };
 
     const handleBasicTtsToggle = () => {
@@ -558,8 +547,6 @@ const TtsMainPageContent = () => {
                     </>
                 )}
 
-                {/* Health Status */}
-                <HealthStatus />
             </div>
         </PageWrapper>
     );
