@@ -1,5 +1,5 @@
 // src/pages/tts/TtsMainPage.jsx
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTts } from '../../context/TtsContext';
 import { useTtsHealth } from '../../context/TtsHealthContext';
@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, ChevronDown, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { TwitchIcon, VKIcon } from '../../components/PlatformIcons';
 import TtsFilterManager from '../../components/tts/TtsFilterManager';
 import TtsChannelPointsMode from '../../components/tts/TtsChannelPointsMode';
@@ -22,7 +22,7 @@ import { logger } from '../../utils/prodLogger';
 
 const TtsMainPageContent = () => {
     const { ttsEnabled, isWhitelisted, initializeTts } = useTts();
-    const { isHealthy } = useTtsHealth();
+    const { isHealthy, isChecking } = useTtsHealth();
     const { isAuthenticated, user, isGuest } = useAuth();
     const { integrations } = useIntegrations();
     
@@ -32,7 +32,11 @@ const TtsMainPageContent = () => {
     const [ttsEngine, setTtsEngine] = useState('cloud');
     const [listeningMode, setListeningMode] = useState('website');
     const [obsUrl, setObsUrl] = useState('');
-    const [volume, setVolume] = useState(50);
+    const [localVolume, setLocalVolume] = useState(50);
+    
+    // Collapsible states
+    const [isAudioExpanded, setIsAudioExpanded] = useState(true);
+    const [isAdditionalExpanded, setIsAdditionalExpanded] = useState(true);
     
     const [platformSettings, setPlatformSettings] = useState({
         enabled_platforms: ['twitch', 'vk'],
@@ -50,6 +54,10 @@ const TtsMainPageContent = () => {
     const [localTtsConfig, setLocalTtsConfig] = useState(null);
     const [isSavingMode, setIsSavingMode] = useState(false);
     const [isRegeneratingUrl, setIsRegeneratingUrl] = useState(false);
+    
+    // Debounce refs
+    const volumeDebounceRef = useRef(null);
+    const settingsDebounceRef = useRef(null);
     
     const queryClient = useQueryClient();
     const isTwitchConnected = integrations.twitch?.enabled || (isGuest && user?.platform === 'twitch');
@@ -74,6 +82,43 @@ const TtsMainPageContent = () => {
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tts-settings'] })
     });
 
+    const saveAudioSettingsMutation = useMutation({
+        mutationFn: async (data) => await botService.post('/api/tts/audio-settings', data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['tts-audio-settings'] });
+            logger.log('Audio settings saved');
+        },
+        onError: (error) => {
+            logger.error('Error saving audio settings:', error);
+            toast.error('Ошибка сохранения громкости');
+        }
+    });
+
+    const saveTtsSettingsMutation = useMutation({
+        mutationFn: async (data) => await botService.post('/api/tts/settings', data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['tts-settings'] });
+            logger.log('TTS settings saved');
+        },
+        onError: (error) => {
+            logger.error('Error saving TTS settings:', error);
+            if (error.response?.status === 409) {
+                toast.warning('Настройки были обновлены. Перезагружаю...');
+                setTimeout(() => queryClient.invalidateQueries({ queryKey: ['tts-settings'] }), 1500);
+            } else {
+                toast.error('Ошибка сохранения настроек');
+            }
+        }
+    });
+
+    const saveListeningModeMutation = useMutation({
+        mutationFn: async (mode) => await botService.post('/api/tts/listening-mode', { listeningMode: mode }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['tts-status'] });
+            logger.log('Listening mode saved');
+        }
+    });
+
     const switchEngineMutation = useMutation({
         mutationFn: async ({ engine_type }) => await botService.post('/api/tts/engine', { engine_type }),
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tts-status'] })
@@ -90,6 +135,16 @@ const TtsMainPageContent = () => {
         refetchInterval: 30000,
     });
 
+    // Load TTS settings
+    const { data: ttsSettingsData } = useQuery({
+        queryKey: ['tts-settings'],
+        queryFn: async () => {
+            const response = await botService.get('/api/tts/settings');
+            return response.data;
+        },
+        enabled: isAuthenticated,
+    });
+
     useEffect(() => {
         if (ttsStatusData) {
             const basicEnabled = ttsStatusData.basic_tts_enabled || false;
@@ -101,9 +156,22 @@ const TtsMainPageContent = () => {
             if (ttsStatusData.tts_engine) setTtsEngine(ttsStatusData.tts_engine);
             if (ttsStatusData.listening_mode) setListeningMode(ttsStatusData.listening_mode);
             if (ttsStatusData.platform_settings) setPlatformSettings(ttsStatusData.platform_settings);
-            if (ttsStatusData.audio_settings?.website_volume) setVolume(ttsStatusData.audio_settings.website_volume);
+            if (ttsStatusData.audio_settings?.website_volume) setLocalVolume(ttsStatusData.audio_settings.website_volume);
         }
     }, [ttsStatusData]);
+
+    useEffect(() => {
+        if (ttsSettingsData) {
+            setTtsSettings(prev => ({
+                ...prev,
+                enable7TV: ttsSettingsData.enable7TV ?? prev.enable7TV,
+                enableTwitch: ttsSettingsData.enableTwitch ?? prev.enableTwitch,
+                filterReplies: ttsSettingsData.filterReplies ?? prev.filterReplies,
+                filterMentions: ttsSettingsData.filterMentions ?? prev.filterMentions,
+                version: ttsSettingsData.version ?? prev.version,
+            }));
+        }
+    }, [ttsSettingsData]);
 
     // Load TTS trigger mode from backend
     useEffect(() => {
@@ -190,17 +258,15 @@ const TtsMainPageContent = () => {
         const newValue = !aiTtsEnabled;
         
         if (newValue) {
-            // Enable AI TTS
             switchEngineMutation.mutate({ engine_type: ttsEngine === 'local' ? 'local' : 'cloud' }, {
                 onSuccess: () => {
                     setAiTtsEnabled(true);
-                    setBasicTtsEnabled(true); // Keep basic enabled
+                    setBasicTtsEnabled(true);
                     toast.success('F5-TTS включён');
                     window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
                 }
             });
         } else {
-            // Disable AI TTS, switch to basic
             switchEngineMutation.mutate({ engine_type: 'gtts' }, {
                 onSuccess: () => {
                     setAiTtsEnabled(false);
@@ -209,6 +275,45 @@ const TtsMainPageContent = () => {
             });
         }
     };
+
+    const handleEngineChange = (engine) => {
+        setTtsEngine(engine);
+        if (aiTtsEnabled) {
+            switchEngineMutation.mutate({ engine_type: engine });
+        }
+    };
+
+    const handleListeningModeChange = (mode) => {
+        setListeningMode(mode);
+        saveListeningModeMutation.mutate(mode);
+    };
+
+    const handleVolumeChange = useCallback((value) => {
+        setLocalVolume(value);
+        
+        // Debounce save (1000ms)
+        if (volumeDebounceRef.current) {
+            clearTimeout(volumeDebounceRef.current);
+        }
+        
+        volumeDebounceRef.current = setTimeout(() => {
+            saveAudioSettingsMutation.mutate({ website_volume: value });
+        }, 1000);
+    }, [saveAudioSettingsMutation]);
+
+    const handleTtsSettingChange = useCallback((key, value) => {
+        const newSettings = { ...ttsSettings, [key]: value };
+        setTtsSettings(newSettings);
+        
+        // Debounce save (500ms)
+        if (settingsDebounceRef.current) {
+            clearTimeout(settingsDebounceRef.current);
+        }
+        
+        settingsDebounceRef.current = setTimeout(() => {
+            saveTtsSettingsMutation.mutate(newSettings);
+        }, 500);
+    }, [ttsSettings, saveTtsSettingsMutation]);
 
     const handlePlatformToggle = useCallback((platform) => {
         const currentPlatforms = platformSettings.enabled_platforms || [];
@@ -283,10 +388,31 @@ const TtsMainPageContent = () => {
                             {/* Left Column: Main Controls */}
                             <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
                                 <CardHeader className="pb-3">
-                                    <CardTitle className="text-base font-bold text-white">Управление</CardTitle>
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="text-base font-bold text-white">Управление</CardTitle>
+                                        {/* Health Status Indicator */}
+                                        <div className="flex items-center gap-2">
+                                            {isChecking ? (
+                                                <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                                                    <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
+                                                    Проверка...
+                                                </div>
+                                            ) : isHealthy ? (
+                                                <div className="flex items-center gap-1.5 text-xs text-green-400">
+                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                    F5-TTS доступен
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-1.5 text-xs text-yellow-400">
+                                                    <AlertCircle className="w-3.5 h-3.5" />
+                                                    F5-TTS недоступен
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    {/* Trigger Mode with Reward Management */}
+                                    {/* Trigger Mode */}
                                     <div>
                                         <label className="block text-xs font-semibold text-gray-400 mb-2">Режим включения</label>
                                         <TtsChannelPointsMode
@@ -349,7 +475,7 @@ const TtsMainPageContent = () => {
                                         <label className="block text-xs font-semibold text-gray-400 mb-2">Движок</label>
                                         <div className="grid grid-cols-2 gap-2">
                                             <button
-                                                onClick={() => setTtsEngine('cloud')}
+                                                onClick={() => handleEngineChange('cloud')}
                                                 className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
                                                     ttsEngine === 'cloud'
                                                         ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
@@ -359,7 +485,7 @@ const TtsMainPageContent = () => {
                                                 Cloud
                                             </button>
                                             <button
-                                                onClick={() => setTtsEngine('local')}
+                                                onClick={() => handleEngineChange('local')}
                                                 disabled={!hasLocalSetup}
                                                 className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
                                                     !hasLocalSetup
@@ -379,7 +505,7 @@ const TtsMainPageContent = () => {
                                         <label className="block text-xs font-semibold text-gray-400 mb-2">Вывод звука</label>
                                         <div className="grid grid-cols-2 gap-2">
                                             <button
-                                                onClick={() => setListeningMode('website')}
+                                                onClick={() => handleListeningModeChange('website')}
                                                 className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
                                                     listeningMode === 'website'
                                                         ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
@@ -389,7 +515,7 @@ const TtsMainPageContent = () => {
                                                 Сайт
                                             </button>
                                             <button
-                                                onClick={() => setListeningMode('obs')}
+                                                onClick={() => handleListeningModeChange('obs')}
                                                 className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
                                                     listeningMode === 'obs'
                                                         ? 'bg-green-600 text-white shadow-lg shadow-green-600/30'
@@ -446,115 +572,131 @@ const TtsMainPageContent = () => {
                                 {/* Audio Settings */}
                                 {listeningMode === 'website' && (
                                     <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
-                                        <CardHeader className="pb-3">
-                                            <CardTitle className="text-base font-bold text-white">Аудио</CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div>
-                                                <div className="flex items-center justify-between mb-3">
-                                                    <label className="text-xs font-semibold text-gray-400">Громкость</label>
-                                                    <span className="text-sm font-bold text-purple-300 bg-purple-600/20 px-3 py-1 rounded-lg">
-                                                        {volume}%
-                                                    </span>
-                                                </div>
-                                                <Slider
-                                                    value={[volume]}
-                                                    onValueChange={(val) => setVolume(val[0])}
-                                                    min={0}
-                                                    max={100}
-                                                    step={1}
-                                                    className="w-full"
-                                                />
+                                        <CardHeader 
+                                            className="pb-3 cursor-pointer hover:bg-gray-800/20 transition-colors"
+                                            onClick={() => setIsAudioExpanded(!isAudioExpanded)}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <CardTitle className="text-base font-bold text-white">Аудио</CardTitle>
+                                                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isAudioExpanded ? 'rotate-180' : ''}`} />
                                             </div>
-                                        </CardContent>
+                                        </CardHeader>
+                                        {isAudioExpanded && (
+                                            <CardContent>
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <label className="text-xs font-semibold text-gray-400">Громкость</label>
+                                                        <span className="text-sm font-bold text-purple-300 bg-purple-600/20 px-3 py-1 rounded-lg">
+                                                            {localVolume}%
+                                                        </span>
+                                                    </div>
+                                                    <Slider
+                                                        value={[localVolume]}
+                                                        onValueChange={(val) => handleVolumeChange(val[0])}
+                                                        min={0}
+                                                        max={100}
+                                                        step={1}
+                                                        className="w-full"
+                                                    />
+                                                </div>
+                                            </CardContent>
+                                        )}
                                     </Card>
                                 )}
 
                                 {/* Additional Settings */}
                                 <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="text-base font-bold text-white">Дополнительно</CardTitle>
+                                    <CardHeader 
+                                        className="pb-3 cursor-pointer hover:bg-gray-800/20 transition-colors"
+                                        onClick={() => setIsAdditionalExpanded(!isAdditionalExpanded)}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <CardTitle className="text-base font-bold text-white">Дополнительно</CardTitle>
+                                            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isAdditionalExpanded ? 'rotate-180' : ''}`} />
+                                        </div>
                                     </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-400 mb-2">Смайлы</label>
-                                            <div className="space-y-2">
-                                                <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
-                                                    <span className="text-xs text-gray-300 font-medium">7TV</span>
-                                                    <Switch
-                                                        checked={ttsSettings.enable7TV}
-                                                        onCheckedChange={() => setTtsSettings(prev => ({ ...prev, enable7TV: !prev.enable7TV }))}
-                                                        className="scale-90 data-[state=checked]:bg-purple-600"
-                                                    />
-                                                </div>
-                                                <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
-                                                    <span className="text-xs text-gray-300 font-medium">Twitch</span>
-                                                    <Switch
-                                                        checked={ttsSettings.enableTwitch}
-                                                        onCheckedChange={() => setTtsSettings(prev => ({ ...prev, enableTwitch: !prev.enableTwitch }))}
-                                                        className="scale-90 data-[state=checked]:bg-purple-600"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-400 mb-2">Фильтры</label>
-                                            <div className="space-y-2">
-                                                <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
-                                                    <span className="text-xs text-gray-300 font-medium">Пропускать ответы</span>
-                                                    <Switch
-                                                        checked={ttsSettings.filterReplies}
-                                                        onCheckedChange={() => setTtsSettings(prev => ({ ...prev, filterReplies: !prev.filterReplies }))}
-                                                        className="scale-90 data-[state=checked]:bg-purple-600"
-                                                    />
-                                                </div>
-                                                <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
-                                                    <span className="text-xs text-gray-300 font-medium">Пропускать упоминания</span>
-                                                    <Switch
-                                                        checked={ttsSettings.filterMentions}
-                                                        onCheckedChange={() => setTtsSettings(prev => ({ ...prev, filterMentions: !prev.filterMentions }))}
-                                                        className="scale-90 data-[state=checked]:bg-purple-600"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Platforms */}
-                                        {(isTwitchConnected || isVkConnected) && (
+                                    {isAdditionalExpanded && (
+                                        <CardContent className="space-y-4">
                                             <div>
-                                                <label className="block text-xs font-semibold text-gray-400 mb-2">Платформы</label>
+                                                <label className="block text-xs font-semibold text-gray-400 mb-2">Смайлы</label>
                                                 <div className="space-y-2">
-                                                    {isTwitchConnected && (
-                                                        <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
-                                                            <div className="flex items-center gap-2">
-                                                                <TwitchIcon className="w-4 h-4 text-purple-400" />
-                                                                <span className="text-xs text-gray-300 font-medium">Twitch</span>
-                                                            </div>
-                                                            <Switch
-                                                                checked={platformSettings.enabled_platforms?.includes('twitch')}
-                                                                onCheckedChange={() => handlePlatformToggle('twitch')}
-                                                                className="scale-90 data-[state=checked]:bg-purple-600"
-                                                            />
-                                                        </div>
-                                                    )}
-                                                    {isVkConnected && (
-                                                        <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
-                                                            <div className="flex items-center gap-2">
-                                                                <VKIcon className="w-4 h-4 text-blue-400" />
-                                                                <span className="text-xs text-gray-300 font-medium">VK</span>
-                                                            </div>
-                                                            <Switch
-                                                                checked={platformSettings.enabled_platforms?.includes('vk')}
-                                                                onCheckedChange={() => handlePlatformToggle('vk')}
-                                                                className="scale-90 data-[state=checked]:bg-purple-600"
-                                                            />
-                                                        </div>
-                                                    )}
+                                                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
+                                                        <span className="text-xs text-gray-300 font-medium">7TV</span>
+                                                        <Switch
+                                                            checked={ttsSettings.enable7TV}
+                                                            onCheckedChange={(checked) => handleTtsSettingChange('enable7TV', checked)}
+                                                            className="scale-90 data-[state=checked]:bg-purple-600"
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
+                                                        <span className="text-xs text-gray-300 font-medium">Twitch</span>
+                                                        <Switch
+                                                            checked={ttsSettings.enableTwitch}
+                                                            onCheckedChange={(checked) => handleTtsSettingChange('enableTwitch', checked)}
+                                                            className="scale-90 data-[state=checked]:bg-purple-600"
+                                                        />
+                                                    </div>
                                                 </div>
                                             </div>
-                                        )}
-                                    </CardContent>
+
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-400 mb-2">Фильтры</label>
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
+                                                        <span className="text-xs text-gray-300 font-medium">Пропускать ответы</span>
+                                                        <Switch
+                                                            checked={ttsSettings.filterReplies}
+                                                            onCheckedChange={(checked) => handleTtsSettingChange('filterReplies', checked)}
+                                                            className="scale-90 data-[state=checked]:bg-purple-600"
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
+                                                        <span className="text-xs text-gray-300 font-medium">Пропускать упоминания</span>
+                                                        <Switch
+                                                            checked={ttsSettings.filterMentions}
+                                                            onCheckedChange={(checked) => handleTtsSettingChange('filterMentions', checked)}
+                                                            className="scale-90 data-[state=checked]:bg-purple-600"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Platforms */}
+                                            {(isTwitchConnected || isVkConnected) && (
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-gray-400 mb-2">Платформы</label>
+                                                    <div className="space-y-2">
+                                                        {isTwitchConnected && (
+                                                            <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
+                                                                <div className="flex items-center gap-2">
+                                                                    <TwitchIcon className="w-4 h-4 text-purple-400" />
+                                                                    <span className="text-xs text-gray-300 font-medium">Twitch</span>
+                                                                </div>
+                                                                <Switch
+                                                                    checked={platformSettings.enabled_platforms?.includes('twitch')}
+                                                                    onCheckedChange={() => handlePlatformToggle('twitch')}
+                                                                    className="scale-90 data-[state=checked]:bg-purple-600"
+                                                                />
+                                                            </div>
+                                                        )}
+                                                        {isVkConnected && (
+                                                            <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
+                                                                <div className="flex items-center gap-2">
+                                                                    <VKIcon className="w-4 h-4 text-blue-400" />
+                                                                    <span className="text-xs text-gray-300 font-medium">VK</span>
+                                                                </div>
+                                                                <Switch
+                                                                    checked={platformSettings.enabled_platforms?.includes('vk')}
+                                                                    onCheckedChange={() => handlePlatformToggle('vk')}
+                                                                    className="scale-90 data-[state=checked]:bg-purple-600"
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    )}
                                 </Card>
                             </div>
                         </div>
