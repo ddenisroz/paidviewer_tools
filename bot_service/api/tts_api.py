@@ -2257,6 +2257,7 @@ class CreateTtsRewardRequest(BaseModel):
 @tts_router.post("/create-reward")
 async def create_tts_reward(
     request: CreateTtsRewardRequest,
+    starlette_request: Request,
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -2314,7 +2315,6 @@ async def create_tts_reward(
         from api.points_api_endpoints import create_vk_reward, create_twitch_reward
         
         if platform == 'vk':
-            from pydantic import BaseModel
             from api.points_api_endpoints import CreateRewardRequest
             
             reward_request = CreateRewardRequest(**reward_data)
@@ -2323,7 +2323,7 @@ async def create_tts_reward(
             from api.points_api_endpoints import CreateRewardRequest
             
             reward_request = CreateRewardRequest(**reward_data)
-            result = await create_twitch_reward(reward_request, user, db)
+            result = await create_twitch_reward(starlette_request, reward_request, user, db)
         else:
             raise HTTPException(status_code=400, detail="Неподдерживаемая платформа")
         

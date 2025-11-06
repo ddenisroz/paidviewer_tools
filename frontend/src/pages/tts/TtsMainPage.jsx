@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, ChevronDown, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { TwitchIcon, VKIcon } from '../../components/PlatformIcons';
 import TtsFilterManager from '../../components/tts/TtsFilterManager';
 import TtsChannelPointsMode from '../../components/tts/TtsChannelPointsMode';
@@ -34,9 +34,7 @@ const TtsMainPageContent = () => {
     const [obsUrl, setObsUrl] = useState('');
     const [localVolume, setLocalVolume] = useState(50);
     
-    // Collapsible states
-    const [isAudioExpanded, setIsAudioExpanded] = useState(true);
-    const [isAdditionalExpanded, setIsAdditionalExpanded] = useState(true);
+    // No collapsible states - always expanded except Filters
     
     const [platformSettings, setPlatformSettings] = useState({
         enabled_platforms: ['twitch', 'vk'],
@@ -63,7 +61,8 @@ const TtsMainPageContent = () => {
     const isTwitchConnected = integrations.twitch?.enabled || (isGuest && user?.platform === 'twitch');
     const isVkConnected = integrations.vk?.enabled || (isGuest && user?.platform === 'vk');
     const hasLocalSetup = localStorage.getItem('tts_has_local_setup') === 'true';
-    const canUseF5TTS = hasLocalSetup || isWhitelisted === true;
+    // F5-TTS доступен если: есть локальная настройка ИЛИ пользователь в whitelist (не null/undefined)
+    const canUseF5TTS = hasLocalSetup || (isWhitelisted !== null && isWhitelisted !== false);
     const isAnyTtsEnabled = basicTtsEnabled || aiTtsEnabled;
 
     // Mutations
@@ -78,12 +77,20 @@ const TtsMainPageContent = () => {
     });
 
     const savePlatformSettingsMutation = useMutation({
-        mutationFn: async (data) => await ttsService.post('/save-settings', data),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tts-settings'] })
+        mutationFn: async (data) => await botService.post('/api/tts/platform-settings', data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['tts-settings'] });
+            queryClient.invalidateQueries({ queryKey: ['tts-status'] });
+            logger.log('Platform settings saved');
+        },
+        onError: (error) => {
+            logger.error('Error saving platform settings:', error);
+            toast.error('Ошибка сохранения платформ');
+        }
     });
 
     const saveAudioSettingsMutation = useMutation({
-        mutationFn: async (data) => await botService.post('/api/tts/audio-settings', data),
+        mutationFn: async (data) => await botService.post('/api/tts/audio-settings', { websiteVolume: data.websiteVolume }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tts-audio-settings'] });
             logger.log('Audio settings saved');
@@ -150,13 +157,29 @@ const TtsMainPageContent = () => {
             const basicEnabled = ttsStatusData.basic_tts_enabled || false;
             const aiEnabled = ttsStatusData.ai_tts_enabled || false;
             
-            setBasicTtsEnabled(basicEnabled);
-            setAiTtsEnabled(aiEnabled);
+            // Only update if values actually changed to prevent loops
+            if (basicTtsEnabled !== basicEnabled) setBasicTtsEnabled(basicEnabled);
+            if (aiTtsEnabled !== aiEnabled) setAiTtsEnabled(aiEnabled);
             
-            if (ttsStatusData.tts_engine) setTtsEngine(ttsStatusData.tts_engine);
-            if (ttsStatusData.listening_mode) setListeningMode(ttsStatusData.listening_mode);
-            if (ttsStatusData.platform_settings) setPlatformSettings(ttsStatusData.platform_settings);
-            if (ttsStatusData.audio_settings?.website_volume) setLocalVolume(ttsStatusData.audio_settings.website_volume);
+            if (ttsStatusData.tts_engine && ttsStatusData.tts_engine !== ttsEngine) {
+                setTtsEngine(ttsStatusData.tts_engine);
+            }
+            if (ttsStatusData.listening_mode && ttsStatusData.listening_mode !== listeningMode) {
+                setListeningMode(ttsStatusData.listening_mode);
+            }
+            if (ttsStatusData.platform_settings) {
+                setPlatformSettings(prev => {
+                    const newPlatforms = ttsStatusData.platform_settings.enabled_platforms || [];
+                    if (JSON.stringify(prev.enabled_platforms) !== JSON.stringify(newPlatforms)) {
+                        return ttsStatusData.platform_settings;
+                    }
+                    return prev;
+                });
+            }
+            const volume = ttsStatusData.audio_settings?.website_volume;
+            if (volume !== undefined && volume !== localVolume) {
+                setLocalVolume(volume);
+            }
         }
     }, [ttsStatusData]);
 
@@ -203,18 +226,35 @@ const TtsMainPageContent = () => {
     }, []);
 
     // Handlers
-    const handleGlobalTtsToggle = () => {
+    const handleGlobalTtsToggle = async () => {
         const newState = !isAnyTtsEnabled;
         
+        // Optimistically update UI
         if (newState) {
             setBasicTtsEnabled(true);
-            toggleBasicTtsMutation.mutate(true);
-            window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
         } else {
             setBasicTtsEnabled(false);
             setAiTtsEnabled(false);
-            toggleBasicTtsMutation.mutate(false);
-            window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: false } }));
+        }
+        
+        // Make API call
+        try {
+            if (newState) {
+                await botService.post('/api/tts/enable');
+            } else {
+                await botService.post('/api/tts/disable');
+            }
+            queryClient.invalidateQueries({ queryKey: ['tts-status'] });
+            window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: newState } }));
+        } catch (error) {
+            // Rollback on error
+            if (newState) {
+                setBasicTtsEnabled(false);
+            } else {
+                setBasicTtsEnabled(true);
+            }
+            logger.error('Error toggling TTS:', error);
+            toast.error('Ошибка переключения озвучки');
         }
     };
 
@@ -297,7 +337,7 @@ const TtsMainPageContent = () => {
         }
         
         volumeDebounceRef.current = setTimeout(() => {
-            saveAudioSettingsMutation.mutate({ website_volume: value });
+            saveAudioSettingsMutation.mutate({ websiteVolume: value });
         }, 1000);
     }, [saveAudioSettingsMutation]);
 
@@ -572,51 +612,36 @@ const TtsMainPageContent = () => {
                                 {/* Audio Settings */}
                                 {listeningMode === 'website' && (
                                     <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
-                                        <CardHeader 
-                                            className="pb-3 cursor-pointer hover:bg-gray-800/20 transition-colors"
-                                            onClick={() => setIsAudioExpanded(!isAudioExpanded)}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <CardTitle className="text-base font-bold text-white">Аудио</CardTitle>
-                                                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isAudioExpanded ? 'rotate-180' : ''}`} />
-                                            </div>
+                                        <CardHeader className="pb-3">
+                                            <CardTitle className="text-base font-bold text-white">Аудио</CardTitle>
                                         </CardHeader>
-                                        {isAudioExpanded && (
-                                            <CardContent>
-                                                <div>
-                                                    <div className="flex items-center justify-between mb-3">
-                                                        <label className="text-xs font-semibold text-gray-400">Громкость</label>
-                                                        <span className="text-sm font-bold text-purple-300 bg-purple-600/20 px-3 py-1 rounded-lg">
-                                                            {localVolume}%
-                                                        </span>
-                                                    </div>
-                                                    <Slider
-                                                        value={[localVolume]}
-                                                        onValueChange={(val) => handleVolumeChange(val[0])}
-                                                        min={0}
-                                                        max={100}
-                                                        step={1}
-                                                        className="w-full"
-                                                    />
+                                        <CardContent>
+                                            <div>
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <label className="text-xs font-semibold text-gray-400">Громкость</label>
+                                                    <span className="text-sm font-bold text-purple-300 bg-purple-600/20 px-3 py-1 rounded-lg">
+                                                        {localVolume}%
+                                                    </span>
                                                 </div>
-                                            </CardContent>
-                                        )}
+                                                <Slider
+                                                    value={[localVolume]}
+                                                    onValueChange={(val) => handleVolumeChange(val[0])}
+                                                    min={0}
+                                                    max={100}
+                                                    step={1}
+                                                    className="w-full"
+                                                />
+                                            </div>
+                                        </CardContent>
                                     </Card>
                                 )}
 
                                 {/* Additional Settings */}
                                 <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
-                                    <CardHeader 
-                                        className="pb-3 cursor-pointer hover:bg-gray-800/20 transition-colors"
-                                        onClick={() => setIsAdditionalExpanded(!isAdditionalExpanded)}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <CardTitle className="text-base font-bold text-white">Дополнительно</CardTitle>
-                                            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isAdditionalExpanded ? 'rotate-180' : ''}`} />
-                                        </div>
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-base font-bold text-white">Дополнительно</CardTitle>
                                     </CardHeader>
-                                    {isAdditionalExpanded && (
-                                        <CardContent className="space-y-4">
+                                    <CardContent className="space-y-4">
                                             <div>
                                                 <label className="block text-xs font-semibold text-gray-400 mb-2">Смайлы</label>
                                                 <div className="space-y-2">
@@ -696,7 +721,6 @@ const TtsMainPageContent = () => {
                                                 </div>
                                             )}
                                         </CardContent>
-                                    )}
                                 </Card>
                             </div>
                         </div>

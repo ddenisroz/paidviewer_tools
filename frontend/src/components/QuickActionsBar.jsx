@@ -7,23 +7,30 @@ import { useIntegrations } from '../context/IntegrationsContext';
 import { useTts } from '../context/TtsContext';
 import { botService } from '../services/microservices';
 import { toast } from 'sonner';
+import { logger } from '../utils/prodLogger';
 
 const QuickActionsBar = () => {
-    const { isAuthenticated, user } = useAuth();
+    const { isAuthenticated, user, isGuest } = useAuth();
     const { integrations } = useIntegrations();
-    const { ttsEnabled, toggleTts } = useTts();
+    const { ttsEnabled } = useTts();
     
     const [ttsState, setTtsState] = useState(false);
     const [streakEnabled, setStreakEnabled] = useState(false);
     const [donationEnabled, setDonationEnabled] = useState(false);
     const [isToggling, setIsToggling] = useState(false);
 
+    // Get channel name from integrations
+    const channelName = integrations.twitch?.username || integrations.vk?.username || user?.twitch_username || user?.vk_username || user?.username;
+    const platform = integrations.twitch?.enabled ? 'twitch' : (integrations.vk?.enabled ? 'vk' : 'twitch');
+    const isDropsEnabled = integrations.twitch?.enabled || integrations.vk?.enabled || (isGuest && user?.platform);
+    const isDonationAlertsConnected = integrations.donationalerts?.enabled || false;
+
     // Load initial states from backend
     useEffect(() => {
-        if (isAuthenticated) {
+        if (isAuthenticated && channelName) {
             loadStates();
         }
-    }, [isAuthenticated]);
+    }, [isAuthenticated, channelName]);
 
     // Listen to TTS status changes
     useEffect(() => {
@@ -37,11 +44,21 @@ const QuickActionsBar = () => {
 
     const loadStates = async () => {
         try {
+            // Load TTS state
             const ttsRes = await botService.get('/api/tts/status');
             const isEnabled = ttsRes.data?.basic_tts_enabled || ttsRes.data?.ai_tts_enabled || false;
             setTtsState(isEnabled);
+
+            // Load Drops config
+            if (isDropsEnabled && channelName) {
+                const dropsRes = await botService.get(`/api/drops/config/${channelName}?platform=${platform}`);
+                if (dropsRes.data?.success) {
+                    setStreakEnabled(dropsRes.data.data?.streak_enabled || false);
+                    setDonationEnabled(dropsRes.data.data?.donation_enabled || false);
+                }
+            }
         } catch (error) {
-            console.error('Error loading states:', error);
+            logger.error('Error loading states:', error);
         }
     };
 
@@ -62,6 +79,7 @@ const QuickActionsBar = () => {
                 detail: { enabled: newState } 
             }));
         } catch (error) {
+            logger.error('Error toggling TTS:', error);
             toast.error('Ошибка переключения озвучки');
         } finally {
             setIsToggling(false);
@@ -69,15 +87,17 @@ const QuickActionsBar = () => {
     };
 
     const handleStreakToggle = async () => {
-        if (isToggling) return;
+        if (isToggling || !channelName) return;
         setIsToggling(true);
         try {
-            // Toggle streak - this would call drops API in the future
             const newState = !streakEnabled;
-            // TODO: Integrate with actual drops streak API when available
+            await botService.put(`/api/drops/config/${channelName}?platform=${platform}`, {
+                streak_enabled: newState
+            });
             setStreakEnabled(newState);
             toast.success(newState ? 'Стрик включен' : 'Стрик отключен');
         } catch (error) {
+            logger.error('Error toggling streak:', error);
             toast.error('Ошибка переключения стрика');
         } finally {
             setIsToggling(false);
@@ -85,15 +105,24 @@ const QuickActionsBar = () => {
     };
 
     const handleDonationToggle = async () => {
-        if (isToggling) return;
+        if (isToggling || !channelName) return;
+        
+        // Check DonationAlerts integration
+        if (!isDonationAlertsConnected) {
+            toast.error('Требуется подключение DonationAlerts');
+            return;
+        }
+        
         setIsToggling(true);
         try {
-            // Toggle donation - this would call drops API in the future
             const newState = !donationEnabled;
-            // TODO: Integrate with actual drops donation API when available
+            await botService.put(`/api/drops/config/${channelName}?platform=${platform}`, {
+                donation_enabled: newState
+            });
             setDonationEnabled(newState);
             toast.success(newState ? 'Донаты включены' : 'Донаты отключены');
         } catch (error) {
+            logger.error('Error toggling donation:', error);
             toast.error('Ошибка переключения донатов');
         } finally {
             setIsToggling(false);
@@ -103,8 +132,6 @@ const QuickActionsBar = () => {
     if (!isAuthenticated) {
         return null;
     }
-
-    const isDropsEnabled = integrations.twitch?.enabled || integrations.vk?.enabled;
 
     return (
         <Card className="border-gray-700/50 bg-gradient-to-br from-gray-900/90 to-gray-800/60 backdrop-blur-sm shadow-xl">
@@ -134,7 +161,7 @@ const QuickActionsBar = () => {
                 {isDropsEnabled && (
                     <button
                         onClick={handleStreakToggle}
-                        disabled={isToggling}
+                        disabled={isToggling || !channelName}
                         className={`w-40 h-10 flex items-center justify-center gap-2 px-4 rounded-xl text-sm font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${
                             streakEnabled
                                 ? 'bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-700 hover:to-yellow-600 text-white shadow-lg shadow-yellow-600/40'
@@ -157,11 +184,13 @@ const QuickActionsBar = () => {
                 {isDropsEnabled && (
                     <button
                         onClick={handleDonationToggle}
-                        disabled={isToggling}
+                        disabled={isToggling || !channelName || !isDonationAlertsConnected}
                         className={`w-40 h-10 flex items-center justify-center gap-2 px-4 rounded-xl text-sm font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${
-                            donationEnabled
-                                ? 'bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white shadow-lg shadow-green-600/40'
-                                : 'bg-gray-800/60 hover:bg-gray-700/60 text-gray-400 hover:text-gray-300 border border-gray-700/50'
+                            !isDonationAlertsConnected
+                                ? 'bg-gray-800/30 text-gray-600 border border-gray-700/30'
+                                : donationEnabled
+                                    ? 'bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white shadow-lg shadow-green-600/40'
+                                    : 'bg-gray-800/60 hover:bg-gray-700/60 text-gray-400 hover:text-gray-300 border border-gray-700/50'
                         }`}
                     >
                         <DollarSign className="w-4 h-4" />
