@@ -1,0 +1,824 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* View Transitions API - современные плавные переходы между страницами */
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 300ms;
+  animation-timing-function: ease-in-out;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 2;
+}
+
+/* Reset стили */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  overflow-y: auto;
+}
+
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* Кастомные анимации для авторизации */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.1);
+    opacity: 0;
+  }
+}
+
+/* Убрали анимации pulse */
+
+.auth-spinner {
+  animation: spin-slow 2s linear infinite;
+}
+
+.auth-pulse {
+  animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+ 
+@layer base {
+  :root {
+    --background: 260 30% 8%; /* Darker Purple */
+    --foreground: 270 20% 95%; /* Light Lavender */
+
+    --card: 260 30% 10%;
+    --card-foreground: 270 20% 95%;
+ 
+    --popover: 260 30% 8%;
+    --popover-foreground: 270 20% 95%;
+ 
+    --primary: 266 90% 60%; /* Twitch Purple */
+    --primary-foreground: 270 20% 98%;
+ 
+    --secondary: 260 30% 15%;
+    --secondary-foreground: 270 20% 98%;
+ 
+    --muted: 260 30% 15%;
+    --muted-foreground: 270 20% 70%;
+ 
+    --accent: 260 30% 18%;
+    --accent-foreground: 270 20% 98%;
+ 
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 86% 97%;
+
+    --border: 260 30% 15%;
+    --input: 260 30% 18%;
+    --ring: 266 90% 65%;
+ 
+    --radius: 0.5rem;
+    
+    /* Quality colors для Drops системы - стандартизированные */
+    --quality-common: 215 16% 47%;      /* #6B7280 */
+    --quality-rare: 217 91% 60%;        /* #3B82F6 */
+    --quality-epic: 262 83% 58%;        /* #8B5CF6 */
+    --quality-legendary: 38 92% 50%;    /* #F59E0B */
+    --quality-mythical: 310 70% 55%;    /* Мифический */
+    
+    /* Typography - стандартизированные шрифты */
+    /* Font families with consistent fallbacks to prevent layout shift */
+    --font-family-base: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    --font-family-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+    
+    /* Font rendering optimization */
+    --font-smoothing: antialiased;
+    --font-feature-settings: 'cv11', 'ss01';
+  }
+ 
+  .dark {
+    /* Same as root for a forced dark theme */
+    --background: 260 30% 8%;
+    --foreground: 270 20% 95%;
+
+    --card: 260 30% 10%;
+    --card-foreground: 270 20% 95%;
+ 
+    --popover: 260 30% 8%;
+    --popover-foreground: 270 20% 95%;
+ 
+    --primary: 266 90% 60%;
+    --primary-foreground: 270 20% 98%;
+ 
+    --secondary: 260 30% 15%;
+    --secondary-foreground: 270 20% 98%;
+ 
+    --muted: 260 30% 15%;
+    --muted-foreground: 270 20% 70%;
+ 
+    --accent: 260 30% 18%;
+    --accent-foreground: 270 20% 98%;
+ 
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 86% 97%;
+
+    --border: 260 30% 15%;
+    --input: 260 30% 18%;
+    --ring: 266 90% 65%;
+  }
+}
+
+/* Правильный перенос эмоджи и Unicode символов */
+@layer base {
+  /* Улучшенная обработка переноса для эмоджи и Unicode */
+  p, span, div, textarea {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    /* Для эмоджи и других Unicode символов */
+  }
+  
+  /* Специально для сообщений в тикетах и чате */
+  .ticket-message,
+  .chat-message,
+  [class*="whitespace-pre-wrap"] {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    /* Сохраняем переносы строк, но правильно обрабатываем эмоджи */
+    white-space: pre-wrap;
+  }
+}
+ 
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-family-base) !important;
+    font-size: 14px !important; /* Базовый размер по умолчанию */
+    line-height: 1.5 !important;
+    -webkit-font-smoothing: var(--font-smoothing);
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: var(--font-feature-settings);
+    /* Prevent font size changes during render */
+    text-size-adjust: 100%;
+    -webkit-text-size-adjust: 100%;
+  }
+  
+  /* Устанавливаем базовые размеры для предотвращения FOUT */
+  h1, h2, h3, h4, h5, h6 {
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+  }
+}
+
+/* === Toast уведомления (Sonner) === */
+/* Стандартизированные стили для всех toast */
+[data-sonner-toast] {
+  --tw-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --tw-shadow-colored: 0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -2px var(--tw-shadow-color);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+  border-radius: calc(var(--radius) + 2px);
+  font-family: inherit;
+}
+
+.toast-base {
+  background: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  color: hsl(var(--foreground)) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.toast-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: hsl(var(--foreground));
+}
+
+.toast-description {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.25rem;
+}
+
+/* Success toast - зеленый с акцентом */
+[data-sonner-toast][data-type="success"] {
+  background: linear-gradient(135deg, hsl(142, 76%, 36%) 0%, hsl(142, 70%, 45%) 100%) !important;
+  border-color: hsl(142, 76%, 36%) !important;
+  color: white !important;
+}
+
+[data-sonner-toast][data-type="success"] .toast-title,
+[data-sonner-toast][data-type="success"] .toast-description {
+  color: white !important;
+}
+
+/* Error toast - красный с акцентом */
+[data-sonner-toast][data-type="error"] {
+  background: linear-gradient(135deg, hsl(0, 84%, 60%) 0%, hsl(0, 72%, 51%) 100%) !important;
+  border-color: hsl(0, 84%, 60%) !important;
+  color: white !important;
+}
+
+[data-sonner-toast][data-type="error"] .toast-title,
+[data-sonner-toast][data-type="error"] .toast-description {
+  color: white !important;
+}
+
+/* Warning toast - желтый с акцентом */
+[data-sonner-toast][data-type="warning"] {
+  background: linear-gradient(135deg, hsl(38, 92%, 50%) 0%, hsl(32, 95%, 44%) 100%) !important;
+  border-color: hsl(38, 92%, 50%) !important;
+  color: white !important;
+}
+
+[data-sonner-toast][data-type="warning"] .toast-title,
+[data-sonner-toast][data-type="warning"] .toast-description {
+  color: white !important;
+}
+
+/* Info toast - синий с акцентом */
+[data-sonner-toast][data-type="info"] {
+  background: linear-gradient(135deg, hsl(217, 91%, 60%) 0%, hsl(221, 83%, 53%) 100%) !important;
+  border-color: hsl(217, 91%, 60%) !important;
+  color: white !important;
+}
+
+[data-sonner-toast][data-type="info"] .toast-title,
+[data-sonner-toast][data-type="info"] .toast-description {
+  color: white !important;
+}
+
+/* Default toast - использует тему */
+[data-sonner-toast]:not([data-type]) {
+  background: hsl(var(--card)) !important;
+  border-color: hsl(var(--border)) !important;
+}
+
+/* Иконки и кнопки */
+[data-sonner-toast] [data-icon] {
+  color: currentColor;
+  flex-shrink: 0;
+}
+
+[data-sonner-toast] [data-close-button] {
+  color: hsl(var(--muted-foreground));
+  opacity: 0.7;
+  transition: opacity 0.2s, color 0.2s;
+}
+
+[data-sonner-toast] [data-close-button]:hover {
+  opacity: 1;
+  color: hsl(var(--foreground));
+}
+
+/* Анимации */
+[data-sonner-toast] {
+  animation: toast-in 0.35s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+}
+
+[data-sonner-toast][data-swiping="true"] {
+  transform: translateX(var(--radix-toast-swipe-end-x));
+}
+
+[data-sonner-toast][data-swipe="end"][data-swiping="false"] {
+  animation: toast-out 0.2s cubic-bezier(0.06, 0.71, 0.55, 1) forwards;
+}
+
+@keyframes toast-in {
+  from {
+    transform: translateX(calc(100% + 1rem));
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(calc(100% + 1rem));
+  }
+}
+
+/* Полностью скрываем скроллбар */
+::-webkit-scrollbar {
+    width: 0px;
+    background: transparent;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: transparent;
+}
+
+/* Для Firefox */
+html {
+    scrollbar-width: none;
+}
+
+/* Убираем полоску скроллбара полностью */
+body {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+/* Дополнительно скрываем скроллбар */
+* {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+*::-webkit-scrollbar {
+    display: none;
+}
+
+/* Body font - использует CSS переменную */
+body {
+  font-family: var(--font-family-base);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Body visibility is controlled by inline CSS in index.html */
+}
+
+/* Font sizes are defined in index.html inline CSS with !important */
+/* This prevents Tailwind from overriding them and causing FOUT */
+
+/* Оптимизация рендеринга - приоритет отрисовки видимого контента */
+* {
+  will-change: auto;
+}
+
+/* Content visibility is controlled by body.fonts-loaded.loaded class in index.html */
+/* No additional animations or hiding needed - everything is hidden until ready */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes progress-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out;
+}
+
+.animate-progress-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: progress-shimmer 2s infinite;
+}
+
+/* Кастомные анимации для индикатора авторизации */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spin-reverse {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes orbit {
+  0% {
+    transform: rotate(0deg) translateX(30px) rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg) translateX(30px) rotate(-360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+.animate-spin-reverse {
+  animation: spin-reverse 2s linear infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-orbit {
+  animation: orbit 4s linear infinite;
+}
+
+/* Стили для страницы логина, как на скриншоте */
+.login-page-bg {
+  background: radial-gradient(ellipse at center, #1a0f2e 0%, #0f0818 70%);
+  background-size: 200% 200%;
+  animation: gentle-glow 20s linear infinite;
+}
+
+@keyframes gentle-glow {
+  0% { 
+    background-position: 0% 50%;
+    filter: brightness(1);
+  }
+  25% {
+    background-position: 50% 0%;
+    filter: brightness(1.1);
+  }
+  50% { 
+    background-position: 100% 50%;
+    filter: brightness(1.05);
+  }
+  75% {
+    background-position: 50% 100%;
+    filter: brightness(1.1);
+  }
+  100% { 
+    background-position: 0% 50%;
+    filter: brightness(1);
+  }
+}
+
+.login-card {
+  position: relative;
+  background: linear-gradient(135deg, #1a0f2e, #2a1d3a);
+  border: 1px solid #3a2a4a;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 20px rgba(100, 80, 200, 0.15);
+  transition: all 0.3s ease;
+}
+
+.login-card:hover {
+  border-color: #34D399;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 0 20px rgba(52, 211, 153, 0.3);
+}
+
+/* Анимация появления/исчезания текста */
+.subtitle-fade {
+  transition: opacity 0.5s ease-in-out;
+}
+
+/* Эффект свечения сверху */
+.login-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 200px; /* Высота свечения */
+  background: radial-gradient(ellipse at top, rgba(167, 139, 250, 0.15), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.login-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes rotate-glow {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Анимация курсора для заголовка */
+.blinking-cursor {
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  from, to {
+    color: transparent;
+  }
+  50% {
+    color: #34D399; /* Зеленый цвет курсора */
+  }
+}
+
+/* Анимации для уведомлений */
+@keyframes slide-in-bottom {
+  from {
+    transform: translate(-50%, 20px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-out-bottom {
+  from {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+  to {
+    transform: translate(-50%, 20px);
+    opacity: 0;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-bottom 0.3s ease-out forwards;
+}
+
+.animate-slide-out-right {
+  animation: slide-out-bottom 0.3s ease-in forwards;
+}
+
+/* Анимации для лутбоксов с картинками */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Анимация появления лутбокса */
+@keyframes lootbox-appear {
+  0% {
+    opacity: 0;
+    transform: scale(0.8) rotateY(180deg);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1) rotateY(90deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotateY(0deg);
+  }
+}
+
+.animate-lootbox-appear {
+  animation: lootbox-appear 0.8s ease-out forwards;
+}
+
+/* Анимация открытия лутбокса */
+@keyframes lootbox-open {
+  0% {
+    transform: scale(1) rotateY(0deg);
+  }
+  25% {
+    transform: scale(1.1) rotateY(90deg);
+  }
+  50% {
+    transform: scale(1.2) rotateY(180deg);
+  }
+  75% {
+    transform: scale(1.1) rotateY(270deg);
+  }
+  100% {
+    transform: scale(1) rotateY(360deg);
+  }
+}
+
+.animate-lootbox-open {
+  animation: lootbox-open 1.2s ease-in-out forwards;
+}
+
+/* Эффект свечения для редких лутбоксов */
+.lootbox-glow-rare {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+}
+
+.lootbox-glow-epic {
+  box-shadow: 0 0 25px rgba(147, 51, 234, 0.6);
+}
+
+.lootbox-glow-legendary {
+  box-shadow: 0 0 30px rgba(251, 191, 36, 0.7);
+  animation: legendary-pulse 2s ease-in-out infinite;
+}
+
+@keyframes legendary-pulse {
+  0%, 100% {
+    box-shadow: 0 0 30px rgba(251, 191, 36, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(251, 191, 36, 0.9);
+  }
+}
+
+/* Анимация смены картинок */
+@keyframes image-transition {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-image-transition {
+  animation: image-transition 0.3s ease-in-out;
+}
+
+/* Эффект блеска при открытии */
+@keyframes sparkle {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2) rotate(180deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0) rotate(360deg);
+  }
+}
+
+.animate-sparkle {
+  animation: sparkle 0.6s ease-out;
+}
+
+/* Предотвращение сдвига верстки для DropdownMenu */
+[data-radix-dropdown-menu-content] {
+  position: absolute !important;
+  z-index: 50 !important;
+}
+
+/* Предотвращение сдвига контента при открытии модальных окон */
+body:has([data-radix-dialog-content]),
+body:has([data-radix-dropdown-menu-content]) {
+  overflow: hidden !important;
+}
+
+/* Восстановление прокрутки после закрытия модальных окон */
+body:not(:has([data-radix-dialog-content])):not(:has([data-radix-dropdown-menu-content])) {
+  overflow: auto !important;
+}
+
+
+/* Убрали правила моргания - они мешали */
+
+/* Убрали анимации fade-in */
+
+/* Убрали анимации скелетонов */
+
+/* Убрали анимации integration-card */
+
+/* Предотвращаем видимую загрузку плейсхолдеров */
+input[placeholder] {
+  color: inherit !important;
+  background-color: inherit !important;
+}
+
+/* Убираем только проблемные анимации */
+.animate-pulse {
+  animation: none !important;
+}
+
+/* Оставляем анимацию bounce для точек загрузки */
+.animate-bounce {
+  animation: bounce 1s infinite !important;
+}
+
+@keyframes bounce {
+  0%, 20%, 53%, 80%, 100% {
+    transform: translate3d(0,0,0);
+  }
+  40%, 43% {
+    transform: translate3d(0, -8px, 0);
+  }
+  70% {
+    transform: translate3d(0, -4px, 0);
+  }
+  90% {
+    transform: translate3d(0, -2px, 0);
+  }
+}
+
+/* Оставляем только анимацию загрузки */
+.animate-spin {
+  animation: spin 1s linear infinite !important;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Убираем transitions только для некоторых элементов */
+/* Но НЕ отключаем полностью - transitions нужны для плавной загрузки */
+
+/* Скрываем контент до полной загрузки */
+.content-hidden {
+  visibility: hidden;
+}
+
+.content-visible {
+  visibility: visible;
+}
+
+/* Кастомный скроллбар для ChatBox предпросмотра */
+.chatbox-preview-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  display: block !important;
+}
+
+.chatbox-preview-scroll::-webkit-scrollbar-track {
+  background: #1F2937;
+  border-radius: 4px;
+}
+
+.chatbox-preview-scroll::-webkit-scrollbar-thumb {
+  background: #4B5563;
+  border-radius: 4px;
+}
+
+.chatbox-preview-scroll::-webkit-scrollbar-thumb:hover {
+  background: #6B7280;
+}

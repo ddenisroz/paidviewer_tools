@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { TwitchIcon, VKIcon } from '../../components/PlatformIcons';
 import TtsFilterManager from '../../components/tts/TtsFilterManager';
+import TtsChannelPointsMode from '../../components/tts/TtsChannelPointsMode';
 import { ttsLogger } from '../../utils/logger';
 import { logger } from '../../utils/prodLogger';
 
@@ -157,22 +158,6 @@ const TtsMainPageContent = () => {
             const response = await botService.post('/api/tts/mode-settings', { tts_mode: mode });
             setTtsTriggerMode(mode);
             toast.success(response.data?.message || 'Режим изменён');
-            
-            // If switching to channel_points mode and on Twitch, create reward
-            if (mode === 'channel_points' && isTwitchConnected) {
-                try {
-                    await botService.post('/api/tts/create-reward', {
-                        platform: 'twitch',
-                        title: 'TTS Озвучка сообщения',
-                        cost: 500,
-                        cooldown: 0
-                    });
-                    toast.success('Награда создана в Twitch');
-                } catch (error) {
-                    logger.error('Error creating TTS reward:', error);
-                    // Don't show error toast, reward might already exist
-                }
-            }
         } catch (error) {
             logger.error('Error changing TTS mode:', error);
             toast.error('Ошибка изменения режима');
@@ -301,35 +286,14 @@ const TtsMainPageContent = () => {
                                     <CardTitle className="text-base font-bold text-white">Управление</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    {/* Trigger Mode */}
+                                    {/* Trigger Mode with Reward Management */}
                                     <div>
                                         <label className="block text-xs font-semibold text-gray-400 mb-2">Режим включения</label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <button
-                                                onClick={() => handleTtsModeChange('all_messages')}
-                                                disabled={isSavingMode}
-                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all disabled:opacity-50 ${
-                                                    ttsTriggerMode === 'all_messages'
-                                                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-                                                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50 border border-gray-700/50'
-                                                }`}
-                                            >
-                                                Все сообщения
-                                            </button>
-                                            <button
-                                                onClick={() => handleTtsModeChange('channel_points')}
-                                                disabled={isSavingMode || !isTwitchConnected}
-                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all disabled:opacity-50 ${
-                                                    !isTwitchConnected
-                                                        ? 'opacity-40 cursor-not-allowed bg-gray-800/20 text-gray-500'
-                                                        : ttsTriggerMode === 'channel_points'
-                                                            ? 'bg-green-600 text-white shadow-lg shadow-green-600/30'
-                                                            : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50 border border-gray-700/50'
-                                                }`}
-                                            >
-                                                За баллы канала
-                                            </button>
-                                        </div>
+                                        <TtsChannelPointsMode
+                                            ttsMode={ttsTriggerMode}
+                                            onModeChange={handleTtsModeChange}
+                                            isSaving={isSavingMode}
+                                        />
                                     </div>
 
                                     {/* TTS Engine */}
