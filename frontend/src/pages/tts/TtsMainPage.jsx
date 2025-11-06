@@ -12,6 +12,8 @@ import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
 import { TwitchIcon, VKIcon } from '../../components/PlatformIcons';
 import TtsFilterManager from '../../components/tts/TtsFilterManager';
 import { ttsLogger } from '../../utils/logger';
@@ -46,6 +48,7 @@ const TtsMainPageContent = () => {
     
     const [localTtsConfig, setLocalTtsConfig] = useState(null);
     const [isSavingMode, setIsSavingMode] = useState(false);
+    const [isRegeneratingUrl, setIsRegeneratingUrl] = useState(false);
     
     const queryClient = useQueryClient();
     const isTwitchConnected = integrations.twitch?.enabled || (isGuest && user?.platform === 'twitch');
@@ -62,16 +65,6 @@ const TtsMainPageContent = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tts-status'] });
             logger.log('Basic TTS state saved');
-        }
-    });
-
-    const toggleAiTtsMutation = useMutation({
-        mutationFn: async (enabled) => {
-            return enabled ? await botService.post('/api/tts/ai/enable') : await botService.post('/api/tts/ai/disable');
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['tts-status'] });
-            logger.log('AI TTS state saved');
         }
     });
 
@@ -98,8 +91,12 @@ const TtsMainPageContent = () => {
 
     useEffect(() => {
         if (ttsStatusData) {
-            setBasicTtsEnabled(ttsStatusData.basic_tts_enabled || false);
-            setAiTtsEnabled(ttsStatusData.ai_tts_enabled || false);
+            const basicEnabled = ttsStatusData.basic_tts_enabled || false;
+            const aiEnabled = ttsStatusData.ai_tts_enabled || false;
+            
+            setBasicTtsEnabled(basicEnabled);
+            setAiTtsEnabled(aiEnabled);
+            
             if (ttsStatusData.tts_engine) setTtsEngine(ttsStatusData.tts_engine);
             if (ttsStatusData.listening_mode) setListeningMode(ttsStatusData.listening_mode);
             if (ttsStatusData.platform_settings) setPlatformSettings(ttsStatusData.platform_settings);
@@ -139,25 +136,43 @@ const TtsMainPageContent = () => {
     // Handlers
     const handleGlobalTtsToggle = () => {
         const newState = !isAnyTtsEnabled;
+        
         if (newState) {
-            toggleBasicTtsMutation.mutate(true);
             setBasicTtsEnabled(true);
+            toggleBasicTtsMutation.mutate(true);
             window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
         } else {
-            toggleBasicTtsMutation.mutate(false);
-            toggleAiTtsMutation.mutate(false);
             setBasicTtsEnabled(false);
             setAiTtsEnabled(false);
+            toggleBasicTtsMutation.mutate(false);
             window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: false } }));
         }
     };
 
     const handleTtsModeChange = async (mode) => {
+        if (isSavingMode) return;
+        
         setIsSavingMode(true);
         try {
             const response = await botService.post('/api/tts/mode-settings', { tts_mode: mode });
             setTtsTriggerMode(mode);
             toast.success(response.data?.message || 'Режим изменён');
+            
+            // If switching to channel_points mode and on Twitch, create reward
+            if (mode === 'channel_points' && isTwitchConnected) {
+                try {
+                    await botService.post('/api/tts/create-reward', {
+                        platform: 'twitch',
+                        title: 'TTS Озвучка сообщения',
+                        cost: 500,
+                        cooldown: 0
+                    });
+                    toast.success('Награда создана в Twitch');
+                } catch (error) {
+                    logger.error('Error creating TTS reward:', error);
+                    // Don't show error toast, reward might already exist
+                }
+            }
         } catch (error) {
             logger.error('Error changing TTS mode:', error);
             toast.error('Ошибка изменения режима');
@@ -168,14 +183,15 @@ const TtsMainPageContent = () => {
 
     const handleBasicTtsToggle = () => {
         const newValue = !basicTtsEnabled;
+        
         if (newValue) {
-            toggleBasicTtsMutation.mutate(true);
             setBasicTtsEnabled(true);
             setAiTtsEnabled(false);
+            toggleBasicTtsMutation.mutate(true);
             window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
         } else {
-            toggleBasicTtsMutation.mutate(false);
             setBasicTtsEnabled(false);
+            toggleBasicTtsMutation.mutate(false);
             window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: false } }));
         }
     };
@@ -185,17 +201,21 @@ const TtsMainPageContent = () => {
             toast.error('F5-TTS недоступен');
             return;
         }
+        
         const newValue = !aiTtsEnabled;
+        
         if (newValue) {
-            botService.post('/api/tts/ai/enable', { engine: ttsEngine })
-                .then(() => {
+            // Enable AI TTS
+            switchEngineMutation.mutate({ engine_type: ttsEngine === 'local' ? 'local' : 'cloud' }, {
+                onSuccess: () => {
                     setAiTtsEnabled(true);
-                    setBasicTtsEnabled(true);
+                    setBasicTtsEnabled(true); // Keep basic enabled
                     toast.success('F5-TTS включён');
                     window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
-                })
-                .catch(() => toast.error('Ошибка включения F5-TTS'));
+                }
+            });
         } else {
+            // Disable AI TTS, switch to basic
             switchEngineMutation.mutate({ engine_type: 'gtts' }, {
                 onSuccess: () => {
                     setAiTtsEnabled(false);
@@ -206,7 +226,7 @@ const TtsMainPageContent = () => {
     };
 
     const handlePlatformToggle = useCallback((platform) => {
-        const currentPlatforms = platformSettings.enabled_platforms;
+        const currentPlatforms = platformSettings.enabled_platforms || [];
         const newEnabledPlatforms = currentPlatforms.includes(platform)
             ? currentPlatforms.filter(p => p !== platform)
             : [...currentPlatforms, platform];
@@ -224,6 +244,7 @@ const TtsMainPageContent = () => {
     }, [platformSettings.enabled_platforms, savePlatformSettingsMutation]);
 
     const handleRegenerateObsUrl = async () => {
+        setIsRegeneratingUrl(true);
         try {
             const response = await generateObsUrl();
             const token = response.data?.obs_token;
@@ -232,7 +253,10 @@ const TtsMainPageContent = () => {
                 toast.success('URL обновлён');
             }
         } catch (error) {
+            logger.error('Error regenerating OBS URL:', error);
             toast.error('Ошибка обновления URL');
+        } finally {
+            setIsRegeneratingUrl(false);
         }
     };
 
@@ -284,7 +308,7 @@ const TtsMainPageContent = () => {
                                             <button
                                                 onClick={() => handleTtsModeChange('all_messages')}
                                                 disabled={isSavingMode}
-                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all disabled:opacity-50 ${
                                                     ttsTriggerMode === 'all_messages'
                                                         ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
                                                         : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50 border border-gray-700/50'
@@ -295,7 +319,7 @@ const TtsMainPageContent = () => {
                                             <button
                                                 onClick={() => handleTtsModeChange('channel_points')}
                                                 disabled={isSavingMode || !isTwitchConnected}
-                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all disabled:opacity-50 ${
                                                     !isTwitchConnected
                                                         ? 'opacity-40 cursor-not-allowed bg-gray-800/20 text-gray-500'
                                                         : ttsTriggerMode === 'channel_points'
@@ -411,7 +435,7 @@ const TtsMainPageContent = () => {
                                                 OBS
                                             </button>
                                         </div>
-                                        <div className="mt-3 p-3 rounded-lg border bg-gray-800/30 border-gray-700/50 min-h-[56px]">
+                                        <div className="mt-3 p-3 rounded-lg border bg-gray-800/30 border-gray-700/50 min-h-[88px]">
                                             {listeningMode === 'obs' ? (
                                                 <>
                                                     <div className="text-xs text-gray-400 mb-2">OBS Browser Source URL:</div>
@@ -422,16 +446,28 @@ const TtsMainPageContent = () => {
                                                             readOnly
                                                             className="flex-1 bg-gray-900/50 border border-gray-700/50 text-gray-300 text-xs px-3 py-2 rounded focus:outline-none focus:border-purple-500"
                                                         />
-                                                        <button
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
                                                             onClick={() => {
                                                                 navigator.clipboard.writeText(obsUrl);
                                                                 toast.success('Скопировано');
                                                             }}
-                                                            className="px-3 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-300 rounded text-xs font-semibold border border-green-600/50"
+                                                            className="px-3 text-xs border-green-600/50 text-green-300 hover:bg-green-600/20"
                                                         >
                                                             Copy
-                                                        </button>
+                                                        </Button>
                                                     </div>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={handleRegenerateObsUrl}
+                                                        disabled={isRegeneratingUrl}
+                                                        className="w-full mt-2 text-xs border-purple-600/50 text-purple-300 hover:bg-purple-600/20"
+                                                    >
+                                                        <RefreshCw className={`w-3 h-3 mr-1 ${isRegeneratingUrl ? 'animate-spin' : ''}`} />
+                                                        Обновить токен
+                                                    </Button>
                                                 </>
                                             ) : (
                                                 <div className="text-xs text-gray-500">Выбран вывод на сайт</div>
