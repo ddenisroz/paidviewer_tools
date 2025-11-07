@@ -10,10 +10,12 @@ import { TwitchIcon, VKIcon } from './PlatformIcons';
 import { useData } from '../context/DataContext';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useUserSettings } from '../context/UserSettingsContext';
+import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 import { logger } from '../utils/prodLogger';
 
 const StreamTitleCard = ({ onLinkStateChange }) => {
+    const { user, isAuthenticated } = useAuth();
     const { integrations, isLoading: integrationsLoading } = useIntegrations();
     const { initialData, currentData, setCurrentData, saveChanges, status } = useData();
     const { getCombineSettings, updateSetting } = useUserSettings();
@@ -26,8 +28,10 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
     const bothEnabled = useMemo(() => twitchEnabled && vkEnabled, [twitchEnabled, vkEnabled]);
     const hasAnyIntegration = useMemo(() => twitchEnabled || vkEnabled, [twitchEnabled, vkEnabled]);
     
-    // 🚀 НИКОГДА НЕ ПОКАЗЫВАЕМ ЛОАДЕР - сразу показываем контент или placeholder
-    const isLoading = false;
+    // 🚀 ANTI-FLASH: Показываем placeholder ТОЛЬКО если user загружен и интеграции точно disabled
+    // Если user еще не загружен - показываем нейтральное состояние (не placeholder)
+    const isDataLoaded = isAuthenticated !== null && user !== null;
+    const shouldShowPlaceholder = isDataLoaded && !hasAnyIntegration;
 
     // Адаптивные размеры карточки
     // Высота НЕ уменьшается при объединении одной карточки
@@ -266,7 +270,9 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
         );
     }
 
-    if (!hasAnyIntegration) {
+    // 🚀 ANTI-FLASH: Показываем placeholder ТОЛЬКО когда данные загружены и интеграции точно disabled
+    // Пока данные не загружены - показываем нормальную карточку (она покажет пустое состояние без мигания)
+    if (shouldShowPlaceholder) {
         return (
             <Card className="border-red-500/50 bg-red-500/5 opacity-60">
                 <CardHeader>
