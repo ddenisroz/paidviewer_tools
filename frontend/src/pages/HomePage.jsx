@@ -57,10 +57,11 @@ const HomePage = () => {
             return response.data;
         },
         enabled: !!isAuthenticated && !!integrations?.twitch?.enabled,
-        staleTime: 30 * 1000, // 30 секунд - данные считаются свежими
-        refetchInterval: 30 * 1000, // Автообновление каждые 30 секунд
-        refetchOnMount: false, // Не делаем дополнительный запрос при монтировании (refetchInterval уже обновляет)
-        refetchOnWindowFocus: false, // Не обновлять при фокусе окна
+        staleTime: 60 * 1000, // 60 секунд - повышенное кэширование для стабильности
+        gcTime: 5 * 60 * 1000, // 5 минут - дольше храним в памяти
+        refetchInterval: 60 * 1000, // Обновляем каждые 60 секунд (вместо 30)
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
         retry: 1,
     });
 
@@ -73,10 +74,11 @@ const HomePage = () => {
             return response.data;
         },
         enabled: !!isAuthenticated && !!integrations?.vk?.enabled,
-        staleTime: 30 * 1000, // 30 секунд - данные считаются свежими
-        refetchInterval: 30 * 1000, // Автообновление каждые 30 секунд
-        refetchOnMount: false, // Не делаем дополнительный запрос при монтировании (refetchInterval уже обновляет)
-        refetchOnWindowFocus: false, // Не обновлять при фокусе окна
+        staleTime: 60 * 1000, // 60 секунд - повышенное кэширование для стабильности
+        gcTime: 5 * 60 * 1000, // 5 минут - дольше храним в памяти
+        refetchInterval: 60 * 1000, // Обновляем каждые 60 секунд (вместо 30)
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
         retry: 1,
     });
 

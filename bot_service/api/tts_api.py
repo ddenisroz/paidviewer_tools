@@ -767,12 +767,12 @@ async def get_tts_status(
         
         is_whitelisted = is_user_whitelisted_cached(user, db)
         
-        # Детальное логирование для диагностики
-        logger.info(f"🔍 [TTS STATUS] User {user_id} whitelist check: twitch={user.twitch_username}, vk={user.vk_username}, vk_channel={user.vk_channel_name}, is_whitelisted={is_whitelisted}, has_local_setup={has_local_setup}")
+        # Детальное логирование для диагностики - только на DEBUG уровне чтобы не спамить логи
+        logger.debug(f"🔍 [TTS STATUS] User {user_id} whitelist check: twitch={user.twitch_username}, vk={user.vk_username}, vk_channel={user.vk_channel_name}, is_whitelisted={is_whitelisted}, has_local_setup={has_local_setup}")
         
         if is_whitelisted:
             platform_name = user.twitch_username if user.twitch_username else (user.vk_username or user.vk_channel_name)
-            logger.info(f"✅ [TTS STATUS] User {user_id} ({platform_name}) whitelisted")
+            logger.debug(f"✅ [TTS STATUS] User {user_id} ({platform_name}) whitelisted")
         elif not has_local_setup:
             logger.warning(f"❌ [TTS STATUS] User {user_id} (twitch: {user.twitch_username}, vk: {user.vk_username}, vk_channel: {user.vk_channel_name}) NOT whitelisted, login_platform: {login_platform}")
             
@@ -1360,11 +1360,12 @@ async def get_platform_settings(
         
         if not tts_settings:
             # Возвращаем дефолтные настройки
-            logger.info(f"📖 [TTS SETTINGS] No settings found for user {user_id}, returning defaults")
             enabled_platforms = ['twitch', 'vk']
         else:
             enabled_platforms = tts_settings.enabled_platforms or ['twitch', 'vk']
-            logger.info(f"📖 [TTS SETTINGS] Loaded for user {user_id}: {enabled_platforms}")
+        
+        # Логируем только если произошло изменение (не логируем при каждом запросе)
+        # logger.debug(f"📖 [TTS SETTINGS] Loaded for user {user_id}: {enabled_platforms}")
         
         return {
             "success": True,

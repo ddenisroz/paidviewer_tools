@@ -23,9 +23,9 @@ TOKEN_VALIDATION_TIMEOUT_OBJ = aiohttp.ClientTimeout(total=10, connect=5)
 VK_API_TIMEOUT = 15.0  # секунд
 """Timeout для VK Live API запросов (legacy)"""
 
-# Twitch API
-TWITCH_API_TIMEOUT = aiohttp.ClientTimeout(total=30, connect=10)
-"""Timeout для Twitch API запросов"""
+# Twitch API - уменьшен таймаут чтобы избежать долгих зависаний при сетевых проблемах
+TWITCH_API_TIMEOUT = aiohttp.ClientTimeout(total=10, connect=5)
+"""Timeout для Twitch API запросов - 10 секунд max (было 30)"""
 
 # DonationAlerts API
 DONATIONALERTS_API_TIMEOUT = 15.0  # секунд
