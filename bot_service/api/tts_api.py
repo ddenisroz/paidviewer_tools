@@ -1289,7 +1289,7 @@ async def set_platform_settings(
         
         if not tts_settings:
             # Создаем новые настройки с выбранными платформами
-            logger.info(f"💾 [TTS SETTINGS] Creating NEW settings for user {user_id}")
+            logger.debug(f"💾 [TTS SETTINGS] Creating NEW settings for user {user_id}")
             tts_settings = TTSUserSettings(
                 user_id=user_id if user_id != -1 else None,
                 session_id=session_id if user_id == -1 else None,
@@ -1298,16 +1298,17 @@ async def set_platform_settings(
             db.add(tts_settings)
         else:
             # Обновляем существующие
-            logger.info(f"💾 [TTS SETTINGS] Updating EXISTING settings for user {user_id}")
-            logger.info(f"💾 [TTS SETTINGS] OLD value: {tts_settings.enabled_platforms}")
+            old_value = tts_settings.enabled_platforms
             tts_settings.enabled_platforms = enabled_platforms if enabled_platforms else ['twitch', 'vk']
-            logger.info(f"💾 [TTS SETTINGS] NEW value: {tts_settings.enabled_platforms}")
+            # Логируем только если значение изменилось
+            if old_value != tts_settings.enabled_platforms:
+                logger.debug(f"💾 [TTS SETTINGS] User {user_id}: {old_value} → {tts_settings.enabled_platforms}")
         
         db.commit()
         db.refresh(tts_settings)
         
-        logger.info(f"✅ [TTS SETTINGS] User {user_id} set enabled platforms to: {enabled_platforms}")
-        logger.info(f"✅ [TTS SETTINGS] Saved to DB: {tts_settings.enabled_platforms}")
+        # Один лог вместо трех
+        logger.debug(f"✅ [TTS SETTINGS] User {user_id} platforms: {tts_settings.enabled_platforms}")
         
         # Отправляем WebSocket уведомление для синхронизации фронтенда
         try:

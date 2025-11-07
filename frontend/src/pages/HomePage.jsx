@@ -12,7 +12,6 @@ import ChatCard from '../components/ChatCard';
 import StreamTitleCard from '../components/StreamTitleCard';
 import StreamCategoryCard from '../components/StreamCategoryCard';
 import GuestStubs from '../components/GuestStubs';
-import IntegrationsDisabledPlaceholder from '../components/IntegrationsDisabledPlaceholder';
 import QuickActionsBar from '../components/QuickActionsBar';
 import { getAndClearReturnUrl } from '../utils/oauthRedirect';
 import { logger } from '../utils/prodLogger';
@@ -132,10 +131,9 @@ const HomePage = () => {
                             isOnHomePage={true}
                         />
                     </div>
-                ) : (integrations.twitch.enabled === false && integrations.vk.enabled === false) ? (
-                    <IntegrationsDisabledPlaceholder />
                 ) : (
                     <>
+                        {/* 🚀 ВСЕГДА показываем карточки - они сами обработают disabled состояние */}
                         {/* Настройки стрима - в две колонки */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Карточка названия */}
