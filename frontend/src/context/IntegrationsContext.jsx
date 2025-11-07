@@ -11,13 +11,36 @@ export const useIntegrations = () => useContext(IntegrationsContext);
 
 export const IntegrationsProvider = ({ children }) => {
     const { isAuthenticated, user, integrationsNeedRefresh, markIntegrationsRefreshed, loginWithTwitch, loginWithVk, refreshAuthStatus } = useAuth();
-    const [integrations, setIntegrations] = useState({
-        twitch: { enabled: null }, // null = загрузка, false = отключено, true = включено
-        vk: { enabled: null },
-        donationalerts: { enabled: null },
-    });
+    
+    // Инициализируем сразу с данными из user если они есть, чтобы избежать мерцания
+    const getInitialIntegrations = () => {
+        if (user?.integrations) {
+            return {
+                twitch: { 
+                    enabled: !!user.integrations.twitch?.connected,
+                    username: user.integrations.twitch?.username || null
+                },
+                vk: { 
+                    enabled: !!user.integrations.vk?.connected,
+                    username: user.integrations.vk?.username || null
+                },
+                donationalerts: {
+                    enabled: !!user.integrations.donationalerts?.connected,
+                    username: user.integrations.donationalerts?.username || null
+                },
+            };
+        }
+        // Только если нет user - ставим null для индикации загрузки
+        return {
+            twitch: { enabled: isAuthenticated === false ? false : null },
+            vk: { enabled: isAuthenticated === false ? false : null },
+            donationalerts: { enabled: isAuthenticated === false ? false : null },
+        };
+    };
+    
+    const [integrations, setIntegrations] = useState(getInitialIntegrations);
     const [isLoading, setIsLoading] = useState(false);
-    const [initialLoad, setInitialLoad] = useState(true);
+    const [initialLoad, setInitialLoad] = useState(!user?.integrations);
 
     const fetchIntegrations = useCallback(async () => {
         if (isAuthenticated === false) {
@@ -47,23 +70,26 @@ export const IntegrationsProvider = ({ children }) => {
                     username: user.integrations.donationalerts?.username || null
                 },
             };
-            setIntegrations(newIntegrations);
+            
+            // Обновляем только если данные действительно изменились
+            setIntegrations(prev => {
+                const hasChanged = 
+                    prev.twitch.enabled !== newIntegrations.twitch.enabled ||
+                    prev.vk.enabled !== newIntegrations.vk.enabled ||
+                    prev.donationalerts.enabled !== newIntegrations.donationalerts.enabled;
+                
+                return hasChanged ? newIntegrations : prev;
+            });
             setIsLoading(false);
             setInitialLoad(false);
             return;
         }
 
-        // Если данные еще не загружены, показываем состояние загрузки
-        if (isAuthenticated === null) {
-            setIntegrations({ 
-                twitch: { enabled: null }, 
-                vk: { enabled: null },
-                donationalerts: { enabled: null }
-            });
+        // Если данные еще не загружены, показываем состояние загрузки ТОЛЬКО если еще не было initial load
+        if (isAuthenticated === null && initialLoad) {
             setIsLoading(true);
-            setInitialLoad(true);
         }
-    }, [isAuthenticated, user?.integrations]);
+    }, [isAuthenticated, user?.integrations, initialLoad]);
 
     useEffect(() => {
         fetchIntegrations();

@@ -105,8 +105,9 @@ const HomePage = () => {
     }, [integrations, streamHistory, twitchStreamInfo, vkStreamInfo]);
 
 
-    // Показываем пустые карточки если интеграции еще загружаются
-    const isLoading = integrations.twitch.enabled === null || integrations.vk.enabled === null || integrationsLoading;
+    // Показываем пустые карточки ТОЛЬКО если интеграции еще не загружены (null)
+    // Убрали integrationsLoading - он может быть true при обновлении, но данные уже есть
+    const isLoading = integrations.twitch.enabled === null || integrations.vk.enabled === null;
 
     return (
         <div className="space-y-8 pb-20">
