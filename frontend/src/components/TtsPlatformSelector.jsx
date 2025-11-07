@@ -11,7 +11,8 @@ const TtsPlatformSelector = () => {
     enabled_platforms: ['twitch', 'vk'],
     global_enabled: true
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // ⚡ Изменено: по умолчанию false
+  const [initialLoading, setInitialLoading] = useState(true); // 🚀 Для первой загрузки
   const [saving, setSaving] = useState(false);
 
   // Загрузка настроек TTS
@@ -38,6 +39,7 @@ const TtsPlatformSelector = () => {
       });
     } finally {
       setLoading(false);
+      setInitialLoading(false); // ⚡ Первая загрузка завершена
     }
   };
 
@@ -120,7 +122,8 @@ const TtsPlatformSelector = () => {
     };
   }, []);
 
-  if (loading) {
+  // ⚡ Показываем скелетон ТОЛЬКО при первой загрузке
+  if (initialLoading) {
     return (
       <div className="bg-white rounded-lg shadow-sm border p-6">
         <div className="animate-pulse">

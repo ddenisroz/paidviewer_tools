@@ -53,7 +53,8 @@ import { logger } from '../utils/prodLogger';
     
     const [basicCommands, setBasicCommands] = useState([]);
     const [customCommands, setCustomCommands] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false); // ⚡ Изменено: по умолчанию false
+    const [initialLoading, setInitialLoading] = useState(true); // 🚀 Для первой загрузки
     
     // 🚀 КЭШИРОВАНИЕ: Храним время последней загрузки
     const [lastLoadTime, setLastLoadTime] = useState(0);
@@ -166,6 +167,7 @@ import { logger } from '../utils/prodLogger';
             toast.error('Ошибка загрузки команд');
         } finally {
             setLoading(false);
+            setInitialLoading(false); // ⚡ Первая загрузка завершена
         }
     };
 
@@ -480,8 +482,8 @@ import { logger } from '../utils/prodLogger';
         );
     }
 
-    // Ранний return для загрузки - сохраняем структуру контейнера
-    if (loading) {
+    // ⚡ Показываем лоадер ТОЛЬКО при первой загрузке и если данных еще нет
+    if (initialLoading && basicCommands.length === 0 && customCommands.length === 0) {
         return (
             <PageWrapper>
                 <PageLoader message="Загрузка команд..." />
