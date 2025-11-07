@@ -28,7 +28,7 @@ const Header = () => {
         '/dashboard/commands': 'Команды',
         '/dashboard/points': 'Управление наградами',
         '/dashboard/settings': 'Настройки',
-        '/dashboard/chat-analysis': 'Анализ и модерация чата',
+        '/dashboard/chat-analysis': 'Управление чатом',
         '/dashboard/dolbaebadmintts': 'Панель администратора',
         '/dashboard': '',
     }), []);

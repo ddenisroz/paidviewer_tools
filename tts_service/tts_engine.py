@@ -172,11 +172,22 @@ class TTSEngineManager:
             try:
                 voice_record = db.query(VoiceModel).filter(VoiceModel.name == voice).first()
                 if not voice_record:
-                    logger.warning(f"Voice '{voice}' not found in DB, using default")
-                    # Используем дефолтный голос female_1
+                    logger.warning(f"Voice '{voice}' not found in DB, trying fallback options")
+                    # Пытаемся найти дефолтный голос female_1
                     voice_record = db.query(VoiceModel).filter(VoiceModel.name == "female_1").first()
                     if not voice_record:
-                        return {"success": False, "error": "No voices available"}
+                        # Если female_1 нет, берем любой доступный глобальный голос
+                        voice_record = db.query(VoiceModel).filter(VoiceModel.voice_type == "global").first()
+                        if voice_record:
+                            logger.info(f"Using first available global voice: {voice_record.name}")
+                        else:
+                            # В крайнем случае берем вообще любой голос
+                            voice_record = db.query(VoiceModel).first()
+                            if voice_record:
+                                logger.info(f"Using first available voice: {voice_record.name}")
+                            else:
+                                logger.error("No voices found in database")
+                                return {"success": False, "error": "No voices available"}
                 
                 ref_audio_path = voice_record.file_path
                 ref_text = voice_record.reference_text or ""

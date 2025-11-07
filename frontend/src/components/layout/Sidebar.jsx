@@ -18,7 +18,7 @@ const getNavItems = (isYourchy) => {
             ]
         },
         { 
-            label: 'Медиа интерактивность', 
+            label: 'Медиа запросы', 
             icon: Sparkles,
             submenu: [
                 { to: '/dashboard/youtube', label: 'YouTube заказы', icon: Youtube },
@@ -26,7 +26,7 @@ const getNavItems = (isYourchy) => {
                 { to: '/dashboard/drops', label: 'Drops система', icon: Sparkles },
             ]
         },
-        { to: '/dashboard/chat-analysis', label: 'Анализ и модерация чата', icon: MessageSquare },
+        { to: '/dashboard/chat-analysis', label: 'Управление чатом', icon: MessageSquare },
         { to: '/dashboard/commands', label: 'Команды', icon: Command },
         { to: '/dashboard/settings', label: 'Настройки', icon: Settings },
     ];

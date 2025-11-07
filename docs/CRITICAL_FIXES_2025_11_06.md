@@ -486,3 +486,5 @@ if (!enabled && !isDonationAlertsConnected) {
 **Автор**: AI Assistant  
 **Статус**: ✅ Все исправления внедрены и протестированы
 
+
+

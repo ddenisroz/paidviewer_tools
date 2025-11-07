@@ -33,19 +33,19 @@ const StreakTracker = ({ user, platform, channelName }) => {
   const streakEnabled = config?.streak_enabled ?? false;
 
   useEffect(() => {
-    // ALWAYS check streakEnabled before loading
-    if (streakEnabled && user && platform && channelName) {
+    // Load streaks always if we have required data
+    if (user && platform && channelName) {
       loadStreaks(true);
     } else {
-      // Clear streaks if disabled or missing required data
+      // Clear streaks if missing required data
       setStreaks([]);
       setHasMore(false);
     }
   }, [user, platform, channelName, streakEnabled]);
 
   const loadStreaks = async (reset = false) => {
-    // DOUBLE CHECK: Do not load if streak is disabled
-    if (!user || !platform || !channelName || !streakEnabled) {
+    // Do not load if missing required data
+    if (!user || !platform || !channelName) {
       setStreaks([]);
       setHasMore(false);
       return;
@@ -65,8 +65,7 @@ const StreakTracker = ({ user, platform, channelName }) => {
       
       if (response.data.success) {
         const newStreaks = response.data.data || [];
-        // EXTRA SAFETY: Clear if empty or streak disabled
-        if (newStreaks.length === 0 || !streakEnabled) {
+        if (newStreaks.length === 0) {
           setStreaks([]);
           setHasMore(false);
         } else {
@@ -123,30 +122,6 @@ const StreakTracker = ({ user, platform, channelName }) => {
     return { text: 'Новичок', emoji: '🌱' };
   };
 
-  // Don't show if streak is disabled
-  if (!streakEnabled) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" />
-            Стрики зрителей
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-            <AlertCircle className="w-5 h-5 text-yellow-400" />
-            <div>
-              <p className="text-sm font-medium text-yellow-400">Стрики отключены</p>
-              <p className="text-xs text-yellow-300/80 mt-1">
-                Включите стрики в настройках, чтобы видеть статистику зрителей
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card>
@@ -157,6 +132,18 @@ const StreakTracker = ({ user, platform, channelName }) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Предупреждение если стрики отключены */}
+        {!streakEnabled && (
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+            <AlertCircle className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+            <div>
+              <p className="text-xs font-medium text-yellow-400">
+                Стрики отключены. Статистика может быть устаревшей.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Поиск */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

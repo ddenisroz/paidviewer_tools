@@ -482,7 +482,7 @@ async def update_voice_settings(
 @admin_router.put("/voices/{voice_id}/rename")
 async def rename_voice(
     voice_id: int,
-    new_name: str,
+    new_name: str = Query(..., description="Новое имя голоса"),
     db: Session = Depends(get_db)
 ):
     """Переименовать голос"""

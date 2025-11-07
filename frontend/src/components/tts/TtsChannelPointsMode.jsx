@@ -110,7 +110,7 @@ const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving, showModeSelecto
     <div className="space-y-3">
       {/* Выбор режима - показываем только если showModeSelector=true */}
       {showModeSelector && (
-        <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <button
           onClick={() => onModeChange('all_messages')}
           disabled={isSaving}
@@ -140,7 +140,7 @@ const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving, showModeSelecto
             {!isTwitchConnected ? 'Требуется Twitch' : 'Только с наградой'}
           </div>
         </button>
-        </div>
+      </div>
       )}
 
       {/* Настройка наград */}
@@ -209,7 +209,7 @@ const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving, showModeSelecto
             )}
           </div>
         </div>
-      )}
+        )}
 
       {/* Диалог создания награды */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>

@@ -135,6 +135,95 @@ const VoiceManagementPageContent = () => {
         },
     });
 
+    // React Query Mutations
+    const uploadVoiceMutation = useMutation({
+        mutationFn: async ({ userId, formData }) => {
+            setIsUploading(true);
+            return await uploadUserVoice(userId, formData);
+        },
+        onSuccess: () => {
+            addToast({ type: 'success', title: 'Успех', message: 'Голос успешно загружен!' });
+            setUploadDialogOpen(false);
+            setUploadFile(null);
+            setVoiceName('');
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+            queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
+        },
+        onError: (error) => {
+            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось загрузить голос.' });
+        },
+        onSettled: () => {
+            setIsUploading(false);
+        }
+    });
+
+    const deleteVoiceMutation = useMutation({
+        mutationFn: async ({ voiceId, userId, voiceName }) => {
+            return await deleteUserVoice(voiceId, userId);
+        },
+        onSuccess: (data, variables) => {
+            addToast({ type: 'success', title: 'Успех', message: `Голос "${variables.voiceName}" удалён.` });
+            queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
+        },
+        onError: (error) => {
+            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось удалить голос.' });
+        }
+    });
+
+    const renameVoiceMutation = useMutation({
+        mutationFn: async ({ voiceId, userId, newName }) => {
+            return await renameUserVoice(voiceId, userId, newName);
+        },
+        onSuccess: () => {
+            addToast({ type: 'success', title: 'Успех', message: 'Голос успешно переименован!' });
+            setRenameDialogOpen(false);
+            setEditDialogOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
+        },
+        onError: (error) => {
+            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось переименовать голос.' });
+        }
+    });
+
+    const updateVoiceSettingsMutation = useMutation({
+        mutationFn: async ({ voiceId, userId, settings }) => {
+            return await updateUserVoiceSettings(voiceId, userId, settings);
+        },
+        onSuccess: () => {
+            setEditDialogOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
+            queryClient.invalidateQueries({ queryKey: ['global-voices'] });
+        },
+        onError: (error) => {
+            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось обновить настройки.' });
+            queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
+            queryClient.invalidateQueries({ queryKey: ['global-voices'] });
+        }
+    });
+
+    const transcribeVoiceMutation = useMutation({
+        mutationFn: async ({ voiceId, userId }) => {
+            setIsTranscribing(true);
+            return await retranscribeUserVoice(voiceId, userId);
+        },
+        onSuccess: (response) => {
+            const newReferenceText = response?.data?.reference_text || response?.reference_text;
+            if (newReferenceText) {
+                setCurrentVoice(prev => ({...prev, reference_text: newReferenceText}));
+                addToast({ type: 'success', title: 'Успех', message: 'Референсный текст обновлён!' });
+            }
+            queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
+        },
+        onError: (error) => {
+            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось перетранскрибировать голос.' });
+        },
+        onSettled: () => {
+            setIsTranscribing(false);
+        }
+    });
+
     // Используем данные из React Query напрямую
     // Важно: используем ?? для fallback, если данные еще не загружены
     const globalVoices = globalVoicesData ?? [];

@@ -681,7 +681,11 @@ import { logger } from '../utils/prodLogger';
                                         }))}
                                     >
                                         <SelectTrigger>
-                                            <SelectValue placeholder="Выберите платформы" />
+                                            <SelectValue placeholder="Выберите платформы">
+                                                {createForm.platforms === 'twitch,vk' || !createForm.platforms 
+                                                    ? 'Все платформы' 
+                                                    : getPlatformLabel(createForm.platforms)}
+                                            </SelectValue>
                                         </SelectTrigger>
                                         <SelectContent>
                                             {platformsToShow.map(option => (
@@ -749,13 +753,9 @@ import { logger } from '../utils/prodLogger';
                                     <Terminal className="h-16 w-16 mx-auto text-muted-foreground opacity-50" />
                                     <div>
                                         <h4 className="text-lg font-semibold mb-2">Нет кастомных команд</h4>
-                                        <p className="text-muted-foreground mb-6">
+                                        <p className="text-muted-foreground">
                                             Создайте первую команду для взаимодействия с вашей аудиторией
                                         </p>
-                                        <Button onClick={() => setIsCreateDialogOpen(true)} size="lg">
-                                            <Plus className="h-4 w-4 mr-2" />
-                                            Создать команду
-                                        </Button>
                                     </div>
                     </div>
                 ) : (
@@ -783,13 +783,7 @@ import { logger } from '../utils/prodLogger';
                             Настройка команды !{editingCommand?.command_name}
                         </DialogTitle>
                         <DialogDescription>
-                            {editingCommand?.command_type === 'global' ? (
-                                <span className="text-yellow-600 dark:text-yellow-500">
-                                    ⚠️ При сохранении будет создана ваша персональная настройка этой команды
-                                </span>
-                            ) : (
-                                'Настройте параметры команды: платформы, роли и кулдаун'
-                            )}
+                            Настройте параметры команды: платформы, роли и кулдаун
                         </DialogDescription>
                     </DialogHeader>
                     {editingCommand && (

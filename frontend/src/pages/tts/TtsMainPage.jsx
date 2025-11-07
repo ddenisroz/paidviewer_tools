@@ -730,9 +730,9 @@ const TtsMainPageContent = () => {
                             <div className="space-y-4 flex flex-col">
                                 {/* Rewards Creation */}
                                 <Card className={`border-gray-700/50 bg-gray-900/50 backdrop-blur-sm transition-all ${ttsTriggerMode === 'all_messages' ? 'opacity-50' : ''}`}>
-                                    <CardHeader className="pb-3">
+                                        <CardHeader className="pb-3">
                                         <CardTitle className="text-base font-bold text-white">Награды за озвучку</CardTitle>
-                                    </CardHeader>
+                                        </CardHeader>
                                     <CardContent className="h-[160px] flex items-center p-0">
                                         {ttsTriggerMode === 'channel_points' ? (
                                             <div className="w-full px-6">
@@ -748,8 +748,8 @@ const TtsMainPageContent = () => {
                                                 <p className="text-sm text-gray-400">Выберите режим "За баллы канала" для настройки наград</p>
                                             </div>
                                         )}
-                                    </CardContent>
-                                </Card>
+                                        </CardContent>
+                                    </Card>
 
                                 {/* Additional Settings */}
                                 <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm flex-1 flex flex-col">
@@ -804,36 +804,36 @@ const TtsMainPageContent = () => {
                                             {/* Platforms */}
                                             {(isTwitchConnected || isVkConnected) && (
                                                 <div>
-                                                    <label className="block text-xs font-semibold text-gray-400 mb-2">Платформы</label>
-                                                    <div className="space-y-2">
-                                                        {isTwitchConnected && (
-                                                            <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
-                                                                <div className="flex items-center gap-2">
-                                                                    <TwitchIcon className="w-4 h-4 text-purple-400" />
-                                                                    <span className="text-xs text-gray-300 font-medium">Twitch</span>
+                                                        <label className="block text-xs font-semibold text-gray-400 mb-2">Платформы</label>
+                                                        <div className="space-y-2">
+                                                            {isTwitchConnected && (
+                                                                <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <TwitchIcon className="w-4 h-4 text-purple-400" />
+                                                                        <span className="text-xs text-gray-300 font-medium">Twitch</span>
+                                                                    </div>
+                                                                    <Switch
+                                                                        checked={platformSettings.enabled_platforms?.includes('twitch')}
+                                                                        onCheckedChange={() => handlePlatformToggle('twitch')}
+                                                                        className="scale-90 data-[state=checked]:bg-purple-600"
+                                                                    />
                                                                 </div>
-                                                                <Switch
-                                                                    checked={platformSettings.enabled_platforms?.includes('twitch')}
-                                                                    onCheckedChange={() => handlePlatformToggle('twitch')}
-                                                                    className="scale-90 data-[state=checked]:bg-purple-600"
-                                                                />
-                                                            </div>
-                                                        )}
-                                                        {isVkConnected && (
-                                                            <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
-                                                                <div className="flex items-center gap-2">
-                                                                    <VKIcon className="w-4 h-4 text-blue-400" />
-                                                                    <span className="text-xs text-gray-300 font-medium">VK</span>
+                                                            )}
+                                                            {isVkConnected && (
+                                                                <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <VKIcon className="w-4 h-4 text-blue-400" />
+                                                                        <span className="text-xs text-gray-300 font-medium">VK</span>
+                                                                    </div>
+                                                                    <Switch
+                                                                        checked={platformSettings.enabled_platforms?.includes('vk')}
+                                                                        onCheckedChange={() => handlePlatformToggle('vk')}
+                                                                        className="scale-90 data-[state=checked]:bg-purple-600"
+                                                                    />
                                                                 </div>
-                                                                <Switch
-                                                                    checked={platformSettings.enabled_platforms?.includes('vk')}
-                                                                    onCheckedChange={() => handlePlatformToggle('vk')}
-                                                                    className="scale-90 data-[state=checked]:bg-purple-600"
-                                                                />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
+                                                            )}
+                                                        </div>
+                                            </div>
                                             )}
                                         </CardContent>
                                 </Card>

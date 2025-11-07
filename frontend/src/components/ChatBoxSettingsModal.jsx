@@ -513,13 +513,13 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                     }}
                                 />
                             </div>
-                        </div>
-                        
+                                </div>
+                                
                         {/* Right: Live Preview + Additional Settings */}
                         <div className="space-y-4">
                             {/* Preview */}
-                            <div className="space-y-2">
-                                <Label className="text-white font-semibold">Предпросмотр</Label>
+                        <div className="space-y-2">
+                            <Label className="text-white font-semibold">Предпросмотр</Label>
                             <div 
                                 className="rounded-lg p-4 h-[400px] chatbox-preview-scroll"
                                 style={{
@@ -673,7 +673,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                             <p className="text-xs text-gray-500 text-center">
                                 Изменения применяются в реальном времени
                             </p>
-                            </div>
+                        </div>
 
                             {/* Additional Settings - Moved to right column */}
                             <div className="space-y-3 pt-2 border-t border-gray-700">

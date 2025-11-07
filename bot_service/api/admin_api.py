@@ -2018,11 +2018,11 @@ async def rename_voice_proxy(
         TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
         import httpx
         
-        # Проксируем запрос в TTS Service (используем FormData как в оригинале)
+        # Проксируем запрос в TTS Service с query параметром
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.put(
                 f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/rename",
-                data={'new_name': new_name}
+                params={'new_name': new_name}
             )
             
             if response.status_code != 200:

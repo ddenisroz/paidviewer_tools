@@ -96,7 +96,30 @@ const PointsManagementPage = () => {
     <div className="container mx-auto p-4 sm:p-6 max-w-5xl">
       {/* Header - заголовок теперь в Header компоненте */}
       <div className="flex flex-col gap-4 mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Вкладки и выбор платформы в одной строке */}
+        <div className="flex items-center justify-between border-b border-border">
+          <div className="flex">
+            <button
+              onClick={() => setActiveTab('rewards')}
+              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                activeTab === 'rewards'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Награды
+            </button>
+            <button
+              onClick={() => setActiveTab('queue')}
+              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                activeTab === 'queue'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Очередь запросов
+            </button>
+          </div>
           
           {/* Переключатель платформ - показываем только подключенные */}
           {(twitchEnabled || vkEnabled) && (
@@ -129,30 +152,6 @@ const PointsManagementPage = () => {
               )}
             </div>
           )}
-        </div>
-
-        {/* Вкладки */}
-        <div className="flex border-b border-border">
-          <button
-            onClick={() => setActiveTab('rewards')}
-            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'rewards'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Награды
-          </button>
-          <button
-            onClick={() => setActiveTab('queue')}
-            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'queue'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Очередь запросов
-          </button>
         </div>
       </div>
 

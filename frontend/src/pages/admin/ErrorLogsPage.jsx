@@ -50,7 +50,29 @@ const ErrorLogsPage = () => {
     if (upper.includes('WARNING')) {
       return { bg: 'bg-yellow-500/20', text: 'text-yellow-400', icon: '⚠️', label: 'WARNING' };
     }
+    if (upper.includes('INFO')) {
+      return { bg: 'bg-blue-500/20', text: 'text-blue-400', icon: 'ℹ️', label: 'INFO' };
+    }
     return { bg: 'bg-slate-500/20', text: 'text-slate-400', icon: '•', label: 'LOG' };
+  };
+
+  // Парсим лог-строку для извлечения компонентов
+  const parseLogLine = (logLine) => {
+    // Формат: "2025-11-07 12:28:35 - INFO - сообщение"
+    const match = logLine.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) - (\w+) - (.+)$/);
+    if (match) {
+      return {
+        timestamp: match[1],
+        level: match[2],
+        message: match[3]
+      };
+    }
+    // Если не удалось распарсить, возвращаем как есть
+    return {
+      timestamp: null,
+      level: null,
+      message: logLine
+    };
   };
 
   const errorCount = logs.filter(l => l.toUpperCase().includes('ERROR')).length;
@@ -76,11 +98,11 @@ const ErrorLogsPage = () => {
           <select
             value={filterLevel}
             onChange={(e) => setFilterLevel(e.target.value)}
-            className="bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm"
+            className="bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
           >
-            <option value="error">Только ошибки</option>
-            <option value="warning">Предупреждения</option>
-            <option value="all">Все</option>
+            <option value="error">❌ Только ошибки</option>
+            <option value="warning">⚠️ Предупреждения</option>
+            <option value="all">📋 Все логи</option>
           </select>
           <Button onClick={loadLogs} disabled={loading} size="sm" variant="outline">
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -101,17 +123,31 @@ const ErrorLogsPage = () => {
               <p className="text-slate-400">Нет записей с выбранными фильтрами</p>
             </div>
           ) : (
-            <div className="space-y-1 font-mono text-xs overflow-auto max-h-[600px]">
+            <div className="space-y-2 overflow-auto max-h-[600px]">
               {logs.map((log, idx) => {
                 const badge = getLevelBadge(log);
+                const parsed = parseLogLine(log);
                 return (
                   <div
                     key={idx}
-                    className={`${badge.bg} ${badge.text} px-3 py-2 rounded hover:bg-opacity-80 transition cursor-text`}
+                    className={`${badge.bg} border border-opacity-20 ${badge.text} px-4 py-3 rounded-lg hover:bg-opacity-80 transition cursor-text`}
                   >
-                    <span className="mr-2">{badge.icon}</span>
-                    <span className="font-semibold">[{badge.label}]</span>
-                    <span className="ml-2 break-all">{log}</span>
+                    <div className="flex items-start gap-3">
+                      <span className="text-lg flex-shrink-0">{badge.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-sm">{badge.label}</span>
+                          {parsed.timestamp && (
+                            <span className="text-xs opacity-60 font-mono">
+                              {parsed.timestamp}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm break-words whitespace-pre-wrap">
+                          {parsed.message || log}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 );
               })}
