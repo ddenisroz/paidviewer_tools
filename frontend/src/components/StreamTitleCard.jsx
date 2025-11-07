@@ -25,10 +25,9 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
     const vkEnabled = useMemo(() => integrations.vk?.enabled === true, [integrations.vk?.enabled]);
     const bothEnabled = useMemo(() => twitchEnabled && vkEnabled, [twitchEnabled, vkEnabled]);
     const hasAnyIntegration = useMemo(() => twitchEnabled || vkEnabled, [twitchEnabled, vkEnabled]);
-    const isLoading = useMemo(() => 
-        integrationsLoading || integrations.twitch?.enabled === null || integrations.vk?.enabled === null,
-        [integrationsLoading, integrations.twitch?.enabled, integrations.vk?.enabled]
-    );
+    
+    // 🚀 НИКОГДА НЕ ПОКАЗЫВАЕМ ЛОАДЕР - сразу показываем контент или placeholder
+    const isLoading = false;
 
     // Адаптивные размеры карточки
     // Высота НЕ уменьшается при объединении одной карточки
