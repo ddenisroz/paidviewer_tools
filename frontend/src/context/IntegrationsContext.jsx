@@ -30,11 +30,26 @@ export const IntegrationsProvider = ({ children }) => {
                 },
             };
         }
-        // Только если нет user - ставим null для индикации загрузки
+        
+        // 🚀 ANTI-FLASH: Пытаемся загрузить последнее известное состояние из localStorage
+        try {
+            const cached = localStorage.getItem('integrations_cache');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                // Проверяем что данные не старше 5 минут
+                if (parsed.timestamp && (Date.now() - parsed.timestamp) < 5 * 60 * 1000) {
+                    return parsed.data;
+                }
+            }
+        } catch (e) {
+            // Игнорируем ошибки парсинга
+        }
+        
+        // Fallback: показываем disabled состояние вместо null (no flash)
         return {
-            twitch: { enabled: isAuthenticated === false ? false : null },
-            vk: { enabled: isAuthenticated === false ? false : null },
-            donationalerts: { enabled: isAuthenticated === false ? false : null },
+            twitch: { enabled: false, username: null },
+            vk: { enabled: false, username: null },
+            donationalerts: { enabled: false, username: null },
         };
     };
     
@@ -77,6 +92,18 @@ export const IntegrationsProvider = ({ children }) => {
                     prev.twitch.enabled !== newIntegrations.twitch.enabled ||
                     prev.vk.enabled !== newIntegrations.vk.enabled ||
                     prev.donationalerts.enabled !== newIntegrations.donationalerts.enabled;
+                
+                if (hasChanged) {
+                    // 🚀 ANTI-FLASH: Сохраняем в localStorage для быстрого доступа при следующей загрузке
+                    try {
+                        localStorage.setItem('integrations_cache', JSON.stringify({
+                            data: newIntegrations,
+                            timestamp: Date.now()
+                        }));
+                    } catch (e) {
+                        // Игнорируем ошибки localStorage
+                    }
+                }
                 
                 return hasChanged ? newIntegrations : prev;
             });
