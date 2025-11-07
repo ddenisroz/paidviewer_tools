@@ -59,8 +59,8 @@ const HomePage = () => {
         enabled: !!isAuthenticated && !!integrations?.twitch?.enabled,
         staleTime: 30 * 1000, // 30 секунд - данные считаются свежими
         refetchInterval: 30 * 1000, // Автообновление каждые 30 секунд
-        refetchOnMount: true, // Обновлять при монтировании (обновление страницы)
-        refetchOnWindowFocus: false, // Не обновлять при фокусе окна (уже настроено глобально)
+        refetchOnMount: false, // Не делаем дополнительный запрос при монтировании (refetchInterval уже обновляет)
+        refetchOnWindowFocus: false, // Не обновлять при фокусе окна
         retry: 1,
     });
 
@@ -75,7 +75,7 @@ const HomePage = () => {
         enabled: !!isAuthenticated && !!integrations?.vk?.enabled,
         staleTime: 30 * 1000, // 30 секунд - данные считаются свежими
         refetchInterval: 30 * 1000, // Автообновление каждые 30 секунд
-        refetchOnMount: true, // Обновлять при монтировании (обновление страницы)
+        refetchOnMount: false, // Не делаем дополнительный запрос при монтировании (refetchInterval уже обновляет)
         refetchOnWindowFocus: false, // Не обновлять при фокусе окна
         retry: 1,
     });

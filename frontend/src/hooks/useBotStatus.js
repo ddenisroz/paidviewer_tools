@@ -21,7 +21,7 @@ export const useBotStatus = () => {
         enabled: !!username,
         staleTime: 15 * 1000, // 15 секунд - соответствует старому кэшу
         refetchInterval: 30 * 1000, // Автоматически обновляем каждые 30 секунд
-        refetchOnMount: true,
+        refetchOnMount: false, // Не делаем дополнительный запрос (refetchInterval уже обновляет)
         refetchOnWindowFocus: false,
         retry: 1,
         onError: (error) => {

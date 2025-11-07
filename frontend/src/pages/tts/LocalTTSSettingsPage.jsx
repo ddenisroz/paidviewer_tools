@@ -67,7 +67,8 @@ const LocalTTSSettingsPage = () => {
             return response.data.config || null;
         },
         staleTime: 5 * 60 * 1000,
-        refetchOnMount: true,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
         onSuccess: (data) => {
             if (data) {
                 setConfig({

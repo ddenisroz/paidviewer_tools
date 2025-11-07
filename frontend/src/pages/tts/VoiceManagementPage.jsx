@@ -97,8 +97,8 @@ const VoiceManagementPageContent = () => {
             return response.data;
         },
         enabled: !!user,
-        staleTime: 30 * 1000, // 30 секунд
-        refetchOnMount: true,
+        staleTime: 5 * 60 * 1000, // 5 минут
+        refetchOnMount: false,
         refetchOnWindowFocus: false,
     });
 
@@ -112,7 +112,8 @@ const VoiceManagementPageContent = () => {
         },
         enabled: !!whitelistStatusData?.can_manage_voices,
         staleTime: 5 * 60 * 1000,
-        refetchOnMount: true,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
         onError: (error) => {
             logger.error('Error loading global voices:', error);
         },
@@ -130,7 +131,8 @@ const VoiceManagementPageContent = () => {
         },
         enabled: !!userId, // Загружаем пользовательские голоса всегда, если есть userId
         staleTime: 5 * 60 * 1000,
-        refetchOnMount: true,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
         onError: (error) => {
             logger.error('Error loading user voices:', error);
         },
@@ -240,7 +242,8 @@ const VoiceManagementPageContent = () => {
         },
         enabled: !!userId && !!whitelistStatusData?.can_manage_voices,
         staleTime: 5 * 60 * 1000,
-        refetchOnMount: true,
+        refetchOnMount: false, // Не делаем лишних запросов при каждом монтировании
+        refetchOnWindowFocus: false, // Не рефетчим при фокусе окна
     });
 
     // Mutation для обновления включенных голосов
