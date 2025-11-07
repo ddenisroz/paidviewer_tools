@@ -278,9 +278,7 @@ const TtsMainPageContent = () => {
         }
     }, [listeningMode, isAuthenticated, user?.id]);
 
-    useEffect(() => {
-        initializeTts();
-    }, []);
+    // TTS инициализация происходит автоматически в TtsContext, не нужно вызывать здесь
 
     // Handlers
     const handleGlobalTtsToggle = async () => {

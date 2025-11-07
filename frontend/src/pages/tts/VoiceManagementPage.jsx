@@ -77,10 +77,7 @@ const VoiceManagementPageContent = () => {
         // No-op: volume is managed via UserVoiceSettings in admin panel
     };
 
-    // Инициализируем TTS только при загрузке этой страницы
-    useEffect(() => {
-        initializeTts();
-    }, [initializeTts]);
+    // TTS инициализация происходит автоматически в TtsContext, не нужно вызывать здесь
 
     // React Query: проверяем whitelist статус пользователя
     const { data: whitelistStatusData } = useQuery({

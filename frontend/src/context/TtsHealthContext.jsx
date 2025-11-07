@@ -178,7 +178,7 @@ export const TtsHealthProvider = ({ children }) => {
         return () => {
             mountedRef.current = false;
         };
-    }, [location.pathname]); // Добавляем pathname для отслеживания навигации
+    }, []); // Убрали зависимость от pathname - проверяем только при монтировании провайдера
 
     const value = {
         isHealthy,

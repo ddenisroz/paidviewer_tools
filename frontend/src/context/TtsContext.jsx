@@ -1,5 +1,5 @@
 // src/context/TtsContext.jsx
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getTtsHealth, getGlobalVoices, enableTts, disableTts, getTtsStatus } from '../services/microservices';
 import { AuthContext } from './AuthContext';
 import { useToast } from '../components/ui/toast';
@@ -37,9 +37,13 @@ export const TtsProvider = ({ children }) => {
         }
     }, [isInitialized]);
 
-    // Дополнительная инициализация при появлении пользователя
+    // Дополнительная инициализация при появлении пользователя - ТОЛЬКО ОДИН РАЗ
+    const userInitializedRef = useRef(false);
     useEffect(() => {
-        if (isInitialized && user) {
+        // Делаем инициализацию только один раз после появления пользователя
+        if (isInitialized && user && !userInitializedRef.current) {
+            userInitializedRef.current = true;
+            
             // Вызываем функции напрямую, без зависимости
             const initUserTts = async () => {
                 try {
@@ -76,7 +80,7 @@ export const TtsProvider = ({ children }) => {
             
             initUserTts();
         }
-    }, [isInitialized, engineStatus.loaded, user]);
+    }, [isInitialized, user]); // Убрали engineStatus.loaded из зависимостей
 
     const checkEngineStatus = useCallback(async () => {
         try {
