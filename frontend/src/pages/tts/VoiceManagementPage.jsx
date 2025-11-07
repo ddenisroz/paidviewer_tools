@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Upload, Trash2, Settings, TestTube2, Globe, User, Edit, Lock, AlertCircle } from 'lucide-react';
 import { Slider } from "@/components/ui/slider";
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '../../components/ui/toast';
 import { useButtonPosition } from '../../hooks/useButtonPosition';
 import { useAuth } from '../../context/AuthContext';
@@ -224,10 +225,43 @@ const VoiceManagementPageContent = () => {
         }
     });
 
+    // React Query: загружаем включенные голоса пользователя
+    const { data: enabledVoicesData, isLoading: enabledVoicesLoading } = useQuery({
+        queryKey: ['enabled-voices', userId],
+        queryFn: async () => {
+            if (!userId) return [];
+            try {
+                const response = await botService.get(`/api/user/voices/enabled/${userId}`);
+                return response.data.enabled_voice_ids || [];
+            } catch (error) {
+                logger.error('Error loading enabled voices:', error);
+                return [];
+            }
+        },
+        enabled: !!userId && !!whitelistStatusData?.can_manage_voices,
+        staleTime: 5 * 60 * 1000,
+        refetchOnMount: true,
+    });
+
+    // Mutation для обновления включенных голосов
+    const updateEnabledVoicesMutation = useMutation({
+        mutationFn: async ({ userId, voiceIds }) => {
+            return await botService.post(`/api/user/voices/enabled/${userId}`, voiceIds);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['enabled-voices', userId] });
+        },
+        onError: (error) => {
+            logger.error('Error updating enabled voices:', error);
+            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось обновить включенные голоса' });
+        }
+    });
+
     // Используем данные из React Query напрямую
     // Важно: используем ?? для fallback, если данные еще не загружены
     const globalVoices = globalVoicesData ?? [];
     const userVoices = userVoicesData ?? [];
+    const enabledVoiceIds = enabledVoicesData ?? [];
     
     // Используем whitelistStatusData напрямую из React Query
     const whitelistStatus = whitelistStatusData;
@@ -544,6 +578,24 @@ const VoiceManagementPageContent = () => {
         if (currentVoice) {
             setCurrentVoice(prev => ({ ...prev, [field]: value[0] }));
         }
+    };
+
+    // Функция для переключения включения/выключения голоса
+    const handleToggleVoiceEnabled = async (voiceId) => {
+        if (!userId) return;
+        
+        const isCurrentlyEnabled = enabledVoiceIds.includes(voiceId);
+        const newEnabledIds = isCurrentlyEnabled
+            ? enabledVoiceIds.filter(id => id !== voiceId)
+            : [...enabledVoiceIds, voiceId];
+        
+        // Проверяем что хотя бы один голос останется включенным
+        if (newEnabledIds.length === 0) {
+            addToast({ type: 'error', title: 'Ошибка', message: 'Необходимо оставить хотя бы один голос включенным' });
+            return;
+        }
+        
+        updateEnabledVoicesMutation.mutate({ userId, voiceIds: newEnabledIds });
     };
 
 
@@ -875,40 +927,48 @@ const VoiceManagementPageContent = () => {
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
-                                    {userVoices.map((voice) => (
-                                        <Card key={voice.id} className="bg-slate-800 border-slate-700 flex flex-col">
-                                            <CardHeader className="pb-2 pt-3 px-3">
-                                                <div className="flex items-center justify-between">
-                                                    <CardTitle className="text-xs font-medium text-white flex items-center gap-1.5">
-                                                        <User className="h-3.5 w-3.5 text-green-400 flex-shrink-0"/>
-                                                        <span className="truncate">{voice.name}</span>
-                                                    </CardTitle>
-                                                </div>
-                                            </CardHeader>
-                                            <CardContent className="flex-grow flex flex-col justify-end pt-0 px-3 pb-3">
-                                                <div className="flex gap-1.5">
-                                                    <Button 
-                                                        className="flex-1 h-7 text-xs px-2" 
-                                                        variant="outline" 
-                                                        size="sm" 
-                                                        onClick={() => handleEdit(voice)}
-                                                    >
-                                                        <Settings className="h-3 w-3 mr-1"/>
-                                                        Настроить
-                                                    </Button>
-                                                    <Button 
-                                                        className="h-7 w-7 p-0 text-red-400 hover:text-red-300 hover:bg-red-900/20" 
-                                                        variant="ghost" 
-                                                        size="sm" 
-                                                        onClick={() => handleDelete(voice.id)}
-                                                        title="Удалить голос"
-                                                    >
-                                                        <Trash2 className="h-3 w-3"/>
-                                                    </Button>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
+                                    {userVoices.map((voice) => {
+                                        const isEnabled = enabledVoiceIds.includes(voice.id);
+                                        return (
+                                            <Card key={voice.id} className={`bg-slate-800 border-slate-700 flex flex-col transition-opacity ${!isEnabled ? 'opacity-50' : ''}`}>
+                                                <CardHeader className="pb-2 pt-3 px-3">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <CardTitle className="text-xs font-medium text-white flex items-center gap-1.5 flex-1 min-w-0">
+                                                            <Checkbox
+                                                                checked={isEnabled}
+                                                                onCheckedChange={() => handleToggleVoiceEnabled(voice.id)}
+                                                                className="flex-shrink-0"
+                                                            />
+                                                            <User className="h-3.5 w-3.5 text-green-400 flex-shrink-0"/>
+                                                            <span className="truncate">{voice.name}</span>
+                                                        </CardTitle>
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent className="flex-grow flex flex-col justify-end pt-0 px-3 pb-3">
+                                                    <div className="flex gap-1.5">
+                                                        <Button 
+                                                            className="flex-1 h-7 text-xs px-2" 
+                                                            variant="outline" 
+                                                            size="sm" 
+                                                            onClick={() => handleEdit(voice)}
+                                                        >
+                                                            <Settings className="h-3 w-3 mr-1"/>
+                                                            Настроить
+                                                        </Button>
+                                                        <Button 
+                                                            className="h-7 w-7 p-0 text-red-400 hover:text-red-300 hover:bg-red-900/20" 
+                                                            variant="ghost" 
+                                                            size="sm" 
+                                                            onClick={() => handleDelete(voice.id)}
+                                                            title="Удалить голос"
+                                                        >
+                                                            <Trash2 className="h-3 w-3"/>
+                                                        </Button>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
@@ -937,29 +997,37 @@ const VoiceManagementPageContent = () => {
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
-                                    {globalVoices.map((voice) => (
-                                        <Card key={voice.id} className="bg-slate-800 border-slate-700 flex flex-col">
-                                            <CardHeader className="pb-2 pt-3 px-3">
-                                                <div className="flex items-center justify-between">
-                                                    <CardTitle className="text-xs font-medium text-white flex items-center gap-1.5">
-                                                        <Globe className="h-3.5 w-3.5 text-blue-400 flex-shrink-0"/>
-                                                        <span className="truncate">{voice.name}</span>
-                                                    </CardTitle>
-                                                </div>
-                                            </CardHeader>
-                                            <CardContent className="flex-grow flex flex-col justify-end pt-0 px-3 pb-3">
-                                                <Button 
-                                                    className="w-full h-7 text-xs px-2" 
-                                                    variant="outline" 
-                                                    size="sm" 
-                                                    onClick={() => handleEdit(voice)}
-                                                >
-                                                    <Settings className="h-3 w-3 mr-1"/>
-                                                    Настроить
-                                                </Button>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
+                                    {globalVoices.map((voice) => {
+                                        const isEnabled = enabledVoiceIds.includes(voice.id);
+                                        return (
+                                            <Card key={voice.id} className={`bg-slate-800 border-slate-700 flex flex-col transition-opacity ${!isEnabled ? 'opacity-50' : ''}`}>
+                                                <CardHeader className="pb-2 pt-3 px-3">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <CardTitle className="text-xs font-medium text-white flex items-center gap-1.5 flex-1 min-w-0">
+                                                            <Checkbox
+                                                                checked={isEnabled}
+                                                                onCheckedChange={() => handleToggleVoiceEnabled(voice.id)}
+                                                                className="flex-shrink-0"
+                                                            />
+                                                            <Globe className="h-3.5 w-3.5 text-blue-400 flex-shrink-0"/>
+                                                            <span className="truncate">{voice.name}</span>
+                                                        </CardTitle>
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent className="flex-grow flex flex-col justify-end pt-0 px-3 pb-3">
+                                                    <Button 
+                                                        className="w-full h-7 text-xs px-2" 
+                                                        variant="outline" 
+                                                        size="sm" 
+                                                        onClick={() => handleEdit(voice)}
+                                                    >
+                                                        <Settings className="h-3 w-3 mr-1"/>
+                                                        Настроить
+                                                    </Button>
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>

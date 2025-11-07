@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, B
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from tts_service.database import get_db, Voice as VoiceModel, User as UserModel
+from tts_service.database import get_db, Voice as VoiceModel, User as UserModel, UserVoiceEnabled
 from tts_service.models import *
 from tts_service.tts_engine import tts_engine_manager
 from tts_service.file_manager import file_manager

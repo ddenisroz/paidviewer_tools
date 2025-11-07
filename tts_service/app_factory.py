@@ -116,9 +116,11 @@ def create_app() -> FastAPI:
     from tts_service.health_api import health_router, api_health_router
     from tts_service.admin_api import admin_router
     from tts_service.tts_control_api import router as tts_control_router
+    from tts_service.api_endpoints_voice_enabled import voice_enabled_router
     
     # Регистрируем роутеры
     app.include_router(tts_api, prefix="/api/tts")
+    app.include_router(voice_enabled_router, prefix="/api/tts")
     app.include_router(health_router, prefix="")  # /health
     app.include_router(api_health_router, prefix="/api")  # /api/health для совместимости с bot_service
     app.include_router(admin_router, prefix="/api/admin")

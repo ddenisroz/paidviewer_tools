@@ -1580,6 +1580,64 @@ async def upload_user_voice(
         raise HTTPException(status_code=500, detail="Ошибка загрузки голоса")
 
 # ============================================================================
+# USER VOICE ENABLED ENDPOINTS - /api/user/voices/enabled
+# ============================================================================
+
+@user_voices_router.get("/enabled/{user_id}")
+async def get_user_enabled_voices(
+    user_id: int,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить список ID включенных голосов для пользователя"""
+    try:
+        # Проверка доступа
+        if user['id'] != user_id and not user.get('is_admin', False):
+            raise HTTPException(status_code=403, detail="Нет доступа")
+        
+        tts_service_url = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        response = requests.get(f"{tts_service_url}/api/tts/user/voices/enabled/{user_id}")
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise HTTPException(status_code=response.status_code, detail="Ошибка получения включенных голосов")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting enabled voices: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка получения включенных голосов")
+
+@user_voices_router.post("/enabled/{user_id}")
+async def update_user_enabled_voices(
+    user_id: int,
+    voice_ids: List[int],
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Обновить список включенных голосов для пользователя"""
+    try:
+        # Проверка доступа
+        if user['id'] != user_id and not user.get('is_admin', False):
+            raise HTTPException(status_code=403, detail="Нет доступа")
+        
+        tts_service_url = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        response = requests.post(
+            f"{tts_service_url}/api/tts/user/voices/enabled/{user_id}",
+            json=voice_ids
+        )
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise HTTPException(status_code=response.status_code, detail="Ошибка обновления включенных голосов")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating enabled voices: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка обновления включенных голосов")
+
+# ============================================================================
 # LOCAL TTS ENDPOINTS - /api/local-tts
 # ============================================================================
 

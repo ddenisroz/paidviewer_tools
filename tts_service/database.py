@@ -27,7 +27,7 @@ Base = declarative_base()
 
 # Определяем модели, которые нужны этому сервису
 # (они должны быть идентичны моделям в bot_service.database)
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, JSON, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, JSON, ForeignKey, Float, UniqueConstraint
 from sqlalchemy.sql import func
 
 class User(Base):
@@ -72,6 +72,22 @@ class Voice(Base):
     cross_fade_duration = Column(Float, default=0.15)
     silence_duration_ms = Column(Integer, default=100)
     sway_sampling_coef = Column(Float, default=-1.0)
+
+class UserVoiceEnabled(Base):
+    """Таблица для хранения информации о том, какие голоса включены для пользователя"""
+    __tablename__ = 'user_voice_enabled'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    voice_id = Column(Integer, ForeignKey('voices.id'), nullable=False, index=True)
+    is_enabled = Column(Boolean, default=True)  # Включен ли голос для этого пользователя
+    created_at = Column(DateTime(timezone=True), default=func.now())
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
+    
+    # Уникальный индекс: один пользователь - один голос
+    __table_args__ = (
+        UniqueConstraint('user_id', 'voice_id', name='uq_user_voice'),
+    )
 
 class UserTTSUsage(Base):
     """Логирование использования TTS пользователями для биллинга и throttle"""
