@@ -602,87 +602,95 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
     )
     logger.info(f"✅ Connection added: {conn_id}")
     
-    # Отправляем историю сообщений сразу после подключения
-    try:
-        from core.database import ChatMessage, User, get_db
-        db = next(get_db())
+    # IMPORTANTE: Отправляем историю в BACKGROUND асинхронно, не блокируя WebSocket подключение!
+    async def send_chat_history():
+        """Отправляем историю сообщений в background без блокировки"""
         try:
-            user = db.query(User).filter(User.id == user_id_int).first()
-            if user:
-                # Получаем последние 50 сообщений для всех каналов пользователя
-                messages = []
-                
-                # Twitch сообщения
-                if user.twitch_username:
-                    twitch_messages = db.query(ChatMessage).filter(
-                        ChatMessage.user_id == user_id_int,
-                        ChatMessage.platform == 'twitch'
-                    ).order_by(ChatMessage.timestamp.desc()).limit(50).all()
-                    messages.extend(twitch_messages)
-                
-                # VK сообщения
-                if user.vk_channel_name:
-                    vk_messages = db.query(ChatMessage).filter(
-                        ChatMessage.user_id == user_id_int,
-                        ChatMessage.platform == 'vk'
-                    ).order_by(ChatMessage.timestamp.desc()).limit(50).all()
-                    messages.extend(vk_messages)
-                
-                # Сортируем все сообщения по времени
-                messages.sort(key=lambda x: x.timestamp)
-                
-                # Форматируем для отправки
-                import json
-                import time
-                history_data = []
-                for msg in messages[-50:]:  # Последние 50
-                    # Парсим badges если это строка JSON
-                    badges_list = msg.badges
-                    if isinstance(badges_list, str):
-                        try:
-                            badges_list = json.loads(badges_list)
-                        except:
-                            badges_list = None
+            import asyncio
+            import json
+            from core.database import ChatMessage, User, get_db
+            
+            # Даем клиенту время на инициализацию (50ms)
+            await asyncio.sleep(0.05)
+            
+            # Выполняем DB запрос в отдельном потоке чтобы не блокировать event loop
+            def load_chat_history():
+                db = next(get_db())
+                try:
+                    user = db.query(User).filter(User.id == user_id_int).first()
+                    if not user:
+                        return []
                     
-                    # Конвертируем datetime в миллисекунды (JavaScript Date.now() формат)
-                    timestamp_ms = None
-                    if msg.timestamp:
-                        timestamp_ms = int(msg.timestamp.timestamp() * 1000)
+                    messages = []
                     
-                    history_data.append({
-                        "id": msg.id,
-                        "platform": msg.platform,
-                        "author": msg.author_username,
-                        "author_name": msg.author_username,
-                        "message": msg.message,
-                        "timestamp": timestamp_ms,
-                        "role": msg.role,  # Роль пользователя
-                        "badges": badges_list  # Значки пользователя (массив)
-                    })
+                    # Twitch сообщения
+                    if user.twitch_username:
+                        twitch_messages = db.query(ChatMessage).filter(
+                            ChatMessage.user_id == user_id_int,
+                            ChatMessage.platform == 'twitch'
+                        ).order_by(ChatMessage.timestamp.desc()).limit(50).all()
+                        messages.extend(twitch_messages)
+                    
+                    # VK сообщения
+                    if user.vk_channel_name:
+                        vk_messages = db.query(ChatMessage).filter(
+                            ChatMessage.user_id == user_id_int,
+                            ChatMessage.platform == 'vk'
+                        ).order_by(ChatMessage.timestamp.desc()).limit(50).all()
+                        messages.extend(vk_messages)
+                    
+                    # Сортируем все сообщения по времени
+                    messages.sort(key=lambda x: x.timestamp)
+                    return messages[-50:]  # Последние 50
+                finally:
+                    db.close()
+            
+            # Запускаем DB запрос в отдельном потоке
+            messages = await asyncio.to_thread(load_chat_history)
+            
+            if not messages:
+                return
+            
+            # Форматируем для отправки
+            history_data = []
+            for msg in messages:
+                # Парсим badges если это строка JSON
+                badges_list = msg.badges
+                if isinstance(badges_list, str):
+                    try:
+                        badges_list = json.loads(badges_list)
+                    except:
+                        badges_list = None
                 
-                # Отправляем историю
-                await websocket.send_text(json.dumps({
-                    "type": "chat_history",
-                    "messages": history_data
-                }))
+                # Конвертируем datetime в миллисекунды
+                timestamp_ms = None
+                if msg.timestamp:
+                    timestamp_ms = int(msg.timestamp.timestamp() * 1000)
                 
-                # Debug: Проверяем первое сообщение
-                if history_data:
-                    sample_msg = history_data[0]
-                    logger.info(f"📜 [WS HISTORY] Sample message: author={sample_msg.get('author')}, badges={sample_msg.get('badges')}, role={sample_msg.get('role')}")
-                    # DEBUG: Проверяем все поля сообщения из БД
-                    if messages:
-                        raw_msg = messages[-1]  # Первое сообщение из БД
-                        import json
-                        logger.info(f"🔍 [DEBUG] Raw DB message badges type: {type(raw_msg.badges)}, value: {raw_msg.badges}")
-                        if raw_msg.badges:
-                            logger.info(f"🔍 [DEBUG] Raw DB message badges JSON: {json.dumps(raw_msg.badges) if not isinstance(raw_msg.badges, str) else raw_msg.badges}")
-                
-                logger.info(f"📜 Sent {len(history_data)} messages history to ChatOverlay")
-        finally:
-            db.close()
-    except Exception as e:
-        logger.error(f"❌ Error sending chat history: {e}")
+                history_data.append({
+                    "id": msg.id,
+                    "platform": msg.platform,
+                    "author": msg.author_username,
+                    "author_name": msg.author_username,
+                    "message": msg.message,
+                    "timestamp": timestamp_ms,
+                    "role": msg.role,
+                    "badges": badges_list
+                })
+            
+            # Отправляем историю через WebSocket
+            await websocket.send_text(json.dumps({
+                "type": "chat_history",
+                "messages": history_data
+            }))
+            
+            logger.info(f"📜 Sent {len(history_data)} messages history (loaded in background)")
+        except Exception as e:
+            logger.debug(f"⚠️ Error loading chat history in background: {e}")
+    
+    # Запускаем загрузку историю как отдельную task (не ждем завершения)
+    import asyncio
+    asyncio.create_task(send_chat_history())
     
     try:
         while True:
