@@ -377,11 +377,6 @@ async def handle_tts_for_message(
             if has_local_endpoint:
                 logger.info(f"🏠 [{platform.upper()} TTS] Using local TTS endpoint for user {user_id}: {local_tts.endpoint_url}")
             
-            # Громкость из AudioSettings
-            volume_level = audio_settings.website_volume if audio_settings else 50.0
-            if tts_user_settings.listening_mode == 'obs':
-                volume_level = audio_settings.obs_volume if audio_settings else 50.0
-            
             # ===== ПРОВЕРКА ВКЛЮЧЕННЫХ ПЛАТФОРМ =====
             # NOTE: Для базовой реализации все платформы включены по умолчанию
             # Можно добавить кастомное поле enabled_platforms в TTSUserSettings при необходимости
@@ -443,7 +438,24 @@ async def handle_tts_for_message(
             text_for_tts = filtered_text
             
             # Загружаем персональные настройки голоса пользователя (если есть)
-            voice_settings_override = None
+            # 🚀 FIX: Если персональных настроек нет, не передаем voice_settings вообще,
+            # чтобы tts_engine.py использовал дефолтные настройки из таблицы Voice
+            tts_settings_dict = {
+                "enable7TV": tts_user_settings.enable_7tv,
+                "enableTwitch": tts_user_settings.enable_twitch,
+                "enableProfanity": tts_user_settings.enable_lexicon_filter,
+                "maxLength": tts_user_settings.max_message_length,
+                "skipCommands": tts_user_settings.skip_commands,
+                "voice": tts_user_settings.voice  # ✅ Передаем голос пользователя
+            }
+            
+            # 🚀 FIX: Базовая громкость из AudioSettings (дефолт от админа/системы)
+            base_volume_level = audio_settings.website_volume if audio_settings else 50.0
+            if tts_user_settings.listening_mode == 'obs':
+                base_volume_level = audio_settings.obs_volume if audio_settings else 50.0
+            
+            # 🚀 FIX: Загружаем персональные настройки голоса и применяем volume
+            user_voice_config = None
             if use_ai_tts and tts_user_settings.voice:
                 # Получаем voice_id из TTS Service по имени голоса
                 # NOTE: Для полной интеграции нужно запрашивать voice_id из tts_service
@@ -454,34 +466,49 @@ async def handle_tts_for_message(
                 ).first()
                 
                 if user_voice_config:
-                    voice_settings_override = {
-                        "cfg_strength": user_voice_config.cfg_strength,
-                        "speed_preset": user_voice_config.speed_preset,
-                        "volume": user_voice_config.volume
-                    }
-                    logger.info(f"🎛️ [{platform.upper()} TTS] Using personal voice settings: {voice_settings_override}")
+                    # ✅ Передаем персональные настройки только если они есть
+                    # Если их нет, tts_engine.py использует дефолтные из таблицы Voice
+                    voice_settings_dict = {}
+                    
+                    # ✅ cfg_strength: персональный или None (будет использован дефолт из Voice)
+                    if user_voice_config.cfg_strength is not None:
+                        voice_settings_dict["cfg_strength"] = user_voice_config.cfg_strength
+                    
+                    # ✅ speed_preset: персональный или None (будет использован дефолт из Voice)
+                    if user_voice_config.speed_preset is not None:
+                        voice_settings_dict["speed_preset"] = user_voice_config.speed_preset
+                    
+                    # ✅ volume обрабатывается отдельно через final_volume_level (не передаем в voice_settings)
+                    # volume будет применен через параметр volume_level функции
+                    
+                    if voice_settings_dict:
+                        tts_settings_dict["voice_settings"] = voice_settings_dict
+                        logger.info(f"🎛️ [{platform.upper()} TTS] Using personal voice settings: {voice_settings_dict}")
+                else:
+                    # ✅ Персональных настроек нет - tts_engine.py использует дефолты из Voice таблицы
+                    logger.debug(f"🎛️ [{platform.upper()} TTS] No personal voice settings found, will use defaults from Voice table")
+            
+            # 🚀 FIX: Финальная громкость: персональный volume из voice_settings или базовый
+            final_volume_level = base_volume_level
+            if user_voice_config and user_voice_config.volume is not None:
+                final_volume_level = user_voice_config.volume
+                logger.debug(f"🔊 [{platform.upper()} TTS] Using personal volume: {final_volume_level}% (base: {base_volume_level}%)")
+            else:
+                logger.debug(f"🔊 [{platform.upper()} TTS] Using base volume: {final_volume_level}%")
             
             # Отправляем запрос на TTS с настройками пользователя
-            logger.info(f"🎙️ [{platform.upper()} TTS] Processing: {username}: {text[:50]}... (engine={tts_user_settings.engine}, volume={volume_level}%)")
+            logger.info(f"🎙️ [{platform.upper()} TTS] Processing: {username}: {text[:50]}... (engine={tts_user_settings.engine}, volume={final_volume_level}%)")
             
             result = await tts_api.send_tts_request(
                 channel_name=channel_identifier,
                 text=text_for_tts, # Используем отфильтрованный текст
                 author=username,
                 user_id=user_id,
-                volume_level=volume_level,
+                volume_level=final_volume_level,  # ✅ Используем финальную громкость (персональную или базовую)
                 use_ai_tts=use_ai_tts,
                 use_basic_tts=use_basic_tts,
                 connection_manager=connection_manager,
-                tts_settings={
-                    "enable7TV": tts_user_settings.enable_7tv,
-                    "enableTwitch": tts_user_settings.enable_twitch,
-                    "enableProfanity": tts_user_settings.enable_lexicon_filter,
-                    "maxLength": tts_user_settings.max_message_length,
-                    "skipCommands": tts_user_settings.skip_commands,
-                    "voice": tts_user_settings.voice,  # ✅ Передаем голос пользователя
-                    "voice_settings": voice_settings_override  # ✅ Добавляем персональные настройки голоса
-                }
+                tts_settings=tts_settings_dict
             )
             
             if result.get("success"):

@@ -193,12 +193,38 @@ class TTSEngineManager:
                 ref_text = voice_record.reference_text or ""
                 
                 # Извлекаем voice_settings из tts_settings если есть
-                voice_settings = (tts_settings or {}).get("voice_settings", {}) if tts_settings else {}
-                cfg_strength = voice_settings.get("cfg_strength") or voice_record.cfg_strength
-                speed_preset = voice_settings.get("speed_preset") or voice_record.speed_preset
+                # 🚀 FIX: Гарантируем, что voice_settings всегда будет словарем, даже если в tts_settings он None
+                if tts_settings and isinstance(tts_settings, dict):
+                    voice_settings_raw = tts_settings.get("voice_settings")
+                    # Если voice_settings_raw это словарь, используем его, иначе используем пустой словарь
+                    voice_settings = voice_settings_raw if isinstance(voice_settings_raw, dict) else {}
+                else:
+                    voice_settings = {}
+                
+                # 🚀 FIX: Безопасное извлечение параметров с fallback на значения из voice_record
+                # voice_settings уже гарантированно словарь (не None), поэтому можно безопасно использовать .get()
+                # ✅ ЛОГИКА: Если персональных настроек нет, используются дефолтные из Voice (настроенные админом)
+                cfg_strength = voice_settings.get("cfg_strength")
+                if cfg_strength is None:
+                    cfg_strength = voice_record.cfg_strength or 2.5  # Fallback на дефолт, если даже в Voice нет
+                    logger.debug(f"🎛️ Using default cfg_strength from Voice '{voice_record.name}': {cfg_strength}")
+                else:
+                    logger.debug(f"🎛️ Using personal cfg_strength: {cfg_strength} (default from Voice: {voice_record.cfg_strength})")
+                
+                speed_preset = voice_settings.get("speed_preset")
+                if speed_preset is None:
+                    speed_preset = voice_record.speed_preset or 'normal'  # Fallback на дефолт, если даже в Voice нет
+                    logger.debug(f"🎛️ Using default speed_preset from Voice '{voice_record.name}': {speed_preset}")
+                else:
+                    logger.debug(f"🎛️ Using personal speed_preset: {speed_preset} (default from Voice: {voice_record.speed_preset})")
+                
+                # ✅ volume обрабатывается отдельно через параметр функции (уже применен в websocket_helper.py)
+                # volume передается как параметр volume_level и применяется к аудио после синтеза
                 
                 if voice_settings:
-                    logger.info(f"🎛️ Using custom voice settings: cfg={cfg_strength}, speed={speed_preset}")
+                    logger.info(f"🎛️ Final voice settings: cfg={cfg_strength}, speed={speed_preset}, volume={volume}% (personal settings applied)")
+                else:
+                    logger.info(f"🎛️ Using default voice settings from Voice '{voice_record.name}': cfg={cfg_strength}, speed={speed_preset}, volume={volume}% (admin defaults)")
                 
             finally:
                 db.close()

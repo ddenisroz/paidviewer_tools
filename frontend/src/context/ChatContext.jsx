@@ -1,7 +1,7 @@
 // src/context/ChatContext.jsx
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useReducer, useMemo } from 'react';
 import { API_BASE_URL } from '../constants';
-import { connectBot, disconnectBot, getBotStatus } from '../services/microservices';
+import { connectBot, disconnectBot, getBotStatus, TTS_SERVICE_URL } from '../services/microservices';
 import { AuthContext, useAuth } from './AuthContext';
 import { useToast } from '../components/ui/toast';
 import { useIntegrations } from './IntegrationsContext';
@@ -260,6 +260,19 @@ export const ChatProvider = ({ children }) => {
                 const audioData = data.data || data;
                 if (audioData.audio_url) {
                     try {
+                        // 🚀 FIX: Преобразуем относительный URL в полный, если нужно
+                        let audioUrl = audioData.audio_url;
+                        if (audioUrl && !audioUrl.startsWith('http://') && !audioUrl.startsWith('https://')) {
+                            // Относительный путь - должен быть уже преобразован в bot_service, но на всякий случай
+                            // Если это путь к TTS Service (/audio/...), добавляем TTS_SERVICE_URL
+                            if (audioUrl.startsWith('/audio/') && TTS_SERVICE_URL) {
+                                audioUrl = `${TTS_SERVICE_URL}${audioUrl}`;
+                                logger.debug(`🔗 Converted relative audio URL to full URL: ${audioUrl}`);
+                            } else {
+                                logger.warn(`⚠️ Audio URL is relative but could not convert: ${audioUrl} (TTS_SERVICE_URL: ${TTS_SERVICE_URL})`);
+                            }
+                        }
+                        
                         // Используем Web Audio API для лучшей совместимости с autoplay политикой
                         const playAudioViaWebAudioAPI = async () => {
                             try {
@@ -286,11 +299,19 @@ export const ChatProvider = ({ children }) => {
                                 }
                                 
                                 // Загружаем аудио файл
-                                const response = await fetch(audioData.audio_url);
+                                logger.debug(`📥 Fetching audio from: ${audioUrl}`);
+                                const response = await fetch(audioUrl);
+                                
+                                if (!response.ok) {
+                                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                                }
+                                
                                 const arrayBuffer = await response.arrayBuffer();
+                                logger.debug(`✅ Audio fetched, size: ${arrayBuffer.byteLength} bytes`);
                                 
                                 // Декодируем аудио данные
                                 const audioBuffer = await audioContext.current.decodeAudioData(arrayBuffer);
+                                logger.debug(`✅ Audio decoded, duration: ${audioBuffer.duration}s, sample rate: ${audioBuffer.sampleRate}Hz`);
                                 
                                 // Создаем source и применяем громкость
                                 const source = audioContext.current.createBufferSource();
@@ -310,8 +331,10 @@ export const ChatProvider = ({ children }) => {
                             } catch (err) {
                                 // Fallback на обычный Audio если Web Audio API не работает
                                 logger.warn('Web Audio API failed, falling back to Audio element:', err.message);
+                                logger.warn('Audio URL:', audioUrl);
+                                logger.warn('Error details:', err);
                                 
-                                const audio = new Audio(audioData.audio_url);
+                                const audio = new Audio(audioUrl);
                                 audio.volume = (audioData.volume || 50) / 100;
                                 
                                 const playPromise = audio.play();

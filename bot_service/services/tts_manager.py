@@ -260,9 +260,24 @@ class TTSManager:
                     if response.status == 200:
                         result = await response.json()
                         selected_voice = result.get("selected_voice")
-                        audio_url = result.get("audio_url")  # Extract audio URL from response
+                        audio_url_raw = result.get("audio_url")  # Extract audio URL from response
+                        
+                        # 🚀 FIX: Преобразуем относительный путь в полный URL для фронтенда
+                        if audio_url_raw:
+                            if audio_url_raw.startswith('http://') or audio_url_raw.startswith('https://'):
+                                # Уже полный URL
+                                audio_url = audio_url_raw
+                            elif audio_url_raw.startswith('/'):
+                                # Относительный путь - добавляем TTS_SERVICE_URL
+                                audio_url = f"{endpoint}{audio_url_raw}"
+                            else:
+                                # Просто имя файла - добавляем путь к audio endpoint
+                                audio_url = f"{endpoint}/api/tts/audio/{audio_url_raw}"
+                        else:
+                            audio_url = None
                         
                         logger.info(f"🎙️ TTS Service response: {result}")
+                        logger.info(f"🔗 Audio URL (raw): {audio_url_raw}, (full): {audio_url}")
                         
                         # Если есть connection_manager и выбран голос, проверяем приоритетную громкость
                         if connection_manager and selected_voice:
@@ -279,7 +294,7 @@ class TTSManager:
                                             "voice": selected_voice,
                                             "volume": priority_volume,
                                             "tts_type": "ai_f5",
-                                            "audio_url": audio_url  # Include audio URL
+                                            "audio_url": audio_url  # ✅ Полный URL
                                         }
                         
                         return {
@@ -287,7 +302,7 @@ class TTSManager:
                             "voice": selected_voice,
                             "volume": volume_level,
                             "tts_type": "ai_f5",
-                            "audio_url": audio_url  # Include audio URL
+                            "audio_url": audio_url  # ✅ Полный URL
                         }
                     else:
                         error_text = await response.text()
