@@ -122,6 +122,7 @@ cd bot_service && python main.py  # Backend (localhost:8000)
 
 | Дата | Версия | Основные изменения |
 |------|--------|-------------------|
+| Nov 8, 2025 | 0.02 | F5-TTS audio playback fix, yoficator improvements, voice settings fallback |
 | Nov 3, 2025 | 0.02 | Code quality cleanup, production ready |
 | Nov 1, 2025 | 0.01 | Security improvements |
 | Oct 31, 2025 | 0.9.5 | Comprehensive audit |
@@ -136,4 +137,4 @@ MIT License - Свободен для использования и модифи
 
 ---
 
-**Последнее обновление:** 3 ноября 2025 | **Версия:** 0.02
+**Последнее обновление:** 8 ноября 2025 | **Версия:** 0.02

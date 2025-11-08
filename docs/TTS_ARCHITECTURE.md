@@ -373,7 +373,76 @@ AUDIO_FORMAT=wav
 
 ---
 
-**Версия:** 2.0  
+---
+
+## 🎵 Audio Playback & URL Handling
+
+### Audio URL Flow
+
+```
+TTS Service → bot_service → Frontend
+   /audio/temp/file.wav → http://localhost:8001/audio/temp/file.wav → Web Audio API
+```
+
+**Исправления (8 ноября 2025):**
+- ✅ Относительные URL (`/audio/temp/...`) теперь корректно преобразуются в полные URL с `TTS_SERVICE_URL` в `bot_service`
+- ✅ Добавлена дополнительная обработка относительных URL на фронтенде с fallback
+- ✅ Улучшено логирование загрузки и декодирования аудио
+- ✅ Исправлена ошибка `Unable to decode audio data` в Web Audio API
+
+**Логика обработки:**
+1. `tts_service` возвращает относительный путь `/audio/temp/file.wav`
+2. `bot_service/services/tts_manager.py` преобразует его в полный URL: `http://localhost:8001/audio/temp/file.wav`
+3. `frontend/src/context/ChatContext.jsx` загружает аудио через Web Audio API
+4. Если Web Audio API не работает → fallback на обычный HTML5 Audio элемент
+
+---
+
+## 🎛️ Personal Voice Settings
+
+### Логика работы персональных настроек
+
+**Принцип:**
+- Если пользователь настроил параметры → используются его настройки
+- Если пользователь не настроил → используются дефолтные из таблицы `Voice` (настроенные админом)
+
+**Параметры:**
+- `cfg_strength` - стабильность синтеза
+- `speed_preset` - скорость речи (very_slow, slow, normal, fast, very_fast)
+- `volume` - индивидуальная громкость голоса (0-100%)
+
+**Flow:**
+```
+UserVoiceSettings (персональные) → voice_settings → TTS Service
+                ↓ (если NULL)
+Voice table (дефолты от админа) → voice_record → TTS Service
+```
+
+**Исправления (8 ноября 2025):**
+- ✅ Корректный fallback на дефолтные значения из таблицы `Voice`, если персональные настройки отсутствуют
+- ✅ Volume обрабатывается отдельно: персональный volume из `UserVoiceSettings` или базовый из `AudioSettings`
+- ✅ Если `cfg_strength` или `speed_preset` = `None`, они не передаются в `voice_settings` (используются дефолты)
+- ✅ Добавлено детальное логирование используемых настроек
+
+**Подробнее:** См. [USER_VOICE_SETTINGS_SYSTEM.md](USER_VOICE_SETTINGS_SYSTEM.md)
+
+---
+
+## 🔤 Yoficator (Ёфикатор)
+
+### Исправления (8 ноября 2025)
+
+**Проблема:** Слово "проверка" неправильно ёфицировалось как "провёрка"
+
+**Решение:**
+- ✅ Добавлены исключения для слов с "ерк" в корне (проверка, сверка, и т.д.)
+- ✅ Правило замены "е" на "ё" в словах, заканчивающихся на "а", теперь исключает слова с "ерк"
+
+**Файл:** `tts_service/TTS_rus_engine/yoficator_module.py`
+
+---
+
+**Версия:** 2.1  
 **Статус:** ✅ Production Ready  
-**Последнее обновление:** 27 октября 2025
+**Последнее обновление:** 8 ноября 2025
 
