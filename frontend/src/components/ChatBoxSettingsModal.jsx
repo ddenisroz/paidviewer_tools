@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { botService } from '../services/microservices';
+import { chatboxService } from '../services/api/services/chatboxService';
 import { TwitchIcon, VKIcon } from './PlatformIcons';
 import { toast } from 'sonner';
 import { twitchBadgesService } from '../services/twitchBadges';
@@ -103,7 +103,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
     const loadSettings = async () => {
         try {
             setLoading(true);
-            const response = await botService.get('/api/chatbox/settings');
+            const response = await chatboxService.getSettings();
             
             // ✅ Нормализуем данные - убеждаемся что числа это числа
             const normalizedSettings = {
@@ -141,10 +141,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                 version: settings.version || 1
             };
             
-            const response = await botService.post(
-                `/api/chatbox/settings?regenerate_token=${regenerateToken}`,
-                requestData
-            );
+            const response = await chatboxService.saveSettings(requestData, regenerateToken);
             
             // ✅ Нормализуем данные после сохранения
             const normalizedSettings = {

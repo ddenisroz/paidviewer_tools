@@ -1,64 +1,55 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { History, Search, Download, RefreshCw } from 'lucide-react';
-import { botService } from '../../services/microservices';
-import { toast } from 'sonner';
-import { logger } from '../../utils/prodLogger';
+import { History, Search, RefreshCw } from 'lucide-react';
+import { useDropsHistory } from '../../queries/drops/dropsQueries';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../../queries/queryKeys';
 
 const DropsHistory = ({ user, channelName }) => {
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
+  const [allHistory, setAllHistory] = useState([]);
   const limit = 50;
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    loadHistory(true);
-  }, [user, channelName]);
-
-  const loadHistory = async (reset = false) => {
-    if (!user || !channelName) return;
-
-    const currentOffset = reset ? 0 : offset;
-
-    try {
-      setLoading(true);
-      // 🚀 FIX: Загружаем общую историю (без фильтрации по platform)
-      const response = await botService.get(`/api/drops/history/${channelName}`, {
-        params: { 
-          limit, 
-          offset: currentOffset 
-        }
-      });
-      
-      if (response.data.success) {
-        const newHistory = response.data.data;
-        setHistory(reset ? newHistory : [...history, ...newHistory]);
-        setHasMore(newHistory.length === limit);
-        if (reset) setOffset(0);
-      }
-    } catch (error) {
-      logger.error('Error loading history:', error);
-      toast.error('Ошибка загрузки истории');
-    } finally {
-      setLoading(false);
+  // ✅ НОВЫЙ КОД: Используем централизованный hook для загрузки истории
+  const { data: historyData, isLoading: loading, refetch } = useDropsHistory(
+    channelName,
+    { limit, offset },
+    {
+      enabled: !!user && !!channelName,
     }
-  };
+  );
 
-  const handleLoadMore = () => {
+  // Объединяем историю при изменении offset
+  useEffect(() => {
+    if (historyData) {
+      if (offset === 0) {
+        setAllHistory(historyData.data || []);
+      } else {
+        setAllHistory(prev => [...prev, ...(historyData.data || [])]);
+      }
+    }
+  }, [historyData, offset]);
+
+  const hasMore = historyData?.hasMore || false;
+  const history = allHistory;
+
+  const handleLoadMore = useCallback(() => {
     if (!loading && hasMore) {
       setOffset(prev => prev + limit);
-      loadHistory(false);
     }
-  };
+  }, [loading, hasMore, limit]);
 
-  const handleRefresh = () => {
-    loadHistory(true);
-  };
+  const handleRefresh = useCallback(() => {
+    setOffset(0);
+    setAllHistory([]);
+    queryClient.invalidateQueries({ queryKey: queryKeys.drops.history(channelName) });
+    refetch();
+  }, [channelName, queryClient, refetch]);
 
   const filteredHistory = history.filter(entry => 
     entry.viewer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||

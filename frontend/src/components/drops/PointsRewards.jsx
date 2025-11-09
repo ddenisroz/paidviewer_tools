@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,17 +9,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Edit, Trash2, Loader2, Power, PowerOff, Coins } from 'lucide-react';
-import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
-import { logger } from '../../utils/prodLogger';
 import { useIntegrations } from '../../context/IntegrationsContext';
+import { usePlatformRewards, useCreatePlatformReward, useUpdatePlatformReward, useDeletePlatformReward, useTogglePlatformReward } from '../../queries/points/pointsQueries';
 
 const PointsRewards = ({ user, platform, channelName, integrations }) => {
   const { integrations: integrationsContext } = useIntegrations();
   const actualIntegrations = integrations || integrationsContext;
   const [selectedPlatform, setSelectedPlatform] = useState(null);
-  const [rewards, setRewards] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
   const [editingReward, setEditingReward] = useState(null);
   const [partnerRequired, setPartnerRequired] = useState(false);
@@ -58,134 +55,97 @@ const PointsRewards = ({ user, platform, channelName, integrations }) => {
     }
   }, [platform, twitchAvailable, vkAvailable, selectedPlatform]);
 
-  const loadRewards = useCallback(async () => {
-    if (!user || !selectedPlatform || !channelName) return;
-    
-    try {
-      setLoading(true);
-      setPartnerRequired(false);
-      setErrorMessage(null);
-      const response = await botService.get(`/api/points/platform/rewards`, {
-        params: { platform: selectedPlatform }
-      });
-      
-      if (response.data.success) {
-        setRewards(response.data.rewards || []);
+  // React Query hooks
+  const { data: rewardsData, isLoading: loading, error: rewardsError, refetch } = usePlatformRewards(
+    selectedPlatform,
+    {
+      enabled: !!user && !!selectedPlatform && !!channelName,
+      onError: (error) => {
+        // ✅ Обработка 403 - партнер/аффилиат требуется
+        if (error.response?.status === 403) {
+          const detail = error.response?.data?.detail || error.response?.data?.message;
+          if (detail && (detail.includes('партнёр') || detail.includes('аффилейт') || detail.includes('partner') || detail.includes('affiliate'))) {
+            setPartnerRequired(true);
+            setErrorMessage(detail);
+            return;
+          }
+        }
+        
+        // Для других ошибок (кроме 404)
+        if (error.response?.status !== 404) {
+          const detail = error.response?.data?.detail || error.response?.data?.message;
+          setErrorMessage(detail || 'Ошибка загрузки наград');
+        }
+      },
+      onSuccess: () => {
         setPartnerRequired(false);
         setErrorMessage(null);
-      }
-    } catch (error) {
-      logger.error('Error loading platform rewards:', error);
-      
-      // ✅ Обработка 403 - партнер/аффилиат требуется
-      if (error.response?.status === 403) {
-        const detail = error.response?.data?.detail || error.response?.data?.message;
-        if (detail && (detail.includes('партнёр') || detail.includes('аффилейт') || detail.includes('partner') || detail.includes('affiliate'))) {
-          setPartnerRequired(true);
-          setErrorMessage(detail);
-          setRewards([]);
-          // Не показываем toast для ожидаемой ошибки
-          return;
-        }
-      }
-      
-      // Для других ошибок (кроме 404) показываем toast
-      if (error.response?.status !== 404) {
-        const detail = error.response?.data?.detail || error.response?.data?.message;
-        setErrorMessage(detail || 'Ошибка загрузки наград');
-        // Показываем toast только для неожиданных ошибок
-        if (error.response?.status !== 403) {
-          toast.error(detail || 'Ошибка загрузки наград');
-        }
-      }
-    } finally {
-      setLoading(false);
+      },
     }
-  }, [user, selectedPlatform, channelName]);
+  );
 
-  useEffect(() => {
-    if (selectedPlatform) {
-      loadRewards();
-    }
-  }, [selectedPlatform, loadRewards]);
+  const rewards = rewardsData?.data?.rewards || [];
 
-  const handleSave = async () => {
+  const createRewardMutation = useCreatePlatformReward(selectedPlatform, {
+    onSuccess: () => {
+      setShowDialog(false);
+      resetForm();
+    },
+  });
+
+  const updateRewardMutation = useUpdatePlatformReward(selectedPlatform, {
+    onSuccess: () => {
+      setShowDialog(false);
+      resetForm();
+    },
+  });
+
+  const deleteRewardMutation = useDeletePlatformReward(selectedPlatform);
+
+  const toggleRewardMutation = useTogglePlatformReward(selectedPlatform);
+
+  const handleSave = () => {
     if (!formData.title.trim()) {
       toast.error('Введите название награды');
       return;
     }
 
-    try {
-      const rewardData = {
-        title: formData.title,
-        description: formData.description,
-        cost: parseInt(formData.cost) || 100,
-        is_user_input_required: formData.is_user_input_required,
-        platform: selectedPlatform,
-        channel_name: channelName
-      };
+    const rewardData = {
+      title: formData.title,
+      description: formData.description,
+      cost: parseInt(formData.cost) || 100,
+      is_user_input_required: formData.is_user_input_required,
+      platform: selectedPlatform,
+      channel_name: channelName
+    };
 
-      // Добавляем платформо-специфичные поля
-      if (selectedPlatform === 'twitch') {
-        rewardData.global_cooldown_seconds = parseInt(formData.global_cooldown_seconds) || 0;
-        rewardData.max_per_stream = parseInt(formData.max_per_stream) || 0;
-        rewardData.max_per_user_per_stream = parseInt(formData.max_per_user_per_stream) || 0;
-        rewardData.should_redemptions_skip_request_queue = formData.should_redemptions_skip_request_queue;
-      } else if (selectedPlatform === 'vk') {
-        rewardData.repair_timeout = parseInt(formData.repair_timeout) || 0;
-        rewardData.max_uses_count = parseInt(formData.max_uses_count) || 0;
-        rewardData.max_uses_count_per_user = parseInt(formData.max_uses_count_per_user) || 0;
-        rewardData.is_message_required = formData.is_message_required;
-      }
+    // Добавляем платформо-специфичные поля
+    if (selectedPlatform === 'twitch') {
+      rewardData.global_cooldown_seconds = parseInt(formData.global_cooldown_seconds) || 0;
+      rewardData.max_per_stream = parseInt(formData.max_per_stream) || 0;
+      rewardData.max_per_user_per_stream = parseInt(formData.max_per_user_per_stream) || 0;
+      rewardData.should_redemptions_skip_request_queue = formData.should_redemptions_skip_request_queue;
+    } else if (selectedPlatform === 'vk') {
+      rewardData.repair_timeout = parseInt(formData.repair_timeout) || 0;
+      rewardData.max_uses_count = parseInt(formData.max_uses_count) || 0;
+      rewardData.max_uses_count_per_user = parseInt(formData.max_uses_count_per_user) || 0;
+      rewardData.is_message_required = formData.is_message_required;
+    }
 
-      if (editingReward) {
-        await botService.put(`/api/points/platform/rewards/${editingReward.id}`, rewardData);
-        toast.success('Награда обновлена');
-      } else {
-        await botService.post(`/api/points/platform/rewards/create`, rewardData, {
-          params: { platform: selectedPlatform }
-        });
-        toast.success('Награда создана на платформе');
-      }
-
-      await loadRewards();
-      setShowDialog(false);
-      resetForm();
-    } catch (error) {
-      logger.error('Error saving platform reward:', error);
-      const errorMessage = error.response?.data?.detail || error.response?.data?.message || 'Ошибка сохранения награды';
-      toast.error(errorMessage);
+    if (editingReward) {
+      updateRewardMutation.mutate({ rewardId: editingReward.id, reward: rewardData });
+    } else {
+      createRewardMutation.mutate(rewardData);
     }
   };
 
-  const handleDelete = async (rewardId) => {
+  const handleDelete = (rewardId) => {
     if (!confirm('Удалить эту награду с платформы?')) return;
-
-    try {
-      await botService.delete(`/api/points/platform/rewards/${rewardId}`, {
-        params: { platform: selectedPlatform }
-      });
-      toast.success('Награда удалена');
-      await loadRewards();
-    } catch (error) {
-      logger.error('Error deleting reward:', error);
-      toast.error('Ошибка удаления награды');
-    }
+    deleteRewardMutation.mutate(rewardId);
   };
 
-  const handleToggle = async (rewardId, enabled) => {
-    try {
-      await botService.put(`/api/points/platform/rewards/${rewardId}`, {
-        is_enabled: !enabled
-      }, {
-        params: { platform: selectedPlatform }
-      });
-      toast.success(enabled ? 'Награда отключена' : 'Награда включена');
-      await loadRewards();
-    } catch (error) {
-      logger.error('Error toggling reward:', error);
-      toast.error('Ошибка изменения статуса награды');
-    }
+  const handleToggle = (rewardId, enabled) => {
+    toggleRewardMutation.mutate({ rewardId, isEnabled: !enabled });
   };
 
   const resetForm = () => {
@@ -310,7 +270,7 @@ const PointsRewards = ({ user, platform, channelName, integrations }) => {
             <div className="text-center py-8 border-2 border-dashed rounded-lg">
               <p className="text-sm font-medium text-destructive mb-2">Ошибка загрузки</p>
               <p className="text-xs text-muted-foreground mb-4">{errorMessage}</p>
-              <Button onClick={loadRewards} size="sm" variant="outline">
+              <Button onClick={() => refetch()} size="sm" variant="outline">
                 Повторить попытку
               </Button>
             </div>
@@ -530,8 +490,11 @@ const PointsRewards = ({ user, platform, channelName, integrations }) => {
             <Button variant="outline" onClick={handleCloseDialog}>
               Отмена
             </Button>
-            <Button onClick={handleSave} disabled={loading}>
-              {loading ? (
+            <Button 
+              onClick={handleSave} 
+              disabled={createRewardMutation.isPending || updateRewardMutation.isPending}
+            >
+              {(createRewardMutation.isPending || updateRewardMutation.isPending) ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Сохранение...

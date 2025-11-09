@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,8 +41,15 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useIntegrations } from '../context/IntegrationsContext';
-import api from '../services/api';
-import { toast } from 'sonner';
+// ✅ НОВЫЙ ИМПОРТ: Используем централизованные queries
+import {
+    useCommands,
+    useCreateCommand,
+    useCreateCommandOverride,
+    useUpdateCommand,
+    useDeleteCommand,
+    useToggleCommand,
+} from '../queries/commands/commandsQueries';
 import { CardSkeleton } from '@/components/ui/skeleton';
 import { PageLoader } from '@/components/ui/loader';
 import PageWrapper from '../components/PageWrapper';
@@ -86,112 +92,22 @@ import { logger } from '../utils/prodLogger';
         );
     }
     
-    const queryClient = useQueryClient();
-    
-    // ✅ ОПТИМИЗАЦИЯ: Используем React Query вместо ручного кэширования
-    const { data: commandsData, isLoading: loading, isInitialLoading: initialLoading } = useQuery({
-        queryKey: ['commands'],
-        queryFn: async () => {
-            const response = await api.get('/api/commands');
-            return {
-                basic_commands: response.data.basic_commands || [],
-                custom_commands: response.data.custom_commands || []
-            };
-        },
+    // ✅ НОВЫЙ КОД: Используем централизованные queries
+    const { data: commandsData, isLoading: loading, isInitialLoading: initialLoading } = useCommands({
         enabled: isAuthenticated && (integrations?.twitch?.enabled || integrations?.vk?.enabled),
-        staleTime: 30 * 1000, // 30 секунд
-        gcTime: 5 * 60 * 1000, // 5 минут
-        refetchOnWindowFocus: false,
-        refetchOnMount: true,
-        retry: 1,
-        onError: (error) => {
-            logger.error('Error loading commands:', error);
-            toast.error('Ошибка загрузки команд');
-        }
     });
     
+    // ✅ Извлекаем данные (команды возвращаются напрямую из query)
     const basicCommands = commandsData?.basic_commands || [];
     const customCommands = commandsData?.custom_commands || [];
     
-    // ✅ Mutations для управления командами
-    const createCommandMutation = useMutation({
-        mutationFn: async (data) => {
-            return await api.post('/api/commands', data);
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['commands'] });
-            toast.success('Кастомная команда создана!');
-        },
-        onError: (error) => {
-            logger.error('Error creating command:', error);
-            toast.error(error.response?.data?.detail || 'Ошибка создания команды');
-        }
-    });
-    
-    const createOverrideMutation = useMutation({
-        mutationFn: async (data) => {
-            return await api.post('/api/commands/override', data);
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['commands'] });
-            toast.success('Персональная настройка команды создана!');
-        },
-        onError: (error) => {
-            logger.error('Error creating override:', error);
-            if (error.response?.status === 400 && 
-                error.response?.data?.detail?.includes('уже существует')) {
-                toast.error('Персональная настройка уже существует. Перезагрузите список команд.');
-                queryClient.invalidateQueries({ queryKey: ['commands'] });
-            } else {
-                throw error;
-            }
-        }
-    });
-    
-    const updateCommandMutation = useMutation({
-        mutationFn: async ({ commandId, data }) => {
-            return await api.put(`/api/commands/${commandId}`, data);
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['commands'] });
-            toast.success('Команда обновлена!');
-        },
-        onError: (error) => {
-            logger.error('Error updating command:', error);
-            if (!error.response?.data?.detail?.includes('уже существует')) {
-                toast.error(error.response?.data?.detail || 'Ошибка обновления команды');
-            }
-        }
-    });
-    
-    const toggleCommandMutation = useMutation({
-        mutationFn: async ({ commandName, data }) => {
-            return await api.put(`/api/commands/${commandName}`, data);
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['commands'] });
-        },
-        onError: (error) => {
-            logger.error('Error toggling command:', error);
-            toast.error('Ошибка переключения команды');
-            // ✅ Откатываем изменения через invalidateQueries
-            queryClient.invalidateQueries({ queryKey: ['commands'] });
-        }
-    });
-    
-    const deleteCommandMutation = useMutation({
-        mutationFn: async (commandId) => {
-            return await api.delete(`/api/commands/${commandId}`);
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['commands'] });
-            toast.success('Команда удалена!');
-        },
-        onError: (error) => {
-            logger.error('Error deleting command:', error);
-            toast.error('Ошибка удаления команды');
-        }
-    });
+    // ✅ НОВЫЙ КОД: Используем централизованные mutations
+    // Обработка ошибок и toast уже реализована в queries
+    const createCommandMutation = useCreateCommand();
+    const createOverrideMutation = useCreateCommandOverride();
+    const updateCommandMutation = useUpdateCommand();
+    const toggleCommandMutation = useToggleCommand();
+    const deleteCommandMutation = useDeleteCommand();
     
     // Состояния для фильтрации базовых команд (как в Excel)
     const [basicSearchTerm, setBasicSearchTerm] = useState('');
@@ -322,6 +238,7 @@ import { logger } from '../utils/prodLogger';
                     cooldown_seconds: 0,
                     is_enabled: true
                 });
+                // ✅ toast уже показывается в mutation
             }
         });
     };
@@ -340,38 +257,24 @@ import { logger } from '../utils/prodLogger';
                 onSuccess: () => {
                     setIsEditDialogOpen(false);
                     setEditingCommand(null);
+                    // ✅ toast уже показывается в mutation
                 },
-                onError: () => {
-                    // Ошибка уже обработана в mutation
-                }
             });
         } else {
             // Для override и custom команд - обычное обновление
             updateCommandMutation.mutate({ commandId, data: editForm }, {
                 onSuccess: () => {
-                    toast.success('Команда обновлена!');
                     setIsEditDialogOpen(false);
                     setEditingCommand(null);
+                    // ✅ toast уже показывается в mutation
                 }
             });
         }
     };
 
     const handleToggleCommand = (commandName, data) => {
-        // ✅ Оптимистичное обновление через React Query
-        queryClient.setQueryData(['commands'], (old) => {
-            if (!old) return old;
-            return {
-                basic_commands: old.basic_commands?.map(cmd => 
-                    cmd.command_name === commandName ? { ...cmd, ...data } : cmd
-                ) || [],
-                custom_commands: old.custom_commands?.map(cmd => 
-                    cmd.command_name === commandName ? { ...cmd, ...data } : cmd
-                ) || []
-            };
-        });
-        
-        // ✅ Отправляем запрос через mutation
+        // ✅ Оптимистичное обновление уже реализовано в useToggleCommand
+        // Просто вызываем mutation - она сама сделает optimistic update и откат при ошибке
         toggleCommandMutation.mutate({ commandName, data });
     };
 

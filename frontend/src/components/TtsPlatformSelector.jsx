@@ -2,87 +2,83 @@ import React, { useState, useEffect } from 'react';
 import { Mic, MicOff, Volume2, Monitor } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { TwitchIcon, VKIcon } from './PlatformIcons';
-import { botService } from '../services/microservices';
 import { logger } from '../utils/prodLogger';
+import { useTtsPlatformSettings, useSaveTtsPlatformSettings } from '../queries/tts/ttsQueries';
 
 const TtsPlatformSelector = () => {
   const { user } = useAuth();
+  // ✅ НОВЫЙ КОД: Используем централизованные hooks для настроек платформы TTS
+  const { data: platformSettingsResponse, isLoading: loading, isInitialLoading: initialLoading } = useTtsPlatformSettings({
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
+  const platformSettingsData = platformSettingsResponse?.data;
+  
   const [settings, setSettings] = useState({
     enabled_platforms: ['twitch', 'vk'],
     global_enabled: true
   });
-  const [loading, setLoading] = useState(false); // ⚡ Изменено: по умолчанию false
-  const [initialLoading, setInitialLoading] = useState(true); // 🚀 Для первой загрузки
-  const [saving, setSaving] = useState(false);
 
-  // Загрузка настроек TTS
-  const loadSettings = async () => {
-    try {
-      setLoading(true);
-      // Добавляем cache-busting параметр для принудительного обновления
-      const response = await botService.get('/api/tts/platform-settings', {
-        params: { _t: Date.now() }  // Cache-busting достаточно, без лишних заголовков
-      });
-      logger.log('🔄 [TTS SELECTOR] Loaded settings from API:', response.data);
-      logger.log('🔄 [TTS SELECTOR] enabled_platforms:', response.data.enabled_platforms);
-      setSettings(response.data);
-      logger.log('🔄 [TTS SELECTOR] State updated. Current state:', {
-        enabled_platforms: response.data.enabled_platforms,
-        twitch_enabled: response.data.enabled_platforms.includes('twitch'),
-        vk_enabled: response.data.enabled_platforms.includes('vk')
-      });
-    } catch (err) {
-      logger.error('❌ [TTS SELECTOR] Error loading TTS settings:', err);
+  // ✅ НОВЫЙ КОД: Синхронизируем состояние с данными из React Query
+  useEffect(() => {
+    if (platformSettingsData) {
       setSettings({
-        enabled_platforms: ['twitch', 'vk'],
-        global_enabled: true
+        enabled_platforms: platformSettingsData.enabled_platforms || ['twitch', 'vk'],
+        global_enabled: platformSettingsData.global_enabled !== false
       });
-    } finally {
-      setLoading(false);
-      setInitialLoading(false); // ⚡ Первая загрузка завершена
+      logger.log('🔄 [TTS SELECTOR] State updated from React Query:', {
+        enabled_platforms: platformSettingsData.enabled_platforms,
+        twitch_enabled: platformSettingsData.enabled_platforms?.includes('twitch'),
+        vk_enabled: platformSettingsData.enabled_platforms?.includes('vk')
+      });
     }
-  };
+  }, [platformSettingsData]);
 
-  // Сохранение настроек
-  const saveSettings = async (newSettings) => {
-    try {
-      setSaving(true);
-      // Отправляем только enabled_platforms
-      await botService.post('/api/tts/platform-settings', {
-        enabled_platforms: newSettings.enabled_platforms
-      });
+  // ✅ НОВЫЙ КОД: Используем централизованный mutation для сохранения настроек
+  const savePlatformSettingsMutation = useSaveTtsPlatformSettings({
+    onSuccess: (response, variables) => {
+      const newSettings = {
+        enabled_platforms: variables.enabled_platforms,
+        global_enabled: settings.global_enabled
+      };
       setSettings(newSettings);
       
       // 🔄 Отправляем событие для синхронизации с нижними кнопками
       window.dispatchEvent(new CustomEvent('tts-settings-changed', {
-        detail: { enabledPlatforms: newSettings.enabled_platforms }
+        detail: { enabledPlatforms: variables.enabled_platforms }
       }));
-      logger.log('🔄 [TTS SELECTOR] Dispatched settings update:', newSettings.enabled_platforms);
-      
-      if (window.toast) {
-        window.toast.success('Настройки TTS сохранены');
-      }
-    } catch (err) {
-      logger.error('Error saving TTS settings:', err);
-      if (window.toast) {
-        window.toast.error('Ошибка сохранения настроек');
-      }
-    } finally {
-      setSaving(false);
-    }
+      logger.log('🔄 [TTS SELECTOR] Dispatched settings update:', variables.enabled_platforms);
+      // toast уже показан в hook
+    },
+    onError: (error) => {
+      logger.error('Error saving TTS settings:', error);
+      // toast уже показан в hook
+    },
+  });
+
+  const saving = savePlatformSettingsMutation.isPending;
+
+  // Сохранение настроек
+  const saveSettings = (newSettings) => {
+    // Отправляем только enabled_platforms
+    savePlatformSettingsMutation.mutate({
+      enabled_platforms: newSettings.enabled_platforms
+    });
   };
 
   // Переключение глобального TTS
-  const toggleGlobalTts = async () => {
+  const toggleGlobalTts = () => {
     const newSettings = {
       ...settings,
       global_enabled: !settings.global_enabled
     };
-    await saveSettings(newSettings);
+    setSettings(newSettings);
+    // Глобальный TTS не сохраняется через platform-settings, это отдельный endpoint
+    // Пока оставляем только локальное обновление
   };
 
   // Переключение платформы
-  const togglePlatform = async (platform) => {
+  const togglePlatform = (platform) => {
     const enabledPlatforms = [...settings.enabled_platforms];
     const index = enabledPlatforms.indexOf(platform);
     
@@ -96,12 +92,10 @@ const TtsPlatformSelector = () => {
       ...settings,
       enabled_platforms: enabledPlatforms
     };
-    await saveSettings(newSettings);
+    saveSettings(newSettings);
   };
 
   useEffect(() => {
-    loadSettings();
-    
     // 🔄 Слушаем изменения TTS настроек из нижних кнопок
     const handleTtsSettingsChanged = (event) => {
       const { enabledPlatforms } = event.detail;

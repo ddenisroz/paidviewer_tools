@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
 import { logger } from '../../utils/prodLogger';
-import { botService } from '../../services/microservices';
+import { dropsService } from '../../services/api/services/dropsService';
 import StreakCalendar from './StreakCalendar';
 import { AlertTriangle, Loader2, Package } from 'lucide-react';
 import { useDropsConfig } from '../../hooks/useDropsConfig';
@@ -165,7 +165,7 @@ const StreakSettings = ({ user, channelName, hasRewards = false, integrations })
 
   const resetStatsMutation = useMutation({
     mutationFn: async () => {
-      return await botService.post(`/api/drops/streak/reset/${channelName}`, {});
+      return await dropsService.resetStreak(channelName);
     },
     onSuccess: (response) => {
       const deletedCount = response?.data?.data?.deleted_count || 0;

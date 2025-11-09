@@ -5,106 +5,83 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Monitor, Copy, ExternalLink, Settings2, Loader2 } from 'lucide-react';
-import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
-import { logger } from '../../utils/prodLogger';
+import { useDropsConfig, useUpdateDropsConfig, useGenerateDropsWidgetUrl } from '../../queries/drops/dropsQueries';
+import { useAutoSave } from '../../hooks/useAutoSave';
 
 const WidgetSettings = ({ user, channelName }) => {
-  const [config, setConfig] = useState(null);
   const [widgetUrl, setWidgetUrl] = useState(null);
-  const [regenerating, setRegenerating] = useState(false);
   const saveTimeoutRef = useRef(null);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  
+  // ✅ НОВЫЙ КОД: Используем централизованные hooks
+  const { data: config, isLoading: configLoading } = useDropsConfig(channelName, {
+    enabled: !!user && !!channelName,
+  });
+  
+  const updateConfigMutation = useUpdateDropsConfig(channelName, {
+    onSuccess: () => {
+      // Автосохранение работает тихо, без toast
+    },
+  });
+  
+  const generateWidgetUrlMutation = useGenerateDropsWidgetUrl({
+    onSuccess: (response) => {
+      if (response.data.success) {
+        setWidgetUrl(response.data.data.url);
+      }
+    },
+  });
+
   const [formData, setFormData] = useState({
     widget_spinning_duration_ms: [1500],
     widget_opening_duration_ms: [1000],
     widget_result_duration_ms: [5500]
   });
 
+  // Загружаем конфигурацию и генерируем URL виджета при монтировании
   useEffect(() => {
-    loadConfig();
-    generateWidgetUrl();
+    if (config) {
+      setFormData({
+        widget_spinning_duration_ms: [config.widget_spinning_duration_ms ?? 1500],
+        widget_opening_duration_ms: [config.widget_opening_duration_ms ?? 1000],
+        widget_result_duration_ms: [config.widget_result_duration_ms ?? 5500]
+      });
+    }
+  }, [config]);
+
+  // Генерируем URL виджета при монтировании
+  useEffect(() => {
+    if (user && channelName && !widgetUrl) {
+      generateWidgetUrlMutation.mutate(false);
+    }
   }, [user, channelName]);
 
-  const loadConfig = async () => {
-    if (!user || !channelName) {
-      return;
-    }
-    try {
-      const response = await botService.get(`/api/drops/config/${channelName}`);
-      if (response.data.success) {
-        setConfig(response.data.data);
-        setFormData({
-          widget_spinning_duration_ms: [response.data.data.widget_spinning_duration_ms ?? 1500],
-          widget_opening_duration_ms: [response.data.data.widget_opening_duration_ms ?? 1000],
-          widget_result_duration_ms: [response.data.data.widget_result_duration_ms ?? 5500]
-        });
-        setIsInitialLoad(false);
-      }
-    } catch (error) {
-      logger.error('Error loading widget config:', error);
-    }
-  };
-
-  const generateWidgetUrl = async (regenerate = false) => {
-    try {
-      if (regenerate) {
-        setRegenerating(true);
-      }
-      const response = await botService.post('/api/drops/widget-url', null, {
-        params: { regenerate }
-      });
-      if (response.data.success) {
-        setWidgetUrl(response.data.data.url);
-        if (regenerate) {
-          toast.success('Токен виджета перегенерирован');
-        }
-      }
-    } catch (error) {
-      logger.error('Error generating widget URL:', error);
-      toast.error('Ошибка генерации URL виджета');
-    } finally {
-      if (regenerate) {
-        setRegenerating(false);
-      }
-    }
-  };
-
   // ✅ Автосохранение с дебаунсом
-  const autoSave = async () => {
-    if (!user || !channelName || isInitialLoad) {
-      return;
+  const { autoSave } = useAutoSave(
+    (payload) => updateConfigMutation.mutate(payload),
+    1000,
+    () => {
+      if (!user || !channelName || !config) return false;
+      return true;
     }
-    
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    
-    saveTimeoutRef.current = setTimeout(async () => {
-      try {
-        const payload = {
-          widget_spinning_duration_ms: formData.widget_spinning_duration_ms[0],
-          widget_opening_duration_ms: formData.widget_opening_duration_ms[0],
-          widget_result_duration_ms: formData.widget_result_duration_ms[0]
-        };
-        await botService.put(`/api/drops/config/${channelName}`, payload);
-        // ✅ Автосохранение работает тихо, без toast
-      } catch (error) {
-        logger.error('Error auto-saving widget config:', error);
-      }
-    }, 1000); // Дебаунс 1 секунда
-  };
-  
+  );
+
   // ✅ Автосохранение при изменении полей
   useEffect(() => {
-    if (!isInitialLoad && config) {
-      autoSave();
+    if (config) {
+      const payload = {
+        widget_spinning_duration_ms: formData.widget_spinning_duration_ms[0],
+        widget_opening_duration_ms: formData.widget_opening_duration_ms[0],
+        widget_result_duration_ms: formData.widget_result_duration_ms[0]
+      };
+      autoSave(payload);
     }
   }, [
     formData.widget_spinning_duration_ms,
     formData.widget_opening_duration_ms,
     formData.widget_result_duration_ms,
-    isInitialLoad
+    config,
+    autoSave
   ]);
   
   // Очистка таймера при размонтировании
@@ -115,6 +92,10 @@ const WidgetSettings = ({ user, channelName }) => {
       }
     };
   }, []);
+
+  const handleRegenerateWidgetUrl = () => {
+    generateWidgetUrlMutation.mutate(true);
+  };
 
   const copyWidgetUrl = () => {
     if (widgetUrl) {
@@ -205,11 +186,11 @@ const WidgetSettings = ({ user, channelName }) => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => generateWidgetUrl(true)}
-                  disabled={regenerating}
+                  onClick={handleRegenerateWidgetUrl}
+                  disabled={generateWidgetUrlMutation.isPending}
                   className="gap-2 text-xs"
                 >
-                  {regenerating ? (
+                  {generateWidgetUrlMutation.isPending ? (
                     <>
                       <Loader2 className="w-3 h-3 animate-spin" />
                       Перегенерация...

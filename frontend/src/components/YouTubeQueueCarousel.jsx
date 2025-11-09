@@ -1,145 +1,85 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Play, SkipForward, Trash2, Plus, Search, Clock, User, ExternalLink } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Play, SkipForward, Trash2, Plus, Clock, User, ExternalLink } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { botService } from '../services/microservices';
-import { logger } from '../utils/prodLogger';
+import { 
+  useYoutubeQueue, 
+  useAddYoutubeVideo, 
+  useDeleteYoutubeVideo, 
+  useSkipYoutubeVideo,
+  useClearYoutubeQueue,
+  useMarkYoutubeVideoAsPlayed
+} from '../queries/youtube/youtubeQueries';
 
 const YouTubeQueueCarousel = () => {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   const [newVideoUrl, setNewVideoUrl] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
 
-  // React Query: загружаем очередь YouTube
-  const { data: queueData = [], isLoading: loading, error: queueError } = useQuery({
-    queryKey: ['youtube-queue'],
-    queryFn: async () => {
-      const response = await botService.get('/api/youtube/queue', {
-        withCredentials: true
-      });
-      const data = response.data;
-        // Обрабатываем новый формат ответа
-        if (data.current_video && data.queue) {
-        return [data.current_video, ...data.queue];
-      } else {
-        return Array.isArray(data) ? data : [];
-      }
-    },
-    staleTime: 10 * 1000, // 10 секунд
+  // ✅ НОВЫЙ КОД: Используем централизованные hooks
+  const { data: queueResponse, isLoading: loading, error: queueError } = useYoutubeQueue({
     refetchInterval: 30 * 1000, // Автоматически обновляем каждые 30 секунд
     refetchOnMount: true,
     refetchOnWindowFocus: false,
-    onError: (err) => {
-      logger.error('Error loading queue:', err);
-    },
   });
 
-  // React Query мутация: добавление видео
-  const addVideoMutation = useMutation({
-    mutationFn: async (url) => {
-      return await botService.post('/api/youtube/queue', { url }, {
-        withCredentials: true
-      });
-    },
+  // Обрабатываем формат ответа от backend
+  const queueData = useMemo(() => {
+    if (!queueResponse?.data) return [];
+    const data = queueResponse.data;
+    // Backend возвращает { queue: [], current_video: {}, is_playing: boolean }
+    if (data.current_video && data.queue) {
+      return [data.current_video, ...data.queue];
+    } else if (Array.isArray(data)) {
+      return data;
+    } else if (data.queue) {
+      return data.queue;
+    }
+    return [];
+  }, [queueResponse]);
+
+  const addVideoMutation = useAddYoutubeVideo({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['youtube-queue'] });
       setNewVideoUrl('');
       setShowAddForm(false);
     },
-    onError: (error) => {
-      logger.error('Error adding video:', error);
-    },
   });
 
-  // Добавление видео
-  const addVideo = async (url) => {
+  const removeVideoMutation = useDeleteYoutubeVideo();
+  const playVideoMutation = useSkipYoutubeVideo({
+    onSuccess: () => {
+      // Уведомляем другие вкладки
+      window.dispatchEvent(new CustomEvent('youtube_event', {
+        detail: {
+          event: 'video_played'
+        }
+      }));
+    },
+  });
+  const markAsPlayedMutation = useMarkYoutubeVideoAsPlayed();
+  const clearQueueMutation = useClearYoutubeQueue();
+
+  // Обертки для функций
+  const queue = queueData;
+  const addingVideo = addVideoMutation.isPending;
+
+  const addVideo = (url) => {
     if (!url.trim()) return;
     addVideoMutation.mutate(url.trim());
   };
 
-  // React Query мутации для операций с очередью
-  const removeVideoMutation = useMutation({
-    mutationFn: async (queueId) => {
-      return await botService.delete(`/api/youtube/queue/remove/${queueId}`, {
-        withCredentials: true
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['youtube-queue'] });
-    },
-    onError: (error) => {
-      logger.error('Error removing video:', error);
-    },
-  });
-
-  const playVideoMutation = useMutation({
-    mutationFn: async (video) => {
-      return await botService.post('/api/youtube/player/next', {}, {
-        withCredentials: true
-      });
-    },
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['youtube-queue'] });
-        // Уведомляем другие вкладки
-        window.dispatchEvent(new CustomEvent('youtube_event', {
-          detail: {
-            event: 'video_played',
-          data: { video: variables }
-          }
-        }));
-    },
-    onError: (error) => {
-      logger.error('Error playing video:', error);
-    },
-  });
-
-  const markAsPlayedMutation = useMutation({
-    mutationFn: async (queueId) => {
-      return await botService.post(`/api/youtube/queue/mark-played/${queueId}`, {}, {
-        withCredentials: true
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['youtube-queue'] });
-    },
-    onError: (error) => {
-      logger.error('Error marking as played:', error);
-    },
-  });
-
-  const clearQueueMutation = useMutation({
-    mutationFn: async () => {
-      return await botService.post('/api/youtube/clear', {}, {
-        withCredentials: true
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['youtube-queue'] });
-    },
-    onError: (error) => {
-      logger.error('Error clearing queue:', error);
-    },
-  });
-
-  // Обертки для функций
-  const queue = queueData;
-  const error = queueError?.message || null;
-  const addingVideo = addVideoMutation.isPending;
-
-  const removeVideo = async (queueId) => {
+  const removeVideo = (queueId) => {
     removeVideoMutation.mutate(queueId);
   };
 
-  const playVideo = async (video) => {
-    playVideoMutation.mutate(video);
+  const playVideo = () => {
+    playVideoMutation.mutate();
   };
 
-  const markAsPlayed = async (queueId) => {
+  const markAsPlayed = (queueId) => {
     markAsPlayedMutation.mutate(queueId);
   };
 
-  const clearQueue = async () => {
+  const clearQueue = () => {
     if (!confirm('Вы уверены, что хотите очистить всю очередь?')) {
       return;
     }
@@ -222,18 +162,6 @@ const YouTubeQueueCarousel = () => {
         </div>
       )}
 
-      {/* Ошибка */}
-      {error && (
-        <div className="p-4 border-b bg-red-50 border-red-200">
-          <p className="text-sm text-red-600">{error}</p>
-          <button
-            onClick={() => setError(null)}
-            className="text-xs text-red-500 hover:text-red-700 underline"
-          >
-            Закрыть
-          </button>
-        </div>
-      )}
 
       {/* Очередь видео */}
       <div className="max-h-96 overflow-y-auto">
@@ -334,7 +262,7 @@ const YouTubeQueueCarousel = () => {
                     )}
                     
                     <button
-                      onClick={() => playVideo(video)}
+                      onClick={() => playVideo()}
                       className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                       title="Воспроизвести это видео"
                     >

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,8 +10,9 @@ import { TwitchIcon, VKIcon } from '../PlatformIcons';
 import { useAuth } from '../../context/AuthContext';
 import { useIntegrations } from '../../context/IntegrationsContext';
 import { Loader2, Trash2 } from 'lucide-react';
-import { botService } from '../../services/microservices';
 import { logger } from '../../utils/prodLogger';
+import { useTtsModeSettings, useCreateTtsReward, useDeleteTtsReward } from '../../queries/tts/ttsQueries';
+import { queryKeys } from '../../queries/queryKeys';
 
 /**
  * Компонент для управления режимом TTS (все сообщения / за баллы канала)
@@ -31,18 +32,14 @@ const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving, showModeSelecto
     cooldown: 0
   });
 
-  // Load mode settings using React Query
-  const { data: modeSettingsData, isLoading: isLoadingRewards, refetch: refetchModeSettings } = useQuery({
-    queryKey: ['tts-mode-settings'],
-    queryFn: async () => {
-      const response = await botService.get('/api/tts/mode-settings');
-      return response.data;
-    },
+  // ✅ НОВЫЙ КОД: Используем централизованный hook для режима TTS
+  const { data: modeSettingsResponse, isLoading: isLoadingRewards, refetch: refetchModeSettings } = useTtsModeSettings({
     enabled: !!user,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
     staleTime: 0, // Всегда считаем данные устаревшими для немедленного обновления
   });
+  const modeSettingsData = modeSettingsResponse?.data;
 
   const ttsRewardIds = modeSettingsData?.tts_reward_ids || {};
 
@@ -57,27 +54,13 @@ const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving, showModeSelecto
     setShowCreateDialog(true);
   };
 
-  // Создать награду TTS
-  const handleCreateReward = async () => {
-    try {
-      if (!rewardForm.title.trim()) {
-        toast.error('Введите название награды');
-        return;
-      }
-
-      setSaving(true);
-      
-      const response = await botService.post('/api/tts/create-reward', {
-        platform: selectedPlatform,
-        title: rewardForm.title,
-        cost: rewardForm.cost,
-        cooldown: rewardForm.cooldown
-      });
-      
-      // 🚀 FIX: Оптимистичное обновление - сразу обновляем кэш с новым reward_id
+  // ✅ НОВЫЙ КОД: Используем централизованный hook для создания награды
+  const createTtsRewardMutation = useCreateTtsReward({
+    onSuccess: (response) => {
+      // Оптимистичное обновление - сразу обновляем кэш с новым reward_id
       const rewardId = response.data?.reward_id;
       if (rewardId && modeSettingsData) {
-        queryClient.setQueryData(['tts-mode-settings'], (oldData) => {
+        queryClient.setQueryData(queryKeys.tts.modeSettings(), (oldData) => {
           if (!oldData) return oldData;
           return {
             ...oldData,
@@ -88,54 +71,78 @@ const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving, showModeSelecto
           };
         });
       }
-      
-      // 🚀 FIX: Принудительно обновляем данные с сервера
-      await refetchModeSettings();
-      
-      toast.success('Награда создана');
+      // Принудительно обновляем данные с сервера
+      refetchModeSettings();
       setShowCreateDialog(false);
-    } catch (error) {
+      // toast уже показан в hook
+    },
+    onError: (error) => {
       logger.error('Error creating TTS reward:', error);
-      toast.error('Ошибка создания награды');
       // Откатываем оптимистичное обновление при ошибке
-      queryClient.invalidateQueries({ queryKey: ['tts-mode-settings'] });
-    } finally {
-      setSaving(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.tts.modeSettings() });
+      // toast уже показан в hook
+    },
+  });
+
+  // Создать награду TTS
+  const handleCreateReward = () => {
+    if (!rewardForm.title.trim()) {
+      toast.error('Введите название награды');
+      return;
     }
+
+    if (createTtsRewardMutation.isPending) return;
+    setSaving(true);
+    
+    createTtsRewardMutation.mutate({
+      platform: selectedPlatform,
+      title: rewardForm.title,
+      cost: rewardForm.cost,
+      cooldown: rewardForm.cooldown
+    }, {
+      onSettled: () => {
+        setSaving(false);
+      },
+    });
   };
 
+  // ✅ НОВЫЙ КОД: Используем централизованный hook для удаления награды
+  const deleteTtsRewardMutation = useDeleteTtsReward({
+    onSuccess: () => {
+      // Принудительно обновляем данные с сервера
+      refetchModeSettings();
+      // toast уже показан в hook
+    },
+    onError: (error) => {
+      logger.error('Error deleting TTS reward:', error);
+      // Откатываем оптимистичное обновление при ошибке
+      queryClient.invalidateQueries({ queryKey: queryKeys.tts.modeSettings() });
+      // toast уже показан в hook
+    },
+  });
+
   // Удалить награду TTS
-  const handleDeleteReward = async (platform) => {
+  const handleDeleteReward = (platform) => {
     if (!confirm(`Удалить TTS награду для ${platform.toUpperCase()}?`)) {
       return;
     }
 
-    try {
-      // 🚀 FIX: Оптимистичное обновление - сразу удаляем reward_id из кэша
-      if (modeSettingsData) {
-        queryClient.setQueryData(['tts-mode-settings'], (oldData) => {
-          if (!oldData) return oldData;
-          const newRewardIds = { ...(oldData.tts_reward_ids || {}) };
-          delete newRewardIds[platform];
-          return {
-            ...oldData,
-            tts_reward_ids: newRewardIds
-          };
-        });
-      }
-      
-      await botService.delete(`/api/tts/reward/${platform}`);
-      
-      // 🚀 FIX: Принудительно обновляем данные с сервера
-      await refetchModeSettings();
-      
-      toast.success('Награда удалена');
-    } catch (error) {
-      logger.error('Error deleting TTS reward:', error);
-      toast.error('Ошибка удаления награды');
-      // Откатываем оптимистичное обновление при ошибке
-      queryClient.invalidateQueries({ queryKey: ['tts-mode-settings'] });
+    if (deleteTtsRewardMutation.isPending) return;
+
+    // Оптимистичное обновление - сразу удаляем reward_id из кэша
+    if (modeSettingsData) {
+      queryClient.setQueryData(queryKeys.tts.modeSettings(), (oldData) => {
+        if (!oldData) return oldData;
+        const newRewardIds = { ...(oldData.tts_reward_ids || {}) };
+        delete newRewardIds[platform];
+        return {
+          ...oldData,
+          tts_reward_ids: newRewardIds
+        };
+      });
     }
+    
+    deleteTtsRewardMutation.mutate(platform);
   };
 
   const isTwitchConnected = integrations.twitch?.enabled || (isGuest && user?.platform === 'twitch');

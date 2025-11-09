@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useMemo, useTransition } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,8 +33,16 @@ import {
   Loader2,
   Power
 } from 'lucide-react';
-import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
+// ✅ НОВЫЙ ИМПОРТ: Используем централизованные queries
+import {
+  useDropsQualities,
+  useDropsRewards,
+  useCreateDropsReward,
+  useUpdateDropsReward,
+  useDeleteDropsReward,
+  useToggleDropsReward,
+} from '../../queries/drops/dropsQueries';
 import { logger } from '../../utils/prodLogger';
 
 import CommonClosed from '../../images/lootboxes/common/common_closed.png';
@@ -84,7 +91,6 @@ const QUALITIES = [
 
 
 const RewardsManager = ({ user, channelName, onRewardsCountChange, integrations }) => {
-  const queryClient = useQueryClient();
   const [rewardDialogOpen, setRewardDialogOpen] = useState(false);
   const [editingReward, setEditingReward] = useState(null);
   const [selectedQuality, setSelectedQuality] = useState(null);
@@ -113,49 +119,38 @@ const RewardsManager = ({ user, channelName, onRewardsCountChange, integrations 
   // Фильтр по платформе для отображения
   const [platformFilter, setPlatformFilter] = useState('all'); // 'all', 'twitch', 'vk'
 
-  // React Query: загружаем качества (кешируются глобально)
-  const { data: qualitiesData = [], isLoading: qualitiesLoading } = useQuery({
-    queryKey: ['drops-qualities'],
-    queryFn: async () => {
-      const response = await botService.get('/api/drops/qualities');
-      return response.data.success ? response.data.data : [];
-    },
-    staleTime: 10 * 60 * 1000, // 10 минут - качества редко меняются
-  });
+  // ✅ НОВЫЙ КОД: Используем централизованные queries
+  const { data: qualitiesData = [], isLoading: qualitiesLoading } = useDropsQualities();
 
-  // React Query: загружаем награды (ОБЩИЕ для всех платформ)
-  const { data: allRewardsData, isLoading: rewardsLoading } = useQuery({
-    queryKey: ['drops-rewards', channelName],
-    queryFn: async () => {
-      if (!channelName) return [];
-      
-      // ✅ Награды ОБЩИЕ - делаем один запрос
-      // Параметр platform передаем для совместимости, но он игнорируется на бэкенде
-      const response = await botService.get(`/api/drops/rewards/${channelName}`, { 
-        params: { platform: 'twitch' } // Игнорируется бэкендом, награды общие
-      });
-      
-      if (!response.data.success) return [];
-      
-      // Добавляем platform к каждой награде для отображения
-      return (response.data.data || []).map(r => ({
-        ...r,
-        // Награда доступна на всех платформах, но показываем где она была создана
-        platform: r.platform || 'twitch'
-      }));
-    },
-    enabled: !!channelName, // ✅ Награды глобальные, не зависят от платформы
+  // ✅ НОВЫЙ КОД: Используем централизованные queries для наград
+  const { data: allRewardsData = [], isLoading: rewardsLoading } = useDropsRewards(channelName);
+  
+  // ✅ НОВЫЙ КОД: Используем централизованные mutations
+  const createRewardMutation = useCreateDropsReward(channelName, {
+    onSuccess: () => {
+      setRewardDialogOpen(false);
+      // toast уже показывается в mutation
+    }
   });
+  const updateRewardMutation = useUpdateDropsReward(channelName, {
+    onSuccess: () => {
+      setRewardDialogOpen(false);
+      // toast уже показывается в mutation
+    }
+  });
+  const deleteRewardMutation = useDeleteDropsReward(channelName);
+  const toggleRewardMutation = useToggleDropsReward(channelName);
   
   // ✅ Защита от null/undefined - всегда массив
   const allRewards = allRewardsData || [];
   
-  // Фильтруем награды по выбранной платформе
+  // Фильтруем награды по выбранной платформе (награды общие для всех платформ, но можем фильтровать по platform если нужно)
   const rewards = React.useMemo(() => {
     // ✅ Защита от null/undefined
     if (!allRewards) return [];
+    // Награды общие для всех платформ, но можем фильтровать по platform если есть
     if (platformFilter === 'all') return allRewards;
-    return allRewards.filter(r => r.platform === platformFilter);
+    return allRewards.filter(r => (r.platform || 'twitch') === platformFilter);
   }, [allRewards, platformFilter]);
 
   // Уведомляем родителя об изменении количества наград
@@ -205,93 +200,6 @@ const RewardsManager = ({ user, channelName, onRewardsCountChange, integrations 
     setRewardDialogOpen(true);
   };
 
-  // React Query: мутация для создания/обновления награды с optimistic updates
-  const saveRewardMutation = useMutation({
-    mutationFn: async ({ payload, isEdit, rewardId }) => {
-      if (isEdit) {
-        return await botService.put(`/api/drops/rewards/${rewardId}`, payload);
-      } else {
-        // При создании используем platform из payload
-        const platform = payload.platform || 'twitch';
-        return await botService.post(`/api/drops/rewards/${channelName}`, payload, {
-          params: { platform }
-        });
-      }
-    },
-    onMutate: async ({ payload, isEdit }) => {
-      // Отменяем исходящие запросы для всех платформ
-      await queryClient.cancelQueries({ queryKey: ['drops-rewards', channelName] });
-      
-      // Snapshot предыдущего значения
-      const previousRewards = queryClient.getQueryData(['drops-rewards', channelName]);
-      
-      // Optimistically update (работаем с объединенным списком наград)
-      if (isEdit && editingReward) {
-        queryClient.setQueryData(['drops-rewards', channelName], (old) => {
-          // ✅ Защита от null/undefined
-          if (!old) return [];
-          return old.map(reward => 
-            reward.id === editingReward.id 
-              ? { ...reward, ...payload, quality: qualitiesData.find(q => q.id === payload.quality_id) }
-              : reward
-          );
-        });
-      } else {
-        const newReward = {
-          ...payload,
-          platform: payload.platform || 'twitch',
-          quality: qualitiesData.find(q => q.id === payload.quality_id),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        queryClient.setQueryData(['drops-rewards', channelName], (old) => {
-          // ✅ Защита от null/undefined
-          return [...(old || []), newReward];
-        });
-      }
-      
-      return { previousRewards };
-    },
-    onError: (err, variables, context) => {
-      // Rollback при ошибке
-      if (context?.previousRewards) {
-        // ✅ Защита от null - устанавливаем пустой массив если previousRewards null
-        queryClient.setQueryData(['drops-rewards', channelName], context.previousRewards || []);
-      }
-      
-      // Обрабатываем ошибки валидации
-      let errorMessage = 'Ошибка сохранения награды';
-      
-      if (err.response?.data) {
-        const errorData = err.response.data;
-        
-        if (Array.isArray(errorData.detail)) {
-          const messages = errorData.detail.map(e => {
-            if (typeof e === 'object' && e.msg) {
-              return `${e.loc?.join('.')}: ${e.msg}`;
-            }
-            return String(e);
-          });
-          errorMessage = messages.join(', ');
-        } else if (typeof errorData.detail === 'string') {
-          errorMessage = errorData.detail;
-        } else if (errorData.message) {
-          errorMessage = errorData.message;
-        }
-      }
-      
-      toast.error(errorMessage);
-      logger.error('Error saving reward:', err);
-    },
-    onSuccess: (response, variables) => {
-      toast.success(variables.isEdit ? 'Награда обновлена' : 'Награда создана');
-      setRewardDialogOpen(false);
-    },
-    onSettled: () => {
-      // Refetch для синхронизации (обновляем все награды)
-      queryClient.invalidateQueries({ queryKey: ['drops-rewards', channelName] });
-    },
-  });
 
   const handleSaveReward = async () => {
     if (!rewardForm.name) {
@@ -312,74 +220,33 @@ const RewardsManager = ({ user, channelName, onRewardsCountChange, integrations 
       reward_type: 'custom', // Всегда custom, так как награда - это просто сундук
       reward_value: '', // Пустое значение, так как награда - это просто показ сундука
       image_url: (rewardForm.image_url && rewardForm.image_url.trim()) || null, // URL изображения для карточки в гача крутке (null если пусто)
-      sound_volume: 1.0, // Дефолтное значение, настройка звука в виджете
+      sound_volume: rewardForm.sound_volume[0] || 1.0, // Используем значение из формы
       is_active: rewardForm.is_active,
-      platform: rewardForm.platform // Добавляем platform для новой награды
+      platform: rewardForm.platform // Добавляем platform для новой награды (для совместимости)
     };
 
-    saveRewardMutation.mutate({
-      payload,
-      isEdit: !!editingReward,
-      rewardId: editingReward?.id,
-    });
+    // ✅ НОВЫЙ КОД: Используем централизованные mutations
+    if (editingReward) {
+      updateRewardMutation.mutate({ rewardId: editingReward.id, reward: payload });
+    } else {
+      createRewardMutation.mutate(payload);
+    }
   };
 
-  // React Query: мутация для удаления награды с optimistic updates
-  const deleteRewardMutation = useMutation({
-    mutationFn: async (rewardId) => {
-      return await botService.delete(`/api/drops/rewards/${rewardId}`);
-    },
-    onMutate: async (rewardId) => {
-      await queryClient.cancelQueries({ queryKey: ['drops-rewards', channelName] });
-      
-      const previousRewards = queryClient.getQueryData(['drops-rewards', channelName]);
-      
-      // Optimistically remove
-      queryClient.setQueryData(['drops-rewards', channelName], (old) => 
-        (old || []).filter(reward => reward.id !== rewardId)
-      );
-      
-      return { previousRewards };
-    },
-    onError: (err, rewardId, context) => {
-      if (context?.previousRewards) {
-        // ✅ Защита от null - устанавливаем пустой массив если previousRewards null
-        queryClient.setQueryData(['drops-rewards', channelName], context.previousRewards || []);
-      }
-      toast.error('Ошибка удаления награды');
-      logger.error('Error deleting reward:', err);
-    },
-    onSuccess: () => {
-      toast.success('Награда удалена');
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['drops-rewards', channelName] });
-    },
-  });
-
-  const handleDeleteReward = async (rewardId) => {
+  const handleDeleteReward = (rewardId) => {
     if (!confirm('Удалить эту награду?')) return;
     deleteRewardMutation.mutate(rewardId);
+    // toast уже показывается в mutation
   };
 
-  // React Query: мутация для переключения активности награды
-  const toggleRewardMutation = useMutation({
-    mutationFn: async (rewardId) => {
-      const response = await botService.patch(`/api/drops/rewards/${rewardId}/toggle`);
-      return response.data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['drops-rewards', channelName] });
-      toast.success(data.message || 'Статус награды изменен');
-    },
-    onError: (error) => {
-      logger.error('Error toggling reward:', error);
-      toast.error('Ошибка изменения статуса награды');
-    },
-  });
-
-  const handleToggleReward = async (reward) => {
-    toggleRewardMutation.mutate(reward.id);
+  // Обертка для переключения награды
+  const handleToggleReward = (reward) => {
+    const newIsActive = !reward.is_active;
+    toggleRewardMutation.mutate({ 
+      rewardId: reward.id, 
+      isActive: newIsActive 
+    });
+    // toast уже показывается в mutation
   };
 
   const getRewardsForQuality = (qualityName) => {
@@ -668,10 +535,10 @@ const RewardsManager = ({ user, channelName, onRewardsCountChange, integrations 
             </Button>
             <Button 
               onClick={handleSaveReward} 
-              disabled={saveRewardMutation.isPending || deleteRewardMutation.isPending}
+              disabled={createRewardMutation.isPending || updateRewardMutation.isPending || deleteRewardMutation.isPending}
               className="gap-2 w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground font-semibold order-1 sm:order-2"
             >
-              {saveRewardMutation.isPending ? (
+              {(createRewardMutation.isPending || updateRewardMutation.isPending) ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Сохранение...

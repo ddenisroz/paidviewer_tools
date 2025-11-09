@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,17 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, AlertCircle, ChevronDown } from 'lucide-react';
-import { botService } from '../../services/microservices';
-import { toast } from 'sonner';
 import { useIntegrations } from '../../context/IntegrationsContext';
-import { logger } from '../../utils/prodLogger';
+import { useFilteredWords, useAddFilteredWord, useDeleteFilteredWord } from '../../queries/tts/ttsQueries';
 
 const WordFilterManager = React.memo(() => {
-    const [words, setWords] = useState([]);
-    const [loading, setLoading] = useState(false);
     const [newWord, setNewWord] = useState('');
     const [selectedPlatform, setSelectedPlatform] = useState('all');
-    const [isAdding, setIsAdding] = useState(false);
     const [isWordFilterExpanded, setIsWordFilterExpanded] = useState(false);
     
     // Используем useCallback для стабильной ссылки на функцию
@@ -25,6 +20,36 @@ const WordFilterManager = React.memo(() => {
     }, []);
     
     const { integrations } = useIntegrations();
+
+    // React Query hooks
+    const { data: wordsData, isLoading: loading } = useFilteredWords({
+        retry: false, // Не повторяем при ошибке
+        refetchOnWindowFocus: false,
+    });
+
+    const addWordMutation = useAddFilteredWord({
+        onSuccess: () => {
+            setNewWord('');
+        },
+        onError: (error) => {
+            // Ошибка уже обработана в hook, но не показываем toast если TTS сервис недоступен
+            if (error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED') {
+                // Не показываем ошибку если TTS сервис недоступен
+            }
+        },
+    });
+
+    const deleteWordMutation = useDeleteFilteredWord({
+        onError: (error) => {
+            // Ошибка уже обработана в hook, но не показываем toast если TTS сервис недоступен
+            if (error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED') {
+                // Не показываем ошибку если TTS сервис недоступен
+            }
+        },
+    });
+
+    const words = wordsData?.data?.filtered_words || wordsData?.data?.words || [];
+    const isAdding = addWordMutation.isPending;
 
     // Получаем доступные платформы из интеграций
     const getAvailablePlatforms = () => {
@@ -42,74 +67,21 @@ const WordFilterManager = React.memo(() => {
         return '❓';
     };
 
-    // Загрузка списка слов
-    const loadWords = async () => {
-        try {
-            setLoading(true);
-            const response = await botService.get('/api/tts/filtered-words');
-            if (response.data.success) {
-                setWords(response.data.words || []);
-            }
-        } catch (error) {
-            logger.error('Error loading filtered words:', error);
-            // Не показываем ошибку если TTS сервис недоступен
-            if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
-                toast.error('Ошибка загрузки списка слов');
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
-
     // Добавление слова
-    const addWord = async () => {
+    const addWord = () => {
         if (!newWord.trim()) {
-            toast.error('Введите слово');
             return;
         }
 
-        try {
-            setIsAdding(true);
-            const response = await botService.post('/api/tts/filtered-words', {
-                word: newWord.trim(),
-                platform: selectedPlatform
-            });
-
-            if (response.data.success) {
-                setWords(prev => [...prev, response.data.word]);
-                setNewWord('');
-                toast.success('Слово добавлено');
-            } else {
-                toast.error(response.data.message || 'Ошибка добавления слова');
-            }
-        } catch (error) {
-            logger.error('Error adding word:', error);
-            // Не показываем ошибку если TTS сервис недоступен
-            if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
-                toast.error('Ошибка добавления слова');
-            }
-        } finally {
-            setIsAdding(false);
-        }
+        addWordMutation.mutate({
+            word: newWord.trim(),
+            platform: selectedPlatform
+        });
     };
 
     // Удаление слова
-    const removeWord = async (wordId) => {
-        try {
-            const response = await botService.delete(`/api/tts/filtered-words/${wordId}`);
-            if (response.data.success) {
-                setWords(prev => prev.filter(word => word.id !== wordId));
-                toast.success('Слово удалено');
-            } else {
-                toast.error(response.data.message || 'Ошибка удаления слова');
-            }
-        } catch (error) {
-            logger.error('Error removing word:', error);
-            // Не показываем ошибку если TTS сервис недоступен
-            if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
-                toast.error('Ошибка удаления слова');
-            }
-        }
+    const removeWord = (wordId) => {
+        deleteWordMutation.mutate(wordId);
     };
 
     // Получение цвета для платформы
@@ -132,9 +104,6 @@ const WordFilterManager = React.memo(() => {
         }
     };
 
-    useEffect(() => {
-        loadWords();
-    }, []);
 
     return (
         <Card data-testid="word-filter-card">

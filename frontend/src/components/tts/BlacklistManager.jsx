@@ -1,31 +1,64 @@
 // src/components/tts/BlacklistManager.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { X, Plus, UserX, UserCheck, ChevronDown } from 'lucide-react';
+import { X, Plus, UserX, VolumeX, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { botService } from '../../services/microservices';
 import { useIntegrations } from '../../context/IntegrationsContext';
 import { useAuth } from '../../context/AuthContext';
-import { logger } from '../../utils/prodLogger';
+import { useBlockedUsers, useBlockUser, useUnblockUser } from '../../queries/tts/ttsQueries';
 
 const BlacklistManager = React.memo(() => {
-    const [blacklist, setBlacklist] = useState([]);
     const [newUsername, setNewUsername] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [adding, setAdding] = useState(false);
     const [isBlacklistExpanded, setIsBlacklistExpanded] = useState(false);
+    const [selectedPlatform, setSelectedPlatform] = useState('twitch'); // По умолчанию Twitch
     
     // Используем useCallback для стабильной ссылки на функцию
     const toggleBlacklistExpanded = useCallback(() => {
         setIsBlacklistExpanded(prev => !prev);
     }, []);
-    const [selectedPlatform, setSelectedPlatform] = useState('twitch'); // По умолчанию Twitch
+    
     const { integrations } = useIntegrations();
     const { user } = useAuth();
+
+    // React Query hooks
+    const { data: blockedUsersData, isLoading: loading } = useBlockedUsers({
+        retry: false, // Не повторяем при ошибке
+        refetchOnWindowFocus: false,
+    });
+
+    const blockUserMutation = useBlockUser({
+        onSuccess: (response, variables) => {
+            setNewUsername('');
+            const platformName = variables.platform === 'twitch' ? 'Twitch' : 'VK Live';
+            toast.success(`Пользователь ${variables.username} заглушен на ${platformName}`);
+        },
+        onError: (error) => {
+            // Ошибка уже обработана в hook
+            if (error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED') {
+                // Не показываем ошибку если TTS сервис недоступен
+            }
+        },
+    });
+
+    const unblockUserMutation = useUnblockUser({
+        onSuccess: (response, variables) => {
+            const platformName = variables.platform === 'twitch' ? 'Twitch' : 'VK Live';
+            toast.success(`${variables.username} разглушен на ${platformName}`);
+        },
+        onError: (error) => {
+            // Ошибка уже обработана в hook
+            if (error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED') {
+                // Не показываем ошибку если TTS сервис недоступен
+            }
+        },
+    });
+
+    const blacklist = blockedUsersData?.data?.blocked_users || [];
+    const adding = blockUserMutation.isPending;
 
     // Получаем доступные платформы из интеграций
     const getAvailablePlatforms = () => {
@@ -42,96 +75,37 @@ const BlacklistManager = React.memo(() => {
         return '';
     };
 
-    // Загрузка черного списка
-    const loadBlacklist = async () => {
-        try {
-            setLoading(true);
-            // Получаем список заблокированных пользователей для всех каналов
-            const response = await botService.get('/api/tts/blocked-users');
-            if (response.data.success) {
-                // Сохраняем полные объекты с платформой
-                const allUsers = response.data.blocked_users || [];
-                setBlacklist(allUsers);
-            } else {
-                setBlacklist([]);
-            }
-        } catch (error) {
-            // Не показываем ошибку если TTS сервис недоступен
-            if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
-                logger.error('Error loading blacklist:', error);
-                toast.error('Ошибка загрузки черного списка');
-            }
-            setBlacklist([]);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     // Добавление пользователя в черный список
-    const addToBlacklist = async () => {
+    const addToBlacklist = () => {
         if (!newUsername.trim()) {
-            toast.error('Введите имя пользователя');
             return;
         }
 
         if (!selectedPlatform) {
-            toast.error('Выберите платформу');
             return;
         }
 
-        try {
-            setAdding(true);
-            const channelName = getChannelName(selectedPlatform);
-            
-            if (!channelName) {
-                toast.error(`Не удалось получить имя канала для платформы ${selectedPlatform}`);
-                return;
-            }
-
-            const response = await botService.post('/api/tts/block', {
-                channel_name: channelName,
-                platform: selectedPlatform,
-                username: newUsername.trim()
-            });
-
-            if (response.data.success) {
-                toast.success(`Пользователь ${newUsername} заглушен на ${selectedPlatform === 'twitch' ? 'Twitch' : 'VK Live'}`);
-                setNewUsername('');
-                loadBlacklist();
-            } else {
-                toast.error(response.data.message || 'Ошибка при добавлении в черный список');
-            }
-        } catch (error) {
-            logger.error('Error adding to blacklist:', error);
-            toast.error('Ошибка при добавлении в черный список');
-        } finally {
-            setAdding(false);
+        const channelName = getChannelName(selectedPlatform);
+        
+        if (!channelName) {
+            toast.error(`Не удалось получить имя канала для платформы ${selectedPlatform}`);
+            return;
         }
+
+        blockUserMutation.mutate({
+            channel_name: channelName,
+            platform: selectedPlatform,
+            username: newUsername.trim()
+        });
     };
 
     // Удаление пользователя из черного списка (конкретная запись)
-    const removeFromBlacklist = async (blockedUser) => {
-        try {
-            const response = await botService.post('/api/tts/unblock', {
-                channel_name: blockedUser.channel_name,
-                platform: blockedUser.platform,
-                username: blockedUser.username
-            });
-            
-            if (response.data.success) {
-                const platformName = blockedUser.platform === 'twitch' ? 'Twitch' : 'VK Live';
-                toast.success(`${blockedUser.username} разглушен на ${platformName}`);
-                loadBlacklist(); // Перезагружаем список
-            } else {
-                toast.error('Ошибка удаления из черного списка');
-            }
-        } catch (error) {
-            logger.error('Error removing from blacklist:', error);
-            // Не показываем ошибку если TTS сервис недоступен
-            if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
-                toast.error('Ошибка удаления из черного списка');
-            }
-        }
+    const removeFromBlacklist = (blockedUser) => {
+        unblockUserMutation.mutate({
+            channel_name: blockedUser.channel_name,
+            platform: blockedUser.platform,
+            username: blockedUser.username
+        });
     };
 
 
@@ -142,10 +116,6 @@ const BlacklistManager = React.memo(() => {
         return '❓';
     };
 
-    // Загрузка при монтировании
-    useEffect(() => {
-        loadBlacklist();
-    }, []);
 
     const availablePlatforms = getAvailablePlatforms();
 

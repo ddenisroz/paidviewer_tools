@@ -1,5 +1,5 @@
 // src/components/tts/TtsFilterManager.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,10 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { X, Plus, UserX, ChevronDown, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { botService } from '../../services/microservices';
 import { useIntegrations } from '../../context/IntegrationsContext';
 import { useAuth } from '../../context/AuthContext';
-import { logger } from '../../utils/prodLogger';
+import { useBlockedUsers, useBlockUser, useUnblockUser, useFilteredWords, useAddFilteredWord, useDeleteFilteredWord } from '../../queries/tts/ttsQueries';
 
 const TtsFilterManager = React.memo(() => {
     // Общие состояния
@@ -21,23 +20,77 @@ const TtsFilterManager = React.memo(() => {
     const { user } = useAuth();
 
     // Состояния для черного списка
-    const [blacklist, setBlacklist] = useState([]);
     const [newUsername, setNewUsername] = useState('');
-    const [addingUser, setAddingUser] = useState(false);
-    const [loadingUsers, setLoadingUsers] = useState(false);
     const [selectedUserPlatform, setSelectedUserPlatform] = useState('twitch');
 
     // Состояния для словаря фильтра
-    const [words, setWords] = useState([]);
     const [newWord, setNewWord] = useState('');
-    const [addingWord, setAddingWord] = useState(false);
-    const [loadingWords, setLoadingWords] = useState(false);
     const [selectedWordPlatform, setSelectedWordPlatform] = useState('all');
 
     // Функция переключения спойлера
     const toggleExpanded = useCallback(() => {
         setIsExpanded(prev => !prev);
     }, []);
+
+    // React Query hooks для черного списка
+    const { data: blockedUsersData, isLoading: loadingUsers } = useBlockedUsers({
+        retry: false,
+        refetchOnWindowFocus: false,
+    });
+
+    const blockUserMutation = useBlockUser({
+        onSuccess: (response, variables) => {
+            setNewUsername('');
+            const platformName = variables.platform === 'twitch' ? 'Twitch' : 'VK Live';
+            toast.success(`Пользователь ${variables.username} заглушен на ${platformName}`);
+        },
+        onError: (error) => {
+            if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
+                // Ошибка уже обработана в hook
+            }
+        },
+    });
+
+    const unblockUserMutation = useUnblockUser({
+        onSuccess: (response, variables) => {
+            toast.success(`Пользователь ${variables.username} разблокирован`);
+        },
+        onError: (error) => {
+            if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
+                // Ошибка уже обработана в hook
+            }
+        },
+    });
+
+    // React Query hooks для словаря фильтра
+    const { data: wordsData, isLoading: loadingWords } = useFilteredWords({
+        retry: false,
+        refetchOnWindowFocus: false,
+    });
+
+    const addWordMutation = useAddFilteredWord({
+        onSuccess: () => {
+            setNewWord('');
+        },
+        onError: (error) => {
+            if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
+                // Ошибка уже обработана в hook
+            }
+        },
+    });
+
+    const deleteWordMutation = useDeleteFilteredWord({
+        onError: (error) => {
+            if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
+                // Ошибка уже обработана в hook
+            }
+        },
+    });
+
+    const blacklist = blockedUsersData?.data?.blocked_users || [];
+    const words = wordsData?.data?.filtered_words || wordsData?.data?.words || [];
+    const addingUser = blockUserMutation.isPending;
+    const addingWord = addWordMutation.isPending;
 
     // Получаем доступные платформы из интеграций
     const getAvailablePlatforms = () => {
@@ -84,162 +137,61 @@ const TtsFilterManager = React.memo(() => {
 
     // ========== ЧЕРНЫЙ СПИСОК ==========
 
-    // Загрузка черного списка
-    const loadBlacklist = async () => {
-        try {
-            setLoadingUsers(true);
-            const response = await botService.get('/api/tts/blocked-users');
-            if (response.data.success) {
-                const allUsers = response.data.blocked_users || [];
-                setBlacklist(allUsers);
-            } else {
-                setBlacklist([]);
-            }
-        } catch (error) {
-            logger.error('Error loading blacklist:', error);
-            setBlacklist([]);
-        } finally {
-            setLoadingUsers(false);
-        }
-    };
-
     // Добавление пользователя в черный список
-    const addToBlacklist = async () => {
+    const addToBlacklist = () => {
         if (!newUsername.trim()) {
-            toast.error('Введите имя пользователя');
             return;
         }
 
         if (!selectedUserPlatform) {
-            toast.error('Выберите платформу');
             return;
         }
 
-        try {
-            setAddingUser(true);
-            const channelName = getChannelName(selectedUserPlatform);
-            
-            if (!channelName) {
-                toast.error(`Не удалось получить имя канала для платформы ${selectedUserPlatform}`);
-                return;
-            }
-
-            const response = await botService.post('/api/tts/block', {
-                channel_name: channelName,
-                platform: selectedUserPlatform,
-                username: newUsername.trim()
-            });
-
-            if (response.data.success) {
-                toast.success(`Пользователь ${newUsername} заглушен на ${selectedUserPlatform === 'twitch' ? 'Twitch' : 'VK Live'}`);
-                setNewUsername('');
-                loadBlacklist();
-            } else {
-                toast.error(response.data.message || 'Ошибка при добавлении в черный список');
-            }
-        } catch (error) {
-            logger.error('Error adding to blacklist:', error);
-            toast.error('Ошибка при добавлении в черный список');
-        } finally {
-            setAddingUser(false);
+        const channelName = getChannelName(selectedUserPlatform);
+        
+        if (!channelName) {
+            toast.error(`Не удалось получить имя канала для платформы ${selectedUserPlatform}`);
+            return;
         }
+
+        blockUserMutation.mutate({
+            channel_name: channelName,
+            platform: selectedUserPlatform,
+            username: newUsername.trim()
+        });
     };
 
     // Удаление пользователя из черного списка
-    const removeFromBlacklist = async (blockedUser) => {
+    const removeFromBlacklist = (blockedUser) => {
         if (!window.confirm(`Разблокировать пользователя ${blockedUser.username}?`)) {
             return;
         }
 
-        try {
-            const response = await botService.post('/api/tts/unblock', {
-                channel_name: blockedUser.channel_name,
-                platform: blockedUser.platform,
-                username: blockedUser.username
-            });
-
-            if (response.data.success) {
-                toast.success(`Пользователь ${blockedUser.username} разблокирован`);
-                loadBlacklist();
-            } else {
-                toast.error('Ошибка удаления из черного списка');
-            }
-        } catch (error) {
-            logger.error('Error removing from blacklist:', error);
-            toast.error('Ошибка удаления из черного списка');
-        }
+        unblockUserMutation.mutate({
+            channel_name: blockedUser.channel_name,
+            platform: blockedUser.platform,
+            username: blockedUser.username
+        });
     };
 
     // ========== СЛОВАРЬ ФИЛЬТРА ==========
 
-    // Загрузка списка слов
-    const loadWords = async () => {
-        try {
-            setLoadingWords(true);
-            const response = await botService.get('/api/tts/filtered-words');
-            if (response.data.success) {
-                setWords(Array.isArray(response.data.words) ? response.data.words : []);
-            } else {
-                setWords([]);
-            }
-        } catch (error) {
-            logger.error('Error loading words:', error);
-            setWords([]);
-        } finally {
-            setLoadingWords(false);
-        }
-    };
-
     // Добавление слова
-    const addWord = async () => {
+    const addWord = () => {
         if (!newWord.trim()) {
-            toast.error('Введите слово');
             return;
         }
 
-        try {
-            setAddingWord(true);
-            const response = await botService.post('/api/tts/filtered-words', {
-                word: newWord.trim(),
-                platform: selectedWordPlatform
-            });
-
-            if (response.data.success) {
-                setWords(prev => [...prev, response.data.word]);
-                setNewWord('');
-                toast.success('Слово добавлено');
-            } else {
-                toast.error(response.data.message || 'Ошибка добавления слова');
-            }
-        } catch (error) {
-            logger.error('Error adding word:', error);
-            toast.error('Ошибка добавления слова');
-        } finally {
-            setAddingWord(false);
-        }
+        addWordMutation.mutate({
+            word: newWord.trim(),
+            platform: selectedWordPlatform
+        });
     };
 
     // Удаление слова
-    const removeWord = async (wordId) => {
-        try {
-            const response = await botService.delete(`/api/tts/filtered-words/${wordId}`);
-            if (response.data.success) {
-                setWords(prev => prev.filter(w => w.id !== wordId));
-                toast.success('Слово удалено');
-            } else {
-                toast.error('Ошибка удаления слова');
-            }
-        } catch (error) {
-            logger.error('Error removing word:', error);
-            toast.error('Ошибка удаления слова');
-        }
+    const removeWord = (wordId) => {
+        deleteWordMutation.mutate(wordId);
     };
-
-    // Загрузка данных при монтировании
-    useEffect(() => {
-        loadBlacklist();
-        loadWords();
-    }, []);
 
     const availablePlatforms = getAvailablePlatforms();
 

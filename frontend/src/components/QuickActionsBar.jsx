@@ -8,10 +8,13 @@ import { useAuth } from '../context/AuthContext';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useTts } from '../context/TtsContext';
 import { useDonationAlerts } from '../context/DonationAlertsContext';
-import { botService } from '../services/microservices';
 import { toast } from 'sonner';
 import { logger } from '../utils/prodLogger';
 import { getQueryCache, setQueryCache } from '../utils/queryPersist';
+import { useTtsStatus, useToggleTts } from '../queries/tts/ttsQueries';
+import { useDropsConfig, useUpdateDropsConfig } from '../queries/drops/dropsQueries';
+import { useDropsRewards } from '../queries/drops/dropsQueries';
+import { queryKeys } from '../queries/queryKeys';
 
 const QuickActionsBar = () => {
     const navigate = useNavigate();
@@ -36,20 +39,33 @@ const QuickActionsBar = () => {
     const isDropsEnabled = integrations.twitch?.enabled || integrations.vk?.enabled || (isGuest && user?.platform);
     const isDonationAlertsConnected = integrations?.donationalerts?.enabled || daConnected || false;
 
-    // 🔄 СИНХРОНИЗАЦИЯ: Используем React Query для синхронизации с TtsMainPage
-    const { data: ttsStatusData } = useQuery({
-        queryKey: ['tts-status'],
-        queryFn: async () => {
-            const response = await botService.get('/api/tts/status');
-            const data = response.data;
-            setQueryCache(['tts-status'], data);
-            return data;
-        },
+    // ✅ НОВЫЙ КОД: Используем централизованный hook для TTS статуса
+    const { data: ttsStatusResponse } = useTtsStatus(null, {
         enabled: isAuthenticated,
         refetchInterval: 30000,
         staleTime: 60000,
         gcTime: 5 * 60 * 1000,
         initialData: () => getQueryCache(['tts-status']),
+        onSuccess: (response) => {
+            if (response?.data) {
+                setQueryCache(['tts-status'], response.data);
+            }
+        },
+    });
+    const ttsStatusData = ttsStatusResponse?.data;
+
+    // ✅ НОВЫЙ КОД: Используем централизованный hook для переключения TTS
+    const toggleTtsMutation = useToggleTts({
+        onSuccess: (response, enabled) => {
+            // Сохраняем в кэш
+            if (response?.data) {
+                setQueryCache(['tts-status'], response.data);
+            }
+            // Отправляем событие для других компонентов
+            window.dispatchEvent(new CustomEvent('tts-status-changed', { 
+                detail: { enabled } 
+            }));
+        },
     });
 
     // 🔄 СИНХРОНИЗАЦИЯ: Вычисляем состояние TTS ТОЧНО ТАК ЖЕ как в TtsMainPage
@@ -67,47 +83,40 @@ const QuickActionsBar = () => {
         return basicEnabled || aiEnabled;
     }, [ttsStatusData]);
 
-    // 🔄 СИНХРОНИЗАЦИЯ: Используем React Query для синхронизации Drops настроек с DropsMainPage
-    // Получаем общий конфиг (без platform параметра)
-    const { data: dropsConfigData } = useQuery({
-        queryKey: ['drops-config', channelName],
-        queryFn: async () => {
-            if (!channelName) return null;
-            const response = await botService.get(`/api/drops/config/${channelName}`);
-            const data = response.data?.success ? response.data.data : null;
-            // 🚀 ANTI-FLASH: Сохраняем в кэш
+    // ✅ НОВЫЙ КОД: Используем централизованные hooks для Drops
+    const { data: dropsConfigData } = useDropsConfig(channelName, {
+        enabled: isAuthenticated && isDropsEnabled && !!channelName,
+        refetchInterval: 30000,
+        staleTime: 60000,
+        gcTime: 5 * 60 * 1000,
+        initialData: () => getQueryCache(['drops-config', channelName]),
+        onSuccess: (data) => {
             if (data) {
                 setQueryCache(['drops-config', channelName], data);
             }
-            return data;
         },
-        enabled: isAuthenticated && isDropsEnabled && !!channelName,
-        refetchInterval: 30000,
-        staleTime: 60000,
-        gcTime: 5 * 60 * 1000,
-        initialData: () => getQueryCache(['drops-config', channelName]), // 🚀 ANTI-FLASH: Загружаем из кэша
     });
 
-    // 🔄 СИНХРОНИЗАЦИЯ: Используем React Query для проверки наличия наград
-    // ✅ ВАЖНО: Награды ОБЩИЕ для всех платформ, не нужно передавать platform
-    const { data: rewardsData } = useQuery({
-        queryKey: ['drops-rewards', channelName],
-        queryFn: async () => {
-            if (!channelName) return [];
-            // ✅ Награды общие, platform игнорируется на бэкенде
-            const response = await botService.get(`/api/drops/rewards/${channelName}?platform=twitch`);
-            const data = response.data?.success ? (response.data.data || []) : [];
-            // 🚀 ANTI-FLASH: Сохраняем в кэш
-            if (data.length > 0) {
-                setQueryCache(['drops-rewards', channelName], data);
-            }
-            return data;
-        },
+    const { data: rewardsData } = useDropsRewards(channelName, {
         enabled: isAuthenticated && isDropsEnabled && !!channelName,
         refetchInterval: 30000,
         staleTime: 60000,
         gcTime: 5 * 60 * 1000,
-        initialData: () => getQueryCache(['drops-rewards', channelName]), // 🚀 ANTI-FLASH: Загружаем из кэша
+        initialData: () => getQueryCache(['drops-rewards', channelName]),
+        onSuccess: (data) => {
+            if (data && data.length > 0) {
+                setQueryCache(['drops-rewards', channelName], data);
+            }
+        },
+    });
+
+    // ✅ НОВЫЙ КОД: Используем централизованный hook для обновления Drops конфига
+    const updateDropsConfigMutation = useUpdateDropsConfig(channelName, {
+        onSuccess: (response) => {
+            if (response?.data?.data) {
+                setQueryCache(['drops-config', channelName], response.data.data);
+            }
+        },
     });
 
     // 🔄 СИНХРОНИЗАЦИЯ: Вычисляем состояния Drops из React Query данных
@@ -172,7 +181,7 @@ const QuickActionsBar = () => {
                     });
                     
                     // ✅ ОБНОВЛЯЕМ КЭШ: Кэш уже обновлен в useDropsConfig, но обновляем для консистентности
-                    queryClient.setQueryData(['drops-config', channelName], (old) => {
+                    queryClient.setQueryData(queryKeys.drops.config(channelName), (old) => {
                         if (!old) return old;
                         const updated = {
                             ...old,
@@ -187,7 +196,7 @@ const QuickActionsBar = () => {
                     }, 100);
                 } else if (donation_enabled !== undefined && source === 'useDropsConfig') {
                     isProcessing = true;
-                    queryClient.setQueryData(['drops-config', channelName], (old) => {
+                    queryClient.setQueryData(queryKeys.drops.config(channelName), (old) => {
                         if (!old) return old;
                         return {
                             ...old,
@@ -205,37 +214,20 @@ const QuickActionsBar = () => {
         return () => window.removeEventListener('drops-config-changed', handleDropsConfigChange);
     }, [channelName, queryClient]);
 
-    const handleTtsToggle = async () => {
-        if (isToggling) return;
+    const handleTtsToggle = () => {
+        if (isToggling || toggleTtsMutation.isPending) return;
         setIsToggling(true);
         
-        try {
-            const newState = !ttsState;
-            if (newState) {
-                await botService.post('/api/tts/enable');
-                toast.success('Озвучка включена');
-            } else {
-                await botService.post('/api/tts/disable');
-                toast.success('Озвучка отключена');
-            }
-            
-            // 🔄 СИНХРОНИЗАЦИЯ: Инвалидируем React Query кэш для синхронизации с TtsMainPage
-            queryClient.invalidateQueries({ queryKey: ['tts-status'] });
-            
-            // Отправляем событие для других компонентов
-            window.dispatchEvent(new CustomEvent('tts-status-changed', { 
-                detail: { enabled: newState } 
-            }));
-        } catch (error) {
-            logger.error('Error toggling TTS:', error);
-            toast.error('Ошибка переключения озвучки');
-        } finally {
-            setIsToggling(false);
-        }
+        const newState = !ttsState;
+        toggleTtsMutation.mutate(newState, {
+            onSettled: () => {
+                setIsToggling(false);
+            },
+        });
     };
 
-    const handleStreakToggle = async () => {
-        if (isToggling || !channelName) return;
+    const handleStreakToggle = () => {
+        if (isToggling || !channelName || updateDropsConfigMutation.isPending) return;
         
         // ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Используем АКТУАЛЬНОЕ состояние с учетом optimisticStreakState
         // Это предотвращает race condition при быстрых кликах
@@ -266,91 +258,77 @@ const QuickActionsBar = () => {
         
         setIsToggling(true);
         
-        try {
-            // ✅ Переключаем обе платформы одновременно синхронно
-            // Используем АКТУАЛЬНОЕ состояние для определения нового значения
-            const newState = !currentAnyStreakEnabled;
-            const newTwitchState = integrations.twitch?.enabled ? newState : currentTwitchStreakEnabled;
-            const newVkState = integrations.vk?.enabled ? newState : currentVkStreakEnabled;
-            const payload = {
-                streak_enabled_twitch: newTwitchState,
-                streak_enabled_vk: newVkState
-            };
-            
-            // ✅ ОПТИМИСТИЧНОЕ СОСТОЯНИЕ: Устанавливаем локальное состояние для мгновенного отображения
-            setOptimisticStreakState({
-                twitch: newTwitchState,
-                vk: newVkState
-            });
-            
-            // ✅ ОПТИМИСТИЧНОЕ ОБНОВЛЕНИЕ КЭША: Обновляем кэш ДО запроса
-            queryClient.setQueryData(['drops-config', channelName], (old) => {
-                if (!old) return { ...payload };
-                return {
-                    ...old,
-                    ...payload
-                };
-            });
+        // ✅ Переключаем обе платформы одновременно синхронно
+        // Используем АКТУАЛЬНОЕ состояние для определения нового значения
+        const newState = !currentAnyStreakEnabled;
+        const newTwitchState = integrations.twitch?.enabled ? newState : currentTwitchStreakEnabled;
+        const newVkState = integrations.vk?.enabled ? newState : currentVkStreakEnabled;
+        const payload = {
+            streak_enabled_twitch: newTwitchState,
+            streak_enabled_vk: newVkState
+        };
+        
+        // ✅ ОПТИМИСТИЧНОЕ СОСТОЯНИЕ: Устанавливаем локальное состояние для мгновенного отображения
+        setOptimisticStreakState({
+            twitch: newTwitchState,
+            vk: newVkState
+        });
+        
+        // ✅ НОВЫЙ КОД: Используем централизованный mutation
+        updateDropsConfigMutation.mutate(payload, {
+            onSuccess: (response) => {
+                toast.success(newState ? 'Стрик включен для всех платформ' : 'Стрик отключен для всех платформ');
                 
-            // Выполняем запрос к серверу
-            const response = await botService.put(`/api/drops/config/${channelName}`, payload);
-            
-            // ✅ ПОСЛЕ УСПЕШНОГО ОТВЕТА: Обновляем кэш данными с сервера
-            if (response.data?.success && response.data?.data) {
-                queryClient.setQueryData(['drops-config', channelName], response.data.data);
-                setQueryCache(['drops-config', channelName], response.data.data);
-            }
-            
-            toast.success(newState ? 'Стрик включен для всех платформ' : 'Стрик отключен для всех платформ');
-            
-            // ✅ СИНХРОНИЗАЦИЯ: Отправляем события для синхронизации с StreakSettings
-            // Используем source='QuickActionsBar' чтобы StreakSettings знал, что изменение пришло от QuickActionsBar
-            // StreakSettings должен обновить свое локальное состояние, но не должен отправлять события обратно
-            if (integrations.twitch?.enabled) {
-                window.dispatchEvent(new CustomEvent('drops-config-changed', {
-                    detail: { 
-                        streak_enabled: newState, 
-                        channel: channelName, 
-                        platform: 'twitch',
-                        source: 'QuickActionsBar'
-                    }
-                }));
-            }
-            if (integrations.vk?.enabled) {
-                window.dispatchEvent(new CustomEvent('drops-config-changed', {
-                    detail: { 
-                        streak_enabled: newState, 
-                        channel: channelName, 
-                        platform: 'vk',
-                        source: 'QuickActionsBar'
-                    }
-                }));
-            }
-            
-        } catch (error) {
-            logger.error('Error toggling streak:', error);
-            toast.error('Ошибка переключения стрика');
-            
-            // ✅ ОТКАТ: Восстанавливаем предыдущее состояние из кэша
-            // Получаем предыдущее состояние из React Query кэша
-            const previousConfig = queryClient.getQueryData(['drops-config', channelName]);
-            if (previousConfig) {
-                setOptimisticStreakState({
-                    twitch: previousConfig.streak_enabled_twitch || false,
-                    vk: previousConfig.streak_enabled_vk || false
-                });
-            } else {
-                // Если кэша нет - сбрасываем и перезагружаем
-                setOptimisticStreakState(null);
-                queryClient.invalidateQueries({ queryKey: ['drops-config', channelName] });
-            }
-        } finally {
-            setIsToggling(false);
-        }
+                // ✅ СИНХРОНИЗАЦИЯ: Отправляем события для синхронизации с StreakSettings
+                // Используем source='QuickActionsBar' чтобы StreakSettings знал, что изменение пришло от QuickActionsBar
+                // StreakSettings должен обновить свое локальное состояние, но не должен отправлять события обратно
+                if (integrations.twitch?.enabled) {
+                    window.dispatchEvent(new CustomEvent('drops-config-changed', {
+                        detail: { 
+                            streak_enabled: newState, 
+                            channel: channelName, 
+                            platform: 'twitch',
+                            source: 'QuickActionsBar'
+                        }
+                    }));
+                }
+                if (integrations.vk?.enabled) {
+                    window.dispatchEvent(new CustomEvent('drops-config-changed', {
+                        detail: { 
+                            streak_enabled: newState, 
+                            channel: channelName, 
+                            platform: 'vk',
+                            source: 'QuickActionsBar'
+                        }
+                    }));
+                }
+            },
+            onError: (error) => {
+                logger.error('Error toggling streak:', error);
+                toast.error('Ошибка переключения стрика');
+                
+                // ✅ ОТКАТ: Восстанавливаем предыдущее состояние из кэша
+                // Получаем предыдущее состояние из React Query кэша
+                const previousConfig = queryClient.getQueryData(queryKeys.drops.config(channelName));
+                if (previousConfig) {
+                    setOptimisticStreakState({
+                        twitch: previousConfig.streak_enabled_twitch || false,
+                        vk: previousConfig.streak_enabled_vk || false
+                    });
+                } else {
+                    // Если кэша нет - сбрасываем и перезагружаем
+                    setOptimisticStreakState(null);
+                    queryClient.invalidateQueries({ queryKey: queryKeys.drops.config(channelName) });
+                }
+            },
+            onSettled: () => {
+                setIsToggling(false);
+            },
+        });
     };
 
-    const handleDonationToggle = async () => {
-        if (isToggling || !channelName) return;
+    const handleDonationToggle = () => {
+        if (isToggling || !channelName || updateDropsConfigMutation.isPending) return;
         
         // 🚀 FIX: Если DonationAlerts не подключен - перенаправляем на настройки
         // Работает как обычный переключатель: всегда кликабельный, но перенаправляет на подключение
@@ -378,27 +356,26 @@ const QuickActionsBar = () => {
         
         setIsToggling(true);
         
-        try {
-            // 🚀 FIX: Используем donationEnabledRaw для определения нового состояния
-            const newState = !donationEnabledRaw;
-            await botService.put(`/api/drops/config/${channelName}?platform=${platform}`, {
-                donation_enabled: newState
-            });
-            toast.success(newState ? 'Донаты включены' : 'Донаты отключены');
-            
-            // 🔄 СИНХРОНИЗАЦИЯ: Инвалидируем React Query кэш для синхронизации с DropsMainPage
-            queryClient.invalidateQueries({ queryKey: ['drops-config', channelName] });
-            
-            // Dispatch event to sync with DropsMainPage
-            window.dispatchEvent(new CustomEvent('drops-config-changed', {
-                detail: { donation_enabled: newState, channel: channelName, platform }
-            }));
-        } catch (error) {
-            logger.error('Error toggling donation:', error);
-            toast.error('Ошибка переключения донатов');
-        } finally {
-            setIsToggling(false);
-        }
+        // ✅ НОВЫЙ КОД: Используем централизованный mutation
+        const newState = !donationEnabledRaw;
+        updateDropsConfigMutation.mutate({
+            donation_enabled: newState
+        }, {
+            onSuccess: () => {
+                toast.success(newState ? 'Донаты включены' : 'Донаты отключены');
+                // Dispatch event to sync with DropsMainPage
+                window.dispatchEvent(new CustomEvent('drops-config-changed', {
+                    detail: { donation_enabled: newState, channel: channelName, platform, source: 'QuickActionsBar' }
+                }));
+            },
+            onError: (error) => {
+                logger.error('Error toggling donation:', error);
+                toast.error('Ошибка переключения донатов');
+            },
+            onSettled: () => {
+                setIsToggling(false);
+            },
+        });
     };
 
     if (!isAuthenticated) {
