@@ -67,24 +67,40 @@ const QuickActionsBar = () => {
         queryFn: async () => {
             if (!channelName) return null;
             const response = await botService.get(`/api/drops/config/${channelName}`);
-            return response.data?.success ? response.data.data : null;
+            const data = response.data?.success ? response.data.data : null;
+            // 🚀 ANTI-FLASH: Сохраняем в кэш
+            if (data) {
+                setQueryCache(['drops-config', channelName], data);
+            }
+            return data;
         },
         enabled: isAuthenticated && isDropsEnabled && !!channelName,
         refetchInterval: 30000,
         staleTime: 60000,
+        gcTime: 5 * 60 * 1000,
+        initialData: () => getQueryCache(['drops-config', channelName]), // 🚀 ANTI-FLASH: Загружаем из кэша
     });
 
     // 🔄 СИНХРОНИЗАЦИЯ: Используем React Query для проверки наличия наград
+    // ✅ ВАЖНО: Награды ОБЩИЕ для всех платформ, не нужно передавать platform
     const { data: rewardsData } = useQuery({
-        queryKey: ['drops-rewards', channelName, platform],
+        queryKey: ['drops-rewards', channelName],
         queryFn: async () => {
             if (!channelName) return [];
-            const response = await botService.get(`/api/drops/rewards/${channelName}?platform=${platform}`);
-            return response.data?.success ? (response.data.data || []) : [];
+            // ✅ Награды общие, platform игнорируется на бэкенде
+            const response = await botService.get(`/api/drops/rewards/${channelName}?platform=twitch`);
+            const data = response.data?.success ? (response.data.data || []) : [];
+            // 🚀 ANTI-FLASH: Сохраняем в кэш
+            if (data.length > 0) {
+                setQueryCache(['drops-rewards', channelName], data);
+            }
+            return data;
         },
         enabled: isAuthenticated && isDropsEnabled && !!channelName,
         refetchInterval: 30000,
         staleTime: 60000,
+        gcTime: 5 * 60 * 1000,
+        initialData: () => getQueryCache(['drops-rewards', channelName]), // 🚀 ANTI-FLASH: Загружаем из кэша
     });
 
     // 🔄 СИНХРОНИЗАЦИЯ: Вычисляем состояния Drops из React Query данных
@@ -144,15 +160,25 @@ const QuickActionsBar = () => {
     const handleStreakToggle = async () => {
         if (isToggling || !channelName) return;
         
+        // ✅ СИНХРОННАЯ ПРОВЕРКА: Проверяем награды ДО включения стрика
+        // Используем актуальные данные из кэша или запроса
+        const currentRewards = rewardsData || getQueryCache(['drops-rewards', channelName]) || [];
+        const currentHasRewards = currentRewards.length > 0;
+        
         // IMPORTANT: Check if rewards exist before enabling streak
         const twitchStreakEnabled = dropsConfigData?.streak_enabled_twitch || false;
         const vkStreakEnabled = dropsConfigData?.streak_enabled_vk || false;
         const anyStreakEnabled = twitchStreakEnabled || vkStreakEnabled;
         
-        if (!anyStreakEnabled && !hasRewards) {
+        // ✅ Проверяем награды только при ВКЛЮЧЕНИИ стрика (не при выключении)
+        if (!anyStreakEnabled && !currentHasRewards) {
             toast.error('Сначала настройте содержимое сундуков на вкладке "Награды"', {
                 description: 'Перейдите в Drops → Награды',
-                duration: 4000
+                duration: 4000,
+                action: {
+                    label: 'Перейти',
+                    onClick: () => navigate('/dashboard/drops?tab=rewards')
+                }
             });
             return;
         }
@@ -160,7 +186,7 @@ const QuickActionsBar = () => {
         setIsToggling(true);
         
         try {
-            // Переключаем обе платформы одновременно
+            // ✅ Переключаем обе платформы одновременно синхронно
             const newState = !anyStreakEnabled;
             const payload = {
                 streak_enabled_twitch: integrations.twitch?.enabled ? newState : (dropsConfigData?.streak_enabled_twitch || false),
@@ -168,6 +194,13 @@ const QuickActionsBar = () => {
             };
                 
             await botService.put(`/api/drops/config/${channelName}`, payload);
+            
+            // ✅ Оптимистичное обновление для мгновенного отклика
+            queryClient.setQueryData(['drops-config', channelName], (old) => ({
+                ...old,
+                ...payload
+            }));
+            
             toast.success(newState ? 'Стрик включен для всех платформ' : 'Стрик отключен для всех платформ');
             
             // 🔄 СИНХРОНИЗАЦИЯ: Инвалидируем React Query кэш для синхронизации с DropsMainPage
@@ -187,6 +220,8 @@ const QuickActionsBar = () => {
         } catch (error) {
             logger.error('Error toggling streak:', error);
             toast.error('Ошибка переключения стрика');
+            // Откатываем оптимистичное обновление при ошибке
+            queryClient.invalidateQueries({ queryKey: ['drops-config', channelName] });
         } finally {
             setIsToggling(false);
         }

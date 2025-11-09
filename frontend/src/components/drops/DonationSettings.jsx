@@ -1,13 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
-import { Sparkles, Loader2, Check, AlertTriangle, Package } from 'lucide-react';
-import { botService } from '../../services/microservices';
+import { Sparkles, Loader2, AlertTriangle, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '../../utils/prodLogger';
 import { useIntegrations } from '../../context/IntegrationsContext';
@@ -15,21 +13,17 @@ import { useDonationAlerts } from '../../context/DonationAlertsContext';
 import DonationGrid from './DonationGrid';
 import DonationHistory from './DonationHistory';
 import MythycClosed from '../../images/lootboxes/mythyc/mythyc_closed.png';
+import { useDropsConfig } from '../../hooks/useDropsConfig';
+import { useAutoSave } from '../../hooks/useAutoSave';
 
 const DonationSettings = ({ user, channelName, hasRewards = false }) => {
   const { integrations } = useIntegrations();
   const { isConnected: daConnected, connect: daConnect } = useDonationAlerts();
-  const queryClient = useQueryClient();
   const donationalertsConnected = integrations?.donationalerts?.enabled || daConnected || false;
-  const saveTimeoutRef = useRef(null);
-  
-  // Определяем платформу для истории донатов
   const platform = integrations?.twitch?.enabled ? 'twitch' : (integrations?.vk?.enabled ? 'vk' : 'twitch');
   
-  // Флаг для отслеживания первой загрузки
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  // 🚀 FIX: Начальное состояние должно учитывать статус подключения DonationAlerts
-  // Если DonationAlerts не подключен, начинаем с false
+  const { config, isLoading, isInitialLoad, setIsInitialLoad, saveMutation } = useDropsConfig(channelName);
+  
   const [formData, setFormData] = useState({
     donation_enabled: false,
     donation_amount_common: [50.0],
@@ -43,37 +37,19 @@ const DonationSettings = ({ user, channelName, hasRewards = false }) => {
     mythical_donation_amount: [2000.0]
   });
 
-  // Listen to drops config changes from QuickActionsBar
   useEffect(() => {
     const handleDropsConfigChange = (event) => {
-      const { donation_enabled, channel, platform: eventPlatform } = event.detail;
-      // Only update if it's for the same channel
+      const { donation_enabled, channel } = event.detail;
       if (channel === channelName && donation_enabled !== undefined) {
         setFormData(prev => ({ ...prev, donation_enabled }));
-        // Invalidate query to refetch
-        queryClient.invalidateQueries({ queryKey: ['drops-config', channelName] });
       }
     };
 
     window.addEventListener('drops-config-changed', handleDropsConfigChange);
     return () => window.removeEventListener('drops-config-changed', handleDropsConfigChange);
-  }, [channelName, queryClient]);
-
-  // React Query: загружаем конфигурацию (общие настройки, без platform)
-  const { data: config, isLoading } = useQuery({
-    queryKey: ['drops-config', channelName],
-    queryFn: async () => {
-      if (!channelName) return null;
-      const response = await botService.get(`/api/drops/config/${channelName}`);
-      return response.data.success ? response.data.data : null;
-    },
-    enabled: !!channelName,
-    staleTime: 30000, // 30 секунд - данные актуальны
-  });
+  }, [channelName]);
   
-  // ✅ Загружаем данные из конфига СРАЗУ при получении (без мерцания)
-  // Используем useMemo для мгновенного обновления formData при получении config
-  const initialFormData = React.useMemo(() => {
+  const initialFormData = useMemo(() => {
     if (!config) return null;
     // Проверяем интеграцию DonationAlerts при загрузке (используем актуальное значение)
     const currentDonationalertsConnected = integrations?.donationalerts?.enabled || daConnected || false;
@@ -108,31 +84,16 @@ const DonationSettings = ({ user, channelName, hasRewards = false }) => {
     }
   }, [initialFormData, isInitialLoad]);
 
-  // ✅ Синхронизируем только donation_enabled с подключением DonationAlerts
-  // mythical_enabled доступен всегда (активация только при онлайн стриме)
   useEffect(() => {
-    if (!donationalertsConnected) {
-      setFormData(prev => {
-        // Обновляем только donation_enabled, mythical_enabled НЕ трогаем
-        if (prev.donation_enabled) {
-          return { 
-            ...prev, 
-            donation_enabled: false
-            // ✅ mythical_enabled НЕ отключаем - настройки доступны всегда
-          };
-        }
-        return prev;
-      });
+    if (!donationalertsConnected && formData.donation_enabled) {
+      setFormData(prev => ({ ...prev, donation_enabled: false }));
     }
   }, [donationalertsConnected]);
 
-  // ✅ Автоматически включаем donation drops после успешного подключения DonationAlerts
   useEffect(() => {
     const handleDonationAlertsConnected = (event) => {
       if (event.detail?.success && donationalertsConnected && !formData.donation_enabled) {
-        logger.log('✅ [DONATION] Auto-enabling donation drops after DonationAlerts connection');
         setFormData(prev => ({ ...prev, donation_enabled: true }));
-        // Автосохранение сработает через useEffect
       }
     };
 
@@ -140,14 +101,56 @@ const DonationSettings = ({ user, channelName, hasRewards = false }) => {
     return () => window.removeEventListener('donationalerts_connected', handleDonationAlertsConnected);
   }, [donationalertsConnected, formData.donation_enabled]);
 
-  // 🚀 FIX: Вычисляем актуальное значение для тогла
-  // Если DonationAlerts не подключен, тогл всегда должен показывать false
-  // ✅ НАСТРОЙКИ МИФИЧЕСКОГО DROPS ДОСТУПНЫ ВСЕГДА
-  // Активация происходит только когда стрим онлайн, но настройки доступны всегда
   const mythicalEnabledDisplay = formData.mythical_enabled;
   const donationEnabledDisplay = donationalertsConnected ? formData.donation_enabled : false;
 
-  // ✅ Скрываем компонент до загрузки данных (предотвращаем мерцание)
+  const validateMythical = (payload) => {
+    if (payload.mythical_enabled) {
+      const minInterval = payload.mythical_min_interval_hours ?? formData.mythical_min_interval_hours[0];
+      const maxInterval = payload.mythical_max_interval_hours ?? formData.mythical_max_interval_hours[0];
+      if (minInterval >= maxInterval) {
+        return 'Минимальный интервал должен быть меньше максимального';
+      }
+    }
+    return null;
+  };
+
+  const { autoSave } = useAutoSave(
+    (payload) => saveMutation.mutate(payload),
+    1000,
+    validateMythical
+  );
+  
+  const createPayload = () => ({
+    donation_enabled: formData.donation_enabled,
+    donation_amount_common: formData.donation_amount_common[0],
+    donation_amount_rare: formData.donation_amount_rare[0],
+    donation_amount_epic: formData.donation_amount_epic[0],
+    donation_amount_legendary: formData.donation_amount_legendary[0],
+    mythical_enabled: formData.mythical_enabled,
+    mythical_min_interval_hours: formData.mythical_min_interval_hours[0],
+    mythical_max_interval_hours: formData.mythical_max_interval_hours[0],
+    mythical_window_duration_minutes: formData.mythical_window_duration_minutes[0],
+    mythical_donation_amount: formData.mythical_donation_amount[0]
+  });
+
+  useEffect(() => {
+    if (!isInitialLoad && config) {
+      autoSave(createPayload());
+    }
+  }, [
+    formData.donation_amount_common,
+    formData.donation_amount_rare,
+    formData.donation_amount_epic,
+    formData.donation_amount_legendary,
+    formData.mythical_min_interval_hours,
+    formData.mythical_max_interval_hours,
+    formData.mythical_window_duration_minutes,
+    formData.mythical_donation_amount,
+    isInitialLoad,
+    autoSave
+  ]);
+  
   if (isLoading || isInitialLoad || !config) {
     return (
       <Card>
@@ -159,103 +162,6 @@ const DonationSettings = ({ user, channelName, hasRewards = false }) => {
       </Card>
     );
   }
-
-  // React Query: мутация для сохранения настроек (общие настройки, без platform)
-  const saveMutation = useMutation({
-    mutationFn: async (payload) => {
-      return await botService.put(`/api/drops/config/${channelName}`, payload);
-    },
-    onMutate: async (payload) => {
-      await queryClient.cancelQueries({ queryKey: ['drops-config', channelName] });
-      const previousConfig = queryClient.getQueryData(['drops-config', channelName]);
-      queryClient.setQueryData(['drops-config', channelName], (old) => ({
-        ...old,
-        ...payload,
-      }));
-      return { previousConfig };
-    },
-    onError: (err, payload, context) => {
-      if (context?.previousConfig) {
-        queryClient.setQueryData(['drops-config', channelName], context.previousConfig);
-      }
-      toast.error('Ошибка сохранения настроек');
-      logger.error('Error saving donation config:', err);
-    },
-    onSuccess: (response, payload) => {
-      // ✅ Убрали toast и savedSuccessfully - автосохранение работает тихо
-      
-      // 🔄 СИНХРОНИЗАЦИЯ: Отправляем событие для синхронизации с QuickActionsBar
-      if (payload.donation_enabled !== undefined) {
-        window.dispatchEvent(new CustomEvent('drops-config-changed', {
-          detail: { 
-            donation_enabled: payload.donation_enabled,
-            channel: channelName
-          }
-        }));
-      }
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['drops-config', channelName] });
-    },
-  });
-  
-  // ✅ Автосохранение с дебаунсом
-  const autoSave = (payload) => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    
-    saveTimeoutRef.current = setTimeout(() => {
-      // Валидация мифического лутбокса
-      if (payload.mythical_enabled) {
-        const minInterval = payload.mythical_min_interval_hours ?? formData.mythical_min_interval_hours[0];
-        const maxInterval = payload.mythical_max_interval_hours ?? formData.mythical_max_interval_hours[0];
-        if (minInterval >= maxInterval) {
-          toast.error('Минимальный интервал должен быть меньше максимального');
-          return;
-        }
-      }
-      saveMutation.mutate(payload);
-    }, 1000); // Дебаунс 1 секунда
-  };
-  
-  // ✅ Автосохранение при изменении полей
-  useEffect(() => {
-    if (!isInitialLoad && config) {
-      const payload = {
-        donation_enabled: formData.donation_enabled,
-        donation_amount_common: formData.donation_amount_common[0],
-        donation_amount_rare: formData.donation_amount_rare[0],
-        donation_amount_epic: formData.donation_amount_epic[0],
-        donation_amount_legendary: formData.donation_amount_legendary[0],
-        mythical_enabled: formData.mythical_enabled,
-        mythical_min_interval_hours: formData.mythical_min_interval_hours[0],
-        mythical_max_interval_hours: formData.mythical_max_interval_hours[0],
-        mythical_window_duration_minutes: formData.mythical_window_duration_minutes[0],
-        mythical_donation_amount: formData.mythical_donation_amount[0]
-      };
-      autoSave(payload);
-    }
-  }, [
-    formData.donation_amount_common,
-    formData.donation_amount_rare,
-    formData.donation_amount_epic,
-    formData.donation_amount_legendary,
-    formData.mythical_min_interval_hours,
-    formData.mythical_max_interval_hours,
-    formData.mythical_window_duration_minutes,
-    formData.mythical_donation_amount,
-    isInitialLoad
-  ]);
-  
-  // Очистка таймера при размонтировании
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, []);
 
   return (
     <div className="space-y-4">
@@ -317,22 +223,8 @@ const DonationSettings = ({ user, channelName, hasRewards = false }) => {
                       return;
                     }
                   }
-                  // Update local state immediately
                   setFormData({...formData, donation_enabled: checked});
-                  // ✅ Автосохранение с дебаунсом
-                  const payload = {
-                    donation_enabled: checked,
-                    donation_amount_common: formData.donation_amount_common[0],
-                    donation_amount_rare: formData.donation_amount_rare[0],
-                    donation_amount_epic: formData.donation_amount_epic[0],
-                    donation_amount_legendary: formData.donation_amount_legendary[0],
-                    mythical_enabled: formData.mythical_enabled,
-                    mythical_min_interval_hours: formData.mythical_min_interval_hours[0],
-                    mythical_max_interval_hours: formData.mythical_max_interval_hours[0],
-                    mythical_window_duration_minutes: formData.mythical_window_duration_minutes[0],
-                    mythical_donation_amount: formData.mythical_donation_amount[0]
-                  };
-                  autoSave(payload);
+                  autoSave({ ...createPayload(), donation_enabled: checked });
                 }}
               />
               </div>
@@ -359,25 +251,8 @@ const DonationSettings = ({ user, channelName, hasRewards = false }) => {
               <Switch
                 checked={mythicalEnabledDisplay}
                 onCheckedChange={async (checked) => {
-                  // ✅ НАСТРОЙКИ МИФИЧЕСКОГО DROPS ДОСТУПНЫ ВСЕГДА
-                  // Можно включать/выключать независимо от DonationAlerts
-                  // Активация (появление сундука) происходит только когда стрим онлайн
-                  // Update local state immediately
                   setFormData({...formData, mythical_enabled: checked});
-                  // ✅ Автосохранение с дебаунсом
-                  const payload = {
-                    donation_enabled: formData.donation_enabled,
-                    donation_amount_common: formData.donation_amount_common[0],
-                    donation_amount_rare: formData.donation_amount_rare[0],
-                    donation_amount_epic: formData.donation_amount_epic[0],
-                    donation_amount_legendary: formData.donation_amount_legendary[0],
-                    mythical_enabled: checked,
-                    mythical_min_interval_hours: formData.mythical_min_interval_hours[0],
-                    mythical_max_interval_hours: formData.mythical_max_interval_hours[0],
-                    mythical_window_duration_minutes: formData.mythical_window_duration_minutes[0],
-                    mythical_donation_amount: formData.mythical_donation_amount[0]
-                  };
-                  autoSave(payload);
+                  autoSave({ ...createPayload(), mythical_enabled: checked });
                 }}
               />
               </div>

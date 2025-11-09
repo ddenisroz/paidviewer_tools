@@ -31,7 +31,8 @@ import {
   Crown,
   Music,
   Save,
-  Loader2
+  Loader2,
+  Power
 } from 'lucide-react';
 import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
@@ -123,7 +124,7 @@ const RewardsManager = ({ user, channelName, onRewardsCountChange, integrations 
   });
 
   // React Query: загружаем награды (ОБЩИЕ для всех платформ)
-  const { data: allRewards = [], isLoading: rewardsLoading } = useQuery({
+  const { data: allRewardsData, isLoading: rewardsLoading } = useQuery({
     queryKey: ['drops-rewards', channelName],
     queryFn: async () => {
       if (!channelName) return [];
@@ -146,18 +147,23 @@ const RewardsManager = ({ user, channelName, onRewardsCountChange, integrations 
     enabled: !!channelName, // ✅ Награды глобальные, не зависят от платформы
   });
   
+  // ✅ Защита от null/undefined - всегда массив
+  const allRewards = allRewardsData || [];
+  
   // Фильтруем награды по выбранной платформе
   const rewards = React.useMemo(() => {
+    // ✅ Защита от null/undefined
+    if (!allRewards) return [];
     if (platformFilter === 'all') return allRewards;
     return allRewards.filter(r => r.platform === platformFilter);
   }, [allRewards, platformFilter]);
 
   // Уведомляем родителя об изменении количества наград
   useEffect(() => {
-    if (onRewardsCountChange) {
+    if (onRewardsCountChange && rewards) {
       onRewardsCountChange(rewards.length);
     }
-  }, [rewards.length, onRewardsCountChange]);
+  }, [rewards, onRewardsCountChange]);
 
   const handleOpenRewardDialog = (qualityId = null) => {
     setSelectedQuality(qualityId);
@@ -222,6 +228,8 @@ const RewardsManager = ({ user, channelName, onRewardsCountChange, integrations 
       // Optimistically update (работаем с объединенным списком наград)
       if (isEdit && editingReward) {
         queryClient.setQueryData(['drops-rewards', channelName], (old) => {
+          // ✅ Защита от null/undefined
+          if (!old) return [];
           return old.map(reward => 
             reward.id === editingReward.id 
               ? { ...reward, ...payload, quality: qualitiesData.find(q => q.id === payload.quality_id) }
@@ -229,16 +237,17 @@ const RewardsManager = ({ user, channelName, onRewardsCountChange, integrations 
           );
         });
       } else {
-        // Для новой награды добавляем временный ID и platform из payload
         const newReward = {
-          id: `temp-${Date.now()}`,
           ...payload,
-          platform: payload.platform || 'twitch', // Сохраняем platform
+          platform: payload.platform || 'twitch',
           quality: qualitiesData.find(q => q.id === payload.quality_id),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
-        queryClient.setQueryData(['drops-rewards', channelName], (old) => [...(old || []), newReward]);
+        queryClient.setQueryData(['drops-rewards', channelName], (old) => {
+          // ✅ Защита от null/undefined
+          return [...(old || []), newReward];
+        });
       }
       
       return { previousRewards };
@@ -246,7 +255,8 @@ const RewardsManager = ({ user, channelName, onRewardsCountChange, integrations 
     onError: (err, variables, context) => {
       // Rollback при ошибке
       if (context?.previousRewards) {
-        queryClient.setQueryData(['drops-rewards', channelName], context.previousRewards);
+        // ✅ Защита от null - устанавливаем пустой массив если previousRewards null
+        queryClient.setQueryData(['drops-rewards', channelName], context.previousRewards || []);
       }
       
       // Обрабатываем ошибки валидации
@@ -333,7 +343,8 @@ const RewardsManager = ({ user, channelName, onRewardsCountChange, integrations 
     },
     onError: (err, rewardId, context) => {
       if (context?.previousRewards) {
-        queryClient.setQueryData(['drops-rewards', channelName], context.previousRewards);
+        // ✅ Защита от null - устанавливаем пустой массив если previousRewards null
+        queryClient.setQueryData(['drops-rewards', channelName], context.previousRewards || []);
       }
       toast.error('Ошибка удаления награды');
       logger.error('Error deleting reward:', err);
@@ -351,7 +362,29 @@ const RewardsManager = ({ user, channelName, onRewardsCountChange, integrations 
     deleteRewardMutation.mutate(rewardId);
   };
 
+  // React Query: мутация для переключения активности награды
+  const toggleRewardMutation = useMutation({
+    mutationFn: async (rewardId) => {
+      const response = await botService.patch(`/api/drops/rewards/${rewardId}/toggle`);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['drops-rewards', channelName] });
+      toast.success(data.message || 'Статус награды изменен');
+    },
+    onError: (error) => {
+      logger.error('Error toggling reward:', error);
+      toast.error('Ошибка изменения статуса награды');
+    },
+  });
+
+  const handleToggleReward = async (reward) => {
+    toggleRewardMutation.mutate(reward.id);
+  };
+
   const getRewardsForQuality = (qualityName) => {
+    // ✅ Защита от null/undefined
+    if (!rewards) return [];
     return rewards.filter(r => r.quality?.name === qualityName);
   };
 
@@ -469,6 +502,21 @@ const RewardsManager = ({ user, channelName, onRewardsCountChange, integrations 
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => handleToggleReward(reward)}
+                            className={`h-8 w-8 sm:h-9 sm:w-auto p-0 sm:px-3 ${
+                              reward.is_active ? 'text-green-500 hover:text-green-600' : 'text-gray-500 hover:text-gray-600'
+                            }`}
+                            disabled={toggleRewardMutation.isPending}
+                            title={reward.is_active ? 'Деактивировать награду' : 'Активировать награду'}
+                          >
+                            <Power className={`w-4 h-4 ${reward.is_active ? '' : 'opacity-50'}`} />
+                            <span className="hidden sm:inline ml-2">
+                              {reward.is_active ? 'Активна' : 'Неактивна'}
+                            </span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => handleDeleteReward(reward.id)}
                             className="h-8 w-8 sm:h-9 sm:w-auto p-0 sm:px-3 text-destructive"
                           >
@@ -524,66 +572,6 @@ const RewardsManager = ({ user, channelName, onRewardsCountChange, integrations 
                 rows={2}
               />
             </div>
-
-            {/* Изображение для карточки - только загрузка файла после сохранения */}
-            {editingReward && (
-              <div className="space-y-2">
-                <Label htmlFor="reward_image">Изображение для карточки (гача)</Label>
-                <div className="space-y-2">
-                  <Input
-                    id="reward_image_file"
-                    type="file"
-                    accept="image/*"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      
-                      try {
-                        const formData = new FormData();
-                        formData.append('image_file', file);
-                        
-                        const response = await botService.post(
-                          `/api/drops/rewards/${editingReward.id}/image`,
-                          formData,
-                          {
-                            headers: {
-                              'Content-Type': 'multipart/form-data'
-                            }
-                          }
-                        );
-                        
-                        if (response.data.success) {
-                          setRewardForm({...rewardForm, image_url: response.data.data.image_url});
-                          toast.success('Изображение загружено');
-                        }
-                      } catch (error) {
-                        logger.error('Error uploading image:', error);
-                        toast.error('Ошибка загрузки изображения');
-                      } finally {
-                        // Сброс input
-                        e.target.value = '';
-                      }
-                    }}
-                    className="flex-1"
-                  />
-                  {rewardForm.image_url && (
-                    <div className="w-24 h-24 border rounded overflow-hidden bg-muted">
-                      <img 
-                        src={rewardForm.image_url} 
-                        alt="Preview" 
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Изображение будет показано на карточке при крутке сундука (как в гача-играх). Загрузите изображение после создания награды.
-                </p>
-              </div>
-            )}
 
             {/* Качество */}
             <div className="space-y-2">
@@ -670,39 +658,6 @@ const RewardsManager = ({ user, channelName, onRewardsCountChange, integrations 
                   placeholder="Введите вес награды"
                 />
               </div>
-              
-              {/* Пояснение как работает вес */}
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-                <p className="text-xs text-blue-300 font-medium mb-2">💡 Как работает вес награды:</p>
-                <div className="text-xs text-blue-200/80 space-y-1">
-                  <p>• Система случайно выбирает награду из всех наград <strong>того же качества</strong></p>
-                  <p>• <strong>Процент = (вес награды / сумма всех весов) × 100%</strong></p>
-                  <p className="mt-2 font-semibold">Пример:</p>
-                  <p>Если у вас 3 награды с весом 100 каждая:</p>
-                  <p className="pl-2">• Общий вес = 300</p>
-                  <p className="pl-2">• Шанс каждой = 100/300 = <strong>33.3%</strong></p>
-                  <p className="mt-1">Если одна награда с весом 200, а две с весом 100:</p>
-                  <p className="pl-2">• Общий вес = 400</p>
-                  <p className="pl-2">• Шанс первой = 200/400 = <strong>50%</strong></p>
-                  <p className="pl-2">• Шанс остальных = 100/400 = <strong>25%</strong> каждая</p>
-                </div>
-              </div>
-            </div>
-
-
-            {/* Активность */}
-            <div className="flex items-center justify-between p-3 sm:p-4 border rounded-lg gap-3">
-              <div className="flex-1 min-w-0">
-                <h3 className="font-medium text-sm sm:text-base">Активна</h3>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  Награда доступна для выдачи
-                </p>
-              </div>
-              <Switch
-                checked={rewardForm.is_active}
-                onCheckedChange={(checked) => setRewardForm({...rewardForm, is_active: checked})}
-                className="flex-shrink-0"
-              />
             </div>
           </div>
 

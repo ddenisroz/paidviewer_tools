@@ -32,7 +32,7 @@ const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving, showModeSelecto
   });
 
   // Load mode settings using React Query
-  const { data: modeSettingsData, refetch: refetchModeSettings } = useQuery({
+  const { data: modeSettingsData, isLoading: isLoadingRewards, refetch: refetchModeSettings } = useQuery({
     queryKey: ['tts-mode-settings'],
     queryFn: async () => {
       const response = await botService.get('/api/tts/mode-settings');
@@ -201,7 +201,12 @@ const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving, showModeSelecto
                         <div className="font-semibold text-sm text-white truncate">
                           {platform === 'twitch' ? 'Twitch' : 'VK Live'}
                         </div>
-                        {ttsRewardIds[platform] ? (
+                        {isLoadingRewards ? (
+                          <div className="text-xs text-gray-400 flex items-center gap-1">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Загрузка...
+                          </div>
+                        ) : ttsRewardIds[platform] ? (
                           <div className="text-xs text-green-400">
                             ✓ Создана
                           </div>
@@ -214,7 +219,17 @@ const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving, showModeSelecto
                     </div>
 
                     <div className="flex justify-end">
-                      {ttsRewardIds[platform] ? (
+                      {isLoadingRewards ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled
+                          className="w-full text-xs opacity-50 cursor-not-allowed"
+                        >
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          Загрузка...
+                        </Button>
+                      ) : ttsRewardIds[platform] ? (
                         <Button
                           variant="outline"
                           size="sm"

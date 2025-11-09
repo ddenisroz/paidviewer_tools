@@ -34,6 +34,7 @@ import { twitchBadgesService } from '../services/twitchBadges';
 import MessageContent from './MessageContent';
 import ChatBoxSettingsModal from './ChatBoxSettingsModal';
 import { logger } from '../utils/prodLogger';
+import { useChatScroll } from '../hooks/useChatScroll';
 
 const ChatCard = ({ integrations, isOnHomePage = true }) => {
     const { user, isGuest } = useAuth();
@@ -425,13 +426,44 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
 
     // Ref для контейнера сообщений
     const messagesContainerRef = useRef(null);
+    const hasSetInitialScroll = useRef(false);
+
+    // Callback ref для установки начальной позиции сразу после монтирования
+    const setMessagesContainerRef = (node) => {
+        messagesContainerRef.current = node;
+        
+        // Если контейнер только что примонтирован и есть сообщения - сразу скроллим вниз
+        if (node && isOnHomePage && filteredMessages.length > 0 && !hasSetInitialScroll.current) {
+            // Используем несколько проверок для гарантии что DOM готов
+            requestAnimationFrame(() => {
+                if (node) {
+                    node.scrollTop = node.scrollHeight;
+                    // Дополнительная проверка после следующего кадра
+                    requestAnimationFrame(() => {
+                        if (node) {
+                            node.scrollTop = node.scrollHeight;
+                            hasSetInitialScroll.current = true;
+                            logger.log('⬇️ [INITIAL] Set scroll position via callback ref');
+                        }
+                    });
+                }
+            });
+        }
+    };
 
     // Автоскролл к последнему сообщению
     const scrollToBottom = () => {
         const container = messagesContainerRef.current;
         if (container) {
             // Используем scrollTop вместо scrollIntoView - НЕ скроллит страницу!
+            // Устанавливаем максимальное значение для гарантии прокрутки вниз
             container.scrollTop = container.scrollHeight;
+            // Дополнительная проверка через requestAnimationFrame для гарантии
+            requestAnimationFrame(() => {
+                if (container) {
+                    container.scrollTop = container.scrollHeight;
+                }
+            });
         }
     };
 
@@ -440,9 +472,9 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
         const container = messagesContainerRef.current;
         if (!container) return true;
         
-        const threshold = 150; // 150px от низа = считаем что внизу (увеличено для компенсации отступов)
+        const SCROLL_THRESHOLD = 150;
         const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-        return distanceFromBottom < threshold;
+        return distanceFromBottom < SCROLL_THRESHOLD;
     };
     
     // Обработчик скролла для показа/скрытия кнопки
@@ -451,62 +483,105 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
         setShowScrollButton(!atBottom);
     };
 
-    // Автоматический скролл при ПЕРВОЙ загрузке (показываем новые сообщения)
-    const hasScrolledOnLoad = useRef(false);
+    // ✅ ПРАВИЛЬНАЯ ЛОГИКА: Чат сразу открывается внизу, без автоскролла
+    const previousMessageCount = useRef(0);
     const previousIsOnHomePage = useRef(isOnHomePage);
     
-    // Используем useLayoutEffect для установки позиции ДО отрисовки (синхронно)
-    // Это предотвращает видимый скролл при переключении на главную страницу
-    useLayoutEffect(() => {
+    // ✅ 1. Устанавливаем начальную позицию после рендера (когда DOM готов)
+    // Используем useEffect с проверкой стабильности scrollHeight
+    useEffect(() => {
         if (isOnHomePage && filteredMessages.length > 0) {
             const container = messagesContainerRef.current;
             if (container) {
-                // Устанавливаем позицию синхронно ДО отрисовки - пользователь не увидит скролл
-                container.scrollTop = container.scrollHeight;
-                if (!hasScrolledOnLoad.current) {
-                    logger.log('⬇️ Auto-scrolled to bottom on initial load (instant, before render)');
-                    hasScrolledOnLoad.current = true;
-                }
+                // Ждем стабилизации scrollHeight (когда все сообщения отрендерены)
+                let lastScrollHeight = 0;
+                let attempts = 0;
+                const maxAttempts = 10;
+                
+                const checkAndSetScroll = () => {
+                    if (!container) return;
+                    
+                    const currentScrollHeight = container.scrollHeight;
+                    
+                    // Если scrollHeight изменился - значит еще рендерится, ждем еще
+                    if (currentScrollHeight !== lastScrollHeight && attempts < maxAttempts) {
+                        lastScrollHeight = currentScrollHeight;
+                        attempts++;
+                        requestAnimationFrame(checkAndSetScroll);
+                        return;
+                    }
+                    
+                    // scrollHeight стабилен - устанавливаем позицию
+                    container.scrollTop = container.scrollHeight;
+                    
+                    // Финальная проверка через небольшую задержку
+                    setTimeout(() => {
+                        if (container) {
+                            container.scrollTop = container.scrollHeight;
+                            hasSetInitialScroll.current = true;
+                            previousMessageCount.current = filteredMessages.length;
+                            logger.log(`⬇️ [INITIAL] Set scroll position (${attempts} attempts, height: ${container.scrollHeight})`);
+                        }
+                    }, 50);
+                };
+                
+                // Начинаем проверку
+                checkAndSetScroll();
             }
+        }
+        
+        // Сбрасываем флаг при изменении страницы
+        if (!isOnHomePage) {
+            hasSetInitialScroll.current = false;
         }
     }, [isOnHomePage, filteredMessages.length]);
     
-    // Скролл при переключении на главную страницу (дополнительная проверка)
+    // ✅ 2. Автопрокрутка при переключении на главную страницу
     useEffect(() => {
-        // Если только что переключились на главную страницу
         if (isOnHomePage && !previousIsOnHomePage.current && filteredMessages.length > 0) {
-            // Дополнительная установка позиции после рендера (на случай если layoutEffect не сработал)
             const container = messagesContainerRef.current;
             if (container) {
-                // Используем микро-задержку чтобы гарантировать что DOM обновлен
-                const timeoutId = setTimeout(() => {
-                    container.scrollTop = container.scrollHeight;
-                    logger.log('⬇️ Scrolled to bottom on page switch (fallback)');
-                }, 0);
-                return () => clearTimeout(timeoutId);
+                // Используем useLayoutEffect уже отработал, но на всякий случай делаем еще раз
+                requestAnimationFrame(() => {
+                    if (container) {
+                        container.scrollTop = container.scrollHeight;
+                    }
+                });
             }
         }
         previousIsOnHomePage.current = isOnHomePage;
     }, [isOnHomePage, filteredMessages.length]);
     
-    // Автоматический скролл при новых сообщениях (только если пользователь внизу)
-    const lastMessageId = filteredMessages.length > 0 ? filteredMessages[filteredMessages.length - 1]?.id : null;
+    // ✅ 3. Автоматический скролл при новых сообщениях (только если пользователь внизу)
     useEffect(() => {
-        if (filteredMessages.length > 0 && hasScrolledOnLoad.current && lastMessageId) {
-            // Проверяем позицию скролла ПОСЛЕ рендера
-            // Используем requestAnimationFrame для гарантированного ожидания рендера
-            requestAnimationFrame(() => {
-                setTimeout(() => {
-                    const atBottom = isUserAtBottom();
-                    logger.log('🔍 [AUTOSCROLL] Check:', { atBottom, lastMessageId: String(lastMessageId).substring(0, 20) });
-                    if (atBottom) {
-                        scrollToBottom();
-                        logger.log('⬇️ [AUTOSCROLL] Scrolling to bottom');
-                    }
-                }, 0);
-            });
+        if (!isOnHomePage || filteredMessages.length === 0) {
+            previousMessageCount.current = filteredMessages.length;
+            return;
         }
-    }, [lastMessageId]); // Следим только за последним сообщением
+        
+        const messageCount = filteredMessages.length;
+        const hasNewMessages = messageCount > previousMessageCount.current;
+        
+        if (hasNewMessages) {
+            const container = messagesContainerRef.current;
+            if (container) {
+                // Ждем рендера нового сообщения, затем проверяем позицию пользователя
+                requestAnimationFrame(() => {
+                    const atBottom = isUserAtBottom();
+                    // Прокручиваем только если пользователь внизу ИЛИ это первое сообщение
+                    if (atBottom || previousMessageCount.current === 0) {
+                        scrollToBottom();
+                        logger.log(`⬇️ [NEW_MSG] Scrolled to bottom (${messageCount} messages)`);
+                    } else {
+                        logger.log('🔍 [NEW_MSG] User scrolled up, skipping auto-scroll');
+                    }
+                    previousMessageCount.current = messageCount;
+                });
+            }
+        } else {
+            previousMessageCount.current = messageCount;
+        }
+    }, [filteredMessages.length, isOnHomePage]);
 
     // Загружаем список заблокированных пользователей TTS
     useEffect(() => {

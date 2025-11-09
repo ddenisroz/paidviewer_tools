@@ -1,5 +1,5 @@
 // src/pages/ChatWindow.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { TwitchIcon, VKIcon } from '../components/PlatformIcons';
 import { useAuth } from '../context/AuthContext';
 import MessageContent from '../components/MessageContent';
@@ -51,12 +51,42 @@ const ChatWindow = () => {
         }
     }, [badgesLoaded, settings.show_7tv_emotes, user?.twitch_username]);
     
-    // Автопрокрутка к последнему сообщению
-    useEffect(() => {
-        if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    // ✅ ПРАВИЛЬНАЯ ЛОГИКА: Чат сразу открывается внизу, без автоскролла
+    const previousMessageCount = useRef(0);
+    
+    // ✅ 1. Устанавливаем начальную позицию ДО первого рендера (синхронно)
+    // Это гарантирует, что пользователь сразу видит чат внизу, без прокрутки
+    useLayoutEffect(() => {
+        if (messages.length > 0 && messagesEndRef.current) {
+            // Синхронно устанавливаем позицию ДО того, как пользователь увидит страницу
+            messagesEndRef.current.scrollIntoView({ behavior: 'auto', block: 'end' });
+            previousMessageCount.current = messages.length;
         }
-    }, [messages]);
+    }, [messages.length]);
+    
+    // ✅ 2. Автопрокрутка при изменении сообщений (только для новых сообщений)
+    useEffect(() => {
+        if (messages.length === 0) {
+            previousMessageCount.current = 0;
+            return;
+        }
+        
+        const messageCount = messages.length;
+        const hasNewMessages = messageCount > previousMessageCount.current;
+        
+        if (hasNewMessages && messagesEndRef.current) {
+            // Для новых сообщений используем smooth скролл
+            requestAnimationFrame(() => {
+                if (messagesEndRef.current) {
+                    messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                    logger.log(`⬇️ [NEW_MSG] Auto-scrolled to bottom (ChatWindow) - ${messageCount} messages`);
+                }
+                previousMessageCount.current = messageCount;
+            });
+        } else {
+            previousMessageCount.current = messageCount;
+        }
+    }, [messages.length]);
     
     // Ограничение количества сообщений
     const displayMessages = messages.slice(-settings.max_messages);

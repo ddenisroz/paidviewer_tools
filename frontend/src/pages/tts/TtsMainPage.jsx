@@ -66,8 +66,6 @@ const TtsMainPageContent = () => {
     // 🔒 Проверка наличия интеграций: гость ИЛИ есть хотя бы одна интеграция
     const hasAnyIntegration = isGuest || isTwitchConnected || isVkConnected;
     const hasLocalSetup = localStorage.getItem('tts_has_local_setup') === 'true';
-    // F5-TTS доступен если: есть локальная настройка ИЛИ пользователь в whitelist (не null/undefined)
-    const canUseF5TTS = hasLocalSetup || (isWhitelisted !== null && isWhitelisted !== false);
     const isAnyTtsEnabled = basicTtsEnabled || aiTtsEnabled;
 
     // Mutations
@@ -138,7 +136,7 @@ const TtsMainPageContent = () => {
     });
 
     // Load TTS status
-    const { data: ttsStatusData } = useQuery({
+    const { data: ttsStatusData, isLoading: isLoadingTtsStatus } = useQuery({
         queryKey: ['tts-status'],
         queryFn: async () => {
             const response = await botService.get('/api/tts/status');
@@ -153,6 +151,11 @@ const TtsMainPageContent = () => {
         gcTime: 5 * 60 * 1000,
         initialData: () => getQueryCache(['tts-status']), // 🚀 ANTI-FLASH: Загружаем из кэша
     });
+    
+    // F5-TTS доступен если: есть локальная настройка ИЛИ пользователь в whitelist (не null/undefined)
+    // ✅ Проверяем загрузку: если данные еще загружаются, считаем что F5-TTS недоступен
+    const isF5TTSDataLoading = isLoadingTtsStatus || isWhitelisted === null || isChecking;
+    const canUseF5TTS = !isF5TTSDataLoading && (hasLocalSetup || (isWhitelisted !== null && isWhitelisted !== false));
 
     // Load TTS settings
     const { data: ttsSettingsData } = useQuery({
@@ -666,9 +669,9 @@ const TtsMainPageContent = () => {
                                                 />
                                             </div>
                                             <div
-                                                onClick={!isHealthy || !canUseF5TTS ? undefined : handleAiTtsToggle}
+                                                onClick={!isHealthy || !canUseF5TTS || isF5TTSDataLoading ? undefined : handleAiTtsToggle}
                                                 className={`group flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${
-                                                    !isHealthy || !canUseF5TTS
+                                                    !isHealthy || !canUseF5TTS || isF5TTSDataLoading
                                                         ? 'opacity-50 cursor-not-allowed bg-gray-800/20 border border-gray-700/30'
                                                         : aiTtsEnabled
                                                             ? 'cursor-pointer bg-purple-600/15 border border-gray-700/50'
@@ -676,16 +679,27 @@ const TtsMainPageContent = () => {
                                                 }`}
                                             >
                                                 <div>
-                                                    <div className="text-sm font-semibold text-white">F5-TTS (AI)</div>
+                                                    <div className="text-sm font-semibold text-white flex items-center gap-2">
+                                                        F5-TTS (AI)
+                                                        {isF5TTSDataLoading && (
+                                                            <RefreshCw className="w-3 h-3 animate-spin text-gray-400" />
+                                                        )}
+                                                    </div>
                                                     <div className="text-xs text-gray-400">
-                                                        {!isHealthy ? 'Сервис недоступен' : !canUseF5TTS ? 'Требуется whitelist' : 'Качественная озвучка'}
+                                                        {isF5TTSDataLoading 
+                                                            ? 'Загрузка данных...' 
+                                                            : !isHealthy 
+                                                                ? 'Сервис недоступен' 
+                                                                : !canUseF5TTS 
+                                                                    ? 'Требуется whitelist' 
+                                                                    : 'Качественная озвучка'}
                                                     </div>
                                                 </div>
                                                 <Switch
                                                     checked={aiTtsEnabled}
                                                     onCheckedChange={handleAiTtsToggle}
                                                     onClick={(e) => e.stopPropagation()}
-                                                    disabled={!isHealthy || !canUseF5TTS}
+                                                    disabled={!isHealthy || !canUseF5TTS || isF5TTSDataLoading}
                                                     className="data-[state=checked]:bg-purple-600"
                                                 />
                                             </div>
