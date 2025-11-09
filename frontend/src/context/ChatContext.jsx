@@ -79,7 +79,7 @@ export const ChatProvider = ({ children }) => {
     // Ref для отслеживания загрузки истории (чтобы избежать дублирования)
     const historyLoadedRef = useRef(false);
     
-    // Загрузка истории сообщений из API при инициализации
+    // Загрузка истории сообщений из API при инициализации (с задержкой для WebSocket)
     useEffect(() => {
         const loadChatHistory = async () => {
             // Проверяем что пользователь авторизован и интеграции загружены
@@ -92,8 +92,31 @@ export const ChatProvider = ({ children }) => {
                 return;
             }
             
+            // ✅ УЛУЧШЕННАЯ ЛОГИКА: Проверяем WebSocket подключение вместо фиксированной задержки
+            // Даем WebSocket время подключиться, но не более 2 секунд
+            const maxWaitTime = 2000; // Максимальное время ожидания
+            const checkInterval = 100; // Проверяем каждые 100ms
+            let elapsedTime = 0;
+            
+            while (elapsedTime < maxWaitTime && !historyLoadedRef.current) {
+                // Проверяем, подключен ли WebSocket
+                if (isConnected) {
+                    // WebSocket подключен, даем еще немного времени для получения истории
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    break;
+                }
+                await new Promise(resolve => setTimeout(resolve, checkInterval));
+                elapsedTime += checkInterval;
+            }
+            
+            // Проверяем еще раз - возможно история уже загрузилась через WebSocket
+            if (historyLoadedRef.current) {
+                logger.debug('📜 History already loaded via WebSocket, skipping API load...');
+                return;
+            }
+            
             try {
-                logger.info('📜 Loading chat history from API...');
+                logger.info('📜 Loading chat history from API (WebSocket fallback)...');
                 const response = await api.get('/api/chat/history', {
                     params: {
                         limit: parseInt(import.meta.env.VITE_CHAT_MAX_MESSAGES || '200', 10)
@@ -121,7 +144,7 @@ export const ChatProvider = ({ children }) => {
                     }
                     
                     if (filteredMessages.length > 0) {
-                        logger.info(`📜 Loaded ${filteredMessages.length} messages from history`);
+                        logger.info(`📜 Loaded ${filteredMessages.length} messages from history (API fallback)`);
                         dispatchMessages({ type: 'SET_MESSAGES', payload: filteredMessages });
                         historyLoadedRef.current = true;
                     } else {
@@ -137,7 +160,7 @@ export const ChatProvider = ({ children }) => {
         };
         
         loadChatHistory();
-    }, [isAuthenticated, isGuest, integrationsLoading]); // Убрали integrations из зависимостей чтобы избежать повторных загрузок
+    }, [isAuthenticated, isGuest, integrationsLoading, isConnected]); // ✅ Добавляем isConnected для проверки WebSocket
     const [lastJsonMessage, setLastJsonMessage] = useState(null);
     const [error, setError] = useState(null);
     const [botStatus, setBotStatus] = useState('disconnected');

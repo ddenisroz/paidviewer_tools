@@ -355,6 +355,7 @@ export const removeCookie = (name, path = '/') => {
 
 /**
  * Debounce функция для ограничения частоты вызовов
+ * @deprecated Используйте useDebounce или useDebouncedCallback из hooks/useDebounce
  * @param {function} func - Функция для выполнения
  * @param {number} wait - Задержка в миллисекундах
  * @returns {function} Debounced функция

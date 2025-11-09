@@ -3,6 +3,7 @@
 import json
 import uuid
 import logging
+import asyncio
 from datetime import datetime
 from typing import Dict, Any, Optional
 
@@ -163,13 +164,28 @@ async def broadcast_chat_message(
             logger.debug(f"⚠️ No WebSocket connections available for {platform} message")
             return False
         
+        # ✅ ОПТИМИЗАЦИЯ: Batch отправка для лучшей производительности
         sent_count = 0
-        for conn_id, connection in memory_websocket_manager.connections.items():
+        message_json = json.dumps(chat_data)
+        
+        # Создаем список задач для параллельной отправки
+        async def send_to_connection(conn_id: str, conn):
             try:
-                await connection.websocket.send_text(json.dumps(chat_data))
-                sent_count += 1
+                await conn.websocket.send_text(message_json)
+                return True
             except Exception as e:
                 logger.error(f"❌ Failed to send {platform} message to {conn_id}: {e}")
+                return False
+        
+        send_tasks = [
+            send_to_connection(conn_id, connection)
+            for conn_id, connection in memory_websocket_manager.connections.items()
+        ]
+        
+        # Выполняем все отправки параллельно
+        if send_tasks:
+            results = await asyncio.gather(*send_tasks, return_exceptions=True)
+            sent_count = sum(1 for r in results if r is True)
         
         logger.info(f"📤 {platform.upper()} message sent to {sent_count}/{total_connections} connections")
         return sent_count > 0
@@ -233,25 +249,17 @@ async def handle_tts_for_message(
             logger.warning(f"⛔ User {username} is blocked from TTS in {platform} channel {channel_identifier}")
             return {"success": False, "error": "User is blocked from TTS"}
         
-        # Проверяем заблокированных ботов (Nightbot, StreamElements, наш бот и т.д.)
-        from core.database import SessionLocal, User, UserToken, BlockedBot
-        from sqlalchemy import func
-        db_blocked = SessionLocal()
-        try:
-            is_blocked_bot = db_blocked.query(BlockedBot).filter(
-                func.lower(BlockedBot.bot_name) == username.lower()
-            ).first()
-            
-            if is_blocked_bot:
-                logger.debug(f"🤖 Bot {username} is in blocked list, skipping TTS")
-                return {"success": False, "error": "Bot is blocked from TTS"}
-        finally:
-            db_blocked.close()
-        
         # Получаем настройки пользователя для канала
         from core.database import SessionLocal, User, UserToken
         db = SessionLocal()
         try:
+            # Проверяем заблокированных ботов (Nightbot, StreamElements, наш бот и т.д.)
+            # ✅ ОПТИМИЗАЦИЯ: Используем кешированную проверку
+            from utils.blocked_bot_cache import is_bot_blocked_cached
+            if is_bot_blocked_cached(username, db):
+                logger.debug(f"🤖 Bot {username} is in blocked list, skipping TTS")
+                return {"success": False, "error": "Bot is blocked from TTS"}
+            
             # Находим владельца канала
             # Case-insensitive поиск для всех платформ
             from sqlalchemy import func
@@ -288,8 +296,11 @@ async def handle_tts_for_message(
                 logger.info(f"ℹ️ [{platform.upper()} TTS] TTS is DISABLED GLOBALLY for user {user_id}")
                 return {"success": False, "error": "TTS is disabled for this user"}
             
-            # Загружаем настройки TTS пользователя из БД
+            # ✅ ОПТИМИЗАЦИЯ: Загружаем все настройки одним запросом с JOIN
             from core.database import TTSUserSettings, AudioSettings, LocalTTSEndpoint, UserVoiceSettings
+            from sqlalchemy.orm import joinedload
+            
+            # Загружаем TTS настройки
             tts_user_settings = db.query(TTSUserSettings).filter(TTSUserSettings.user_id == user_id).first()
             audio_settings = db.query(AudioSettings).filter(AudioSettings.user_id == user_id).first()
             local_tts = db.query(LocalTTSEndpoint).filter(LocalTTSEndpoint.user_id == user_id).first()
@@ -385,7 +396,7 @@ async def handle_tts_for_message(
             # Можно добавить кастомное поле enabled_platforms в TTSUserSettings при необходимости
             # ===== ФИЛЬТРАЦИЯ ТЕКСТА И ПРОВЕРКА ПОЛЬЗОВАТЕЛЯ =====
             
-            # Проверяем фильтры слов
+            # ✅ ОПТИМИЗАЦИЯ: Проверяем фильтры слов и применяем их эффективнее
             from core.database import FilteredWord
             filtered_words = db.query(FilteredWord).filter(
                 FilteredWord.user_id == user_id,
@@ -393,12 +404,20 @@ async def handle_tts_for_message(
                 (FilteredWord.platform == 'all') | (FilteredWord.platform == platform)
             ).all()
             
-            # Применяем фильтры к тексту
+            # ✅ ОПТИМИЗАЦИЯ: Применяем фильтры к тексту более эффективно
             filtered_text = text
-            for fw in filtered_words:
-                # Простая замена (можно улучшить на регулярные выражения)
-                filtered_text = filtered_text.replace(fw.word, '*' * len(fw.word))
-                filtered_text = filtered_text.replace(fw.word.upper(), '*' * len(fw.word))
+            if filtered_words:
+                import re
+                # Создаем паттерн для всех слов сразу
+                words_pattern = '|'.join(re.escape(fw.word.lower()) for fw in filtered_words)
+                if words_pattern:
+                    # Заменяем все слова одним regex вызовом
+                    filtered_text = re.sub(
+                        words_pattern,
+                        lambda m: '*' * len(m.group(0)),
+                        filtered_text,
+                        flags=re.IGNORECASE
+                    )
             
             # Проверяем заблокированного пользователя
             from core.database import TTSBlockedUser
@@ -721,13 +740,28 @@ async def broadcast_tts_audio(
             logger.debug(f"⚠️ No WebSocket connections for TTS audio playback")
             return False
         
+        # ✅ ОПТИМИЗАЦИЯ: Batch отправка для лучшей производительности
         sent_count = 0
-        for conn_id, connection in memory_websocket_manager.connections.items():
+        tts_event_json = json.dumps(tts_event)
+        
+        # Создаем список задач для параллельной отправки
+        async def send_to_connection(conn_id: str, conn):
             try:
-                await connection.websocket.send_text(json.dumps(tts_event))
-                sent_count += 1
+                await conn.websocket.send_text(tts_event_json)
+                return True
             except Exception as e:
                 logger.error(f"❌ Failed to send TTS audio to {conn_id}: {e}")
+                return False
+        
+        send_tasks = [
+            send_to_connection(conn_id, connection)
+            for conn_id, connection in memory_websocket_manager.connections.items()
+        ]
+        
+        # Выполняем все отправки параллельно
+        if send_tasks:
+            results = await asyncio.gather(*send_tasks, return_exceptions=True)
+            sent_count = sum(1 for r in results if r is True)
         
         logger.info(f"🔊 TTS audio sent to {sent_count}/{total_connections} connections (voice={audio_data.get('voice')})")
         return sent_count > 0

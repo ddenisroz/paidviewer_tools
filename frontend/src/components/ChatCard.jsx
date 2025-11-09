@@ -35,6 +35,8 @@ import MessageContent from './MessageContent';
 import ChatBoxSettingsModal from './ChatBoxSettingsModal';
 import { logger } from '../utils/prodLogger';
 import { useChatScroll } from '../hooks/useChatScroll';
+import { useTimeout } from '../hooks/useTimeout';
+import { CHAT_CONSTANTS } from '../constants/drops';
 
 const ChatCard = ({ integrations, isOnHomePage = true }) => {
     const { user, isGuest } = useAuth();
@@ -152,12 +154,19 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
             }
             
             try {
+                // Загружаем global badges
                 await twitchBadgesService.loadGlobalBadges();
-                logger.log('✅ [BADGES] Twitch badges loaded');
+                logger.log('✅ [BADGES] Twitch global badges loaded');
+                
+                // ✅ Channel badges загружаются в отдельном useEffect когда integrations становятся доступными
+                // Не загружаем здесь, чтобы избежать дублирования
+                
                 badgesLoadedRef.current = true;
                 setBadgesLoaded(true); // Триггерим ре-рендер
             } catch (error) {
                 logger.error('❌ [BADGES] Error loading badges:', error);
+                const errorMessage = error.response?.data?.detail || error.message || 'Не удалось загрузить значки';
+                toast.error(`Ошибка загрузки значков: ${errorMessage}`);
             }
         };
         
@@ -214,6 +223,69 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
             window.removeEventListener('tts-settings-changed', handleTtsSettingsChanged);
         };
     }, [user?.id]); // 🔄 Перезагружаем настройки при смене пользователя
+    
+    // ✅ Загружаем channel badges когда integrations становятся доступными
+    // ✅ ИСПРАВЛЕНИЕ: Используем только badgesLoaded state (убрали badgesLoadedRef для консистентности)
+    useEffect(() => {
+        const loadChannelBadges = async () => {
+            // Логируем состояние для отладки
+            logger.log('🔍 [BADGES] Checking channel badges conditions:', {
+                badgesLoaded: badgesLoaded, // ✅ Используем только state
+                twitchEnabled: integrations?.twitch?.enabled,
+                twitchUsername: user?.twitch_username
+            });
+            
+            // ✅ Проверяем что badges уже загружены и есть Twitch интеграция
+            if (!badgesLoaded) { // ✅ Используем только state
+                logger.debug('⏭️ [BADGES] Global badges not loaded yet, skipping channel badges');
+                return;
+            }
+            
+            if (!integrations?.twitch?.enabled) {
+                logger.debug('⏭️ [BADGES] Twitch integration not enabled, skipping channel badges');
+                return;
+            }
+            
+            if (!user?.twitch_username) {
+                logger.debug('⏭️ [BADGES] Twitch username not available, skipping channel badges');
+                return;
+            }
+            
+            // ✅ ЗАЩИТА ОТ ДУБЛИРОВАНИЯ: Проверяем ref для предотвращения повторной загрузки
+            if (badgesLoadedRef.current) {
+                logger.debug('⏭️ [BADGES] Channel badges already loaded, skipping...');
+                return;
+            }
+            
+            try {
+                badgesLoadedRef.current = true; // ✅ Помечаем что начали загрузку
+                logger.log('📥 [BADGES] Loading channel badges for:', user.twitch_username);
+                // Используем twitch_username напрямую для загрузки channel badges
+                await twitchBadgesService.loadChannelBadges(user.twitch_username);
+                logger.log('✅ [BADGES] Channel badges loaded (after integrations):', user.twitch_username);
+            } catch (err) {
+                badgesLoadedRef.current = false; // ✅ Сбрасываем флаг при ошибке для повторной попытки
+                logger.warn('⚠️ [BADGES] Failed to load channel badges:', err);
+            }
+        };
+        
+        // Загружаем channel badges с небольшой задержкой, чтобы дать время integrations загрузиться
+        if (integrations?.twitch?.enabled && user?.twitch_username && badgesLoaded) {
+            logger.log('⏰ [BADGES] Scheduling channel badges load...');
+            const timeoutId = setTimeout(() => {
+                loadChannelBadges();
+            }, 200); // Увеличиваем задержку для надежности
+            
+            // ✅ Cleanup: очищаем timeout при размонтировании или изменении зависимостей
+            return () => clearTimeout(timeoutId);
+        } else {
+            logger.debug('⏭️ [BADGES] Conditions not met for channel badges:', {
+                twitchEnabled: integrations?.twitch?.enabled,
+                twitchUsername: user?.twitch_username,
+                badgesLoaded: badgesLoaded // ✅ Используем только state
+            });
+        }
+    }, [integrations?.twitch?.enabled, user?.twitch_username, badgesLoaded]);
     
     // Шорткат: Переключение TTS + фильтрации для Twitch
     const handleTwitchToggle = async () => {
@@ -352,8 +424,8 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
     // Настройки виджета для OBS
     const [obsSettings, setObsSettings] = useState({
         // Размеры
-        width: 400,
-        height: 300,
+        width: CHAT_CONSTANTS.DEFAULT_WIDTH,
+        height: CHAT_CONSTANTS.DEFAULT_HEIGHT,
         
         // Внешний вид
         fontSize: 14,
@@ -489,14 +561,19 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
     
     // ✅ 1. Устанавливаем начальную позицию после рендера (когда DOM готов)
     // Используем useEffect с проверкой стабильности scrollHeight
+    // ✅ ANTI-FLASH: Выполняем скролл только один раз после полной загрузки истории
     useEffect(() => {
-        if (isOnHomePage && filteredMessages.length > 0) {
+        if (isOnHomePage && filteredMessages.length > 0 && !hasSetInitialScroll.current) {
             const container = messagesContainerRef.current;
             if (container) {
-                // Ждем стабилизации scrollHeight (когда все сообщения отрендерены)
-                let lastScrollHeight = 0;
+                // ✅ ANTI-FLASH: Сразу устанавливаем позицию вниз, затем проверяем стабильность
+                // Это предотвращает видимый скролл - сразу открываемся внизу
+                container.scrollTop = container.scrollHeight;
+                
+                // Затем ждем стабилизации scrollHeight (когда все сообщения отрендерены)
+                let lastScrollHeight = container.scrollHeight;
                 let attempts = 0;
-                const maxAttempts = 10;
+                const maxAttempts = 20; // Увеличиваем количество попыток
                 
                 const checkAndSetScroll = () => {
                     if (!container) return;
@@ -507,26 +584,23 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                     if (currentScrollHeight !== lastScrollHeight && attempts < maxAttempts) {
                         lastScrollHeight = currentScrollHeight;
                         attempts++;
+                        // Обновляем позицию при изменении высоты
+                        container.scrollTop = container.scrollHeight;
                         requestAnimationFrame(checkAndSetScroll);
                         return;
                     }
                     
-                    // scrollHeight стабилен - устанавливаем позицию
+                    // scrollHeight стабилен - финальная установка позиции
                     container.scrollTop = container.scrollHeight;
-                    
-                    // Финальная проверка через небольшую задержку
-                    setTimeout(() => {
-                        if (container) {
-                            container.scrollTop = container.scrollHeight;
-                            hasSetInitialScroll.current = true;
-                            previousMessageCount.current = filteredMessages.length;
-                            logger.log(`⬇️ [INITIAL] Set scroll position (${attempts} attempts, height: ${container.scrollHeight})`);
-                        }
-                    }, 50);
+                    hasSetInitialScroll.current = true;
+                    previousMessageCount.current = filteredMessages.length;
+                    logger.log(`⬇️ [INITIAL] Set scroll position (${attempts} attempts, height: ${container.scrollHeight})`);
                 };
                 
-                // Начинаем проверку
-                checkAndSetScroll();
+                // Начинаем проверку сразу, без задержки
+                requestAnimationFrame(() => {
+                    checkAndSetScroll();
+                });
             }
         }
         
@@ -553,8 +627,15 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
     }, [isOnHomePage, filteredMessages.length]);
     
     // ✅ 3. Автоматический скролл при новых сообщениях (только если пользователь внизу)
+    // ✅ ANTI-FLASH: Не скроллим во время начальной загрузки истории
     useEffect(() => {
         if (!isOnHomePage || filteredMessages.length === 0) {
+            previousMessageCount.current = filteredMessages.length;
+            return;
+        }
+        
+        // ✅ ANTI-FLASH: Пропускаем скролл если еще не установлена начальная позиция (идет загрузка истории)
+        if (!hasSetInitialScroll.current) {
             previousMessageCount.current = filteredMessages.length;
             return;
         }
@@ -625,24 +706,28 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
         // Загружаем историю если флаг сброшен и есть user
         if (!historyLoadedRef.current && user?.id) {
             logger.log('📜 [CHAT] Loading history...');
-            // Откладываем загрузку истории чтобы не блокировать первый рендер
-            setTimeout(() => {
-                loadChatHistory();
-            }, 100); // Небольшая задержка для рендера UI
             historyLoadedRef.current = true;
         } else if (historyLoadedRef.current) {
             logger.log('⏭️ [CHAT] History already loaded, skipping...');
         }
     }, [user?.id, integrations?.twitch?.enabled, integrations?.vk?.enabled]); // 🔄 Следим за изменениями интеграций
 
-    // 🚀 ANTI-FLASH: Загружаем 7TV смайлы асинхронно
-    useEffect(() => {
-        if (user?.twitch_username) {
-            setTimeout(() => {
-                loadEmotes();
-            }, 200); // Откладываем загрузку эмодзи
+    // 🚀 ANTI-FLASH: Загружаем историю с задержкой чтобы не блокировать первый рендер
+    // Используем useTimeout для автоматической очистки
+    const shouldLoadHistory = !historyLoadedRef.current && user?.id;
+    useTimeout(() => {
+        if (shouldLoadHistory) {
+            loadChatHistory();
         }
-    }, [user?.twitch_username]);
+    }, shouldLoadHistory ? CHAT_CONSTANTS.RENDER_DELAY : null);
+
+    // 🚀 ANTI-FLASH: Загружаем 7TV смайлы асинхронно
+    // Используем useTimeout для автоматической очистки
+    useTimeout(() => {
+        if (user?.twitch_username) {
+            loadEmotes();
+        }
+    }, user?.twitch_username ? CHAT_CONSTANTS.EMOJI_LOAD_DELAY : null);
 
     const loadEmotes = async () => {
         try {
@@ -652,6 +737,8 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
             setEmotes(emotesData);
         } catch (error) {
             logger.error('Error loading emotes:', error);
+            const errorMessage = error.response?.data?.detail || error.message || 'Не удалось загрузить эмодзи';
+            toast.error(`Ошибка загрузки эмодзи: ${errorMessage}`);
         }
     };
 
@@ -667,14 +754,9 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                 // Загружаем channel badges если есть Twitch username
                 if (integrations?.twitch?.enabled && user?.twitch_username) {
                     try {
-                        // Получаем broadcaster_id из API для загрузки channel badges
-                        const channelResponse = await microservicesAPI.get('/api/chatbox/settings', {
-                            params: { channel_name: user.twitch_username }
-                        });
-                        if (channelResponse.data?.channel_name) {
-                            await twitchBadgesService.loadChannelBadges(channelResponse.data.channel_name);
-                            logger.log('✅ [CHAT] Channel badges loaded for:', channelResponse.data.channel_name);
-                        }
+                        // Используем twitch_username напрямую для загрузки channel badges
+                        await twitchBadgesService.loadChannelBadges(user.twitch_username);
+                        logger.log('✅ [CHAT] Channel badges loaded for:', user.twitch_username);
                     } catch (err) {
                         logger.warn('⚠️ [CHAT] Failed to load channel badges:', err);
                     }
@@ -685,7 +767,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                 logger.warn('⚠️ [CHAT] Failed to load badges, continuing anyway:', error);
             }
             
-            const limit = 50; // 🚀 ANTI-FLASH: Уменьшили с 500 до 50 для быстрой загрузки
+            const limit = CHAT_CONSTANTS.MESSAGE_LIMIT;
             const historyMessages = [];
             
             // Загружаем историю для Twitch (не проверяем isOnHomePage - это для отображения, а не для загрузки)
@@ -761,6 +843,8 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
             }
         } catch (error) {
             logger.error('❌ Error loading chat history:', error);
+            const errorMessage = error.response?.data?.detail || error.message || 'Не удалось загрузить историю чата';
+            toast.error(`Ошибка загрузки истории: ${errorMessage}`);
         }
     };
 
@@ -783,6 +867,8 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
             }
         } catch (error) {
             logger.error('Error loading blocked users:', error);
+            const errorMessage = error.response?.data?.detail || error.message || 'Не удалось загрузить список заблокированных пользователей';
+            toast.error(`Ошибка загрузки: ${errorMessage}`);
         }
     };
 
@@ -1010,7 +1096,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                                 <Input
                                     type="number"
                                     value={obsSettings.width}
-                                    onChange={(e) => setObsSettings({ ...obsSettings, width: parseInt(e.target.value) || 400 })}
+                                    onChange={(e) => setObsSettings({ ...obsSettings, width: parseInt(e.target.value) || CHAT_CONSTANTS.DEFAULT_WIDTH })}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -1018,7 +1104,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                                 <Input
                                     type="number"
                                     value={obsSettings.height}
-                                    onChange={(e) => setObsSettings({ ...obsSettings, height: parseInt(e.target.value) || 300 })}
+                                    onChange={(e) => setObsSettings({ ...obsSettings, height: parseInt(e.target.value) || CHAT_CONSTANTS.DEFAULT_HEIGHT })}
                                 />
                             </div>
                         </div>

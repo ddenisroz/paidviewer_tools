@@ -4,6 +4,7 @@ import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Plus, Minus } from 'lucide-react';
+import { DROPS_CONSTANTS } from '../../constants/drops';
 
 import CommonClosed from '../../images/lootboxes/common/common_closed.png';
 import RareClosed from '../../images/lootboxes/rare/rare_closed.png';
@@ -18,10 +19,16 @@ const QUALITY_CONFIGS = [
 ];
 
 const DonationGrid = ({ formData, setFormData }) => {
+  const getMaxAmount = (quality) => {
+    return quality === 'legendary' 
+      ? DROPS_CONSTANTS.DONATION.MAX_AMOUNT_LEGENDARY 
+      : DROPS_CONSTANTS.DONATION.MAX_AMOUNT_OTHER;
+  };
+
   const handleAmountChange = (quality, delta) => {
     const fieldName = `donation_amount_${quality}`;
     const currentValue = formData[fieldName][0];
-    const maxValue = quality === 'legendary' ? 10000 : 5000;
+    const maxValue = getMaxAmount(quality);
     const newValue = Math.max(0, Math.min(maxValue, currentValue + delta));
     setFormData({ ...formData, [fieldName]: [newValue] });
   };
@@ -29,7 +36,7 @@ const DonationGrid = ({ formData, setFormData }) => {
   const handleInputChange = (quality, value) => {
     const fieldName = `donation_amount_${quality}`;
     const numValue = parseFloat(value) || 0;
-    const maxValue = quality === 'legendary' ? 10000 : 5000;
+    const maxValue = getMaxAmount(quality);
     const clampedValue = Math.max(0, Math.min(maxValue, numValue));
     setFormData({ ...formData, [fieldName]: [clampedValue] });
   };
@@ -40,7 +47,7 @@ const DonationGrid = ({ formData, setFormData }) => {
         {QUALITY_CONFIGS.map((quality) => {
           const fieldName = `donation_amount_${quality.id}`;
           const value = formData[fieldName][0];
-          const maxValue = quality.id === 'legendary' ? 10000 : 5000;
+          const maxValue = getMaxAmount(quality.id);
           
           return (
             <div key={quality.id} className="space-y-3">

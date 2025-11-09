@@ -13,7 +13,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import cacheManager, { CACHE_CONFIG } from '../utils/cacheManager';
 import useSharedWebSocket from './useSharedWebSocket';
-import Logger from '../utils/logger';
+import Logger from '../utils/prodLogger';
 
 const logger = new Logger('CACHE_SYNC');
 

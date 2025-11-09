@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useAuth } from './AuthContext';
 import { botService } from '../services/microservices';
 import cacheManager, { CACHE_CONFIG } from '../utils/cacheManager';
-import Logger from '../utils/logger';
+import Logger from '../utils/prodLogger';
 
 const logger = new Logger('USER_SETTINGS');
 

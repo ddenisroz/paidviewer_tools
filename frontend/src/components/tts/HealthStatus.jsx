@@ -2,19 +2,22 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from '../ui/button';
 import { RefreshCw } from 'lucide-react';
+import { useInterval } from '../../hooks/useInterval';
 
 const HealthStatus = ({ isHealthy, isChecking, checkTtsHealth, isWhitelisted }) => {
     const [checkingDuration, setCheckingDuration] = useState(0);
     
-    // Таймер для отслеживания длительности проверки
+    // Используем современный хук useInterval вместо ручного setInterval
+    useInterval(() => {
+        if (isChecking) {
+            setCheckingDuration(prev => prev + 1);
+        }
+    }, isChecking ? 1000 : null);
+
+    // Сбрасываем счетчик при начале проверки
     useEffect(() => {
         if (isChecking) {
             setCheckingDuration(0);
-            const interval = setInterval(() => {
-                setCheckingDuration(prev => prev + 1);
-            }, 1000);
-            
-            return () => clearInterval(interval);
         }
     }, [isChecking]);
 

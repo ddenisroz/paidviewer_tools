@@ -323,6 +323,13 @@ async def update_drops_config(
         except Exception as ws_error:
             logger.warning(f"Failed to send WebSocket notification for drops config: {ws_error}")
         
+        # ✅ ВАЖНО: Возвращаем полный конфиг для корректного обновления фронтенда
+        # Безопасное получение полей (на случай если миграция не применена)
+        streak_reset_on_skip = getattr(config, 'streak_reset_on_skip', True)
+        widget_token = getattr(config, 'widget_token', None)
+        streak_enabled_twitch = getattr(config, 'streak_enabled_twitch', False)
+        streak_enabled_vk = getattr(config, 'streak_enabled_vk', False)
+        
         return {
             "success": True,
             "message": "Конфигурация лутбоксов обновлена",
@@ -330,6 +337,31 @@ async def update_drops_config(
                 "id": config.id,
                 "channel_name": config.channel_name,
                 "platform": config.platform,
+                "streak_days_common": config.streak_days_common,
+                "streak_days_rare": config.streak_days_rare,
+                "streak_days_epic": config.streak_days_epic,
+                "streak_days_legendary": config.streak_days_legendary,
+                "streak_messages_required": config.streak_messages_required,
+                "streak_reset_on_skip": streak_reset_on_skip,
+                "streak_enabled_twitch": streak_enabled_twitch,
+                "streak_enabled_vk": streak_enabled_vk,
+                "donation_enabled": config.donation_enabled,
+                "donation_amount_common": config.donation_amount_common,
+                "donation_amount_rare": config.donation_amount_rare,
+                "donation_amount_epic": config.donation_amount_epic,
+                "donation_amount_legendary": config.donation_amount_legendary,
+                "mythical_enabled": config.mythical_enabled,
+                "mythical_min_interval_hours": config.mythical_min_interval_hours,
+                "mythical_max_interval_hours": config.mythical_max_interval_hours,
+                "mythical_window_duration_minutes": config.mythical_window_duration_minutes,
+                "mythical_donation_amount": config.mythical_donation_amount,
+                "mythical_last_appeared": config.mythical_last_appeared,
+                "widget_spinning_duration_ms": config.widget_spinning_duration_ms,
+                "widget_opening_duration_ms": config.widget_opening_duration_ms,
+                "widget_result_duration_ms": config.widget_result_duration_ms,
+                "widget_closing_duration_ms": config.widget_closing_duration_ms,
+                "widget_token": widget_token,
+                "created_at": config.created_at,
                 "updated_at": config.updated_at
             }
         }

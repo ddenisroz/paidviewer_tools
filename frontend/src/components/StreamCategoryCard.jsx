@@ -690,43 +690,41 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
             autoSaveTimerRef.current = null;
         }
         
-        // Небольшая задержка, чтобы дать время на обработку клика по категории в dropdown
-        setTimeout(() => {
-            // Если есть несохранённые изменения - запускаем таймер
-            if (isChanged && status.saveCategory !== 'loading' && status.saveCategory !== 'success') {
-                logger.log('⏰ [AUTO-RESET] Input blurred - starting 10s timer to reset unsaved changes');
+        // Если есть несохранённые изменения - запускаем таймер через 200ms (для обработки клика по категории)
+        if (isChanged && status.saveCategory !== 'loading' && status.saveCategory !== 'success') {
+            logger.log('⏰ [AUTO-RESET] Input blurred - starting 10s timer to reset unsaved changes');
+            
+            // Используем useTimeout для автоматической очистки
+            autoSaveTimerRef.current = setTimeout(() => {
+                // Проверяем, что изменения все еще есть (пользователь не сохранил)
+                const stillChanged = 
+                    (twitchEnabled && JSON.stringify(initialData.twitch?.category) !== JSON.stringify(currentData.twitch?.category)) ||
+                    (vkEnabled && JSON.stringify(initialData.vk?.category) !== JSON.stringify(currentData.vk?.category));
                 
-                autoSaveTimerRef.current = setTimeout(() => {
-                    // Проверяем, что изменения все еще есть (пользователь не сохранил)
-                    const stillChanged = 
-                        (twitchEnabled && JSON.stringify(initialData.twitch?.category) !== JSON.stringify(currentData.twitch?.category)) ||
-                        (vkEnabled && JSON.stringify(initialData.vk?.category) !== JSON.stringify(currentData.vk?.category));
-                    
-                    if (!stillChanged) {
-                        logger.log('⏰ [AUTO-RESET] Skipping reset - changes were already saved');
-                        return;
-                    }
-                    
-                    logger.log('⏰ [AUTO-RESET] 10 seconds passed - resetting to initial data');
-                    
-                    // Сбрасываем к исходным данным
-                    setCurrentData(prev => ({
-                        ...prev,
-                        twitch: { ...prev.twitch, category: initialData.twitch?.category },
-                        vk: { ...prev.vk, category: initialData.vk?.category }
-                    }));
-                    
-                    // Обновляем инпуты
-                    setSearchTerms({
-                        twitch: initialData.twitch?.category?.name || '',
-                        vk: initialData.vk?.category?.name || ''
-                    });
-                    
-                    // Уведомление пользователю
-                    toast.info('Изменения категории отменены (не были сохранены в течение 10 секунд)');
-                }, 10000); // 10 секунд
-            }
-        }, 200); // 200ms задержка для обработки клика по категории
+                if (!stillChanged) {
+                    logger.log('⏰ [AUTO-RESET] Skipping reset - changes were already saved');
+                    return;
+                }
+                
+                logger.log('⏰ [AUTO-RESET] 10 seconds passed - resetting to initial data');
+                
+                // Сбрасываем к исходным данным
+                setCurrentData(prev => ({
+                    ...prev,
+                    twitch: { ...prev.twitch, category: initialData.twitch?.category },
+                    vk: { ...prev.vk, category: initialData.vk?.category }
+                }));
+                
+                // Обновляем инпуты
+                setSearchTerms({
+                    twitch: initialData.twitch?.category?.name || '',
+                    vk: initialData.vk?.category?.name || ''
+                });
+                
+                // Уведомление пользователю
+                toast.info('Изменения категории отменены (не были сохранены в течение 10 секунд)');
+            }, 10000); // 10 секунд
+        }
     };
     
     // Очищаем таймер при получении фокуса (пользователь снова начал редактировать)

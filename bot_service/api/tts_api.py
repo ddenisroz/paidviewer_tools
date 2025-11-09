@@ -10,7 +10,6 @@
 import os
 import aiohttp
 import httpx
-import requests
 import logging
 import time
 import re
@@ -1513,7 +1512,8 @@ async def get_all_voices(
     """Получить все голоса"""
     try:
         tts_service_url = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
-        response = requests.get(f"{tts_service_url}/api/voices")
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{tts_service_url}/api/voices")
         
         if response.status_code == 200:
             return response.json()
@@ -1537,7 +1537,8 @@ async def get_user_voices(
     """Получить все голоса пользователя"""
     try:
         tts_service_url = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
-        response = requests.get(f"{tts_service_url}/api/user/voices/{user_id}")
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{tts_service_url}/api/user/voices/{user_id}")
         
         if response.status_code == 200:
             return response.json()
@@ -1564,14 +1565,17 @@ async def upload_user_voice(
         
         tts_service_url = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
         
-        files = {'file': (file.filename, file.file, file.content_type)}
+        # Читаем файл в память для асинхронной отправки
+        file_content = await file.read()
+        files = {'file': (file.filename, file_content, file.content_type)}
         data = {'name': name, 'user_id': user_id}
         
-        response = requests.post(
-            f"{tts_service_url}/api/user/voices/upload?user_id={user_id}",
-            files=files,
-            data=data
-        )
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{tts_service_url}/api/user/voices/upload?user_id={user_id}",
+                files=files,
+                data=data
+            )
         
         if response.status_code == 200:
             return response.json()
@@ -1598,7 +1602,8 @@ async def get_user_enabled_voices(
             raise HTTPException(status_code=403, detail="Нет доступа")
         
         tts_service_url = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
-        response = requests.get(f"{tts_service_url}/api/tts/user/voices/enabled/{user_id}")
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{tts_service_url}/api/tts/user/voices/enabled/{user_id}")
         
         if response.status_code == 200:
             return response.json()
@@ -1624,10 +1629,11 @@ async def update_user_enabled_voices(
             raise HTTPException(status_code=403, detail="Нет доступа")
         
         tts_service_url = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
-        response = requests.post(
-            f"{tts_service_url}/api/tts/user/voices/enabled/{user_id}",
-            json=voice_ids
-        )
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                f"{tts_service_url}/api/tts/user/voices/enabled/{user_id}",
+                json=voice_ids
+            )
         
         if response.status_code == 200:
             return response.json()

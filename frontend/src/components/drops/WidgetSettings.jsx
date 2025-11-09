@@ -150,7 +150,6 @@ const WidgetSettings = ({ user, channelName }) => {
                 max={5000}
                 step={100}
               />
-              <p className="text-xs text-muted-foreground">Крутка сундука перед открытием</p>
             </div>
 
             <div className="space-y-2">
@@ -165,7 +164,6 @@ const WidgetSettings = ({ user, channelName }) => {
                 max={3000}
                 step={100}
               />
-              <p className="text-xs text-muted-foreground">Момент открытия сундука</p>
             </div>
 
             <div className="space-y-2">
@@ -180,7 +178,6 @@ const WidgetSettings = ({ user, channelName }) => {
                 max={15000}
                 step={500}
               />
-              <p className="text-xs text-muted-foreground">Показ награды зрителю</p>
             </div>
           </div>
 
@@ -198,9 +195,6 @@ const WidgetSettings = ({ user, channelName }) => {
             <Monitor className="w-5 h-5" />
             OBS Виджет
           </CardTitle>
-          <CardDescription className="text-xs">
-            Добавьте этот виджет в OBS как Browser Source
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* ✅ Убрали инструкцию OBS */}

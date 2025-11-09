@@ -96,11 +96,25 @@ async def get_channel_badges(broadcaster_id: str, client_id: str, access_token: 
                     CHANNEL_BADGES_CACHE[broadcaster_id] = badges_dict
                     logger.info(f"✅ Loaded {len(badges_dict)} badge sets for channel {broadcaster_id}")
                     return badges_dict
+                elif response.status == 400:
+                    # 400 Bad Request - обычно означает что канал не найден или неверный broadcaster_id
+                    error_text = await response.text()
+                    logger.warning(f"⚠️ Channel badges not available for broadcaster {broadcaster_id}: {response.status} - {error_text}")
+                    # Кэшируем пустой результат, чтобы не запрашивать снова
+                    CHANNEL_BADGES_CACHE[broadcaster_id] = {}
+                    return {}
+                elif response.status == 404:
+                    # 404 Not Found - канал не найден
+                    logger.warning(f"⚠️ Channel {broadcaster_id} not found")
+                    CHANNEL_BADGES_CACHE[broadcaster_id] = {}
+                    return {}
                 else:
-                    logger.error(f"❌ Failed to fetch channel badges: {response.status}")
+                    error_text = await response.text()
+                    logger.error(f"❌ Failed to fetch channel badges: {response.status} - {error_text}")
+                    # Не кэшируем ошибки, чтобы можно было повторить попытку
                     return {}
     except Exception as e:
-        logger.error(f"❌ Error fetching channel badges: {e}")
+        logger.error(f"❌ Error fetching channel badges: {e}", exc_info=True)
         return {}
 
 

@@ -10,7 +10,7 @@
  * - Защита от race conditions
  */
 
-import Logger from './logger';
+import Logger from './prodLogger';
 
 // Создаём экземпляр логгера для кэша
 const logger = new Logger('CACHE');

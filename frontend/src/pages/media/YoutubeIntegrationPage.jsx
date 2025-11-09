@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Pause, SkipForward, Volume2, VolumeX, Plus, X, Maximize, Minimize, Monitor, Trash2, RefreshCw, Settings, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -57,8 +57,8 @@ const YoutubeIntegrationPage = () => {
         handlePlayerReady(event);
     };
 
-    // Загрузка настроек YouTube
-    const loadYoutubeSettings = async () => {
+    // ✅ ОПТИМИЗАЦИЯ: Мемоизируем функцию для стабильности зависимостей
+    const loadYoutubeSettings = useCallback(async () => {
         try {
             const response = await api.get('/api/tts/youtube-settings');
             setPlaybackMode(response.data.playback_mode || 'browser');
@@ -66,7 +66,7 @@ const YoutubeIntegrationPage = () => {
         } catch (error) {
             logger.error('Error loading YouTube settings:', error);
         }
-    };
+    }, []);
 
     // Сохранение настроек YouTube
     const saveYoutubeSettings = async (newPlaybackMode, newVolume) => {
@@ -142,8 +142,8 @@ const YoutubeIntegrationPage = () => {
         toast.success('OBS URL скрыт');
     };
 
-    // Загрузка существующего OBS URL
-    const loadExistingObsUrl = async () => {
+    // ✅ ОПТИМИЗАЦИЯ: Мемоизируем функцию для стабильности зависимостей
+    const loadExistingObsUrl = useCallback(async () => {
         try {
             const response = await api.get('/api/tts/obs-url');
             if (response.data.obs_token) {
@@ -155,12 +155,12 @@ const YoutubeIntegrationPage = () => {
         } catch (error) {
             logger.error('Error loading existing OBS URL:', error);
         }
-    };
+    }, []);
 
     useEffect(() => {
         loadYoutubeSettings();
         loadExistingObsUrl();
-    }, []);
+    }, [loadYoutubeSettings, loadExistingObsUrl]); // ✅ Добавляем функции в зависимости
 
     // Обработчик клавиши Esc для выхода из полноэкранного режима
     useEffect(() => {

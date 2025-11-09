@@ -6,6 +6,7 @@ import { useToast } from '../components/ui/toast';
 import { expandQueryWithAliases } from '../constants/categoryAliases';
 import { logger } from '../utils/prodLogger';
 import { getQueryCache, setQueryCache } from '../utils/queryPersist';
+import { useInterval } from '../hooks/useInterval';
 
 const DataContext = createContext();
 
@@ -264,31 +265,53 @@ export const DataProvider = ({ children }) => {
     });
     const CACHE_TTL = 30000; // 30 секунд кэш
     
-    const loadStreamHistory = useCallback(async () => {
+    // ✅ ЗАЩИТА ОТ ДУБЛИРОВАНИЯ: Ref для отслеживания текущего запроса
+    const isLoadingHistoryRef = useRef(false);
+    const isLoadingStreamDataRef = useRef(false);
+    
+    const loadStreamHistory = useCallback(async (force = false) => {
         if (!isAuthenticated) {
             return;
         }
         
-        // Проверяем кэш
-        const now = Date.now();
-        if (now - lastLoadTime.history < CACHE_TTL) {
-            logger.log('📦 [DataContext] Using cached history data');
+        // ✅ ЗАЩИТА ОТ ДУБЛИРОВАНИЯ: Пропускаем если уже загружается (если не force)
+        if (!force && isLoadingHistoryRef.current) {
+            logger.debug('⏭️ [DataContext] History load already in progress, skipping...');
             return;
         }
         
+        // Проверяем кэш (только если не force)
+        if (!force) {
+            const now = Date.now();
+            if (now - lastLoadTime.history < CACHE_TTL) {
+                logger.log('📦 [DataContext] Using cached history data');
+                return;
+            }
+        }
+        
         try {
+            isLoadingHistoryRef.current = true;
             setLoading(prev => ({ ...prev, history: true }));
             const response = await botService.get('/api/stream/history');
             setStreamHistory(response.data);
-            setLastLoadTime(prev => ({ ...prev, history: now }));
+            setLastLoadTime(prev => ({ ...prev, history: Date.now() }));
+        } catch (error) {
+            logger.error('Error loading stream history:', error);
         } finally {
+            isLoadingHistoryRef.current = false;
             setLoading(prev => ({ ...prev, history: false }));
         }
-    }, [isAuthenticated, lastLoadTime.history]);
+    }, [isAuthenticated]);
 
     const loadStreamData = useCallback(async (force = false) => {
         if (!isAuthenticated) {
             // Not authenticated, skipping
+            return;
+        }
+        
+        // ✅ ЗАЩИТА ОТ ДУБЛИРОВАНИЯ: Пропускаем если уже загружается (если не force)
+        if (!force && isLoadingStreamDataRef.current) {
+            logger.debug('⏭️ [DataContext] Stream data load already in progress, skipping...');
             return;
         }
         
@@ -302,6 +325,7 @@ export const DataProvider = ({ children }) => {
         }
         
         // Loading stream data
+        isLoadingStreamDataRef.current = true;
         setLoading(prev => ({ ...prev, streamData: true }));
 
         try {
@@ -374,9 +398,10 @@ export const DataProvider = ({ children }) => {
             logger.error('Error loading stream data:', error);
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось загрузить данные о стриме.' });
         } finally {
+            isLoadingStreamDataRef.current = false;
             setLoading(prev => ({ ...prev, streamData: false }));
         }
-    }, [isAuthenticated, integrations.twitch?.enabled, integrations.vk?.enabled, addToast]);
+    }, [isAuthenticated, integrations.twitch?.enabled, integrations.vk?.enabled, addToast, user?.id]);
 
 
     // --- DATA SAVING ---
@@ -596,25 +621,22 @@ export const DataProvider = ({ children }) => {
 
     useEffect(() => {
         if (shouldLoadData) {
-            loadStreamHistory();
+            // ✅ Загружаем данные при монтировании (force = true для первоначальной загрузки)
+            loadStreamHistory(true);
             // 🔄 Проверяем кэш - если пустой или нет категории, загружаем
             const cached = getQueryCache(['stream-data', user?.id]);
             const needsLoad = !cached || !cached.twitch?.category || !cached.vk?.category;
             loadStreamData(needsLoad); // force = true только если кэш пустой или нет категории
         }
-    }, [shouldLoadData, user?.id]); // Убираем loadStreamData и loadStreamHistory из зависимостей
+    }, [shouldLoadData, user?.id, loadStreamHistory, loadStreamData]); // ✅ Добавляем функции в зависимости для корректной работы
 
-    // Автообновление данных каждые 30 секунд
-    useEffect(() => {
-        if (!isAuthenticated) return;
-        
-        // Используем функцию напрямую, loadStreamHistory стабильна через useCallback
-        const intervalId = setInterval(() => {
-            loadStreamHistory();
-        }, 30000); // 30 секунд
-        
-        return () => clearInterval(intervalId);
-    }, [isAuthenticated, loadStreamHistory]);
+    // ✅ ОПТИМИЗАЦИЯ: Используем современный хук useInterval вместо ручного setInterval
+    // Автообновление данных каждые 30 секунд (только если не загружается)
+    useInterval(() => {
+        if (isAuthenticated && !isLoadingHistoryRef.current) {
+            loadStreamHistory(); // Без force для периодического обновления
+        }
+    }, isAuthenticated ? 30000 : null);
     
 
     const value = useMemo(() => ({

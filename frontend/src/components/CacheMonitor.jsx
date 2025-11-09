@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { API_BASE_URL } from '../constants';
 import { logger } from '../utils/prodLogger';
+import { useInterval } from '../hooks/useInterval';
 
 /**
  * Компонент для мониторинга кеша валидации токенов
@@ -82,13 +83,13 @@ const CacheMonitor = () => {
         }
     };
 
+    // Используем современный хук useInterval вместо ручного setInterval
+    useInterval(() => {
+        fetchStats();
+    }, 30000);
+
     useEffect(() => {
         fetchStats();
-        
-        // Обновляем статистику каждые 30 секунд
-        const interval = setInterval(fetchStats, 30000);
-        
-        return () => clearInterval(interval);
     }, []);
 
     if (!stats) {

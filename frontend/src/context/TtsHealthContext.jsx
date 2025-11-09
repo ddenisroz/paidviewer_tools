@@ -37,6 +37,8 @@ export const TtsHealthProvider = ({ children }) => {
     // Убрали кэширование в localStorage
 
     const checkHealthRef = useRef();
+    // ✅ ИСПРАВЛЕНИЕ: Ref для хранения всех таймаутов для правильной очистки
+    const timeoutsRef = useRef([]);
     
     checkHealthRef.current = async () => {
         // Не проверяем TTS для гостевых пользователей
@@ -73,6 +75,10 @@ export const TtsHealthProvider = ({ children }) => {
         
         logger.log('TtsHealthContext: Starting health check...');
         
+        // ✅ ИСПРАВЛЕНИЕ: Очищаем предыдущие таймауты перед созданием новых
+        timeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+        timeoutsRef.current = [];
+        
         // Дополнительная защита - принудительно завершаем проверку через 6 секунд (на случай если что-то пойдёт не так)
         const forceCompleteTimeout = setTimeout(() => {
             if (checkInProgressRef.current && mountedRef.current) {
@@ -84,18 +90,32 @@ export const TtsHealthProvider = ({ children }) => {
                 globalHealthCheckInProgress = false;
             }
         }, 6000);
+        timeoutsRef.current.push(forceCompleteTimeout);
+        
+        // ✅ ИСПРАВЛЕНИЕ: Ref для таймаута Promise.race, чтобы можно было его очистить
+        let healthCheckTimeoutId = null;
         
         try {
             // Добавляем таймаут для проверки TTS сервера - 5 секунд максимум
             const healthCheckTimeout = 5000;
-            const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('TTS health check timeout')), healthCheckTimeout)
-            );
+            const timeoutPromise = new Promise((_, reject) => {
+                healthCheckTimeoutId = setTimeout(() => {
+                    reject(new Error('TTS health check timeout'));
+                }, healthCheckTimeout);
+                timeoutsRef.current.push(healthCheckTimeoutId);
+            });
             
             const response = await Promise.race([
                 ttsService.get('/health', { timeout: healthCheckTimeout }),
                 timeoutPromise
             ]);
+            
+            // ✅ ИСПРАВЛЕНИЕ: Очищаем таймаут Promise.race если запрос завершился успешно
+            if (healthCheckTimeoutId) {
+                clearTimeout(healthCheckTimeoutId);
+                timeoutsRef.current = timeoutsRef.current.filter(id => id !== healthCheckTimeoutId);
+                healthCheckTimeoutId = null;
+            }
             
             const data = response.data;
             const isOk = response.status === 200 && data.tts_engine_loaded;
@@ -121,9 +141,12 @@ export const TtsHealthProvider = ({ children }) => {
             setIsHealthy(false);
             setLastCheck(new Date());
         } finally {
+            // ✅ ИСПРАВЛЕНИЕ: Очищаем все таймауты в finally
+            timeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+            timeoutsRef.current = [];
+            
             if (mountedRef.current) {
                 logger.log('TtsHealthContext: Health check completed, setting isChecking to false');
-                clearTimeout(forceCompleteTimeout);
                 setIsChecking(false);
             }
             checkInProgressRef.current = false;
@@ -174,9 +197,12 @@ export const TtsHealthProvider = ({ children }) => {
             };
         }
         
-        // Cleanup при размонтировании
+        // ✅ ИСПРАВЛЕНИЕ: Cleanup при размонтировании - очищаем все таймауты
         return () => {
             mountedRef.current = false;
+            // Очищаем все активные таймауты при размонтировании
+            timeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+            timeoutsRef.current = [];
         };
     }, []); // Убрали зависимость от pathname - проверяем только при монтировании провайдера
 

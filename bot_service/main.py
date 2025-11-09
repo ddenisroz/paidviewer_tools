@@ -4,7 +4,7 @@ import os
 import sys
 import asyncio
 import logging
-import requests
+import httpx
 import urllib3
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -417,10 +417,11 @@ async def lifespan(app: FastAPI):
                                     # Используем dev API (только он доступен, SSL verification отключена)
                                     # ⚠️ Это безопасно, так как это официальный dev API VK
                                     # Предупреждение о небезопасном HTTPS уже подавлено глобально в начале файла
-                                    test_response = requests.get(f'https://apidev.live.vkvideo.ru/v1/current_user', 
-                                                               headers={'Authorization': f'Bearer {vk_access_token}'}, 
-                                                               timeout=5,
-                                                               verify=False)
+                                    async with httpx.AsyncClient(timeout=5.0, verify=False) as client:
+                                        test_response = await client.get(
+                                            'https://apidev.live.vkvideo.ru/v1/current_user',
+                                            headers={'Authorization': f'Bearer {vk_access_token}'}
+                                        )
                                     logger.info(f"📺 [VK] Token validation response: status={test_response.status_code}")
                                     if test_response.status_code == 401:
                                         logger.info("🔄 VK Live OAuth token expired, refreshing automatically...")
@@ -435,10 +436,11 @@ async def lifespan(app: FastAPI):
                                             logger.info("✅ VK token successfully refreshed!")
                                             vk_access_token = new_access_token
                                             # Повторяем валидацию с новым токеном (используем dev API)
-                                            test_response = requests.get(f'https://apidev.live.vkvideo.ru/v1/current_user', 
-                                                                       headers={'Authorization': f'Bearer {vk_access_token}'}, 
-                                                                       timeout=5,
-                                                                       verify=False)
+                                            async with httpx.AsyncClient(timeout=5.0, verify=False) as client:
+                                                test_response = await client.get(
+                                                    'https://apidev.live.vkvideo.ru/v1/current_user',
+                                                    headers={'Authorization': f'Bearer {vk_access_token}'}
+                                                )
                                             logger.info(f"📺 [VK] Token validation after refresh: status={test_response.status_code}")
                                             
                                             if test_response.status_code != 200:
@@ -615,27 +617,26 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
                     if not user:
                         return []
                     
-                    messages = []
-                    
-                    # Twitch сообщения
+                    # ✅ ОПТИМИЗАЦИЯ: Один запрос вместо двух отдельных
+                    # Загружаем сообщения для всех платформ одним запросом
+                    platforms = []
                     if user.twitch_username:
-                        twitch_messages = db.query(ChatMessage).filter(
-                            ChatMessage.user_id == user_id_int,
-                            ChatMessage.platform == 'twitch'
-                        ).order_by(ChatMessage.timestamp.desc()).limit(50).all()
-                        messages.extend(twitch_messages)
-                    
-                    # VK сообщения
+                        platforms.append('twitch')
                     if user.vk_channel_name:
-                        vk_messages = db.query(ChatMessage).filter(
-                            ChatMessage.user_id == user_id_int,
-                            ChatMessage.platform == 'vk'
-                        ).order_by(ChatMessage.timestamp.desc()).limit(50).all()
-                        messages.extend(vk_messages)
+                        platforms.append('vk')
                     
-                    # Сортируем все сообщения по времени
+                    if not platforms:
+                        return []
+                    
+                    # Один запрос для всех платформ
+                    messages = db.query(ChatMessage).filter(
+                        ChatMessage.user_id == user_id_int,
+                        ChatMessage.platform.in_(platforms)
+                    ).order_by(ChatMessage.timestamp.desc()).limit(50).all()
+                    
+                    # Сортируем все сообщения по времени (уже отсортированы, но на всякий случай)
                     messages.sort(key=lambda x: x.timestamp)
-                    return messages[-50:]  # Последние 50
+                    return messages  # Возвращаем последние 50
                 finally:
                     db.close()
             

@@ -446,88 +446,89 @@ const RewardsManager = ({ user, channelName, onRewardsCountChange, integrations 
                   <p className="text-xs mt-1 text-yellow-500">Без наград система Drops не будет работать</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                <div className="space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {qualityRewards.map((reward) => {
                     return (
                       <div 
                         key={reward.id} 
-                        className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                        className="relative flex flex-col p-2.5 border rounded-lg hover:bg-muted/50 transition-colors group"
                       >
-                        <div className="flex-1 min-w-0 w-full sm:w-auto">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="text-sm font-medium break-words">{reward.name}</h4>
+                        {/* Шанс справа вверху */}
+                        <div className="absolute top-2 right-2 z-10">
+                          <Badge variant="secondary" className="text-xs">
+                            {reward.weight}
+                          </Badge>
+                        </div>
+                        
+                        {/* Изображение (если есть) */}
+                        {reward.image_url && (
+                          <div className="w-full aspect-square border rounded overflow-hidden mb-1.5 bg-muted">
+                            <img 
+                              src={reward.image_url} 
+                              alt={reward.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                              }}
+                            />
+                          </div>
+                        )}
+                        
+                        {/* Название слева */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start gap-1.5 mb-1 pr-12">
+                            <h4 className="text-sm font-medium line-clamp-2 flex-1">{reward.name}</h4>
                             {!reward.is_active && (
                               <Badge variant="outline" className="text-xs flex-shrink-0">Отключено</Badge>
                             )}
                           </div>
                           {reward.description && (
-                            <p className="text-xs text-muted-foreground mt-1 break-words">{reward.description}</p>
+                            <p className="text-xs text-muted-foreground line-clamp-1 mb-1">{reward.description}</p>
                           )}
-                          {reward.image_url && (
-                            <div className="mt-2 w-16 h-16 sm:w-20 sm:h-20 border rounded overflow-hidden flex-shrink-0">
-                              <img 
-                                src={reward.image_url} 
-                                alt={reward.name}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  e.target.style.display = 'none';
-                                }}
-                              />
+                          {reward.sound_file && (
+                            <div className="flex items-center gap-1 mb-1">
+                              <Music className="w-3 h-3 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">Звук</span>
                             </div>
                           )}
-                          <div className="flex items-center gap-2 sm:gap-3 mt-1.5 flex-wrap">
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <span>Шанс:</span>
-                              <span className="font-semibold">{reward.weight}</span>
-                            </div>
-                            {reward.sound_file && (
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Music className="w-3 h-3" />
-                                <span>Звук</span>
-                              </div>
-                            )}
-                          </div>
                         </div>
-                        <div className="flex gap-2 self-end sm:self-auto flex-shrink-0">
+                        
+                        {/* Кнопки действий - справа */}
+                        <div className="flex gap-1 justify-end w-full pt-1.5 border-t opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleEditReward(reward)}
-                            className="h-8 w-8 sm:h-9 sm:w-auto p-0 sm:px-3"
+                            className="h-7 w-7 p-0"
+                            title="Редактировать"
                           >
-                            <Edit className="w-4 h-4" />
-                            <span className="hidden sm:inline ml-2">Редактировать</span>
+                            <Edit className="w-3.5 h-3.5" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleToggleReward(reward)}
-                            className={`h-8 w-8 sm:h-9 sm:w-auto p-0 sm:px-3 ${
+                            className={`h-7 w-7 p-0 ${
                               reward.is_active ? 'text-green-500 hover:text-green-600' : 'text-gray-500 hover:text-gray-600'
                             }`}
                             disabled={toggleRewardMutation.isPending}
-                            title={reward.is_active ? 'Деактивировать награду' : 'Активировать награду'}
+                            title={reward.is_active ? 'Деактивировать' : 'Активировать'}
                           >
-                            <Power className={`w-4 h-4 ${reward.is_active ? '' : 'opacity-50'}`} />
-                            <span className="hidden sm:inline ml-2">
-                              {reward.is_active ? 'Активна' : 'Неактивна'}
-                            </span>
+                            <Power className={`w-3.5 h-3.5 ${reward.is_active ? '' : 'opacity-50'}`} />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteReward(reward.id)}
-                            className="h-8 w-8 sm:h-9 sm:w-auto p-0 sm:px-3 text-destructive"
+                            className="h-7 w-7 p-0 text-destructive"
+                            title="Удалить"
                           >
-                            <Trash2 className="w-4 h-4" />
-                            <span className="hidden sm:inline ml-2">Удалить</span>
+                            <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         </div>
                       </div>
                     );
                   })}
-                </div>
                 </div>
               )}
             </CardContent>

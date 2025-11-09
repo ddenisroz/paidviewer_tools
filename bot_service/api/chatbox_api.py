@@ -43,6 +43,7 @@ class ChatBoxSettingsCreate(BaseModel):
     animation_duration: int = Field(default=300, ge=0, le=2000)
     animation_type: str = Field(default='fade')  # fade, slide-right, slide-left, scale, bounce
     chat_direction: str = Field(default='vertical')  # vertical или horizontal
+    chat_width: int = Field(default=100, ge=20, le=100)  # Ширина чата в vw (20-100%)
     message_fade_seconds: int = Field(default=60, ge=10, le=60)  # 10-60 сек, 60 = не исчезают
     
     # v0.03 - Поддержка 7TV эмодзи, ссылок и загрузки изображений
@@ -118,6 +119,7 @@ async def get_chatbox_settings(
         animation_duration=settings.animation_duration,
         animation_type=settings.animation_type,
         chat_direction=settings.chat_direction,
+        chat_width=settings.chat_width,
         message_fade_seconds=settings.message_fade_seconds,
         show_7tv_emotes=settings.show_7tv_emotes,
         show_links=settings.show_links,
@@ -214,6 +216,7 @@ async def save_chatbox_settings(
         animation_duration=settings.animation_duration,
         animation_type=settings.animation_type,
         chat_direction=settings.chat_direction,
+        chat_width=settings.chat_width,
         message_fade_seconds=settings.message_fade_seconds,
         show_7tv_emotes=settings.show_7tv_emotes,
         show_links=settings.show_links,
@@ -247,6 +250,7 @@ async def save_chatbox_settings(
             "animation_duration": settings.animation_duration,
             "animation_type": settings.animation_type,
             "chat_direction": settings.chat_direction,
+            "chat_width": settings.chat_width,
             "message_fade_seconds": settings.message_fade_seconds,
             "show_7tv_emotes": settings.show_7tv_emotes,
             "show_links": settings.show_links,

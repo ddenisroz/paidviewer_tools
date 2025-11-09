@@ -12,6 +12,7 @@ import StreakCalendar from './StreakCalendar';
 import { AlertTriangle, Loader2, Package } from 'lucide-react';
 import { useDropsConfig } from '../../hooks/useDropsConfig';
 import { useAutoSave } from '../../hooks/useAutoSave';
+import { DROPS_CONSTANTS } from '../../constants/drops';
 
 const StreakSettings = ({ user, channelName, hasRewards = false, integrations }) => {
   const twitchAvailable = integrations?.twitch?.enabled && user?.twitch_username;
@@ -20,11 +21,11 @@ const StreakSettings = ({ user, channelName, hasRewards = false, integrations })
   const { config, isLoading, isInitialLoad, setIsInitialLoad, saveMutation } = useDropsConfig(channelName);
   
   const [formData, setFormData] = useState({
-    streak_days_common: [1],
-    streak_days_rare: [7],
-    streak_days_epic: [30],
-    streak_days_legendary: [60],
-    streak_messages_required: [10],
+    streak_days_common: [DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_COMMON],
+    streak_days_rare: [DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_RARE],
+    streak_days_epic: [DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_EPIC],
+    streak_days_legendary: [DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_LEGENDARY],
+    streak_messages_required: [DROPS_CONSTANTS.STREAK.DEFAULT_MESSAGES_REQUIRED],
     streak_reset_on_skip: true,
     streak_enabled_twitch: false,
     streak_enabled_vk: false
@@ -32,8 +33,10 @@ const StreakSettings = ({ user, channelName, hasRewards = false, integrations })
 
   useEffect(() => {
     const handleDropsConfigChange = (event) => {
-      const { streak_enabled, channel, platform: eventPlatform } = event.detail;
-      if (channel === channelName && streak_enabled !== undefined && eventPlatform) {
+      const { streak_enabled, channel, platform: eventPlatform, source } = event.detail;
+      // ✅ ИСПРАВЛЕНИЕ: Обновляем локальное состояние только если событие пришло от QuickActionsBar
+      // Если событие пришло от useDropsConfig (наш собственный saveMutation), то состояние уже обновлено через setFormData
+      if (channel === channelName && streak_enabled !== undefined && eventPlatform && source === 'QuickActionsBar') {
         if (eventPlatform === 'twitch') {
           setFormData(prev => ({ ...prev, streak_enabled_twitch: streak_enabled }));
         } else if (eventPlatform === 'vk') {
@@ -49,23 +52,59 @@ const StreakSettings = ({ user, channelName, hasRewards = false, integrations })
   const initialFormData = useMemo(() => {
     if (!config) return null;
     return {
-      streak_days_common: [config.streak_days_common ?? 1],
-      streak_days_rare: [config.streak_days_rare ?? 7],
-      streak_days_epic: [config.streak_days_epic ?? 30],
-      streak_days_legendary: [config.streak_days_legendary ?? 60],
-      streak_messages_required: [config.streak_messages_required ?? 10],
+      streak_days_common: [config.streak_days_common ?? DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_COMMON],
+      streak_days_rare: [config.streak_days_rare ?? DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_RARE],
+      streak_days_epic: [config.streak_days_epic ?? DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_EPIC],
+      streak_days_legendary: [config.streak_days_legendary ?? DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_LEGENDARY],
+      streak_messages_required: [config.streak_messages_required ?? DROPS_CONSTANTS.STREAK.DEFAULT_MESSAGES_REQUIRED],
       streak_reset_on_skip: config.streak_reset_on_skip ?? true,
       streak_enabled_twitch: config.streak_enabled_twitch ?? false,
       streak_enabled_vk: config.streak_enabled_vk ?? false
     };
   }, [config]);
   
+  // ✅ ИНИЦИАЛИЗАЦИЯ: Загружаем данные при первой загрузке
   useEffect(() => {
     if (initialFormData && isInitialLoad) {
       setFormData(initialFormData);
       setIsInitialLoad(false);
     }
   }, [initialFormData, isInitialLoad]);
+  
+  // ✅ СИНХРОНИЗАЦИЯ: Синхронизируем formData с config из React Query
+  // Обновляем все поля, включая streak_enabled (fallback если событие не было обработано)
+  useEffect(() => {
+    if (!isInitialLoad && config && initialFormData) {
+      setFormData(prev => {
+        // ✅ Проверяем, изменились ли значения в config
+        const needsUpdate = 
+          prev.streak_days_common[0] !== initialFormData.streak_days_common[0] ||
+          prev.streak_days_rare[0] !== initialFormData.streak_days_rare[0] ||
+          prev.streak_days_epic[0] !== initialFormData.streak_days_epic[0] ||
+          prev.streak_days_legendary[0] !== initialFormData.streak_days_legendary[0] ||
+          prev.streak_messages_required[0] !== initialFormData.streak_messages_required[0] ||
+          prev.streak_reset_on_skip !== initialFormData.streak_reset_on_skip ||
+          prev.streak_enabled_twitch !== initialFormData.streak_enabled_twitch ||
+          prev.streak_enabled_vk !== initialFormData.streak_enabled_vk;
+        
+        // Обновляем только если значения изменились (предотвращаем лишние обновления)
+        if (needsUpdate) {
+          return {
+            ...prev,
+            streak_days_common: initialFormData.streak_days_common,
+            streak_days_rare: initialFormData.streak_days_rare,
+            streak_days_epic: initialFormData.streak_days_epic,
+            streak_days_legendary: initialFormData.streak_days_legendary,
+            streak_messages_required: initialFormData.streak_messages_required,
+            streak_reset_on_skip: initialFormData.streak_reset_on_skip,
+            streak_enabled_twitch: initialFormData.streak_enabled_twitch,
+            streak_enabled_vk: initialFormData.streak_enabled_vk
+          };
+        }
+        return prev;
+      });
+    }
+  }, [config, isInitialLoad, initialFormData]);
 
   const queryClient = useQueryClient();
   const { autoSave } = useAutoSave(
@@ -73,16 +112,24 @@ const StreakSettings = ({ user, channelName, hasRewards = false, integrations })
     1000
   );
 
-  const createPayload = () => ({
-    streak_days_common: formData.streak_days_common[0],
-    streak_days_rare: formData.streak_days_rare[0],
-    streak_days_epic: formData.streak_days_epic[0],
-    streak_days_legendary: formData.streak_days_legendary[0],
-    streak_messages_required: formData.streak_messages_required[0],
-    streak_reset_on_skip: formData.streak_reset_on_skip,
-    streak_enabled_twitch: formData.streak_enabled_twitch,
-    streak_enabled_vk: formData.streak_enabled_vk
-  });
+  const createPayload = (includeEnabledFlags = true) => {
+    const payload = {
+      streak_days_common: formData.streak_days_common[0],
+      streak_days_rare: formData.streak_days_rare[0],
+      streak_days_epic: formData.streak_days_epic[0],
+      streak_days_legendary: formData.streak_days_legendary[0],
+      streak_messages_required: formData.streak_messages_required[0],
+      streak_reset_on_skip: formData.streak_reset_on_skip
+    };
+    
+    // ✅ Включаем streak_enabled только если explicitly requested (для handlePlatformToggle)
+    if (includeEnabledFlags) {
+      payload.streak_enabled_twitch = formData.streak_enabled_twitch;
+      payload.streak_enabled_vk = formData.streak_enabled_vk;
+    }
+    
+    return payload;
+  };
 
   const handlePlatformToggle = (platform, enabled) => {
     if (!hasRewards && enabled) {
@@ -95,9 +142,13 @@ const StreakSettings = ({ user, channelName, hasRewards = false, integrations })
     autoSave({ ...createPayload(), [platformKey]: enabled });
   };
   
+  // ✅ ИСПРАВЛЕНИЕ: Автосохранение только для настроек, НЕ для streak_enabled_twitch/vk
+  // streak_enabled_twitch/vk сохраняются отдельно через handlePlatformToggle
+  // Это предотвращает повторное сохранение при обновлении из QuickActionsBar
   useEffect(() => {
     if (!isInitialLoad && config) {
-      autoSave(createPayload());
+      // ✅ Создаем payload БЕЗ streak_enabled полей для автосохранения
+      autoSave(createPayload(false));
     }
   }, [
     formData.streak_days_common,
@@ -108,6 +159,8 @@ const StreakSettings = ({ user, channelName, hasRewards = false, integrations })
     formData.streak_reset_on_skip,
     isInitialLoad,
     autoSave
+    // ✅ ИСКЛЮЧЕНО: formData.streak_enabled_twitch, formData.streak_enabled_vk
+    // Эти поля сохраняются отдельно через handlePlatformToggle
   ]);
 
   const resetStatsMutation = useMutation({
@@ -187,9 +240,8 @@ const StreakSettings = ({ user, channelName, hasRewards = false, integrations })
       {/* Календарь дней стрика - поднят вверх */}
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <CardTitle className="text-lg">Настройка стриков</CardTitle>
-            {/* Переключатели для каждой платформы */}
+          <div className="flex items-center justify-end flex-wrap gap-3">
+            {/* Переключатели для каждой платформы - справа */}
             <div className="flex items-center gap-4 flex-wrap">
               {twitchAvailable && (
                 <div className="flex items-center gap-2">

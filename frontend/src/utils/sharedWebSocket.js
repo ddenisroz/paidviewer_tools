@@ -4,8 +4,9 @@
  * Использует Leader Election для управления одним WebSocket соединением между вкладками
  */
 
-import Logger from './logger';
+import Logger from './prodLogger';
 import { WS_BASE_URL } from '../constants';
+import { WEBSOCKET_CONSTANTS } from '../constants/websocket';
 
 const logger = new Logger('SHARED_WS');
 
@@ -16,7 +17,7 @@ class SharedWebSocketManager {
         this.tabId = `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         this.channel = null;
         this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 5;
+        this.maxReconnectAttempts = WEBSOCKET_CONSTANTS.RECONNECT.MAX_ATTEMPTS;
         this.reconnectTimeout = null;
         this.messageHandlers = new Set();
         this.leaderHeartbeatInterval = null;
@@ -141,10 +142,28 @@ class SharedWebSocketManager {
 
         const timeSinceLastHeartbeat = Date.now() - this.lastLeaderHeartbeat;
         
-        // Ждем 5 секунд перед выборами - защита от перезагрузки страницы
-        if (timeSinceLastHeartbeat > 5000) {
-            logger.warn(`[${this.tabId}] Leader seems dead (no heartbeat for ${timeSinceLastHeartbeat}ms), starting election`);
-            this._electLeader();
+        // ✅ Улучшенная логика: сначала проверяем через ping, потом запускаем выборы
+        // Увеличиваем таймаут до 8 секунд для учета задержек BroadcastChannel
+        if (timeSinceLastHeartbeat > 8000) {
+            // Перед запуском выборов отправляем ping для проверки
+            this.leaderResponseReceived = false;
+            this.channel.postMessage({
+                type: 'leader_ping',
+                tabId: this.tabId
+            });
+            
+            // Ждем ответа 300ms - если лидер жив, он ответит
+            setTimeout(() => {
+                if (!this.leaderResponseReceived && !this.isLeader) {
+                    // Лидер действительно не отвечает - запускаем выборы
+                    logger.warn(`[${this.tabId}] Leader seems dead (no heartbeat for ${timeSinceLastHeartbeat}ms, no ping response), starting election`);
+                    this._electLeader();
+                } else if (this.leaderResponseReceived) {
+                    // Лидер ответил - просто обновляем время последнего heartbeat
+                    logger.debug(`[${this.tabId}] Leader is alive (responded to ping), updating heartbeat`);
+                    this.lastLeaderHeartbeat = Date.now();
+                }
+            }, 300);
         }
     }
 
@@ -272,7 +291,10 @@ class SharedWebSocketManager {
 
                 // Пытаемся переподключиться, если всё ещё лидер
                 if (this.isLeader && this.reconnectAttempts < this.maxReconnectAttempts) {
-                    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+                    const delay = Math.min(
+                        WEBSOCKET_CONSTANTS.RECONNECT.INITIAL_DELAY * Math.pow(WEBSOCKET_CONSTANTS.RECONNECT.BACKOFF_MULTIPLIER, this.reconnectAttempts),
+                        WEBSOCKET_CONSTANTS.RECONNECT.MAX_DELAY
+                    );
                     this.reconnectAttempts++;
                     
                     logger.info(`[${this.tabId}] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);

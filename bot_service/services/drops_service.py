@@ -654,18 +654,38 @@ class DropsService:
         """Проверяет, можно ли запустить мифический Drops
         
         ВАЖНО: 
-        - Настройки мифического drops доступны всегда (можно включать/выключать, настраивать параметры)
-        - Но активация (появление сундука) происходит только когда стрим онлайн!
+        - Мифический drops требует подключения DonationAlerts (работает на основе донатов)
+        - Активация (появление сундука) происходит только когда стрим онлайн!
         """
         config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
         if not config or not config.mythical_enabled:
             return False
         
+        # ✅ ПРОВЕРКА: DonationAlerts должен быть подключен
+        from core.database import UserToken
+        if user_id:
+            da_token = self.db.query(UserToken).filter(
+                UserToken.user_id == user_id,
+                UserToken.platform == 'donationalerts',
+                UserToken.is_active == True
+            ).first()
+        elif session_id:
+            da_token = self.db.query(UserToken).filter(
+                UserToken.session_id == session_id,
+                UserToken.platform == 'donationalerts',
+                UserToken.is_active == True
+            ).first()
+        else:
+            da_token = None
+        
+        if not da_token:
+            logger.debug(f"🚫 [MYTHICAL] DonationAlerts not connected, cannot activate mythical drops for {channel_name}")
+            return False
+        
         # ✅ ПРОВЕРКА: Стрим должен быть онлайн для активации
-        # Настройки доступны всегда, но сундук появляется только при онлайн стриме
         is_stream_online = self._check_stream_online(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
         if not is_stream_online:
-            logger.debug(f"🚫 [MYTHICAL] Stream is offline, cannot activate mythical drops for {channel_name} (settings are still available)")
+            logger.debug(f"🚫 [MYTHICAL] Stream is offline, cannot activate mythical drops for {channel_name}")
             return False
         
         # Проверяем интервал
@@ -726,18 +746,38 @@ class DropsService:
         """Запускает мифический Drops
         
         ВАЖНО: 
-        - Настройки мифического drops доступны всегда
-        - Но активация (появление сундука) происходит только когда стрим онлайн!
+        - Мифический drops требует подключения DonationAlerts (работает на основе донатов)
+        - Активация (появление сундука) происходит только когда стрим онлайн!
         """
         config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
         if not config or not config.mythical_enabled:
             return None
         
+        # ✅ ПРОВЕРКА: DonationAlerts должен быть подключен
+        from core.database import UserToken
+        if user_id:
+            da_token = self.db.query(UserToken).filter(
+                UserToken.user_id == user_id,
+                UserToken.platform == 'donationalerts',
+                UserToken.is_active == True
+            ).first()
+        elif session_id:
+            da_token = self.db.query(UserToken).filter(
+                UserToken.session_id == session_id,
+                UserToken.platform == 'donationalerts',
+                UserToken.is_active == True
+            ).first()
+        else:
+            da_token = None
+        
+        if not da_token:
+            logger.warning(f"🚫 [MYTHICAL] Cannot activate mythical drops: DonationAlerts not connected for {channel_name}")
+            return None
+        
         # ✅ ПРОВЕРКА: Стрим должен быть онлайн для активации
-        # Настройки доступны всегда, но сундук появляется только при онлайн стриме
         is_stream_online = self._check_stream_online(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
         if not is_stream_online:
-            logger.warning(f"🚫 [MYTHICAL] Cannot activate mythical drops: stream is offline for {channel_name} (settings are still available)")
+            logger.warning(f"🚫 [MYTHICAL] Cannot activate mythical drops: stream is offline for {channel_name}")
             return None
         
         # Создаем сессию

@@ -6,7 +6,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { getSharedWebSocket } from '../utils/sharedWebSocket';
-import Logger from '../utils/logger';
+import Logger from '../utils/prodLogger';
 
 const logger = new Logger('USE_SHARED_WS');
 

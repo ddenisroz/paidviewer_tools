@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useRef, useCallback } from 'react';
 import { botService } from '../services/microservices';
 import { logger } from '../utils/prodLogger';
 import { useAuth } from './AuthContext';
 import { useChat } from './ChatContext';
+import { useInterval } from '../hooks/useInterval';
 
 // Контекст для глобального состояния плеера
 const PlayerContext = createContext();
@@ -125,14 +126,24 @@ export const PlayerProvider = ({ children }) => {
     // const wsUrl = isAuthenticated && wsBaseUrl ? `${wsBaseUrl.replace('http', 'ws')}/ws/youtube/1` : null;
     // const { isConnected } = useWebSocket(wsUrl, { ... });
 
-    // Загрузка очереди и текущего видео
-    const loadQueue = async () => {
+    // ✅ ЗАЩИТА ОТ ДУБЛИРОВАНИЯ: Ref для отслеживания текущего запроса
+    const isLoadingQueueRef = useRef(false);
+    
+    // ✅ ОПТИМИЗАЦИЯ: Загрузка очереди и текущего видео (обернута в useCallback для стабильности)
+    const loadQueue = useCallback(async (force = false) => {
         // Не загружаем данные если пользователь не авторизован
         if (!isAuthenticated) {
             return;
         }
         
+        // ✅ ЗАЩИТА ОТ ДУБЛИРОВАНИЯ: Пропускаем если уже загружается (если не force)
+        if (!force && isLoadingQueueRef.current) {
+            logger.debug('⏭️ [YOUTUBE] Queue load already in progress, skipping...');
+            return;
+        }
+        
         try {
+            isLoadingQueueRef.current = true;
             dispatch({ type: playerActions.SET_LOADING, payload: true });
             const response = await botService.get('/api/youtube/queue');
             const data = response.data;
@@ -159,8 +170,11 @@ export const PlayerProvider = ({ children }) => {
                 type: playerActions.SET_ERROR, 
                 payload: 'Ошибка загрузки очереди' 
             });
+        } finally {
+            isLoadingQueueRef.current = false;
+            dispatch({ type: playerActions.SET_LOADING, payload: false });
         }
-    };
+    }, [isAuthenticated, dispatch]);
 
     // Переход к следующему видео
     const nextVideo = async () => {
@@ -178,8 +192,8 @@ export const PlayerProvider = ({ children }) => {
                     payload: { current_video: response.data.current_video }
                 });
                 
-                // Обновляем очередь
-                setTimeout(loadQueue, 500);
+                // ✅ Обновляем очередь с небольшой задержкой (force = true для немедленной загрузки)
+                setTimeout(() => loadQueue(true), 500);
             } else {
                 // Если нет видео, скрываем плеер
                 dispatch({ type: playerActions.CLOSE_PLAYER });
@@ -254,7 +268,8 @@ export const PlayerProvider = ({ children }) => {
     };
 
     // Обновление времени воспроизведения
-    const updateTime = () => {
+    // ✅ ОПТИМИЗАЦИЯ: Обернута в useCallback для стабильности
+    const updateTime = useCallback(() => {
         if (state.playerRef) {
             try {
                 const time = state.playerRef.getCurrentTime();
@@ -271,7 +286,7 @@ export const PlayerProvider = ({ children }) => {
                 // Игнорируем ошибки
             }
         }
-    };
+    }, [state.playerRef, dispatch]);
 
     // Обработчики событий YouTube плеера
     const handlePlayerReady = (event) => {
@@ -365,36 +380,35 @@ export const PlayerProvider = ({ children }) => {
         }
     };
 
-    // Загрузка данных при монтировании
+    // ✅ ОПТИМИЗАЦИЯ: Используем современный хук useInterval вместо ручного setInterval
+    // Периодическое обновление очереди (только если не загружается)
+    useInterval(() => {
+        if (isAuthenticated && !isLoadingQueueRef.current) {
+            loadQueue();
+        }
+    }, isAuthenticated ? 15000 : null);
+    
+    // Обновление времени воспроизведения
+    useInterval(() => {
+        if (isAuthenticated) {
+            updateTime();
+        }
+    }, isAuthenticated ? 3000 : null);
+
+    // ✅ Загрузка данных при монтировании (force = true для первоначальной загрузки)
     useEffect(() => {
         if (!isAuthenticated) {
             return;
         }
         
-        loadQueue();
-        
-        // Периодическое обновление очереди
-        // Используем ref для стабильной ссылки на функцию
-        const intervalId = setInterval(() => {
-            loadQueue();
-        }, 15000);
-        
-        // Обновление времени воспроизведения
-        const timeIntervalId = setInterval(() => {
-            updateTime();
-        }, 3000);
-        
-        return () => {
-            clearInterval(intervalId);
-            clearInterval(timeIntervalId);
-        };
-    }, [isAuthenticated]); // loadQueue и updateTime стабильны (useCallback), можно не добавлять
+        loadQueue(true); // Force load при монтировании
+    }, [isAuthenticated, loadQueue]);
 
-    // Обработка WebSocket сообщений
+    // ✅ Обработка WebSocket сообщений (force = true для немедленной загрузки)
     useEffect(() => {
         if (lastJsonMessage && lastJsonMessage.type === 'youtube_queue_update') {
             logger.debug('📺 [YouTube] Queue updated via WebSocket, reloading...');
-            loadQueue();
+            loadQueue(true); // Force load при WebSocket обновлении
         }
     }, [lastJsonMessage, loadQueue]);
 

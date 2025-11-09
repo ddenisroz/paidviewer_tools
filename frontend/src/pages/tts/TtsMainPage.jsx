@@ -18,8 +18,7 @@ import { RefreshCw, AlertCircle, CheckCircle2, Settings } from 'lucide-react';
 import { TwitchIcon, VKIcon } from '../../components/PlatformIcons';
 import TtsFilterManager from '../../components/tts/TtsFilterManager';
 import TtsChannelPointsMode from '../../components/tts/TtsChannelPointsMode';
-import { ttsLogger } from '../../utils/logger';
-import { logger } from '../../utils/prodLogger';
+import { ttsLogger, logger } from '../../utils/prodLogger';
 import { getQueryCache, setQueryCache } from '../../utils/queryPersist';
 
 const TtsMainPageContent = () => {
@@ -209,10 +208,13 @@ const TtsMainPageContent = () => {
         initialData: () => getQueryCache(['tts-mode-settings']),
     });
 
-    // Проверяем, загружены ли все данные (или есть в кэше)
+    // ✅ ОПТИМИЗАЦИЯ: Проверяем загрузку всех критичных данных для предотвращения layout shift
     const isDataLoaded = React.useMemo(() => {
-        return ttsStatusData !== undefined || getQueryCache(['tts-status']) !== null;
-    }, [ttsStatusData]);
+        const hasStatus = ttsStatusData !== undefined || getQueryCache(['tts-status']) !== null;
+        const hasSettings = ttsSettingsData !== undefined || getQueryCache(['tts-settings']) !== null;
+        const hasAudio = audioSettingsData !== undefined || getQueryCache(['tts-audio-settings']) !== null;
+        return hasStatus && hasSettings && hasAudio;
+    }, [ttsStatusData, ttsSettingsData, audioSettingsData]);
 
     // Update state from TTS status
     useEffect(() => {

@@ -4,6 +4,8 @@
  * Предотвращает мерцание при перезагрузке страницы
  */
 
+import { logger } from './prodLogger';
+
 const QUERY_CACHE_PREFIX = 'rq_cache_';
 const CACHE_VERSION = 1;
 
@@ -25,11 +27,9 @@ export function getQueryCache(queryKey) {
       return null;
     }
     
-    // Данные из кэша всегда считаем валидными для ANTI-FLASH
-    // React Query обновит их в фоне
     return data;
   } catch (error) {
-    console.error('[Query Persist] Error reading cache:', error);
+    logger.error('[Query Persist] Error reading cache:', error);
     return null;
   }
 }
@@ -48,8 +48,7 @@ export function setQueryCache(queryKey, data) {
     
     localStorage.setItem(cacheKey, JSON.stringify(cacheData));
   } catch (error) {
-    // Игнорируем ошибки записи (например, переполнение localStorage)
-    console.error('[Query Persist] Error writing cache:', error);
+    logger.error('[Query Persist] Error writing cache:', error);
   }
 }
 
@@ -61,7 +60,7 @@ export function clearQueryCache(queryKey) {
     const cacheKey = `${QUERY_CACHE_PREFIX}${JSON.stringify(queryKey)}`;
     localStorage.removeItem(cacheKey);
   } catch (error) {
-    console.error('[Query Persist] Error clearing cache:', error);
+    logger.error('[Query Persist] Error clearing cache:', error);
   }
 }
 
@@ -77,7 +76,7 @@ export function clearAllQueryCache() {
       }
     });
   } catch (error) {
-    console.error('[Query Persist] Error clearing all cache:', error);
+    logger.error('[Query Persist] Error clearing all cache:', error);
   }
 }
 

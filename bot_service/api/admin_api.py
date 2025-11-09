@@ -508,16 +508,15 @@ async def get_sessions(
         sessions = db.query(UserSession).offset(offset).limit(limit).all()
         total_sessions = db.query(UserSession).count()
         
-        # Загружаем гостевые сессии
+        # ✅ ОПТИМИЗАЦИЯ: Загружаем гостевые сессии с пагинацией
         guest_sessions = []
         total_guest_sessions = 0
         if include_guests:
-            guest_sessions = db.query(GuestSession).filter(
+            guest_query = db.query(GuestSession).filter(
                 GuestSession.is_active == True
-            ).all()
-            total_guest_sessions = db.query(GuestSession).filter(
-                GuestSession.is_active == True
-            ).count()
+            )
+            total_guest_sessions = guest_query.count()
+            guest_sessions = guest_query.offset(offset).limit(limit).all()
         
         # Получаем все уникальные user_id из авторизованных сессий
         user_ids = {session.user_id for session in sessions if session.user_id}

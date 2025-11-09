@@ -156,6 +156,8 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                 message_fade_seconds: parseInt(response.data.message_fade_seconds) || 60,
                 message_spacing: parseInt(response.data.message_spacing) || 4,
                 animation_type: response.data.animation_type || 'fade',
+                chat_width: parseInt(response.data.chat_width) || 100,
+                chat_direction: response.data.chat_direction || 'vertical',
                 version: response.data.version || 1  // ✅ Обновляем версию
             };
             

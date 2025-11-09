@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,8 @@ const PointsRewards = ({ user, platform, channelName, integrations }) => {
   const [loading, setLoading] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
   const [editingReward, setEditingReward] = useState(null);
+  const [partnerRequired, setPartnerRequired] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -43,7 +45,7 @@ const PointsRewards = ({ user, platform, channelName, integrations }) => {
   const twitchAvailable = actualIntegrations?.twitch?.enabled && user?.twitch_username;
   const vkAvailable = actualIntegrations?.vk?.enabled && (user?.vk_username || user?.vk_channel_name);
   
-  // Устанавливаем выбранную платформу при первой загрузке
+  // ✅ УПРОЩЕНИЕ: Автоматически определяем платформу (приоритет: Twitch -> VK)
   useEffect(() => {
     if (!selectedPlatform) {
       if (platform) {
@@ -56,33 +58,56 @@ const PointsRewards = ({ user, platform, channelName, integrations }) => {
     }
   }, [platform, twitchAvailable, vkAvailable, selectedPlatform]);
 
-  useEffect(() => {
-    if (selectedPlatform) {
-      loadRewards();
-    }
-  }, [user, selectedPlatform, channelName]);
-
-  const loadRewards = async () => {
+  const loadRewards = useCallback(async () => {
     if (!user || !selectedPlatform || !channelName) return;
     
     try {
       setLoading(true);
+      setPartnerRequired(false);
+      setErrorMessage(null);
       const response = await botService.get(`/api/points/platform/rewards`, {
         params: { platform: selectedPlatform }
       });
       
       if (response.data.success) {
         setRewards(response.data.rewards || []);
+        setPartnerRequired(false);
+        setErrorMessage(null);
       }
     } catch (error) {
       logger.error('Error loading platform rewards:', error);
+      
+      // ✅ Обработка 403 - партнер/аффилиат требуется
+      if (error.response?.status === 403) {
+        const detail = error.response?.data?.detail || error.response?.data?.message;
+        if (detail && (detail.includes('партнёр') || detail.includes('аффилейт') || detail.includes('partner') || detail.includes('affiliate'))) {
+          setPartnerRequired(true);
+          setErrorMessage(detail);
+          setRewards([]);
+          // Не показываем toast для ожидаемой ошибки
+          return;
+        }
+      }
+      
+      // Для других ошибок (кроме 404) показываем toast
       if (error.response?.status !== 404) {
-        toast.error('Ошибка загрузки наград');
+        const detail = error.response?.data?.detail || error.response?.data?.message;
+        setErrorMessage(detail || 'Ошибка загрузки наград');
+        // Показываем toast только для неожиданных ошибок
+        if (error.response?.status !== 403) {
+          toast.error(detail || 'Ошибка загрузки наград');
+        }
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, selectedPlatform, channelName]);
+
+  useEffect(() => {
+    if (selectedPlatform) {
+      loadRewards();
+    }
+  }, [selectedPlatform, loadRewards]);
 
   const handleSave = async () => {
     if (!formData.title.trim()) {
@@ -238,42 +263,14 @@ const PointsRewards = ({ user, platform, channelName, integrations }) => {
                 Награды за баллы
               </CardTitle>
               <CardDescription className="text-xs mt-1">
-                Создавайте и управляйте наградами за баллы канала через API платформы
+                {selectedPlatform ? `Награды для ${selectedPlatform === 'twitch' ? 'Twitch' : 'VK Live'}` : 'Создавайте и управляйте наградами за баллы канала'}
               </CardDescription>
             </div>
-            {/* Переключатель платформ */}
-            {(twitchAvailable || vkAvailable) && (
-              <div className="flex bg-muted rounded-lg p-1">
-                {twitchAvailable && (
-                  <button
-                    onClick={() => setSelectedPlatform('twitch')}
-                    className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                      selectedPlatform === 'twitch'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'hover:bg-muted-foreground/10'
-                    }`}
-                  >
-                    Twitch
-                  </button>
-                )}
-                {vkAvailable && (
-                  <button
-                    onClick={() => setSelectedPlatform('vk')}
-                    className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                      selectedPlatform === 'vk'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'hover:bg-muted-foreground/10'
-                    }`}
-                  >
-                    VK Live
-                  </button>
-                )}
-              </div>
-            )}
             <Button
               onClick={() => handleOpenDialog()}
               size="sm"
               className="gap-2"
+              disabled={partnerRequired}
             >
               <Plus className="w-4 h-4" />
               Создать награду
@@ -285,6 +282,37 @@ const PointsRewards = ({ user, platform, channelName, integrations }) => {
             <div className="text-center py-8">
               <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">Загрузка наград...</p>
+            </div>
+          ) : partnerRequired ? (
+            <div className="text-center py-8 border-2 border-dashed rounded-lg bg-muted/30">
+              <p className="text-sm font-medium mb-2 text-amber-600 dark:text-amber-400">
+                {selectedPlatform === 'twitch' ? 'Требуется статус партнёра или аффилиата' : 'Награды недоступны'}
+              </p>
+              <p className="text-xs text-muted-foreground mb-4 max-w-md mx-auto">
+                {errorMessage || (selectedPlatform === 'twitch' 
+                  ? 'Награды за баллы канала Twitch доступны только для партнёров и аффилейтов. Получите статус партнёра или аффилиата на Twitch, чтобы использовать эту функцию.'
+                  : 'Награды недоступны для этой платформы.')}
+              </p>
+              {selectedPlatform === 'twitch' && (
+                <p className="text-xs text-muted-foreground">
+                  Узнайте больше о программе партнёрства Twitch: <a 
+                    href="https://www.twitch.tv/p/ru-ru/partners/" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    twitch.tv/p/partners
+                  </a>
+                </p>
+              )}
+            </div>
+          ) : errorMessage && !partnerRequired ? (
+            <div className="text-center py-8 border-2 border-dashed rounded-lg">
+              <p className="text-sm font-medium text-destructive mb-2">Ошибка загрузки</p>
+              <p className="text-xs text-muted-foreground mb-4">{errorMessage}</p>
+              <Button onClick={loadRewards} size="sm" variant="outline">
+                Повторить попытку
+              </Button>
             </div>
           ) : rewards.length === 0 ? (
             <div className="text-center py-8 border-2 border-dashed rounded-lg">
@@ -360,7 +388,7 @@ const PointsRewards = ({ user, platform, channelName, integrations }) => {
               {editingReward ? 'Редактировать награду' : 'Создать награду'}
             </DialogTitle>
             <DialogDescription>
-              Награда будет создана на платформе {selectedPlatform === 'twitch' ? 'Twitch' : 'VK Live'} через API
+              {selectedPlatform ? `Награда будет создана на ${selectedPlatform === 'twitch' ? 'Twitch' : 'VK Live'}` : 'Создание награды за баллы'}
             </DialogDescription>
           </DialogHeader>
 

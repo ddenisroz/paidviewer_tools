@@ -43,11 +43,19 @@ export const useDropsConfig = (channelName) => {
       logger.error('Error saving drops config:', err);
     },
     onSuccess: (response, payload) => {
+      // ✅ ОБНОВЛЕНИЕ КЭША: Обновляем кэш данными с сервера для надежности
+      if (response.data?.success && response.data?.data) {
+        queryClient.setQueryData(['drops-config', channelName], response.data.data);
+      }
+      
+      // ✅ СИНХРОНИЗАЦИЯ: Отправляем события для синхронизации с другими компонентами
+      // ✅ ИСПРАВЛЕНИЕ: Добавляем source для предотвращения циклических обновлений
       if (payload.donation_enabled !== undefined) {
         window.dispatchEvent(new CustomEvent('drops-config-changed', {
           detail: { 
             donation_enabled: payload.donation_enabled,
-            channel: channelName
+            channel: channelName,
+            source: 'useDropsConfig'
           }
         }));
       }
@@ -56,7 +64,8 @@ export const useDropsConfig = (channelName) => {
           detail: { 
             streak_enabled: payload.streak_enabled_twitch, 
             channel: channelName, 
-            platform: 'twitch'
+            platform: 'twitch',
+            source: 'useDropsConfig'
           }
         }));
       }
@@ -65,14 +74,14 @@ export const useDropsConfig = (channelName) => {
           detail: { 
             streak_enabled: payload.streak_enabled_vk, 
             channel: channelName, 
-            platform: 'vk'
+            platform: 'vk',
+            source: 'useDropsConfig'
           }
         }));
       }
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['drops-config', channelName] });
-    },
+    // ✅ УБРАНО: onSettled с invalidateQueries - не нужен, так как данные уже обновлены в onSuccess
+    // Это предотвращает race condition и некорректное отображение статуса
   });
 
   return {

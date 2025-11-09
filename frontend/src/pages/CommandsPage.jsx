@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -85,19 +86,117 @@ import { logger } from '../utils/prodLogger';
         );
     }
     
-    const [basicCommands, setBasicCommands] = useState([]);
-    const [customCommands, setCustomCommands] = useState([]);
-    const [loading, setLoading] = useState(false); // ⚡ Изменено: по умолчанию false
-    const [initialLoading, setInitialLoading] = useState(true); // 🚀 Для первой загрузки
+    const queryClient = useQueryClient();
     
-    // 🚀 КЭШИРОВАНИЕ: Храним время последней загрузки
-    const [lastLoadTime, setLastLoadTime] = useState(0);
-    const CACHE_TTL = 30000; // 30 секунд кэш
+    // ✅ ОПТИМИЗАЦИЯ: Используем React Query вместо ручного кэширования
+    const { data: commandsData, isLoading: loading, isInitialLoading: initialLoading } = useQuery({
+        queryKey: ['commands'],
+        queryFn: async () => {
+            const response = await api.get('/api/commands');
+            return {
+                basic_commands: response.data.basic_commands || [],
+                custom_commands: response.data.custom_commands || []
+            };
+        },
+        enabled: isAuthenticated && (integrations?.twitch?.enabled || integrations?.vk?.enabled),
+        staleTime: 30 * 1000, // 30 секунд
+        gcTime: 5 * 60 * 1000, // 5 минут
+        refetchOnWindowFocus: false,
+        refetchOnMount: true,
+        retry: 1,
+        onError: (error) => {
+            logger.error('Error loading commands:', error);
+            toast.error('Ошибка загрузки команд');
+        }
+    });
+    
+    const basicCommands = commandsData?.basic_commands || [];
+    const customCommands = commandsData?.custom_commands || [];
+    
+    // ✅ Mutations для управления командами
+    const createCommandMutation = useMutation({
+        mutationFn: async (data) => {
+            return await api.post('/api/commands', data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['commands'] });
+            toast.success('Кастомная команда создана!');
+        },
+        onError: (error) => {
+            logger.error('Error creating command:', error);
+            toast.error(error.response?.data?.detail || 'Ошибка создания команды');
+        }
+    });
+    
+    const createOverrideMutation = useMutation({
+        mutationFn: async (data) => {
+            return await api.post('/api/commands/override', data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['commands'] });
+            toast.success('Персональная настройка команды создана!');
+        },
+        onError: (error) => {
+            logger.error('Error creating override:', error);
+            if (error.response?.status === 400 && 
+                error.response?.data?.detail?.includes('уже существует')) {
+                toast.error('Персональная настройка уже существует. Перезагрузите список команд.');
+                queryClient.invalidateQueries({ queryKey: ['commands'] });
+            } else {
+                throw error;
+            }
+        }
+    });
+    
+    const updateCommandMutation = useMutation({
+        mutationFn: async ({ commandId, data }) => {
+            return await api.put(`/api/commands/${commandId}`, data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['commands'] });
+            toast.success('Команда обновлена!');
+        },
+        onError: (error) => {
+            logger.error('Error updating command:', error);
+            if (!error.response?.data?.detail?.includes('уже существует')) {
+                toast.error(error.response?.data?.detail || 'Ошибка обновления команды');
+            }
+        }
+    });
+    
+    const toggleCommandMutation = useMutation({
+        mutationFn: async ({ commandName, data }) => {
+            return await api.put(`/api/commands/${commandName}`, data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['commands'] });
+        },
+        onError: (error) => {
+            logger.error('Error toggling command:', error);
+            toast.error('Ошибка переключения команды');
+            // ✅ Откатываем изменения через invalidateQueries
+            queryClient.invalidateQueries({ queryKey: ['commands'] });
+        }
+    });
+    
+    const deleteCommandMutation = useMutation({
+        mutationFn: async (commandId) => {
+            return await api.delete(`/api/commands/${commandId}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['commands'] });
+            toast.success('Команда удалена!');
+        },
+        onError: (error) => {
+            logger.error('Error deleting command:', error);
+            toast.error('Ошибка удаления команды');
+        }
+    });
     
     // Состояния для фильтрации базовых команд (как в Excel)
     const [basicSearchTerm, setBasicSearchTerm] = useState('');
     const [selectedBasicTags, setSelectedBasicTags] = useState([]);
-    const [basicTags, setBasicTags] = useState([]);
+    // ✅ Удаляем basicTags из state - теперь вычисляется через useMemo
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [tagSearchTerm, setTagSearchTerm] = useState('');
     
@@ -161,49 +260,15 @@ import { logger } from '../utils/prodLogger';
     // Если ни одна платформа не подключена, показываем все
     const platformsToShow = availablePlatforms.length > 0 ? availablePlatforms : platformOptions;
 
-    useEffect(() => {
-        if (isAuthenticated) {
-            loadCommands();
-        }
-    }, [isAuthenticated]);
-
-    const loadCommands = async (force = false) => {
-        // Проверяем кэш (если не force reload)
-        if (!force) {
-            const now = Date.now();
-            if (now - lastLoadTime < CACHE_TTL) {
-                logger.log('📦 [CommandsPage] Using cached commands data');
-                return;
-            }
-        }
-        
-        try {
-            setLoading(true);
-            const response = await api.get('/api/commands');
-            
-            const basicCommandsData = response.data.basic_commands || [];
-            
-            setBasicCommands(basicCommandsData);
-            setCustomCommands(response.data.custom_commands || []);
-            
-            // Извлекаем уникальные теги из базовых команд
-            const tags = [...new Set(basicCommandsData.flatMap(cmd => {
-                return Array.isArray(cmd.tags) ? cmd.tags : [];
-            }))];
-            
-            setBasicTags(tags);
-            
-            // Обновляем timestamp кэша
-            setLastLoadTime(Date.now());
-            
-        } catch (error) {
-            logger.error('Error loading commands:', error);
-            toast.error('Ошибка загрузки команд');
-        } finally {
-            setLoading(false);
-            setInitialLoading(false); // ⚡ Первая загрузка завершена
-        }
-    };
+    // ✅ ОПТИМИЗАЦИЯ: Извлекаем уникальные теги из базовых команд (мемоизируем)
+    const basicTags = React.useMemo(() => {
+        return [...new Set(basicCommands.flatMap(cmd => {
+            return Array.isArray(cmd.tags) ? cmd.tags : [];
+        }))];
+    }, [basicCommands]);
+    
+    // ✅ Удаляем ручную загрузку - React Query делает это автоматически
+    // useEffect для loadCommands больше не нужен
 
     // Функция для фильтрации базовых команд (как в Excel)
     const getFilteredBasicCommands = () => {
@@ -245,115 +310,81 @@ import { logger } from '../utils/prodLogger';
         setSelectedBasicTags([...basicTags]);
     };
 
-    const handleCreateCommand = async () => {
-        try {
-            await api.post('/api/commands', createForm);
-            toast.success('Кастомная команда создана!');
-            setIsCreateDialogOpen(false);
-            setCreateForm({
-                command_name: '',
-                response_text: '',
-                platforms: 'twitch,vk',
-                allowed_roles: 'all',
-                cooldown_seconds: 0,
-                is_enabled: true
-            });
-            loadCommands();
-        } catch (error) {
-            logger.error('Error creating command:', error);
-            toast.error(error.response?.data?.detail || 'Ошибка создания команды');
-        }
+    const handleCreateCommand = () => {
+        createCommandMutation.mutate(createForm, {
+            onSuccess: () => {
+                setIsCreateDialogOpen(false);
+                setCreateForm({
+                    command_name: '',
+                    response_text: '',
+                    platforms: 'twitch,vk',
+                    allowed_roles: 'all',
+                    cooldown_seconds: 0,
+                    is_enabled: true
+                });
+            }
+        });
     };
 
-    const handleUpdateCommand = async (commandId) => {
-        try {
-            // Если редактируем global команду - создаем override
-            if (editingCommand?.command_type === 'global') {
-                try {
-                    await api.post('/api/commands/override', {
-                        command_name: editingCommand.command_name,
-                        is_enabled: editForm.is_enabled,
-                        platforms: editForm.platforms,
-                        allowed_roles: editForm.allowed_roles,
-                        cooldown_seconds: editForm.cooldown_seconds,
-                        alias: null
-                    });
-                    toast.success('Персональная настройка команды создана!');
-                } catch (createError) {
-                    // Если override уже существует - показываем специфичное сообщение
-                    if (createError.response?.status === 400 && 
-                        createError.response?.data?.detail?.includes('уже существует')) {
-                        toast.error('Персональная настройка уже существует. Перезагрузите список команд.');
-                        loadCommands(); // Перезагружаем чтобы увидеть override
-                        throw createError;
-                    }
-                    throw createError;
+    const handleUpdateCommand = (commandId) => {
+        // Если редактируем global команду - создаем override
+        if (editingCommand?.command_type === 'global') {
+            createOverrideMutation.mutate({
+                command_name: editingCommand.command_name,
+                is_enabled: editForm.is_enabled,
+                platforms: editForm.platforms,
+                allowed_roles: editForm.allowed_roles,
+                cooldown_seconds: editForm.cooldown_seconds,
+                alias: null
+            }, {
+                onSuccess: () => {
+                    setIsEditDialogOpen(false);
+                    setEditingCommand(null);
+                },
+                onError: () => {
+                    // Ошибка уже обработана в mutation
                 }
-            } else {
-                // Для override и custom команд - обычное обновление
-                await api.put(`/api/commands/${commandId}`, editForm);
-                toast.success('Команда обновлена!');
-            }
-            
-            setIsEditDialogOpen(false);
-            setEditingCommand(null);
-            loadCommands();
-        } catch (error) {
-            logger.error('Error updating command:', error);
-            if (!error.response?.data?.detail?.includes('уже существует')) {
-                const errorMsg = error.response?.data?.detail || 'Ошибка обновления команды';
-                toast.error(errorMsg);
-            }
+            });
+        } else {
+            // Для override и custom команд - обычное обновление
+            updateCommandMutation.mutate({ commandId, data: editForm }, {
+                onSuccess: () => {
+                    toast.success('Команда обновлена!');
+                    setIsEditDialogOpen(false);
+                    setEditingCommand(null);
+                }
+            });
         }
     };
 
-    const handleToggleCommand = async (commandName, data) => {
-        // Оптимистичное обновление - сразу меняем состояние
-        setBasicCommands(prev => 
-            prev.map(cmd => 
-                cmd.command_name === commandName 
-                    ? { ...cmd, ...data }
-                    : cmd
-            )
-        );
+    const handleToggleCommand = (commandName, data) => {
+        // ✅ Оптимистичное обновление через React Query
+        queryClient.setQueryData(['commands'], (old) => {
+            if (!old) return old;
+            return {
+                basic_commands: old.basic_commands?.map(cmd => 
+                    cmd.command_name === commandName ? { ...cmd, ...data } : cmd
+                ) || [],
+                custom_commands: old.custom_commands?.map(cmd => 
+                    cmd.command_name === commandName ? { ...cmd, ...data } : cmd
+                ) || []
+            };
+        });
         
-        setCustomCommands(prev => 
-            prev.map(cmd => 
-                cmd.command_name === commandName 
-                    ? { ...cmd, ...data }
-                    : cmd
-            )
-        );
-        
-        // Отправляем запрос в фоне
-        try {
-            await api.put(`/api/commands/${commandName}`, data);
-        } catch (error) {
-            logger.error('Error toggling command:', error);
-            toast.error('Ошибка переключения команды');
-            // Откатываем изменения при ошибке
-            loadCommands();
-        }
+        // ✅ Отправляем запрос через mutation
+        toggleCommandMutation.mutate({ commandName, data });
     };
 
-    const handleDeleteCommand = async (commandId) => {
+    const handleDeleteCommand = (commandId) => {
         if (!confirm('Вы уверены, что хотите удалить эту команду?')) return;
         
-        try {
-            await api.delete(`/api/commands/${commandId}`);
-            toast.success('Команда удалена!');
-            loadCommands();
-        } catch (error) {
-            logger.error('Error deleting command:', error);
-            toast.error('Ошибка удаления команды');
-        }
+        deleteCommandMutation.mutate(commandId);
     };
 
     const openEditDialog = (command) => {
         setEditingCommand(command);
-        // Если platforms пустое или не указано, используем 'twitch,vk' (Все платформы)
+        // ✅ УНИФИКАЦИЯ: Всегда используем значения по умолчанию если пусто
         const platforms = command.platforms || 'twitch,vk';
-        // Если allowed_roles пустое или не указано, используем 'all'
         const allowed_roles = (command.allowed_roles && command.allowed_roles.trim() !== '') ? command.allowed_roles : 'all';
         setEditForm({
             is_enabled: command.is_enabled,
@@ -442,8 +473,8 @@ import { logger } from '../utils/prodLogger';
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1">
-                        {getRoleIcon(command.allowed_roles)}
-                        <span>{getRoleLabel(command.allowed_roles)}</span>
+                        {getRoleIcon(command.allowed_roles || 'all')}
+                        <span>{getRoleLabel(command.allowed_roles || 'all')}</span>
                     </div>
                         <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
@@ -801,11 +832,8 @@ import { logger } from '../utils/prodLogger';
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
-                            Настройка команды !{editingCommand?.command_name}
+                            !{editingCommand?.command_name}
                         </DialogTitle>
-                        <DialogDescription>
-                            Настройте параметры команды: платформы, роли и кулдаун
-                        </DialogDescription>
                     </DialogHeader>
                     {editingCommand && (
                         <div className="space-y-4">
@@ -907,10 +935,7 @@ import { logger } from '../utils/prodLogger';
                         </Button>
                         <Button onClick={() => handleUpdateCommand(editingCommand?.id)}>
                             <Save className="h-4 w-4 mr-2" />
-                            {editingCommand?.command_type === 'global' 
-                                ? 'Создать персональную настройку' 
-                                : 'Сохранить'
-                            }
+                            Сохранить
                         </Button>
                     </DialogFooter>
                 </DialogContent>

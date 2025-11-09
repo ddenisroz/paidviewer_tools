@@ -13,6 +13,7 @@ import { useUserSettings } from '../context/UserSettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 import { logger } from '../utils/prodLogger';
+import { useTimeout } from '../hooks/useTimeout';
 
 const StreamTitleCard = ({ onLinkStateChange }) => {
     const { user, isAuthenticated } = useAuth();
@@ -115,51 +116,47 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
         }
     };
     
-    // 🚀 FIX: Запускаем таймер автосброса только после того, как пользователь убрал фокус с инпута
-    const handleInputBlur = () => {
-        // Очищаем предыдущий таймер
-        if (autoSaveTimerRef.current) {
-            clearTimeout(autoSaveTimerRef.current);
-            autoSaveTimerRef.current = null;
+    // Используем useTimeout для автоматической очистки таймера
+    const [resetTimerDelay, setResetTimerDelay] = useState(null);
+    
+    useTimeout(() => {
+        // Проверяем, что изменения все еще есть (пользователь не сохранил)
+        const stillChanged = 
+            (twitchEnabled && (initialData.twitch?.title || '') !== (currentData.twitch?.title || '')) ||
+            (vkEnabled && (initialData.vk?.title || '') !== (currentData.vk?.title || ''));
+        
+        if (!stillChanged) {
+            logger.log('⏰ [AUTO-RESET] Skipping reset - changes were already saved');
+            return;
         }
         
+        logger.log('⏰ [AUTO-RESET] 10 seconds passed - resetting to initial data');
+        
+        // Сбрасываем к исходным данным
+        setCurrentData(prev => ({
+            ...prev,
+            twitch: { ...prev.twitch, title: initialData.twitch?.title || '' },
+            vk: { ...prev.vk, title: initialData.vk?.title || '' }
+        }));
+        
+        // Уведомление пользователю
+        toast.info('Изменения названия отменены (не были сохранены в течение 10 секунд)');
+        setResetTimerDelay(null); // Останавливаем таймер
+    }, resetTimerDelay);
+
+    // 🚀 FIX: Запускаем таймер автосброса только после того, как пользователь убрал фокус с инпута
+    const handleInputBlur = () => {
         // Если есть несохранённые изменения - запускаем таймер
         if (isChanged && status.saveTitle !== 'loading' && status.saveTitle !== 'success') {
             logger.log('⏰ [AUTO-RESET] Input blurred - starting 10s timer to reset unsaved changes');
-            
-            autoSaveTimerRef.current = setTimeout(() => {
-                // Проверяем, что изменения все еще есть (пользователь не сохранил)
-                const stillChanged = 
-                    (twitchEnabled && (initialData.twitch?.title || '') !== (currentData.twitch?.title || '')) ||
-                    (vkEnabled && (initialData.vk?.title || '') !== (currentData.vk?.title || ''));
-                
-                if (!stillChanged) {
-                    logger.log('⏰ [AUTO-RESET] Skipping reset - changes were already saved');
-                    return;
-                }
-                
-                logger.log('⏰ [AUTO-RESET] 10 seconds passed - resetting to initial data');
-                
-                // Сбрасываем к исходным данным
-                setCurrentData(prev => ({
-                    ...prev,
-                    twitch: { ...prev.twitch, title: initialData.twitch?.title || '' },
-                    vk: { ...prev.vk, title: initialData.vk?.title || '' }
-                }));
-                
-                // Уведомление пользователю
-                toast.info('Изменения названия отменены (не были сохранены в течение 10 секунд)');
-            }, 10000); // 10 секунд
+            setResetTimerDelay(10000); // 10 секунд
         }
     };
     
     // Очищаем таймер при получении фокуса (пользователь снова начал редактировать)
     const handleInputFocus = () => {
-        if (autoSaveTimerRef.current) {
-            clearTimeout(autoSaveTimerRef.current);
-            autoSaveTimerRef.current = null;
-            logger.log('⏰ [AUTO-RESET] Input focused - clearing timer');
-        }
+        setResetTimerDelay(null);
+        logger.log('⏰ [AUTO-RESET] Input focused - clearing timer');
     };
 
     const handleKeyPress = (e) => {

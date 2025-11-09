@@ -15,6 +15,7 @@ import DonationHistory from './DonationHistory';
 import MythycClosed from '../../images/lootboxes/mythyc/mythyc_closed.png';
 import { useDropsConfig } from '../../hooks/useDropsConfig';
 import { useAutoSave } from '../../hooks/useAutoSave';
+import { DROPS_CONSTANTS } from '../../constants/drops';
 
 const DonationSettings = ({ user, channelName, hasRewards = false }) => {
   const { integrations } = useIntegrations();
@@ -26,16 +27,19 @@ const DonationSettings = ({ user, channelName, hasRewards = false }) => {
   
   const [formData, setFormData] = useState({
     donation_enabled: false,
-    donation_amount_common: [50.0],
-    donation_amount_rare: [100.0],
-    donation_amount_epic: [500.0],
-    donation_amount_legendary: [1000.0],
+    donation_amount_common: [DROPS_CONSTANTS.DONATION.DEFAULT_COMMON],
+    donation_amount_rare: [DROPS_CONSTANTS.DONATION.DEFAULT_RARE],
+    donation_amount_epic: [DROPS_CONSTANTS.DONATION.DEFAULT_EPIC],
+    donation_amount_legendary: [DROPS_CONSTANTS.DONATION.DEFAULT_LEGENDARY],
     mythical_enabled: false,
-    mythical_min_interval_hours: [2],
-    mythical_max_interval_hours: [8],
-    mythical_window_duration_minutes: [5],
-    mythical_donation_amount: [2000.0]
+    mythical_min_interval_hours: [DROPS_CONSTANTS.MYTHICAL.DEFAULT_MIN_INTERVAL_HOURS],
+    mythical_max_interval_hours: [DROPS_CONSTANTS.MYTHICAL.DEFAULT_MAX_INTERVAL_HOURS],
+    mythical_window_duration_minutes: [DROPS_CONSTANTS.MYTHICAL.DEFAULT_WINDOW_DURATION_MINUTES],
+    mythical_donation_amount: [DROPS_CONSTANTS.MYTHICAL.DEFAULT_DONATION_AMOUNT]
   });
+
+  // Отслеживаем предыдущее состояние подключения DonationAlerts для автоматического включения donation drops
+  const [wasDonationAlertsConnected, setWasDonationAlertsConnected] = useState(donationalertsConnected);
 
   useEffect(() => {
     const handleDropsConfigChange = (event) => {
@@ -57,23 +61,22 @@ const DonationSettings = ({ user, channelName, hasRewards = false }) => {
     // Если интеграция не подключена, принудительно ставим false
     const donationEnabled = currentDonationalertsConnected ? donationEnabledFromServer : false;
     
-    // ✅ НАСТРОЙКИ МИФИЧЕСКОГО DROPS ДОСТУПНЫ ВСЕГДА
-    // Активация (появление сундука) происходит только когда стрим онлайн
-    // Но настройки можно включать/выключать и настраивать параметры всегда
+    // ✅ МИФИЧЕСКИЙ DROPS ДОСТУПЕН ТОЛЬКО С DONATIONALERTS
+    // Мифический drops работает на основе донатов, поэтому требует подключения DonationAlerts
     const mythicalEnabledFromServer = config.mythical_enabled ?? false;
-    const mythicalEnabled = mythicalEnabledFromServer;
+    const mythicalEnabled = currentDonationalertsConnected ? mythicalEnabledFromServer : false;
     
     return {
       donation_enabled: donationEnabled,
-      donation_amount_common: [config.donation_amount_common ?? 50.0],
-      donation_amount_rare: [config.donation_amount_rare ?? 100.0],
-      donation_amount_epic: [config.donation_amount_epic ?? 500.0],
-      donation_amount_legendary: [config.donation_amount_legendary ?? 1000.0],
+      donation_amount_common: [config.donation_amount_common ?? DROPS_CONSTANTS.DONATION.DEFAULT_COMMON],
+      donation_amount_rare: [config.donation_amount_rare ?? DROPS_CONSTANTS.DONATION.DEFAULT_RARE],
+      donation_amount_epic: [config.donation_amount_epic ?? DROPS_CONSTANTS.DONATION.DEFAULT_EPIC],
+      donation_amount_legendary: [config.donation_amount_legendary ?? DROPS_CONSTANTS.DONATION.DEFAULT_LEGENDARY],
       mythical_enabled: mythicalEnabled,
-      mythical_min_interval_hours: [config.mythical_min_interval_hours ?? 2],
-      mythical_max_interval_hours: [config.mythical_max_interval_hours ?? 8],
-      mythical_window_duration_minutes: [config.mythical_window_duration_minutes ?? 5],
-      mythical_donation_amount: [config.mythical_donation_amount ?? 2000.0]
+      mythical_min_interval_hours: [config.mythical_min_interval_hours ?? DROPS_CONSTANTS.MYTHICAL.DEFAULT_MIN_INTERVAL_HOURS],
+      mythical_max_interval_hours: [config.mythical_max_interval_hours ?? DROPS_CONSTANTS.MYTHICAL.DEFAULT_MAX_INTERVAL_HOURS],
+      mythical_window_duration_minutes: [config.mythical_window_duration_minutes ?? DROPS_CONSTANTS.MYTHICAL.DEFAULT_WINDOW_DURATION_MINUTES],
+      mythical_donation_amount: [config.mythical_donation_amount ?? DROPS_CONSTANTS.MYTHICAL.DEFAULT_DONATION_AMOUNT]
     };
   }, [config, integrations, daConnected]);
   
@@ -84,22 +87,25 @@ const DonationSettings = ({ user, channelName, hasRewards = false }) => {
     }
   }, [initialFormData, isInitialLoad]);
 
+  // ✅ ИСПРАВЛЕНИЕ: Используем функциональное обновление и удаляем formData из зависимостей
+  // чтобы избежать бесконечного цикла. Проверяем текущие значения через ref или функциональное обновление.
   useEffect(() => {
-    if (!donationalertsConnected && formData.donation_enabled) {
-      setFormData(prev => ({ ...prev, donation_enabled: false }));
+    if (!donationalertsConnected) {
+      // Отключаем donation и mythical drops если DonationAlerts отключен
+      // ✅ Используем функциональное обновление для чтения актуальных значений без добавления в зависимости
+      setFormData(prev => {
+        // ✅ Проверяем текущие значения и обновляем только если они true
+        if (prev.donation_enabled || prev.mythical_enabled) {
+          return {
+            ...prev,
+            donation_enabled: false,
+            mythical_enabled: false
+          };
+        }
+        return prev; // Не изменяем состояние если значения уже false
+      });
     }
-  }, [donationalertsConnected]);
-
-  useEffect(() => {
-    const handleDonationAlertsConnected = (event) => {
-      if (event.detail?.success && donationalertsConnected && !formData.donation_enabled) {
-        setFormData(prev => ({ ...prev, donation_enabled: true }));
-      }
-    };
-
-    window.addEventListener('donationalerts_connected', handleDonationAlertsConnected);
-    return () => window.removeEventListener('donationalerts_connected', handleDonationAlertsConnected);
-  }, [donationalertsConnected, formData.donation_enabled]);
+  }, [donationalertsConnected]); // ✅ Убираем formData из зависимостей для предотвращения бесконечного цикла
 
   const mythicalEnabledDisplay = formData.mythical_enabled;
   const donationEnabledDisplay = donationalertsConnected ? formData.donation_enabled : false;
@@ -133,6 +139,43 @@ const DonationSettings = ({ user, channelName, hasRewards = false }) => {
     mythical_window_duration_minutes: formData.mythical_window_duration_minutes[0],
     mythical_donation_amount: formData.mythical_donation_amount[0]
   });
+
+  useEffect(() => {
+    // Если DonationAlerts только что подключился (был false, стал true)
+    if (donationalertsConnected && !wasDonationAlertsConnected && !formData.donation_enabled) {
+      // Автоматически включаем donation drops после подключения
+      setFormData(prev => ({ ...prev, donation_enabled: true }));
+      // Сохраняем автоматически через небольшую задержку, чтобы дать время обновиться состоянию
+      setTimeout(() => {
+        const payload = {
+          donation_enabled: true,
+          donation_amount_common: formData.donation_amount_common[0],
+          donation_amount_rare: formData.donation_amount_rare[0],
+          donation_amount_epic: formData.donation_amount_epic[0],
+          donation_amount_legendary: formData.donation_amount_legendary[0],
+          mythical_enabled: formData.mythical_enabled,
+          mythical_min_interval_hours: formData.mythical_min_interval_hours[0],
+          mythical_max_interval_hours: formData.mythical_max_interval_hours[0],
+          mythical_window_duration_minutes: formData.mythical_window_duration_minutes[0],
+          mythical_donation_amount: formData.mythical_donation_amount[0]
+        };
+        autoSave(payload);
+      }, 1000);
+    }
+    setWasDonationAlertsConnected(donationalertsConnected);
+  }, [donationalertsConnected, wasDonationAlertsConnected, formData, autoSave]);
+
+  useEffect(() => {
+    const handleDonationAlertsConnected = (event) => {
+      if (event.detail?.success) {
+        // Событие подключения - обновляем состояние для триггера автоматического включения
+        // Основная логика в useEffect выше
+      }
+    };
+
+    window.addEventListener('donationalerts_connected', handleDonationAlertsConnected);
+    return () => window.removeEventListener('donationalerts_connected', handleDonationAlertsConnected);
+  }, []);
 
   useEffect(() => {
     if (!isInitialLoad && config) {
@@ -196,8 +239,7 @@ const DonationSettings = ({ user, channelName, hasRewards = false }) => {
       {/* Настройки донатов - компактно */}
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Настройка сундуков</CardTitle>
+          <div className="flex items-center justify-end">
             <div className="flex items-center gap-2">
               <Label className="text-sm font-medium">Включить donation drops</Label>
               <div title={!donationalertsConnected ? "Нажмите чтобы подключить DonationAlerts" : ""}>
@@ -245,20 +287,39 @@ const DonationSettings = ({ user, channelName, hasRewards = false }) => {
                   <Sparkles className="w-5 h-5" />
                   Мифический drops
                 </CardTitle>
-            <div className="flex items-center gap-2">
-              <Label className="text-sm font-medium text-pink-300">Включить mythyc drops</Label>
-              <div title="Настройки мифического drops доступны всегда. Активация происходит только когда стрим онлайн.">
-              <Switch
-                checked={mythicalEnabledDisplay}
-                onCheckedChange={async (checked) => {
-                  setFormData({...formData, mythical_enabled: checked});
-                  autoSave({ ...createPayload(), mythical_enabled: checked });
-                }}
-              />
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm font-medium text-pink-300">Включить mythyc drops</Label>
+                  <div title="Мифический drops работает на основе донатов. Активация происходит только когда стрим онлайн.">
+                    <Switch
+                      checked={mythicalEnabledDisplay}
+                      onCheckedChange={async (checked) => {
+                        if (checked) {
+                          // Проверяем интеграцию с DonationAlerts
+                          if (!donationalertsConnected) {
+                            // Автоматически включаем интеграцию DonationAlerts
+                            toast.info('Подключаем интеграцию DonationAlerts...', {
+                              description: 'Вы будете перенаправлены на страницу авторизации'
+                            });
+                            const connected = await daConnect();
+                            
+                            if (!connected) {
+                              toast.error('Не удалось подключить интеграцию DonationAlerts');
+                              return;
+                            }
+                            
+                            // Если подключение успешно, daConnect() перенаправит на OAuth
+                            // После возврата с OAuth интеграция будет подключена
+                            return;
+                          }
+                        }
+                        setFormData({...formData, mythical_enabled: checked});
+                        autoSave({ ...createPayload(), mythical_enabled: checked });
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        </CardHeader>
+            </CardHeader>
         {mythicalEnabledDisplay && (
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
