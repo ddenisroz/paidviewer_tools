@@ -8,7 +8,7 @@ import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
 import { logger } from '../../utils/prodLogger';
 
-const DropsHistory = ({ user, platform, channelName }) => {
+const DropsHistory = ({ user, channelName }) => {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -18,18 +18,18 @@ const DropsHistory = ({ user, platform, channelName }) => {
 
   useEffect(() => {
     loadHistory(true);
-  }, [user, platform, channelName]);
+  }, [user, channelName]);
 
   const loadHistory = async (reset = false) => {
-    if (!user || !platform || !channelName) return;
+    if (!user || !channelName) return;
 
     const currentOffset = reset ? 0 : offset;
 
     try {
       setLoading(true);
+      // 🚀 FIX: Загружаем общую историю (без фильтрации по platform)
       const response = await botService.get(`/api/drops/history/${channelName}`, {
         params: { 
-          platform, 
           limit, 
           offset: currentOffset 
         }

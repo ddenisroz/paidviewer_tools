@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '../../components/ui/toast';
 import { useButtonPosition } from '../../hooks/useButtonPosition';
 import { useAuth } from '../../context/AuthContext';
+import { useIntegrations } from '../../context/IntegrationsContext';
 import { useTts } from '../../context/TtsContext';
 import { useTtsHealth } from '../../context/TtsHealthContext';
 import TtsErrorCard from '../../components/TtsErrorCard';
@@ -36,12 +38,20 @@ import { logger } from '../../utils/prodLogger';
 
 
 const VoiceManagementPageContent = () => {
+    const navigate = useNavigate();
     const { addToast } = useToast();
     const { getButtonPosition } = useButtonPosition();
+    const { user, isGuest, isAuthenticated } = useAuth();
+    const { integrations } = useIntegrations();
     // УДАЛЕНО: useState для голосов - теперь используется напрямую из React Query
     // const [globalVoices, setGlobalVoices] = useState([]); - УДАЛЕНО
     // const [userVoices, setUserVoices] = useState([]); - УДАЛЕНО
     const [loading, setLoading] = useState(true);
+    
+    // 🔒 Проверка наличия интеграций
+    const isTwitchConnected = integrations.twitch?.enabled || (isGuest && user?.platform === 'twitch');
+    const isVkConnected = integrations.vk?.enabled || (isGuest && user?.platform === 'vk');
+    const hasAnyIntegration = isTwitchConnected || isVkConnected || isGuest;
     const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [renameDialogOpen, setRenameDialogOpen] = useState(false);
@@ -57,7 +67,6 @@ const VoiceManagementPageContent = () => {
     const fileInputRef = React.useRef(null);
     const voiceVolumeSaveTimeout = React.useRef({});
     
-    const { user } = useAuth();
     const { initializeTts, engineStatus } = useTts();
     const { isHealthy, isChecking, lastCheck, checkTtsHealth } = useTtsHealth();
     const queryClient = useQueryClient();
@@ -599,6 +608,39 @@ const VoiceManagementPageContent = () => {
     };
 
 
+    // 🔒 ПЕРВООЧЕРЕДНАЯ ПРОВЕРКА: Авторизация
+    // Если пользователь не авторизован - показываем сообщение с предложением войти
+    if (!isAuthenticated) {
+        return (
+            <PageWrapper 
+                title="Управление голосами"
+            >
+                <Card className="border-gray-700">
+                    <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
+                        <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
+                            <AlertCircle className="w-10 h-10 text-gray-500" />
+                        </div>
+                        <div className="space-y-2 max-w-md">
+                            <h3 className="text-xl font-semibold text-gray-200">
+                                Требуется авторизация
+                            </h3>
+                            <p className="text-gray-400 text-sm">
+                                Для использования управления голосами необходимо войти в систему и подключить хотя бы одну платформу (Twitch или VK Live)
+                            </p>
+                        </div>
+                        <Button 
+                            onClick={() => navigate('/login')}
+                            className="gap-2"
+                        >
+                            <Settings className="w-4 h-4" />
+                            Войти в систему
+                        </Button>
+                    </CardContent>
+                </Card>
+            </PageWrapper>
+        );
+    }
+
     // Показываем скелетон с фиксированной высотой пока проверяется health или загружаются голоса
     if (showLoader) {
         return (
@@ -608,6 +650,38 @@ const VoiceManagementPageContent = () => {
                 <div className="flex justify-center items-center min-h-[400px]">
                     <PageLoader />
                 </div>
+            </PageWrapper>
+        );
+    }
+
+    // 🔒 Проверка наличия интеграций - если нет интеграций и не гость, показываем сообщение
+    if (!isGuest && !isTwitchConnected && !isVkConnected) {
+        return (
+            <PageWrapper 
+                title="Управление голосами"
+            >
+                <Card className="border-gray-700">
+                    <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
+                        <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
+                            <AlertCircle className="w-10 h-10 text-gray-500" />
+                        </div>
+                        <div className="space-y-2 max-w-md">
+                            <h3 className="text-xl font-semibold text-gray-200">
+                                Нет подключенных интеграций
+                            </h3>
+                            <p className="text-gray-400 text-sm">
+                                Для использования управления голосами необходимо подключить хотя бы одну платформу (Twitch или VK Live)
+                            </p>
+                        </div>
+                        <Button 
+                            onClick={() => navigate('/dashboard/settings')}
+                            className="gap-2"
+                        >
+                            <Settings className="w-4 h-4" />
+                            Перейти в настройки
+                        </Button>
+                    </CardContent>
+                </Card>
             </PageWrapper>
         );
     }
@@ -1009,7 +1083,6 @@ const VoiceManagementPageContent = () => {
                                                                 onCheckedChange={() => handleToggleVoiceEnabled(voice.id)}
                                                                 className="flex-shrink-0"
                                                             />
-                                                            <Globe className="h-3.5 w-3.5 text-blue-400 flex-shrink-0"/>
                                                             <span className="truncate">{voice.name}</span>
                                                         </CardTitle>
                                                     </div>

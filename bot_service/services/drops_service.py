@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from core.database import DropsConfig, DropsReward, DropsQuality, UserStreak, DropsHistory, MythicalDropsSession
 from core.datetime_utils import utcnow_naive
+from services.stream_session_service import StreamSessionService
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +18,18 @@ class DropsService:
     def __init__(self, db: Session):
         self.db = db
     
-    def get_config(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch") -> Optional[DropsConfig]:
-        """Получает конфигурацию Drops для канала"""
+    def get_config(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = None) -> Optional[DropsConfig]:
+        """Получает конфигурацию Drops для канала
+        
+        Если platform не указан, возвращает общий конфиг (platform="global").
+        Если общий конфиг не существует, создает его на основе существующих записей (twitch/vk).
+        """
+        # Если platform не указан, используем "global" для общих настроек
+        target_platform = platform or "global"
+        
         query = self.db.query(DropsConfig).filter(
             DropsConfig.channel_name == channel_name,
-            DropsConfig.platform == platform
+            DropsConfig.platform == target_platform
         )
         
         if user_id:
@@ -31,18 +39,93 @@ class DropsService:
         else:
             return None
         
-        return query.first()
+        config = query.first()
+        
+        # Если platform не указан и общий конфиг не существует, создаем его из существующих записей
+        if not config and not platform:
+            # Ищем существующие конфиги для этого пользователя/канала
+            existing_query = self.db.query(DropsConfig).filter(
+                DropsConfig.channel_name == channel_name
+            )
+            if user_id:
+                existing_query = existing_query.filter(DropsConfig.user_id == user_id)
+            elif session_id:
+                existing_query = existing_query.filter(DropsConfig.session_id == session_id)
+            else:
+                return None
+            
+            existing_configs = existing_query.filter(DropsConfig.platform.in_(['twitch', 'vk'])).all()
+            
+            if existing_configs:
+                # Используем первую найденную запись как основу (приоритет: twitch > vk)
+                base_config = next((c for c in existing_configs if c.platform == 'twitch'), existing_configs[0])
+                
+                # Объединяем флаги из всех существующих записей
+                streak_enabled_twitch = any(
+                    getattr(c, 'streak_enabled_twitch', getattr(c, 'streak_enabled', False))
+                    for c in existing_configs if c.platform == 'twitch'
+                )
+                streak_enabled_vk = any(
+                    getattr(c, 'streak_enabled_vk', getattr(c, 'streak_enabled', False))
+                    for c in existing_configs if c.platform == 'vk'
+                )
+                
+                # Создаем общий конфиг с объединенными настройками
+                config = DropsConfig(
+                    user_id=user_id,
+                    session_id=session_id,
+                    channel_name=channel_name,
+                    platform="global",
+                    # Копируем общие настройки из базового конфига
+                    streak_days_common=base_config.streak_days_common,
+                    streak_days_rare=base_config.streak_days_rare,
+                    streak_days_epic=base_config.streak_days_epic,
+                    streak_days_legendary=base_config.streak_days_legendary,
+                    streak_messages_required=base_config.streak_messages_required,
+                    streak_reset_on_skip=getattr(base_config, 'streak_reset_on_skip', True),
+                    streak_enabled_twitch=streak_enabled_twitch,
+                    streak_enabled_vk=streak_enabled_vk,
+                    # Донат настройки (общие)
+                    donation_enabled=base_config.donation_enabled,
+                    donation_amount_common=base_config.donation_amount_common,
+                    donation_amount_rare=base_config.donation_amount_rare,
+                    donation_amount_epic=base_config.donation_amount_epic,
+                    donation_amount_legendary=base_config.donation_amount_legendary,
+                    # Мифический лутбокс (общий)
+                    mythical_enabled=base_config.mythical_enabled,
+                    mythical_min_interval_hours=base_config.mythical_min_interval_hours,
+                    mythical_max_interval_hours=base_config.mythical_max_interval_hours,
+                    mythical_window_duration_minutes=base_config.mythical_window_duration_minutes,
+                    mythical_donation_amount=base_config.mythical_donation_amount,
+                    # Настройки виджета (общие)
+                    widget_spinning_duration_ms=getattr(base_config, 'widget_spinning_duration_ms', 1500),
+                    widget_opening_duration_ms=getattr(base_config, 'widget_opening_duration_ms', 1000),
+                    widget_result_duration_ms=getattr(base_config, 'widget_result_duration_ms', 5500),
+                    widget_closing_duration_ms=getattr(base_config, 'widget_closing_duration_ms', 500),
+                    widget_token=getattr(base_config, 'widget_token', None)
+                )
+                self.db.add(config)
+                self.db.commit()
+                self.db.refresh(config)
+        
+        return config
     
-    def create_or_update_config(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", config_data: Dict[str, Any] = None) -> DropsConfig:
-        """Создает или обновляет конфигурацию Drops"""
-        config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
+    def create_or_update_config(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = None, config_data: Dict[str, Any] = None) -> DropsConfig:
+        """Создает или обновляет конфигурацию Drops
+        
+        Если platform не указан, создает/обновляет общий конфиг (platform="global").
+        """
+        # Если platform не указан, используем "global" для общих настроек
+        target_platform = platform or "global"
+        
+        config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=target_platform)
         
         if not config:
             config = DropsConfig(
                 user_id=user_id,
                 session_id=session_id,
                 channel_name=channel_name,
-                platform=platform
+                platform=target_platform
             )
             self.db.add(config)
         
@@ -53,17 +136,37 @@ class DropsService:
                     setattr(config, field, value)
         
         config.updated_at = utcnow_naive()
-        self.db.commit()
-        self.db.refresh(config)
+        
+        try:
+            self.db.commit()
+            self.db.refresh(config)
+        except Exception as e:
+            logger.error(f"❌ Error saving drops config for {channel_name}: {e}")
+            self.db.rollback()
+            raise
         
         return config
     
     def get_rewards(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", quality_id: Optional[int] = None) -> List[DropsReward]:
-        """Получает награды для канала"""
+        """Получает награды для канала
+        
+        ВАЖНО: Награды ОБЩИЕ для всех платформ! Параметр platform игнорируется.
+        Все награды доступны для всех платформ (Twitch, VK, DonationAlerts).
+        
+        Args:
+            user_id: ID пользователя
+            session_id: ID сессии (для гостей)
+            channel_name: Имя канала
+            platform: Платформа (игнорируется, оставлено для совместимости)
+            quality_id: ID качества (опционально)
+            
+        Returns:
+            Список активных наград для канала
+        """
         query = self.db.query(DropsReward).filter(
             DropsReward.channel_name == channel_name,
-            DropsReward.platform == platform,
             DropsReward.is_active == True
+            # ✅ УБРАН фильтр по platform - награды общие для всех платформ!
         )
         
         if user_id:
@@ -100,8 +203,46 @@ class DropsService:
         return query.first()
     
     def update_user_streak(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None, is_streaming: bool = True) -> UserStreak:
-        """Обновляет стрик пользователя"""
-        streak = self.get_user_streak(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, viewer_id=viewer_id)
+        """Обновляет стрик пользователя
+        
+        ВАЖНО: Стрик привязан к трансляциям, а не к дням!
+        Каждая трансляция = одна отметка о посещении.
+        Стрик увеличивается только если зритель написал достаточно сообщений в предыдущей трансляции!
+        
+        Args:
+            user_id: ID владельца канала
+            session_id: ID сессии (для гостей)
+            channel_name: Имя канала
+            platform: Платформа (twitch/vk)
+            viewer_id: ID зрителя
+            viewer_name: Имя зрителя
+            is_streaming: Идет ли стрим сейчас
+            
+        Returns:
+            Обновленный объект UserStreak
+        """
+        # Получаем конфигурацию для проверки требований
+        config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=None)
+        if not config:
+            logger.warning(f"No config found for streak update: channel={channel_name}, viewer={viewer_name}")
+            return None
+        
+        # ✅ ЗАЩИТА ОТ RACE CONDITIONS: Используем pessimistic locking
+        from sqlalchemy import and_
+        query = self.db.query(UserStreak).filter(
+            UserStreak.channel_name == channel_name,
+            UserStreak.platform == platform,
+            UserStreak.viewer_id == viewer_id
+        )
+        if user_id:
+            query = query.filter(UserStreak.user_id == user_id)
+        elif session_id:
+            query = query.filter(UserStreak.session_id == session_id)
+        else:
+            return None
+        
+        # ✅ Блокируем запись для предотвращения race conditions
+        streak = query.with_for_update().first()
         
         if not streak:
             streak = UserStreak(
@@ -110,37 +251,174 @@ class DropsService:
                 channel_name=channel_name,
                 platform=platform,
                 viewer_id=viewer_id,
-                viewer_name=viewer_name
+                viewer_name=viewer_name,
+                messages_this_stream=0
             )
             self.db.add(streak)
         
         now = utcnow_naive()
         
-        # Проверяем, был ли пользователь активен в последние 24 часа
-        if streak.last_activity and (now - streak.last_activity).total_seconds() < 24 * 3600:
-            # Продолжаем стрик
-            if is_streaming:
+        # ✅ НОВАЯ ЛОГИКА: Стрик привязан к трансляциям через StreamSession
+        stream_session_service = StreamSessionService(self.db)
+        
+        # Проверяем, онлайн ли стрим сейчас
+        is_stream_online = self._check_stream_online(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
+        
+        # Если стрим оффлайн, просто обновляем время последней активности, но не засчитываем стрик
+        if not is_stream_online:
+            streak.last_activity = now
+            streak.updated_at = now
+            self.db.commit()
+            self.db.refresh(streak)
+            return streak
+        
+        # Получаем или создаем активную сессию трансляции
+        active_session = stream_session_service.get_or_create_active_session(
+            user_id=user_id,
+            session_id=session_id,
+            channel_name=channel_name,
+            platform=platform
+        )
+        
+        if not active_session:
+            # Если не удалось создать сессию, просто обновляем время
+            streak.last_activity = now
+            streak.updated_at = now
+            self.db.commit()
+            self.db.refresh(streak)
+            return streak
+        
+        # Отмечаем что зритель посетил текущую трансляцию
+        stream_session_service.mark_viewer_attended_stream(
+            user_id=user_id,
+            session_id=session_id,
+            channel_name=channel_name,
+            platform=platform,
+            viewer_id=viewer_id
+        )
+        
+        # Проверяем, это новая трансляция?
+        # Если last_stream_session_id отличается от текущей активной сессии - это новая трансляция
+        is_new_stream = streak.last_stream_session_id != active_session.id
+        
+        # ✅ Обрабатываем новую трансляцию (включая первую, когда last_stream_session_id is None)
+        if is_new_stream:
+            # ✅ НОВАЯ ТРАНСЛЯЦИЯ: Проверяем выполнено ли требование по сообщениям за предыдущую трансляцию
+            # Если это первая трансляция (last_stream_session_id is None), считаем что зритель "посетил" предыдущую
+            if streak.last_stream_session_id is None:
+                # Первая трансляция - зритель автоматически "посетил" предыдущую (её не было)
+                attended_previous = True
+            else:
+                # Проверяем, посетил ли зритель предыдущую трансляцию
+                attended_previous = stream_session_service.check_viewer_attended_last_stream(
+                    user_id=user_id,
+                    session_id=session_id,
+                    channel_name=channel_name,
+                    platform=platform,
+                    viewer_id=viewer_id
+                )
+            
+            if attended_previous and streak.messages_this_stream >= config.streak_messages_required:
+                # Зритель посетил предыдущую трансляцию и выполнил требование - увеличиваем стрик
                 streak.current_streak += 1
                 streak.max_streak = max(streak.max_streak, streak.current_streak)
-        else:
-            # Стрик прерван или новый день
-            if is_streaming:
-                streak.current_streak = 1
+                logger.info(f"✅ Streak +1 for {viewer_name}: {streak.current_streak} трансляций (messages: {streak.messages_this_stream}/{config.streak_messages_required})")
+            elif not attended_previous:
+                # Зритель НЕ посетил предыдущую трансляцию - сбрасываем стрик (если включен streak_reset_on_skip)
+                if config.streak_reset_on_skip and streak.current_streak > 0:
+                    logger.info(f"❌ Streak reset for {viewer_name}: пропустил трансляцию (had {streak.current_streak} трансляций)")
+                    streak.current_streak = 0
+                else:
+                    logger.info(f"⏸️ Streak paused for {viewer_name}: пропустил трансляцию, но streak_reset_on_skip=False (current: {streak.current_streak} трансляций)")
             else:
-                streak.current_streak = 0
+                # Зритель посетил, но не выполнил требование по сообщениям - сбрасываем стрик
+                if config.streak_reset_on_skip and streak.current_streak > 0:
+                    logger.info(f"❌ Streak reset for {viewer_name}: посетил, но недостаточно сообщений ({streak.messages_this_stream}/{config.streak_messages_required}, had {streak.current_streak} трансляций)")
+                    streak.current_streak = 0
+                else:
+                    logger.info(f"⏸️ Streak paused for {viewer_name}: недостаточно сообщений ({streak.messages_this_stream}/{config.streak_messages_required}), но streak_reset_on_skip=False")
+            
+            # Обнуляем счетчик сообщений для новой трансляции
+            streak.messages_this_stream = 0
         
+        # Обновляем время последней активности
         streak.last_activity = now
         streak.updated_at = now
+        
+        try:
+            self.db.commit()
+            self.db.refresh(streak)
+        except Exception as e:
+            logger.error(f"❌ Error updating streak for {viewer_name}: {e}")
+            self.db.rollback()
+            raise
+        
+        return streak
+    
+    def increment_viewer_message_count(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None) -> UserStreak:
+        """Увеличивает счетчик сообщений зрителя за текущий стрим
+        
+        Этот метод должен вызываться при КАЖДОМ сообщении зрителя в чате.
+        
+        Args:
+            user_id: ID владельца канала
+            session_id: ID сессии (для гостей)
+            channel_name: Имя канала
+            platform: Платформа (twitch/vk)
+            viewer_id: ID зрителя
+            viewer_name: Имя зрителя
+            
+        Returns:
+            Обновленный объект UserStreak
+        """
+        streak = self.get_user_streak(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, viewer_id=viewer_id)
+        
+        if not streak:
+            # Создаем новый стрик если его нет
+            streak = UserStreak(
+                user_id=user_id,
+                session_id=session_id,
+                channel_name=channel_name,
+                platform=platform,
+                viewer_id=viewer_id,
+                viewer_name=viewer_name,
+                messages_this_stream=1,
+                current_streak=0,
+                max_streak=0
+            )
+            self.db.add(streak)
+        else:
+            # Увеличиваем счетчик сообщений
+            streak.messages_this_stream += 1
+        
+        streak.last_activity = utcnow_naive()
+        streak.updated_at = utcnow_naive()
         
         self.db.commit()
         self.db.refresh(streak)
         
+        logger.debug(f"📝 Message count for {viewer_name}: {streak.messages_this_stream} (channel: {channel_name})")
+        
         return streak
     
     def process_streak_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None) -> Optional[Dict[str, Any]]:
-        """Обрабатывает стрик Drops"""
-        config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
-        if not config or not config.streak_enabled:
+        """Обрабатывает стрик Drops
+        
+        Получает общий конфиг и проверяет флаг для конкретной платформы.
+        """
+        # Получаем общий конфиг (platform=None)
+        config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=None)
+        if not config:
+            return None
+        
+        # Проверяем, включен ли стрик для конкретной платформы
+        streak_enabled = False
+        if platform == "twitch":
+            streak_enabled = getattr(config, 'streak_enabled_twitch', False)
+        elif platform == "vk":
+            streak_enabled = getattr(config, 'streak_enabled_vk', False)
+        
+        if not streak_enabled:
             return None
         
         # Обновляем стрик
@@ -179,8 +457,12 @@ class DropsService:
         }
     
     def process_donation_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None, donation_amount: float = None) -> Optional[Dict[str, Any]]:
-        """Обрабатывает донатные Drops"""
-        config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
+        """Обрабатывает донатные Drops
+        
+        Донаты не зависят от платформы, используем общий конфиг (platform=None).
+        """
+        # Получаем общий конфиг (platform=None)
+        config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=None)
         if not config or not config.donation_enabled:
             return None
         
@@ -217,8 +499,12 @@ class DropsService:
         }
     
     def process_mythical_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None) -> Optional[Dict[str, Any]]:
-        """Обрабатывает мифические Drops"""
-        config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
+        """Обрабатывает мифические Drops
+        
+        Мифический лутбокс не зависит от платформы, используем общий конфиг (platform=None).
+        """
+        # Получаем общий конфиг (platform=None)
+        config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=None)
         if not config or not config.mythical_enabled:
             return None
         
@@ -282,25 +568,56 @@ class DropsService:
         return None
     
     def _get_random_reward(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", quality_id: int = None) -> Optional[DropsReward]:
-        """Получает случайную награду по качеству"""
+        """Получает случайную награду по качеству с корректным взвешенным случайным выбором
+        
+        Args:
+            user_id: ID пользователя
+            session_id: ID сессии (для гостей)
+            channel_name: Имя канала
+            platform: Платформа (twitch/vk)
+            quality_id: ID качества награды
+            
+        Returns:
+            Случайная награда с учетом весов или None если наград нет
+            
+        Algorithm:
+            1. Суммируем все веса: total_weight
+            2. Генерируем случайное число: 0 <= random_value < total_weight
+            3. Идем по наградам, суммируя их веса
+            4. Когда накопленный вес > random_value, возвращаем текущую награду
+            
+        Example:
+            Награды: A (вес 10), B (вес 30), C (вес 60)
+            total_weight = 100
+            random_value ∈ [0, 100)
+            - 0-9 → A (10%)
+            - 10-39 → B (30%)
+            - 40-99 → C (60%)
+        """
         rewards = self.get_rewards(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, quality_id=quality_id)
         if not rewards:
+            logger.warning(f"No rewards found for quality_id={quality_id}, platform={platform}, channel={channel_name}")
             return None
         
-        # Взвешенный случайный выбор
+        # ✅ ПРАВИЛЬНЫЙ взвешенный случайный выбор
         total_weight = sum(reward.weight for reward in rewards)
         if total_weight == 0:
-            return None
+            logger.warning(f"Total weight is 0 for rewards in channel {channel_name}, using uniform distribution")
+            return random.choice(rewards)
         
-        random_value = random.randint(1, total_weight)
+        # Генерируем случайное число от 0 до total_weight (исключая total_weight)
+        random_value = random.random() * total_weight  # или random.uniform(0, total_weight)
         current_weight = 0
         
         for reward in rewards:
             current_weight += reward.weight
-            if random_value <= current_weight:
+            if random_value < current_weight:
+                logger.debug(f"Selected reward '{reward.name}' (weight={reward.weight}/{total_weight}, random={random_value:.2f})")
                 return reward
         
-        return rewards[0]  # Fallback
+        # Fallback: возвращаем последнюю награду (математически не должно произойти)
+        logger.warning(f"Fallback to last reward for channel {channel_name} (random_value={random_value}, total_weight={total_weight})")
+        return rewards[-1]
     
     def _record_drops_history(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None, drops_type: str = None, quality_id: int = None, reward: DropsReward = None, **kwargs):
         """Записывает в историю Drops"""
@@ -334,9 +651,21 @@ class DropsService:
         return time_since_last >= config.mythical_min_interval_hours
     
     def check_mythical_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch") -> bool:
-        """Проверяет, можно ли запустить мифический Drops"""
+        """Проверяет, можно ли запустить мифический Drops
+        
+        ВАЖНО: 
+        - Настройки мифического drops доступны всегда (можно включать/выключать, настраивать параметры)
+        - Но активация (появление сундука) происходит только когда стрим онлайн!
+        """
         config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
         if not config or not config.mythical_enabled:
+            return False
+        
+        # ✅ ПРОВЕРКА: Стрим должен быть онлайн для активации
+        # Настройки доступны всегда, но сундук появляется только при онлайн стриме
+        is_stream_online = self._check_stream_online(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
+        if not is_stream_online:
+            logger.debug(f"🚫 [MYTHICAL] Stream is offline, cannot activate mythical drops for {channel_name} (settings are still available)")
             return False
         
         # Проверяем интервал
@@ -358,10 +687,57 @@ class DropsService:
         # Случайная вероятность
         return random.random() < 0.1  # 10% шанс каждый раз
     
+    def _check_stream_online(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch") -> bool:
+        """Проверяет, онлайн ли стрим на указанной платформе"""
+        try:
+            from core.database import User, UserToken
+            from core.connection_manager import get_connection_manager
+            
+            # Проверяем через connection_manager - если канал активен, значит стрим скорее всего онлайн
+            connection_manager = get_connection_manager()
+            if connection_manager.is_channel_active(channel_name):
+                return True
+            
+            # Дополнительная проверка через API (если есть токены)
+            if user_id:
+                user = self.db.query(User).filter(User.id == user_id).first()
+                if not user:
+                    return False
+                
+                if platform == "twitch" and user.twitch_username:
+                    # Проверяем через connection_manager
+                    return connection_manager.is_channel_active(user.twitch_username.lower())
+                elif platform == "vk":
+                    vk_token = self.db.query(UserToken).filter(
+                        UserToken.user_id == user_id,
+                        UserToken.platform == 'vk',
+                        UserToken.is_active == True
+                    ).first()
+                    if vk_token and user.vk_channel_name:
+                        return connection_manager.is_channel_active(user.vk_channel_name)
+            
+            return False
+        except Exception as e:
+            logger.error(f"Error checking stream online status: {e}")
+            # В случае ошибки считаем что стрим оффлайн (безопаснее)
+            return False
+    
     def start_mythical_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch") -> Optional[MythicalDropsSession]:
-        """Запускает мифический Drops"""
+        """Запускает мифический Drops
+        
+        ВАЖНО: 
+        - Настройки мифического drops доступны всегда
+        - Но активация (появление сундука) происходит только когда стрим онлайн!
+        """
         config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
-        if not config:
+        if not config or not config.mythical_enabled:
+            return None
+        
+        # ✅ ПРОВЕРКА: Стрим должен быть онлайн для активации
+        # Настройки доступны всегда, но сундук появляется только при онлайн стриме
+        is_stream_online = self._check_stream_online(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
+        if not is_stream_online:
+            logger.warning(f"🚫 [MYTHICAL] Cannot activate mythical drops: stream is offline for {channel_name} (settings are still available)")
             return None
         
         # Создаем сессию
@@ -384,8 +760,13 @@ class DropsService:
         config.mythical_last_appeared = now
         config.updated_at = now
         
-        self.db.commit()
-        self.db.refresh(session)
+        try:
+            self.db.commit()
+            self.db.refresh(session)
+        except Exception as e:
+            logger.error(f"❌ Error starting mythical drops for {channel_name}: {e}")
+            self.db.rollback()
+            return None
         
         return session
     

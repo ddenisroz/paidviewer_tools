@@ -108,6 +108,47 @@ class TwitchBotCore(commands.Bot):
                 badges=badges_list if badges_list else None
             )
             
+            # ✅ НОВОЕ: Увеличиваем счетчик сообщений для стриков (только если стрик включен)
+            try:
+                from services.drops_service import DropsService
+                from core.database import get_db, User
+                
+                # Ищем user_id владельца канала по имени канала
+                db = next(get_db())
+                try:
+                    channel_owner = db.query(User).filter(
+                        User.twitch_username == message.channel.name.lower()
+                    ).first()
+                    
+                    if channel_owner:
+                        drops_service = DropsService(db)
+                        # ✅ Проверяем включен ли стрик для Twitch
+                        config = drops_service.get_config(
+                            user_id=channel_owner.id,
+                            session_id=None,
+                            channel_name=message.channel.name.lower(),
+                            platform=None  # Общий конфиг
+                        )
+                        
+                        # Проверяем включен ли стрик для Twitch
+                        streak_enabled = False
+                        if config:
+                            streak_enabled = getattr(config, 'streak_enabled_twitch', False)
+                        
+                        # Увеличиваем счетчик только если стрик включен
+                        if streak_enabled:
+                            drops_service.increment_viewer_message_count(
+                                user_id=channel_owner.id,
+                                channel_name=message.channel.name.lower(),
+                                platform="twitch",
+                                viewer_id=str(message.author.id) if hasattr(message.author, 'id') else message.author.name.lower(),
+                                viewer_name=message.author.name
+                            )
+                finally:
+                    db.close()
+            except Exception as streak_err:
+                logger.debug(f"Could not increment streak message count: {streak_err}")
+            
             # NOTE: TTS обрабатывается в twitch_bot.py::_handle_tts()
             # Не дублируем вызов здесь!
             

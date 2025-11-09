@@ -1,6 +1,7 @@
 // src/pages/tts/TtsMainPage.jsx
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { useTts } from '../../context/TtsContext';
 import { useTtsHealth } from '../../context/TtsHealthContext';
 import { useAuth } from '../../context/AuthContext';
@@ -13,14 +14,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, AlertCircle, CheckCircle2, Settings } from 'lucide-react';
 import { TwitchIcon, VKIcon } from '../../components/PlatformIcons';
 import TtsFilterManager from '../../components/tts/TtsFilterManager';
 import TtsChannelPointsMode from '../../components/tts/TtsChannelPointsMode';
 import { ttsLogger } from '../../utils/logger';
 import { logger } from '../../utils/prodLogger';
+import { getQueryCache, setQueryCache } from '../../utils/queryPersist';
 
 const TtsMainPageContent = () => {
+    const navigate = useNavigate();
     const { ttsEnabled, isWhitelisted, initializeTts } = useTts();
     const { isHealthy, isChecking } = useTtsHealth();
     const { isAuthenticated, user, isGuest } = useAuth();
@@ -60,6 +63,8 @@ const TtsMainPageContent = () => {
     const queryClient = useQueryClient();
     const isTwitchConnected = integrations.twitch?.enabled || (isGuest && user?.platform === 'twitch');
     const isVkConnected = integrations.vk?.enabled || (isGuest && user?.platform === 'vk');
+    // 🔒 Проверка наличия интеграций: гость ИЛИ есть хотя бы одна интеграция
+    const hasAnyIntegration = isGuest || isTwitchConnected || isVkConnected;
     const hasLocalSetup = localStorage.getItem('tts_has_local_setup') === 'true';
     // F5-TTS доступен если: есть локальная настройка ИЛИ пользователь в whitelist (не null/undefined)
     const canUseF5TTS = hasLocalSetup || (isWhitelisted !== null && isWhitelisted !== false);
@@ -137,10 +142,16 @@ const TtsMainPageContent = () => {
         queryKey: ['tts-status'],
         queryFn: async () => {
             const response = await botService.get('/api/tts/status');
-            return response.data;
+            const data = response.data;
+            // 🚀 ANTI-FLASH: Сохраняем в кэш
+            setQueryCache(['tts-status'], data);
+            return data;
         },
         enabled: isAuthenticated,
         refetchInterval: 30000,
+        staleTime: 60000,
+        gcTime: 5 * 60 * 1000,
+        initialData: () => getQueryCache(['tts-status']), // 🚀 ANTI-FLASH: Загружаем из кэша
     });
 
     // Load TTS settings
@@ -148,9 +159,12 @@ const TtsMainPageContent = () => {
         queryKey: ['tts-settings'],
         queryFn: async () => {
             const response = await botService.get('/api/tts/settings');
-            return response.data;
+            const data = response.data;
+            setQueryCache(['tts-settings'], data);
+            return data;
         },
         enabled: isAuthenticated,
+        initialData: () => getQueryCache(['tts-settings']),
     });
 
     // Load audio settings
@@ -158,9 +172,12 @@ const TtsMainPageContent = () => {
         queryKey: ['tts-audio-settings'],
         queryFn: async () => {
             const response = await botService.get('/api/tts/audio-settings');
-            return response.data;
+            const data = response.data;
+            setQueryCache(['tts-audio-settings'], data);
+            return data;
         },
         enabled: isAuthenticated,
+        initialData: () => getQueryCache(['tts-audio-settings']),
     });
 
     // Load platform settings
@@ -168,9 +185,12 @@ const TtsMainPageContent = () => {
         queryKey: ['tts-platform-settings'],
         queryFn: async () => {
             const response = await botService.get('/api/tts/platform-settings');
-            return response.data;
+            const data = response.data;
+            setQueryCache(['tts-platform-settings'], data);
+            return data;
         },
         enabled: isAuthenticated,
+        initialData: () => getQueryCache(['tts-platform-settings']),
     });
 
     // Load TTS mode settings
@@ -178,10 +198,18 @@ const TtsMainPageContent = () => {
         queryKey: ['tts-mode-settings'],
         queryFn: async () => {
             const response = await botService.get('/api/tts/mode-settings');
-            return response.data;
+            const data = response.data;
+            setQueryCache(['tts-mode-settings'], data);
+            return data;
         },
         enabled: isAuthenticated,
+        initialData: () => getQueryCache(['tts-mode-settings']),
     });
+
+    // Проверяем, загружены ли все данные (или есть в кэше)
+    const isDataLoaded = React.useMemo(() => {
+        return ttsStatusData !== undefined || getQueryCache(['tts-status']) !== null;
+    }, [ttsStatusData]);
 
     // Update state from TTS status
     useEffect(() => {
@@ -282,6 +310,12 @@ const TtsMainPageContent = () => {
 
     // Handlers
     const handleGlobalTtsToggle = async () => {
+        // 🔒 Проверка наличия интеграций - не позволяем включать TTS без интеграций
+        if (!isGuest && !isTwitchConnected && !isVkConnected) {
+            toast.error('Для использования TTS необходимо подключить хотя бы одну платформу');
+            return;
+        }
+        
         const newState = !isAnyTtsEnabled;
         
         // Optimistically update UI
@@ -481,12 +515,64 @@ const TtsMainPageContent = () => {
         }
     };
 
+    // 🔒 ПЕРВООЧЕРЕДНАЯ ПРОВЕРКА: Авторизация
+    // Если пользователь не авторизован - показываем сообщение с предложением войти
     if (!isAuthenticated) {
         return (
             <PageWrapper title="Text to Speech">
-                <div className="text-center text-gray-400">
-                    Войдите, чтобы настроить TTS
-                </div>
+                <Card className="border-gray-700">
+                    <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
+                        <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
+                            <AlertCircle className="w-10 h-10 text-gray-500" />
+                        </div>
+                        <div className="space-y-2 max-w-md">
+                            <h3 className="text-xl font-semibold text-gray-200">
+                                Требуется авторизация
+                            </h3>
+                            <p className="text-gray-400 text-sm">
+                                Для использования TTS необходимо войти в систему и подключить хотя бы одну платформу (Twitch или VK Live)
+                            </p>
+                        </div>
+                        <Button 
+                            onClick={() => navigate('/login')}
+                            className="gap-2"
+                        >
+                            <Settings className="w-4 h-4" />
+                            Войти в систему
+                        </Button>
+                    </CardContent>
+                </Card>
+            </PageWrapper>
+        );
+    }
+
+    // 🔒 Проверка наличия интеграций - ДО загрузки данных
+    // Если нет интеграций и не гость - показываем сообщение сразу
+    if (!isGuest && !isTwitchConnected && !isVkConnected) {
+        return (
+            <PageWrapper title="Text to Speech">
+                <Card className="border-gray-700">
+                    <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
+                        <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
+                            <AlertCircle className="w-10 h-10 text-gray-500" />
+                        </div>
+                        <div className="space-y-2 max-w-md">
+                            <h3 className="text-xl font-semibold text-gray-200">
+                                Нет подключенных интеграций
+                            </h3>
+                            <p className="text-gray-400 text-sm">
+                                Для использования TTS необходимо подключить хотя бы одну платформу (Twitch или VK Live)
+                            </p>
+                        </div>
+                        <Button 
+                            onClick={() => navigate('/dashboard/settings')}
+                            className="gap-2"
+                        >
+                            <Settings className="w-4 h-4" />
+                            Перейти в настройки
+                        </Button>
+                    </CardContent>
+                </Card>
             </PageWrapper>
         );
     }
@@ -509,6 +595,7 @@ const TtsMainPageContent = () => {
                         checked={isAnyTtsEnabled}
                         onCheckedChange={handleGlobalTtsToggle}
                         className="data-[state=checked]:bg-green-600"
+                        disabled={!isDataLoaded || (!isGuest && !isTwitchConnected && !isVkConnected)} // 🔒 Отключаем если нет интеграций
                     />
                 </div>
 
@@ -563,7 +650,7 @@ const TtsMainPageContent = () => {
                                                 onClick={handleBasicTtsToggle}
                                                 className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200 ${
                                                     basicTtsEnabled && !aiTtsEnabled
-                                                        ? 'bg-purple-600/15 border-2 border-purple-500 shadow-sm shadow-purple-500/20'
+                                                        ? 'bg-purple-600/15 border border-gray-700/50'
                                                         : 'bg-gray-800/30 border border-gray-700/50 hover:bg-gray-700/40 hover:border-gray-600/50'
                                                 }`}
                                             >
@@ -584,7 +671,7 @@ const TtsMainPageContent = () => {
                                                     !isHealthy || !canUseF5TTS
                                                         ? 'opacity-50 cursor-not-allowed bg-gray-800/20 border border-gray-700/30'
                                                         : aiTtsEnabled
-                                                            ? 'cursor-pointer bg-purple-600/15 border-2 border-purple-500 shadow-sm shadow-purple-500/20'
+                                                            ? 'cursor-pointer bg-purple-600/15 border border-gray-700/50'
                                                             : 'cursor-pointer bg-gray-800/30 border border-gray-700/50 hover:bg-gray-700/40 hover:border-gray-600/50'
                                                 }`}
                                             >
@@ -729,7 +816,7 @@ const TtsMainPageContent = () => {
                                 {/* Rewards Creation */}
                                 <Card className={`border-gray-700/50 bg-gray-900/50 backdrop-blur-sm transition-all ${ttsTriggerMode === 'all_messages' ? 'opacity-50' : ''}`}>
                                         <CardHeader className="pb-3">
-                                        <CardTitle className="text-base font-bold text-white">Награды за озвучку</CardTitle>
+                                        <CardTitle className="text-base font-bold text-white">Озвучка за баллы</CardTitle>
                                         </CardHeader>
                                     <CardContent className="h-[160px] flex items-center p-0">
                                         {ttsTriggerMode === 'channel_points' ? (

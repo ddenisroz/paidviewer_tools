@@ -797,6 +797,8 @@ async def upload_user_voice_endpoint(
         
         logger.info(f"✅ User voice saved: {final_voice_path}")
         
+        # Используем значения из конфига для дефолтных настроек
+        from tts_service.config import config
         # Создаём запись в БД
         new_voice = VoiceModel(
             name=voice_name,
@@ -805,8 +807,8 @@ async def upload_user_voice_endpoint(
             reference_text=reference_text or None,
             owner_id=user_id,
             is_active=True,
-            cfg_strength=2.5,
-            speed_preset='normal'
+            cfg_strength=config.cfg_strength,  # Используем значение из конфига (по умолчанию 2.5)
+            speed_preset='normal'  # Константа для скорости по умолчанию
         )
         db.add(new_voice)
         db.commit()

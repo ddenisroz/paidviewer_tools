@@ -19,7 +19,10 @@ export const useUserSettings = () => {
 
 export const UserSettingsProvider = ({ children }) => {
     const { isAuthenticated, user } = useAuth();
-    const [settings, setSettings] = useState(null);
+    // 🚀 ANTI-FLASH: Инициализируем из кэша сразу, чтобы не было мерцания
+    const [settings, setSettings] = useState(() => {
+        return cacheManager.get(CACHE_CONFIG.USER_SETTINGS, { ignoreExpired: true }) || null;
+    });
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -32,7 +35,11 @@ export const UserSettingsProvider = ({ children }) => {
         }
 
         try {
-            setIsLoading(true);
+            // 🚀 ANTI-FLASH: Показываем loading только если нет данных в кэше
+            const hasCache = cacheManager.get(CACHE_CONFIG.USER_SETTINGS, { ignoreExpired: true });
+            if (!hasCache) {
+                setIsLoading(true);
+            }
             
             // Используем cache-aside pattern с защитой от race conditions
             const data = await cacheManager.getOrFetch(
@@ -161,13 +168,27 @@ export const UserSettingsProvider = ({ children }) => {
     }, [settings]);
 
     // Получение настроек объединения (только UI настройки)
+    // 🚀 ANTI-FLASH: Проверяем кэш напрямую, чтобы получить значения даже если settings еще не загружен
     const getCombineSettings = useCallback(() => {
-        if (!settings) return { combine_titles: false, combine_categories: false };
+        // Сначала пытаемся использовать settings из state
+        if (settings) {
+            return {
+                combine_titles: settings.combine_titles ?? false,
+                combine_categories: settings.combine_categories ?? false
+            };
+        }
         
-        return {
-            combine_titles: settings.combine_titles ?? false,
-            combine_categories: settings.combine_categories ?? false
-        };
+        // Если settings еще не загружен, проверяем кэш напрямую
+        const cachedSettings = cacheManager.get(CACHE_CONFIG.USER_SETTINGS, { ignoreExpired: true });
+        if (cachedSettings) {
+            return {
+                combine_titles: cachedSettings.combine_titles ?? false,
+                combine_categories: cachedSettings.combine_categories ?? false
+            };
+        }
+        
+        // Если ничего не найдено, возвращаем false
+        return { combine_titles: false, combine_categories: false };
     }, [settings]);
 
     // Загружаем настройки при изменении авторизации

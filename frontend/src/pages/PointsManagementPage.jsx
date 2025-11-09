@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { Gift, Plus, Edit, Trash2, Loader2, Power, PowerOff } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Gift, Plus, Edit, Trash2, Loader2, Power, PowerOff, Settings, AlertCircle, CheckCircle2, XCircle, Clock, MessageCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { TwitchIcon, VKIcon } from '../components/PlatformIcons';
@@ -11,14 +12,49 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import pointsApi from '../services/pointsApi';
 import { PLATFORM_COLORS } from '../constants/uiConstants';
 import { logger } from '../utils/prodLogger';
+import PageWrapper from '../components/PageWrapper';
 
 const PointsManagementPage = () => {
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
   const { integrations } = useIntegrations();
+  
+  // 🔒 ПЕРВООЧЕРЕДНАЯ ПРОВЕРКА: Авторизация
+  // Если пользователь не авторизован - показываем сообщение с предложением войти
+  if (!isAuthenticated) {
+    return (
+      <PageWrapper title="Баллы канала">
+        <Card className="border-gray-700">
+          <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
+            <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
+              <AlertCircle className="w-10 h-10 text-gray-500" />
+            </div>
+            <div className="space-y-2 max-w-md">
+              <h3 className="text-xl font-semibold text-gray-200">
+                Требуется авторизация
+              </h3>
+              <p className="text-gray-400 text-sm">
+                Для использования управления баллами необходимо войти в систему и подключить хотя бы одну платформу (Twitch или VK Live)
+              </p>
+            </div>
+            <Button 
+              onClick={() => navigate('/login')}
+              className="gap-2"
+            >
+              <Settings className="w-4 h-4" />
+              Войти в систему
+            </Button>
+          </CardContent>
+        </Card>
+      </PageWrapper>
+    );
+  }
+  
   const [selectedPlatform, setSelectedPlatform] = useState('twitch'); // vk или twitch
   const [activeTab, setActiveTab] = useState('rewards'); // rewards или queue
   const [rewards, setRewards] = useState([]);
@@ -236,15 +272,17 @@ const RewardCard = ({ reward, platform, onEdit, onRefresh }) => {
     
     setDeleting(true);
     try {
-      // Для VK: ВСЕГДА отключаем награду перед удалением (VK API требование)
-      if (platform === 'vk') {
+      // Backend автоматически отключает награду перед удалением для VK
+      // Но для надежности пытаемся отключить на frontend тоже, если награда включена
+      if (platform === 'vk' && reward.is_enabled) {
         try {
+          logger.log(`🔄 [DELETE] Attempting to disable VK reward ${reward.id} before deletion`);
           await pointsApi.toggleReward(platform, reward.id, false);
           // Небольшая задержка чтобы VK API обработал
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 800));
         } catch (toggleErr) {
-          // Ignore toggle error, награда может быть уже отключена
-          logger.log('Toggle before delete:', toggleErr.message);
+          // Игнорируем ошибку - backend попытается отключить автоматически
+          logger.warn('Toggle before delete failed (backend will handle it):', toggleErr.message);
         }
       }
 
@@ -253,7 +291,7 @@ const RewardCard = ({ reward, platform, onEdit, onRefresh }) => {
       onRefresh();
     } catch (err) {
       logger.error('Error deleting reward:', err);
-      // apiClient.js уже показывает toast при ошибках
+      toast.error(err.message || 'Ошибка удаления награды');
     } finally {
       setDeleting(false);
     }
@@ -915,28 +953,36 @@ const RedemptionQueue = ({ platform }) => {
   }
 
   return (
-    <div className="min-h-[400px]">
-      {/* Фильтры и массовые действия */}
-      <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+    <div className="min-h-[400px] space-y-4">
+      {/* Фильтры и массовые действия - улучшенный дизайн */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <Label className="text-sm">Фильтр:</Label>
-          <select
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-            className="px-3 py-1.5 text-sm border rounded-md bg-background"
-          >
-            <option value="all">Все награды</option>
-            <option value="tts">TTS Озвучка</option>
-            <option value="other">Другие</option>
-          </select>
+                <Label className="text-sm font-medium whitespace-nowrap">Фильтр:</Label>
+                <Select value={filterType} onValueChange={setFilterType}>
+                  <SelectTrigger className="w-[160px] h-9">
+                    <SelectValue placeholder="Выберите фильтр" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Все награды</SelectItem>
+                    <SelectItem value="tts">TTS Озвучка</SelectItem>
+                    <SelectItem value="other">Другие</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
           {filteredRedemptions.length > 0 && (
             <>
-              <span className="text-xs text-muted-foreground">
-                Найдено: {filteredRedemptions.length}
+                  <div className="h-6 w-px bg-gray-700" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">
+                      Найдено: <span className="font-semibold text-foreground">{filteredRedemptions.length}</span>
               </span>
               <Button
                 size="sm"
-                variant="ghost"
+                      variant="outline"
                 onClick={() => {
                   const allSelected = filteredRedemptions.every(d => selectedItems.has(d.id));
                   if (allSelected) {
@@ -945,35 +991,45 @@ const RedemptionQueue = ({ platform }) => {
                     setSelectedItems(new Set(filteredRedemptions.map(d => d.id)));
                   }
                 }}
+                      className="whitespace-nowrap"
               >
                 {filteredRedemptions.every(d => selectedItems.has(d.id)) ? 'Снять всё' : 'Отметить всё'}
               </Button>
+                  </div>
             </>
           )}
         </div>
         
         {selectedItems.size > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Выбрано: {selectedItems.size}</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="px-3 py-1.5 rounded-md bg-primary/10 border border-primary/20">
+                  <span className="text-sm font-medium text-primary">Выбрано: {selectedItems.size}</span>
+                </div>
             <Button
               size="sm"
               variant="default"
               onClick={handleBulkAccept}
               disabled={Array.from(selectedItems).some(id => processing.has(id))}
+                  className="whitespace-nowrap"
             >
-              Принять выбранные ({selectedItems.size})
+                  <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                  Принять ({selectedItems.size})
             </Button>
             <Button
               size="sm"
               variant="destructive"
               onClick={handleBulkReject}
               disabled={Array.from(selectedItems).some(id => processing.has(id))}
+                  className="whitespace-nowrap"
             >
-              Отклонить выбранные ({selectedItems.size})
+                  <XCircle className="w-4 h-4 mr-1.5" />
+                  Отклонить ({selectedItems.size})
             </Button>
           </div>
         )}
       </div>
+        </CardContent>
+      </Card>
 
       {Array.isArray(filteredRedemptions) && filteredRedemptions.length === 0 ? (
         <Card>
@@ -985,11 +1041,12 @@ const RedemptionQueue = ({ platform }) => {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {filteredRedemptions.map((demand, index) => {
         const rewardData = rewardsMap.get(demand.reward?.id);
         const rewardTitle = rewardData?.name || rewardData?.title || 'Неизвестная награда';
         const rewardCost = rewardData?.price || rewardData?.cost || 0;
+        const isTtsReward = rewardTitle.toLowerCase().includes('озвучка') || rewardTitle.toLowerCase().includes('tts') || rewardTitle.toLowerCase().includes('голос');
         
         // Собираем сообщение из message_parts (правильно обрабатываем объекты)
         let message = '';
@@ -1017,12 +1074,25 @@ const RedemptionQueue = ({ platform }) => {
         
         const isSelected = selectedItems.has(demand.id);
         const isProcessing = processing.has(demand.id);
+        const userName = demand.user?.nick || demand.user?.name || 'Пользователь';
+        const timestamp = demand.created_at ? new Date(demand.created_at * 1000).toLocaleString('ru-RU', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        }) : 'Неизвестно';
         
         return (
-          <Card key={demand.id || index} className={isSelected ? 'ring-2 ring-primary' : ''}>
-            <CardContent className="p-2">
+          <Card 
+            key={demand.id || index} 
+            className={`transition-all hover:shadow-lg ${isSelected ? 'ring-2 ring-primary border-primary/50' : 'border-gray-700/50'} ${isProcessing ? 'opacity-60' : ''}`}
+          >
+            <CardContent className="p-4">
               <div className="flex items-start gap-3">
-                {/* Чекбокс для выбора */}
+                {/* Чекбокс для выбора - улучшенный стиль */}
+                <div className="mt-1">
                 <input
                   type="checkbox"
                   checked={isSelected}
@@ -1038,30 +1108,59 @@ const RedemptionQueue = ({ platform }) => {
                     });
                   }}
                   disabled={isProcessing}
-                  className="mt-1 w-4 h-4 rounded border-gray-300 cursor-pointer"
+                    className="w-4 h-4 rounded border-gray-600 bg-background cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed accent-primary"
                 />
+                </div>
                 
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className="font-medium">{demand.user?.nick || demand.user?.name || 'Пользователь'}</span>
-                    <Badge variant="outline" className="text-xs">
+                <div className="flex-1 min-w-0">
+                  {/* Заголовок карточки */}
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 border border-primary/20">
+                          <span className="text-xs font-bold text-primary">
+                            {(userName[0] || 'U').toUpperCase()}
+                          </span>
+                        </div>
+                        <span className="font-semibold text-sm truncate">{userName}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Информация о награде */}
+                  <div className="flex items-center gap-2 mb-3 flex-wrap">
+                    <Badge 
+                      variant={isTtsReward ? "default" : "outline"} 
+                      className={`text-xs font-medium ${isTtsReward ? 'bg-purple-600/20 text-purple-300 border-purple-600/30' : 'bg-gray-800/50'}`}
+                    >
                       {rewardTitle}
                     </Badge>
-                    <Badge variant="secondary" className="text-xs font-mono">
+                    <Badge variant="secondary" className="text-xs font-mono bg-blue-600/20 text-blue-300 border-blue-600/30">
                       {rewardCost} баллов
                     </Badge>
                   </div>
+
+                  {/* Сообщение */}
                   {message && (
-                    <p className="text-sm text-muted-foreground mt-2 break-words">
-                      💬 {message}
+                    <div className="mb-3 p-3 rounded-md bg-gray-800/50 border border-gray-700/50">
+                      <div className="flex items-start gap-2">
+                        <MessageCircle className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                        <p className="text-sm text-foreground break-words flex-1 leading-relaxed">
+                          {message}
                     </p>
+                      </div>
+                    </div>
                   )}
-                  <p className="text-xs text-muted-foreground mt-1">
-                    🕐 {demand.created_at ? new Date(demand.created_at * 1000).toLocaleString('ru-RU') : 'Неизвестно'}
-                  </p>
+
+                  {/* Время */}
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>{timestamp}</span>
+                  </div>
                 </div>
 
-                <div className="flex gap-2 flex-shrink-0">
+                {/* Кнопки действий - вертикальное расположение для лучшего UX */}
+                <div className="flex flex-col gap-2 flex-shrink-0">
                   <Button
                     size="sm"
                     variant="default"
@@ -1070,12 +1169,15 @@ const RedemptionQueue = ({ platform }) => {
                       handleAccept(demand.id);
                     }}
                     disabled={isProcessing}
-                    className="h-8"
+                    className="min-w-[100px] h-9"
                   >
                     {isProcessing ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
-                      'Принять'
+                      <>
+                        <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                        Принять
+                      </>
                     )}
                   </Button>
                   <Button
@@ -1086,8 +1188,9 @@ const RedemptionQueue = ({ platform }) => {
                       handleReject(demand.id);
                     }}
                     disabled={isProcessing}
-                    className="h-8"
+                    className="min-w-[100px] h-9"
                   >
+                    <XCircle className="w-4 h-4 mr-1.5" />
                     Отклонить
                   </Button>
                 </div>

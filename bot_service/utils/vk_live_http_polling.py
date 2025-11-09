@@ -181,9 +181,21 @@ class VKLiveHTTPPolling:
                 if "text" in part:
                     text_content = part["text"].get("content", "")
                     message_text += text_content
+                # ✅ Также обрабатываем другие типы parts (упоминания, смайлы и т.д.)
+                elif "mention" in part:
+                    message_text += f"@{part['mention'].get('nick', '')}"
+                elif "smile" in part:
+                    message_text += f":{part['smile'].get('name', '')}:"
+                # ✅ Если есть другие типы parts (например, ссылки), добавляем их
+                elif "link" in part:
+                    link_url = part["link"].get("url", "")
+                    if link_url:
+                        message_text += link_url
                     
-            if not message_text:
-                return  # Пропускаем пустые сообщения
+            # ✅ НЕ пропускаем сообщения, даже если текст пустой - возможно это только ссылка или эмодзи
+            # Проверяем наличие хотя бы одного part
+            if not message_text and not parts:
+                return  # Пропускаем только если вообще нет parts
                 
             # Формируем объект сообщения для обработчика
             processed_message = {

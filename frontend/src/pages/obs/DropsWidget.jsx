@@ -28,6 +28,9 @@ const DropsWidget = () => {
   const [roulettePosition, setRoulettePosition] = useState(0); // Позиция в рулетке
   const [channelName, setChannelName] = useState(null);
   const [platform, setPlatform] = useState(null);
+  const [mythicalSession, setMythicalSession] = useState(null);
+  const [mythicalTimer, setMythicalTimer] = useState(null);
+  const mythicalTimerInterval = useRef(null);
   const widgetConfig = useRef({
     spinning_duration: 1500,
     opening_duration: 1000,
@@ -51,7 +54,7 @@ const DropsWidget = () => {
             if (data.channel_name && data.platform) {
               setChannelName(data.channel_name);
               setPlatform(data.platform);
-              return fetch(`${apiUrl}/api/drops/config/${data.channel_name}?platform=${data.platform}`);
+              return fetch(`${apiUrl}/api/drops/config/${data.channel_name}?platform=${data.platform}&widget_token=${token}`);
             }
           })
           .then(res => res?.json())
@@ -100,7 +103,8 @@ const DropsWidget = () => {
         // Загружаем настройки виджета
         if (userId && data.channel_name && data.platform) {
           try {
-            const configResponse = await fetch(`${apiUrl}/api/drops/config/${data.channel_name}?platform=${data.platform}`);
+            // ✅ Добавляем widget_token для авторизации
+            const configResponse = await fetch(`${apiUrl}/api/drops/config/${data.channel_name}?platform=${data.platform}&widget_token=${token}`);
             if (configResponse.ok) {
               const configData = await configResponse.json();
               if (configData.success && configData.data) {
@@ -110,12 +114,17 @@ const DropsWidget = () => {
                   result_duration: configData.data.widget_result_duration_ms || 5500
                 };
               }
+            } else {
+              logger.warn(`Failed to load widget config: ${configResponse.status}`);
             }
           } catch (configError) {
             logger.error('Error loading widget config:', configError);
             // Продолжаем с дефолтными значениями
           }
         }
+        
+        // Загружаем активную сессию мифического сундука
+        loadMythicalSession(data.channel_name);
         
         // Теперь подключаемся к WebSocket
         const wsUrl = `${wsBaseUrl}/ws/chat/${userId}`;
@@ -132,6 +141,13 @@ const DropsWidget = () => {
             const data = JSON.parse(event.data);
             if (data.type === 'drops' && data.event === 'reward_received') {
               showReward(data.data);
+            } else if (data.type === 'drops' && data.event === 'mythical_session_started') {
+              // Обновляем сессию мифического сундука
+              loadMythicalSession();
+            } else if (data.type === 'drops' && data.event === 'mythical_session_ended') {
+              // Очищаем сессию
+              setMythicalSession(null);
+              setMythicalTimer(null);
             }
           } catch (error) {
             logger.error('Error parsing WebSocket message:', error);
@@ -166,12 +182,73 @@ const DropsWidget = () => {
 
     fetchUserId();
 
+    // Периодически проверяем активную сессию мифического сундука (каждые 10 секунд)
+    const mythicalCheckInterval = setInterval(() => {
+      if (channelName) {
+        loadMythicalSession(channelName);
+      }
+    }, 10000);
+
     return () => {
       if (ws.current) {
         ws.current.close();
       }
+      if (mythicalTimerInterval.current) {
+        clearInterval(mythicalTimerInterval.current);
+      }
+      clearInterval(mythicalCheckInterval);
     };
-  }, [token]);
+  }, [token, channelName]);
+
+  const loadMythicalSession = async (channel = channelName) => {
+    if (!channel || !token) return;
+    
+    const apiUrl = import.meta.env.VITE_BOT_SERVICE_URL;
+    try {
+      const response = await fetch(`${apiUrl}/api/drops/mythical-session/${channel}?widget_token=${token}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data) {
+          setMythicalSession(data.data);
+          startMythicalTimer(data.data.time_remaining_seconds);
+        } else {
+          setMythicalSession(null);
+          setMythicalTimer(null);
+          if (mythicalTimerInterval.current) {
+            clearInterval(mythicalTimerInterval.current);
+          }
+        }
+      }
+    } catch (error) {
+      logger.error('Error loading mythical session:', error);
+    }
+  };
+
+  const startMythicalTimer = (initialSeconds) => {
+    if (mythicalTimerInterval.current) {
+      clearInterval(mythicalTimerInterval.current);
+    }
+    
+    let remaining = initialSeconds;
+    setMythicalTimer(remaining);
+    
+    mythicalTimerInterval.current = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        setMythicalTimer(0);
+        setMythicalSession(null);
+        clearInterval(mythicalTimerInterval.current);
+      } else {
+        setMythicalTimer(remaining);
+      }
+    }, 1000);
+  };
+
+  const formatTimer = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const loadRewardsForQuality = async (quality, channelName, platform) => {
     const apiUrl = import.meta.env.VITE_BOT_SERVICE_URL;
@@ -214,17 +291,32 @@ const DropsWidget = () => {
       setAnimationPhase('roulette');
       // Анимация прокрутки рулетки
       const startPosition = 0;
-      const targetIndex = duplicatedRewards.findIndex(r => 
-        r.id === rewardData.reward_id || 
-        r.name === rewardData.reward_name ||
-        (rewards.length > 0 && Math.floor(Math.random() * rewards.length))
+      
+      // ✅ ПРАВИЛЬНОЕ определение позиции победителя
+      // Бэкенд УЖЕ выбрал награду, виджет только показывает анимацию
+      let targetIndex = duplicatedRewards.findIndex(r => 
+        r.id === rewardData.reward_id || r.name === rewardData.reward_name
       );
-      const targetPosition = targetIndex >= 0 ? targetIndex : Math.floor(Math.random() * rewards.length);
+      
+      // Если награда не найдена (неактивна или удалена), используем первое совпадение по имени в оригинальном списке
+      if (targetIndex === -1) {
+        logger.warn('Reward not found in active rewards list, using fallback');
+        // Ищем среди первых reward.length элементов (не дублированных)
+        targetIndex = rewards.findIndex(r => r.name === rewardData.reward_name);
+        if (targetIndex === -1) {
+          // Крайний fallback - показываем первую награду
+          logger.error('Could not find reward even in fallback, showing first reward');
+          targetIndex = 0;
+        }
+      }
+      
+      // Убеждаемся что индекс в пределах дублированного массива
+      const targetPosition = targetIndex;
       
       // Прокручиваем быстро, потом замедляем
       let currentPos = startPosition;
       const totalCards = duplicatedRewards.length;
-      const finalPosition = targetPosition + rewards.length; // Добавляем один полный оборот
+      const finalPosition = targetPosition + rewards.length; // Добавляем один полный оборот для красивой анимации
       const duration = widgetConfig.current.spinning_duration;
       const startTime = Date.now();
       
@@ -279,22 +371,103 @@ const DropsWidget = () => {
     }
   };
 
-  // Тестовая анимация для режима предпросмотра
-  const testAnimation = async () => {
-    const testReward = {
-      quality: 'epic',
-      quality_name: 'epic',
-      viewer_name: 'TestViewer',
-      reward_name: '1000 очков',
-      reward_id: 1,
-      reward_type: 'points',
-      streak_days: 5,
-      donation_amount: null,
-      sound_file: null,
-      sound_volume: 1.0
+  // ✅ Тестовые анимации для режима предпросмотра (все качества)
+  const testAnimation = async (quality = 'epic') => {
+    const testRewards = {
+      common: {
+        quality: 'common',
+        quality_name: 'common',
+        viewer_name: 'TestViewer',
+        reward_name: '100 очков',
+        reward_id: 1,
+        reward_type: 'points',
+        reward_value: 100,
+        description: 'Тестовая награда (Обычная)',
+        sound_file: null,
+        sound_volume: 1.0
+      },
+      rare: {
+        quality: 'rare',
+        quality_name: 'rare',
+        viewer_name: 'TestViewer',
+        reward_name: '500 очков',
+        reward_id: 2,
+        reward_type: 'points',
+        reward_value: 500,
+        description: 'Тестовая награда (Редкая)',
+        sound_file: null,
+        sound_volume: 1.0
+      },
+      epic: {
+        quality: 'epic',
+        quality_name: 'epic',
+        viewer_name: 'TestViewer',
+        reward_name: '1000 очков',
+        reward_id: 3,
+        reward_type: 'points',
+        reward_value: 1000,
+        description: 'Тестовая награда (Эпическая)',
+        sound_file: null,
+        sound_volume: 1.0
+      },
+      legendary: {
+        quality: 'legendary',
+        quality_name: 'legendary',
+        viewer_name: 'TestViewer',
+        reward_name: '5000 очков',
+        reward_id: 4,
+        reward_type: 'points',
+        reward_value: 5000,
+        description: 'Тестовая награда (Легендарная)',
+        sound_file: null,
+        sound_volume: 1.0
+      },
+      mythical: {
+        quality: 'mythical',
+        quality_name: 'mythical',
+        viewer_name: 'TestViewer',
+        reward_name: '10000 очков',
+        reward_id: 5,
+        reward_type: 'points',
+        reward_value: 10000,
+        description: 'Тестовая награда (Мифическая)',
+        sound_file: null,
+        sound_volume: 1.0
+      }
     };
+    
+    const testReward = testRewards[quality] || testRewards.epic;
     await showReward(testReward);
   };
+
+  // Показываем активную сессию мифического сундука если есть
+  if (mythicalSession && mythicalTimer !== null && mythicalTimer > 0) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-pink-900/50 via-purple-900/50 to-pink-900/50 rounded-lg border-2 border-pink-500/30">
+        <div className="text-center text-white">
+          <div className="mb-4">
+            <img 
+              src={QUALITY_IMAGES.mythical} 
+              alt="Мифический сундук"
+              className="w-32 h-32 mx-auto animate-pulse"
+            />
+          </div>
+          <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent">
+            Мифический Drops активен!
+          </h2>
+          <p className="text-lg font-semibold mb-4 text-pink-300">
+            Минимальный донат: {mythicalSession.donation_amount}₽
+          </p>
+          <div className="text-4xl font-bold text-yellow-400 mb-2 font-mono">
+            {formatTimer(mythicalTimer)}
+          </div>
+          <p className="text-sm text-white/60">
+            Осталось времени
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Показываем status если не подключены
   if (!isAnimating || !currentReward) {
@@ -310,12 +483,41 @@ const DropsWidget = () => {
           </div>
           <p className="text-sm font-medium mb-4">{status}</p>
           {isPreviewMode && (
-            <button
-              onClick={testAnimation}
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors font-medium"
-            >
-              🎬 Тестировать анимацию
-            </button>
+            <div className="space-y-3">
+              <p className="text-xs text-gray-400 mb-2">Тестовые события:</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <button
+                  onClick={() => testAnimation('common')}
+                  className="px-3 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-colors text-xs font-medium"
+                >
+                  Обычный
+                </button>
+                <button
+                  onClick={() => testAnimation('rare')}
+                  className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors text-xs font-medium"
+                >
+                  Редкий
+                </button>
+                <button
+                  onClick={() => testAnimation('epic')}
+                  className="px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors text-xs font-medium text-xs"
+                >
+                  Эпический
+                </button>
+                <button
+                  onClick={() => testAnimation('legendary')}
+                  className="px-3 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg transition-colors text-xs font-medium"
+                >
+                  Легендарный
+                </button>
+                <button
+                  onClick={() => testAnimation('mythical')}
+                  className="px-3 py-2 bg-pink-600 hover:bg-pink-500 text-white rounded-lg transition-colors text-xs font-medium col-span-2 sm:col-span-1"
+                >
+                  Мифический
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>

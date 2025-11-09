@@ -1,6 +1,6 @@
 # tts_service/admin_api.py
 """API для администрирования TTS Service"""
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body, Query
 from sqlalchemy.orm import Session
 from tts_service.database import get_db, Voice as VoiceModel
 from tts_service.tts_engine import tts_engine_manager
@@ -197,14 +197,16 @@ async def upload_voice(
         logger.info(f"✅ Voice saved: {final_voice_path}")
         
         # Создаём запись в БД
+        # Используем значения из конфига для дефолтных настроек
+        from tts_service.config import config
         new_voice = VoiceModel(
             name=voice_name,
             voice_type='global',
             file_path=str(final_voice_path),
             reference_text=reference_text or None,
             is_active=True,
-            cfg_strength=2.5,  # Значение по умолчанию
-            speed_preset='normal'  # Значение по умолчанию
+            cfg_strength=config.cfg_strength,  # Используем значение из конфига (по умолчанию 2.5)
+            speed_preset='normal'  # Константа для скорости по умолчанию
         )
         db.add(new_voice)
         db.commit()

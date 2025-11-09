@@ -41,8 +41,28 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
     
     // Фильтрация сообщений + TTS настройки платформ
     // ❌ УБРАНО: больше НЕ загружаем из localStorage, только из API
-    const [twitchChatVisible, setTwitchChatVisible] = useState(true);  // Дефолтные значения
-    const [vkChatVisible, setVkChatVisible] = useState(true);  // Будут обновлены из API
+    // 🔄 Инициализируем из кэша или дефолтные значения
+    const getInitialVisibility = () => {
+        try {
+            const cached = localStorage.getItem('tts_platform_settings');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                const enabledPlatforms = parsed.enabled_platforms || [];
+                return {
+                    twitch: enabledPlatforms.includes('twitch'),
+                    vk: enabledPlatforms.includes('vk')
+                };
+            }
+        } catch (e) {
+            logger.error('Failed to parse cached platform settings:', e);
+        }
+        // Дефолтные значения - показываем обе платформы
+        return { twitch: true, vk: true };
+    };
+    
+    const initialVisibility = getInitialVisibility();
+    const [twitchChatVisible, setTwitchChatVisible] = useState(initialVisibility.twitch);
+    const [vkChatVisible, setVkChatVisible] = useState(initialVisibility.vk);
     
     // TTS настройки (для синхронизации с кнопками-шорткатами)
     const [ttsSettings, setTtsSettings] = useState({
@@ -70,8 +90,9 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
     // Ref для предотвращения повторной загрузки badges и истории
     const badgesLoadedRef = useRef(false);
     const historyLoadedRef = useRef(false);
+    const prevIntegrationsRef = useRef({ twitch: false, vk: false }); // 🔄 Отслеживаем предыдущее состояние интеграций
     
-    // Загрузка TTS настроек и Twitch badges при монтировании (только 1 раз)
+    // Загрузка TTS настроек и Twitch badges при монтировании и изменении зависимостей
     useEffect(() => {
         // 🧹 Очистка ВСЕХ старых localStorage значений (больше не используются)
         const obsoleteKeys = [
@@ -100,10 +121,18 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                 logger.log('✅ [TTS SHORTCUT] Settings loaded:', response.data);
                 logger.log('✅ [TTS SHORTCUT] enabled_platforms:', response.data.enabled_platforms);
                 
-                // 🔄 СИНХРОНИЗАЦИЯ: Обновляем видимость платформ на основе API (не localStorage)
+                // 🔄 СИНХРОНИЗАЦИЯ: Обновляем видимость платформ на основе API
                 const enabledPlatforms = response.data.enabled_platforms || [];
                 setTwitchChatVisible(enabledPlatforms.includes('twitch'));
                 setVkChatVisible(enabledPlatforms.includes('vk'));
+                
+                // 🔄 Сохраняем в localStorage для быстрой инициализации
+                try {
+                    localStorage.setItem('tts_platform_settings', JSON.stringify(response.data));
+                } catch (e) {
+                    logger.error('Failed to cache platform settings:', e);
+                }
+                
                 logger.log('🔄 [TTS SHORTCUT] Synced visibility from API:', {
                     enabled_platforms: enabledPlatforms,
                     twitch: enabledPlatforms.includes('twitch'),
@@ -130,19 +159,52 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                 logger.error('❌ [BADGES] Error loading badges:', error);
             }
         };
+        
+        // 🔄 Загружаем настройки сразу (без задержки) для правильной синхронизации
         loadTtsSettings();
-        loadBadges();
+        // Badges загружаем с небольшой задержкой чтобы не блокировать рендер
+        setTimeout(() => {
+            loadBadges();
+        }, 50);
         
         // 🔄 Слушаем изменения TTS настроек из верхних переключателей
-        const handleTtsSettingsChanged = (event) => {
+        const handleTtsSettingsChanged = async (event) => {
             const { enabledPlatforms } = event.detail;
             logger.log('🔄 [TTS SHORTCUT] Received settings update:', enabledPlatforms);
+            
+            // Обновляем видимость платформ сразу из события
             setTwitchChatVisible(enabledPlatforms.includes('twitch'));
             setVkChatVisible(enabledPlatforms.includes('vk'));
             setTtsSettings(prev => ({
                 ...prev,
                 enabled_platforms: enabledPlatforms
             }));
+            
+            // 🔄 Перезагружаем настройки из API для синхронизации
+            try {
+                const response = await microservicesAPI.get('/api/tts/platform-settings', {
+                    params: { _t: Date.now() }
+                });
+                const enabledPlatformsFromAPI = response.data.enabled_platforms || [];
+                logger.log('🔄 [TTS SHORTCUT] Reloaded from API:', enabledPlatformsFromAPI);
+                
+                // Обновляем состояние из API
+                setTwitchChatVisible(enabledPlatformsFromAPI.includes('twitch'));
+                setVkChatVisible(enabledPlatformsFromAPI.includes('vk'));
+                setTtsSettings(prev => ({
+                    ...prev,
+                    enabled_platforms: enabledPlatformsFromAPI
+                }));
+                
+                // 🔄 Сохраняем в localStorage для быстрой инициализации
+                try {
+                    localStorage.setItem('tts_platform_settings', JSON.stringify(response.data));
+                } catch (e) {
+                    logger.error('Failed to cache platform settings:', e);
+                }
+            } catch (error) {
+                logger.error('❌ [TTS SHORTCUT] Error reloading settings:', error);
+            }
         };
         
         window.addEventListener('tts-settings-changed', handleTtsSettingsChanged);
@@ -150,7 +212,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
         return () => {
             window.removeEventListener('tts-settings-changed', handleTtsSettingsChanged);
         };
-    }, []);
+    }, [user?.id]); // 🔄 Перезагружаем настройки при смене пользователя
     
     // Шорткат: Переключение TTS + фильтрации для Twitch
     const handleTwitchToggle = async () => {
@@ -175,14 +237,22 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                 enabledPlatforms.splice(index, 1);
             }
             
-            await microservicesAPI.post('/api/tts/platform-settings', {
+            const response = await microservicesAPI.post('/api/tts/platform-settings', {
                 enabled_platforms: enabledPlatforms
             });
             
-            setTtsSettings({
+            const updatedSettings = {
                 ...ttsSettings,
                 enabled_platforms: enabledPlatforms
-            });
+            };
+            setTtsSettings(updatedSettings);
+            
+            // 🔄 Сохраняем в localStorage для быстрой инициализации
+            try {
+                localStorage.setItem('tts_platform_settings', JSON.stringify(response.data || { enabled_platforms: enabledPlatforms }));
+            } catch (e) {
+                logger.error('Failed to cache platform settings:', e);
+            }
             
             // 🔄 Отправляем событие для синхронизации с верхними переключателями
             window.dispatchEvent(new CustomEvent('tts-settings-changed', {
@@ -220,14 +290,22 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                 enabledPlatforms.splice(index, 1);
             }
             
-            await microservicesAPI.post('/api/tts/platform-settings', {
+            const response = await microservicesAPI.post('/api/tts/platform-settings', {
                 enabled_platforms: enabledPlatforms
             });
             
-            setTtsSettings({
+            const updatedSettings = {
                 ...ttsSettings,
                 enabled_platforms: enabledPlatforms
-            });
+            };
+            setTtsSettings(updatedSettings);
+            
+            // 🔄 Сохраняем в localStorage для быстрой инициализации
+            try {
+                localStorage.setItem('tts_platform_settings', JSON.stringify(response.data || { enabled_platforms: enabledPlatforms }));
+            } catch (e) {
+                logger.error('Failed to cache platform settings:', e);
+            }
             
             // 🔄 Отправляем событие для синхронизации с верхними переключателями
             window.dispatchEvent(new CustomEvent('tts-settings-changed', {
@@ -437,24 +515,57 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
         }
     }, [user]);
 
-    // Загружаем историю сообщений при монтировании (только 1 раз)
+    // 🚀 ANTI-FLASH: Загружаем историю асинхронно без блокировки рендера
     useEffect(() => {
-        // Предотвращаем повторную загрузку
-        if (historyLoadedRef.current) {
-            logger.log('⏭️ [CHAT] History already loaded, skipping...');
+        // Проверяем что есть хотя бы одна интеграция
+        const hasIntegrations = integrations?.twitch?.enabled || integrations?.vk?.enabled;
+        const prevHasIntegrations = prevIntegrationsRef.current.twitch || prevIntegrationsRef.current.vk;
+        
+        // 🔄 Определяем изменились ли интеграции с false на true
+        const integrationsEnabled = (integrations?.twitch?.enabled && !prevIntegrationsRef.current.twitch) ||
+                                     (integrations?.vk?.enabled && !prevIntegrationsRef.current.vk);
+        
+        // Обновляем предыдущее состояние
+        prevIntegrationsRef.current = {
+            twitch: integrations?.twitch?.enabled || false,
+            vk: integrations?.vk?.enabled || false
+        };
+        
+        if (!hasIntegrations) {
+            // Если интеграции отключены - очищаем сообщения и сбрасываем флаг
+            if (historyLoadedRef.current) {
+                logger.log('🧹 [CHAT] Integrations disabled, clearing messages');
+                setMessages([]);
+                historyLoadedRef.current = false;
+            }
             return;
         }
         
-        if (user?.id && (integrations?.twitch?.enabled || integrations?.vk?.enabled)) {
-            loadChatHistory();
-            historyLoadedRef.current = true;
+        // 🔄 Если интеграции подключились (были false, стали true) - сбрасываем флаг и загружаем
+        if (integrationsEnabled) {
+            logger.log('🔄 [CHAT] Integrations enabled, resetting history flag and loading...');
+            historyLoadedRef.current = false; // Сбрасываем флаг чтобы загрузить заново
         }
-    }, [user?.id]); // Только при изменении user.id, не при integrations
+        
+        // Загружаем историю если флаг сброшен и есть user
+        if (!historyLoadedRef.current && user?.id) {
+            logger.log('📜 [CHAT] Loading history...');
+            // Откладываем загрузку истории чтобы не блокировать первый рендер
+            setTimeout(() => {
+                loadChatHistory();
+            }, 100); // Небольшая задержка для рендера UI
+            historyLoadedRef.current = true;
+        } else if (historyLoadedRef.current) {
+            logger.log('⏭️ [CHAT] History already loaded, skipping...');
+        }
+    }, [user?.id, integrations?.twitch?.enabled, integrations?.vk?.enabled]); // 🔄 Следим за изменениями интеграций
 
-    // Загружаем 7TV смайлы
+    // 🚀 ANTI-FLASH: Загружаем 7TV смайлы асинхронно
     useEffect(() => {
         if (user?.twitch_username) {
-            loadEmotes();
+            setTimeout(() => {
+                loadEmotes();
+            }, 200); // Откладываем загрузку эмодзи
         }
     }, [user?.twitch_username]);
 
@@ -499,7 +610,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                 logger.warn('⚠️ [CHAT] Failed to load badges, continuing anyway:', error);
             }
             
-            const limit = 500; // Загружаем последние 500 сообщений из env
+            const limit = 50; // 🚀 ANTI-FLASH: Уменьшили с 500 до 50 для быстрой загрузки
             const historyMessages = [];
             
             // Загружаем историю для Twitch (не проверяем isOnHomePage - это для отображения, а не для загрузки)

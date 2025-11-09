@@ -14,8 +14,21 @@ export const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [isAuthenticated, setIsAuthenticated] = useState(null); // null = проверяем, true/false = результат
+    // 🚀 ANTI-FLASH: Инициализируем user из localStorage чтобы избежать мерцания
+    const getCachedUser = () => {
+        try {
+            const cached = localStorage.getItem('cached_user');
+            if (cached) {
+                return JSON.parse(cached);
+            }
+        } catch (e) {
+            logger.error('Failed to parse cached user:', e);
+        }
+        return null;
+    };
+
+    const [user, setUser] = useState(getCachedUser);
+    const [isAuthenticated, setIsAuthenticated] = useState(getCachedUser() ? true : null); // null = проверяем, true/false = результат
     const [isGuest, setIsGuest] = useState(false); // Состояние гостя
     const [isCheckingAuth, setIsCheckingAuth] = useState(true); // Состояние проверки аутентификации
     const [integrationsNeedRefresh, setIntegrationsNeedRefresh] = useState(false);
@@ -44,31 +57,53 @@ export const AuthProvider = ({ children }) => {
             const { authenticated, user: userData, integrations } = response.data;
 
             if (authenticated) {
+                const newUser = { ...userData, integrations };
                 setIsAuthenticated(true);
                 setIsGuest(userData.is_guest || false);
-                setUser({ ...userData, integrations });
+                setUser(newUser);
+                // 🚀 ANTI-FLASH: Кэшируем user в localStorage
+                try {
+                    localStorage.setItem('cached_user', JSON.stringify(newUser));
+                } catch (e) {
+                    logger.error('Failed to cache user:', e);
+                }
             } else {
                 setIsAuthenticated(false);
                 setIsGuest(false);
                 setUser(null);
+                // 🚀 ANTI-FLASH: Очищаем кэш при logout
+                localStorage.removeItem('cached_user');
             }
             
             // 🧹 Очищаем URL параметры после успешной проверки авторизации
-            // Убираем ?auth=twitch&success=1 и подобные параметры
+            // Убираем ?auth=twitch&success=1&auth_link=twitch и подобные параметры
             const currentUrl = new URL(window.location.href);
             const hasAuthParams = currentUrl.searchParams.has('auth') || 
                                   currentUrl.searchParams.has('success') || 
-                                  currentUrl.searchParams.has('error');
+                                  currentUrl.searchParams.has('error') ||
+                                  currentUrl.searchParams.has('auth_link');
             
             if (hasAuthParams) {
+                const authPlatform = currentUrl.searchParams.get('auth') || currentUrl.searchParams.get('auth_link');
+                const authSuccess = currentUrl.searchParams.get('success') === '1';
+                
                 // Удаляем параметры авторизации
                 currentUrl.searchParams.delete('auth');
                 currentUrl.searchParams.delete('success');
                 currentUrl.searchParams.delete('error');
+                currentUrl.searchParams.delete('auth_link');
                 
                 // Обновляем URL без перезагрузки страницы
                 window.history.replaceState({}, '', currentUrl.pathname + currentUrl.search);
                 logger.debug('Auth URL params cleaned');
+                
+                // 🔄 Отправляем событие для обновления интеграций если OAuth успешен
+                if (authSuccess || authPlatform) {
+                    logger.log(`🔄 [AUTH] OAuth success for ${authPlatform}, triggering integrations refresh`);
+                    setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent('auth_refresh_required'));
+                    }, 200); // Задержка чтобы user успел обновиться
+                }
             }
         } catch (error) {
             logger.error('Authentication check failed:', error);
@@ -77,6 +112,8 @@ export const AuthProvider = ({ children }) => {
                 setIsAuthenticated(false);
                 setIsGuest(false);
                 setUser(null);
+                // 🚀 ANTI-FLASH: Очищаем кэш при ошибках авторизации
+                localStorage.removeItem('cached_user');
             }
             // При других ошибках (сеть, 500, etc) не меняем состояние аутентификации
         } finally {
@@ -165,11 +202,19 @@ export const AuthProvider = ({ children }) => {
             setIsAuthenticated(false);
             setUser(null);
             
+            // 🚀 ANTI-FLASH: Очищаем кэш user
+            localStorage.removeItem('cached_user');
+            
             // Очищаем кэш пользователя
             if (userId) {
                 const cacheManager = await import('../utils/cacheManager');
                 cacheManager.default.invalidateUser(userId);
                 logger.info('[AUTH] User cache cleared on logout');
+                
+                // 🚀 ANTI-FLASH: Очищаем React Query persist кэш
+                const { clearAllQueryCache } = await import('../utils/queryPersist');
+                clearAllQueryCache();
+                logger.info('[AUTH] Query cache cleared on logout');
             }
             
             // 🔌 Очищаем SharedWebSocket (глобальный cleanup)

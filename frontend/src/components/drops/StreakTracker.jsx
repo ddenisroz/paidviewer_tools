@@ -9,7 +9,7 @@ import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
 import { logger } from '../../utils/prodLogger';
 
-const StreakTracker = ({ user, platform, channelName }) => {
+const StreakTracker = ({ user, channelName }) => {
   const [streaks, setStreaks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -17,35 +17,34 @@ const StreakTracker = ({ user, platform, channelName }) => {
   const [offset, setOffset] = useState(0);
   const limit = 50;
 
-  // Check if streak is enabled
+  // Check if streak is enabled (общий конфиг, без platform)
   const { data: config } = useQuery({
-    queryKey: ['drops-config', channelName, platform],
+    queryKey: ['drops-config', channelName],
     queryFn: async () => {
       if (!channelName) return null;
-      const response = await botService.get(`/api/drops/config/${channelName}`, {
-        params: { platform }
-      });
+      const response = await botService.get(`/api/drops/config/${channelName}`);
       return response.data.success ? response.data.data : null;
     },
-    enabled: !!channelName && !!platform,
+    enabled: !!channelName,
   });
 
-  const streakEnabled = config?.streak_enabled ?? false;
+  // Проверяем, включен ли стрик хотя бы на одной платформе
+  const streakEnabled = (config?.streak_enabled_twitch || config?.streak_enabled_vk) ?? false;
 
   useEffect(() => {
-    // Load streaks always if we have required data
-    if (user && platform && channelName) {
+    // Load streaks always if we have required data (общая статистика для всех платформ)
+    if (user && channelName) {
       loadStreaks(true);
     } else {
       // Clear streaks if missing required data
       setStreaks([]);
       setHasMore(false);
     }
-  }, [user, platform, channelName, streakEnabled]);
+  }, [user, channelName, streakEnabled]);
 
   const loadStreaks = async (reset = false) => {
     // Do not load if missing required data
-    if (!user || !platform || !channelName) {
+    if (!user || !channelName) {
       setStreaks([]);
       setHasMore(false);
       return;
@@ -55,9 +54,9 @@ const StreakTracker = ({ user, platform, channelName }) => {
 
     try {
       setLoading(true);
+      // 🚀 FIX: Загружаем общую статистику стриков (без фильтрации по platform)
       const response = await botService.get(`/api/drops/streaks/${channelName}`, {
         params: { 
-          platform, 
           limit, 
           offset: currentOffset 
         }
@@ -132,18 +131,6 @@ const StreakTracker = ({ user, platform, channelName }) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Предупреждение если стрики отключены */}
-        {!streakEnabled && (
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-            <AlertCircle className="w-4 h-4 text-yellow-400 flex-shrink-0" />
-            <div>
-              <p className="text-xs font-medium text-yellow-400">
-                Стрики отключены. Статистика может быть устаревшей.
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* Поиск */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -199,17 +186,21 @@ const StreakTracker = ({ user, platform, channelName }) => {
                         </td>
                         <td className="p-3 text-center">
                           <div className="flex items-center justify-center gap-1">
-                            <span className="text-lg font-bold">{streak.current_streak}</span>
-                            <span className="text-xs text-muted-foreground">дней</span>
+                            <span className="text-base font-semibold">{streak.current_streak}</span>
+                            <span className="text-xs text-muted-foreground">стримов</span>
                           </div>
                         </td>
                         <td className="p-3 text-center">
-                          <span className="text-sm font-medium text-muted-foreground">
-                            {streak.max_streak}
-                          </span>
+                          <div className="flex items-center justify-center gap-1">
+                            <span className="text-base font-semibold">{streak.max_streak}</span>
+                            <span className="text-xs text-muted-foreground">стримов</span>
+                          </div>
                         </td>
                         <td className="p-3 text-center">
-                          <span className="text-sm">{streak.messages_this_stream}</span>
+                          <div className="flex items-center justify-center gap-1">
+                            <span className="text-base font-semibold">{streak.messages_this_stream}</span>
+                            <span className="text-xs text-muted-foreground">сообщ.</span>
+                          </div>
                         </td>
                         <td className="p-3 text-right">
                           <div className="flex items-center justify-end gap-1 text-xs text-muted-foreground">

@@ -5,6 +5,7 @@ import { botService } from '../services/microservices';
 import { useToast } from '../components/ui/toast';
 import { expandQueryWithAliases } from '../constants/categoryAliases';
 import { logger } from '../utils/prodLogger';
+import { getQueryCache, setQueryCache } from '../utils/queryPersist';
 
 const DataContext = createContext();
 
@@ -205,17 +206,32 @@ export const DataProvider = ({ children }) => {
     const { integrations, isLoading: integrationsLoading } = useIntegrations();
     const { addToast } = useToast();
 
+    // 🚀 ANTI-FLASH: Инициализируем данные из кэша для предотвращения мерцания
+    const getCachedStreamData = useCallback(() => {
+        const cached = getQueryCache(['stream-data', user?.id]);
+        if (cached) {
+            return cached;
+        }
+        return {
+            twitch: { title: '', category: null },
+            vk: { title: '', category: null },
+        };
+    }, [user?.id]);
+
     // State for initial data loaded from server
-    const [initialData, setInitialData] = useState({
-        twitch: { title: '', category: null },
-        vk: { title: '', category: null },
-    });
+    const [initialData, setInitialData] = useState(getCachedStreamData);
 
     // State for current data being edited by user
-    const [currentData, setCurrentData] = useState({
-        twitch: { title: '', category: null },
-        vk: { title: '', category: null },
-    });
+    const [currentData, setCurrentData] = useState(getCachedStreamData);
+    
+    // 🔄 Обновляем данные из кэша при изменении user или интеграций
+    useEffect(() => {
+        const cached = getQueryCache(['stream-data', user?.id]);
+        if (cached && (cached.twitch?.title || cached.twitch?.category || cached.vk?.title || cached.vk?.category)) {
+            setInitialData(cached);
+            setCurrentData(cached);
+        }
+    }, [user?.id, integrations.twitch?.enabled, integrations.vk?.enabled]);
     
     // State for category search results
     const [categories, setCategories] = useState({
@@ -343,6 +359,9 @@ export const DataProvider = ({ children }) => {
             // Final data processed
             setInitialData(data);
             setCurrentData(data);
+            
+            // 🚀 ANTI-FLASH: Сохраняем в кэш для быстрой загрузки при перезагрузке
+            setQueryCache(['stream-data', user?.id], data);
             
             // Обновляем timestamp кэша
             setLastLoadTime(prev => ({ ...prev, streamData: Date.now() }));
@@ -570,17 +589,20 @@ export const DataProvider = ({ children }) => {
     }, [integrations.twitch?.enabled, integrations.vk?.enabled, addToast, isAuthenticated, integrationsLoading]);
     
     
-    // Мемоизируем условия для предотвращения лишних вызовов
+    // 🚀 ANTI-FLASH: Убрали проверку integrationsLoading, так как интеграции инициализируются мгновенно
     const shouldLoadData = useMemo(() => {
-        return isAuthenticated && !integrationsLoading && (integrations.twitch?.enabled || integrations.vk?.enabled);
-    }, [isAuthenticated, integrationsLoading, integrations.twitch?.enabled, integrations.vk?.enabled]);
+        return isAuthenticated && (integrations.twitch?.enabled || integrations.vk?.enabled);
+    }, [isAuthenticated, integrations.twitch?.enabled, integrations.vk?.enabled]);
 
     useEffect(() => {
         if (shouldLoadData) {
             loadStreamHistory();
-            loadStreamData();
+            // 🔄 Проверяем кэш - если пустой или нет категории, загружаем
+            const cached = getQueryCache(['stream-data', user?.id]);
+            const needsLoad = !cached || !cached.twitch?.category || !cached.vk?.category;
+            loadStreamData(needsLoad); // force = true только если кэш пустой или нет категории
         }
-    }, [shouldLoadData]); // Убираем loadStreamData и loadStreamHistory из зависимостей
+    }, [shouldLoadData, user?.id]); // Убираем loadStreamData и loadStreamHistory из зависимостей
 
     // Автообновление данных каждые 30 секунд
     useEffect(() => {

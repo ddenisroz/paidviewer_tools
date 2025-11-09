@@ -20,18 +20,15 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
     const { initialData, currentData, setCurrentData, saveChanges, status } = useData();
     const { getCombineSettings, updateSetting } = useUserSettings();
     const { combine_titles: combineTitles, combine_categories: combineCategories } = getCombineSettings();
-    const [isLinked, setIsLinked] = useState(false);
+    // 🚀 ANTI-FLASH: Используем useMemo для вычисления isLinked напрямую из combineTitles
+    // Это гарантирует, что значение всегда синхронизировано и нет видимого переключения
+    const isLinked = useMemo(() => combineTitles || false, [combineTitles]);
     const autoSaveTimerRef = useRef(null);
 
     const twitchEnabled = useMemo(() => integrations.twitch?.enabled === true, [integrations.twitch?.enabled]);
     const vkEnabled = useMemo(() => integrations.vk?.enabled === true, [integrations.vk?.enabled]);
     const bothEnabled = useMemo(() => twitchEnabled && vkEnabled, [twitchEnabled, vkEnabled]);
     const hasAnyIntegration = useMemo(() => twitchEnabled || vkEnabled, [twitchEnabled, vkEnabled]);
-    
-    // 🚀 ANTI-FLASH: Показываем placeholder ТОЛЬКО если user загружен и интеграции точно disabled
-    // Если user еще не загружен - показываем нейтральное состояние (не placeholder)
-    const isDataLoaded = isAuthenticated !== null && user !== null;
-    const shouldShowPlaceholder = isDataLoaded && !hasAnyIntegration;
 
     // Адаптивные размеры карточки
     // Высота НЕ уменьшается при объединении одной карточки
@@ -63,11 +60,8 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
 
     // Component state processed
 
-    // Синхронизируем с сервером и уведомляем родительский компонент
-    useEffect(() => {
-        setIsLinked(combineTitles);
-    }, [combineTitles]);
-
+    // 🚀 ANTI-FLASH: Уведомляем родительский компонент об изменении isLinked
+    // isLinked теперь вычисляется напрямую из combineTitles через useMemo, поэтому нет видимого переключения
     useEffect(() => {
         if (onLinkStateChange) {
             onLinkStateChange(isLinked);
@@ -78,8 +72,7 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
     const handleToggleChange = async (value) => {
         const success = await updateSetting('combine_titles', value);
         if (success) {
-            setIsLinked(value);
-            
+            // isLinked теперь вычисляется из combineTitles через useMemo, поэтому обновление произойдет автоматически
             // При включении объединения - синхронизируем название Twitch на VK Live
             if (value && bothEnabled) {
                 const twitchTitle = currentData.twitch?.title || '';
@@ -102,6 +95,12 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
         // Убираем все пробелы в начале и конце, но сохраняем внутренние пробелы
         const trimmedValue = value.trim();
         
+        // Очищаем таймер автосброса, пока пользователь редактирует
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+        }
+        
         if (isLinked && bothEnabled) {
             setCurrentData(prev => ({
                 ...prev,
@@ -113,6 +112,53 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
                 ...prev,
                 [platform]: { ...prev[platform], title: trimmedValue },
             }));
+        }
+    };
+    
+    // 🚀 FIX: Запускаем таймер автосброса только после того, как пользователь убрал фокус с инпута
+    const handleInputBlur = () => {
+        // Очищаем предыдущий таймер
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+        }
+        
+        // Если есть несохранённые изменения - запускаем таймер
+        if (isChanged && status.saveTitle !== 'loading' && status.saveTitle !== 'success') {
+            logger.log('⏰ [AUTO-RESET] Input blurred - starting 10s timer to reset unsaved changes');
+            
+            autoSaveTimerRef.current = setTimeout(() => {
+                // Проверяем, что изменения все еще есть (пользователь не сохранил)
+                const stillChanged = 
+                    (twitchEnabled && (initialData.twitch?.title || '') !== (currentData.twitch?.title || '')) ||
+                    (vkEnabled && (initialData.vk?.title || '') !== (currentData.vk?.title || ''));
+                
+                if (!stillChanged) {
+                    logger.log('⏰ [AUTO-RESET] Skipping reset - changes were already saved');
+                    return;
+                }
+                
+                logger.log('⏰ [AUTO-RESET] 10 seconds passed - resetting to initial data');
+                
+                // Сбрасываем к исходным данным
+                setCurrentData(prev => ({
+                    ...prev,
+                    twitch: { ...prev.twitch, title: initialData.twitch?.title || '' },
+                    vk: { ...prev.vk, title: initialData.vk?.title || '' }
+                }));
+                
+                // Уведомление пользователю
+                toast.info('Изменения названия отменены (не были сохранены в течение 10 секунд)');
+            }, 10000); // 10 секунд
+        }
+    };
+    
+    // Очищаем таймер при получении фокуса (пользователь снова начал редактировать)
+    const handleInputFocus = () => {
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+            logger.log('⏰ [AUTO-RESET] Input focused - clearing timer');
         }
     };
 
@@ -195,105 +241,18 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
         }
     }, [initialData.twitch?.title, initialData.vk?.title, currentData.twitch?.title, currentData.vk?.title, twitchEnabled, vkEnabled, isLinked, bothEnabled]);
 
-    // Автосброс изменений через 10 секунд, если пользователь не сохранил
+    // Cleanup таймера при размонтировании
     useEffect(() => {
-        // Очищаем предыдущий таймер
-        if (autoSaveTimerRef.current) {
-            clearTimeout(autoSaveTimerRef.current);
-            autoSaveTimerRef.current = null;
-        }
-
-        // Если есть несохранённые изменения - запускаем таймер
-        if (isChanged && status.saveTitle !== 'loading' && status.saveTitle !== 'success') {
-            logger.log('⏰ [AUTO-RESET] Starting 10s timer to reset unsaved changes');
-            
-            autoSaveTimerRef.current = setTimeout(() => {
-                logger.log('⏰ [AUTO-RESET] 10 seconds passed - resetting to initial data');
-                
-                // Сбрасываем к исходным данным
-                setCurrentData(prev => ({
-                    ...prev,
-                    twitch: { ...prev.twitch, title: initialData.twitch?.title || '' },
-                    vk: { ...prev.vk, title: initialData.vk?.title || '' }
-                }));
-                
-                // Уведомление пользователю
-                toast.info('Изменения названия отменены (не были сохранены в течение 10 секунд)');
-            }, 10000); // 10 секунд
-        }
-
-        // Cleanup при размонтировании
         return () => {
             if (autoSaveTimerRef.current) {
                 clearTimeout(autoSaveTimerRef.current);
                 autoSaveTimerRef.current = null;
             }
         };
-    }, [isChanged, status.saveTitle, initialData.twitch?.title, initialData.vk?.title, setCurrentData]);
+    }, []);
 
-    if (isLoading) {
-        return (
-            <Card className="border-yellow-500/50 bg-yellow-500/5 integration-card">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-yellow-500">
-                        <Edit3 className="h-6 w-6" />
-                        Смена названия
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="flex items-center justify-center min-h-[300px]">
-                    <div className="text-center space-y-4">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto"></div>
-                        <p className="text-sm text-muted-foreground px-4">Загрузка интеграций...</p>
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    // Показываем загрузку если данные еще не загружены
-    if (!currentData || (!currentData.twitch && !currentData.vk)) {
-        return (
-            <Card className="border-blue-500/50 bg-blue-500/5 integration-card">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-blue-500">
-                        <Edit3 className="h-6 w-6" />
-                        Смена названия
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="flex items-center justify-center min-h-[300px]">
-                    <div className="text-center space-y-4">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-                        <p className="text-sm text-muted-foreground px-4">Загрузка данных стрима...</p>
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    // 🚀 ANTI-FLASH: Показываем placeholder ТОЛЬКО когда данные загружены и интеграции точно disabled
-    // Пока данные не загружены - показываем нормальную карточку (она покажет пустое состояние без мигания)
-    if (shouldShowPlaceholder) {
-        return (
-            <Card className="border-red-500/50 bg-red-500/5 opacity-60">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-red-500">
-                        <Edit3 className="h-6 w-6" />
-                        Смена названия
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="flex items-center justify-center min-h-[300px]">
-                    <div className="text-center space-y-4">
-                        <div className="w-16 h-16 mx-auto flex items-center justify-center">
-                            <svg className="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </div>
-                        <p className="text-sm text-muted-foreground px-4">Подключите интеграции для полного функционала</p>
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
+    // 🚀 ANTI-FLASH: Показываем skeleton пока данные не загружены
+    const isDataLoaded = currentData && (currentData.twitch || currentData.vk);
 
     return (
         <Card className="flex flex-col overflow-hidden" style={cardStyle}>
@@ -304,6 +263,16 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
                 </CardTitle>
             </CardHeader>
             <CardContent className="p-3 flex-1 flex flex-col overflow-y-auto" >
+                {!isDataLoaded ? (
+                    // Показываем минимальный placeholder пока данные загружаются
+                    <div className="flex-1 flex items-center justify-center opacity-50">
+                        <div className="animate-pulse space-y-3 w-full max-w-2xl">
+                            <div className="h-10 bg-muted rounded"></div>
+                            <div className="h-10 bg-muted rounded"></div>
+                        </div>
+                    </div>
+                ) : (
+                <>
                 {/* Toggle объединения полей */}
                 {bothEnabled && (
                     <div className="flex items-center justify-between p-2 bg-background/10 rounded-lg mb-2">
@@ -331,6 +300,8 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
                             value={currentData.twitch.title || ''} 
                             onChange={(e) => handleTitleChange('twitch', e.target.value)} 
                             onKeyPress={handleKeyPress}
+                            onBlur={handleInputBlur}
+                            onFocus={handleInputFocus}
                             placeholder="Введите общее название для обеих платформ..."
                             className="h-10"
                         />
@@ -347,6 +318,8 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
                                 value={currentData.twitch.title || ''} 
                                 onChange={(e) => handleTitleChange('twitch', e.target.value)} 
                                 onKeyPress={handleKeyPress}
+                                onBlur={handleInputBlur}
+                                onFocus={handleInputFocus}
                                 placeholder={twitchEnabled ? "Название стрима на Twitch..." : "Интеграция отключена"}
                                 className={`h-10 ${!twitchEnabled ? 'bg-muted cursor-not-allowed blur-sm' : ''}`}
                                 disabled={!twitchEnabled}
@@ -363,6 +336,8 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
                                 value={currentData.vk.title || ''} 
                                 onChange={(e) => handleTitleChange('vk', e.target.value)} 
                                 onKeyPress={handleKeyPress}
+                                onBlur={handleInputBlur}
+                                onFocus={handleInputFocus}
                                 placeholder={vkEnabled ? "Название стрима на VK Live..." : "Интеграция отключена"}
                                 className={`h-10 ${!vkEnabled ? 'bg-muted cursor-not-allowed blur-sm' : ''}`}
                                 disabled={!vkEnabled}
@@ -371,10 +346,12 @@ const StreamTitleCard = ({ onLinkStateChange }) => {
                     </div>
                 )}
                 </div>
+                </>
+                )}
             </CardContent>
             
             {/* Кнопка сохранения - вынесена ИЗ CardContent (как в StreamCategoryCard) */}
-            {hasAnyIntegration && (
+            {isDataLoaded && hasAnyIntegration && (
                 <div className="p-3 pt-0 flex-shrink-0">
                     <Button 
                         onClick={() => handleSave(isLinked && bothEnabled ? 'both' : 'individual')}

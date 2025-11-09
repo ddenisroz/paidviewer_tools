@@ -50,7 +50,7 @@ const StreakCalendar = ({ formData, setFormData }) => {
                   />
                   <div>
                     <Label className="text-sm font-medium">{quality.label}</Label>
-                    <p className="text-xs text-muted-foreground">После {value} дн.</p>
+                    <p className="text-xs text-muted-foreground">После {value} стримов</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 border rounded-lg">

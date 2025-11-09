@@ -6,6 +6,9 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
 
+# Импортируем константы для TTS
+from constants import TTS_DEFAULT_VOLUME
+
 logger = logging.getLogger('bot_service')
 
 
@@ -450,9 +453,10 @@ async def handle_tts_for_message(
             }
             
             # 🚀 FIX: Базовая громкость из AudioSettings (дефолт от админа/системы)
-            base_volume_level = audio_settings.website_volume if audio_settings else 50.0
+            # TTS_DEFAULT_VOLUME уже импортирован в начале файла
+            base_volume_level = audio_settings.website_volume if audio_settings else TTS_DEFAULT_VOLUME
             if tts_user_settings.listening_mode == 'obs':
-                base_volume_level = audio_settings.obs_volume if audio_settings else 50.0
+                base_volume_level = audio_settings.obs_volume if audio_settings else TTS_DEFAULT_VOLUME
             
             # 🚀 FIX: Загружаем персональные настройки голоса и применяем volume
             user_voice_config = None
@@ -518,15 +522,145 @@ async def handle_tts_for_message(
                 logger.info(f"✅ [{platform.upper()} TTS] Voice: {result.get('voice', 'unknown')}")
                 logger.info(f"✅ [{platform.upper()} TTS] Duration: {result.get('duration', 0)}s")
                 
+                # ✅ Автоматическое принятие наград TTS для VK и Twitch
+                if reward_id and tts_user_settings.tts_mode == 'channel_points':
+                    try:
+                        from core.database import UserToken
+                        from core.token_encryption import decrypt_token as decrypt_access_token
+                        from api.points_api_endpoints import _decrypt_access_token, _get_vk_channel_name
+                        
+                        if platform == 'vk':
+                            # ✅ Автоматическое принятие для VK
+                            from api.vk_api import vk_api
+                            
+                            # Получаем токен VK
+                            user_token = db.query(UserToken).filter(
+                                UserToken.user_id == user_id,
+                                UserToken.platform == 'vk'
+                            ).first()
+                            
+                            if user_token:
+                                channel_name = _get_vk_channel_name(user_id, db)
+                                if channel_name:
+                                    # Получаем активные demands для TTS награды
+                                    demands_data = await vk_api.get_reward_demands(
+                                        channel_url=channel_name,
+                                        access_token=decrypt_access_token(user_token.access_token),
+                                        limit=50,
+                                        offset=0
+                                    )
+                                    
+                                    if demands_data and isinstance(demands_data, dict):
+                                        demands_list = demands_data.get("demands", []) or demands_data.get("items", []) or []
+                                        if isinstance(demands_list, list):
+                                            # Фильтруем demands для TTS награды
+                                            tts_demands = [
+                                                demand for demand in demands_list
+                                                if isinstance(demand, dict) and 
+                                                str(demand.get("reward_id") or demand.get("reward", {}).get("id", "")) == str(reward_id)
+                                            ]
+                                            
+                                            if tts_demands:
+                                                # Извлекаем ID demands
+                                                demand_ids = [
+                                                    int(demand.get("id") or demand.get("demand_id", 0))
+                                                    for demand in tts_demands
+                                                    if demand.get("id") or demand.get("demand_id")
+                                                ]
+                                                
+                                                if demand_ids:
+                                                    # ✅ Автоматически принимаем награды TTS
+                                                    accept_result = await vk_api.accept_reward_demands(
+                                                        channel_url=channel_name,
+                                                        access_token=decrypt_access_token(user_token.access_token),
+                                                        demand_ids=demand_ids
+                                                    )
+                                                    if accept_result:
+                                                        logger.info(f"✅ [VK TTS] Auto-accepted {len(demand_ids)} TTS reward demands")
+                                                    else:
+                                                        logger.warning(f"⚠️ [VK TTS] Failed to auto-accept TTS reward demands")
+                        
+                        elif platform == 'twitch':
+                            # ✅ Автоматическое принятие для Twitch
+                            from api.twitch_api import TwitchAPI
+                            from core.connection_manager import get_connection_manager
+                            
+                            # Получаем токен Twitch
+                            user_token = db.query(UserToken).filter(
+                                UserToken.user_id == user_id,
+                                UserToken.platform == 'twitch',
+                                UserToken.is_active == True
+                            ).first()
+                            
+                            if user_token and user_token.platform_user_id:
+                                connection_manager = get_connection_manager()
+                                twitch_api = TwitchAPI(connection_manager)
+                                
+                                # Получаем активные redemption для TTS награды
+                                try:
+                                    redemptions_response = await twitch_api.get_custom_reward_redemptions(
+                                        broadcaster_id=user_token.platform_user_id,
+                                        reward_id=reward_id,
+                                        access_token=_decrypt_access_token(user_token.access_token),
+                                        status='UNFULFILLED',  # Только невыполненные
+                                        first=50  # Получаем больше для поиска
+                                    )
+                                    
+                                    # Twitch API возвращает {'data': [...]}
+                                    redemptions = []
+                                    if redemptions_response and isinstance(redemptions_response, dict):
+                                        redemptions = redemptions_response.get('data', [])
+                                    elif isinstance(redemptions_response, list):
+                                        redemptions = redemptions_response
+                                    
+                                    if redemptions and isinstance(redemptions, list):
+                                        # Фильтруем redemption по username (ищем для текущего пользователя)
+                                        user_redemptions = [
+                                            r for r in redemptions
+                                            if r.get('user_login', '').lower() == username.lower() or
+                                               r.get('user_name', '').lower() == username.lower()
+                                        ]
+                                        
+                                        # Если не нашли по username, берем последний (самый свежий) UNFULFILLED
+                                        target_redemptions = user_redemptions if user_redemptions else redemptions
+                                        
+                                        # Сортируем по дате (самый свежий последний)
+                                        target_redemptions.sort(key=lambda x: x.get('redeemed_at', ''), reverse=False)
+                                        
+                                        if target_redemptions:
+                                            # Берем последний (самый свежий) redemption
+                                            latest_redemption = target_redemptions[-1]
+                                            latest_redemption_id = latest_redemption.get('id')
+                                            
+                                            if latest_redemption_id:
+                                                # ✅ Автоматически принимаем награду TTS
+                                                fulfill_result = await twitch_api.update_redemption_status(
+                                                    broadcaster_id=user_token.platform_user_id,
+                                                    reward_id=reward_id,
+                                                    redemption_id=latest_redemption_id,
+                                                    access_token=_decrypt_access_token(user_token.access_token),
+                                                    status='FULFILLED'
+                                                )
+                                                
+                                                if fulfill_result:
+                                                    logger.info(f"✅ [TWITCH TTS] Auto-fulfilled TTS reward redemption: {latest_redemption_id} for {username}")
+                                                else:
+                                                    logger.warning(f"⚠️ [TWITCH TTS] Failed to auto-fulfill TTS reward redemption")
+                                except Exception as twitch_error:
+                                    logger.warning(f"⚠️ [TWITCH TTS] Error getting/fulfilling redemptions: {twitch_error}")
+                    except Exception as auto_accept_error:
+                        logger.warning(f"⚠️ [{platform.upper()} TTS] Error auto-accepting reward: {auto_accept_error}")
+                        # Не прерываем обработку TTS при ошибке принятия награды
+                
                 # Отправляем готовое аудио на фронтенд через WebSocket
                 await broadcast_tts_audio(
-                    audio_data={
-                        "audio_url": result.get("audio_url"),
-                        "voice": result.get("voice", "unknown"),
-                        "volume": volume_level,
-                        "tts_type": tts_type,
-                        "duration": result.get("duration", 0)
-                    },
+                audio_data={
+                    "audio_url": result.get("audio_url"),
+                    "voice": result.get("voice", "unknown"),
+                    "volume": final_volume_level,  # ✅ Исправлено: было volume_level
+                    "tts_type": tts_type,
+                    "duration": result.get("duration", 0)
+                },
                     channel_name=channel_identifier,
                     platform=platform
                 )
@@ -572,7 +706,7 @@ async def broadcast_tts_audio(
             "data": {
                 "audio_url": audio_data.get("audio_url"),
                 "voice": audio_data.get("voice", "unknown"),
-                "volume": audio_data.get("volume", 50),
+                "volume": audio_data.get("volume", TTS_DEFAULT_VOLUME),
                 "tts_type": audio_data.get("tts_type", "unknown"),
                 "duration": audio_data.get("duration", 0),
                 "channel": channel_name,

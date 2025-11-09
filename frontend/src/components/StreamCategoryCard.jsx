@@ -76,7 +76,9 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
     const { initialData, currentData, setCurrentData, saveChanges, status, categories, searchCategories } = useData();
     const { getCombineSettings, updateSetting } = useUserSettings();
     const { combine_categories: combineCategories, combine_titles: combineTitles } = getCombineSettings();
-    const [isLinked, setIsLinked] = useState(false);
+    // 🚀 ANTI-FLASH: Используем useMemo для вычисления isLinked напрямую из combineCategories
+    // Это гарантирует, что значение всегда синхронизировано и нет видимого переключения
+    const isLinked = useMemo(() => combineCategories || false, [combineCategories]);
     const [searchTerms, setSearchTerms] = useState({ twitch: '', vk: '' });
     const [showDropdown, setShowDropdown] = useState({ twitch: false, vk: false });
     const autoSaveTimerRef = useRef(null);
@@ -91,11 +93,6 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
     const vkEnabled = useMemo(() => integrations.vk?.enabled === true, [integrations.vk?.enabled]);
     const bothEnabled = useMemo(() => twitchEnabled && vkEnabled, [twitchEnabled, vkEnabled]);
     const hasAnyIntegration = useMemo(() => twitchEnabled || vkEnabled, [twitchEnabled, vkEnabled]);
-    
-    // 🚀 ANTI-FLASH: Показываем placeholder ТОЛЬКО если user загружен и интеграции точно disabled
-    // Если user еще не загружен - показываем нейтральное состояние (не placeholder)
-    const isDataLoaded = isAuthenticated !== null && user !== null;
-    const shouldShowPlaceholder = isDataLoaded && !hasAnyIntegration;
 
     // Адаптивные размеры карточки
     // Высота НЕ уменьшается при объединении одной карточки
@@ -127,11 +124,8 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
 
     // Component state processed
 
-    // Синхронизируем с сервером и уведомляем родительский компонент
-    useEffect(() => {
-        setIsLinked(combineCategories);
-    }, [combineCategories]);
-
+    // 🚀 ANTI-FLASH: Уведомляем родительский компонент об изменении isLinked
+    // isLinked теперь вычисляется напрямую из combineCategories через useMemo, поэтому нет видимого переключения
     useEffect(() => {
         if (onLinkStateChange) {
             onLinkStateChange(isLinked);
@@ -142,7 +136,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
     const handleToggleChange = async (value) => {
         const success = await updateSetting('combine_categories', value);
         if (success) {
-            setIsLinked(value);
+            // isLinked теперь вычисляется из combineCategories через useMemo, поэтому обновление произойдет автоматически
             
             // При включении объединения - синхронизируем категорию Twitch на VK Live (или близкую по маппингу)
             if (value && bothEnabled) {
@@ -444,6 +438,12 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
     };
 
     const handleCategorySelect = async (platform, category) => {
+        // Очищаем таймер автосброса, пока пользователь выбирает категорию
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+        }
+        
         logger.log('🎮 [HANDLE SELECT] Category selected:', { platform, category: category.name, id: category.id, isLinked, bothEnabled });
         
         if (isLinked && bothEnabled) {
@@ -682,110 +682,89 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
     }, [initialData.twitch?.category?.id, initialData.vk?.category?.id, currentData.twitch?.category?.id, currentData.vk?.category?.id, twitchEnabled, vkEnabled]);
 
     // Автосброс изменений через 10 секунд, если пользователь не сохранил
-    useEffect(() => {
+    // 🚀 FIX: Запускаем таймер автосброса только после того, как пользователь убрал фокус с инпута категории
+    const handleInputBlur = () => {
         // Очищаем предыдущий таймер
         if (autoSaveTimerRef.current) {
             clearTimeout(autoSaveTimerRef.current);
             autoSaveTimerRef.current = null;
         }
-
-        // Если есть несохранённые изменения - запускаем таймер
-        if (isChanged && status.saveCategory !== 'loading' && status.saveCategory !== 'success') {
-            logger.log('⏰ [AUTO-RESET] Starting 10s timer to reset unsaved changes');
-            
-            autoSaveTimerRef.current = setTimeout(() => {
-                logger.log('⏰ [AUTO-RESET] 10 seconds passed - resetting to initial data');
+        
+        // Небольшая задержка, чтобы дать время на обработку клика по категории в dropdown
+        setTimeout(() => {
+            // Если есть несохранённые изменения - запускаем таймер
+            if (isChanged && status.saveCategory !== 'loading' && status.saveCategory !== 'success') {
+                logger.log('⏰ [AUTO-RESET] Input blurred - starting 10s timer to reset unsaved changes');
                 
-                // Сбрасываем к исходным данным
-                setCurrentData(prev => ({
-                    ...prev,
-                    twitch: { ...prev.twitch, category: initialData.twitch?.category },
-                    vk: { ...prev.vk, category: initialData.vk?.category }
-                }));
-                
-                // Обновляем инпуты
-                setSearchTerms({
-                    twitch: initialData.twitch?.category?.name || '',
-                    vk: initialData.vk?.category?.name || ''
-                });
-                
-                // Уведомление пользователю
-                toast.info('Изменения категории отменены (не были сохранены в течение 10 секунд)');
-            }, 10000); // 10 секунд
+                autoSaveTimerRef.current = setTimeout(() => {
+                    // Проверяем, что изменения все еще есть (пользователь не сохранил)
+                    const stillChanged = 
+                        (twitchEnabled && JSON.stringify(initialData.twitch?.category) !== JSON.stringify(currentData.twitch?.category)) ||
+                        (vkEnabled && JSON.stringify(initialData.vk?.category) !== JSON.stringify(currentData.vk?.category));
+                    
+                    if (!stillChanged) {
+                        logger.log('⏰ [AUTO-RESET] Skipping reset - changes were already saved');
+                        return;
+                    }
+                    
+                    logger.log('⏰ [AUTO-RESET] 10 seconds passed - resetting to initial data');
+                    
+                    // Сбрасываем к исходным данным
+                    setCurrentData(prev => ({
+                        ...prev,
+                        twitch: { ...prev.twitch, category: initialData.twitch?.category },
+                        vk: { ...prev.vk, category: initialData.vk?.category }
+                    }));
+                    
+                    // Обновляем инпуты
+                    setSearchTerms({
+                        twitch: initialData.twitch?.category?.name || '',
+                        vk: initialData.vk?.category?.name || ''
+                    });
+                    
+                    // Уведомление пользователю
+                    toast.info('Изменения категории отменены (не были сохранены в течение 10 секунд)');
+                }, 10000); // 10 секунд
+            }
+        }, 200); // 200ms задержка для обработки клика по категории
+    };
+    
+    // Очищаем таймер при получении фокуса (пользователь снова начал редактировать)
+    const handleInputFocus = () => {
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+            logger.log('⏰ [AUTO-RESET] Input focused - clearing timer');
         }
-
-        // Cleanup при размонтировании
+    };
+    
+    // Cleanup таймера при размонтировании
+    useEffect(() => {
         return () => {
             if (autoSaveTimerRef.current) {
                 clearTimeout(autoSaveTimerRef.current);
                 autoSaveTimerRef.current = null;
             }
         };
-    }, [isChanged, status.saveCategory, initialData.twitch?.category, initialData.vk?.category, setCurrentData]);
+    }, []);
 
-    if (isLoading) {
-        return (
-            <Card className="border-yellow-500/50 bg-yellow-500/5 integration-card">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-yellow-500">
-                        <Tag className="h-6 w-6" />
-                        Смена категории
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="flex items-center justify-center min-h-[300px]">
-                    <div className="text-center space-y-4">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto"></div>
-                        <p className="text-sm text-muted-foreground px-4">Загрузка интеграций...</p>
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    // Показываем загрузку если данные еще не загружены
-    if (!currentData || (!currentData.twitch && !currentData.vk)) {
-        return (
-            <Card className="border-blue-500/50 bg-blue-500/5 integration-card">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-blue-500">
-                        <Tag className="h-6 w-6" />
-                        Смена категории
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="flex items-center justify-center min-h-[300px]">
-                    <div className="text-center space-y-4">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-                        <p className="text-sm text-muted-foreground px-4">Загрузка данных стрима...</p>
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    // 🚀 ANTI-FLASH: Показываем placeholder ТОЛЬКО когда данные загружены и интеграции точно disabled
-    // Пока данные не загружены - показываем нормальную карточку (она покажет пустое состояние без мигания)
-    if (shouldShowPlaceholder) {
-        return (
-            <Card className="border-red-500/50 bg-red-500/5 opacity-60">
-                 <CardHeader><CardTitle className="flex items-center gap-2 text-red-500"><Tag /> Смена категории</CardTitle></CardHeader>
-                 <CardContent className="flex items-center justify-center min-h-[300px]">
-                    <div className="text-center space-y-4">
-                        <div className="w-16 h-16 mx-auto flex items-center justify-center">
-                            <svg className="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </div>
-                        <p className="text-sm text-muted-foreground px-4">Подключите интеграции для полного функционала</p>
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
+    // 🚀 ANTI-FLASH: Показываем skeleton пока данные не загружены
+    const isDataLoaded = currentData && (currentData.twitch || currentData.vk);
 
     return (
         <Card className="flex flex-col overflow-hidden" style={cardStyle}>
             <CardHeader className="flex-shrink-0 pb-3"><CardTitle className="flex items-center gap-2"><Tag className="h-5 w-5 text-green-500"/> Смена категории</CardTitle></CardHeader>
             <CardContent ref={dropdownRef} className="p-3 flex-1 flex flex-col overflow-y-auto" >
+                {!isDataLoaded ? (
+                    // Показываем минимальный placeholder пока данные загружаются
+                    <div className="flex-1 flex items-center justify-center opacity-50">
+                        <div className="animate-pulse space-y-3 w-full max-w-2xl">
+                            <div className="h-10 bg-muted rounded"></div>
+                            <div className="h-10 bg-muted rounded"></div>
+                        </div>
+                    </div>
+                ) : (
+                <>
                 {/* Toggle объединения полей */}
                 {bothEnabled && (
                     <div className="flex items-center justify-between p-2 bg-background/10 rounded-lg mb-2">
@@ -821,6 +800,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                                         value={searchTerms.twitch} 
                                         onChange={(e) => handleSearchChange('twitch', e.target.value)}
                                         onFocus={() => {
+                                            handleInputFocus(); // Очищаем таймер автосброса
                                             // Открываем dropdown
                                             setShowDropdown({ twitch: true, vk: true });
                                             // Очищаем поле при фокусе если в нем название текущей категории
@@ -835,6 +815,7 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                                                 }, 0);
                                             }
                                         }}
+                                        onBlur={handleInputBlur} // Запускаем таймер автосброса при потере фокуса
                                         onClick={() => {
                                             // При клике также очищаем, если еще не очищено
                                             const currentCategoryName = currentData.twitch?.category?.name || '';
@@ -879,7 +860,11 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                                         <Input
                                             value={searchTerms.twitch} 
                                             onChange={(e) => handleSearchChange('twitch', e.target.value)}
-                                            onFocus={() => twitchEnabled && handleSearchFocus('twitch')}
+                                            onFocus={() => {
+                                                handleInputFocus(); // Очищаем таймер автосброса
+                                                twitchEnabled && handleSearchFocus('twitch');
+                                            }}
+                                            onBlur={handleInputBlur} // Запускаем таймер автосброса при потере фокуса
                                             onClick={() => twitchEnabled && handleSearchFocus('twitch')}
                                             onKeyDown={(e) => handleSearchKeyDown('twitch', e)}
                                             onKeyPress={handleKeyPress}
@@ -920,7 +905,11 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                                         <Input
                                             value={searchTerms.vk} 
                                             onChange={(e) => handleSearchChange('vk', e.target.value)} 
-                                            onFocus={() => vkEnabled && handleSearchFocus('vk')}
+                                            onFocus={() => {
+                                                handleInputFocus(); // Очищаем таймер автосброса
+                                                vkEnabled && handleSearchFocus('vk');
+                                            }}
+                                            onBlur={handleInputBlur} // Запускаем таймер автосброса при потере фокуса
                                             onClick={() => vkEnabled && handleSearchFocus('vk')}
                                             onKeyDown={(e) => handleSearchKeyDown('vk', e)}
                                             onKeyPress={handleKeyPress}
@@ -945,10 +934,12 @@ const StreamCategoryCard = ({ onLinkStateChange }) => {
                         </div>
                     )}
                 </div>
+                </>
+                )}
             </CardContent>
             
             {/* Кнопка сохранения - вынесена ИЗ CardContent */}
-            {hasAnyIntegration && (
+            {isDataLoaded && hasAnyIntegration && (
                 <div className="p-3 pt-0 flex-shrink-0">
                     <Button 
                         onClick={() => handleSave(isLinked && bothEnabled ? 'both' : 'individual')}

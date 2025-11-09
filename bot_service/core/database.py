@@ -735,16 +735,20 @@ class DropsConfig(Base):
     user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)  # ╨Ф╨╗╤П ╨░╨▓╤В╨╛╤А╨╕╨╖╨╛╨▓╨░╨╜╨╜╤Л╤Е ╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╨╡╨╣
     session_id = Column(String, nullable=True, index=True)  # ╨Ф╨╗╤П ╨│╨╛╤Б╤В╨╡╨╣
     channel_name = Column(String, nullable=False, index=True)
-    platform = Column(String, nullable=False)  # twitch, vk
+    platform = Column(String, nullable=True, default="global")  # twitch, vk, или "global" для общих настроек
     
-    # ╨б╤В╤А╨╕╨║ ╨╜╨░╤Б╤В╤А╨╛╨╣╨║╨╕
-    streak_enabled = Column(Boolean, default=True)
+    # ╨б╤В╤А╨╕╨║ ╨╜╨░╤Б╤В╤А╨╛╨╣╨║╨╕ (общие настройки)
     streak_days_common = Column(Integer, default=1)
     streak_days_rare = Column(Integer, default=3)
     streak_days_epic = Column(Integer, default=7)
     streak_days_legendary = Column(Integer, default=14)
     streak_messages_required = Column(Integer, default=5)  # ╨б╨╛╨╛╨▒╤Й╨╡╨╜╨╕╨╣ ╨▓ ╤З╨░╤В╨╡ ╨╖╨░ ╤Б╤В╤А╨╕╨╝
     streak_reset_on_skip = Column(Boolean, default=True)  # ╨б╨▒╤А╨░╤Б╤Л╨▓╨░╤В╤М ╤Б╤В╤А╨╕╨║ ╨┐╤А╨╕ ╨┐╤А╨╛╨┐╤Г╤Б╨║╨╡ ╤Б╤В╤А╨╕╨╝╨░
+    # Флаги включения стрика для каждой платформы
+    streak_enabled_twitch = Column(Boolean, nullable=False, server_default='false')  # Включен ли стрик для Twitch
+    streak_enabled_vk = Column(Boolean, nullable=False, server_default='false')  # Включен ли стрик для VK Live
+    # Устаревшее поле (оставляем для обратной совместимости)
+    streak_enabled = Column(Boolean, default=False)  # DEPRECATED: использовать streak_enabled_twitch/vk
     
     # ╨Ф╨╛╨╜╨░╤В ╨╜╨░╤Б╤В╤А╨╛╨╣╨║╨╕
     donation_enabled = Column(Boolean, default=True)
@@ -829,6 +833,10 @@ class UserStreak(Base):
     last_activity = Column(DateTime, default=utcnow_naive)
     messages_this_stream = Column(Integer, default=0)
     
+    # ✅ НОВОЕ: Информация о последней трансляции
+    last_stream_session_id = Column(Integer, ForeignKey('stream_sessions.id'), nullable=True, index=True)  # ID последней трансляции, в которой участвовал зритель
+    last_stream_attended_at = Column(DateTime, nullable=True, index=True)  # Время последнего посещения трансляции
+    
     created_at = Column(DateTime, default=utcnow_naive)
     updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
@@ -898,7 +906,35 @@ class MythicalDropsSession(Base):
     
     created_at = Column(DateTime, default=utcnow_naive)
 
-# ╨д╤Г╨╜╨║╤Ж╨╕╤П ╨┤╨╗╤П ╨┐╨╛╨╗╤Г╤З╨╡╨╜╨╕╤П ╤Б╨╡╤Б╤Б╨╕╨╕ ╨С╨Ф
+class StreamSession(Base):
+    """Сессии трансляций для отслеживания начала и конца стримов"""
+    __tablename__ = 'stream_sessions'
+    __table_args__ = (
+        CheckConstraint('(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)', name='check_user_or_session_stream_session'),
+        {'extend_existing': True}
+    )
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)  # Для авторизованных пользователей
+    session_id = Column(String, nullable=True, index=True)  # Для гостей
+    channel_name = Column(String, nullable=False, index=True)
+    platform = Column(String, nullable=False)  # twitch, vk
+    
+    # Время начала и конца трансляции
+    started_at = Column(DateTime, nullable=False, default=utcnow_naive, index=True)
+    ended_at = Column(DateTime, nullable=True, index=True)
+    
+    # Статус трансляции
+    is_active = Column(Boolean, default=True, index=True)
+    
+    # Дополнительная информация
+    viewer_count_peak = Column(Integer, default=0)  # Пиковое количество зрителей
+    title = Column(String, nullable=True)  # Название трансляции
+    
+    created_at = Column(DateTime, default=utcnow_naive)
+    updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
+
+# ╨д╤Г╨╜╨║╤Ж╨╕╤П ╨┤╨╗╤П ╨┐╨╛╨╗╤Г╤З╨╡╨╜╨╕╤П ╤Б╨╡╤Б╤Б╨╕╨╡╨╣ ╨С╨Ф
 def get_db():
     """╨д╤Г╨╜╨║╤Ж╨╕╤П-╨│╨╡╨╜╨╡╤А╨░╤В╨╛╤А ╨┤╨╗╤П ╨┐╨╛╨╗╤Г╤З╨╡╨╜╨╕╤П ╤Б╨╡╤Б╤Б╨╕╨╕ ╨С╨Ф"""
     db = SessionLocal()
@@ -933,6 +969,30 @@ def init_db():
         logger.info("ЁЯдЦ Initialized default blocked bots in database")
     except Exception as e:
         logger.error(f"Error initializing blocked bots: {e}")
+        db.rollback()
+    finally:
+        db.close()
+    
+    # ✅ Инициализация качеств лутбоксов (Drops Qualities)
+    DEFAULT_QUALITIES = [
+        {"name": "Common", "color": "#9ca3af", "weight": 100},
+        {"name": "Rare", "color": "#3b82f6", "weight": 50},
+        {"name": "Epic", "color": "#a855f7", "weight": 20},
+        {"name": "Legendary", "color": "#eab308", "weight": 5},
+        {"name": "Mythical", "color": "#ef4444", "weight": 1}
+    ]
+    
+    db = SessionLocal()
+    try:
+        existing_qualities = {q.name for q in db.query(DropsQuality).all()}
+        for quality_data in DEFAULT_QUALITIES:
+            if quality_data["name"] not in existing_qualities:
+                quality = DropsQuality(**quality_data)
+                db.add(quality)
+        db.commit()
+        logger.info("🎁 Initialized default lootbox qualities")
+    except Exception as e:
+        logger.error(f"Error initializing lootbox qualities: {e}")
         db.rollback()
     finally:
         db.close()
@@ -1000,6 +1060,7 @@ class ChatBoxSettings(Base):
     # ╨Э╨░╤Б╤В╤А╨╛╨╣╨║╨╕ ╨╛╤В╨╛╨▒╤А╨░╨╢╨╡╨╜╨╕╤П
     max_messages = Column(Integer, default=20)  # ╨Ъ╨╛╨╗╨╕╤З╨╡╤Б╤В╨▓╨╛ ╨╛╤В╨╛╨▒╤А╨░╨╢╨░╨╡╨╝╤Л╤Е ╤Б╨╛╨╛╨▒╤Й╨╡╨╜╨╕╨╣ (╨╝╨╕╨╜: 1, ╨╝╨░╨║╤Б: 50)
     chat_direction = Column(String, default='vertical')  # vertical ╨╕╨╗╨╕ horizontal
+    chat_width = Column(Integer, default=100)  # Ширина чата в vw (viewport width), по умолчанию 100vw
     show_platform_icons = Column(Boolean, default=True)  # ╨Я╨╛╨║╨░╨╖╤Л╨▓╨░╤В╤М ╨╕╨║╨╛╨╜╨║╨╕ ╨┐╨╗╨░╤В╤Д╨╛╤А╨╝ (Twitch/VK)
     show_roles = Column(Boolean, default=False)  # ╨Я╨╛╨║╨░╨╖╤Л╨▓╨░╤В╤М ╤А╨╛╨╗╨╕ ╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╨╡╨╣ (╨Ь╨╛╨┤╨╡╤А╨░╤В╨╛╤А, ╨Я╨╛╨┤╨┐╨╕╤Б╤З╨╕╨║ ╨╕ ╤В.╨┤.)
     show_badges = Column(Boolean, default=True)  # ╨Я╨╛╨║╨░╨╖╤Л╨▓╨░╤В╤М ╨╖╨╜╨░╤З╨║╨╕ ╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╨╡╨╣ (Twitch badges ╤З╨╡╤А╨╡╨╖ API)

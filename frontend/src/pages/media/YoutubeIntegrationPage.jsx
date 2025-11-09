@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, SkipForward, Volume2, VolumeX, Plus, X, Maximize, Minimize, Monitor, Trash2, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Play, Pause, SkipForward, Volume2, VolumeX, Plus, X, Maximize, Minimize, Monitor, Trash2, RefreshCw, Settings, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,10 +11,14 @@ import { toast } from 'sonner';
 import YouTube from 'react-youtube';
 import { usePlayer } from '../../context/PlayerContext';
 import { useChat } from '../../context/ChatContext';
+import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import { logger } from '../../utils/prodLogger';
+import PageWrapper from '../../components/PageWrapper';
 
 const YoutubeIntegrationPage = () => {
+    const navigate = useNavigate();
+    const { isAuthenticated } = useAuth();
     const {
         currentVideo,
         isPlaying,
@@ -209,6 +214,37 @@ const YoutubeIntegrationPage = () => {
             setIsTheaterMode(false);
         }
     };
+
+    // 🔒 ПЕРВООЧЕРЕДНАЯ ПРОВЕРКА: Авторизация
+    // Если пользователь не авторизован - показываем сообщение с предложением войти
+    if (!isAuthenticated) {
+        return (
+            <PageWrapper title="YouTube заказы">
+                <Card className="border-gray-700">
+                    <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
+                        <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
+                            <AlertCircle className="w-10 h-10 text-gray-500" />
+                        </div>
+                        <div className="space-y-2 max-w-md">
+                            <h3 className="text-xl font-semibold text-gray-200">
+                                Требуется авторизация
+                            </h3>
+                            <p className="text-gray-400 text-sm">
+                                Для использования YouTube заказов необходимо войти в систему и подключить хотя бы одну платформу (Twitch или VK Live)
+                            </p>
+                        </div>
+                        <Button 
+                            onClick={() => navigate('/login')}
+                            className="gap-2"
+                        >
+                            <Settings className="w-4 h-4" />
+                            Войти в систему
+                        </Button>
+                    </CardContent>
+                </Card>
+            </PageWrapper>
+        );
+    }
 
     return (
         <div 

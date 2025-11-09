@@ -115,10 +115,16 @@ class TTSEngineManager:
 
     def is_ready(self) -> bool:
         """Проверка готовности движка"""
-        return (self.is_initialized and 
-                self.tts_engine is not None and 
-                hasattr(self.tts_engine, 'is_ready') and 
-                self.tts_engine.is_ready())
+        # ✅ Упрощенная проверка: если движок инициализирован и существует, он готов
+        if not self.is_initialized or self.tts_engine is None:
+            return False
+        
+        # Если у движка есть метод is_ready, используем его, иначе считаем готовым если движок существует
+        if hasattr(self.tts_engine, 'is_ready'):
+            return self.tts_engine.is_ready()
+        else:
+            # Если метода is_ready нет, но движок существует и инициализирован - считаем готовым
+            return True
 
     async def synthesize(self, text: str, voice_name: str, output_path: str, **kwargs) -> bool:
         """Синтез речи"""
@@ -204,17 +210,21 @@ class TTSEngineManager:
                 # 🚀 FIX: Безопасное извлечение параметров с fallback на значения из voice_record
                 # voice_settings уже гарантированно словарь (не None), поэтому можно безопасно использовать .get()
                 # ✅ ЛОГИКА: Если персональных настроек нет, используются дефолтные из Voice (настроенные админом)
+                # config уже импортирован в начале файла
+                DEFAULT_CFG_STRENGTH = config.cfg_strength  # Используем значение из конфига (по умолчанию 2.5)
+                DEFAULT_SPEED_PRESET = 'normal'  # Константа для скорости по умолчанию
+                
                 cfg_strength = voice_settings.get("cfg_strength")
                 if cfg_strength is None:
-                    cfg_strength = voice_record.cfg_strength or 2.5  # Fallback на дефолт, если даже в Voice нет
-                    logger.debug(f"🎛️ Using default cfg_strength from Voice '{voice_record.name}': {cfg_strength}")
+                    cfg_strength = voice_record.cfg_strength or DEFAULT_CFG_STRENGTH  # Fallback: Voice -> Config -> 2.5
+                    logger.debug(f"🎛️ Using default cfg_strength from Voice '{voice_record.name}': {cfg_strength} (config default: {DEFAULT_CFG_STRENGTH})")
                 else:
                     logger.debug(f"🎛️ Using personal cfg_strength: {cfg_strength} (default from Voice: {voice_record.cfg_strength})")
                 
                 speed_preset = voice_settings.get("speed_preset")
                 if speed_preset is None:
-                    speed_preset = voice_record.speed_preset or 'normal'  # Fallback на дефолт, если даже в Voice нет
-                    logger.debug(f"🎛️ Using default speed_preset from Voice '{voice_record.name}': {speed_preset}")
+                    speed_preset = voice_record.speed_preset or DEFAULT_SPEED_PRESET  # Fallback: Voice -> 'normal'
+                    logger.debug(f"🎛️ Using default speed_preset from Voice '{voice_record.name}': {speed_preset} (config default: {DEFAULT_SPEED_PRESET})")
                 else:
                     logger.debug(f"🎛️ Using personal speed_preset: {speed_preset} (default from Voice: {voice_record.speed_preset})")
                 
@@ -250,7 +260,7 @@ class TTSEngineManager:
             if audio_path and Path(audio_path).exists():
                 logger.info(f"✅ Speech synthesized: {audio_path}")
                 # Формируем URL для аудио относительно audio директории
-                from tts_service.config import config
+                # config уже импортирован глобально в начале файла
                 audio_path_obj = Path(audio_path).resolve()
                 abs_audio_path = config.audio_path.resolve()
                 

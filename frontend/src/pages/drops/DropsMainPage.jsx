@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import PageWrapper from '../../components/PageWrapper';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Gift, 
   History, 
@@ -13,9 +12,10 @@ import {
   DollarSign,
   Coins,
   Package,
-  Monitor
+  Monitor,
+  Settings,
+  AlertCircle
 } from 'lucide-react';
-import { TwitchIcon, VKIcon } from '../../components/PlatformIcons';
 import { useAuth } from '../../context/AuthContext';
 import { useIntegrations } from '../../context/IntegrationsContext';
 import StreakSettings from '../../components/drops/StreakSettings';
@@ -29,11 +29,11 @@ import { logger } from '../../utils/prodLogger';
 import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
 const DropsMainPage = () => {
+  const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const { integrations } = useIntegrations();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'streak');
-  const [selectedPlatform, setSelectedPlatform] = useState(null);
   const [channelName, setChannelName] = useState(null);
   const [rewardsCount, setRewardsCount] = useState(0);
 
@@ -60,100 +60,92 @@ const DropsMainPage = () => {
     }
   }, []); // Только при монтировании
 
-  // Определяем доступные платформы и устанавливаем первую доступную как дефолт
+  // Определяем channelName (используем первый доступный канал)
   useEffect(() => {
     if (!isAuthenticated || !user) {
-      setSelectedPlatform(null);
       setChannelName(null);
       return;
     }
 
-    // Если платформа уже выбрана (из URL или пользовательского выбора), не меняем
-    if (selectedPlatform) {
-      return;
-    }
-
-    // Приоритет: Twitch -> VK (только при первой загрузке)
+    // Приоритет: Twitch -> VK
     if (integrations?.twitch?.enabled && user?.twitch_username) {
-      setSelectedPlatform('twitch');
       setChannelName(user.twitch_username);
     } else if (integrations?.vk?.enabled && (user?.vk_username || user?.vk_channel_name)) {
-      setSelectedPlatform('vk');
       setChannelName(user.vk_username || user.vk_channel_name);
     } else {
-      setSelectedPlatform(null);
       setChannelName(null);
     }
   }, [isAuthenticated, user, integrations]);
 
-  // Проверяем доступные платформы
-  const availablePlatforms = [];
-  if (integrations?.twitch?.enabled && user?.twitch_username) {
-    availablePlatforms.push({ value: 'twitch', label: 'Twitch', icon: TwitchIcon });
-  }
-  if (integrations?.vk?.enabled && (user?.vk_username || user?.vk_channel_name)) {
-    availablePlatforms.push({ value: 'vk', label: 'VK Live', icon: VKIcon });
-  }
-
-  // Если пользователь не авторизован или нет подключенных платформ
-  if (!isAuthenticated || availablePlatforms.length === 0) {
+  // 🔒 ПЕРВООЧЕРЕДНАЯ ПРОВЕРКА: Авторизация
+  // Если пользователь не авторизован - показываем сообщение с предложением войти
+  if (!isAuthenticated) {
     return (
-      <PageWrapper>
-        <Card>
-          <CardContent className="p-8">
-            <div className="text-center py-8 text-muted-foreground">
-              <h3 className="text-lg font-semibold mb-2">Требуется подключение</h3>
-              <p className="text-sm mb-4">
-                Для использования системы лояльности необходимо подключить хотя бы одну платформу (Twitch или VK)
+      <PageWrapper title="Drops система">
+        <Card className="border-gray-700">
+          <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
+            <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
+              <AlertCircle className="w-10 h-10 text-gray-500" />
+            </div>
+            <div className="space-y-2 max-w-md">
+              <h3 className="text-xl font-semibold text-gray-200">
+                Требуется авторизация
+              </h3>
+              <p className="text-gray-400 text-sm">
+                Для использования системы лояльности необходимо войти в систему и подключить хотя бы одну платформу (Twitch или VK Live)
               </p>
             </div>
+            <Button 
+              onClick={() => navigate('/login')}
+              className="gap-2"
+            >
+              <Settings className="w-4 h-4" />
+              Войти в систему
+            </Button>
           </CardContent>
         </Card>
       </PageWrapper>
     );
   }
 
-  // Обновляем selectedPlatform и channelName при изменении выбранной платформы
-  const handlePlatformChange = (platform) => {
-    setSelectedPlatform(platform);
-    if (platform === 'twitch' && user?.twitch_username) {
-      setChannelName(user.twitch_username);
-    } else if (platform === 'vk' && (user?.vk_username || user?.vk_channel_name)) {
-      setChannelName(user.vk_username || user.vk_channel_name);
-    }
-  };
-
-  // Убеждаемся что selectedPlatform установлена
-  if (!selectedPlatform && availablePlatforms.length > 0) {
-    handlePlatformChange(availablePlatforms[0].value);
-    return null; // Показываем loader пока устанавливается платформа
+  // Проверка наличия подключенных платформ
+  const hasAnyIntegration = (integrations?.twitch?.enabled && user?.twitch_username) || 
+                            (integrations?.vk?.enabled && (user?.vk_username || user?.vk_channel_name));
+  
+  if (!hasAnyIntegration) {
+    return (
+      <PageWrapper title="Drops система">
+        <Card className="border-gray-700">
+          <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
+            <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
+              <AlertCircle className="w-10 h-10 text-gray-500" />
+            </div>
+            <div className="space-y-2 max-w-md">
+              <h3 className="text-xl font-semibold text-gray-200">
+                Нет подключенных интеграций
+              </h3>
+              <p className="text-gray-400 text-sm">
+                Для использования системы лояльности необходимо подключить хотя бы одну платформу (Twitch или VK Live)
+              </p>
+            </div>
+            <Button 
+              onClick={() => navigate('/dashboard/settings')}
+              className="gap-2"
+            >
+              <Settings className="w-4 h-4" />
+              Перейти в настройки
+            </Button>
+          </CardContent>
+        </Card>
+      </PageWrapper>
+    );
   }
 
   // Проверяем, есть ли награды
   const hasRewards = rewardsCount > 0;
 
   return (
-      <PageWrapper 
-        actions={
-          availablePlatforms.length > 1 && (
-            <Select value={selectedPlatform} onValueChange={handlePlatformChange}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {availablePlatforms.map((p) => (
-                  <SelectItem key={p.value} value={p.value}>
-                    <div className="flex items-center gap-2">
-                      <p.icon className="w-4 h-4" />
-                      {p.label}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )
-        }
-      >
+      <PageWrapper>
       {/* Основной контент */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-1 sm:gap-2">
@@ -188,13 +180,12 @@ const DropsMainPage = () => {
           <div className="space-y-4">
             <StreakSettings 
               user={user}
-              platform={selectedPlatform}
               channelName={channelName}
               hasRewards={hasRewards}
+              integrations={integrations}
             />
             <StreakTracker 
               user={user}
-              platform={selectedPlatform}
               channelName={channelName}
             />
           </div>
@@ -204,7 +195,6 @@ const DropsMainPage = () => {
         <TabsContent value="donation" className="mt-0">
           <DonationSettings 
             user={user}
-            platform={selectedPlatform}
             channelName={channelName}
             hasRewards={hasRewards}
           />
@@ -214,8 +204,9 @@ const DropsMainPage = () => {
         <TabsContent value="points" className="mt-0">
           <PointsRewards 
             user={user}
-            platform={selectedPlatform}
+            platform={null}
             channelName={channelName}
+            integrations={integrations}
           />
         </TabsContent>
 
@@ -223,8 +214,8 @@ const DropsMainPage = () => {
         <TabsContent value="rewards" className="mt-0">
           <RewardsManager 
             user={user}
-            platform={selectedPlatform}
             channelName={channelName}
+            integrations={integrations}
             onRewardsCountChange={setRewardsCount}
           />
         </TabsContent>
@@ -233,7 +224,6 @@ const DropsMainPage = () => {
         <TabsContent value="history" className="mt-0">
           <DropsHistory 
             user={user}
-            platform={selectedPlatform}
             channelName={channelName}
           />
         </TabsContent>
@@ -242,7 +232,6 @@ const DropsMainPage = () => {
         <TabsContent value="widget" className="mt-0">
           <WidgetSettings 
             user={user}
-            platform={selectedPlatform}
             channelName={channelName}
           />
         </TabsContent>

@@ -256,6 +256,7 @@ const ChatWindow = () => {
                                         channelEmotes={settings.show_7tv_emotes ? emotes.channelEmotes : new Map()}
                                         globalEmotes={settings.show_7tv_emotes ? emotes.globalEmotes : new Map()}
                                         showLinks={settings.show_links}
+                                        autoLoadImages={settings.auto_load_images}
                                     />
                                 </span>
                             </div>

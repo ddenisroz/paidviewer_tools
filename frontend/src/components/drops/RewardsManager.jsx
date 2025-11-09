@@ -41,6 +41,7 @@ import CommonClosed from '../../images/lootboxes/common/common_closed.png';
 import RareClosed from '../../images/lootboxes/rare/rare_closed.png';
 import EpicClosed from '../../images/lootboxes/epic/epic_closed.png';
 import LegendaryClosed from '../../images/lootboxes/legendary/legendary_closed.png';
+import MythicalClosed from '../../images/lootboxes/mythyc/mythyc_closed.png';
 
 const QUALITIES = [
   { 
@@ -70,16 +71,31 @@ const QUALITIES = [
     color: '#F59E0B', 
     label: 'Легендарный',
     image: LegendaryClosed
+  },
+  { 
+    id: 5, 
+    name: 'Mythical', 
+    color: '#EF4444', 
+    label: 'Мифический',
+    image: MythicalClosed
   }
-  // Мифический сундук только для донатов, не включаем здесь
 ];
 
 
-const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) => {
+const RewardsManager = ({ user, channelName, onRewardsCountChange, integrations }) => {
   const queryClient = useQueryClient();
   const [rewardDialogOpen, setRewardDialogOpen] = useState(false);
   const [editingReward, setEditingReward] = useState(null);
   const [selectedQuality, setSelectedQuality] = useState(null);
+  
+  // Проверяем доступные платформы (явно преобразуем в boolean)
+  const twitchAvailable = !!(integrations?.twitch?.enabled && user?.twitch_username);
+  const vkAvailable = !!(integrations?.vk?.enabled && (user?.vk_username || user?.vk_channel_name));
+  
+  // Определяем доступные платформы для выбора
+  const availablePlatforms = [];
+  if (twitchAvailable) availablePlatforms.push({ value: 'twitch', label: 'Twitch' });
+  if (vkAvailable) availablePlatforms.push({ value: 'vk', label: 'VK Live' });
   
   const [rewardForm, setRewardForm] = useState({
     name: '',
@@ -89,8 +105,12 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
     reward_type: 'custom',
     reward_value: '',
     sound_volume: [1.0],
-    is_active: true
+    is_active: true,
+    platform: availablePlatforms.length > 0 ? availablePlatforms[0].value : 'twitch' // Выбранная платформа для новой награды
   });
+  
+  // Фильтр по платформе для отображения
+  const [platformFilter, setPlatformFilter] = useState('all'); // 'all', 'twitch', 'vk'
 
   // React Query: загружаем качества (кешируются глобально)
   const { data: qualitiesData = [], isLoading: qualitiesLoading } = useQuery({
@@ -102,18 +122,35 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
     staleTime: 10 * 60 * 1000, // 10 минут - качества редко меняются
   });
 
-  // React Query: загружаем награды
-  const { data: rewards = [], isLoading: rewardsLoading } = useQuery({
-    queryKey: ['drops-rewards', channelName, platform],
+  // React Query: загружаем награды (ОБЩИЕ для всех платформ)
+  const { data: allRewards = [], isLoading: rewardsLoading } = useQuery({
+    queryKey: ['drops-rewards', channelName],
     queryFn: async () => {
       if (!channelName) return [];
-      const response = await botService.get(`/api/drops/rewards/${channelName}`, {
-        params: { platform }
+      
+      // ✅ Награды ОБЩИЕ - делаем один запрос
+      // Параметр platform передаем для совместимости, но он игнорируется на бэкенде
+      const response = await botService.get(`/api/drops/rewards/${channelName}`, { 
+        params: { platform: 'twitch' } // Игнорируется бэкендом, награды общие
       });
-      return response.data.success ? response.data.data : [];
+      
+      if (!response.data.success) return [];
+      
+      // Добавляем platform к каждой награде для отображения
+      return (response.data.data || []).map(r => ({
+        ...r,
+        // Награда доступна на всех платформах, но показываем где она была создана
+        platform: r.platform || 'twitch'
+      }));
     },
-    enabled: !!channelName && !!platform, // Запрос только если есть channelName и platform
+    enabled: !!channelName, // ✅ Награды глобальные, не зависят от платформы
   });
+  
+  // Фильтруем награды по выбранной платформе
+  const rewards = React.useMemo(() => {
+    if (platformFilter === 'all') return allRewards;
+    return allRewards.filter(r => r.platform === platformFilter);
+  }, [allRewards, platformFilter]);
 
   // Уведомляем родителя об изменении количества наград
   useEffect(() => {
@@ -136,7 +173,8 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
       reward_value: '',
       image_url: '',
       sound_volume: [1.0],
-      is_active: true
+      is_active: true,
+      platform: availablePlatforms.length > 0 ? availablePlatforms[0].value : 'twitch' // Выбираем первую доступную платформу
     });
     setRewardDialogOpen(true);
   };
@@ -155,7 +193,8 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
       reward_value: reward.reward_value || '',
       image_url: reward.image_url || '',
       sound_volume: [reward.sound_volume || 1.0],
-      is_active: reward.is_active !== undefined ? reward.is_active : true
+      is_active: reward.is_active !== undefined ? reward.is_active : true,
+      platform: reward.platform || 'twitch' // Используем platform из награды или дефолт
     });
     setRewardDialogOpen(true);
   };
@@ -166,21 +205,23 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
       if (isEdit) {
         return await botService.put(`/api/drops/rewards/${rewardId}`, payload);
       } else {
+        // При создании используем platform из payload
+        const platform = payload.platform || 'twitch';
         return await botService.post(`/api/drops/rewards/${channelName}`, payload, {
           params: { platform }
         });
       }
     },
     onMutate: async ({ payload, isEdit }) => {
-      // Отменяем исходящие запросы
-      await queryClient.cancelQueries({ queryKey: ['drops-rewards', channelName, platform] });
+      // Отменяем исходящие запросы для всех платформ
+      await queryClient.cancelQueries({ queryKey: ['drops-rewards', channelName] });
       
       // Snapshot предыдущего значения
-      const previousRewards = queryClient.getQueryData(['drops-rewards', channelName, platform]);
+      const previousRewards = queryClient.getQueryData(['drops-rewards', channelName]);
       
-      // Optimistically update
+      // Optimistically update (работаем с объединенным списком наград)
       if (isEdit && editingReward) {
-        queryClient.setQueryData(['drops-rewards', channelName, platform], (old) => {
+        queryClient.setQueryData(['drops-rewards', channelName], (old) => {
           return old.map(reward => 
             reward.id === editingReward.id 
               ? { ...reward, ...payload, quality: qualitiesData.find(q => q.id === payload.quality_id) }
@@ -188,15 +229,16 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
           );
         });
       } else {
-        // Для новой награды добавляем временный ID
+        // Для новой награды добавляем временный ID и platform из payload
         const newReward = {
           id: `temp-${Date.now()}`,
           ...payload,
+          platform: payload.platform || 'twitch', // Сохраняем platform
           quality: qualitiesData.find(q => q.id === payload.quality_id),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
-        queryClient.setQueryData(['drops-rewards', channelName, platform], (old) => [...(old || []), newReward]);
+        queryClient.setQueryData(['drops-rewards', channelName], (old) => [...(old || []), newReward]);
       }
       
       return { previousRewards };
@@ -204,7 +246,7 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
     onError: (err, variables, context) => {
       // Rollback при ошибке
       if (context?.previousRewards) {
-        queryClient.setQueryData(['drops-rewards', channelName, platform], context.previousRewards);
+        queryClient.setQueryData(['drops-rewards', channelName], context.previousRewards);
       }
       
       // Обрабатываем ошибки валидации
@@ -236,8 +278,8 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
       setRewardDialogOpen(false);
     },
     onSettled: () => {
-      // Refetch для синхронизации
-      queryClient.invalidateQueries({ queryKey: ['drops-rewards', channelName, platform] });
+      // Refetch для синхронизации (обновляем все награды)
+      queryClient.invalidateQueries({ queryKey: ['drops-rewards', channelName] });
     },
   });
 
@@ -261,7 +303,8 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
       reward_value: '', // Пустое значение, так как награда - это просто показ сундука
       image_url: (rewardForm.image_url && rewardForm.image_url.trim()) || null, // URL изображения для карточки в гача крутке (null если пусто)
       sound_volume: 1.0, // Дефолтное значение, настройка звука в виджете
-      is_active: rewardForm.is_active
+      is_active: rewardForm.is_active,
+      platform: rewardForm.platform // Добавляем platform для новой награды
     };
 
     saveRewardMutation.mutate({
@@ -277,20 +320,20 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
       return await botService.delete(`/api/drops/rewards/${rewardId}`);
     },
     onMutate: async (rewardId) => {
-      await queryClient.cancelQueries({ queryKey: ['drops-rewards', channelName, platform] });
+      await queryClient.cancelQueries({ queryKey: ['drops-rewards', channelName] });
       
-      const previousRewards = queryClient.getQueryData(['drops-rewards', channelName, platform]);
+      const previousRewards = queryClient.getQueryData(['drops-rewards', channelName]);
       
       // Optimistically remove
-      queryClient.setQueryData(['drops-rewards', channelName, platform], (old) => 
-        old.filter(reward => reward.id !== rewardId)
+      queryClient.setQueryData(['drops-rewards', channelName], (old) => 
+        (old || []).filter(reward => reward.id !== rewardId)
       );
       
       return { previousRewards };
     },
     onError: (err, rewardId, context) => {
       if (context?.previousRewards) {
-        queryClient.setQueryData(['drops-rewards', channelName, platform], context.previousRewards);
+        queryClient.setQueryData(['drops-rewards', channelName], context.previousRewards);
       }
       toast.error('Ошибка удаления награды');
       logger.error('Error deleting reward:', err);
@@ -299,7 +342,7 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
       toast.success('Награда удалена');
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['drops-rewards', channelName, platform] });
+      queryClient.invalidateQueries({ queryKey: ['drops-rewards', channelName] });
     },
   });
 
@@ -319,19 +362,18 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
 
   return (
     <div className="space-y-6">
-      {/* Общая кнопка создания награды */}
-      <div className="flex justify-end">
+      {/* ✅ Одна общая кнопка создания награды */}
+      <div className="flex justify-end mb-6 mt-4">
         <Button
           onClick={() => handleOpenRewardDialog(null)}
-          size="sm"
-          className="gap-2"
-          variant="outline"
+          size="default"
+          className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md font-medium gap-2"
         >
           <Plus className="w-4 h-4" />
-          Добавить награду
+          Создать награду
         </Button>
       </div>
-
+      
       {/* Награды по качествам */}
       {QUALITIES.map((quality) => {
         const qualityRewards = getRewardsForQuality(quality.name);
@@ -341,11 +383,11 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
         return (
           <Card key={quality.id}>
             <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <img 
                   src={quality.image} 
                   alt={`${quality.label} chest`}
-                  className="w-8 h-8 object-contain"
+                  className="w-10 h-10 object-contain"
                 />
                 <div>
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -458,6 +500,8 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
           </DialogHeader>
 
           <div className="space-y-4 sm:space-y-6 py-2 sm:py-4">
+            {/* ✅ УБРАЛИ выбор платформы - награды ОБЩИЕ для всех платформ */}
+
             {/* Название */}
             <div className="space-y-2">
               <Label htmlFor="reward_name">Название награды *</Label>
@@ -583,28 +627,65 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
             </div>
 
 
-            {/* Вес награды */}
+            {/* Вес награды - ПРЕСЕТЫ БЕЗ ПРОЦЕНТОВ */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="reward_weight">Шанс выпадения (вес награды)</Label>
-                <span className="text-sm font-semibold">{rewardForm.weight[0]}</span>
+              <Label>Вес награды (относительный шанс)</Label>
+              
+              {/* Пресеты без процентов - только вес */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                {[
+                  { label: 'Очень редко', value: 10, color: 'border-purple-500/50 hover:bg-purple-500/10' },
+                  { label: 'Редко', value: 50, color: 'border-blue-500/50 hover:bg-blue-500/10' },
+                  { label: 'Обычно', value: 100, color: 'border-gray-500/50 hover:bg-gray-500/10' },
+                  { label: 'Часто', value: 200, color: 'border-green-500/50 hover:bg-green-500/10' },
+                  { label: 'Очень часто', value: 500, color: 'border-yellow-500/50 hover:bg-yellow-500/10' }
+                ].map((preset) => (
+                  <Button
+                    key={preset.value}
+                    type="button"
+                    variant={rewardForm.weight[0] === preset.value ? "default" : "outline"}
+                    className={`flex flex-col h-auto py-2.5 ${preset.color} ${rewardForm.weight[0] === preset.value ? 'ring-2 ring-primary' : ''}`}
+                    onClick={() => setRewardForm({...rewardForm, weight: [preset.value]})}
+                  >
+                    <span className="text-xs font-medium">{preset.label}</span>
+                    <span className="text-sm font-bold mt-0.5">Вес: {preset.value}</span>
+                  </Button>
+                ))}
               </div>
-              <Slider
-                id="reward_weight"
-                value={rewardForm.weight}
-                onValueChange={(value) => setRewardForm({...rewardForm, weight: value})}
-                min={1}
-                max={1000}
-                step={1}
-                className="w-full"
-              />
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-2 sm:p-3">
-                <p className="text-xs text-blue-300 font-medium mb-1">💡 Как работает вес награды:</p>
-                <p className="text-xs text-blue-200/80 leading-relaxed">
-                  Система случайно выбирает награду из всех наград того же качества. 
-                  Награда с весом <span className="font-semibold">200</span> выпадет в <span className="font-semibold">2 раза чаще</span>, чем награда с весом <span className="font-semibold">100</span>.
-                  Используйте вес для регулирования редкости наград.
-                </p>
+              
+              {/* Кастомный вес */}
+              <div className="space-y-2">
+                <Label htmlFor="reward_weight_custom">Или укажите свой вес (1-10000)</Label>
+                <Input
+                  id="reward_weight_custom"
+                  type="number"
+                  min="1"
+                  max="10000"
+                  value={rewardForm.weight[0]}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value) || 1;
+                    setRewardForm({...rewardForm, weight: [Math.max(1, Math.min(10000, value))]});
+                  }}
+                  className="w-full"
+                  placeholder="Введите вес награды"
+                />
+              </div>
+              
+              {/* Пояснение как работает вес */}
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                <p className="text-xs text-blue-300 font-medium mb-2">💡 Как работает вес награды:</p>
+                <div className="text-xs text-blue-200/80 space-y-1">
+                  <p>• Система случайно выбирает награду из всех наград <strong>того же качества</strong></p>
+                  <p>• <strong>Процент = (вес награды / сумма всех весов) × 100%</strong></p>
+                  <p className="mt-2 font-semibold">Пример:</p>
+                  <p>Если у вас 3 награды с весом 100 каждая:</p>
+                  <p className="pl-2">• Общий вес = 300</p>
+                  <p className="pl-2">• Шанс каждой = 100/300 = <strong>33.3%</strong></p>
+                  <p className="mt-1">Если одна награда с весом 200, а две с весом 100:</p>
+                  <p className="pl-2">• Общий вес = 400</p>
+                  <p className="pl-2">• Шанс первой = 200/400 = <strong>50%</strong></p>
+                  <p className="pl-2">• Шанс остальных = 100/400 = <strong>25%</strong> каждая</p>
+                </div>
               </div>
             </div>
 
@@ -625,14 +706,14 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
             </div>
           </div>
 
-          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setRewardDialogOpen(false)} className="w-full sm:w-auto">
+          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0 pt-4 border-t">
+            <Button variant="outline" onClick={() => setRewardDialogOpen(false)} className="w-full sm:w-auto order-2 sm:order-1">
               Отмена
             </Button>
             <Button 
               onClick={handleSaveReward} 
               disabled={saveRewardMutation.isPending || deleteRewardMutation.isPending}
-              className="gap-2 w-full sm:w-auto"
+              className="gap-2 w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground font-semibold order-1 sm:order-2"
             >
               {saveRewardMutation.isPending ? (
                 <>
@@ -642,7 +723,7 @@ const RewardsManager = ({ user, platform, channelName, onRewardsCountChange }) =
               ) : (
                 <>
                   <Save className="w-4 h-4" />
-                  {editingReward ? 'Сохранить' : 'Создать'}
+                  {editingReward ? 'Сохранить изменения' : 'Создать награду'}
                 </>
               )}
             </Button>

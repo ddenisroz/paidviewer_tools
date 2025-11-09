@@ -253,6 +253,66 @@ class VKLiveBotCore:
             )
             logger.info(f"✅ [VK MSG] Broadcast completed, processing command checks...")
             
+            # 1.5. ✅ НОВОЕ: Увеличиваем счетчик сообщений для стриков (только если стрик включен)
+            try:
+                from services.drops_service import DropsService
+                from core.database import get_db, User
+                from sqlalchemy import func
+                
+                db = get_db().__next__()
+                try:
+                    channel_owner = db.query(User).filter(
+                        func.lower(User.vk_channel_name) == channel_id.lower()
+                    ).first()
+                    
+                    if channel_owner:
+                        drops_service = DropsService(db)
+                        # ✅ Проверяем включен ли стрик для VK
+                        config = drops_service.get_config(
+                            user_id=channel_owner.id,
+                            session_id=None,
+                            channel_name=channel_id.lower(),
+                            platform=None  # Общий конфиг
+                        )
+                        
+                        # Проверяем включен ли стрик для VK
+                        streak_enabled = False
+                        if config:
+                            streak_enabled = getattr(config, 'streak_enabled_vk', False)
+                        
+                        # Увеличиваем счетчик только если стрик включен
+                        if streak_enabled:
+                            drops_service.increment_viewer_message_count(
+                                user_id=channel_owner.id,
+                                channel_name=channel_id.lower(),
+                                platform="vk",
+                                viewer_id=user_id,
+                                viewer_name=user
+                            )
+                            
+                            # ✅ Обрабатываем стрик Drops (проверяем награды)
+                            try:
+                                result = drops_service.process_streak_drops(
+                                    user_id=channel_owner.id,
+                                    channel_name=channel_id.lower(),
+                                    platform="vk",
+                                    viewer_id=user_id,
+                                    viewer_name=user
+                                )
+                                
+                                if result:
+                                    logger.info(f"🎁 [DROPS VK] {result['viewer_name']} получил {result['reward']} ({result['quality']})")
+                                    
+                                    # Отправляем событие в WebSocket для OBS виджета
+                                    from utils.websocket_helper import broadcast_drops_event
+                                    await broadcast_drops_event(result)
+                            except Exception as drops_err:
+                                logger.debug(f"Could not process streak drops for VK: {drops_err}")
+                finally:
+                    db.close()
+            except Exception as streak_err:
+                logger.debug(f"Could not increment streak message count for VK: {streak_err}")
+            
             # 2. Проверка гостевого кода (если это 6 цифр)
             if text.strip().isdigit() and len(text.strip()) == 6:
                 logger.info(f"🔍 [GUEST_VK] Detected 6-digit code: {text.strip()}")

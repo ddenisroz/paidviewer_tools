@@ -2228,7 +2228,11 @@ async def get_tts_mode_settings(
 ):
     """Получить настройки режима TTS (все сообщения / за баллы)"""
     try:
-        from core.database import TTSUserSettings
+        from core.database import TTSUserSettings, User, UserToken
+        from api.points_api_endpoints import _decrypt_access_token, _get_vk_channel_name
+        from api.twitch_api import TwitchAPI
+        from api.vk_api import vk_api
+        from core.connection_manager import get_connection_manager
         
         # Получаем настройки пользователя
         settings = db.query(TTSUserSettings).filter(
@@ -2246,10 +2250,253 @@ async def get_tts_mode_settings(
             db.commit()
             db.refresh(settings)
         
+        # ✅ СИНХРОНИЗАЦИЯ: Проверяем существование наград на платформах
+        tts_reward_ids = settings.tts_reward_ids or {}
+        updated_reward_ids = dict(tts_reward_ids)
+        needs_update = False
+        
+        # Проверяем Twitch награду (ВСЕГДА если режим channel_points, даже если нет награды в БД)
+        if settings.tts_mode == 'channel_points':
+            try:
+                twitch_token = db.query(UserToken).filter(
+                    UserToken.user_id == user['id'],
+                    UserToken.platform == 'twitch',
+                    UserToken.is_active == True
+                ).first()
+                
+                if twitch_token and twitch_token.platform_user_id:
+                    connection_manager = get_connection_manager()
+                    twitch_api = TwitchAPI(connection_manager)
+                    
+                    # Получаем все награды Twitch (игнорируем 403 ошибки)
+                    rewards = None
+                    try:
+                        rewards = await twitch_api.get_custom_rewards(
+                            broadcaster_id=twitch_token.platform_user_id,
+                            access_token=_decrypt_access_token(twitch_token.access_token),
+                            only_manageable=True
+                        )
+                        logger.info(f"🔍 [TTS SYNC] Twitch rewards fetched: {len(rewards) if rewards else 0} rewards")
+                    except ValueError as e:
+                        # Если 403 (не партнер/аффилейт) - используем сохраненный ID если есть
+                        error_str = str(e)
+                        if '403' in error_str:
+                            stored_reward_id = tts_reward_ids.get('twitch')
+                            if stored_reward_id:
+                                logger.info(f"⚠️ [TTS SYNC] Twitch API недоступен (403), но есть сохраненный ID: {stored_reward_id}")
+                                # Оставляем сохраненный ID, не обновляем - пропускаем синхронизацию
+                                rewards = None  # None означает что API недоступен, не ищем дальше
+                            else:
+                                logger.warning(f"⚠️ [TTS SYNC] Twitch API недоступен (403) и нет сохраненного ID")
+                                rewards = None
+                        else:
+                            raise  # Пробрасываем другие ошибки
+                    
+                    if rewards is not None and rewards:
+                        # Twitch API может вернуть {'data': [...]} или просто список
+                        rewards_list = rewards.get('data', []) if isinstance(rewards, dict) else rewards
+                        if not isinstance(rewards_list, list):
+                            rewards_list = []
+                        
+                        logger.info(f"🔍 [TTS SYNC] Processing {len(rewards_list)} Twitch rewards")
+                        
+                        # Ищем награду TTS по названию или по сохраненному ID
+                        stored_reward_id = tts_reward_ids.get('twitch')
+                        found_reward = None
+                        
+                        # Сначала проверяем по ID
+                        if stored_reward_id:
+                            found_reward = next((r for r in rewards_list if str(r.get('id')) == str(stored_reward_id)), None)
+                            if found_reward:
+                                logger.info(f"✅ [TTS SYNC] Found Twitch reward by ID: {stored_reward_id}")
+                        
+                        # Если не нашли по ID, ищем по названию (TTS, озвучка, etc.)
+                        if not found_reward:
+                            # Расширенный список ключевых слов для поиска
+                            tts_keywords = [
+                                'tts', 'озвуч', 'voice', 'voiceover', 'озвучить', 
+                                'озвучить сообщение', 'голос', 'speech', 'say',
+                                'озвучка', 'озвучить сообщение', 'озвучить моё сообщение',
+                                'озвучить мое сообщение', 'tts озвучка', 'tts озвучить'
+                            ]
+                            for reward in rewards_list:
+                                title = reward.get('title', '').lower()
+                                logger.debug(f"🔍 [TTS SYNC] Checking reward: '{title}'")
+                                # Проверяем все ключевые слова
+                                if any(keyword in title for keyword in tts_keywords):
+                                    found_reward = reward
+                                    logger.info(f"✅ [TTS SYNC] Found Twitch TTS reward by name: '{title}' (ID: {reward.get('id')})")
+                                    break
+                            
+                            # Если все еще не нашли, проверяем описание награды
+                            if not found_reward:
+                                for reward in rewards_list:
+                                    description = reward.get('prompt', '') or reward.get('description', '') or ''
+                                    description_lower = description.lower()
+                                    if any(keyword in description_lower for keyword in tts_keywords):
+                                        found_reward = reward
+                                        logger.info(f"✅ [TTS SYNC] Found Twitch TTS reward by description: '{description[:50]}...' (ID: {reward.get('id')})")
+                                        break
+                        
+                        if found_reward:
+                            reward_id = str(found_reward.get('id'))
+                            if reward_id != stored_reward_id:
+                                updated_reward_ids['twitch'] = reward_id
+                                needs_update = True
+                                logger.info(f"✅ [TTS SYNC] Updated Twitch reward ID: {stored_reward_id} -> {reward_id}")
+                        elif stored_reward_id:
+                            # Награда была в БД, но не найдена на платформе - удаляем из БД
+                            logger.warning(f"⚠️ [TTS SYNC] Twitch reward {stored_reward_id} not found on platform, removing from DB")
+                            if 'twitch' in updated_reward_ids:
+                                del updated_reward_ids['twitch']
+                            needs_update = True
+                    else:
+                        logger.warning(f"⚠️ [TTS SYNC] No Twitch rewards returned from API")
+            except Exception as e:
+                logger.error(f"❌ [TTS SYNC] Error syncing Twitch rewards: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
+        
+        # Проверяем VK награду (ВСЕГДА если режим channel_points, даже если нет награды в БД)
+        if settings.tts_mode == 'channel_points':
+            try:
+                vk_token = db.query(UserToken).filter(
+                    UserToken.user_id == user['id'],
+                    UserToken.platform == 'vk',
+                    UserToken.is_active == True
+                ).first()
+                
+                if vk_token:
+                    channel_name = _get_vk_channel_name(user['id'], db)
+                    if channel_name:
+                        # Получаем все награды VK (используем manage_info для получения всех наград)
+                        rewards = None
+                        try:
+                            # Используем get_rewards_manage_info для получения всех наград (включая управляемые)
+                            rewards = await vk_api.get_rewards_manage_info(
+                                channel_url=channel_name,
+                                access_token=_decrypt_access_token(vk_token.access_token)
+                            )
+                            logger.info(f"🔍 [TTS SYNC] VK rewards fetched: {len(rewards) if rewards else 0} rewards")
+                        except Exception as vk_error:
+                            # Если 403 (нет scope) - используем сохраненный ID если есть
+                            error_str = str(vk_error)
+                            if '403' in error_str or 'scope' in error_str.lower():
+                                stored_reward_id = tts_reward_ids.get('vk')
+                                if stored_reward_id:
+                                    logger.info(f"⚠️ [TTS SYNC] VK API недоступен (403), но есть сохраненный ID: {stored_reward_id}")
+                                    # Оставляем сохраненный ID, не обновляем - пропускаем синхронизацию
+                                    rewards = None  # None означает что API недоступен, не ищем дальше
+                                else:
+                                    logger.warning(f"⚠️ [TTS SYNC] VK API недоступен (403) и нет сохраненного ID")
+                                    rewards = None
+                            else:
+                                raise  # Пробрасываем другие ошибки
+                        
+                        if rewards is not None and rewards:
+                            # VK API может вернуть список или объект
+                            rewards_list = rewards if isinstance(rewards, list) else (rewards.get('data', []) or rewards.get('rewards', []) or [])
+                            if not isinstance(rewards_list, list):
+                                rewards_list = []
+                            
+                            logger.info(f"🔍 [TTS SYNC] Processing {len(rewards_list)} VK rewards")
+                            # Логируем все награды для отладки
+                            for idx, reward in enumerate(rewards_list):
+                                logger.debug(f"🔍 [TTS SYNC] VK Reward #{idx}: {reward}")
+                            
+                            # Ищем награду TTS по названию или по сохраненному ID
+                            stored_reward_id = tts_reward_ids.get('vk')
+                            found_reward = None
+                            
+                            # Сначала проверяем по ID (проверяем все возможные поля)
+                            if stored_reward_id:
+                                for reward in rewards_list:
+                                    # Проверяем все возможные поля для ID
+                                    reward_id_candidate = reward.get('id') or reward.get('reward_id') or reward.get('_id')
+                                    if reward_id_candidate and str(reward_id_candidate) == str(stored_reward_id):
+                                        found_reward = reward
+                                        logger.info(f"✅ [TTS SYNC] Found VK reward by ID: {stored_reward_id}")
+                                        break
+                            
+                            # Если не нашли по ID, ищем по названию (даже если есть stored_reward_id - награда могла быть пересоздана)
+                            if not found_reward:
+                                # Расширенный список ключевых слов для поиска
+                                tts_keywords = [
+                                    'tts', 'озвуч', 'voice', 'voiceover', 'озвучить', 
+                                    'озвучить сообщение', 'голос', 'speech', 'say',
+                                    'озвучка', 'озвучить сообщение', 'озвучить моё сообщение',
+                                    'озвучить мое сообщение', 'tts озвучка', 'tts озвучить',
+                                    'озвучь', 'озвучь сообщение', 'озвучь моё сообщение'
+                                ]
+                                # Сначала ищем точное совпадение по ключевым словам
+                                for reward in rewards_list:
+                                    # Проверяем все возможные поля для названия
+                                    title = reward.get('title', '') or reward.get('name', '') or reward.get('label', '')
+                                    title_lower = title.lower()
+                                    logger.debug(f"🔍 [TTS SYNC] Checking VK reward: '{title}' (ID: {reward.get('id') or reward.get('reward_id')})")
+                                    # Проверяем все ключевые слова
+                                    if any(keyword in title_lower for keyword in tts_keywords):
+                                        found_reward = reward
+                                        reward_id = str(reward.get('id') or reward.get('reward_id') or 'unknown')
+                                        logger.info(f"✅ [TTS SYNC] Found VK TTS reward by name: '{title}' (ID: {reward_id})")
+                                        break
+                                
+                                # Если все еще не нашли, проверяем описание награды
+                                if not found_reward:
+                                    for reward in rewards_list:
+                                        # Проверяем все возможные поля для описания
+                                        description = reward.get('description', '') or reward.get('text', '') or reward.get('desc', '')
+                                        description_lower = description.lower()
+                                        if any(keyword in description_lower for keyword in tts_keywords):
+                                            found_reward = reward
+                                            reward_id = str(reward.get('id') or reward.get('reward_id') or 'unknown')
+                                            logger.info(f"✅ [TTS SYNC] Found VK TTS reward by description: '{description[:50]}...' (ID: {reward_id})")
+                                            break
+                                
+                                # Если все еще не нашли, но есть сохраненный ID - проверяем, может награда просто не в списке manage_info
+                                # В этом случае оставляем сохраненный ID (награда может быть создана, но не управляемая)
+                                if not found_reward and stored_reward_id:
+                                    logger.warning(f"⚠️ [TTS SYNC] VK reward {stored_reward_id} not found in manage_info list, but keeping it (may be non-manageable reward)")
+                                    # Не удаляем из БД - награда может существовать, но не быть в списке управляемых
+                                    found_reward = None  # Не обновляем, но и не удаляем
+                            
+                            if found_reward:
+                                # Извлекаем ID из всех возможных полей
+                                reward_id = str(found_reward.get('id') or found_reward.get('reward_id') or found_reward.get('_id') or '')
+                                if reward_id and reward_id != stored_reward_id:
+                                    updated_reward_ids['vk'] = reward_id
+                                    needs_update = True
+                                    logger.info(f"✅ [TTS SYNC] Updated VK reward ID: {stored_reward_id} -> {reward_id}")
+                                elif reward_id == stored_reward_id:
+                                    logger.info(f"✅ [TTS SYNC] VK reward ID unchanged: {reward_id}")
+                            elif stored_reward_id and not found_reward:
+                                # Награда была в БД, но не найдена на платформе
+                                # НЕ удаляем сразу - возможно награда существует, но не в списке manage_info
+                                # Удаляем только если точно уверены, что награды нет (например, после нескольких попыток)
+                                logger.warning(f"⚠️ [TTS SYNC] VK reward {stored_reward_id} not found in manage_info, but keeping in DB (may exist but not manageable)")
+                                # Не удаляем из БД - оставляем сохраненный ID
+                    else:
+                        logger.warning(f"⚠️ [TTS SYNC] VK channel name not found for user {user['id']}")
+                else:
+                    logger.warning(f"⚠️ [TTS SYNC] VK token not found for user {user['id']}")
+            except Exception as e:
+                logger.error(f"❌ [TTS SYNC] Error syncing VK rewards: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
+        
+        # Обновляем БД если нашли изменения
+        if needs_update:
+            settings.tts_reward_ids = updated_reward_ids
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(settings, 'tts_reward_ids')
+            db.commit()
+            db.refresh(settings)
+            logger.info(f"✅ [TTS SYNC] Updated reward IDs: {updated_reward_ids}")
+        
         return {
             "success": True,
             "tts_mode": settings.tts_mode,
-            "tts_reward_ids": settings.tts_reward_ids or {}
+            "tts_reward_ids": updated_reward_ids
         }
     except Exception as e:
         logger.error(f"Error getting TTS mode settings: {e}")

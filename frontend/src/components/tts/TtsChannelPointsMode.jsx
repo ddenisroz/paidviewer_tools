@@ -32,13 +32,16 @@ const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving, showModeSelecto
   });
 
   // Load mode settings using React Query
-  const { data: modeSettingsData } = useQuery({
+  const { data: modeSettingsData, refetch: refetchModeSettings } = useQuery({
     queryKey: ['tts-mode-settings'],
     queryFn: async () => {
       const response = await botService.get('/api/tts/mode-settings');
       return response.data;
     },
     enabled: !!user,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    staleTime: 0, // Всегда считаем данные устаревшими для немедленного обновления
   });
 
   const ttsRewardIds = modeSettingsData?.tts_reward_ids || {};
@@ -64,19 +67,38 @@ const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving, showModeSelecto
 
       setSaving(true);
       
-      await botService.post('/api/tts/create-reward', {
+      const response = await botService.post('/api/tts/create-reward', {
         platform: selectedPlatform,
         title: rewardForm.title,
         cost: rewardForm.cost,
         cooldown: rewardForm.cooldown
       });
       
+      // 🚀 FIX: Оптимистичное обновление - сразу обновляем кэш с новым reward_id
+      const rewardId = response.data?.reward_id;
+      if (rewardId && modeSettingsData) {
+        queryClient.setQueryData(['tts-mode-settings'], (oldData) => {
+          if (!oldData) return oldData;
+          return {
+            ...oldData,
+            tts_reward_ids: {
+              ...(oldData.tts_reward_ids || {}),
+              [selectedPlatform]: rewardId
+            }
+          };
+        });
+      }
+      
+      // 🚀 FIX: Принудительно обновляем данные с сервера
+      await refetchModeSettings();
+      
       toast.success('Награда создана');
       setShowCreateDialog(false);
-      queryClient.invalidateQueries({ queryKey: ['tts-mode-settings'] });
     } catch (error) {
       logger.error('Error creating TTS reward:', error);
       toast.error('Ошибка создания награды');
+      // Откатываем оптимистичное обновление при ошибке
+      queryClient.invalidateQueries({ queryKey: ['tts-mode-settings'] });
     } finally {
       setSaving(false);
     }
@@ -89,13 +111,30 @@ const TtsChannelPointsMode = ({ ttsMode, onModeChange, isSaving, showModeSelecto
     }
 
     try {
+      // 🚀 FIX: Оптимистичное обновление - сразу удаляем reward_id из кэша
+      if (modeSettingsData) {
+        queryClient.setQueryData(['tts-mode-settings'], (oldData) => {
+          if (!oldData) return oldData;
+          const newRewardIds = { ...(oldData.tts_reward_ids || {}) };
+          delete newRewardIds[platform];
+          return {
+            ...oldData,
+            tts_reward_ids: newRewardIds
+          };
+        });
+      }
+      
       await botService.delete(`/api/tts/reward/${platform}`);
       
+      // 🚀 FIX: Принудительно обновляем данные с сервера
+      await refetchModeSettings();
+      
       toast.success('Награда удалена');
-      queryClient.invalidateQueries({ queryKey: ['tts-mode-settings'] });
     } catch (error) {
       logger.error('Error deleting TTS reward:', error);
       toast.error('Ошибка удаления награды');
+      // Откатываем оптимистичное обновление при ошибке
+      queryClient.invalidateQueries({ queryKey: ['tts-mode-settings'] });
     }
   };
 

@@ -14,7 +14,15 @@ from typing import Optional, Dict, Tuple
 from pathlib import Path
 import time
 
-from constants import DEFAULT_TTS_SERVICE_URL, DEFAULT_BACKEND_URL
+from constants import (
+    DEFAULT_TTS_SERVICE_URL, 
+    DEFAULT_BACKEND_URL,
+    TTS_DEFAULT_VOLUME,
+    TTS_MAX_RETRIES,
+    TTS_RETRY_DELAY,
+    TTS_HEALTH_CHECK_INTERVAL
+)
+from core.http_timeouts import DEFAULT_API_TIMEOUT
 
 from services.basic_tts import get_basic_tts
 
@@ -42,7 +50,7 @@ class TTSManager:
         # Кеш состояния TTS сервиса
         self._tts_service_available = True
         self._last_health_check = 0
-        self._health_check_interval = 30  # Проверять каждые 30 секунд
+        self._health_check_interval = TTS_HEALTH_CHECK_INTERVAL  # Используем константу из constants.py
         
         logger.info(f"✅ TTS Manager инициализирован. TTS Service URL: {self.tts_service_url}")
     
@@ -131,7 +139,7 @@ class TTSManager:
         text: str,
         author: str,
         user_id: int = None,
-        volume_level: float = 50.0,
+        volume_level: float = TTS_DEFAULT_VOLUME,  # Используем константу вместо хардкода
         use_ai_tts: bool = False,
         use_basic_tts: bool = True,
         connection_manager=None,
@@ -157,7 +165,8 @@ class TTSManager:
         # Приоритет 1: AI TTS (F5-TTS) через HTTP с retry логикой
         if use_ai_tts:
             logger.info(f"🎙️ [PRIORITY 1] Trying AI TTS (F5-TTS) with fallback support")
-            max_retries = 2
+            max_retries = TTS_MAX_RETRIES  # Используем константу из constants.py
+            retry_delay = TTS_RETRY_DELAY  # Используем константу из constants.py
             tts_endpoint = self.tts_service_url
             
             if user_id and db_session:
@@ -183,18 +192,18 @@ class TTSManager:
                             logger.warning(f"⚠️ AI TTS попытка {attempt}/{max_retries} не удалась: {result.get('error')}")
                             if attempt < max_retries:
                                 import asyncio
-                                await asyncio.sleep(0.5)  # Небольшая задержка перед retry
+                                await asyncio.sleep(retry_delay)
                     else:
                         logger.warning(f"⚠️ TTS Service недоступен (попытка {attempt}/{max_retries}), пытаемся снова...")
                         if attempt < max_retries:
                             import asyncio
-                            await asyncio.sleep(0.5)
+                            await asyncio.sleep(retry_delay)
                             
                 except Exception as e:
                     logger.error(f"❌ Ошибка AI TTS (попытка {attempt}/{max_retries}): {e}")
                     if attempt < max_retries:
                         import asyncio
-                        await asyncio.sleep(0.5)
+                        await asyncio.sleep(retry_delay)
                     else:
                         logger.error(f"❌ Все попытки AI TTS исчерпаны, используем fallback на gTTS")
             
@@ -226,7 +235,7 @@ class TTSManager:
         text: str,
         author: str,
         user_id: int = None,
-        volume_level: float = 50.0,
+        volume_level: float = TTS_DEFAULT_VOLUME,  # Используем константу вместо хардкода
         connection_manager=None,
         tts_settings: dict = None,
         word_filter: list = None,
@@ -256,7 +265,9 @@ class TTSManager:
                     "blocked_users": blocked_users or []
                 }
                 
-                async with session.post(url, json=data, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                # Используем таймаут из констант (по умолчанию 30 секунд)
+                timeout_obj = DEFAULT_API_TIMEOUT
+                async with session.post(url, json=data, timeout=timeout_obj) as response:
                     if response.status == 200:
                         result = await response.json()
                         selected_voice = result.get("selected_voice")
@@ -282,11 +293,11 @@ class TTSManager:
                         # Если есть connection_manager и выбран голос, проверяем приоритетную громкость
                         if connection_manager and selected_voice:
                             priority_volume = connection_manager.get_voice_volume(channel_name, selected_voice)
-                            if priority_volume != 50.0:  # Если есть кастомная громкость
-                                logger.info(f"🔊 Приоритетная громкость для голоса {selected_voice}: {priority_volume}%")
+                            if priority_volume != TTS_DEFAULT_VOLUME:  # Если есть кастомная громкость (не дефолтная)
+                                logger.info(f"🔊 Приоритетная громкость для голоса {selected_voice}: {priority_volume}% (default: {TTS_DEFAULT_VOLUME}%)")
                                 # Пересылаем запрос с приоритетной громкостью
                                 data["volume_level"] = priority_volume
-                                async with session.post(url, json=data, timeout=aiohttp.ClientTimeout(total=30)) as priority_response:
+                                async with session.post(url, json=data, timeout=timeout_obj) as priority_response:
                                     if priority_response.status == 200:
                                         priority_result = await priority_response.json()
                                         return {

@@ -87,10 +87,8 @@ export const IntegrationsProvider = ({ children }) => {
             return;
         }
 
-        // Если данные еще не загружены, показываем состояние загрузки ТОЛЬКО если еще не было initial load
-        if (isAuthenticated === null && initialLoad) {
-            setIsLoading(true);
-        }
+        // 🚀 ANTI-FLASH: НЕ показываем состояние загрузки, чтобы избежать мерцания
+        // Компоненты будут работать с disabled состоянием до загрузки данных
     }, [isAuthenticated, user?.integrations, initialLoad]);
 
     useEffect(() => {
@@ -105,6 +103,24 @@ export const IntegrationsProvider = ({ children }) => {
             markIntegrationsRefreshed();
         }
     }, [integrationsNeedRefresh, fetchIntegrations, markIntegrationsRefreshed, refreshAuthStatus]);
+
+    // 🔄 Слушаем событие auth_refresh_required для синхронизации после OAuth
+    useEffect(() => {
+        const handleAuthRefresh = () => {
+            logger.log('🔄 [INTEGRATIONS] Received auth_refresh_required, refreshing integrations...');
+            // Задержка чтобы AuthContext успел обновиться
+            setTimeout(() => {
+                refreshAuthStatus(true);
+                fetchIntegrations();
+            }, 100);
+        };
+
+        window.addEventListener('auth_refresh_required', handleAuthRefresh);
+        
+        return () => {
+            window.removeEventListener('auth_refresh_required', handleAuthRefresh);
+        };
+    }, [fetchIntegrations, refreshAuthStatus]);
 
     const updateTwitchIntegration = useCallback(async (enabled, onClose = null) => {
         if (enabled) {

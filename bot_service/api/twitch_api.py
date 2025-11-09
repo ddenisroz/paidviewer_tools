@@ -714,15 +714,52 @@ class TwitchAPI:
                 async with session.post(url, headers=headers, params=params, json=reward_data) as response:
                     if response.status == 200:
                         data = await response.json()
-                        logger.info(f"Created Twitch custom reward: {reward_data.get('title')}")
+                        logger.info(f"✅ Created Twitch custom reward: {reward_data.get('title')}")
                         return data.get("data", [{}])[0] if data.get("data") else None
                     else:
                         error_text = await response.text()
-                        logger.error(f"Twitch create reward error: {response.status} - {error_text}")
-                        return None
+                        error_message = f"HTTP {response.status}"
+                        
+                        # Парсим ошибку Twitch API
+                        try:
+                            import json
+                            error_json = json.loads(error_text)
+                            error_message = error_json.get("message", error_message)
+                            
+                            # Специфичные ошибки Twitch
+                            if response.status == 400:
+                                error_message = f"Неверные параметры: {error_message}"
+                            elif response.status == 401:
+                                error_message = "Неверный или истекший токен авторизации"
+                            elif response.status == 403:
+                                if "partner or affiliate" in error_message.lower():
+                                    error_message = "Награды доступны только для партнёров и аффилейтов Twitch"
+                                elif "scope" in error_message.lower():
+                                    error_message = "Недостаточно прав доступа (требуется scope: channel:manage:redemptions)"
+                                else:
+                                    error_message = f"Доступ запрещён: {error_message}"
+                            elif response.status == 404:
+                                error_message = f"Канал не найден: {error_message}"
+                            elif response.status == 429:
+                                error_message = "Превышен лимит запросов к Twitch API. Попробуйте позже"
+                            elif response.status >= 500:
+                                error_message = f"Ошибка сервера Twitch: {error_message}"
+                        except (json.JSONDecodeError, KeyError):
+                            # Если не удалось распарсить JSON, используем текст ошибки
+                            pass
+                        
+                        logger.error(f"❌ Twitch create reward error [{response.status}]: {error_message}")
+                        logger.error(f"   Full response: {error_text}")
+                        logger.error(f"   Reward data: {reward_data}")
+                        
+                        # Пробрасываем ошибку с деталями
+                        raise ValueError(f"{response.status}:{error_message}")
+        except ValueError:
+            # Пробрасываем ValueError дальше (это наши обработанные ошибки API)
+            raise
         except Exception as e:
-            logger.error(f"Error creating Twitch custom reward: {e}")
-            return None
+            logger.error(f"❌ Error creating Twitch custom reward: {e}", exc_info=True)
+            raise ValueError(f"500:Неожиданная ошибка при создании награды: {str(e)}")
     
     async def update_custom_reward(self, broadcaster_id: str, reward_id: str, access_token: str, reward_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Обновить кастомную награду"""
@@ -742,15 +779,50 @@ class TwitchAPI:
                 async with session.patch(url, headers=headers, params=params, json=reward_data) as response:
                     if response.status == 200:
                         data = await response.json()
-                        logger.info(f"Updated Twitch custom reward: {reward_id}")
+                        logger.info(f"✅ Updated Twitch custom reward: {reward_id}")
                         return data.get("data", [{}])[0] if data.get("data") else None
                     else:
                         error_text = await response.text()
-                        logger.error(f"Twitch update reward error: {response.status} - {error_text}")
-                        return None
+                        error_message = f"HTTP {response.status}"
+                        
+                        # Парсим ошибку Twitch API
+                        try:
+                            import json
+                            error_json = json.loads(error_text)
+                            error_message = error_json.get("message", error_message)
+                            
+                            # Специфичные ошибки Twitch
+                            if response.status == 400:
+                                error_message = f"Неверные параметры: {error_message}"
+                            elif response.status == 401:
+                                error_message = "Неверный или истекший токен авторизации"
+                            elif response.status == 403:
+                                if "scope" in error_message.lower():
+                                    error_message = "Недостаточно прав доступа (требуется scope: channel:manage:redemptions)"
+                                else:
+                                    error_message = f"Доступ запрещён: {error_message}"
+                            elif response.status == 404:
+                                error_message = "Награда не найдена"
+                            elif response.status == 429:
+                                error_message = "Превышен лимит запросов к Twitch API. Попробуйте позже"
+                            elif response.status >= 500:
+                                error_message = f"Ошибка сервера Twitch: {error_message}"
+                        except (json.JSONDecodeError, KeyError):
+                            # Если не удалось распарсить JSON, используем текст ошибки
+                            pass
+                        
+                        logger.error(f"❌ Twitch update reward error [{response.status}]: {error_message}")
+                        logger.error(f"   Full response: {error_text}")
+                        logger.error(f"   Reward ID: {reward_id}, Reward data: {reward_data}")
+                        
+                        # Пробрасываем ошибку с деталями
+                        raise ValueError(f"{response.status}:{error_message}")
+        except ValueError:
+            # Пробрасываем ValueError дальше (это наши обработанные ошибки API)
+            raise
         except Exception as e:
-            logger.error(f"Error updating Twitch custom reward: {e}")
-            return None
+            logger.error(f"❌ Error updating Twitch custom reward: {e}", exc_info=True)
+            raise ValueError(f"500:Неожиданная ошибка при обновлении награды: {str(e)}")
     
     async def delete_custom_reward(self, broadcaster_id: str, reward_id: str, access_token: str) -> bool:
         """Удалить кастомную награду"""
@@ -768,15 +840,54 @@ class TwitchAPI:
             async with aiohttp.ClientSession(timeout=TWITCH_API_TIMEOUT) as session:
                 async with session.delete(url, headers=headers, params=params) as response:
                     if response.status == 204:
-                        logger.info(f"Deleted Twitch custom reward: {reward_id}")
+                        logger.info(f"✅ Deleted Twitch custom reward: {reward_id}")
                         return True
                     else:
                         error_text = await response.text()
-                        logger.error(f"Twitch delete reward error: {response.status} - {error_text}")
-                        return False
+                        error_message = f"HTTP {response.status}"
+                        
+                        # Парсим ошибку Twitch API
+                        try:
+                            import json
+                            error_json = json.loads(error_text)
+                            error_message = error_json.get("message", error_message)
+                            
+                            # Специфичные ошибки Twitch
+                            if response.status == 400:
+                                # Возможные причины: награда не существует, неверный ID, активные redemption'ы
+                                if "redemption" in error_message.lower() or "pending" in error_message.lower():
+                                    error_message = "Нельзя удалить награду с активными запросами на использование. Сначала обработайте все pending redemption'ы"
+                                else:
+                                    error_message = f"Неверные параметры: {error_message}"
+                            elif response.status == 401:
+                                error_message = "Неверный или истекший токен авторизации"
+                            elif response.status == 403:
+                                if "scope" in error_message.lower():
+                                    error_message = "Недостаточно прав доступа (требуется scope: channel:manage:redemptions)"
+                                else:
+                                    error_message = f"Доступ запрещён: {error_message}"
+                            elif response.status == 404:
+                                error_message = "Награда не найдена или уже удалена"
+                            elif response.status == 429:
+                                error_message = "Превышен лимит запросов к Twitch API. Попробуйте позже"
+                            elif response.status >= 500:
+                                error_message = f"Ошибка сервера Twitch: {error_message}"
+                        except (json.JSONDecodeError, KeyError):
+                            # Если не удалось распарсить JSON, используем текст ошибки
+                            pass
+                        
+                        logger.error(f"❌ Twitch delete reward error [{response.status}]: {error_message}")
+                        logger.error(f"   Full response: {error_text}")
+                        logger.error(f"   Reward ID: {reward_id}, Broadcaster ID: {broadcaster_id}")
+                        
+                        # Пробрасываем ошибку с деталями
+                        raise ValueError(f"{response.status}:{error_message}")
+        except ValueError:
+            # Пробрасываем ValueError дальше (это наши обработанные ошибки API)
+            raise
         except Exception as e:
-            logger.error(f"Error deleting Twitch custom reward: {e}")
-            return False
+            logger.error(f"❌ Error deleting Twitch custom reward: {e}", exc_info=True)
+            raise ValueError(f"500:Неожиданная ошибка при удалении награды: {str(e)}")
     
     async def get_custom_reward_redemptions(
         self, 

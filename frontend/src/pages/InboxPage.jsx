@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../constants';
-import { MessageCircle, Clock, CheckCircle, AlertCircle, Reply, Send, Eye, EyeOff, Plus } from 'lucide-react';
+import { MessageCircle, Clock, CheckCircle, AlertCircle, Reply, Send, Eye, EyeOff, Plus, Settings } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -12,8 +13,12 @@ import { toast } from 'sonner';
 import { logger } from '../utils/prodLogger';
 import { getErrorMessage, getOperationMessage } from '../services/microservices';
 import { validators, createFormErrors, isFormValid } from '../utils/formValidation';
+import { useAuth } from '../context/AuthContext';
+import PageWrapper from '../components/PageWrapper';
 
 const InboxPage = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTicket, setSelectedTicket] = useState(null);
@@ -251,6 +256,37 @@ const InboxPage = () => {
   };
 
   const totalUnread = tickets.reduce((sum, ticket) => sum + ticket.unread_responses, 0);
+
+  // 🔒 ПЕРВООЧЕРЕДНАЯ ПРОВЕРКА: Авторизация
+  // Если пользователь не авторизован - показываем сообщение с предложением войти
+  if (!isAuthenticated) {
+    return (
+      <PageWrapper title="Входящие">
+        <Card className="border-gray-700">
+          <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
+            <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
+              <AlertCircle className="w-10 h-10 text-gray-500" />
+            </div>
+            <div className="space-y-2 max-w-md">
+              <h3 className="text-xl font-semibold text-gray-200">
+                Требуется авторизация
+              </h3>
+              <p className="text-gray-400 text-sm">
+                Для доступа к входящим сообщениям необходимо войти в систему
+              </p>
+            </div>
+            <Button 
+              onClick={() => navigate('/login')}
+              className="gap-2"
+            >
+              <Settings className="w-4 h-4" />
+              Войти в систему
+            </Button>
+          </CardContent>
+        </Card>
+      </PageWrapper>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">

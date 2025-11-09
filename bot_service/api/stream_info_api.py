@@ -104,8 +104,47 @@ async def get_twitch_stream_info(user: dict = Depends(get_current_user)):
         stream_info = await twitch_api.get_stream_info_by_id(platform_user_id)
         logger.info(f"Stream info result: {stream_info}")
         
+        is_live = stream_info is not None
+        channel_name = channel_info.get("broadcaster_name", "").lower() if channel_info else ""
+        
+        # ✅ Отслеживание трансляций: создаем или обновляем сессию
+        if is_live and channel_name:
+            from core.database import get_db
+            from services.stream_session_service import StreamSessionService
+            db = next(get_db())
+            try:
+                stream_session_service = StreamSessionService(db)
+                stream_session_service.get_or_create_active_session(
+                    user_id=user_id,
+                    session_id=session_id,
+                    channel_name=channel_name,
+                    platform="twitch",
+                    title=channel_info.get("title", "")
+                )
+            except Exception as e:
+                logger.error(f"Error creating stream session: {e}")
+            finally:
+                db.close()
+        elif not is_live and channel_name:
+            # Закрываем активную сессию если стрим оффлайн
+            from core.database import get_db
+            from services.stream_session_service import StreamSessionService
+            db = next(get_db())
+            try:
+                stream_session_service = StreamSessionService(db)
+                stream_session_service.end_session(
+                    user_id=user_id,
+                    session_id=session_id,
+                    channel_name=channel_name,
+                    platform="twitch"
+                )
+            except Exception as e:
+                logger.error(f"Error ending stream session: {e}")
+            finally:
+                db.close()
+        
         result = {
-            "is_live": stream_info is not None,
+            "is_live": is_live,
             "title": channel_info.get("title", ""),
             "game_id": channel_info.get("game_id"),
             "game": channel_info.get("game_name"),
@@ -145,8 +184,45 @@ async def get_vk_stream_info(user: dict = Depends(get_current_user)):
         # Получаем информацию о стриме VK (с проверкой безопасности)
         stream_info = await vk_api.get_stream_info(str(user_id), session_id)
         
+        is_live = stream_info.get("online", False)
+        
+        # Получаем channel_name из User
+        from core.database import get_db, User
+        db = next(get_db())
+        try:
+            user_record = db.query(User).filter(User.id == user_id).first()
+            channel_name = None
+            if user_record:
+                channel_name = (user_record.vk_channel_name or user_record.vk_username or "").lower()
+            
+            # ✅ Отслеживание трансляций: создаем или обновляем сессию
+            if is_live and channel_name:
+                from services.stream_session_service import StreamSessionService
+                stream_session_service = StreamSessionService(db)
+                stream_session_service.get_or_create_active_session(
+                    user_id=user_id,
+                    session_id=session_id,
+                    channel_name=channel_name,
+                    platform="vk",
+                    title=stream_info.get("title", "")
+                )
+            elif not is_live and channel_name:
+                # Закрываем активную сессию если стрим оффлайн
+                from services.stream_session_service import StreamSessionService
+                stream_session_service = StreamSessionService(db)
+                stream_session_service.end_session(
+                    user_id=user_id,
+                    session_id=session_id,
+                    channel_name=channel_name,
+                    platform="vk"
+                )
+        except Exception as e:
+            logger.error(f"Error managing stream session: {e}")
+        finally:
+            db.close()
+        
         return JSONResponse(content={
-            "is_live": stream_info.get("online", False),
+            "is_live": is_live,
             "title": stream_info.get("title", ""),
             "category_id": stream_info.get("category_id"),
             "category": stream_info.get("category"),

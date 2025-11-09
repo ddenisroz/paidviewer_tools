@@ -340,13 +340,37 @@ async def create_twitch_reward(
                 "reward": result
             }
         else:
-            raise HTTPException(status_code=400, detail="Ошибка создания награды на Twitch")
+            raise HTTPException(status_code=400, detail="Не удалось создать награду на Twitch")
             
     except HTTPException:
         raise
+    except ValueError as e:
+        # Обрабатываем ошибки от Twitch API (формат: "status_code:message")
+        error_str = str(e)
+        if ":" in error_str:
+            status_str, message = error_str.split(":", 1)
+            try:
+                status_code = int(status_str)
+                # Маппим статусы к соответствующим HTTP кодам
+                if status_code == 403:
+                    raise HTTPException(status_code=403, detail=message)
+                elif status_code == 401:
+                    raise HTTPException(status_code=401, detail=message)
+                elif status_code == 404:
+                    raise HTTPException(status_code=404, detail=message)
+                elif status_code == 429:
+                    raise HTTPException(status_code=429, detail=message)
+                elif status_code >= 500:
+                    raise HTTPException(status_code=502, detail=f"Ошибка сервера Twitch: {message}")
+                else:
+                    raise HTTPException(status_code=400, detail=message)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=error_str)
+        else:
+            raise HTTPException(status_code=500, detail=f"Ошибка создания награды: {error_str}")
     except Exception as e:
-        logger.error(f"Error creating Twitch reward: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка создания награды Twitch: {str(e)}")
+        logger.error(f"Error creating Twitch reward: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Неожиданная ошибка при создании награды Twitch: {str(e)}")
 
 @points_router.post("/rewards/vk/create")
 @limiter.limit("10/minute")
@@ -486,13 +510,37 @@ async def update_twitch_reward(
                 "reward": result
             })
         else:
-            raise HTTPException(status_code=400, detail="Ошибка обновления награды")
+            raise HTTPException(status_code=400, detail="Не удалось обновить награду на Twitch")
             
     except HTTPException:
         raise
+    except ValueError as e:
+        # Обрабатываем ошибки от Twitch API (формат: "status_code:message")
+        error_str = str(e)
+        if ":" in error_str:
+            status_str, message = error_str.split(":", 1)
+            try:
+                status_code = int(status_str)
+                # Маппим статусы к соответствующим HTTP кодам
+                if status_code == 403:
+                    raise HTTPException(status_code=403, detail=message)
+                elif status_code == 401:
+                    raise HTTPException(status_code=401, detail=message)
+                elif status_code == 404:
+                    raise HTTPException(status_code=404, detail=message)
+                elif status_code == 429:
+                    raise HTTPException(status_code=429, detail=message)
+                elif status_code >= 500:
+                    raise HTTPException(status_code=502, detail=f"Ошибка сервера Twitch: {message}")
+                else:
+                    raise HTTPException(status_code=400, detail=message)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=error_str)
+        else:
+            raise HTTPException(status_code=500, detail=f"Ошибка обновления награды: {error_str}")
     except Exception as e:
-        logger.error(f"Error updating Twitch reward: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка обновления награды Twitch: {str(e)}")
+        logger.error(f"Error updating Twitch reward: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Неожиданная ошибка при обновлении награды Twitch: {str(e)}")
 
 @points_router.delete("/rewards/twitch/{reward_id}")
 async def delete_twitch_reward(
@@ -538,13 +586,37 @@ async def delete_twitch_reward(
                 "message": "Награда удалена"
             })
         else:
-            raise HTTPException(status_code=400, detail="Ошибка удаления награды")
+            raise HTTPException(status_code=400, detail="Не удалось удалить награду на Twitch")
             
     except HTTPException:
         raise
+    except ValueError as e:
+        # Обрабатываем ошибки от Twitch API (формат: "status_code:message")
+        error_str = str(e)
+        if ":" in error_str:
+            status_str, message = error_str.split(":", 1)
+            try:
+                status_code = int(status_str)
+                # Маппим статусы к соответствующим HTTP кодам
+                if status_code == 403:
+                    raise HTTPException(status_code=403, detail=message)
+                elif status_code == 401:
+                    raise HTTPException(status_code=401, detail=message)
+                elif status_code == 404:
+                    raise HTTPException(status_code=404, detail=message)
+                elif status_code == 429:
+                    raise HTTPException(status_code=429, detail=message)
+                elif status_code >= 500:
+                    raise HTTPException(status_code=502, detail=f"Ошибка сервера Twitch: {message}")
+                else:
+                    raise HTTPException(status_code=400, detail=message)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=error_str)
+        else:
+            raise HTTPException(status_code=500, detail=f"Ошибка удаления награды: {error_str}")
     except Exception as e:
-        logger.error(f"Error deleting Twitch reward: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка удаления награды Twitch: {str(e)}")
+        logger.error(f"Error deleting Twitch reward: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Неожиданная ошибка при удалении награды Twitch: {str(e)}")
 
 @points_router.patch("/rewards/vk/{reward_id}")
 async def update_vk_reward(
@@ -618,6 +690,7 @@ async def delete_vk_reward(
     try:
         from api.vk_api import vk_api
         from core.database import UserToken
+        import asyncio
         
         # Получаем токены пользователя
         user_token = db.query(UserToken).filter(
@@ -630,16 +703,94 @@ async def delete_vk_reward(
         
         # Получаем имя VK канала
         channel_name = _get_vk_channel_name(user["id"], db)
+        access_token = _decrypt_access_token(user_token.access_token)
+        
+        # 🔄 FIX: VK API не позволяет удалять награды с активными запросами (demands)
+        # Сначала получаем и отклоняем все активные запросы для этой награды
+        try:
+            logger.info(f"🔄 [VK DELETE] Checking for active demands for reward {reward_id}")
+            demands_data = await vk_api.get_reward_demands(
+                channel_url=channel_name,
+                access_token=access_token,
+                limit=100,  # Получаем больше запросов на случай если их много
+                offset=0
+            )
+            
+            if demands_data and isinstance(demands_data, dict):
+                # Структура ответа может быть разной, проверяем разные варианты
+                demands_list = demands_data.get("demands", []) or demands_data.get("items", []) or []
+                if isinstance(demands_list, list):
+                    # Фильтруем запросы для этой награды
+                    # reward_id может быть в разных форматах (UUID строка), сравниваем как строки
+                    reward_demands = [
+                        demand for demand in demands_list
+                        if isinstance(demand, dict) and str(demand.get("reward_id") or demand.get("reward", {}).get("id", "")) == str(reward_id)
+                    ]
+                    
+                    if reward_demands:
+                        # Извлекаем ID запросов
+                        demand_ids = [
+                            int(demand.get("id") or demand.get("demand_id", 0))
+                            for demand in reward_demands
+                            if demand.get("id") or demand.get("demand_id")
+                        ]
+                        
+                        if demand_ids:
+                            logger.info(f"🔄 [VK DELETE] Found {len(demand_ids)} active demands for reward {reward_id}, rejecting them...")
+                            reject_result = await vk_api.reject_reward_demands(
+                                channel_url=channel_name,
+                                access_token=access_token,
+                                demand_ids=demand_ids
+                            )
+                            if reject_result:
+                                logger.info(f"✅ [VK DELETE] Rejected {len(demand_ids)} demands for reward {reward_id}")
+                                # Задержка чтобы VK API обработал отклонение
+                                await asyncio.sleep(0.5)
+                            else:
+                                logger.warning(f"⚠️ [VK DELETE] Failed to reject some demands, trying to delete anyway")
+                                await asyncio.sleep(0.3)
+                        else:
+                            logger.info(f"ℹ️ [VK DELETE] No demand IDs found for reward {reward_id}")
+                    else:
+                        logger.info(f"ℹ️ [VK DELETE] No active demands found for reward {reward_id}")
+                else:
+                    logger.warning(f"⚠️ [VK DELETE] Unexpected demands data structure: {type(demands_list)}")
+        except Exception as demands_err:
+            # Игнорируем ошибку получения/отклонения demands - возможно их нет
+            logger.warning(f"⚠️ [VK DELETE] Error handling demands (may not exist): {demands_err}")
+            await asyncio.sleep(0.3)
+        
+        # 🔄 FIX: VK API не позволяет удалять включенные награды
+        # Сначала пытаемся отключить награду, если она включена
+        try:
+            logger.info(f"🔄 [VK DELETE] Attempting to disable reward {reward_id} before deletion")
+            disable_result = await vk_api.disable_channel_reward(
+                channel_url=channel_name,
+                reward_id=reward_id,
+                access_token=access_token
+            )
+            if disable_result:
+                logger.info(f"✅ [VK DELETE] Reward {reward_id} disabled successfully before deletion")
+                # Небольшая задержка чтобы VK API обработал отключение
+                await asyncio.sleep(0.5)
+            else:
+                logger.warning(f"⚠️ [VK DELETE] Failed to disable reward {reward_id}, trying to delete anyway")
+        except Exception as disable_err:
+            # Игнорируем ошибку отключения - награда может быть уже отключена
+            logger.warning(f"⚠️ [VK DELETE] Error disabling reward (may already be disabled): {disable_err}")
+            # Небольшая задержка перед попыткой удаления
+            await asyncio.sleep(0.3)
         
         # Используем VK API для удаления награды
         result = await vk_api.delete_channel_reward(
             channel_url=channel_name,
             reward_id=reward_id,
-            access_token=_decrypt_access_token(user_token.access_token)
+            access_token=access_token
         )
         
         if result:
             from fastapi.responses import JSONResponse
+            logger.info(f"✅ [VK DELETE] Reward {reward_id} deleted successfully")
             return JSONResponse(content={
                 "success": True,
                 "platform": "vk",

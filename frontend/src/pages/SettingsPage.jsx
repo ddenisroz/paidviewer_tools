@@ -18,7 +18,7 @@ import DeleteAccountModal from '../components/DeleteAccountModal';
 
 const SettingsPage = () => {
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, isAuthenticated } = useAuth();
     const { integrations, isLoading, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
     const { isConnected: daConnected, isLoading: daLoading, error: daError, connect: daConnect, disconnect: daDisconnect } = useDonationAlerts();
     const [activeTab, setActiveTab] = React.useState('settings');
@@ -41,6 +41,37 @@ const SettingsPage = () => {
     const handleDonationAlertsDisconnect = async () => {
         await daDisconnect();
     };
+
+    // 🔒 ПЕРВООЧЕРЕДНАЯ ПРОВЕРКА: Авторизация
+    // Если пользователь не авторизован - показываем сообщение с предложением войти
+    if (!isAuthenticated) {
+        return (
+            <PageWrapper title="Настройки">
+                <Card className="border-gray-700">
+                    <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
+                        <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
+                            <AlertCircle className="w-10 h-10 text-gray-500" />
+                        </div>
+                        <div className="space-y-2 max-w-md">
+                            <h3 className="text-xl font-semibold text-gray-200">
+                                Требуется авторизация
+                            </h3>
+                            <p className="text-gray-400 text-sm">
+                                Для доступа к настройкам необходимо войти в систему
+                            </p>
+                        </div>
+                        <Button 
+                            onClick={() => navigate('/login')}
+                            className="gap-2"
+                        >
+                            <Settings className="w-4 h-4" />
+                            Войти в систему
+                        </Button>
+                    </CardContent>
+                </Card>
+            </PageWrapper>
+        );
+    }
 
     // Убираем глобальный прелоадер
 
@@ -78,11 +109,10 @@ const SettingsPage = () => {
             {/* Содержимое табов */}
             {activeTab === 'settings' && (
             <>
-            <Card>
-                <CardContent className="pt-0">
-                    <div className="grid grid-cols-3 gap-4">
-                        {/* Twitch Integration */}
-                        <div className="flex flex-col items-center justify-between gap-3 p-4 rounded-lg border border-gray-700 bg-gray-800/50">
+            {/* Интеграции */}
+            <div className="grid grid-cols-3 gap-4">
+                {/* Twitch Integration */}
+                <Card className="flex flex-col items-center justify-between gap-3 p-4">
                             <div className="flex items-center gap-2">
                                 <TwitchIcon width="20" height="20" />
                                 <Label htmlFor="twitch-integration" className="text-base font-medium">
@@ -94,10 +124,10 @@ const SettingsPage = () => {
                                 checked={integrations.twitch?.enabled || false}
                                 onCheckedChange={updateTwitchIntegration}
                             />
-                        </div>
+                </Card>
 
-                        {/* VK Integration */}
-                        <div className="flex flex-col items-center justify-between gap-3 p-4 rounded-lg border border-gray-700 bg-gray-800/50">
+                {/* VK Integration */}
+                <Card className="flex flex-col items-center justify-between gap-3 p-4">
                             <div className="flex items-center gap-2">
                                 <VKIcon width="20" height="20" />
                                 <Label htmlFor="vk-integration" className="text-base font-medium">
@@ -110,10 +140,10 @@ const SettingsPage = () => {
                                 onCheckedChange={updateVkIntegration}
                                 style={integrations.vk?.enabled ? { backgroundColor: '#ef4444' } : {}}
                             />
-                        </div>
+                </Card>
 
-                        {/* DonationAlerts Integration */}
-                        <div className="flex flex-col items-center justify-between gap-3 p-4 rounded-lg border border-gray-700 bg-gray-800/50">
+                {/* DonationAlerts Integration */}
+                <Card className="flex flex-col items-center justify-between gap-3 p-4">
                             <div className="flex items-center gap-2">
                                 <img 
                                     src="/src/images/logos/DA_Alert_Color.svg" 
@@ -135,27 +165,23 @@ const SettingsPage = () => {
                                 disabled={daLoading || !hasMainIntegration}
                                 style={daConnected ? { backgroundColor: '#f97316' } : {}}
                             />
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+                </Card>
+            </div>
 
             {/* User Info and Danger Zone */}
-            <Card>
-                <CardContent className="pt-0">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* User Info */}
-                        <div className="flex flex-col gap-2 p-4 rounded-lg border border-border bg-card/50">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* User Info */}
+                <Card className="flex flex-col gap-2 p-4">
                             <div className="flex items-center gap-2">
                                 <span className="text-muted-foreground text-sm">ID пользователя:</span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="font-mono font-semibold text-lg text-foreground">{user?.id}</span>
                             </div>
-                </div>
+                </Card>
 
                 {/* Danger Zone - Delete Account */}
-                        <div className="flex flex-col gap-3 p-4 rounded-lg border border-red-500/30 bg-red-500/10">
+                <Card className="flex flex-col gap-3 p-4 border-red-500/30 bg-red-500/10">
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
                                     <Trash2 className="h-5 w-5 text-red-500 flex-shrink-0" />
@@ -177,10 +203,8 @@ const SettingsPage = () => {
                                     Необратимые действия. Удаление аккаунта приведет к полной потере всех данных.
                     </p>
                 </div>
+                </Card>
             </div>
-                    </div>
-                </CardContent>
-            </Card>
 
             {/* Delete Account Modal */}
             <DeleteAccountModal 

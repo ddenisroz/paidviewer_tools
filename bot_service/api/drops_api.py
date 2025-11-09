@@ -50,13 +50,18 @@ class DropsConfigCreate(BaseModel):
 
 class DropsConfigUpdate(BaseModel):
     """Обновление конфигурации Drops"""
-    streak_enabled: Optional[bool] = None
+    # Общие настройки стрика
     streak_days_common: Optional[int] = Field(None, ge=1, le=365)
     streak_days_rare: Optional[int] = Field(None, ge=1, le=365)
     streak_days_epic: Optional[int] = Field(None, ge=1, le=365)
     streak_days_legendary: Optional[int] = Field(None, ge=1, le=365)
     streak_messages_required: Optional[int] = Field(None, ge=1, le=100)
     streak_reset_on_skip: Optional[bool] = None
+    # Флаги включения стрика для каждой платформы
+    streak_enabled_twitch: Optional[bool] = None
+    streak_enabled_vk: Optional[bool] = None
+    # Устаревшее поле (для обратной совместимости)
+    streak_enabled: Optional[bool] = None  # DEPRECATED
     
     donation_enabled: Optional[bool] = None
     donation_amount_common: Optional[float] = Field(None, ge=0.01, le=1000000)
@@ -158,18 +163,35 @@ def get_drops_quality_by_donation(amount: float, config: DropsConfig) -> str:
 @router.get("/config/{channel_name}")
 async def get_drops_config(
     channel_name: str,
-    platform: str = "twitch",
+    platform: Optional[str] = None,  # Опциональный параметр, если не указан - возвращаем общий конфиг
+    widget_token: Optional[str] = None,  # ✅ Для виджета без авторизации
     current_user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    """Получает конфигурацию Drops для канала"""
+    """Получает конфигурацию Drops для канала
+    
+    Если platform не указан, возвращает общий конфиг (platform="global").
+    Поддерживает widget_token для доступа без авторизации (для OBS виджета).
+    """
     try:
-        if not current_user:
+        # ✅ Проверяем токен виджета если нет авторизованного пользователя
+        user_id = None
+        session_id = None
+        is_guest = False
+        
+        if current_user and current_user.get("id"):
+            user_id, session_id, is_guest = get_user_or_session_filters(current_user)
+        elif widget_token:
+            # Проверяем токен виджета
+            config = db.query(DropsConfig).filter(DropsConfig.widget_token == widget_token).first()
+            if config and config.channel_name == channel_name:
+                user_id = config.user_id
+            else:
+                raise HTTPException(status_code=403, detail="Invalid widget token or channel mismatch")
+        else:
             raise HTTPException(status_code=401, detail="Not authenticated")
         
-        user_id, session_id, is_guest = get_user_or_session_filters(current_user)
-        
-        # Используем DropsService для получения конфига
+        # Используем DropsService для получения конфига (без platform = общий конфиг)
         from services.drops_service import DropsService
         drops_service = DropsService(db)
         
@@ -177,28 +199,24 @@ async def get_drops_config(
             user_id=user_id,
             session_id=session_id,
             channel_name=channel_name,
-            platform=platform
+            platform=platform  # Если None, вернется общий конфиг (platform="global")
         )
         
         if not config:
-            # Создаем конфигурацию по умолчанию
+            # Создаем конфигурацию по умолчанию (общий конфиг, если platform не указан)
             config = drops_service.create_or_update_config(
                 user_id=user_id,
                 session_id=session_id,
                 channel_name=channel_name,
-                platform=platform,
+                platform=platform,  # Если None, создастся общий конфиг (platform="global")
                 config_data={}
             )
         
-        # Безопасное получение streak_reset_on_skip (на случай если миграция не применена)
-        streak_reset_on_skip = True  # значение по умолчанию
-        if hasattr(config, 'streak_reset_on_skip'):
-            streak_reset_on_skip = config.streak_reset_on_skip
-        
-        # Безопасное получение widget_token (на случай если миграция не применена)
-        widget_token = None
-        if hasattr(config, 'widget_token'):
-            widget_token = config.widget_token
+        # Безопасное получение полей (на случай если миграция не применена)
+        streak_reset_on_skip = getattr(config, 'streak_reset_on_skip', True)
+        widget_token = getattr(config, 'widget_token', None)
+        streak_enabled_twitch = getattr(config, 'streak_enabled_twitch', False)
+        streak_enabled_vk = getattr(config, 'streak_enabled_vk', False)
         
         return {
             "success": True,
@@ -206,13 +224,14 @@ async def get_drops_config(
                 "id": config.id,
                 "channel_name": config.channel_name,
                 "platform": config.platform,
-                "streak_enabled": config.streak_enabled,
                 "streak_days_common": config.streak_days_common,
                 "streak_days_rare": config.streak_days_rare,
                 "streak_days_epic": config.streak_days_epic,
                 "streak_days_legendary": config.streak_days_legendary,
                 "streak_messages_required": config.streak_messages_required,
                 "streak_reset_on_skip": streak_reset_on_skip,
+                "streak_enabled_twitch": streak_enabled_twitch,
+                "streak_enabled_vk": streak_enabled_vk,
                 "donation_enabled": config.donation_enabled,
                 "donation_amount_common": config.donation_amount_common,
                 "donation_amount_rare": config.donation_amount_rare,
@@ -244,11 +263,14 @@ async def get_drops_config(
 async def update_drops_config(
     channel_name: str,
     config_data: DropsConfigUpdate,
-    platform: str = "twitch",
+    platform: Optional[str] = None,  # Опциональный параметр, если не указан - обновляем общий конфиг
     current_user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    """Обновляет конфигурацию лутбоксов для канала"""
+    """Обновляет конфигурацию лутбоксов для канала
+    
+    Если platform не указан, обновляет общий конфиг (platform="global").
+    """
     try:
         if not current_user:
             raise HTTPException(status_code=401, detail="Not authenticated")
@@ -258,15 +280,23 @@ async def update_drops_config(
         from services.drops_service import DropsService
         drops_service = DropsService(db)
         
+        # Получаем или создаем конфиг (общий, если platform не указан)
         config = drops_service.get_config(
             user_id=user_id,
             session_id=session_id,
             channel_name=channel_name,
-            platform=platform
+            platform=platform  # Если None, вернется общий конфиг (platform="global")
         )
         
         if not config:
-            raise HTTPException(status_code=404, detail="Конфигурация не найдена")
+            # Создаем конфигурацию по умолчанию (общий конфиг, если platform не указан)
+            config = drops_service.create_or_update_config(
+                user_id=user_id,
+                session_id=session_id,
+                channel_name=channel_name,
+                platform=platform,  # Если None, создастся общий конфиг (platform="global")
+                config_data={}
+            )
         
         # Обновляем только переданные поля
         update_data = config_data.dict(exclude_unset=True)
@@ -275,7 +305,7 @@ async def update_drops_config(
             user_id=user_id,
             session_id=session_id,
             channel_name=channel_name,
-            platform=platform,
+            platform=platform,  # Если None, обновится общий конфиг (platform="global")
             config_data=update_data
         )
         
@@ -313,32 +343,36 @@ async def update_drops_config(
 @router.get("/rewards/{channel_name}")
 async def get_drops_rewards(
     channel_name: str,
-    platform: str = "twitch",
+    platform: str = "twitch",  # Параметр оставлен для совместимости, но игнорируется
     quality: Optional[str] = None,
     widget_token: Optional[str] = None,  # Для виджета без авторизации
     current_user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    """Получает награды лутбоксов для канала"""
+    """Получает награды лутбоксов для канала
+    
+    ВАЖНО: Награды ОБЩИЕ для всех платформ! Параметр platform игнорируется.
+    """
     try:
         # Проверяем токен виджета если нет авторизованного пользователя
         user_id = None
         if current_user and current_user.get("id"):
             user_id = current_user["id"]
         elif widget_token:
-            # Проверяем токен виджета
+            # Проверяем токен виджета (конфиг может быть "global" или платформенным)
             config = db.query(DropsConfig).filter(DropsConfig.widget_token == widget_token).first()
-            if config and config.channel_name == channel_name and config.platform == platform:
+            if config and config.channel_name == channel_name:
                 user_id = config.user_id
             else:
                 raise HTTPException(status_code=403, detail="Invalid widget token or channel mismatch")
         else:
             raise HTTPException(status_code=401, detail="Authentication required")
         
+        # ✅ НАГРАДЫ ОБЩИЕ ДЛЯ ВСЕХ ПЛАТФОРМ - не фильтруем по platform
         query = db.query(DropsReward).filter(
             DropsReward.user_id == user_id,
-            DropsReward.channel_name == channel_name,
-            DropsReward.platform == platform
+            DropsReward.channel_name == channel_name
+            # platform убран - награды общие для всех платформ!
         )
         
         if quality:
@@ -390,11 +424,15 @@ async def get_drops_rewards(
 async def create_drops_reward(
     channel_name: str,
     reward_data: DropsRewardCreate,
-    platform: str = "twitch",
+    platform: str = "twitch",  # Параметр оставлен для совместимости, но награда будет общей для всех платформ
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Создает новую награду в лутбоксе"""
+    """Создает новую награду в лутбоксе
+    
+    ВАЖНО: Награда будет ОБЩЕЙ для всех платформ (Twitch, VK, DonationAlerts).
+    Параметр platform сохраняется в БД для совместимости, но не влияет на доступность награды.
+    """
     try:
         # ✅ NULL CHECK: Проверяем существование качества
         quality = db.query(DropsQuality).filter(DropsQuality.id == reward_data.quality_id).first()
@@ -416,10 +454,11 @@ async def create_drops_reward(
         
         # ✅ SAFETY: Создаем reward с проверкой
         try:
+            # ✅ Награда создается с platform для совместимости, но доступна для всех платформ
             reward = DropsReward(
                 user_id=current_user["id"],
                 channel_name=channel_name,
-                platform=platform,
+                platform=platform,  # Сохраняется для совместимости, но не используется при фильтрации
                 name=reward_data.name,
                 description=reward_data.description,
                 quality_id=reward_data.quality_id,
@@ -451,9 +490,10 @@ async def create_drops_reward(
             from services.memory_websocket_manager import memory_websocket_manager
             user_id = current_user.get('id')
             if user_id and user_id != -1:
+                # ✅ Награды общие, инвалидируем кеш для всех платформ
                 cache_invalidation_event = {
                     "type": "cache_invalidate",
-                    "cache_key": f"drops_rewards_{channel_name}_{platform}",
+                    "cache_key": f"drops_rewards_{channel_name}",  # Убрали platform из ключа
                     "reason": "drops_reward_created"
                 }
                 await memory_websocket_manager.send_to_user(user_id, cache_invalidation_event)
@@ -522,9 +562,10 @@ async def update_drops_reward(
             from services.memory_websocket_manager import memory_websocket_manager
             user_id = current_user.get('id')
             if user_id and user_id != -1:
+                # ✅ Награды общие, инвалидируем кеш для всех платформ
                 cache_invalidation_event = {
                     "type": "cache_invalidate",
-                    "cache_key": f"drops_rewards_{reward.channel_name}_{reward.platform}",
+                    "cache_key": f"drops_rewards_{reward.channel_name}",  # Убрали platform из ключа
                     "reason": "drops_reward_updated"
                 }
                 await memory_websocket_manager.send_to_user(user_id, cache_invalidation_event)
@@ -564,8 +605,7 @@ async def delete_drops_reward(
         if not reward:
             raise HTTPException(status_code=404, detail="Награда не найдена")
         
-        channel_name = reward.channel_name;
-        platform = reward.platform;
+        channel_name = reward.channel_name
         
         db.delete(reward)
         db.commit()
@@ -575,9 +615,10 @@ async def delete_drops_reward(
             from services.memory_websocket_manager import memory_websocket_manager
             user_id = current_user.get('id')
             if user_id and user_id != -1:
+                # ✅ Награды общие, инвалидируем кеш для всех платформ
                 cache_invalidation_event = {
                     "type": "cache_invalidate",
-                    "cache_key": f"drops_rewards_{channel_name}_{platform}",
+                    "cache_key": f"drops_rewards_{channel_name}",  # Убрали platform из ключа
                     "reason": "drops_reward_deleted"
                 }
                 await memory_websocket_manager.send_to_user(user_id, cache_invalidation_event)
@@ -735,19 +776,28 @@ async def get_drops_qualities(
 @router.get("/history/{channel_name}")
 async def get_drops_history(
     channel_name: str,
-    platform: str = "twitch",
+    platform: Optional[str] = None,  # Опциональный параметр, если не указан - возвращаем общую историю
     limit: int = 50,
     offset: int = 0,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получает историю лутбоксов для канала"""
+    """Получает историю лутбоксов для канала
+    
+    Если platform не указан, возвращает общую историю для всех платформ.
+    """
     try:
-        history = db.query(DropsHistory).filter(
+        # Загружаем историю (общую для всех платформ, если platform не указан)
+        query = db.query(DropsHistory).filter(
             DropsHistory.user_id == current_user["id"],
-            DropsHistory.channel_name == channel_name,
-            DropsHistory.platform == platform
-        ).order_by(DropsHistory.created_at.desc()).offset(offset).limit(limit).all()
+            DropsHistory.channel_name == channel_name
+        )
+        
+        # Если platform указан, фильтруем по нему
+        if platform:
+            query = query.filter(DropsHistory.platform == platform)
+        
+        history = query.order_by(DropsHistory.created_at.desc()).offset(offset).limit(limit).all()
         
         # Получаем информацию о качествах одним запросом (оптимизация N+1)
         # Используем только те quality_id, которые реально используются в истории
@@ -908,15 +958,18 @@ async def get_drops_stats(
 @router.get("/streaks/{channel_name}")
 async def get_user_streaks(
     channel_name: str,
-    platform: str = "twitch",
+    platform: Optional[str] = None,  # Опциональный параметр, если не указан - возвращаем общую статистику
     limit: int = 50,
     offset: int = 0,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получает список стриков пользователей"""
+    """Получает список стриков пользователей
+    
+    Если platform не указан, возвращает общую статистику для всех платформ.
+    """
     try:
-        # Check if streak is enabled
+        # Check if streak is enabled (проверяем общий конфиг)
         from services.drops_service import DropsService
         drops_service = DropsService(db)
         user_id, session_id, is_guest = get_user_or_session_filters(current_user)
@@ -925,21 +978,34 @@ async def get_user_streaks(
             user_id=user_id,
             session_id=session_id,
             channel_name=channel_name,
-            platform=platform
+            platform=None  # Получаем общий конфиг
         )
         
+        # Проверяем, включен ли стрик хотя бы на одной платформе
+        streak_enabled = False
+        if config:
+            streak_enabled_twitch = getattr(config, 'streak_enabled_twitch', False)
+            streak_enabled_vk = getattr(config, 'streak_enabled_vk', False)
+            streak_enabled = streak_enabled_twitch or streak_enabled_vk
+        
         # If streak is disabled, return empty list
-        if not config or not config.streak_enabled:
+        if not config or not streak_enabled:
             return {
                 "success": True,
                 "data": []
             }
         
-        streaks = db.query(UserStreak).filter(
+        # Загружаем стрики (общие для всех платформ, если platform не указан)
+        query = db.query(UserStreak).filter(
             UserStreak.user_id == current_user["id"],
-            UserStreak.channel_name == channel_name,
-            UserStreak.platform == platform
-        ).order_by(UserStreak.current_streak.desc()).offset(offset).limit(limit).all()
+            UserStreak.channel_name == channel_name
+        )
+        
+        # Если platform указан, фильтруем по нему
+        if platform:
+            query = query.filter(UserStreak.platform == platform)
+        
+        streaks = query.order_by(UserStreak.current_streak.desc()).offset(offset).limit(limit).all()
         
         return {
             "success": True,
@@ -1064,7 +1130,7 @@ async def get_user_from_token(
         return {
             "user_id": config.user_id,
             "channel_name": config.channel_name,
-            "platform": config.platform,
+            "platform": config.platform or "global",
             "success": True
         }
         
@@ -1085,10 +1151,33 @@ async def generate_widget_url(
         import secrets
         import os
         
-        # Ищем конфигурацию пользователя (берем первую, так как токен один на пользователя)
-        config = db.query(DropsConfig).filter(
-            DropsConfig.user_id == current_user["id"]
-        ).first()
+        # Получаем channel_name из пользователя
+        user = db.query(User).filter(User.id == current_user["id"]).first()
+        
+        if not user:
+            raise HTTPException(
+                status_code=400, 
+                detail="Пользователь не найден"
+            )
+        
+        # Определяем channel_name (приоритет: twitch -> vk)
+        channel_name = user.twitch_username or user.vk_channel_name or user.username or "unknown"
+        
+        if channel_name == "unknown":
+            raise HTTPException(
+                status_code=400, 
+                detail="Необходимо подключить платформу (Twitch/VK) для создания виджета"
+            )
+        
+        # Ищем общий конфиг пользователя (platform="global" или None)
+        from services.drops_service import DropsService
+        drops_service = DropsService(db)
+        config = drops_service.get_config(
+            user_id=current_user["id"],
+            session_id=None,
+            channel_name=channel_name,
+            platform=None  # Используем общий конфиг
+        )
         
         # Если есть токен и не требуется регенерация, возвращаем существующий
         widget_token_value = None
@@ -1122,28 +1211,14 @@ async def generate_widget_url(
                     config.widget_token = token
             except Exception as e:
                 logger.warning(f"Cannot set widget_token: {e}. Field may not exist in database. Creating migration needed.")
-        else:
-            # Если конфигурации нет, создаем базовую для хранения токена
-            # Но нужен channel_name и platform - берем из первого токена пользователя
-            user_token = db.query(UserToken).filter(
-                UserToken.user_id == current_user["id"]
-            ).first()
-            
-            if not user_token:
-                raise HTTPException(
-                    status_code=400, 
-                    detail="Необходимо подключить платформу (Twitch/VK) для создания виджета"
-                )
-            
-            # Используем DropsService для создания конфигурации
-            from services.drops_service import DropsService
-            drops_service = DropsService(db)
-            
+        
+        # Если конфигурации нет, создаем общий конфиг (platform=None -> "global")
+        if not config:
             config = drops_service.create_or_update_config(
                 user_id=current_user["id"],
                 session_id=None,
-                channel_name=user_token.platform_user_login or "unknown",
-                platform=user_token.platform,
+                channel_name=channel_name,
+                platform=None,  # Создаем общий конфиг (platform="global")
                 config_data={}
             )
             
@@ -1293,35 +1368,102 @@ async def donationalerts_webhook(
             "error": str(e)
         }
 
+@router.get("/mythical-session/{channel_name}")
+async def get_active_mythical_session(
+    channel_name: str,
+    widget_token: Optional[str] = None,
+    current_user: Optional[dict] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    """Получить активную сессию мифического сундука (для виджета OBS)"""
+    try:
+        # Если есть widget_token, используем его для авторизации
+        if widget_token:
+            config = db.query(DropsConfig).filter(DropsConfig.widget_token == widget_token).first()
+            if not config:
+                raise HTTPException(status_code=404, detail="Invalid widget token")
+            user_id = config.user_id
+            session_id = config.session_id
+        elif current_user:
+            user_id = current_user.get("id")
+            session_id = current_user.get("session_id")
+        else:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        
+        # Ищем активную сессию
+        query = db.query(MythicalDropsSession).filter(
+            MythicalDropsSession.channel_name == channel_name,
+            MythicalDropsSession.is_active == True,
+            MythicalDropsSession.expires_at > utcnow_naive()
+        )
+        
+        if user_id:
+            query = query.filter(MythicalDropsSession.user_id == user_id)
+        elif session_id:
+            query = query.filter(MythicalDropsSession.session_id == session_id)
+        else:
+            return {"success": False, "data": None}
+        
+        session = query.first()
+        
+        if not session:
+            return {
+                "success": True,
+                "data": None
+            }
+        
+        # Вычисляем оставшееся время
+        now = utcnow_naive()
+        time_remaining = (session.expires_at - now).total_seconds()
+        time_remaining = max(0, int(time_remaining))
+        
+        return {
+            "success": True,
+            "data": {
+                "id": session.id,
+                "is_active": session.is_active,
+                "donation_amount": session.donation_amount,
+                "window_duration_minutes": session.window_duration_minutes,
+                "started_at": session.started_at.isoformat() if session.started_at else None,
+                "expires_at": session.expires_at.isoformat() if session.expires_at else None,
+                "time_remaining_seconds": time_remaining,
+                "time_remaining_minutes": int(time_remaining / 60),
+                "time_remaining_formatted": f"{int(time_remaining / 60)}:{int(time_remaining % 60):02d}"
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting active mythical session: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка получения активной сессии")
+
 @router.post("/streak/reset/{channel_name}")
 async def reset_streak_statistics(
     channel_name: str,
-    platform: str = "twitch",
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Сбрасывает всю статистику стриков для канала (только статистика, не настройки)"""
+    """Сбрасывает всю статистику стриков для канала для всех платформ (только статистика, не настройки)"""
     try:
         user_id, session_id, is_guest = get_user_or_session_filters(current_user)
         
         from services.drops_service import DropsService
         drops_service = DropsService(db)
         
-        # Проверяем, что конфигурация существует и принадлежит пользователю
+        # Проверяем, что конфигурация существует и принадлежит пользователю (общий конфиг)
         config = drops_service.get_config(
             user_id=user_id,
             session_id=session_id,
             channel_name=channel_name,
-            platform=platform
+            platform=None  # Проверяем общий конфиг
         )
         
         if not config:
             raise HTTPException(status_code=404, detail="Конфигурация не найдена")
         
-        # Удаляем все записи UserStreak для этого канала
+        # Удаляем все записи UserStreak для этого канала (для всех платформ)
         query = db.query(UserStreak).filter(
-            UserStreak.channel_name == channel_name,
-            UserStreak.platform == platform
+            UserStreak.channel_name == channel_name
         )
         
         if user_id:
@@ -1334,7 +1476,7 @@ async def reset_streak_statistics(
         deleted_count = query.delete(synchronize_session=False)
         db.commit()
         
-        drops_logger.info(f"🗑️ [STREAK RESET] Удалено {deleted_count} записей стриков для {channel_name} ({platform})")
+        drops_logger.info(f"🗑️ [STREAK RESET] Удалено {deleted_count} записей стриков для {channel_name} (все платформы)")
         
         return {
             "success": True,

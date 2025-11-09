@@ -329,6 +329,11 @@ class VKLiveWebSocketClient:
                     message_text += f"@{part['mention'].get('nick', '')}"
                 elif "smile" in part:
                     message_text += f":{part['smile'].get('name', '')}:"
+                # ✅ Обрабатываем ссылки если они в отдельном part
+                elif "link" in part:
+                    link_url = part["link"].get("url", "")
+                    if link_url:
+                        message_text += link_url
             
             # Извлекаем информацию об авторе
             author_id = author.get("id")

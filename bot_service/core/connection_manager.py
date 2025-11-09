@@ -56,6 +56,21 @@ class ConnectionManager(ConnectionManagerCore):
             await websocket.accept()
             self.obs_connections[token] = websocket
             logger.info(f"OBS WebSocket connected: {token[:10]}...")
+            
+            # 🚀 FIX: Отменяем отложенное отключение TTS при подключении OBS
+            # Получаем user_id из токена
+            from auth.auth import verify_jwt_token
+            from core.database import get_db, User
+            
+            try:
+                payload = verify_jwt_token(token)
+                if payload and 'user_id' in payload:
+                    user_id = payload['user_id']
+                    self.cancel_tts_disconnect(user_id)
+                    logger.info(f"✅ [OBS CONNECT] Cancelled TTS disconnect for user {user_id} (OBS connected)")
+            except Exception as e:
+                logger.debug(f"Could not extract user_id from OBS token: {e}")
+            
         except Exception as e:
             logger.error(f"Error connecting OBS WebSocket: {e}")
 
@@ -67,6 +82,30 @@ class ConnectionManager(ConnectionManagerCore):
                 await websocket.close()
                 del self.obs_connections[token]
                 logger.info(f"OBS WebSocket disconnected: {token[:10]}...")
+                
+                # 🚀 FIX: Планируем отключение TTS если нет других активных соединений
+                # Получаем user_id из токена
+                from auth.auth import verify_jwt_token
+                from core.database import get_db, User
+                
+                try:
+                    payload = verify_jwt_token(token)
+                    if payload and 'user_id' in payload:
+                        user_id = payload['user_id']
+                        db = next(get_db())
+                        try:
+                            user = db.query(User).filter(User.id == user_id).first()
+                            if user:
+                                username = user.twitch_username or user.vk_username or f"user_{user_id}"
+                                # Планируем отключение TTS только если нет других активных соединений
+                                # Это будет проверено в _delayed_tts_disable
+                                self.schedule_tts_disconnect(user_id, username)
+                                logger.info(f"⏱️ [OBS DISCONNECT] Scheduled TTS disconnect for user {user_id} (OBS disconnected)")
+                        finally:
+                            db.close()
+                except Exception as e:
+                    logger.debug(f"Could not extract user_id from OBS token: {e}")
+                    
         except Exception as e:
             logger.error(f"Error disconnecting OBS WebSocket: {e}")
 

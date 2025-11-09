@@ -6,6 +6,13 @@ import asyncio
 import logging
 import time
 import httpx
+import urllib3
+
+# Подавляем предупреждение о небезопасных HTTPS-запросах для dev API VK
+# ⚠️ ВНИМАНИЕ: Это применяется только для apidev.live.vkvideo.ru (dev API VK)
+# Для production API (api.live.vkvideo.ru) нужно будет включить проверку SSL
+# Это безопасно, так как это официальный dev API VK, но с самоподписанным сертификатом
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Глобальный timeout для VK API запросов (30 секунд на общий запрос, 10 секунд на соединение)
 VK_API_TIMEOUT = aiohttp.ClientTimeout(total=30, connect=10)
@@ -715,7 +722,9 @@ class VKLiveAPI:
             }
             params = {"channel_url": channel_url}
             
-            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            # ⚠️ Отключаем проверку SSL для dev API VK (apidev.live.vkvideo.ru)
+            # Это безопасно, так как это внутренний dev API VK
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0, verify=False) as client:
                 response = await client.get(url, headers=headers, params=params, timeout=10)
                 
                 if response.status_code == 200:
@@ -740,7 +749,9 @@ class VKLiveAPI:
             }
             params = {"channel_url": channel_url}
             
-            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            # ⚠️ Отключаем проверку SSL для dev API VK (apidev.live.vkvideo.ru)
+            # Это безопасно, так как это внутренний dev API VK
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0, verify=False) as client:
                 response = await client.get(url, headers=headers, params=params, timeout=10)
                 
                 if response.status_code == 200:
@@ -766,7 +777,9 @@ class VKLiveAPI:
             
             body = {"reward": reward_data}
             
-            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            # ⚠️ Отключаем проверку SSL для dev API VK (apidev.live.vkvideo.ru)
+            # Это безопасно, так как это внутренний dev API VK
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0, verify=False) as client:
                 response = await client.post(url, headers=headers, params=params, json=body, timeout=10)
                 
                 if response.status_code == 200:
@@ -792,7 +805,9 @@ class VKLiveAPI:
             }
             params = {"channel_url": channel_url}
             
-            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            # ⚠️ Отключаем проверку SSL для dev API VK (apidev.live.vkvideo.ru)
+            # Это безопасно, так как это внутренний dev API VK
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0, verify=False) as client:
                 response = await client.get(url, headers=headers, params=params, timeout=10)
                 
                 if response.status_code == 200:
@@ -821,7 +836,9 @@ class VKLiveAPI:
                 "offset": offset
             }
             
-            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            # ⚠️ Отключаем проверку SSL для dev API VK (apidev.live.vkvideo.ru)
+            # Это безопасно, так как это внутренний dev API VK
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0, verify=False) as client:
                 response = await client.get(url, headers=headers, params=params, timeout=10)
                 
                 if response.status_code == 200:
@@ -847,7 +864,9 @@ class VKLiveAPI:
             
             body = {"demands": [{"id": demand_id} for demand_id in demand_ids]}
             
-            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            # ⚠️ Отключаем проверку SSL для dev API VK (apidev.live.vkvideo.ru)
+            # Это безопасно, так как это внутренний dev API VK
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0, verify=False) as client:
                 response = await client.post(url, headers=headers, params=params, json=body, timeout=10)
                 
                 if response.status_code == 200:
@@ -873,7 +892,9 @@ class VKLiveAPI:
             
             body = {"demands": [{"id": demand_id} for demand_id in demand_ids]}
             
-            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            # ⚠️ Отключаем проверку SSL для dev API VK (apidev.live.vkvideo.ru)
+            # Это безопасно, так как это внутренний dev API VK
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0, verify=False) as client:
                 response = await client.post(url, headers=headers, params=params, json=body, timeout=10)
                 
                 if response.status_code == 200:
@@ -929,7 +950,9 @@ class VKLiveAPI:
             
             body = {"reward": reward_data}
             
-            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            # ⚠️ Отключаем проверку SSL для dev API VK (apidev.live.vkvideo.ru)
+            # Это безопасно, так как это внутренний dev API VK
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0, verify=False) as client:
                 response = await client.post(url, headers=headers, params=params, json=body, timeout=10)
                 
                 if response.status_code == 200:

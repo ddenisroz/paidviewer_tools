@@ -307,14 +307,25 @@ class SessionManager:
             channel_name = platform_user_id.lower()
             self.terminate_guest_sessions_for_channel(channel_name, "converted_to_authenticated")
             
-            # Обновляем текущую сессию - меняем user_id с -1 на новый ID
-            guest_session.user_id = new_user.id
+            # Обновляем device_info гостевой сессии перед завершением (для истории)
+            # ⚠️ GuestSession не имеет поля user_id - это отдельная таблица
             guest_session.device_info = {
                 **guest_session.device_info,
                 "converted_from_guest": True,
                 "conversion_platform": platform,
-                "conversion_timestamp": datetime.utcnow().isoformat()
+                "conversion_timestamp": datetime.utcnow().isoformat(),
+                "converted_to_user_id": new_user.id
             }
+            
+            # Создаем новую UserSession для авторизованного пользователя
+            # (GuestSession завершается через terminate_guest_sessions_for_channel)
+            new_user_session = UserSession(
+                user_id=new_user.id,
+                session_id=guest_session_id,  # Используем тот же session_id для плавного перехода
+                device_info=guest_session.device_info,
+                is_active=True
+            )
+            db.add(new_user_session)
             
             db.commit()
             

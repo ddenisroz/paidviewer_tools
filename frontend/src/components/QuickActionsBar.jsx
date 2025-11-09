@@ -1,6 +1,7 @@
 // src/components/QuickActionsBar.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Volume2, VolumeX, Zap, DollarSign } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -10,20 +11,17 @@ import { useDonationAlerts } from '../context/DonationAlertsContext';
 import { botService } from '../services/microservices';
 import { toast } from 'sonner';
 import { logger } from '../utils/prodLogger';
+import { getQueryCache, setQueryCache } from '../utils/queryPersist';
 
 const QuickActionsBar = () => {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const { isAuthenticated, user, isGuest } = useAuth();
     const { integrations } = useIntegrations();
     const { ttsEnabled } = useTts();
     const { isConnected: daConnected, connect: daConnect } = useDonationAlerts();
     
-    const [ttsState, setTtsState] = useState(false);
-    const [streakEnabled, setStreakEnabled] = useState(false);
-    const [donationEnabled, setDonationEnabled] = useState(false);
-    const [mythicalEnabled, setMythicalEnabled] = useState(false);
     const [isToggling, setIsToggling] = useState(false);
-    const [hasRewards, setHasRewards] = useState(false); // Track if rewards are configured
 
     // Get channel name from integrations
     const channelName = integrations.twitch?.username || integrations.vk?.username || user?.twitch_username || user?.vk_username || user?.username;
@@ -31,69 +29,95 @@ const QuickActionsBar = () => {
     const isDropsEnabled = integrations.twitch?.enabled || integrations.vk?.enabled || (isGuest && user?.platform);
     const isDonationAlertsConnected = integrations?.donationalerts?.enabled || daConnected || false;
 
-    // Load initial states from backend
-    useEffect(() => {
-        if (isAuthenticated && channelName) {
-            loadStates();
-        }
-    }, [isAuthenticated, channelName]);
+    // 🔄 СИНХРОНИЗАЦИЯ: Используем React Query для синхронизации с TtsMainPage
+    const { data: ttsStatusData } = useQuery({
+        queryKey: ['tts-status'],
+        queryFn: async () => {
+            const response = await botService.get('/api/tts/status');
+            const data = response.data;
+            setQueryCache(['tts-status'], data);
+            return data;
+        },
+        enabled: isAuthenticated,
+        refetchInterval: 30000,
+        staleTime: 60000,
+        gcTime: 5 * 60 * 1000,
+        initialData: () => getQueryCache(['tts-status']),
+    });
 
-    // Listen to TTS status changes
+    // 🔄 СИНХРОНИЗАЦИЯ: Вычисляем состояние TTS ТОЧНО ТАК ЖЕ как в TtsMainPage
+    const ttsState = React.useMemo(() => {
+        if (!ttsStatusData) return false;
+        const enabled = ttsStatusData.enabled || false;
+        const engineType = ttsStatusData.engine_type || 'gtts';
+        
+        // ТОЧНО ТАКАЯ ЖЕ ЛОГИКА как в TtsMainPage:
+        // basicEnabled = enabled && engineType === 'gtts'
+        // aiEnabled = enabled && (engineType === 'cloud' || engineType === 'local')
+        // isAnyTtsEnabled = basicEnabled || aiEnabled
+        const basicEnabled = enabled && engineType === 'gtts';
+        const aiEnabled = enabled && (engineType === 'cloud' || engineType === 'local');
+        return basicEnabled || aiEnabled;
+    }, [ttsStatusData]);
+
+    // 🔄 СИНХРОНИЗАЦИЯ: Используем React Query для синхронизации Drops настроек с DropsMainPage
+    // Получаем общий конфиг (без platform параметра)
+    const { data: dropsConfigData } = useQuery({
+        queryKey: ['drops-config', channelName],
+        queryFn: async () => {
+            if (!channelName) return null;
+            const response = await botService.get(`/api/drops/config/${channelName}`);
+            return response.data?.success ? response.data.data : null;
+        },
+        enabled: isAuthenticated && isDropsEnabled && !!channelName,
+        refetchInterval: 30000,
+        staleTime: 60000,
+    });
+
+    // 🔄 СИНХРОНИЗАЦИЯ: Используем React Query для проверки наличия наград
+    const { data: rewardsData } = useQuery({
+        queryKey: ['drops-rewards', channelName, platform],
+        queryFn: async () => {
+            if (!channelName) return [];
+            const response = await botService.get(`/api/drops/rewards/${channelName}?platform=${platform}`);
+            return response.data?.success ? (response.data.data || []) : [];
+        },
+        enabled: isAuthenticated && isDropsEnabled && !!channelName,
+        refetchInterval: 30000,
+        staleTime: 60000,
+    });
+
+    // 🔄 СИНХРОНИЗАЦИЯ: Вычисляем состояния Drops из React Query данных
+    // Шорткат показывает состояние если хотя бы одна платформа включена
+    const twitchStreakEnabled = dropsConfigData?.streak_enabled_twitch || false;
+    const vkStreakEnabled = dropsConfigData?.streak_enabled_vk || false;
+    const streakEnabled = twitchStreakEnabled || vkStreakEnabled;
+    const donationEnabledRaw = dropsConfigData?.donation_enabled || false;
+    // 🚀 FIX: Donate drops активен только если включен И подключен DonationAlerts
+    const donationEnabled = donationEnabledRaw && isDonationAlertsConnected;
+    const mythicalEnabled = dropsConfigData?.mythical_enabled || false;
+    const hasRewards = (rewardsData?.length || 0) > 0;
+
+    // 🔄 СИНХРОНИЗАЦИЯ: Слушаем изменения Drops настроек от DropsMainPage
     useEffect(() => {
-        const handleTtsStatusChange = (event) => {
-            setTtsState(event.detail.enabled);
+        const handleDropsConfigChange = (event) => {
+            const { streak_enabled, donation_enabled, channel, platform: eventPlatform } = event.detail;
+            if (channel === channelName) {
+                // Инвалидируем кэш для обновления данных (общий конфиг)
+                queryClient.invalidateQueries({ queryKey: ['drops-config', channelName] });
+            }
         };
 
-        window.addEventListener('tts-status-changed', handleTtsStatusChange);
-        return () => window.removeEventListener('tts-status-changed', handleTtsStatusChange);
-    }, []);
-
-    const loadStates = async () => {
-        try {
-            // Load TTS state - SYNC WITH TTS MAIN PAGE LOGIC
-            const ttsRes = await botService.get('/api/tts/status');
-            // TTS enabled if: enabled=true AND (engine is gtts, cloud, or local)
-            const enabled = ttsRes.data?.enabled || false;
-            const engineType = ttsRes.data?.engine_type || 'gtts';
-            // TTS is ON if enabled and has any valid engine
-            const isTtsOn = enabled && ['gtts', 'cloud', 'local'].includes(engineType);
-            setTtsState(isTtsOn);
-
-            // Load Drops config
-            if (isDropsEnabled && channelName) {
-                const dropsRes = await botService.get(`/api/drops/config/${channelName}?platform=${platform}`);
-                if (dropsRes.data?.success) {
-                    setStreakEnabled(dropsRes.data.data?.streak_enabled || false);
-                    setDonationEnabled(dropsRes.data.data?.donation_enabled || false);
-                    setMythicalEnabled(dropsRes.data.data?.mythical_enabled || false);
-                }
-
-                // Load rewards to check if any exist
-                try {
-                    const rewardsRes = await botService.get(`/api/drops/rewards/${channelName}?platform=${platform}`);
-                    if (rewardsRes.data?.success) {
-                        const rewards = rewardsRes.data.data || [];
-                        setHasRewards(rewards.length > 0);
-                    }
-                } catch (error) {
-                    logger.error('Error loading rewards:', error);
-                    setHasRewards(false);
-                }
-            }
-        } catch (error) {
-            logger.error('Error loading states:', error);
-        }
-    };
+        window.addEventListener('drops-config-changed', handleDropsConfigChange);
+        return () => window.removeEventListener('drops-config-changed', handleDropsConfigChange);
+    }, [channelName, queryClient]);
 
     const handleTtsToggle = async () => {
         if (isToggling) return;
         setIsToggling(true);
-        // Optimistic update
-        const previousState = ttsState;
-        setTtsState(!ttsState);
         
         try {
-            const newState = !previousState;
+            const newState = !ttsState;
             if (newState) {
                 await botService.post('/api/tts/enable');
                 toast.success('Озвучка включена');
@@ -101,14 +125,17 @@ const QuickActionsBar = () => {
                 await botService.post('/api/tts/disable');
                 toast.success('Озвучка отключена');
             }
+            
+            // 🔄 СИНХРОНИЗАЦИЯ: Инвалидируем React Query кэш для синхронизации с TtsMainPage
+            queryClient.invalidateQueries({ queryKey: ['tts-status'] });
+            
+            // Отправляем событие для других компонентов
             window.dispatchEvent(new CustomEvent('tts-status-changed', { 
                 detail: { enabled: newState } 
             }));
         } catch (error) {
             logger.error('Error toggling TTS:', error);
             toast.error('Ошибка переключения озвучки');
-            // Rollback on error
-            setTtsState(previousState);
         } finally {
             setIsToggling(false);
         }
@@ -118,7 +145,11 @@ const QuickActionsBar = () => {
         if (isToggling || !channelName) return;
         
         // IMPORTANT: Check if rewards exist before enabling streak
-        if (!streakEnabled && !hasRewards) {
+        const twitchStreakEnabled = dropsConfigData?.streak_enabled_twitch || false;
+        const vkStreakEnabled = dropsConfigData?.streak_enabled_vk || false;
+        const anyStreakEnabled = twitchStreakEnabled || vkStreakEnabled;
+        
+        if (!anyStreakEnabled && !hasRewards) {
             toast.error('Сначала настройте содержимое сундуков на вкладке "Награды"', {
                 description: 'Перейдите в Drops → Награды',
                 duration: 4000
@@ -127,25 +158,35 @@ const QuickActionsBar = () => {
         }
         
         setIsToggling(true);
-        // Optimistic update
-        const previousState = streakEnabled;
-        setStreakEnabled(!streakEnabled);
         
         try {
-            const newState = !previousState;
-            await botService.put(`/api/drops/config/${channelName}?platform=${platform}`, {
-                streak_enabled: newState
-            });
-            toast.success(newState ? 'Стрик включен' : 'Стрик отключен');
-            // Dispatch event to sync with DropsMainPage
-            window.dispatchEvent(new CustomEvent('drops-config-changed', {
-                detail: { streak_enabled: newState, channel: channelName, platform }
-            }));
+            // Переключаем обе платформы одновременно
+            const newState = !anyStreakEnabled;
+            const payload = {
+                streak_enabled_twitch: integrations.twitch?.enabled ? newState : (dropsConfigData?.streak_enabled_twitch || false),
+                streak_enabled_vk: integrations.vk?.enabled ? newState : (dropsConfigData?.streak_enabled_vk || false)
+            };
+                
+            await botService.put(`/api/drops/config/${channelName}`, payload);
+            toast.success(newState ? 'Стрик включен для всех платформ' : 'Стрик отключен для всех платформ');
+            
+            // 🔄 СИНХРОНИЗАЦИЯ: Инвалидируем React Query кэш для синхронизации с DropsMainPage
+            queryClient.invalidateQueries({ queryKey: ['drops-config', channelName] });
+            
+            // Dispatch events для обеих платформ
+            if (integrations.twitch?.enabled) {
+                window.dispatchEvent(new CustomEvent('drops-config-changed', {
+                    detail: { streak_enabled: newState, channel: channelName, platform: 'twitch' }
+                }));
+            }
+            if (integrations.vk?.enabled) {
+                window.dispatchEvent(new CustomEvent('drops-config-changed', {
+                    detail: { streak_enabled: newState, channel: channelName, platform: 'vk' }
+                }));
+            }
         } catch (error) {
             logger.error('Error toggling streak:', error);
             toast.error('Ошибка переключения стрика');
-            // Rollback on error
-            setStreakEnabled(previousState);
         } finally {
             setIsToggling(false);
         }
@@ -154,21 +195,23 @@ const QuickActionsBar = () => {
     const handleDonationToggle = async () => {
         if (isToggling || !channelName) return;
         
-        // IMPORTANT: Check DonationAlerts integration before enabling
-        if (!donationEnabled && !isDonationAlertsConnected) {
-            toast.error('Требуется подключение DonationAlerts', {
+        // 🚀 FIX: Если DonationAlerts не подключен - перенаправляем на настройки
+        // Работает как обычный переключатель: всегда кликабельный, но перенаправляет на подключение
+        if (!isDonationAlertsConnected) {
+            toast.info('Требуется подключение DonationAlerts', {
                 description: 'Перенаправление на страницу настроек...',
                 duration: 2000
             });
             // Перенаправляем на страницу настроек для подключения DonationAlerts
             setTimeout(() => {
                 navigate('/dashboard/settings');
-            }, 500);
+            }, 300);
             return;
         }
         
         // IMPORTANT: Check if rewards exist before enabling
-        if (!donationEnabled && !hasRewards) {
+        // 🚀 FIX: Используем donationEnabledRaw для проверки текущего состояния в БД
+        if (!donationEnabledRaw && !hasRewards) {
             toast.error('Сначала настройте содержимое сундуков на вкладке "Награды"', {
                 description: 'Перейдите в Drops → Награды',
                 duration: 4000
@@ -177,16 +220,18 @@ const QuickActionsBar = () => {
         }
         
         setIsToggling(true);
-        // Optimistic update
-        const previousState = donationEnabled;
-        setDonationEnabled(!donationEnabled);
         
         try {
-            const newState = !previousState;
+            // 🚀 FIX: Используем donationEnabledRaw для определения нового состояния
+            const newState = !donationEnabledRaw;
             await botService.put(`/api/drops/config/${channelName}?platform=${platform}`, {
                 donation_enabled: newState
             });
             toast.success(newState ? 'Донаты включены' : 'Донаты отключены');
+            
+            // 🔄 СИНХРОНИЗАЦИЯ: Инвалидируем React Query кэш для синхронизации с DropsMainPage
+            queryClient.invalidateQueries({ queryKey: ['drops-config', channelName] });
+            
             // Dispatch event to sync with DropsMainPage
             window.dispatchEvent(new CustomEvent('drops-config-changed', {
                 detail: { donation_enabled: newState, channel: channelName, platform }
@@ -194,8 +239,6 @@ const QuickActionsBar = () => {
         } catch (error) {
             logger.error('Error toggling donation:', error);
             toast.error('Ошибка переключения донатов');
-            // Rollback on error
-            setDonationEnabled(previousState);
         } finally {
             setIsToggling(false);
         }
@@ -206,73 +249,76 @@ const QuickActionsBar = () => {
     }
 
     return (
-        <Card className="border-gray-700/50 bg-gradient-to-br from-gray-900/90 to-gray-800/60 backdrop-blur-sm shadow-xl">
-            <div className="flex items-center justify-center gap-2 px-6 py-3.5">
-                {/* TTS Button - Fixed Width */}
+        <Card className="border-gray-700">
+            <div className="flex items-center justify-center gap-3 px-6 py-4">
+                {/* TTS Button */}
                 <button
                     onClick={handleTtsToggle}
                     disabled={isToggling}
-                    className={`w-40 h-10 flex items-center justify-center gap-1.5 px-3 rounded-xl text-sm font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
+                    className={`w-[160px] h-11 flex items-center justify-center gap-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
                         ttsState
-                            ? 'bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 text-white shadow-lg shadow-purple-600/40'
-                            : 'bg-gray-800/60 hover:bg-gray-700/60 text-gray-400 hover:text-gray-300 border border-gray-700/50'
+                            ? 'bg-green-600 hover:bg-green-700 text-white border border-green-500'
+                            : 'bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-gray-200 border border-gray-700'
                     }`}
                 >
                     {ttsState ? <Volume2 className="w-4 h-4 flex-shrink-0" /> : <VolumeX className="w-4 h-4 flex-shrink-0" />}
-                    <span className="truncate">TTS чата</span>
-                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                    <span className="whitespace-nowrap">TTS чата</span>
+                    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0 ${
                         ttsState 
                             ? 'bg-white/20 text-white' 
-                            : 'bg-gray-700/50 text-gray-500'
+                            : 'bg-gray-700 text-gray-400'
                     }`}>
                         {ttsState ? 'ON' : 'OFF'}
                     </span>
                 </button>
 
-                {/* Streak Button - Fixed Width */}
+                {/* Streak Button */}
                 {isDropsEnabled && (
                     <button
                         onClick={handleStreakToggle}
                         disabled={isToggling || !channelName}
-                        className={`w-40 h-10 flex items-center justify-center gap-1.5 px-3 rounded-xl text-sm font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
+                        className={`w-[160px] h-11 flex items-center justify-center gap-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
                             streakEnabled
-                                ? 'bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 text-white shadow-lg shadow-orange-600/40'
-                                : 'bg-gray-800/60 hover:bg-gray-700/60 text-gray-400 hover:text-gray-300 border border-gray-700/50'
+                                ? 'bg-green-600 hover:bg-green-700 text-white border border-green-500'
+                                : 'bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-gray-200 border border-gray-700'
                         }`}
                     >
                         <Zap className="w-4 h-4 flex-shrink-0" />
-                        <span className="truncate">Стрик drops</span>
-                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                        <span className="whitespace-nowrap">Стрик drops</span>
+                        <span className={`text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0 ${
                             streakEnabled 
                                 ? 'bg-white/20 text-white' 
-                                : 'bg-gray-700/50 text-gray-500'
+                                : 'bg-gray-700 text-gray-400'
                         }`}>
                             {streakEnabled ? 'ON' : 'OFF'}
                         </span>
                     </button>
                 )}
 
-                {/* Donation Button - Fixed Width */}
+                {/* Donation Button */}
                 {isDropsEnabled && (
                     <button
                         onClick={handleDonationToggle}
-                        disabled={isToggling || !channelName || !isDonationAlertsConnected}
-                        className={`w-40 h-10 flex items-center justify-center gap-1.5 px-3 rounded-xl text-sm font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
+                        disabled={isToggling || !channelName}
+                        className={`w-[160px] h-11 flex items-center justify-center gap-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+                            // 🚀 FIX: Кнопка всегда кликабельна, но показывает серый стиль если DonationAlerts не подключен
                             !isDonationAlertsConnected
-                                ? 'bg-gray-800/30 text-gray-600 border border-gray-700/30'
+                                ? 'bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-300 border border-gray-700 cursor-pointer'
                                 : donationEnabled
-                                    ? 'bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white shadow-lg shadow-green-600/40'
-                                    : 'bg-gray-800/60 hover:bg-gray-700/60 text-gray-400 hover:text-gray-300 border border-gray-700/50'
+                                    ? 'bg-green-600 hover:bg-green-700 text-white border border-green-500'
+                                    : 'bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-gray-200 border border-gray-700'
                         }`}
+                        title={!isDonationAlertsConnected ? 'Нажмите для подключения DonationAlerts' : ''}
                     >
                         <DollarSign className="w-4 h-4 flex-shrink-0" />
-                        <span className="truncate">Donate drops</span>
-                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                        <span className="whitespace-nowrap">Donate drops</span>
+                        <span className={`text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0 ${
                             donationEnabled 
                                 ? 'bg-white/20 text-white' 
-                                : 'bg-gray-700/50 text-gray-500'
+                                : 'bg-gray-700 text-gray-400'
                         }`}>
-                            {donationEnabled ? 'ON' : 'OFF'}
+                            {/* 🚀 FIX: Показываем "OFF" если DonationAlerts не подключен, даже если donationEnabledRaw = true */}
+                            {(!isDonationAlertsConnected || !donationEnabled) ? 'OFF' : 'ON'}
                         </span>
                     </button>
                 )}

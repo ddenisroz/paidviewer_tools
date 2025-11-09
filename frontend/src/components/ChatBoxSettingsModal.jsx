@@ -198,14 +198,6 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
         setSettings(prev => ({ ...prev, [field]: value }));
     };
     
-    // Обрезание сообщения до N слов для горизонтального чата
-    const truncateWords = (text, maxWords = 6) => {
-        if (!text) return '';
-        const words = text.trim().split(/\s+/);
-        if (words.length <= maxWords) return text;
-        return words.slice(0, maxWords).join(' ') + '...';
-    };
-    
     if (!isOpen) return null;
     
     // ✅ Показываем loading экран только во время загрузки данных
@@ -291,7 +283,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
             {/* Modal Content */}
             <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pointer-events-none">
                 <div 
-                    className="bg-gray-900 rounded-lg max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto shadow-2xl"
+                    className="bg-gray-900 rounded-lg max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto border border-gray-700"
                     onClick={(e) => e.stopPropagation()}
                 >
                 {/* Header */}
@@ -662,7 +654,7 @@ const ChatBoxSettingsModal = ({ isOpen, onClose, onSave }) => {
                                                 </span>
                                                 {': '}
                                                 <span style={{ color: '#FFFFFF' }}>
-                                                    {settings?.chat_direction === 'horizontal' ? truncateWords(msg.message, 6) : msg.message}
+                                                    {msg.message}
                                                 </span>
                                             </span>
                                         </div>

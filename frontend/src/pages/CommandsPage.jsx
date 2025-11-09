@@ -35,8 +35,10 @@ import {
     Play,
     Mic,
     Radio,
-    Tag
+    Tag,
+    AlertCircle
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useIntegrations } from '../context/IntegrationsContext';
 import api from '../services/api';
@@ -48,8 +50,40 @@ import { logger } from '../utils/prodLogger';
 
 
     const CommandsPage = () => {
+    const navigate = useNavigate();
     const { isAuthenticated } = useAuth();
     const { integrations } = useIntegrations();
+    
+    // 🔒 ПЕРВООЧЕРЕДНАЯ ПРОВЕРКА: Авторизация
+    // Если пользователь не авторизован - показываем сообщение с предложением войти
+    if (!isAuthenticated) {
+        return (
+            <PageWrapper title="Команды">
+                <Card className="border-gray-700">
+                    <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
+                        <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
+                            <AlertCircle className="w-10 h-10 text-gray-500" />
+                        </div>
+                        <div className="space-y-2 max-w-md">
+                            <h3 className="text-xl font-semibold text-gray-200">
+                                Требуется авторизация
+                            </h3>
+                            <p className="text-gray-400 text-sm">
+                                Для использования управления командами необходимо войти в систему и подключить хотя бы одну платформу (Twitch или VK Live)
+                            </p>
+                        </div>
+                        <Button 
+                            onClick={() => navigate('/login')}
+                            className="gap-2"
+                        >
+                            <Settings className="w-4 h-4" />
+                            Войти в систему
+                        </Button>
+                    </CardContent>
+                </Card>
+            </PageWrapper>
+        );
+    }
     
     const [basicCommands, setBasicCommands] = useState([]);
     const [customCommands, setCustomCommands] = useState([]);
@@ -466,21 +500,6 @@ import { logger } from '../utils/prodLogger';
             </CardContent>
         </Card>
     ));
-
-    if (!isAuthenticated) {
-        return (
-            <PageWrapper>
-                <Card>
-                    <CardContent className="flex items-center justify-center h-64">
-                        <div className="text-center space-y-4">
-                            <Settings className="h-16 w-16 mx-auto text-muted-foreground" />
-                            <p className="text-muted-foreground">Войдите в систему для управления командами</p>
-                        </div>
-                    </CardContent>
-                </Card>
-            </PageWrapper>
-        );
-    }
 
     // ⚡ Показываем лоадер ТОЛЬКО при первой загрузке и если данных еще нет
     if (initialLoading && basicCommands.length === 0 && customCommands.length === 0) {

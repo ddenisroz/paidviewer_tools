@@ -3,6 +3,8 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Settings, MessageCircle } from 'lucide-react';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -15,6 +17,7 @@ import GuestStubs from '../components/GuestStubs';
 import QuickActionsBar from '../components/QuickActionsBar';
 import { getAndClearReturnUrl } from '../utils/oauthRedirect';
 import { logger } from '../utils/prodLogger';
+import { getQueryCache, setQueryCache } from '../utils/queryPersist';
 
 
 
@@ -53,15 +56,19 @@ const HomePage = () => {
         queryFn: async () => {
             if (!isAuthenticated || !integrations?.twitch?.enabled) return null;
             const response = await botService.get('/api/twitch/stream-info');
-            return response.data;
+            const data = response.data;
+            // 🚀 ANTI-FLASH: Сохраняем в кэш
+            setQueryCache(['stream-info', 'twitch'], data);
+            return data;
         },
         enabled: !!isAuthenticated && !!integrations?.twitch?.enabled,
-        staleTime: 60 * 1000, // 60 секунд - повышенное кэширование для стабильности
-        gcTime: 5 * 60 * 1000, // 5 минут - дольше храним в памяти
-        refetchInterval: 60 * 1000, // Обновляем каждые 60 секунд (вместо 30)
+        staleTime: 60 * 1000,
+        gcTime: 5 * 60 * 1000,
+        refetchInterval: 60 * 1000,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
         retry: 1,
+        initialData: () => getQueryCache(['stream-info', 'twitch']), // 🚀 ANTI-FLASH
     });
 
     // React Query: загружаем данные стримов (VK) с автоматическим обновлением
@@ -70,20 +77,29 @@ const HomePage = () => {
         queryFn: async () => {
             if (!isAuthenticated || !integrations?.vk?.enabled) return null;
             const response = await botService.get('/api/vk/stream-info');
-            return response.data;
+            const data = response.data;
+            // 🚀 ANTI-FLASH: Сохраняем в кэш
+            setQueryCache(['stream-info', 'vk'], data);
+            return data;
         },
         enabled: !!isAuthenticated && !!integrations?.vk?.enabled,
-        staleTime: 60 * 1000, // 60 секунд - повышенное кэширование для стабильности
-        gcTime: 5 * 60 * 1000, // 5 минут - дольше храним в памяти
-        refetchInterval: 60 * 1000, // Обновляем каждые 60 секунд (вместо 30)
+        staleTime: 60 * 1000,
+        gcTime: 5 * 60 * 1000,
+        refetchInterval: 60 * 1000,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
         retry: 1,
+        initialData: () => getQueryCache(['stream-info', 'vk']), // 🚀 ANTI-FLASH
     });
 
     // Удален неиспользуемый preparedStreamHistory
 
     // Удален неиспользуемый preparedVkStreamHistory
+    
+    // Проверяем наличие хотя бы одной интеграции
+    const hasAnyIntegration = useMemo(() => {
+        return integrations?.twitch?.enabled || integrations?.vk?.enabled;
+    }, [integrations]);
     
     // Подготавливаем данные о стримах для компонента StreamStatus
     const streamData = useMemo(() => {
@@ -131,6 +147,30 @@ const HomePage = () => {
                             isOnHomePage={true}
                         />
                     </div>
+                ) : !hasAnyIntegration ? (
+                    /* Нет подключенных интеграций - показываем сообщение */
+                    <Card className="border-gray-700">
+                        <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
+                            <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
+                                <MessageCircle className="w-10 h-10 text-gray-500" />
+                            </div>
+                            <div className="space-y-2 max-w-md">
+                                <h3 className="text-xl font-semibold text-gray-200">
+                                    У вас нет подключенных интеграций
+                                </h3>
+                                <p className="text-gray-400 text-sm">
+                                    Для использования функций бота необходимо подключить хотя бы одну платформу (Twitch или VK Live)
+                                </p>
+                            </div>
+                            <Button 
+                                onClick={() => navigate('/dashboard/settings')}
+                                className="gap-2"
+                            >
+                                <Settings className="w-4 h-4" />
+                                Перейти в настройки
+                            </Button>
+                        </CardContent>
+                    </Card>
                 ) : (
                     <>
                         {/* 🚀 ВСЕГДА показываем карточки - они сами обработают disabled состояние */}

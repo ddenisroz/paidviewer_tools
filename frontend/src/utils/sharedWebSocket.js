@@ -5,6 +5,7 @@
  */
 
 import Logger from './logger';
+import { WS_BASE_URL } from '../constants';
 
 const logger = new Logger('SHARED_WS');
 
@@ -21,6 +22,7 @@ class SharedWebSocketManager {
         this.leaderHeartbeatInterval = null;
         this.leaderCheckInterval = null;
         this.lastLeaderHeartbeat = Date.now();
+        this.leaderResponseReceived = false; // 🚀 ANTI-FLASH: флаг для быстрого определения активного лидера
         
         logger.info(`[${this.tabId}] Tab initialized`);
     }
@@ -57,19 +59,24 @@ class SharedWebSocketManager {
      * Выборы лидера
      */
     _electLeader() {
+        // Сбрасываем флаг ответа
+        this.leaderResponseReceived = false;
+        
         // Отправляем запрос: кто-нибудь уже лидер?
         this.channel.postMessage({
             type: 'leader_ping',
             tabId: this.tabId
         });
 
-        // Ждём ответа 100ms
+        // 🚀 ANTI-FLASH: Ждём ответа 200ms (быстрее, чем 5-6 секунд)
+        // Если лидер живой - он ответит мгновенно
         setTimeout(() => {
-            if (!this.isLeader && Date.now() - this.lastLeaderHeartbeat > 5000) {
-                // Никто не ответил или старый лидер умер - становимся лидером
+            if (!this.isLeader && !this.leaderResponseReceived) {
+                // Никто не ответил быстро - становимся лидером
+                logger.info(`[${this.tabId}] No leader response, becoming leader`);
                 this._becomeLeader();
             }
-        }, 100);
+        }, 200);
     }
 
     /**
@@ -134,6 +141,7 @@ class SharedWebSocketManager {
 
         const timeSinceLastHeartbeat = Date.now() - this.lastLeaderHeartbeat;
         
+        // Ждем 5 секунд перед выборами - защита от перезагрузки страницы
         if (timeSinceLastHeartbeat > 5000) {
             logger.warn(`[${this.tabId}] Leader seems dead (no heartbeat for ${timeSinceLastHeartbeat}ms), starting election`);
             this._electLeader();
@@ -159,6 +167,7 @@ class SharedWebSocketManager {
                 // Лидер существует
                 if (data.tabId !== this.tabId) {
                     this.lastLeaderHeartbeat = Date.now();
+                    this.leaderResponseReceived = true; // 🚀 ANTI-FLASH: помечаем что лидер активен
                     logger.debug(`[${this.tabId}] Leader ${data.tabId} is active`);
                 }
                 break;
@@ -214,8 +223,12 @@ class SharedWebSocketManager {
         }
 
         try {
+            // Используем WS_BASE_URL из констант (настраивается через env переменные)
+            // WS_BASE_URL уже импортирован в начале файла
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.hostname}:8000/ws/chat/${this.userId}`;
+            // Если WS_BASE_URL не определен, используем hostname с портом 8000 (fallback)
+            const wsBaseUrl = WS_BASE_URL || `${protocol}//${window.location.hostname}:8000`;
+            const wsUrl = `${wsBaseUrl}/ws/chat/${this.userId}`;
             
             logger.info(`[${this.tabId}] 🔌 Connecting WebSocket: ${wsUrl}`);
             this.ws = new WebSocket(wsUrl);

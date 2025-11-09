@@ -1,20 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
-import { Monitor, Copy, ExternalLink, Settings2, Loader2, Check } from 'lucide-react';
+import { Monitor, Copy, ExternalLink, Settings2, Loader2 } from 'lucide-react';
 import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
 import { logger } from '../../utils/prodLogger';
 
-const WidgetSettings = ({ user, platform, channelName }) => {
+const WidgetSettings = ({ user, channelName }) => {
   const [config, setConfig] = useState(null);
   const [widgetUrl, setWidgetUrl] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [savedSuccessfully, setSavedSuccessfully] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const saveTimeoutRef = useRef(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [formData, setFormData] = useState({
     widget_spinning_duration_ms: [1500],
     widget_opening_duration_ms: [1000],
@@ -24,16 +24,14 @@ const WidgetSettings = ({ user, platform, channelName }) => {
   useEffect(() => {
     loadConfig();
     generateWidgetUrl();
-  }, [user, platform, channelName]);
+  }, [user, channelName]);
 
   const loadConfig = async () => {
-    if (!user || !platform || !channelName) {
+    if (!user || !channelName) {
       return;
     }
     try {
-      const response = await botService.get(`/api/drops/config/${channelName}`, {
-        params: { platform }
-      });
+      const response = await botService.get(`/api/drops/config/${channelName}`);
       if (response.data.success) {
         setConfig(response.data.data);
         setFormData({
@@ -41,6 +39,7 @@ const WidgetSettings = ({ user, platform, channelName }) => {
           widget_opening_duration_ms: [response.data.data.widget_opening_duration_ms ?? 1000],
           widget_result_duration_ms: [response.data.data.widget_result_duration_ms ?? 5500]
         });
+        setIsInitialLoad(false);
       }
     } catch (error) {
       logger.error('Error loading widget config:', error);
@@ -71,34 +70,51 @@ const WidgetSettings = ({ user, platform, channelName }) => {
     }
   };
 
-  const handleSave = async () => {
-    if (!user || !platform || !channelName) {
-      toast.error('Недостаточно данных для сохранения');
+  // ✅ Автосохранение с дебаунсом
+  const autoSave = async () => {
+    if (!user || !channelName || isInitialLoad) {
       return;
     }
-    try {
-      setSaving(true);
-      const payload = {
-        widget_spinning_duration_ms: formData.widget_spinning_duration_ms[0],
-        widget_opening_duration_ms: formData.widget_opening_duration_ms[0],
-        widget_result_duration_ms: formData.widget_result_duration_ms[0]
-      };
-      const response = await botService.put(`/api/drops/config/${channelName}`, payload, {
-        params: { platform }
-      });
-      if (response.data.success) {
-        toast.success('Настройки виджета сохранены');
-        setSavedSuccessfully(true);
-        setTimeout(() => setSavedSuccessfully(false), 2000);
-        await loadConfig();
-      }
-    } catch (error) {
-      logger.error('Error saving widget config:', error);
-      toast.error('Ошибка сохранения настроек');
-    } finally {
-      setSaving(false);
+    
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
     }
+    
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        const payload = {
+          widget_spinning_duration_ms: formData.widget_spinning_duration_ms[0],
+          widget_opening_duration_ms: formData.widget_opening_duration_ms[0],
+          widget_result_duration_ms: formData.widget_result_duration_ms[0]
+        };
+        await botService.put(`/api/drops/config/${channelName}`, payload);
+        // ✅ Автосохранение работает тихо, без toast
+      } catch (error) {
+        logger.error('Error auto-saving widget config:', error);
+      }
+    }, 1000); // Дебаунс 1 секунда
   };
+  
+  // ✅ Автосохранение при изменении полей
+  useEffect(() => {
+    if (!isInitialLoad && config) {
+      autoSave();
+    }
+  }, [
+    formData.widget_spinning_duration_ms,
+    formData.widget_opening_duration_ms,
+    formData.widget_result_duration_ms,
+    isInitialLoad
+  ]);
+  
+  // Очистка таймера при размонтировании
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const copyWidgetUrl = () => {
     if (widgetUrl) {
@@ -168,54 +184,10 @@ const WidgetSettings = ({ user, platform, channelName }) => {
             </div>
           </div>
 
-          {/* Кнопки */}
-          <div className="flex justify-between items-center">
-            <Button
-              onClick={() => {
-                if (widgetUrl) {
-                  // Открываем виджет в новой вкладке для настройки и тестирования
-                  const previewUrl = `${widgetUrl}?preview=true`;
-                  window.open(previewUrl, '_blank');
-                } else {
-                  toast.error('URL виджета еще не загружен');
-                }
-              }}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              disabled={!widgetUrl}
-            >
-              <ExternalLink className="w-4 h-4" />
-              Предпросмотр анимации
-            </Button>
-            <Button 
-              onClick={handleSave}
-              disabled={saving}
-              size="sm"
-              variant="default"
-              className={`gap-2 px-6 transition-all duration-300 ${
-                savedSuccessfully 
-                  ? 'bg-green-600 hover:bg-green-500 scale-105' 
-                  : saving 
-                    ? 'opacity-75' 
-                    : ''
-              }`}
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Сохранение...
-                </>
-              ) : savedSuccessfully ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  Сохранено!
-                </>
-              ) : (
-                'Сохранить'
-              )}
-            </Button>
-          </div>
+          {/* ✅ Убрали кнопки - автосохранение работает автоматически */}
+          <p className="text-xs text-muted-foreground italic">
+            Настройки сохраняются автоматически при изменении
+          </p>
         </CardContent>
       </Card>
 
@@ -231,16 +203,7 @@ const WidgetSettings = ({ user, platform, channelName }) => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <h3 className="font-medium text-sm">Настройка OBS</h3>
-            <ol className="list-decimal list-inside space-y-1 text-xs text-muted-foreground">
-              <li>В OBS добавьте новый источник «Browser Source»</li>
-              <li>Вставьте URL виджета в поле URL</li>
-              <li>Установите ширину 1280px и высоту 720px</li>
-              <li>Включите опцию «Shutdown source when not visible»</li>
-            </ol>
-          </div>
-
+          {/* ✅ Убрали инструкцию OBS */}
           {widgetUrl ? (
             <div className="space-y-2">
               <div className="flex items-center justify-between">

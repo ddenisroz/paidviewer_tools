@@ -39,6 +39,11 @@ MESSAGE_CHECK_INTERVAL = 5  # Интервал проверки сообщени
 BOT_CONNECTION_WAIT = 2  # Время ожидания подключения бота (сек)
 STREAM_ONLINE_THRESHOLD_MINUTES = 5  # Порог для определения онлайн стрима (мин)
 
+# === TTS DISCONNECT TIMEOUT ===
+# Таймаут ожидания переподключения перед отключением TTS (в секундах)
+# Увеличен для OBS и сайта (могут быть задержки при перезагрузке)
+TTS_RECONNECT_TIMEOUT_SECONDS = int(os.getenv("TTS_RECONNECT_TIMEOUT_SECONDS", "60"))  # По умолчанию 60 секунд
+
 # === HTTP STATUS CODES ===
 class HTTP_STATUS:
     OK = 200
@@ -51,10 +56,15 @@ class HTTP_STATUS:
 
 # === TTS КОНСТАНТЫ ===
 TTS_DEFAULT_CFG_STRENGTH = 2.5
+TTS_DEFAULT_VOLUME = 50.0  # Дефолтная громкость TTS (0-100)
+TTS_DEFAULT_SPEED_PRESET = 'normal'  # Дефолтная скорость речи
 TTS_CROSS_FADE_DURATION = 0.15
 TTS_SILENCE_DURATION_MS = 100
 TTS_SWAY_SAMPLING_COEF = -1.0
 TTS_MESSAGE_MAX_LENGTH = 500  # Максимальная длина сообщения для TTS
+TTS_MAX_RETRIES = int(os.getenv("TTS_MAX_RETRIES", "2"))  # Количество попыток для AI TTS
+TTS_RETRY_DELAY = float(os.getenv("TTS_RETRY_DELAY", "0.5"))  # Задержка между попытками (секунды)
+TTS_HEALTH_CHECK_INTERVAL = int(os.getenv("TTS_HEALTH_CHECK_INTERVAL", "30"))  # Интервал проверки здоровья TTS сервиса (секунды)
 
 # === ПЛАТФОРМЫ ===
 SUPPORTED_PLATFORMS = ["twitch", "vk"]

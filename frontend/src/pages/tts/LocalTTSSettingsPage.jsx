@@ -1,5 +1,6 @@
 // frontend/src/pages/tts/LocalTTSSettingsPage.jsx
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
     Server, 
@@ -17,7 +18,9 @@ import {
     Upload,
     Trash2,
     Play,
-    Plus
+    Plus,
+    Settings,
+    AlertCircle
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -31,8 +34,19 @@ import { toast } from 'sonner';
 import { botService } from '../../services/microservices';
 import axios from 'axios';
 import { logger } from '../../utils/prodLogger';
+import { useAuth } from '../../context/AuthContext';
+import { useIntegrations } from '../../context/IntegrationsContext';
+import PageWrapper from '../../components/PageWrapper';
 
 const LocalTTSSettingsPage = () => {
+    const navigate = useNavigate();
+    const { isAuthenticated, user, isGuest } = useAuth();
+    const { integrations } = useIntegrations();
+    
+    // 🔒 Проверка наличия интеграций
+    const isTwitchConnected = integrations.twitch?.enabled || (isGuest && user?.platform === 'twitch');
+    const isVkConnected = integrations.vk?.enabled || (isGuest && user?.platform === 'vk');
+    
     const [config, setConfig] = useState({
         endpoint_url: 'http://localhost:8001',
         api_key: '',
@@ -311,6 +325,67 @@ const LocalTTSSettingsPage = () => {
             loadVoices();
         }
     }, [testResult, currentTab]);
+
+    // 🔒 ПЕРВООЧЕРЕДНАЯ ПРОВЕРКА: Авторизация
+    // Если пользователь не авторизован - показываем сообщение с предложением войти
+    if (!isAuthenticated) {
+        return (
+            <PageWrapper title="Локальный TTS">
+                <Card className="border-gray-700">
+                    <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
+                        <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
+                            <AlertCircle className="w-10 h-10 text-gray-500" />
+                        </div>
+                        <div className="space-y-2 max-w-md">
+                            <h3 className="text-xl font-semibold text-gray-200">
+                                Требуется авторизация
+                            </h3>
+                            <p className="text-gray-400 text-sm">
+                                Для использования локального TTS необходимо войти в систему и подключить хотя бы одну платформу (Twitch или VK Live)
+                            </p>
+                        </div>
+                        <Button 
+                            onClick={() => navigate('/login')}
+                            className="gap-2"
+                        >
+                            <Settings className="w-4 h-4" />
+                            Войти в систему
+                        </Button>
+                    </CardContent>
+                </Card>
+            </PageWrapper>
+        );
+    }
+
+    // 🔒 Проверка наличия интеграций - если нет интеграций и не гость, показываем сообщение
+    if (!isGuest && !isTwitchConnected && !isVkConnected) {
+        return (
+            <PageWrapper title="Локальный TTS">
+                <Card className="border-gray-700">
+                    <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
+                        <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
+                            <AlertCircle className="w-10 h-10 text-gray-500" />
+                        </div>
+                        <div className="space-y-2 max-w-md">
+                            <h3 className="text-xl font-semibold text-gray-200">
+                                Нет подключенных интеграций
+                            </h3>
+                            <p className="text-gray-400 text-sm">
+                                Для использования локального TTS необходимо подключить хотя бы одну платформу (Twitch или VK Live)
+                            </p>
+                        </div>
+                        <Button 
+                            onClick={() => navigate('/dashboard/settings')}
+                            className="gap-2"
+                        >
+                            <Settings className="w-4 h-4" />
+                            Перейти в настройки
+                        </Button>
+                    </CardContent>
+                </Card>
+            </PageWrapper>
+        );
+    }
 
     if (loading) {
         return (
