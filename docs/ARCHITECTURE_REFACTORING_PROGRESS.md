@@ -52,19 +52,43 @@
 
 ---
 
-## 🚧 В процессе
-
 ### 3. Миграция компонентов на новые сервисы
 
-**Статус:** Не начато
+**Статус:** ✅ **ЧАСТИЧНО ВЫПОЛНЕНО** (16/50+ компонентов)
 
-**План:**
-- [ ] Мигрировать `CommandsPage` на `commandsService` и `useCommands`
-- [ ] Мигрировать `DropsMainPage` на `dropsService` и `useDropsConfig`
-- [ ] Мигрировать `TtsMainPage` на `ttsService` и `useTtsSettings`
-- [ ] Мигрировать `YoutubeIntegrationPage` на `youtubeService` и `useYoutubeQueue`
-- [ ] Мигрировать `HomePage` на `streamService` и `useTwitchStreamInfo`
-- [ ] Обновить все контексты для использования новых сервисов
+**Выполнено:**
+- ✅ `CommandsPage` - мигрирован на `commandsService` и `useCommands`
+- ✅ `TtsMainPage` - мигрирован на `ttsService` и `useTtsSettings`
+- ✅ TTS компоненты (7 компонентов) - мигрированы
+- ✅ Drops компоненты (5 компонентов) - мигрированы
+- ✅ `PointsRewards` - мигрирован на `pointsService`
+- ✅ `ChatBoxSettingsModal` - мигрирован на `chatboxService`
+- ✅ `YouTubeQueueCarousel` - мигрирован на `youtubeService`
+
+**Осталось:**
+- [ ] `YoutubeIntegrationPage` - мигрировать на `youtubeService` и `useYoutubeQueue`
+- [ ] `HomePage` (StreamTitleCard, StreamCategoryCard) - мигрировать на `streamService`
+- [ ] `ChatCard` - мигрировать на `chatService`
+- [ ] Admin страницы - мигрировать на соответствующие сервисы
+- [ ] Контексты - мигрировать на Service Layer и React Query
+
+---
+
+## 🚧 В процессе
+
+### 4. Миграция контекстов на новые сервисы
+
+**Статус:** ⚠️ **НЕ НАЧАТО**
+
+**Требуется:**
+- [ ] `DataContext.jsx` - мигрировать на `streamService` и React Query
+- [ ] `PlayerContext.jsx` - мигрировать на `youtubeService` и React Query
+- [ ] `UserSettingsContext.jsx` - мигрировать на соответствующий сервис и React Query
+- [ ] `AuthContext.jsx` - мигрировать на `authService` и React Query
+- [ ] `IntegrationsContext.jsx` - мигрировать на `integrationsService` и React Query
+- [ ] `ChatContext.jsx` - мигрировать на `chatService` и React Query
+- [ ] `TtsContext.jsx` - мигрировать на `ttsService` и React Query
+- [ ] `TtsHealthContext.jsx` - объединить с `TtsContext.jsx`
 
 ---
 
@@ -98,11 +122,40 @@
 
 ## 📊 Статистика
 
-- **Создано файлов:** 12
-- **Строк кода:** ~2000
+- **Создано файлов:** 13
+- **Строк кода:** ~3000+
 - **Сервисов:** 10
-- **Queries:** 30+
-- **Мигрировано компонентов:** 0/50+
+- **Queries:** 45+
+- **Мигрировано компонентов:** 16/50+
+- **Мигрировано контекстов:** 0/9
+- **Удалено дублирования:** ~600+ строк
+
+---
+
+## 📝 Документация
+
+- ✅ `docs/ARCHITECTURE_ISSUES_REPORT.md` - Отчет об архитектурных проблемах
+- ✅ `docs/ARCHITECTURE_REFACTORING_PLAN.md` - План рефакторинга
+- ✅ `docs/ARCHITECTURE_REFACTORING_PROGRESS.md` - Прогресс рефакторинга (этот файл)
+- ✅ `docs/ARCHITECTURE_IMPROVEMENTS_STATUS.md` - Статус архитектурных улучшений
+- ✅ `docs/TESTING_PLAN.md` - План проверки всех функций
+- ✅ `docs/TYPESCRIPT_MIGRATION_PLAN.md` - План подготовки к TypeScript
+- ✅ `docs/MIGRATION_PROGRESS.md` - Прогресс миграции компонентов
+- ✅ `docs/MIGRATION_SUMMARY.md` - Резюме миграции
+
+---
+
+## 🎯 Общий прогресс
+
+### Выполнено:
+- ✅ **Фаза 1: Service Layer и API абстракция** - 100% (5/5)
+- ✅ **Фаза 2: React Query миграция (компоненты)** - 60% (3/5)
+- ⚠️ **Фаза 3: Упрощение контекстов** - 0% (0/3)
+- ⚠️ **Фаза 4: Обработка ошибок и валидация** - 50% (1/2)
+- ⚠️ **Фаза 5: Оптимизация производительности** - 30% (1/3)
+- ⚠️ **Фаза 6: Типизация и тестирование** - 50% (1/2)
+
+### Общий прогресс: **53%** (8/15 задач)
 
 ---
 
