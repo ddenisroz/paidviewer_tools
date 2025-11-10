@@ -6,7 +6,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useIntegrations } from '../../context/IntegrationsContext';
 import { Button } from '../ui/button';
 import { TwitchIcon, VKIcon } from '../PlatformIcons';
-import { API_BASE_URL } from '../../constants';
+import { authService } from '../../services/api/services/authService';
+import { integrationsService } from '../../services/api/services/integrationsService';
 import { saveReturnUrl } from '../../utils/oauthRedirect';
 import { logger } from '../../utils/prodLogger';
 
@@ -82,7 +83,7 @@ const Header = () => {
                     // 💾 Сохраняем текущую страницу перед редиректом
                     saveReturnUrl();
                     // Подключение - перенаправляем на OAuth
-                    window.location.href = `${API_BASE_URL}/auth/twitch/login`;
+                    authService.loginWithTwitch();
                 } else {
                     await updateTwitchIntegration(newEnabled);
                 }
@@ -92,7 +93,7 @@ const Header = () => {
                     // 💾 Сохраняем текущую страницу перед редиректом
                     saveReturnUrl();
                     // Прямой редирект на VK OAuth
-                    window.location.href = `${API_BASE_URL}/auth/vk/login`;
+                    authService.loginWithVk();
                 } else {
                     await updateVkIntegration(newEnabled);
                 }
