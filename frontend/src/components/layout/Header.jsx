@@ -100,24 +100,13 @@ const Header = () => {
             } else if (platform === 'donationalerts') {
                 if (integrations?.donationalerts?.enabled) {
                     // Отключаем DonationAlerts
-                    await fetch(`${API_BASE_URL}/api/integrations/donationalerts/disconnect`, { 
-                        method: 'POST',
-                        credentials: 'include'
-                    });
+                    await integrationsService.disconnectDonationAlerts();
                     await refreshAuthStatus(); // Обновляем статус интеграций
                 } else {
                     // Подключаем DonationAlerts - используем тот же подход, что и в DonationAlertsContext
                     try {
-                        const response = await fetch(`${API_BASE_URL}/api/donationalerts/connect`, {
-                            method: 'POST',
-                            credentials: 'include',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            }
-                        });
-                        
-                        if (response.ok) {
-                            const data = await response.json();
+                        const response = await integrationsService.connectDonationAlerts();
+                        const data = response.data;
                             if (data.success && data.auth_url) {
                                 // 💾 Сохраняем текущую страницу перед редиректом
                                 saveReturnUrl();
