@@ -26,7 +26,6 @@ import DropsHistory from '../../components/drops/DropsHistory';
 import StreakTracker from '../../components/drops/StreakTracker';
 import WidgetSettings from '../../components/drops/WidgetSettings';
 import { logger } from '../../utils/prodLogger';
-import { botService } from '../../services/microservices';
 import { toast } from 'sonner';
 const DropsMainPage = () => {
   const navigate = useNavigate();
