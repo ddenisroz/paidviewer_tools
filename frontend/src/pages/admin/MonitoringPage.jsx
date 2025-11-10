@@ -17,7 +17,7 @@ import {
     Tv,
     Volume2
 } from 'lucide-react';
-import { botService } from '@/services/microservices';
+import { adminService } from '../../services/api/services/adminService';
 import { logger } from '../../utils/prodLogger';
 
 const MonitoringPage = () => {
@@ -27,7 +27,7 @@ const MonitoringPage = () => {
     const { data: metricsData, isLoading: metricsLoading, error: metricsError } = useQuery({
         queryKey: ['monitoring-metrics'],
         queryFn: async () => {
-            const response = await botService.get('/api/admin/monitoring/metrics');
+            const response = await adminService.getMonitoringMetrics();
             return response.data.metrics || null;
         },
         staleTime: 5 * 1000, // 5 секунд

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw, Loader } from 'lucide-react';
 import { toast } from 'sonner';
-import { botService } from '../../services/microservices';
+import { adminService } from '../../services/api/services/adminService';
 import { logger } from '../../utils/prodLogger';
 
 const ErrorLogsPage = () => {
@@ -14,7 +14,7 @@ const ErrorLogsPage = () => {
   const loadLogs = async () => {
     try {
       setLoading(true);
-      const response = await botService.get('/api/system/logs?lines=200');
+      const response = await adminService.getSystemLogs({ lines: 200 });
       if (response.data?.success) {
         let filtered = response.data.logs || [];
         

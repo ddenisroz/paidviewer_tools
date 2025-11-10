@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Trash2, Plus, AlertCircle, Shield } from 'lucide-react';
 import { toast } from 'sonner';
-import { botService } from '../../services/microservices';
+import { adminService } from '../../services/api/services/adminService';
 import { logger } from '../../utils/prodLogger';
 
 const BlockedChannelsPage = () => {
@@ -18,7 +18,7 @@ const BlockedChannelsPage = () => {
   const loadBlockedChannels = async () => {
     try {
       setLoading(true);
-      const response = await botService.get('/api/admin/blocked-channels');
+      const response = await adminService.getBlockedChannels();
       setBlockedChannels(response.data.blocked_channels || []);
     } catch (error) {
       logger.error('Error loading blocked channels:', error);
@@ -36,7 +36,7 @@ const BlockedChannelsPage = () => {
 
     try {
       setAddingChannel(true);
-      await botService.post('/api/admin/blocked-channels', {
+      await adminService.blockChannel({
         channel_name: newChannel.trim(),
         reason: 'Заблокировано администратором'
       });
@@ -54,7 +54,7 @@ const BlockedChannelsPage = () => {
 
   const removeBlockedChannel = async (channelId) => {
     try {
-      await botService.delete(`/api/admin/blocked-channels/${channelId}`);
+      await adminService.unblockChannel(channelId);
       toast.success('Канал разблокирован');
       await loadBlockedChannels();
     } catch (error) {
