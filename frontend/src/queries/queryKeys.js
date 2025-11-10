@@ -17,6 +17,7 @@ export const queryKeys = {
   // Auth
   auth: {
     all: ['auth'],
+    status: () => ['auth', 'status'],
     user: () => ['auth', 'user'],
     me: () => ['auth', 'me'],
   },

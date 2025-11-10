@@ -1,9 +1,10 @@
 // src/context/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { botService, loginVk } from '../services/microservices';
 import { toast } from 'sonner';
 import { logger } from '../utils/prodLogger';
 import { API_BASE_URL } from '../constants';
+import { useAuthStatus, useLogout } from '../queries/auth/authQueries';
+import { authService } from '../services/api/services/authService';
 
 // Глобальный флаг для предотвращения множественных проверок аутентификации
 let globalAuthCheckInProgress = false;
@@ -33,29 +34,14 @@ export const AuthProvider = ({ children }) => {
     const [isCheckingAuth, setIsCheckingAuth] = useState(true); // Состояние проверки аутентификации
     const [integrationsNeedRefresh, setIntegrationsNeedRefresh] = useState(false);
 
-    const checkAuthStatus = useCallback(async (force = false) => {
-        // Глобальная проверка - предотвращаем множественные одновременные запросы
-        if (globalAuthCheckInProgress && !force) {
-            logger.debug('AuthContext: Global auth check already in progress, skipping...');
-            return;
-        }
-        
-        // Дополнительная проверка времени - не проверяем слишком часто (кроме принудительного обновления)
-        const now = Date.now();
-        if (!force && now - globalLastAuthCheckTime < 1000) { // Уменьшено до 1 секунды для лучшей синхронизации
-            logger.debug('AuthContext: Auth check too frequent, skipping...');
-            return;
-        }
-        
-        globalAuthCheckInProgress = true;
-        globalLastAuthCheckTime = now;
-        setIsCheckingAuth(true);
-        
-        try {
-            // Проверяем статус аутентификации (токен автоматически отправляется в cookies)
-            const response = await botService.get('/api/auth/status');
-            const { authenticated, user: userData, integrations } = response.data;
-
+    // React Query hook для проверки статуса аутентификации
+    const { data: authStatusData, isLoading: isCheckingAuthStatus, refetch: refetchAuthStatus } = useAuthStatus({
+        enabled: true,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        onSuccess: (data) => {
+            const { authenticated, user: userData, integrations } = data;
+            
             if (authenticated) {
                 const newUser = { ...userData, integrations };
                 setIsAuthenticated(true);
@@ -76,7 +62,6 @@ export const AuthProvider = ({ children }) => {
             }
             
             // 🧹 Очищаем URL параметры после успешной проверки авторизации
-            // Убираем ?auth=twitch&success=1&auth_link=twitch и подобные параметры
             const currentUrl = new URL(window.location.href);
             const hasAuthParams = currentUrl.searchParams.has('auth') || 
                                   currentUrl.searchParams.has('success') || 
@@ -102,43 +87,33 @@ export const AuthProvider = ({ children }) => {
                     logger.log(`🔄 [AUTH] OAuth success for ${authPlatform}, triggering integrations refresh`);
                     setTimeout(() => {
                         window.dispatchEvent(new CustomEvent('auth_refresh_required'));
-                    }, 200); // Задержка чтобы user успел обновиться
+                    }, 200);
                 }
             }
-        } catch (error) {
+        },
+        onError: (error) => {
             logger.error('Authentication check failed:', error);
             // Только при HTTP 401/403 считаем, что пользователь не аутентифицирован
             if (error.response && (error.response.status === 401 || error.response.status === 403)) {
                 setIsAuthenticated(false);
                 setIsGuest(false);
                 setUser(null);
-                // 🚀 ANTI-FLASH: Очищаем кэш при ошибках авторизации
                 localStorage.removeItem('cached_user');
             }
-            // При других ошибках (сеть, 500, etc) не меняем состояние аутентификации
-        } finally {
-            setIsCheckingAuth(false);
-            globalAuthCheckInProgress = false;
-        }
-    }, []);
+        },
+    });
 
+    // Обновляем isCheckingAuth из React Query
     useEffect(() => {
-        // Проверяем статус только при монтировании компонента
-        let mounted = true;
-        
-        const initAuth = async () => {
-            if (mounted) {
-                await checkAuthStatus();
-            }
-        };
-        
-        initAuth();
-        
-        // Cleanup function для предотвращения обновления unmounted компонента
-        return () => {
-            mounted = false;
-        };
-    }, []); // Убираем все зависимости, проверяем только при монтировании
+        setIsCheckingAuth(isCheckingAuthStatus);
+    }, [isCheckingAuthStatus]);
+
+    // Обертка для совместимости
+    const checkAuthStatus = useCallback(async (force = false) => {
+        if (force) {
+            await refetchAuthStatus();
+        }
+    }, [refetchAuthStatus]);
 
     // Слушаем события принудительного обновления
     useEffect(() => {
@@ -162,7 +137,9 @@ export const AuthProvider = ({ children }) => {
         const clearLegacySessions = async () => {
             if (isAuthenticated && user?.id && user?.id > 0 && mounted) {
                 try {
-                    await botService.post('/api/sessions/clear-legacy');
+                    // Используем apiClient напрямую для этого специфичного запроса
+                    const { apiClient } = await import('../services/api/client');
+                    await apiClient.post('/api/sessions/clear-legacy');
                     logger.debug('Legacy sessions cleared');
                 } catch (error) {
                     logger.debug('Legacy sessions cleanup skipped:', error.message);
@@ -178,32 +155,27 @@ export const AuthProvider = ({ children }) => {
     }, [isAuthenticated, user?.id]); // Зависимости корректны - только меняющиеся значения
 
     const loginWithTwitch = useCallback(() => {
-        // Прямой редирект на OAuth endpoint (бэкенд сделает 302 редирект на Twitch)
-        window.location.href = `${API_BASE_URL}/auth/twitch/login`;
+        // Используем authService для входа через Twitch
+        authService.loginWithTwitch();
     }, []);
 
     const loginWithVk = useCallback(() => {
         try {
             logger.log('🔵 [AUTH CONTEXT] loginWithVk() called');
-            loginVk();
-            logger.log('🔵 [AUTH CONTEXT] loginVk() from microservices executed');
+            authService.loginWithVk();
+            logger.log('🔵 [AUTH CONTEXT] loginWithVk() executed');
         } catch (error) {
             logger.error('❌ [AUTH CONTEXT] VK login error:', error);
-            logger.error("VK login error:", error);
             toast.error('Ошибка при входе через VK Live.');
         }
     }, []);
 
-    const logout = useCallback(async () => {
-        try {
+    // React Query mutation для выхода
+    const logoutMutation = useLogout({
+        onSuccess: async () => {
             const userId = user?.id;
-            
-            await botService.post('/api/auth/logout');
             setIsAuthenticated(false);
             setUser(null);
-            
-            // 🚀 ANTI-FLASH: Очищаем кэш user
-            localStorage.removeItem('cached_user');
             
             // Очищаем кэш пользователя
             if (userId) {
@@ -228,13 +200,13 @@ export const AuthProvider = ({ children }) => {
             } catch (error) {
                 logger.error('[AUTH] Failed to cleanup WebSocket:', error);
             }
-            
-            // Молча выходим - редирект на логин уже показывает что пользователь вышел
-        } catch (error) {
-            logger.error('Logout failed:', error);
-            // apiClient.js уже показывает toast при ошибках
-        }
-    }, [user?.id]);
+        },
+    });
+
+    // Обертка для совместимости
+    const logout = useCallback(async () => {
+        logoutMutation.mutate();
+    }, [logoutMutation]);
 
     const markIntegrationsRefreshed = useCallback(() => {
         setIntegrationsNeedRefresh(false);

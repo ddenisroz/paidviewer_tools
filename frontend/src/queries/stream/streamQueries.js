@@ -163,3 +163,29 @@ export const useStreamHistory = (options = {}) => {
   });
 };
 
+/**
+ * Обновить данные стрима (название и категория)
+ */
+export const useUpdateStream = (options = {}) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => streamService.updateStream(payload),
+    onSuccess: () => {
+      // Инвалидируем все stream queries
+      queryClient.invalidateQueries({ queryKey: queryKeys.stream.all });
+      if (!options.onSuccess) {
+        toast.success('Изменения сохранены');
+      }
+    },
+    onError: (error) => {
+      logger.error('Error updating stream:', error);
+      if (!options.onError) {
+        const errorMessage = error.response?.data?.detail || error.response?.data?.message || 'Не удалось сохранить изменения';
+        toast.error(errorMessage);
+      }
+    },
+    ...options,
+  });
+};
+

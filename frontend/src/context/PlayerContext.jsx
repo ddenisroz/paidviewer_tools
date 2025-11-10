@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef, useCallback } from 'react';
-import { botService } from '../services/microservices';
 import { logger } from '../utils/prodLogger';
 import { useAuth } from './AuthContext';
 import { useChat } from './ChatContext';
 import { useInterval } from '../hooks/useInterval';
+import { useYoutubeQueue, useSkipYoutubeVideo } from '../queries/youtube/youtubeQueries';
 
 // Контекст для глобального состояния плеера
 const PlayerContext = createContext();
@@ -126,86 +126,85 @@ export const PlayerProvider = ({ children }) => {
     // const wsUrl = isAuthenticated && wsBaseUrl ? `${wsBaseUrl.replace('http', 'ws')}/ws/youtube/1` : null;
     // const { isConnected } = useWebSocket(wsUrl, { ... });
 
-    // ✅ ЗАЩИТА ОТ ДУБЛИРОВАНИЯ: Ref для отслеживания текущего запроса
-    const isLoadingQueueRef = useRef(false);
-    
-    // ✅ ОПТИМИЗАЦИЯ: Загрузка очереди и текущего видео (обернута в useCallback для стабильности)
-    const loadQueue = useCallback(async (force = false) => {
-        // Не загружаем данные если пользователь не авторизован
-        if (!isAuthenticated) {
-            return;
-        }
-        
-        // ✅ ЗАЩИТА ОТ ДУБЛИРОВАНИЯ: Пропускаем если уже загружается (если не force)
-        if (!force && isLoadingQueueRef.current) {
-            logger.debug('⏭️ [YOUTUBE] Queue load already in progress, skipping...');
-            return;
-        }
-        
-        try {
-            isLoadingQueueRef.current = true;
-            dispatch({ type: playerActions.SET_LOADING, payload: true });
-            const response = await botService.get('/api/youtube/queue');
-            const data = response.data;
-            
+    // React Query hooks для загрузки очереди
+    const { data: queueData, isLoading: isLoadingQueue, refetch: refetchQueue } = useYoutubeQueue({
+        enabled: isAuthenticated,
+        refetchInterval: 15000, // 15 секунд
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        onSuccess: (data) => {
+            const queueResponse = data?.data || data;
             dispatch({ 
                 type: playerActions.LOAD_QUEUE, 
                 payload: {
-                    queue: data.queue || [],
-                    current_video: data.current_video || null
-                    // is_playing НЕ передаём - плеер НЕ должен автоматически запускаться
+                    queue: queueResponse.queue || [],
+                    current_video: queueResponse.current_video || null
                 }
             });
-            
-            logger.debug('🔍 [YOUTUBE] Queue loaded:', data);
-        } catch (error) {
+            dispatch({ type: playerActions.SET_LOADING, payload: false });
+        },
+        onError: (error) => {
             logger.error('Error loading queue:', error);
-            
             // Не показываем ошибки для rate limiting и CORS
             if (error.response?.status === 429 || error.code === 'ERR_NETWORK') {
                 return;
             }
-            
             dispatch({ 
                 type: playerActions.SET_ERROR, 
                 payload: 'Ошибка загрузки очереди' 
             });
-        } finally {
-            isLoadingQueueRef.current = false;
             dispatch({ type: playerActions.SET_LOADING, payload: false });
-        }
-    }, [isAuthenticated, dispatch]);
+        },
+    });
 
-    // Переход к следующему видео
-    const nextVideo = async () => {
+    // Обновляем loading состояние из React Query
+    useEffect(() => {
+        dispatch({ type: playerActions.SET_LOADING, payload: isLoadingQueue });
+    }, [isLoadingQueue]);
+
+    // Загрузка очереди (обертка для совместимости)
+    const loadQueue = useCallback(async (force = false) => {
         if (!isAuthenticated) {
             return;
         }
-        
-        try {
-            logger.debug('Skipping to next video');
-            const response = await botService.post('/api/youtube/player/next');
-            
-            if (response.data.success) {
+        if (force) {
+            await refetchQueue();
+        }
+    }, [isAuthenticated, refetchQueue]);
+
+    // React Query mutation для перехода к следующему видео
+    const skipVideoMutation = useSkipYoutubeVideo({
+        onSuccess: (response) => {
+            const data = response?.data || response;
+            if (data.success) {
                 dispatch({ 
                     type: playerActions.NEXT_VIDEO, 
-                    payload: { current_video: response.data.current_video }
+                    payload: { current_video: data.current_video }
                 });
-                
-                // ✅ Обновляем очередь с небольшой задержкой (force = true для немедленной загрузки)
-                setTimeout(() => loadQueue(true), 500);
+                // Обновляем очередь с небольшой задержкой
+                setTimeout(() => refetchQueue(), 500);
             } else {
                 // Если нет видео, скрываем плеер
                 dispatch({ type: playerActions.CLOSE_PLAYER });
             }
-        } catch (error) {
+        },
+        onError: (error) => {
             logger.error('Error skipping to next video:', error);
             dispatch({ 
                 type: playerActions.SET_ERROR, 
                 payload: 'Не удалось перейти к следующему видео' 
             });
+        },
+    });
+
+    // Переход к следующему видео (обертка для совместимости)
+    const nextVideo = useCallback(async () => {
+        if (!isAuthenticated) {
+            return;
         }
-    };
+        logger.debug('Skipping to next video');
+        skipVideoMutation.mutate();
+    }, [isAuthenticated, skipVideoMutation]);
 
     // Управление воспроизведением
     const togglePlayPause = () => {
@@ -380,13 +379,7 @@ export const PlayerProvider = ({ children }) => {
         }
     };
 
-    // ✅ ОПТИМИЗАЦИЯ: Используем современный хук useInterval вместо ручного setInterval
-    // Периодическое обновление очереди (только если не загружается)
-    useInterval(() => {
-        if (isAuthenticated && !isLoadingQueueRef.current) {
-            loadQueue();
-        }
-    }, isAuthenticated ? 15000 : null);
+    // Периодическое обновление очереди через React Query (refetchInterval уже настроен)
     
     // Обновление времени воспроизведения
     useInterval(() => {

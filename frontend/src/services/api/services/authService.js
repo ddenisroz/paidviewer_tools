@@ -9,6 +9,14 @@ import { API_BASE_URL } from '../../../constants';
  */
 export const authService = {
   /**
+   * Получить статус аутентификации
+   * @returns {Promise<AxiosResponse>}
+   */
+  async getAuthStatus() {
+    return apiClient.get('/api/auth/status');
+  },
+
+  /**
    * Получить текущего пользователя
    * @returns {Promise<AxiosResponse>}
    */

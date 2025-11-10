@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './AuthContext';
-import { botService } from '../services/microservices';
 import { saveReturnUrl } from '../utils/oauthRedirect';
-import { API_BASE_URL } from '../constants';
 import { logger } from '../utils/prodLogger';
+import { integrationsService } from '../services/api/services/integrationsService';
+import { ttsService } from '../services/api/services/ttsService';
 
 const IntegrationsContext = createContext();
 
@@ -127,19 +127,19 @@ export const IntegrationsProvider = ({ children }) => {
             // Подключить Twitch интеграцию - прямой редирект на OAuth
             if (onClose) onClose(); // Закрываем попап перед перенаправлением
             saveReturnUrl(); // Сохраняем текущую страницу
-            window.location.href = `${API_BASE_URL}/auth/twitch/login`;
+            integrationsService.connectTwitch();
         } else {
             // Отключить Twitch интеграцию
             try {
                 setIsLoading(true);
-                const disconnectResponse = await botService.post('/api/integrations/twitch/disconnect');
+                await integrationsService.disconnectTwitch();
                 
                 // 🔄 Автоматически удаляем Twitch из TTS enabled_platforms
                 try {
-                    const ttsSettingsResponse = await botService.get('/api/tts/platform-settings');
+                    const ttsSettingsResponse = await ttsService.getPlatformSettings();
                     const currentPlatforms = ttsSettingsResponse.data.enabled_platforms || [];
                     const updatedPlatforms = currentPlatforms.filter(p => p !== 'twitch');
-                    await botService.post('/api/tts/platform-settings', {
+                    await ttsService.savePlatformSettings({
                         enabled_platforms: updatedPlatforms
                     });
                     
@@ -170,19 +170,19 @@ export const IntegrationsProvider = ({ children }) => {
             logger.log('🔵 [INTEGRATIONS] VK integration enable requested');
             if (onClose) onClose(); // Закрываем попап перед перенаправлением
             saveReturnUrl(); // Сохраняем текущую страницу
-            window.location.href = `${API_BASE_URL}/auth/vk/login`;
+            integrationsService.connectVk();
         } else {
             // Отключить VK интеграцию
             try {
                 setIsLoading(true);
-                const disconnectResponse = await botService.post('/api/integrations/vk/disconnect');
+                await integrationsService.disconnectVk();
                 
                 // 🔄 Автоматически удаляем VK из TTS enabled_platforms
                 try {
-                    const ttsSettingsResponse = await botService.get('/api/tts/platform-settings');
+                    const ttsSettingsResponse = await ttsService.getPlatformSettings();
                     const currentPlatforms = ttsSettingsResponse.data.enabled_platforms || [];
                     const updatedPlatforms = currentPlatforms.filter(p => p !== 'vk');
-                    await botService.post('/api/tts/platform-settings', {
+                    await ttsService.savePlatformSettings({
                         enabled_platforms: updatedPlatforms
                     });
                     

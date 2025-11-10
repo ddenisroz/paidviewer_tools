@@ -90,5 +90,14 @@ export const streamService = {
   async getStreamHistory() {
     return apiClient.get('/api/stream/history');
   },
+
+  /**
+   * Обновить данные стрима (название и категория)
+   * @param {Object} payload - Данные для обновления (twitch, vk)
+   * @returns {Promise<AxiosResponse>}
+   */
+  async updateStream(payload) {
+    return apiClient.post('/api/stream/update', payload);
+  },
 };
 
