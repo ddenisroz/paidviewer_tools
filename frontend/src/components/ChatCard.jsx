@@ -28,7 +28,8 @@ import { useChat } from '../context/ChatContext';
 import { useAuth } from '../context/AuthContext';
 import ChatContextMenu from './ChatContextMenu';
 import SwipeableMessage from './chat/SwipeableMessage';
-import { microservicesAPI } from '../services/microservices';
+import { ttsService } from '../services/api/services/ttsService';
+import { chatService } from '../services/api/services/chatService';
 import { getAllEmotesForChannel } from '../utils/emotes';
 import { twitchBadgesService } from '../services/twitchBadges';
 import MessageContent from './MessageContent';
@@ -117,9 +118,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
         
         const loadTtsSettings = async () => {
             try {
-                const response = await microservicesAPI.get('/api/tts/platform-settings', {
-                    params: { _t: Date.now() }  // Cache-busting достаточно
-                });
+                const response = await ttsService.getPlatformSettings();
                 setTtsSettings(response.data);
                 logger.log('✅ [TTS SHORTCUT] Settings loaded:', response.data);
                 logger.log('✅ [TTS SHORTCUT] enabled_platforms:', response.data.enabled_platforms);
@@ -192,9 +191,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
             
             // 🔄 Перезагружаем настройки из API для синхронизации
             try {
-                const response = await microservicesAPI.get('/api/tts/platform-settings', {
-                    params: { _t: Date.now() }
-                });
+                const response = await ttsService.getPlatformSettings();
                 const enabledPlatformsFromAPI = response.data.enabled_platforms || [];
                 logger.log('🔄 [TTS SHORTCUT] Reloaded from API:', enabledPlatformsFromAPI);
                 
@@ -310,7 +307,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                 enabledPlatforms.splice(index, 1);
             }
             
-            const response = await microservicesAPI.post('/api/tts/platform-settings', {
+            const response = await ttsService.savePlatformSettings({
                 enabled_platforms: enabledPlatforms
             });
             
@@ -363,7 +360,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
                 enabledPlatforms.splice(index, 1);
             }
             
-            const response = await microservicesAPI.post('/api/tts/platform-settings', {
+            const response = await ttsService.savePlatformSettings({
                 enabled_platforms: enabledPlatforms
             });
             
@@ -774,12 +771,10 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
             if (integrations?.twitch?.enabled && user?.twitch_username) {
                 try {
                     logger.log('📜 [CHAT] Fetching Twitch history for:', user.twitch_username);
-                    const response = await microservicesAPI.get(`/api/chat/history`, {
-                        params: {
-                            platform: 'twitch',
-                            channel: user.twitch_username,
-                            limit
-                        }
+                    const response = await chatService.getChatHistory({
+                        platform: 'twitch',
+                        channel: user.twitch_username,
+                        limit
                     });
                     
                         if (response.data.success && response.data.messages) {
@@ -809,12 +804,10 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
             if (integrations?.vk?.enabled && user?.vk_username) {
                 try {
                     logger.log('📜 [CHAT] Fetching VK history for:', user.vk_username);
-                    const response = await microservicesAPI.get(`/api/chat/history`, {
-                        params: {
-                            platform: 'vk',
-                            channel: user.vk_username,
-                            limit
-                        }
+                    const response = await chatService.getChatHistory({
+                        platform: 'vk',
+                        channel: user.vk_username,
+                        limit
                     });
                     
                     if (response.data.success && response.data.messages) {
@@ -853,7 +846,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
             logger.log('🔇 [CHAT] Loading muted users...');
             
             // Используем единый endpoint для обеих платформ
-            const response = await microservicesAPI.get('/api/moderation/muted-users');
+            const response = await chatService.getMutedUsers();
             
             if (response.data.success) {
                 const blockedSet = new Set();
@@ -919,7 +912,7 @@ const ChatCard = ({ integrations, isOnHomePage = true }) => {
             case 'unblock_tts': {
                 logger.log(`🔇 [CHAT MUTE] ${action} для ${username} (${platform})`);
                     
-                const response = await microservicesAPI.post('/api/moderation/toggle-mute', {
+                const response = await chatService.toggleMute({
                     username,
                     platform,
                     channel_name: channelName,

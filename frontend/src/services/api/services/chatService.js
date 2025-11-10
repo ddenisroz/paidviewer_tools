@@ -48,5 +48,13 @@ export const chatService = {
   async toggleMute(data) {
     return apiClient.post('/api/moderation/toggle-mute', data);
   },
+
+  /**
+   * Получить список заглушенных пользователей
+   * @returns {Promise<AxiosResponse>}
+   */
+  async getMutedUsers() {
+    return apiClient.get('/api/moderation/muted-users');
+  },
 };
 

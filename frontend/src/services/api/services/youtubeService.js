@@ -91,5 +91,13 @@ export const youtubeService = {
   async getObsUrl() {
     return apiClient.get('/api/tts/obs-url');
   },
+
+  /**
+   * Сгенерировать OBS URL для YouTube
+   * @returns {Promise<AxiosResponse>}
+   */
+  async generateObsUrl() {
+    return apiClient.post('/api/youtube/generate-obs-url');
+  },
 };
 

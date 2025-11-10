@@ -12,7 +12,7 @@ import YouTube from 'react-youtube';
 import { usePlayer } from '../../context/PlayerContext';
 import { useChat } from '../../context/ChatContext';
 import { useAuth } from '../../context/AuthContext';
-import api from '../../services/api';
+import { youtubeService } from '../../services/api/services/youtubeService';
 import { logger } from '../../utils/prodLogger';
 import PageWrapper from '../../components/PageWrapper';
 
@@ -60,7 +60,7 @@ const YoutubeIntegrationPage = () => {
     // ✅ ОПТИМИЗАЦИЯ: Мемоизируем функцию для стабильности зависимостей
     const loadYoutubeSettings = useCallback(async () => {
         try {
-            const response = await api.get('/api/tts/youtube-settings');
+            const response = await youtubeService.getSettings();
             setPlaybackMode(response.data.playback_mode || 'browser');
             setVolume([response.data.volume_level || 100]); // По умолчанию 100% для синхронизации
         } catch (error) {
@@ -71,7 +71,7 @@ const YoutubeIntegrationPage = () => {
     // Сохранение настроек YouTube
     const saveYoutubeSettings = async (newPlaybackMode, newVolume) => {
         try {
-            await api.post('/api/tts/youtube-settings', {
+            await youtubeService.saveSettings({
                 playback_mode: newPlaybackMode,
                 volume_level: newVolume
             });
@@ -85,7 +85,7 @@ const YoutubeIntegrationPage = () => {
     // Генерация URL для YouTube OBS
     const generateYoutubeObsUrl = async () => {
         try {
-            const response = await api.post('/api/youtube/generate-obs-url');
+            const response = await youtubeService.generateObsUrl();
             const url = response.data.youtube_obs_url;
             setYoutubeObsUrl(url);
             setIsObsUrlVisible(true);
