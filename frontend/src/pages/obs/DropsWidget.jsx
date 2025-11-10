@@ -91,12 +91,8 @@ const DropsWidget = () => {
     // Сначала получаем user_id из токена
     const fetchUserId = async () => {
       try {
-        const response = await fetch(`${apiUrl}/api/drops/user-from-token/${token}`);
-        if (!response.ok) {
-          setStatus('Ошибка: Недействительный токен');
-          return;
-        }
-        const data = await response.json();
+        const response = await dropsService.getUserFromToken(token);
+        const data = response.data;
         const userId = data.user_id;
         setChannelName(data.channel_name);
         setPlatform(data.platform);
@@ -105,18 +101,17 @@ const DropsWidget = () => {
         if (userId && data.channel_name && data.platform) {
           try {
             // ✅ Добавляем widget_token для авторизации
-            const configResponse = await fetch(`${apiUrl}/api/drops/config/${data.channel_name}?platform=${data.platform}&widget_token=${token}`);
-            if (configResponse.ok) {
-              const configData = await configResponse.json();
-              if (configData.success && configData.data) {
-                widgetConfig.current = {
-                  spinning_duration: configData.data.widget_spinning_duration_ms || 1500,
-                  opening_duration: configData.data.widget_opening_duration_ms || 1000,
-                  result_duration: configData.data.widget_result_duration_ms || 5500
-                };
-              }
-            } else {
-              logger.warn(`Failed to load widget config: ${configResponse.status}`);
+            const configResponse = await dropsService.getConfigWithToken(data.channel_name, {
+              platform: data.platform,
+              widget_token: token
+            });
+            const configData = configResponse.data;
+            if (configData.success && configData.data) {
+              widgetConfig.current = {
+                spinning_duration: configData.data.widget_spinning_duration_ms || 1500,
+                opening_duration: configData.data.widget_opening_duration_ms || 1000,
+                result_duration: configData.data.widget_result_duration_ms || 5500
+              };
             }
           } catch (configError) {
             logger.error('Error loading widget config:', configError);

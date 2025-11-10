@@ -136,5 +136,46 @@ export const dropsService = {
   async getStreaks(channelName, params = {}) {
     return apiClient.get(`/api/drops/streaks/${channelName}`, { params });
   },
+
+  /**
+   * Получить данные пользователя по токену виджета
+   * @param {string} token - Токен виджета
+   * @returns {Promise<AxiosResponse>}
+   */
+  async getUserFromToken(token) {
+    return apiClient.get(`/api/drops/user-from-token/${token}`);
+  },
+
+  /**
+   * Получить конфигурацию Drops с токеном виджета
+   * @param {string} channelName - Имя канала
+   * @param {Object} params - Параметры запроса (platform, widget_token)
+   * @returns {Promise<AxiosResponse>}
+   */
+  async getConfigWithToken(channelName, params = {}) {
+    return apiClient.get(`/api/drops/config/${channelName}`, { params });
+  },
+
+  /**
+   * Получить активную сессию мифического сундука
+   * @param {string} channelName - Имя канала
+   * @param {string} token - Токен виджета
+   * @returns {Promise<AxiosResponse>}
+   */
+  async getMythicalSession(channelName, token) {
+    return apiClient.get(`/api/drops/mythical-session/${channelName}`, {
+      params: { widget_token: token },
+    });
+  },
+
+  /**
+   * Получить награды для виджета
+   * @param {string} channelName - Имя канала
+   * @param {Object} params - Параметры запроса (platform, quality, widget_token)
+   * @returns {Promise<AxiosResponse>}
+   */
+  async getRewardsForWidget(channelName, params = {}) {
+    return apiClient.get(`/api/drops/rewards/${channelName}`, { params });
+  },
 };
 
