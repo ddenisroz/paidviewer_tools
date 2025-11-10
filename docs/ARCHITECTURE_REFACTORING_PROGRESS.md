@@ -84,10 +84,10 @@
 - ✅ `PlayerContext.jsx` - мигрирован на `youtubeService` и React Query (useYoutubeQueue, useSkipYoutubeVideo)
 - ✅ `AuthContext.jsx` - мигрирован на `authService` и React Query (useAuthStatus, useLogout)
 - ✅ `IntegrationsContext.jsx` - мигрирован на `integrationsService` и `ttsService`
+- ✅ `DataContext.jsx` - мигрирован на `streamService` и React Query (useStreamHistory, useTwitchStreamInfo, useVkStreamInfo, useUpdateStream)
+- ✅ `UserSettingsContext.jsx` - мигрирован на `userSettingsService` и React Query (useUserSettings, useSaveUserSettings)
 
 **Осталось:**
-- [ ] `DataContext.jsx` - мигрировать на `streamService` и React Query
-- [ ] `UserSettingsContext.jsx` - мигрировать на `userSettingsService` и React Query
 - [ ] `ChatContext.jsx` - мигрировать на `chatService` и React Query
 - [ ] `TtsContext.jsx` - мигрировать на `ttsService` и React Query
 - [ ] `TtsHealthContext.jsx` - объединить с `TtsContext.jsx`
@@ -129,7 +129,7 @@
 - **Сервисов:** 10
 - **Queries:** 45+
 - **Мигрировано компонентов:** 16/50+
-- **Мигрировано контекстов:** 3/9 (33%)
+- **Мигрировано контекстов:** 5/9 (56%)
 - **Удалено дублирования:** ~800+ строк
 
 ---

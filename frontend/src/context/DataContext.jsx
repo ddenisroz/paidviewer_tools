@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { useIntegrations } from './IntegrationsContext';
-import { botService } from '../services/microservices';
 import { useToast } from '../components/ui/toast';
 import { expandQueryWithAliases } from '../constants/categoryAliases';
 import { logger } from '../utils/prodLogger';
 import { getQueryCache, setQueryCache } from '../utils/queryPersist';
-import { useInterval } from '../hooks/useInterval';
+import { useStreamHistory, useTwitchStreamInfo, useVkStreamInfo, useUpdateStream, useTwitchCategories, useVkCategories } from '../queries/stream/streamQueries';
+import { streamService } from '../services/api/services/streamService';
 
 const DataContext = createContext();
 
@@ -257,155 +257,112 @@ export const DataProvider = ({ children }) => {
     // Force re-render trigger
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-    // --- DATA LOADING ---
-    // 🚀 КЭШИРОВАНИЕ: Храним время последней загрузки
-    const [lastLoadTime, setLastLoadTime] = useState({
-        streamData: 0,
-        history: 0
+    // React Query mutation для обновления стрима
+    const updateStreamMutation = useUpdateStream({
+        onSuccess: () => {
+            // Автоматически инвалидирует кэш и обновляет данные
+        },
     });
-    const CACHE_TTL = 30000; // 30 секунд кэш
-    
-    // ✅ ЗАЩИТА ОТ ДУБЛИРОВАНИЯ: Ref для отслеживания текущего запроса
-    const isLoadingHistoryRef = useRef(false);
-    const isLoadingStreamDataRef = useRef(false);
-    
+
+    // React Query hook для истории стримов
+    const { data: historyData, isLoading: isLoadingHistory, refetch: refetchHistory } = useStreamHistory({
+        enabled: isAuthenticated,
+        refetchInterval: 30000, // 30 секунд
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        onSuccess: (data) => {
+            const historyResponse = data?.data || data;
+            setStreamHistory(historyResponse);
+        },
+    });
+
+    // Обновляем loading состояние из React Query
+    useEffect(() => {
+        setLoading(prev => ({ ...prev, history: isLoadingHistory }));
+    }, [isLoadingHistory]);
+
+    // Обертка для совместимости
     const loadStreamHistory = useCallback(async (force = false) => {
         if (!isAuthenticated) {
             return;
         }
-        
-        // ✅ ЗАЩИТА ОТ ДУБЛИРОВАНИЯ: Пропускаем если уже загружается (если не force)
-        if (!force && isLoadingHistoryRef.current) {
-            logger.debug('⏭️ [DataContext] History load already in progress, skipping...');
-            return;
+        if (force) {
+            await refetchHistory();
         }
-        
-        // Проверяем кэш (только если не force)
-        if (!force) {
-            const now = Date.now();
-            if (now - lastLoadTime.history < CACHE_TTL) {
-                logger.log('📦 [DataContext] Using cached history data');
-                return;
-            }
-        }
-        
-        try {
-            isLoadingHistoryRef.current = true;
-            setLoading(prev => ({ ...prev, history: true }));
-            const response = await botService.get('/api/stream/history');
-            setStreamHistory(response.data);
-            setLastLoadTime(prev => ({ ...prev, history: Date.now() }));
-        } catch (error) {
-            logger.error('Error loading stream history:', error);
-        } finally {
-            isLoadingHistoryRef.current = false;
-            setLoading(prev => ({ ...prev, history: false }));
-        }
-    }, [isAuthenticated]);
+    }, [isAuthenticated, refetchHistory]);
 
+    // React Query hooks для данных стрима
+    const { data: twitchData, isLoading: isLoadingTwitch, refetch: refetchTwitch } = useTwitchStreamInfo({
+        enabled: isAuthenticated && integrations.twitch?.enabled,
+        refetchInterval: 60000, // 1 минута
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+    });
+
+    const { data: vkData, isLoading: isLoadingVk, refetch: refetchVk } = useVkStreamInfo({
+        enabled: isAuthenticated && integrations.vk?.enabled,
+        refetchInterval: 60000, // 1 минута
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+    });
+
+    // Объединяем данные из обеих платформ
+    const combinedStreamData = useMemo(() => {
+        const data = {
+            twitch: { title: '', category: null },
+            vk: { title: '', category: null },
+        };
+
+        if (twitchData?.data) {
+            const twitch = twitchData.data;
+            data.twitch.title = twitch.title || '';
+            data.twitch.category = twitch.game_id ? { id: twitch.game_id, name: twitch.game } : null;
+        }
+
+        if (vkData?.data) {
+            const vk = vkData.data;
+            data.vk.title = vk.title || '';
+            data.vk.category = vk.category_id ? { id: vk.category_id, name: vk.category } : null;
+        }
+
+        return data;
+    }, [twitchData, vkData]);
+
+    // Обновляем loading состояние
+    const isLoadingStreamData = isLoadingTwitch || isLoadingVk;
+    useEffect(() => {
+        setLoading(prev => ({ ...prev, streamData: isLoadingStreamData }));
+    }, [isLoadingStreamData]);
+
+    // Обновляем initialData и currentData при изменении данных
+    useEffect(() => {
+        if (combinedStreamData && (combinedStreamData.twitch.title || combinedStreamData.vk.title || combinedStreamData.twitch.category || combinedStreamData.vk.category)) {
+            setInitialData(combinedStreamData);
+            setCurrentData(combinedStreamData);
+            // Сохраняем в кэш для быстрой загрузки при перезагрузке
+            setQueryCache(['stream-data', user?.id], combinedStreamData);
+            setRefreshTrigger(prev => prev + 1);
+        }
+    }, [combinedStreamData, user?.id]);
+
+    // Обертка для совместимости
     const loadStreamData = useCallback(async (force = false) => {
         if (!isAuthenticated) {
-            // Not authenticated, skipping
             return;
         }
-        
-        // ✅ ЗАЩИТА ОТ ДУБЛИРОВАНИЯ: Пропускаем если уже загружается (если не force)
-        if (!force && isLoadingStreamDataRef.current) {
-            logger.debug('⏭️ [DataContext] Stream data load already in progress, skipping...');
-            return;
-        }
-        
-        // Проверяем кэш (если не force reload)
-        if (!force) {
-            const now = Date.now();
-            if (now - lastLoadTime.streamData < CACHE_TTL) {
-                logger.log('📦 [DataContext] Using cached stream data');
-                return;
-            }
-        }
-        
-        // Loading stream data
-        isLoadingStreamDataRef.current = true;
-        setLoading(prev => ({ ...prev, streamData: true }));
-
-        try {
-            const data = {
-                twitch: { title: '', category: null },
-                vk: { title: '', category: null },
-            };
-
-            // Создаем промисы для параллельной загрузки
-            const promises = [];
-
+        if (force) {
             if (integrations.twitch?.enabled) {
-                promises.push(
-                    botService.get('/api/twitch/stream-info', { params: { force } })
-                        .then(twitchData => ({ platform: 'twitch', data: twitchData.data }))
-                        .catch(error => {
-                            logger.error('Error loading Twitch data:', error);
-                            return { platform: 'twitch', data: null };
-                        })
-                );
+                await refetchTwitch();
             }
-
             if (integrations.vk?.enabled) {
-                promises.push(
-                    botService.get('/api/vk/stream-info', { params: { force } })
-                        .then(vkData => ({ platform: 'vk', data: vkData.data }))
-                        .catch(error => {
-                            logger.error('Error loading VK data:', error);
-                            return { platform: 'vk', data: null };
-                        })
-                );
+                await refetchVk();
             }
-
-            // Ждем все промисы и обрабатываем результаты
-            if (promises.length > 0) {
-                const results = await Promise.all(promises);
-                // API results processed
-                results.forEach(result => {
-                    if (result.data) {
-                        if (result.platform === 'twitch') {
-                            data.twitch.title = result.data.title || '';
-                            data.twitch.category = { id: result.data.game_id, name: result.data.game };
-                            // Twitch data loaded
-                        } else if (result.platform === 'vk') {
-                            data.vk.title = result.data.title || '';
-                            data.vk.category = { id: result.data.category_id, name: result.data.category };
-                            // VK data loaded
-                        }
-                    }
-                });
-            } else {
-                // No integrations enabled
-            }
-            
-            // Final data processed
-            setInitialData(data);
-            setCurrentData(data);
-            
-            // 🚀 ANTI-FLASH: Сохраняем в кэш для быстрой загрузки при перезагрузке
-            setQueryCache(['stream-data', user?.id], data);
-            
-            // Обновляем timestamp кэша
-            setLastLoadTime(prev => ({ ...prev, streamData: Date.now() }));
-            
-            // Принудительно обновляем компоненты
-            setRefreshTrigger(prev => prev + 1);
-            // Data updated
-
-        } catch (error) {
-            logger.error('Error loading stream data:', error);
-            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось загрузить данные о стриме.' });
-        } finally {
-            isLoadingStreamDataRef.current = false;
-            setLoading(prev => ({ ...prev, streamData: false }));
         }
-    }, [isAuthenticated, integrations.twitch?.enabled, integrations.vk?.enabled, addToast, user?.id]);
+    }, [isAuthenticated, integrations.twitch?.enabled, integrations.vk?.enabled, refetchTwitch, refetchVk]);
 
 
     // --- DATA SAVING ---
-    const saveChanges = useCallback(async (customPayload = null, statusType = 'saveTitle') => {
+    const saveChanges = useCallback((customPayload = null, statusType = 'saveTitle') => {
         setStatus(prev => ({ ...prev, [statusType]: 'loading' }));
         let payload = customPayload;
         let changesFound = false;
@@ -471,34 +428,35 @@ export const DataProvider = ({ children }) => {
 
         logger.log('📤 [DataContext] Final payload before sending:', JSON.stringify(payload, null, 2));
 
-        try {
-            await botService.post('/api/stream/update', payload);
-            setStatus(prev => ({ ...prev, [statusType]: 'success' }));
-            addToast({ type: 'success', title: 'Успех', message: 'Изменения сохранены.' });
-            await loadStreamData(true); // Refresh data
-        } catch (error) {
-            setStatus(prev => ({ ...prev, [statusType]: 'error' }));
-            
-            logger.error('❌ [DATA CONTEXT] Error saving changes:', error);
-            
-            // Проверяем, является ли ошибка связанной с истекшим токеном
-            if (error.response?.status === 401) {
-                addToast({ 
-                    type: 'error', 
-                    title: 'Токен истек', 
-                    message: 'Пожалуйста, переавторизуйтесь в Twitch для продолжения работы.' 
-                });
-            } else {
-                addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось сохранить изменения. Данные откатываются...' });
-            }
-            
-            // ВАЖНО: При ошибке откатываем к реальным данным из API
-            logger.log('🔄 [DATA CONTEXT] Rolling back to server data...');
-            await loadStreamData(true); // Перезагружаем данные с сервера
-        } finally {
-            setTimeout(() => setStatus(prev => ({ ...prev, [statusType]: 'idle' })), 3000);
-        }
-    }, [initialData, currentData, integrations.twitch?.enabled, integrations.vk?.enabled, loadStreamData, addToast]);
+        // Используем React Query mutation
+        updateStreamMutation.mutate(payload, {
+            onSuccess: () => {
+                setStatus(prev => ({ ...prev, [statusType]: 'success' }));
+                // Данные автоматически обновятся через инвалидацию кэша
+                setTimeout(() => setStatus(prev => ({ ...prev, [statusType]: 'idle' })), 3000);
+            },
+            onError: (error) => {
+                setStatus(prev => ({ ...prev, [statusType]: 'error' }));
+                logger.error('❌ [DATA CONTEXT] Error saving changes:', error);
+                
+                // Проверяем, является ли ошибка связанной с истекшим токеном
+                if (error.response?.status === 401) {
+                    addToast({ 
+                        type: 'error', 
+                        title: 'Токен истек', 
+                        message: 'Пожалуйста, переавторизуйтесь в Twitch для продолжения работы.' 
+                    });
+                } else {
+                    addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось сохранить изменения. Данные откатываются...' });
+                }
+                
+                // ВАЖНО: При ошибке откатываем к реальным данным из API
+                logger.log('🔄 [DATA CONTEXT] Rolling back to server data...');
+                loadStreamData(true); // Перезагружаем данные с сервера
+                setTimeout(() => setStatus(prev => ({ ...prev, [statusType]: 'idle' })), 3000);
+            },
+        });
+    }, [initialData, currentData, integrations.twitch?.enabled, integrations.vk?.enabled, loadStreamData, addToast, updateStreamMutation]);
     
     // --- CATEGORY SEARCH ---
     const searchCategories = useCallback(async (platform, query) => {
@@ -537,15 +495,23 @@ export const DataProvider = ({ children }) => {
             logger.log('🔍 DataContext: Expanded queries:', { original: query, expanded: expandedQueries });
             
             // Делаем параллельные запросы для всех расширенных вариантов
-            const requests = expandedQueries.map(searchQuery =>
-                botService.get(`/api/${platform}/categories`, { 
-                    params: { search: searchQuery },
-                    headers: { 'Content-Type': 'application/json' }
-                }).catch(err => {
+            // Используем React Query queries для поиска категорий
+            // Для каждого расширенного запроса делаем запрос через сервис
+            const requests = expandedQueries.map(async (searchQuery) => {
+                try {
+                    if (platform === 'twitch') {
+                        const response = await streamService.getTwitchCategories(searchQuery);
+                        return response.data;
+                    } else if (platform === 'vk') {
+                        const response = await streamService.getVkCategories(searchQuery);
+                        return response.data;
+                    }
+                    return { categories: [] };
+                } catch (err) {
                     logger.warn(`Search failed for query "${searchQuery}":`, err);
-                    return { data: { categories: [] } };
-                })
-            );
+                    return { categories: [] };
+                }
+            });
             
             const responses = await Promise.all(requests);
             logger.log('🔍 DataContext: All API responses received');
@@ -614,29 +580,8 @@ export const DataProvider = ({ children }) => {
     }, [integrations.twitch?.enabled, integrations.vk?.enabled, addToast, isAuthenticated, integrationsLoading]);
     
     
-    // 🚀 ANTI-FLASH: Убрали проверку integrationsLoading, так как интеграции инициализируются мгновенно
-    const shouldLoadData = useMemo(() => {
-        return isAuthenticated && (integrations.twitch?.enabled || integrations.vk?.enabled);
-    }, [isAuthenticated, integrations.twitch?.enabled, integrations.vk?.enabled]);
-
-    useEffect(() => {
-        if (shouldLoadData) {
-            // ✅ Загружаем данные при монтировании (force = true для первоначальной загрузки)
-            loadStreamHistory(true);
-            // 🔄 Проверяем кэш - если пустой или нет категории, загружаем
-            const cached = getQueryCache(['stream-data', user?.id]);
-            const needsLoad = !cached || !cached.twitch?.category || !cached.vk?.category;
-            loadStreamData(needsLoad); // force = true только если кэш пустой или нет категории
-        }
-    }, [shouldLoadData, user?.id, loadStreamHistory, loadStreamData]); // ✅ Добавляем функции в зависимости для корректной работы
-
-    // ✅ ОПТИМИЗАЦИЯ: Используем современный хук useInterval вместо ручного setInterval
-    // Автообновление данных каждые 30 секунд (только если не загружается)
-    useInterval(() => {
-        if (isAuthenticated && !isLoadingHistoryRef.current) {
-            loadStreamHistory(); // Без force для периодического обновления
-        }
-    }, isAuthenticated ? 30000 : null);
+    // Данные загружаются автоматически через React Query hooks
+    // Не нужно дополнительного useEffect для загрузки
     
 
     const value = useMemo(() => ({

@@ -23,6 +23,9 @@ export * from './stream/streamQueries';
 // Points
 export * from './points/pointsQueries';
 
+// User Settings
+export * from './userSettings/userSettingsQueries';
+
 // Query Keys
 export { queryKeys } from './queryKeys';
 

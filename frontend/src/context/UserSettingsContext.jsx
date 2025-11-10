@@ -1,9 +1,9 @@
 // src/context/UserSettingsContext.jsx
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { botService } from '../services/microservices';
 import cacheManager, { CACHE_CONFIG } from '../utils/cacheManager';
 import Logger from '../utils/prodLogger';
+import { useUserSettings as useUserSettingsQuery, useSaveUserSettings } from '../queries/userSettings/userSettingsQueries';
 
 const logger = new Logger('USER_SETTINGS');
 
@@ -26,84 +26,78 @@ export const UserSettingsProvider = ({ children }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    // Загрузка всех настроек с сервера (с кэшированием)
+    // React Query hook для загрузки настроек
+    const { data: settingsData, isLoading: isLoadingSettings, refetch: refetchSettings } = useUserSettingsQuery({
+        enabled: isAuthenticated,
+        onSuccess: (data) => {
+            setSettings(data);
+            // Сохраняем в cacheManager для обратной совместимости
+            if (data) {
+                cacheManager.set(CACHE_CONFIG.USER_SETTINGS, data, { userId: user?.id });
+            }
+        },
+        onError: (error) => {
+            logger.error('[USER_SETTINGS] Error loading settings:', error);
+            setSettings(null);
+            cacheManager.invalidate(CACHE_CONFIG.USER_SETTINGS);
+        },
+    });
+
+    // Обновляем loading состояние из React Query
+    useEffect(() => {
+        setIsLoading(isLoadingSettings);
+    }, [isLoadingSettings]);
+
+    // Обновляем settings при изменении данных из React Query
+    useEffect(() => {
+        if (settingsData) {
+            setSettings(settingsData);
+        }
+    }, [settingsData]);
+
+    // Обертка для совместимости
     const loadSettings = useCallback(async () => {
         if (!isAuthenticated) {
             setSettings(null);
             cacheManager.invalidate(CACHE_CONFIG.USER_SETTINGS);
             return;
         }
+        await refetchSettings();
+    }, [isAuthenticated, refetchSettings]);
 
-        try {
-            // 🚀 ANTI-FLASH: Показываем loading только если нет данных в кэше
-            const hasCache = cacheManager.get(CACHE_CONFIG.USER_SETTINGS, { ignoreExpired: true });
-            if (!hasCache) {
-                setIsLoading(true);
+    // React Query mutation для сохранения настроек
+    const saveSettingsMutation = useSaveUserSettings({
+        onSuccess: (response) => {
+            const savedSettings = response.data?.settings || response.data;
+            setSettings(savedSettings);
+            // Сохраняем в cacheManager для обратной совместимости
+            if (savedSettings) {
+                cacheManager.set(CACHE_CONFIG.USER_SETTINGS, savedSettings, { userId: user?.id });
             }
-            
-            // Используем cache-aside pattern с защитой от race conditions
-            const data = await cacheManager.getOrFetch(
-                CACHE_CONFIG.USER_SETTINGS,
-                async () => {
-                    logger.debug('[USER_SETTINGS] Fetching from API...');
-                    const response = await botService.get('/api/user-settings/');
-                    if (response.data?.success) {
-                        return response.data.settings;
-                    }
-                    throw new Error('Failed to load user settings');
-                },
-                { userId: user?.id }
-            );
-            
-            setSettings(data);
-            logger.debug('[USER_SETTINGS] Loaded successfully (from cache or API)');
-        } catch (error) {
-            logger.error('[USER_SETTINGS] Error loading settings:', error);
-            setSettings(null);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [isAuthenticated, user?.id]);
+            logger.info('[USER_SETTINGS] Saved successfully');
+        },
+        onError: (error) => {
+            logger.error('[USER_SETTINGS] Error saving settings:', error);
+            // При ошибке React Query автоматически откатит кэш
+        },
+    });
 
-    // Сохранение настроек на сервер (с optimistic update)
+    // Обновляем isSaving из React Query mutation
+    useEffect(() => {
+        setIsSaving(saveSettingsMutation.isPending);
+    }, [saveSettingsMutation.isPending]);
+
+    // Обертка для совместимости
     const saveSettings = useCallback(async (newSettings) => {
         if (!isAuthenticated) return false;
-
-        try {
-            setIsSaving(true);
-            
-            // Optimistic update: сначала обновляем UI и кэш
-            const updatedSettings = { ...settings, ...newSettings };
-            
-            await cacheManager.optimisticUpdate(
-                CACHE_CONFIG.USER_SETTINGS,
-                async (data) => {
-                    logger.debug('[USER_SETTINGS] Saving to API...', newSettings);
-                    const response = await botService.post('/api/user-settings/', newSettings);
-                    
-                    if (!response.data?.success) {
-                        throw new Error('Failed to save settings');
-                    }
-                    
-                    return data; // Возвращаем обновлённые данные
-                },
-                updatedSettings,
-                { userId: user?.id }
-            );
-            
-            // Обновляем state только после успешного сохранения
-            setSettings(updatedSettings);
-            logger.info('[USER_SETTINGS] Saved successfully');
-            return true;
-        } catch (error) {
-            logger.error('[USER_SETTINGS] Error saving settings:', error);
-            // При ошибке кэш автоматически откатится, перезагружаем state
-            await loadSettings();
-            return false;
-        } finally {
-            setIsSaving(false);
-        }
-    }, [isAuthenticated, settings, user?.id, loadSettings]);
+        
+        return new Promise((resolve) => {
+            saveSettingsMutation.mutate(newSettings, {
+                onSuccess: () => resolve(true),
+                onError: () => resolve(false),
+            });
+        });
+    }, [isAuthenticated, saveSettingsMutation]);
 
     // Обновление конкретной настройки
     const updateSetting = useCallback(async (key, value) => {
