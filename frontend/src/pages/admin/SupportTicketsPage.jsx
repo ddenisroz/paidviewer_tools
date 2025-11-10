@@ -80,29 +80,15 @@ const SupportTicketsPage = () => {
     if (!selectedTicket) return;
 
     try {
-      const params = new URLSearchParams();
-      params.append('status', newStatus);
-      if (adminNotes) {
-        params.append('admin_notes', adminNotes);
-      }
-
-      const response = await fetch(`${API_BASE_URL}/api/admin/support/tickets/${selectedTicket.id}/status?${params.toString()}`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+      const response = await supportService.updateTicketStatus(selectedTicket.id, {
+        status: newStatus,
+        admin_notes
       });
-
-      if (response.ok) {
-        toast.success('Тикет обновлен');
-        setIsDialogOpen(false);
-        setSelectedTicket(null);
-        setAdminNotes('');
-        loadTickets();
-      } else {
-        toast.error('Ошибка при обновлении тикета');
-      }
+      toast.success('Тикет обновлен');
+      setIsDialogOpen(false);
+      setSelectedTicket(null);
+      setAdminNotes('');
+      loadTickets();
     } catch (error) {
       logger.error('Error updating ticket:', error);
       toast.error('Ошибка при обновлении тикета');
