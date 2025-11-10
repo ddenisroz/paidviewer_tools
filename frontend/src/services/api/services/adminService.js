@@ -16,6 +16,14 @@ export const adminService = {
   },
 
   /**
+   * Получить whitelist (для гостей)
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async getWhitelist() {
+    return apiClient.get('/api/admin/whitelist');
+  },
+
+  /**
    * Получить статус ботов
    * @returns {Promise<import('axios').AxiosResponse>}
    */

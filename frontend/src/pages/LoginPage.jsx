@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 // TtsHealthContext не нужен на странице логина
-import api from '../services/api';
+import { chatService } from '../services/api/services/chatService';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -139,7 +139,7 @@ const LoginPage = () => {
 
         try {
             // Генерируем код для гостевого доступа
-            const response = await api.post('/api/chat/guest/connect', {
+            const response = await chatService.connectGuest({
                 channel_name: guestUsername.trim(),
                 platform: guestPlatform  // ✅ Отправляем выбранную платформу
             });
@@ -187,7 +187,7 @@ const LoginPage = () => {
             }
             
             try {
-                const response = await api.post('/api/chat/guest/check', {
+                const response = await chatService.checkGuest({
                     channel_name: guestUsername.trim()
                 });
                 
@@ -200,7 +200,7 @@ const LoginPage = () => {
                     
                     // Финализируем сессию
                     try {
-                        const finalizeResponse = await api.post('/api/chat/guest/finalize', {
+                        const finalizeResponse = await chatService.finalizeGuest({
                             channel_name: guestUsername.trim()
                         });
                         
@@ -236,7 +236,7 @@ const LoginPage = () => {
         setIsDisconnecting(true);
         try {
             // Отключаем бота от канала
-            await api.post('/api/chat/guest/disconnect', {
+            await chatService.disconnectGuest({
                 channel_name: guestUsername.trim()
             });
             // LoginPage: Bot disconnected due to verification timeout');
@@ -259,7 +259,7 @@ const LoginPage = () => {
         setIsVerifying(true);
         try {
             // Финализируем гостевую сессию
-            const response = await api.post('/api/chat/guest/finalize', {
+            const response = await chatService.finalizeGuest({
                 channel_name: guestUsername.trim()
             });
             

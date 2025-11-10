@@ -1,7 +1,7 @@
 // src/hooks/useBotStatus.js
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
+import { chatService } from '../services/api/services/chatService';
 import { toast } from 'sonner';
 import { logger } from '../utils/prodLogger';
 
@@ -15,7 +15,7 @@ export const useBotStatus = () => {
         queryKey: ['bot-status', username],
         queryFn: async () => {
             if (!username) return false;
-            const response = await api.get(`/api/status/${username}`);
+            const response = await chatService.getBotStatusForUser(username);
             return response.data.is_enabled || false;
         },
         enabled: !!username,
@@ -32,7 +32,7 @@ export const useBotStatus = () => {
     // React Query мутация: переключение статуса бота
     const toggleBotMutation = useMutation({
         mutationFn: async (enabled) => {
-            return await api.post(`/api/bot/tts/toggle`, { is_enabled: enabled });
+            return await chatService.toggleBotTts({ is_enabled: enabled });
         },
         onMutate: async (enabled) => {
             // Отменяем исходящие запросы

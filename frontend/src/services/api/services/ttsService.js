@@ -331,5 +331,32 @@ export const ttsService = {
   async saveEnabledVoices(userId, voiceIds) {
     return apiClient.post(`/api/user/voices/enabled/${userId}`, voiceIds);
   },
+
+  /**
+   * Включить TTS для гостя
+   * @param {Object} data - Данные { channel_name }
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async enableGuest(data) {
+    return apiClient.post('/api/tts/guest/enable', data);
+  },
+
+  /**
+   * Отключить TTS для гостя
+   * @param {Object} data - Данные { channel_name }
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async disableGuest(data) {
+    return apiClient.post('/api/tts/guest/disable', data);
+  },
+
+  /**
+   * Отключить гостя от TTS
+   * @param {Object} data - Данные { channel, platform }
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async disconnectGuest(data) {
+    return apiClient.post('/api/tts/disconnect-guest', data);
+  },
 };
 

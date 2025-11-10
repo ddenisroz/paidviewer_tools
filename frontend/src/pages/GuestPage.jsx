@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
+import { chatService } from '../services/api/services/chatService';
 import { logger } from '../utils/prodLogger';
 
 const GuestPage = () => {
@@ -18,7 +18,7 @@ const GuestPage = () => {
     // Polling для проверки подтверждения кода
     const checkConfirmation = useCallback(async () => {
         try {
-            const response = await api.post('/api/chat/guest/check', {
+            const response = await chatService.checkGuest({
                 channel_name: channelName
             });
 
@@ -29,7 +29,7 @@ const GuestPage = () => {
                 
                 // Финализируем гостевую сессию
                 try {
-                    await api.post('/api/chat/guest/finalize', {
+                    await chatService.finalizeGuest({
                         channel_name: channelName
                     });
                     
@@ -78,7 +78,7 @@ const GuestPage = () => {
 
         try {
             setIsConnecting(true);
-            const response = await api.post('/api/chat/guest/connect', {
+            const response = await chatService.connectGuest({
                 channel_name: channelName.trim(),
                 platform: platform  // ✅ Отправляем выбранную платформу
             });

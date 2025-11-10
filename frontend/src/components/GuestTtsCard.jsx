@@ -7,7 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Mic, Check, X, AlertCircle, Loader } from 'lucide-react';
 import { useNotification } from '../context/NotificationContext';
-import api from '../services/api';
+import { adminService } from '../services/api/services/adminService';
+import { ttsService } from '../services/api/services/ttsService';
+import { chatService } from '../services/api/services/chatService';
 import { logger } from '../utils/prodLogger';
 
 const GuestTtsCard = () => {
@@ -43,7 +45,7 @@ const GuestTtsCard = () => {
 
     const loadAllowedChannels = async () => {
         try {
-            const response = await api.get('/api/admin/whitelist');
+            const response = await adminService.getWhitelist();
             if (response.data.success) {
                 setAllowedChannels({
                     twitch: response.data.whitelist_users || [],
@@ -64,7 +66,7 @@ const GuestTtsCard = () => {
             }
             
             // Используем универсальный endpoint с channel_name
-            const response = await api.get(`/api/tts/status?channel_name=${channel}`);
+            const response = await ttsService.getStatus(channel);
             const { enabled } = response.data;
             setTtsStatus({ enabled, ready: true, loaded: true });
             setTtsEnabled(enabled);
@@ -77,7 +79,7 @@ const GuestTtsCard = () => {
 
     const loadVoices = async () => {
         try {
-            const response = await api.get('/api/voices');
+            const response = await ttsService.getGlobalVoices();
             setVoices(response.data.voices || []);
             if (response.data.voices && response.data.voices.length > 0) {
                 setSelectedVoice(response.data.voices[0].name);
@@ -103,7 +105,7 @@ const GuestTtsCard = () => {
 
     const checkVerificationStatus = async () => {
         try {
-            const response = await api.get(`/api/chat/guest/status?channel_name=${channel}`);
+            const response = await chatService.getGuestStatus(channel);
             if (response.data.verified) {
                 setIsVerified(true);
                 setVerificationRequired(false);
@@ -132,7 +134,7 @@ const GuestTtsCard = () => {
             // Сначала загружаем разрешенные каналы
             await loadAllowedChannels();
             
-            const response = await api.post('/api/chat/guest/connect', {
+            const response = await chatService.connectGuest({
                 channel_name: channel.trim(),
                 platform: 'twitch' // По умолчанию Twitch для GuestTtsCard
             });
@@ -168,11 +170,11 @@ const GuestTtsCard = () => {
     const toggleTts = async () => {
         try {
             if (ttsEnabled) {
-                await api.post('/api/tts/guest/disable', { channel_name: channel });
+                await ttsService.disableGuest({ channel_name: channel });
                 setTtsEnabled(false);
                 showNotification('TTS отключен', 'success');
             } else {
-                await api.post('/api/tts/guest/enable', { channel_name: channel });
+                await ttsService.enableGuest({ channel_name: channel });
                 setTtsEnabled(true);
                 showNotification('TTS включен', 'success');
             }
@@ -184,14 +186,14 @@ const GuestTtsCard = () => {
     const disconnect = async () => {
         try {
             // Отключаемся от канала через API
-            await api.post('/api/tts/disconnect-guest', {
+            await ttsService.disconnectGuest({
                 channel: channel,
                 platform: platform
             });
             
             // Отключаем TTS
             if (ttsEnabled) {
-                await api.post('/api/tts/disable');
+                await ttsService.disable();
             }
             
             // Обновляем локальное состояние
