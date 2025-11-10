@@ -228,6 +228,32 @@ export const ttsService = {
   },
 
   /**
+   * Сохранить конфигурацию локального TTS
+   * @param {Object} config - Конфигурация { endpoint_url, api_key, use_local }
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async saveLocalTtsConfig(config) {
+    return apiClient.post('/api/local-tts/config', config);
+  },
+
+  /**
+   * Протестировать соединение с локальным TTS сервером
+   * @param {Object} params - Параметры { endpoint_url, api_key }
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async testLocalTtsConnection(params) {
+    return apiClient.post('/api/local-tts/test-connection', params);
+  },
+
+  /**
+   * Переключить использование локального TTS
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async toggleLocalTts() {
+    return apiClient.post('/api/local-tts/toggle');
+  },
+
+  /**
    * Получить статус whitelist для голосов
    * @returns {Promise<import('axios').AxiosResponse>}
    */

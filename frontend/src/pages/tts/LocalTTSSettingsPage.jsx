@@ -1,7 +1,7 @@
 // frontend/src/pages/tts/LocalTTSSettingsPage.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
     Server, 
     CheckCircle, 
@@ -31,7 +31,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/ta
 import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '../../components/ui/dialog';
 import { toast } from 'sonner';
-import { botService } from '../../services/microservices';
+import { 
+  useLocalTtsConfig, 
+  useSaveLocalTtsConfig, 
+  useTestLocalTtsConnection, 
+  useToggleLocalTts 
+} from '../../queries/tts/ttsQueries';
 import axios from 'axios';
 import { logger } from '../../utils/prodLogger';
 import { useAuth } from '../../context/AuthContext';
@@ -74,15 +79,7 @@ const LocalTTSSettingsPage = () => {
     const queryClient = useQueryClient();
 
     // React Query: загружаем конфигурацию локального TTS
-    const { data: configData, isLoading: configLoading } = useQuery({
-        queryKey: ['local-tts-config'],
-        queryFn: async () => {
-            const response = await botService.get('/api/local-tts/config');
-            return response.data.config || null;
-        },
-        staleTime: 5 * 60 * 1000,
-        refetchOnMount: false,
-        refetchOnWindowFocus: false,
+    const { data: configData, isLoading: configLoading } = useLocalTtsConfig({
         onSuccess: (data) => {
             if (data) {
                 setConfig({
@@ -102,25 +99,17 @@ const LocalTTSSettingsPage = () => {
     }, [configLoading]);
 
     // React Query мутации
-    const testConnectionMutation = useMutation({
-        mutationFn: async ({ endpoint_url, api_key }) => {
-            return await botService.post('/api/local-tts/test-connection', {
-                endpoint_url,
-                api_key
-            });
-        },
+    const testConnectionMutation = useTestLocalTtsConnection({
         onSuccess: (response) => {
             if (response.data.success) {
                 setTestResult({ success: true, message: 'Соединение успешно!' });
                 setHealthData(response.data.health_data);
                 setStatusData(response.data.status_data);
-                toast.success('✅ Соединение установлено!');
             } else {
                 setTestResult({ 
                     success: false, 
                     message: response.data.error || 'Не удалось подключиться' 
                 });
-                toast.error('❌ Ошибка подключения');
             }
         },
         onError: (error) => {
@@ -128,7 +117,6 @@ const LocalTTSSettingsPage = () => {
                 success: false, 
                 message: error.response?.data?.detail || 'Ошибка подключения к серверу' 
             });
-            toast.error('❌ Ошибка подключения');
         },
         onMutate: () => {
             setTesting(true);
@@ -148,23 +136,12 @@ const LocalTTSSettingsPage = () => {
         });
     };
 
-    const saveConfigMutation = useMutation({
-        mutationFn: async ({ endpoint_url, api_key, use_local }) => {
-            return await botService.post('/api/local-tts/config', {
-                endpoint_url,
-                api_key,
-                use_local
-            });
-        },
-        onSuccess: (response) => {
-            if (response.data.success) {
-                queryClient.invalidateQueries({ queryKey: ['local-tts-config'] });
-                toast.success('✅ Настройки сохранены!');
-            }
+    const saveConfigMutation = useSaveLocalTtsConfig({
+        onSuccess: () => {
+            // Toast уже показан в hook
         },
         onError: (error) => {
             logger.error('Error saving config:', error);
-            toast.error('❌ Ошибка сохранения');
         },
         onMutate: () => {
             setSaving(true);
@@ -182,15 +159,10 @@ const LocalTTSSettingsPage = () => {
         });
     };
 
-    const toggleServiceMutation = useMutation({
-        mutationFn: async () => {
-            return await botService.post('/api/local-tts/toggle');
-        },
+    const toggleServiceMutation = useToggleLocalTts({
         onSuccess: (response) => {
             if (response.data.success) {
                 setConfig(prev => ({ ...prev, use_local: response.data.use_local }));
-                queryClient.invalidateQueries({ queryKey: ['local-tts-config'] });
-                toast.success(response.data.message);
             } else {
                 toast.error(response.data.message);
             }

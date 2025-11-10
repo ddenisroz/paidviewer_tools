@@ -372,10 +372,88 @@ export const useDeleteTtsReward = (options = {}) => {
 export const useLocalTtsConfig = (options = {}) => {
   return useQuery({
     queryKey: queryKeys.tts.localTtsConfig(),
-    queryFn: () => ttsService.getLocalTtsConfig(),
-    staleTime: 30 * 1000, // 30 секунд
-    gcTime: 5 * 60 * 1000, // 5 минут
+    queryFn: async () => {
+      const response = await ttsService.getLocalTtsConfig();
+      return response.data.config || null;
+    },
+    staleTime: 5 * 60 * 1000, // 5 минут
+    gcTime: 10 * 60 * 1000, // 10 минут
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
     retry: false, // Не повторяем запрос при ошибке
+    ...options,
+  });
+};
+
+/**
+ * Сохранить конфигурацию локального TTS
+ */
+export const useSaveLocalTtsConfig = (options = {}) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (config) => ttsService.saveLocalTtsConfig(config),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tts.localTtsConfig() });
+      if (!options.onSuccess) {
+        toast.success('Настройки локального TTS сохранены');
+      }
+    },
+    onError: (error) => {
+      logger.error('Error saving local TTS config:', error);
+      if (!options.onError) {
+        toast.error('Ошибка сохранения настроек локального TTS');
+      }
+    },
+    ...options,
+  });
+};
+
+/**
+ * Протестировать соединение с локальным TTS сервером
+ */
+export const useTestLocalTtsConnection = (options = {}) => {
+  return useMutation({
+    mutationFn: (params) => ttsService.testLocalTtsConnection(params),
+    onSuccess: (response) => {
+      if (!options.onSuccess) {
+        if (response.data.success) {
+          toast.success('Соединение успешно!');
+        } else {
+          toast.error('Не удалось подключиться');
+        }
+      }
+    },
+    onError: (error) => {
+      logger.error('Error testing local TTS connection:', error);
+      if (!options.onError) {
+        toast.error('Ошибка подключения к серверу');
+      }
+    },
+    ...options,
+  });
+};
+
+/**
+ * Переключить использование локального TTS
+ */
+export const useToggleLocalTts = (options = {}) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => ttsService.toggleLocalTts(),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tts.localTtsConfig() });
+      if (!options.onSuccess) {
+        toast.success(response.data.message || 'Локальный TTS переключен');
+      }
+    },
+    onError: (error) => {
+      logger.error('Error toggling local TTS:', error);
+      if (!options.onError) {
+        toast.error('Ошибка переключения локального TTS');
+      }
+    },
     ...options,
   });
 };
