@@ -15,7 +15,7 @@ import { useButtonPosition } from '../../hooks/useButtonPosition';
 import { useAuth } from '../../context/AuthContext';
 import { useIntegrations } from '../../context/IntegrationsContext';
 import { useTts } from '../../context/TtsContext';
-import { useTtsHealth } from '../../context/TtsHealthContext';
+import { useTts } from '../../context/TtsContext';
 import TtsErrorCard from '../../components/TtsErrorCard';
 import { 
     getUserVoices, 
@@ -67,8 +67,10 @@ const VoiceManagementPageContent = () => {
     const fileInputRef = React.useRef(null);
     const voiceVolumeSaveTimeout = React.useRef({});
     
-    const { initializeTts, engineStatus } = useTts();
-    const { isHealthy, isChecking, lastCheck, checkTtsHealth } = useTtsHealth();
+    const { initializeTts, engineStatus, isCheckingHealth, checkTtsHealth } = useTts();
+    const isHealthy = engineStatus.loaded;
+    const isChecking = isCheckingHealth;
+    const lastCheck = null; // React Query управляет этим автоматически
     const queryClient = useQueryClient();
     let audioContext = null;
     let audioSource = null;

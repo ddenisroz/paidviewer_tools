@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { botService } from '../../services/microservices';
-import { useTtsHealth } from '../../context/TtsHealthContext';
+import { useTts } from '../../context/TtsContext';
 import { TTS_SERVICE_URL } from '../../constants';
 import { logger } from '../../utils/prodLogger';
 
@@ -21,7 +21,10 @@ const BotManagementPage = () => {
     const [ttsStatus, setTtsStatus] = useState(null);
     const [loading, setLoading] = useState(true);
     const [restarting, setRestarting] = useState({});
-    const { isHealthy: ttsIsHealthy, isChecking: ttsIsChecking, lastCheck: ttsLastCheck } = useTtsHealth();
+    const { engineStatus, isCheckingHealth } = useTts();
+    const ttsIsHealthy = engineStatus.loaded;
+    const ttsIsChecking = isCheckingHealth;
+    const ttsLastCheck = null; // React Query управляет этим автоматически
 
     const loadBotsStatus = async () => {
         try {

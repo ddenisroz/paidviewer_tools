@@ -3,7 +3,6 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useTts } from '../../context/TtsContext';
-import { useTtsHealth } from '../../context/TtsHealthContext';
 import { useAuth } from '../../context/AuthContext';
 import { useIntegrations } from '../../context/IntegrationsContext';
 import { getTtsWebSocketUrl } from '../../utils/urlUtils';
@@ -38,8 +37,9 @@ import PageWrapper from '../../components/PageWrapper';
 
 const TtsMainPageContent = () => {
     const navigate = useNavigate();
-    const { ttsEnabled, isWhitelisted, initializeTts } = useTts();
-    const { isHealthy, isChecking } = useTtsHealth();
+    const { ttsEnabled, isWhitelisted, initializeTts, engineStatus, isCheckingHealth } = useTts();
+    const isHealthy = engineStatus.loaded;
+    const isChecking = isCheckingHealth;
     const { isAuthenticated, user, isGuest } = useAuth();
     const { integrations } = useIntegrations();
     
