@@ -72,9 +72,11 @@
 
 1. ✅ **HomePage.jsx** - мигрирован на `useTwitchStreamInfo`, `useVkStreamInfo`
 2. ✅ **Sidebar.jsx** - мигрирован на `useAdminList`
-3. **DeleteAccountModal.jsx** - использует `botService.post('/api/user/delete-account')`
-4. **StreakTracker.jsx** - использует `botService.get('/api/drops/config')`
-5. **DonationHistory.jsx** - использует `botService.get('/api/drops/history')`
+3. ✅ **DeleteAccountModal.jsx** - мигрирован на `useDeleteAccount`
+4. ✅ **StreakTracker.jsx** - мигрирован на `useDropsConfig` и `dropsService.getStreaks`
+5. ✅ **DonationHistory.jsx** - мигрирован на `useDropsHistory`
+6. ✅ **useDropsConfig.js** - мигрирован на `dropsService`
+7. ✅ **LocalTTSSettingsPage.jsx** - мигрирован на `ttsService` и React Query
 
 ### Средний приоритет
 
@@ -130,9 +132,9 @@
 
 ### Код
 - **Мигрировано контекстов**: 7/7 (100%) ✅
-- **Мигрировано компонентов**: 18/50+ (~36%) ✅
-- **Создано сервисов**: 11 (добавлен adminService)
-- **Создано queries**: 46+ (добавлен useAdminList)
+- **Мигрировано компонентов**: 22/50+ (~44%) ✅
+- **Создано сервисов**: 11
+- **Создано queries**: 50+ (добавлены queries для локального TTS)
 - **Удалено дублирования**: ~800+ строк
 
 ### Качество
