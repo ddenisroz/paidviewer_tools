@@ -78,21 +78,19 @@
 6. ✅ **useDropsConfig.js** - мигрирован на `dropsService`
 7. ✅ **LocalTTSSettingsPage.jsx** - мигрирован на `ttsService` и React Query
 
-### Средний приоритет
+### ✅ Все компоненты мигрированы!
 
-6. **VoiceManagementPage.jsx** - частично мигрирован, есть прямые вызовы
-7. **BotManagementPage.jsx** - использует `botService.get('/api/admin/bots/status')`
-8. **LocalTTSSettingsPage.jsx** - использует `botService`
-9. **DropsMainPage.jsx** - использует `botService`
-
-### Низкий приоритет (Админ-страницы)
-
-10. **ErrorLogsPage.jsx**
-11. **UserManagementPage.jsx**
-12. **SystemLogsPage.jsx**
-13. **StorageManagementPage.jsx**
-14. **MonitoringPage.jsx**
-15. **BlockedChannelsPage.jsx**
+- ✅ **VoiceManagementPage.jsx** - полностью мигрирован
+- ✅ **BotManagementPage.jsx** - полностью мигрирован
+- ✅ **LocalTTSSettingsPage.jsx** - полностью мигрирован
+- ✅ **DropsMainPage.jsx** - удален неиспользуемый импорт
+- ✅ **ErrorLogsPage.jsx** - мигрирован
+- ✅ **UserManagementPage.jsx** - мигрирован
+- ✅ **SystemLogsPage.jsx** - мигрирован
+- ✅ **StorageManagementPage.jsx** - мигрирован
+- ✅ **MonitoringPage.jsx** - мигрирован
+- ✅ **BlockedChannelsPage.jsx** - мигрирован
+- ✅ **ChatOverlay.jsx** - мигрирован
 
 ---
 
