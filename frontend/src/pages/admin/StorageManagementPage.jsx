@@ -14,7 +14,7 @@ import {
   Clock
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { botService } from '../../services/microservices';
+import { adminService } from '../../services/api/services/adminService';
 import { logger } from '../../utils/prodLogger';
 
 const StorageManagementPage = () => {
@@ -27,7 +27,7 @@ const StorageManagementPage = () => {
   const loadStats = async () => {
     try {
       setLoading(true);
-      const response = await botService.get('/api/database/stats');
+      const response = await adminService.getDatabaseStats();
       if (response.data?.success) {
         setStats(response.data.data);
       }
@@ -50,7 +50,7 @@ const StorageManagementPage = () => {
     
     try {
       setCleaning(true);
-      const response = await botService.post('/api/database/cleanup', {
+      const response = await adminService.cleanupDatabase({
         cleanup_type: type
       });
       
@@ -76,7 +76,7 @@ const StorageManagementPage = () => {
   const loadBackups = async () => {
     try {
       setLoadingBackups(true);
-      const response = await botService.get('/api/database/backups');
+      const response = await adminService.getBackups();
       if (response.data?.success && response.data.data?.backups) {
         setBackups(response.data.data.backups);
       }
@@ -92,7 +92,7 @@ const StorageManagementPage = () => {
     if (!confirm(`Удалить бэкап "${filename}"?`)) return;
     
     try {
-      const response = await botService.delete(`/api/database/backups/${filename}`);
+      const response = await adminService.deleteBackup(filename);
       if (response.data?.success) {
         toast.success(`Бэкап ${filename} удален`);
         await loadBackups();
@@ -108,7 +108,7 @@ const StorageManagementPage = () => {
     if (!confirm(`⚠️ ВНИМАНИЕ: Восстановить БД из "${filename}"?\n\nТекущее состояние будет сохранено автоматически, но операция необратима.\n\nПродолжить?`)) return;
     
     try {
-      const response = await botService.post(`/api/database/backups/${filename}/restore`);
+      const response = await adminService.restoreBackup(filename);
       if (response.data?.success) {
         toast.success(`База данных восстановлена из ${filename}`);
         await loadBackups();

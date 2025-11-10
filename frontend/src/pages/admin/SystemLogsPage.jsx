@@ -7,7 +7,7 @@ import {
   CheckCircle, XCircle, Clock, User, Target, Loader
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { botService } from '../../services/microservices';
+import { adminService } from '../../services/api/services/adminService';
 import { logger } from '../../utils/prodLogger';
 
 // Компонент для отдельного лога
@@ -142,7 +142,13 @@ const SystemLogsPage = () => {
         ...(status && { status: status })
       });
 
-      const response = await botService.get(`/api/admin/logs?${params}`);
+      const response = await adminService.getAdminLogs({
+        page,
+        limit,
+        days: daysRange,
+        ...(actionType && { action_type: actionType }),
+        ...(status && { status: status })
+      });
       if (response.data?.success) {
         setLogs(response.data.data);
         setPagination(response.data.pagination);
@@ -158,7 +164,7 @@ const SystemLogsPage = () => {
   // Загрузка статистики
   const loadStats = async () => {
     try {
-      const response = await botService.get(`/api/admin/logs/stats?days=${daysRange}`);
+      const response = await adminService.getLogsStats(daysRange);
       if (response.data?.success) {
         setStats(response.data.data);
       }
@@ -170,7 +176,7 @@ const SystemLogsPage = () => {
   // Загрузка доступных действий
   const loadAvailableActions = async () => {
     try {
-      const response = await botService.get('/api/admin/logs/actions');
+      const response = await adminService.getLogsActions();
       if (response.data?.success) {
         setAvailableActions(response.data.data);
       }

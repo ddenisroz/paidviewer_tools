@@ -65,5 +65,74 @@ export const adminService = {
   async unblockChannel(channelId) {
     return apiClient.delete(`/api/admin/blocked-channels/${channelId}`);
   },
+
+  /**
+   * Получить логи администратора
+   * @param {Object} params - Параметры запроса
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async getAdminLogs(params = {}) {
+    return apiClient.get('/api/admin/logs', { params });
+  },
+
+  /**
+   * Получить статистику логов
+   * @param {number} daysRange - Количество дней
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async getLogsStats(daysRange = 7) {
+    return apiClient.get(`/api/admin/logs/stats?days=${daysRange}`);
+  },
+
+  /**
+   * Получить доступные действия логов
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async getLogsActions() {
+    return apiClient.get('/api/admin/logs/actions');
+  },
+
+  /**
+   * Получить статистику базы данных
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async getDatabaseStats() {
+    return apiClient.get('/api/database/stats');
+  },
+
+  /**
+   * Очистить базу данных
+   * @param {Object} data - Данные { cleanup_type }
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async cleanupDatabase(data) {
+    return apiClient.post('/api/database/cleanup', data);
+  },
+
+  /**
+   * Получить список бэкапов
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async getBackups() {
+    return apiClient.get('/api/database/backups');
+  },
+
+  /**
+   * Удалить бэкап
+   * @param {string} filename - Имя файла бэкапа
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async deleteBackup(filename) {
+    return apiClient.delete(`/api/database/backups/${filename}`);
+  },
+
+  /**
+   * Восстановить базу данных из бэкапа
+   * @param {string} filename - Имя файла бэкапа
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async restoreBackup(filename) {
+    return apiClient.post(`/api/database/backups/${filename}/restore`);
+  },
 };
 
