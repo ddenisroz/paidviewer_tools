@@ -1,14 +1,13 @@
 // src/pages/HomePage.jsx
 import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Settings, MessageCircle } from 'lucide-react';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { botService } from '../services/microservices';
+import { useTwitchStreamInfo, useVkStreamInfo } from '../queries/stream/streamQueries';
 import StreamStatus from '../components/StreamStatus';
 import ChatCard from '../components/ChatCard';
 import StreamTitleCard from '../components/StreamTitleCard';
@@ -17,7 +16,6 @@ import GuestStubs from '../components/GuestStubs';
 import QuickActionsBar from '../components/QuickActionsBar';
 import { getAndClearReturnUrl } from '../utils/oauthRedirect';
 import { logger } from '../utils/prodLogger';
-import { getQueryCache, setQueryCache } from '../utils/queryPersist';
 
 
 
@@ -51,16 +49,7 @@ const HomePage = () => {
     // Состояние будет загружаться через контекст CombineSettingsContext
 
     // React Query: загружаем данные стримов (Twitch) с автоматическим обновлением
-    const { data: twitchStreamInfo } = useQuery({
-        queryKey: ['stream-info', 'twitch'],
-        queryFn: async () => {
-            if (!isAuthenticated || !integrations?.twitch?.enabled) return null;
-            const response = await botService.get('/api/twitch/stream-info');
-            const data = response.data;
-            // 🚀 ANTI-FLASH: Сохраняем в кэш
-            setQueryCache(['stream-info', 'twitch'], data);
-            return data;
-        },
+    const { data: twitchStreamInfo } = useTwitchStreamInfo({
         enabled: !!isAuthenticated && !!integrations?.twitch?.enabled,
         staleTime: 60 * 1000,
         gcTime: 5 * 60 * 1000,
@@ -68,20 +57,10 @@ const HomePage = () => {
         refetchOnMount: false,
         refetchOnWindowFocus: false,
         retry: 1,
-        initialData: () => getQueryCache(['stream-info', 'twitch']), // 🚀 ANTI-FLASH
     });
 
     // React Query: загружаем данные стримов (VK) с автоматическим обновлением
-    const { data: vkStreamInfo } = useQuery({
-        queryKey: ['stream-info', 'vk'],
-        queryFn: async () => {
-            if (!isAuthenticated || !integrations?.vk?.enabled) return null;
-            const response = await botService.get('/api/vk/stream-info');
-            const data = response.data;
-            // 🚀 ANTI-FLASH: Сохраняем в кэш
-            setQueryCache(['stream-info', 'vk'], data);
-            return data;
-        },
+    const { data: vkStreamInfo } = useVkStreamInfo({
         enabled: !!isAuthenticated && !!integrations?.vk?.enabled,
         staleTime: 60 * 1000,
         gcTime: 5 * 60 * 1000,
@@ -89,7 +68,6 @@ const HomePage = () => {
         refetchOnMount: false,
         refetchOnWindowFocus: false,
         retry: 1,
-        initialData: () => getQueryCache(['stream-info', 'vk']), // 🚀 ANTI-FLASH
     });
 
     // Удален неиспользуемый preparedStreamHistory

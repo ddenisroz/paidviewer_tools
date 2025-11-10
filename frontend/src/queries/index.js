@@ -11,6 +11,9 @@ export * from './tts/ttsQueries';
 // YouTube
 export * from './youtube/youtubeQueries';
 
+// Admin
+export * from './admin/adminQueries';
+
 // Drops
 export * from './drops/dropsQueries';
 

@@ -111,5 +111,11 @@ export const queryKeys = {
     all: ['user-settings'],
     settings: () => ['user-settings'],
   },
+
+  // Admin
+  admin: {
+    all: ['admin'],
+    list: () => ['admin', 'list'],
+  },
 };
 

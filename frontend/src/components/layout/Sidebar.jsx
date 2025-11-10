@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Home, Mic, Youtube, Coins, Headphones, Settings, Shield, MessageSquare, Command, Sparkles, Monitor, Menu, X, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { getAdminList, botService } from '../../services/microservices';
+import { useAdminList } from '../../queries/admin/adminQueries';
 import { logger } from '../../utils/prodLogger';
 
 const getNavItems = (isYourchy) => {
@@ -165,29 +165,14 @@ const SidebarNavItem = ({ item, openSection, setOpenSection, onMobileMenuClose }
 
 const Sidebar = () => {
     const { user, isAuthenticated, isGuest } = useAuth();
-    const [adminUsers, setAdminUsers] = useState([]);
     const [isAdmin, setIsAdmin] = useState(false);
     
     // Загружаем список админов только для админов
-    useEffect(() => {
-        const loadAdminList = async () => {
-            // Проверяем права доступа перед запросом
-            if (!user?.is_admin) {
-                setAdminUsers([]);
-                return;
-            }
-            
-            try {
-                const response = await botService.get('/api/admin/list');
-                setAdminUsers(response.data);
-            } catch (error) {
-                logger.error('Failed to load admin list:', error);
-                setAdminUsers([]);
-            }
-        };
-        
-        loadAdminList();
-    }, [user?.is_admin]); // Загружаем только при изменении прав админа
+    const { data: adminListData } = useAdminList({
+        enabled: !!user?.is_admin,
+    });
+    
+    const adminUsers = adminListData?.data || [];
     
     // Проверяем, является ли пользователь админом
     useEffect(() => {
@@ -198,7 +183,7 @@ const Sidebar = () => {
         } else {
             setIsAdmin(false);
         }
-    }, [isAuthenticated, user, adminUsers]);
+    }, [isAuthenticated, user]);
     
     // Мемоизируем navItems чтобы избежать пересоздания при каждом рендере
     const navItems = useMemo(() => getNavItems(isAdmin), [isAdmin]);
