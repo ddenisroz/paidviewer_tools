@@ -93,6 +93,11 @@
 - ✅ DeleteAccountModal
 - ✅ ChatBoxSettingsModal
 
+### Компоненты и хуки
+- ✅ ChatCard
+- ✅ GuestTtsCard
+- ✅ useBotStatus hook
+
 ---
 
 ## 🎯 Достигнутые цели
