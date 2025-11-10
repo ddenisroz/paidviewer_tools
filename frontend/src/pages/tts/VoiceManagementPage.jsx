@@ -25,9 +25,10 @@ import {
     retranscribeUserVoice,
     testVoice,
     renameUserVoice,
-    getGlobalVoices,
-    botService
+    getGlobalVoices
 } from '../../services/unified-api';
+import { useWhitelistStatus } from '../../queries/tts/ttsQueries';
+import { ttsService } from '../../services/api/services/ttsService';
 import { Badge } from '@/components/ui/badge';
 import { PageLoader } from '@/components/ui/loader';
 import { useLoadingState } from '../../hooks/useLoadingState';
@@ -240,7 +241,7 @@ const VoiceManagementPageContent = () => {
         queryFn: async () => {
             if (!userId) return [];
             try {
-                const response = await botService.get(`/api/user/voices/enabled/${userId}`);
+                const response = await ttsService.getEnabledVoices(userId);
                 return response.data.enabled_voice_ids || [];
             } catch (error) {
                 logger.error('Error loading enabled voices:', error);
@@ -256,7 +257,7 @@ const VoiceManagementPageContent = () => {
     // Mutation для обновления включенных голосов
     const updateEnabledVoicesMutation = useMutation({
         mutationFn: async ({ userId, voiceIds }) => {
-            return await botService.post(`/api/user/voices/enabled/${userId}`, voiceIds);
+            return await ttsService.saveEnabledVoices(userId, voiceIds);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['enabled-voices', userId] });

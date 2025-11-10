@@ -312,5 +312,24 @@ export const ttsService = {
   async unblockUser(data) {
     return apiClient.post('/api/tts/unblock', data);
   },
+
+  /**
+   * Получить список включенных голосов пользователя
+   * @param {number} userId - ID пользователя
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async getEnabledVoices(userId) {
+    return apiClient.get(`/api/user/voices/enabled/${userId}`);
+  },
+
+  /**
+   * Сохранить список включенных голосов пользователя
+   * @param {number} userId - ID пользователя
+   * @param {Array<number>} voiceIds - Массив ID голосов
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async saveEnabledVoices(userId, voiceIds) {
+    return apiClient.post(`/api/user/voices/enabled/${userId}`, voiceIds);
+  },
 };
 
