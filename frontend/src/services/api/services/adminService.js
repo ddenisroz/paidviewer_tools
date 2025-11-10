@@ -199,5 +199,29 @@ export const adminService = {
   async removeFromWhitelist(channelName, platform) {
     return apiClient.delete(`/api/admin/whitelist/${channelName}`, { params: { platform } });
   },
+
+  /**
+   * Получить статус TTS (админ)
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async getTtsStatus() {
+    return apiClient.get('/api/admin/tts/status');
+  },
+
+  /**
+   * Перезапустить Bot Service (админ)
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async restartBotService() {
+    return apiClient.post('/api/admin/bot-service/restart');
+  },
+
+  /**
+   * Перезапустить TTS движок (админ)
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async restartTtsEngine() {
+    return apiClient.post('/api/admin/tts/restart');
+  },
 };
 

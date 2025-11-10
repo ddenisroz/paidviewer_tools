@@ -39,5 +39,14 @@ export const chatService = {
   async getChatHistory(params = {}) {
     return apiClient.get('/api/chat/history', { params });
   },
+
+  /**
+   * Переключить mute пользователя
+   * @param {Object} data - Данные { username, platform, channel_name }
+   * @returns {Promise<AxiosResponse>}
+   */
+  async toggleMute(data) {
+    return apiClient.post('/api/moderation/toggle-mute', data);
+  },
 };
 

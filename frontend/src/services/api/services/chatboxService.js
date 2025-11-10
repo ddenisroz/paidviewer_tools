@@ -26,5 +26,14 @@ export const chatboxService = {
       params: { regenerate_token: regenerateToken },
     });
   },
+
+  /**
+   * Получить настройки Chatbox по токену
+   * @param {string} token - Токен виджета
+   * @returns {Promise<AxiosResponse>}
+   */
+  async getSettingsByToken(token) {
+    return apiClient.get(`/api/chatbox/settings/by-token/${token}`);
+  },
 };
 

@@ -72,7 +72,7 @@ const BotManagementPage = () => {
 
     const loadTtsStatus = async () => {
         try {
-            const response = await botService.get('/api/admin/tts/status');
+            const response = await adminService.getTtsStatus();
             const ttsService = response.data?.tts_service || {};
             
             // Убеждаемся что healthy определен правильно
@@ -106,7 +106,7 @@ const BotManagementPage = () => {
     const restartBotService = async () => {
         try {
             setRestarting(prev => ({ ...prev, 'bot_service': true }));
-            await botService.post('/api/admin/bot-service/restart');
+            await adminService.restartBotService();
             toast.success('Bot Service перезапущен');
             await loadBotsStatus();
         } catch (error) {
@@ -120,7 +120,7 @@ const BotManagementPage = () => {
     const restartTtsEngine = async () => {
         try {
             setRestarting(prev => ({ ...prev, 'tts_engine': true }));
-            await botService.post('/api/admin/tts/restart');
+            await adminService.restartTtsEngine();
             toast.success('TTS движок перезапущен');
         } catch (error) {
             logger.error('Error restarting TTS engine:', error);

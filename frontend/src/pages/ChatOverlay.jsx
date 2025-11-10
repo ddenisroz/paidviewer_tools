@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { TwitchIcon, VKIcon } from '../components/PlatformIcons';
-import { botService } from '../services/microservices';
+import { chatService } from '../services/api/services/chatService';
+import { chatboxService } from '../services/api/services/chatboxService';
 import MessageContent from '../components/MessageContent';
 import { twitchBadgesService } from '../services/twitchBadges';
 import useSharedWebSocket from '../hooks/useSharedWebSocket';
@@ -194,10 +195,8 @@ const ChatOverlay = () => {
             if (messages.length === 0 && !historyLoadedRef.current) {
                 logger.log('📜 [CHATOVERLAY] WebSocket history not received, loading via API...');
                 try {
-                    const response = await botService.get('/api/chat/history', {
-                        params: {
-                            limit: settings.max_messages || 50
-                        }
+                    const response = await chatService.getChatHistory({
+                        limit: settings.max_messages || 50
                     });
                     
                     if (response.data.success && response.data.messages && response.data.messages.length > 0) {
@@ -235,7 +234,7 @@ const ChatOverlay = () => {
     
     const loadSettings = async (isPolling = false) => {
         try {
-            const response = await botService.get(`/api/chatbox/settings/by-token/${token}`);
+            const response = await chatboxService.getSettingsByToken(token);
             
             // ✅ Нормализуем данные - убеждаемся что числа это числа
             const normalizedSettings = {
@@ -856,7 +855,7 @@ const ChatOverlay = () => {
                     <button
                         onClick={async () => {
                             try {
-                                await botService.post('/api/moderation/toggle-mute', {
+                                await chatService.toggleMute({
                                     username: contextMenu.username,
                                     platform: contextMenu.platform,
                                     channel_name: channelName || 'unknown',
@@ -889,7 +888,7 @@ const ChatOverlay = () => {
                     <button
                         onClick={async () => {
                             try {
-                                await botService.post('/api/moderation/toggle-mute', {
+                                await chatService.toggleMute({
                                     username: contextMenu.username,
                                     platform: contextMenu.platform,
                                     channel_name: channelName || 'unknown',
