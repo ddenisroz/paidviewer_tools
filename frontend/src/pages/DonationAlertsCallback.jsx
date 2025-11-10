@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { API_BASE_URL } from '../constants';
+import { authService } from '../services/api/services/authService';
 import { useNavigate } from 'react-router-dom';
 import { logger } from '../utils/prodLogger';
 
@@ -30,26 +30,20 @@ const DonationAlertsCallback = () => {
         setStatus('Обмен кода на токен...');
 
         // Отправляем код на бэкенд для обмена на токен
-        const response = await fetch(`${API_BASE_URL}/auth/donationalerts/callback?code=${code}&state=${state || ''}`);
+        const response = await authService.handleDonationAlertsCallback(code, state || '');
+        const result = response.data;
         
-        if (response.ok) {
-          const result = await response.json();
-          setStatus('Успешно подключено к DonationAlerts!');
-          
-          // Обновляем контекст DonationAlerts
-          window.dispatchEvent(new CustomEvent('donationalerts_connected', { 
-            detail: { success: true, user_id: result.user_id } 
-          }));
-          
-          // Принудительно обновляем данные аутентификации
-          window.dispatchEvent(new CustomEvent('auth_refresh_required'));
-          
-          setTimeout(() => navigate('/settings'), 2000);
-        } else {
-          const error = await response.json();
-          setStatus(`Ошибка: ${error.detail || 'Неизвестная ошибка'}`);
-          setTimeout(() => navigate('/settings'), 3000);
-        }
+        setStatus('Успешно подключено к DonationAlerts!');
+        
+        // Обновляем контекст DonationAlerts
+        window.dispatchEvent(new CustomEvent('donationalerts_connected', { 
+          detail: { success: true, user_id: result.user_id } 
+        }));
+        
+        // Принудительно обновляем данные аутентификации
+        window.dispatchEvent(new CustomEvent('auth_refresh_required'));
+        
+        setTimeout(() => navigate('/settings'), 2000);
       } catch (error) {
         logger.error('DonationAlerts callback error:', error);
         setStatus(`Ошибка: ${error.message}`);

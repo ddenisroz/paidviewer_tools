@@ -53,5 +53,17 @@ export const authService = {
   async deleteAccount() {
     return apiClient.post('/api/user/delete-account');
   },
+
+  /**
+   * Обработать OAuth callback для DonationAlerts
+   * @param {string} code - Код авторизации
+   * @param {string} state - State параметр
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async handleDonationAlertsCallback(code, state = '') {
+    return apiClient.get('/auth/donationalerts/callback', {
+      params: { code, state },
+    });
+  },
 };
 

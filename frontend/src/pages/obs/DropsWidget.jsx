@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { logger } from '../../utils/prodLogger';
+import { dropsService } from '../../services/api/services/dropsService';
 import CommonOpened from '../../images/lootboxes/common/common_opened.png';
 import RareOpened from '../../images/lootboxes/rare/rare_opened_.png';
 import EpicOpened from '../../images/lootboxes/epic/epic_opened.png';
