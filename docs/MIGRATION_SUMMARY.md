@@ -104,6 +104,8 @@
 - ✅ LootboxManagement
 - ✅ CacheMonitor
 - ✅ ChatConfigurator
+- ✅ DropsWidget
+- ✅ DonationAlertsCallback
 
 ---
 
