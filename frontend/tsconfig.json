@@ -1,0 +1,67 @@
+{
+  "compilerOptions": {
+    // === Базовые настройки ===
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    
+    // === Постепенная миграция ===
+    "allowJs": true,              // Разрешить JS файлы для постепенной миграции
+    "checkJs": true,              // Проверять JS файлы с помощью TypeScript
+    "noEmit": true,               // Не генерировать файлы (Vite делает это)
+    
+    // === Строгость типизации (постепенно увеличивать) ===
+    "strict": false,              // Начнем с false, затем включим постепенно
+    "noImplicitAny": false,       // Позволить any для постепенной миграции
+    "strictNullChecks": false,     // Позволить null/undefined для постепенной миграции
+    "strictFunctionTypes": false,
+    "strictBindCallApply": false,
+    "strictPropertyInitialization": false,
+    "noImplicitThis": false,
+    "alwaysStrict": false,
+    
+    // === Дополнительные проверки ===
+    "noUnusedLocals": true,       // Предупреждать о неиспользуемых переменных
+    "noUnusedParameters": true,   // Предупреждать о неиспользуемых параметрах
+    "noImplicitReturns": true,    // Требовать return во всех путях
+    "noFallthroughCasesInSwitch": true,
+    
+    // === Пути и алиасы ===
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "resolveJsonModule": true,
+    "isolatedModules": true,      // Требовать для Vite
+    
+    // === Дополнительные опции ===
+    "skipLibCheck": true,         // Пропустить проверку типов библиотек (быстрее)
+    "esModuleInterop": true,      // Совместимость с CommonJS
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    
+    // === Source Maps ===
+    "sourceMap": true,
+    "inlineSourceMap": false,
+    "inlineSources": false,
+    
+    // === Дополнительные типы ===
+    "types": ["vite/client", "node"]
+  },
+  "include": [
+    "src/**/*",
+    "vite.config.js",
+    "vite.config.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build"
+  ],
+  "ts-node": {
+    "esm": true
+  }
+}
+
