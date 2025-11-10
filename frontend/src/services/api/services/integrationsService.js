@@ -52,5 +52,21 @@ export const integrationsService = {
   async getIntegrations() {
     return apiClient.get('/api/integrations');
   },
+
+  /**
+   * Отключить интеграцию DonationAlerts
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async disconnectDonationAlerts() {
+    return apiClient.post('/api/integrations/donationalerts/disconnect');
+  },
+
+  /**
+   * Подключить DonationAlerts (получить URL для подключения)
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async connectDonationAlerts() {
+    return apiClient.post('/api/donationalerts/connect');
+  },
 };
 
