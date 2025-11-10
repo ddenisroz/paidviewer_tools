@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Gift, Plus, Edit, Trash2, Trophy, Coins } from 'lucide-react';
-import api from '../../services/api';
+import { lootboxService } from '../../services/api/services/lootboxService';
 import { logger } from '../../utils/prodLogger';
 import { toast } from 'sonner';
 
@@ -57,8 +57,8 @@ const LootboxManagement = () => {
             setIsLoading(true);
             // Загружаем лутбоксы и достижения
             const [lootboxesResponse, achievementsResponse] = await Promise.all([
-                api.get('/api/lootbox/admin/lootboxes'),
-                api.get('/api/lootbox/admin/achievements')
+                lootboxService.getAdminLootboxes(),
+                lootboxService.getAdminAchievements()
             ]);
             
             setLootboxes(lootboxesResponse.data || []);
@@ -75,7 +75,7 @@ const LootboxManagement = () => {
 
     const handleCreateLootbox = async () => {
         try {
-            await api.post('/lootbox/admin/lootbox', lootboxForm);
+            await lootboxService.createLootbox(lootboxForm);
             toast.success('Лутбокс создан!');
             setIsDialogOpen(false);
             setLootboxForm({ name: '', description: '', type: 'free', price: 0 });
@@ -88,7 +88,7 @@ const LootboxManagement = () => {
 
     const handleCreateReward = async () => {
         try {
-            await api.post('/lootbox/admin/lootbox/reward', rewardForm);
+            await lootboxService.createReward(rewardForm);
             toast.success('Награда создана!');
             setIsDialogOpen(false);
             setRewardForm({ lootbox_id: '', name: '', description: '', type: 'currency', value: '{"amount": 100, "currency": "points"}', weight: 1 });
@@ -101,7 +101,7 @@ const LootboxManagement = () => {
 
     const handleCreateAchievement = async () => {
         try {
-            await api.post('/lootbox/admin/achievement', achievementForm);
+            await lootboxService.createAchievement(achievementForm);
             toast.success('Достижение создано!');
             setIsDialogOpen(false);
             setAchievementForm({ channel_name: '', name: '', description: '', type: 'daily_streak', requirement_value: 1, reward_type: 'free_lootbox', reward_value: 1 });

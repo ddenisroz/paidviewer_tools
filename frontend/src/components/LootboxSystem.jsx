@@ -6,7 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Gift, Trophy, Star, Coins, Calendar, MessageSquare, TrendingUp, Check, X, Settings, BarChart3, Plus, Sparkles } from 'lucide-react';
-import api from '../services/api';
+import { lootboxService } from '../services/api/services/lootboxService';
 import { logger } from '../utils/prodLogger';
 import { CardSkeleton } from './ui/skeleton';
 import ImageLootbox from './ImageLootbox';
@@ -107,9 +107,9 @@ const LootboxSystem = ({ channelName }) => {
         try {
             setIsLoading(true);
             const [progressionRes, lootboxesRes, openingsRes] = await Promise.all([
-                api.get(`/lootbox/progression/${channelName}`),
-                api.get(`/lootbox/lootboxes/${channelName}`),
-                api.get(`/lootbox/recent/${channelName}?limit=5`)
+                lootboxService.getProgression(channelName),
+                lootboxService.getLootboxes(channelName),
+                lootboxService.getRecentOpenings(channelName, { limit: 5 })
             ]);
 
             setProgression(progressionRes.data.progression);
@@ -125,7 +125,7 @@ const LootboxSystem = ({ channelName }) => {
     const _openLootbox = async (lootboxId) => {
         try {
             setOpeningLootbox(lootboxId);
-            const response = await api.post('/lootbox/open', { lootbox_id: lootboxId });
+            const response = await lootboxService.openLootbox({ lootbox_id: lootboxId });
 
             if (response.data.success) {
                 // Показываем результат
