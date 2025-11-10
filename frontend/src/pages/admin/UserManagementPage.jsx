@@ -46,7 +46,8 @@ import {
     WifiOff
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { botService } from '../../services/microservices';
+import { adminService } from '../../services/api/services/adminService';
+import { integrationsService } from '../../services/api/services/integrationsService';
 import { logger } from '../../utils/prodLogger';
 
 const UserManagementPage = () => {
@@ -91,12 +92,10 @@ const UserManagementPage = () => {
     const { data: usersResponse = { users: [], pagination: {} }, isLoading: usersLoading, refetch: loadUsers } = useQuery({
         queryKey: ['admin-users', page, debouncedSearch],  // ✅ Пересчитываем при изменении page/search
         queryFn: async () => {
-            const response = await botService.get('/api/admin/users', {
-                params: {
-                    page,
-                    limit,
-                    search: debouncedSearch  // ✅ Отправляем поиск на сервер
-                }
+            const response = await adminService.getUsers({
+                page,
+                limit,
+                search: debouncedSearch  // ✅ Отправляем поиск на сервер
             });
             return response.data || { users: [], pagination: {} };
         },
@@ -117,7 +116,7 @@ const UserManagementPage = () => {
     const { data: sessionsData = [], isLoading: sessionsLoading } = useQuery({
         queryKey: ['admin-sessions'],
         queryFn: async () => {
-            const response = await botService.get('/api/admin/sessions');
+            const response = await adminService.getSessions();
             return response.data?.sessions || [];
         },
         staleTime: 30 * 1000,
@@ -133,7 +132,7 @@ const UserManagementPage = () => {
     const { data: integrationsData = [], isLoading: integrationsLoading } = useQuery({
         queryKey: ['integrations'],
         queryFn: async () => {
-            const response = await botService.get('/api/integrations');
+            const response = await integrationsService.getIntegrations();
             return response.data?.integrations || [];
         },
         staleTime: 30 * 1000,
@@ -148,7 +147,7 @@ const UserManagementPage = () => {
     // React Query мутации для операций с пользователями
     const updateUserMutation = useMutation({
         mutationFn: async ({ userId, data }) => {
-            return await botService.put(`/api/admin/users/${userId}`, data);
+            return await adminService.updateUser(userId, data);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin-users'] });
@@ -163,7 +162,7 @@ const UserManagementPage = () => {
 
     const blockUserMutation = useMutation({
         mutationFn: async ({ userId, reason }) => {
-            return await botService.post(`/api/admin/users/${userId}/block`, { reason });
+            return await adminService.blockUser(userId, { reason });
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin-users'] });
@@ -178,7 +177,7 @@ const UserManagementPage = () => {
 
     const deleteUserMutation = useMutation({
         mutationFn: async (userId) => {
-            return await botService.delete(`/api/admin/users/${userId}`);
+            return await adminService.deleteUser(userId);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin-users'] });
@@ -198,7 +197,7 @@ const UserManagementPage = () => {
             // Добавляем Twitch канал если указан
             if (twitchChannel && twitchChannel.trim()) {
                 try {
-                    await botService.post('/api/admin/whitelist/add', { 
+                    await adminService.addToWhitelist({ 
                         username: twitchChannel.trim(), 
                         platform: 'twitch' 
                     });
@@ -213,7 +212,7 @@ const UserManagementPage = () => {
             // Добавляем VK канал если указан
             if (vkChannel && vkChannel.trim()) {
                 try {
-                    await botService.post('/api/admin/whitelist/add', { 
+                    await adminService.addToWhitelist({ 
                         username: vkChannel.trim(), 
                         platform: 'vk' 
                     });
@@ -268,13 +267,13 @@ const UserManagementPage = () => {
                     // Удаляем с обеих платформ
                     const results = [];
                     try {
-                        await botService.delete(`/api/admin/whitelist/${channelName}?platform=twitch`);
+                        await adminService.removeFromWhitelist(channelName, 'twitch');
                         results.push('Twitch');
                     } catch (err) {
                         logger.warn('Error removing Twitch from whitelist:', err);
                     }
                     try {
-                        await botService.delete(`/api/admin/whitelist/${channelName}?platform=vk`);
+                        await adminService.removeFromWhitelist(channelName, 'vk');
                         results.push('VK');
                     } catch (err) {
                         logger.warn('Error removing VK from whitelist:', err);
@@ -282,7 +281,7 @@ const UserManagementPage = () => {
                     return { success: true, platforms: results };
                 } else {
                     // Удаляем с одной платформы
-                    return await botService.delete(`/api/admin/whitelist/${channelName}?platform=${platform}`);
+                    return await adminService.removeFromWhitelist(channelName, platform);
                 }
             } else {
                 // Добавляем в whitelist
@@ -290,20 +289,20 @@ const UserManagementPage = () => {
                     // Добавляем на обе платформы
                     const results = [];
                     try {
-                        await botService.post('/api/admin/whitelist/add', { username: channelName, platform: 'twitch' });
+                        await adminService.addToWhitelist({ username: channelName, platform: 'twitch' });
                         results.push('Twitch');
                     } catch (err) {
                         logger.warn('Error adding Twitch to whitelist:', err);
                     }
                     try {
-                        await botService.post('/api/admin/whitelist/add', { username: channelName, platform: 'vk' });
+                        await adminService.addToWhitelist({ username: channelName, platform: 'vk' });
                         results.push('VK');
                     } catch (err) {
                         logger.warn('Error adding VK to whitelist:', err);
                     }
                     return { success: true, platforms: results };
                 } else {
-                    return await botService.post('/api/admin/whitelist/add', { username: channelName, platform });
+                    return await adminService.addToWhitelist({ username: channelName, platform });
                 }
             }
         },

@@ -44,5 +44,13 @@ export const integrationsService = {
   connectDonationAlerts() {
     window.location.href = `${API_BASE_URL}/auth/donationalerts/login`;
   },
+
+  /**
+   * Получить список интеграций
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async getIntegrations() {
+    return apiClient.get('/api/integrations');
+  },
 };
 

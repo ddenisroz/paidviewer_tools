@@ -134,5 +134,70 @@ export const adminService = {
   async restoreBackup(filename) {
     return apiClient.post(`/api/database/backups/${filename}/restore`);
   },
+
+  /**
+   * Получить список пользователей (админ)
+   * @param {Object} params - Параметры запроса (page, limit, search)
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async getUsers(params = {}) {
+    return apiClient.get('/api/admin/users', { params });
+  },
+
+  /**
+   * Получить список сессий (админ)
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async getSessions() {
+    return apiClient.get('/api/admin/sessions');
+  },
+
+  /**
+   * Обновить пользователя (админ)
+   * @param {number} userId - ID пользователя
+   * @param {Object} data - Данные для обновления
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async updateUser(userId, data) {
+    return apiClient.put(`/api/admin/users/${userId}`, data);
+  },
+
+  /**
+   * Заблокировать пользователя (админ)
+   * @param {number} userId - ID пользователя
+   * @param {Object} data - Данные { reason }
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async blockUser(userId, data) {
+    return apiClient.post(`/api/admin/users/${userId}/block`, data);
+  },
+
+  /**
+   * Удалить пользователя (админ)
+   * @param {number} userId - ID пользователя
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async deleteUser(userId) {
+    return apiClient.delete(`/api/admin/users/${userId}`);
+  },
+
+  /**
+   * Добавить канал в whitelist
+   * @param {Object} data - Данные { username, platform }
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async addToWhitelist(data) {
+    return apiClient.post('/api/admin/whitelist/add', data);
+  },
+
+  /**
+   * Удалить канал из whitelist
+   * @param {string} channelName - Имя канала
+   * @param {string} platform - Платформа (twitch/vk)
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async removeFromWhitelist(channelName, platform) {
+    return apiClient.delete(`/api/admin/whitelist/${channelName}`, { params: { platform } });
+  },
 };
 
