@@ -45,5 +45,13 @@ export const authService = {
   loginWithVk() {
     window.location.href = `${API_BASE_URL}/auth/vk/login`;
   },
+
+  /**
+   * Удалить аккаунт пользователя
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async deleteAccount() {
+    return apiClient.post('/api/user/delete-account');
+  },
 };
 

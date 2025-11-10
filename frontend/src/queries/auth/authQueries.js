@@ -59,3 +59,31 @@ export const useLogout = (options = {}) => {
   });
 };
 
+/**
+ * Удалить аккаунт пользователя
+ */
+export const useDeleteAccount = (options = {}) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => authService.deleteAccount(),
+    onSuccess: () => {
+      queryClient.clear(); // Очищаем весь кэш при удалении аккаунта
+      if (!options.onSuccess) {
+        toast.success('Аккаунт успешно удалён');
+        // Перенаправляем на страницу логина через 2 секунды
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+      }
+    },
+    onError: (error) => {
+      logger.error('Error deleting account:', error);
+      if (!options.onError) {
+        toast.error(error.response?.data?.detail || 'Ошибка удаления аккаунта');
+      }
+    },
+    ...options,
+  });
+};
+

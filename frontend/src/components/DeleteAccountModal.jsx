@@ -2,38 +2,27 @@ import React, { useState } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { botService } from '../services/microservices';
+import { useDeleteAccount } from '../queries/auth/authQueries';
 import { toast } from 'sonner';
-import { logger } from '../utils/prodLogger';
 
 const DeleteAccountModal = ({ isOpen, onClose }) => {
     const [confirmText, setConfirmText] = useState('');
-    const [isDeleting, setIsDeleting] = useState(false);
+    
+    const deleteAccountMutation = useDeleteAccount({
+        onSuccess: () => {
+            // Редирект уже обработан в mutation
+        },
+    });
 
-    const handleDelete = async () => {
+    const isDeleting = deleteAccountMutation.isPending;
+
+    const handleDelete = () => {
         if (confirmText !== 'Delete') {
             toast.error('Введите "Delete" для подтверждения');
             return;
         }
 
-        try {
-            setIsDeleting(true);
-            
-            const response = await botService.post('/api/user/delete-account');
-            
-            if (response.data.success) {
-                toast.success('Аккаунт успешно удалён');
-                
-                // Перенаправляем на страницу логина через 2 секунды
-                setTimeout(() => {
-                    window.location.href = '/login';
-                }, 2000);
-            }
-        } catch (error) {
-            logger.error('Error deleting account:', error);
-            toast.error(error.response?.data?.detail || 'Ошибка удаления аккаунта');
-            setIsDeleting(false);
-        }
+        deleteAccountMutation.mutate();
     };
 
     const handleClose = () => {

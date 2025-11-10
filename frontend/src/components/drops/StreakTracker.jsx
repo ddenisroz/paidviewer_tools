@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Search, Trophy, TrendingUp, Calendar, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { botService } from '../../services/microservices';
+import { useDropsConfig } from '../../queries/drops/dropsQueries';
+import { dropsService } from '../../services/api/services/dropsService';
 import { toast } from 'sonner';
 import { logger } from '../../utils/prodLogger';
 
@@ -18,15 +18,7 @@ const StreakTracker = ({ user, channelName }) => {
   const limit = 50;
 
   // Check if streak is enabled (общий конфиг, без platform)
-  const { data: config } = useQuery({
-    queryKey: ['drops-config', channelName],
-    queryFn: async () => {
-      if (!channelName) return null;
-      const response = await botService.get(`/api/drops/config/${channelName}`);
-      return response.data.success ? response.data.data : null;
-    },
-    enabled: !!channelName,
-  });
+  const { data: config } = useDropsConfig(channelName);
 
   // Проверяем, включен ли стрик хотя бы на одной платформе
   const streakEnabled = (config?.streak_enabled_twitch || config?.streak_enabled_vk) ?? false;
@@ -55,11 +47,9 @@ const StreakTracker = ({ user, channelName }) => {
     try {
       setLoading(true);
       // 🚀 FIX: Загружаем общую статистику стриков (без фильтрации по platform)
-      const response = await botService.get(`/api/drops/streaks/${channelName}`, {
-        params: { 
-          limit, 
-          offset: currentOffset 
-        }
+      const response = await dropsService.getStreaks(channelName, {
+        limit, 
+        offset: currentOffset 
       });
       
       if (response.data.success) {

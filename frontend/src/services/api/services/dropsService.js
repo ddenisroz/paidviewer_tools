@@ -126,5 +126,15 @@ export const dropsService = {
   async resetStreak(channelName) {
     return apiClient.post(`/api/drops/streak/reset/${channelName}`, {});
   },
+
+  /**
+   * Получить статистику стриков
+   * @param {string} channelName - Имя канала
+   * @param {Object} params - Параметры запроса (limit, offset, search)
+   * @returns {Promise<AxiosResponse>}
+   */
+  async getStreaks(channelName, params = {}) {
+    return apiClient.get(`/api/drops/streaks/${channelName}`, { params });
+  },
 };
 
