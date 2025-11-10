@@ -14,5 +14,13 @@ export const adminService = {
   async getAdminList() {
     return apiClient.get('/api/admin/list');
   },
+
+  /**
+   * Получить статус ботов
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async getBotsStatus() {
+    return apiClient.get('/api/admin/bots/status');
+  },
 };
 

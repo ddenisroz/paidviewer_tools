@@ -11,7 +11,7 @@ import {
     Clock
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { botService } from '../../services/microservices';
+import { adminService } from '../../services/api/services/adminService';
 import { useTts } from '../../context/TtsContext';
 import { TTS_SERVICE_URL } from '../../constants';
 import { logger } from '../../utils/prodLogger';
@@ -29,7 +29,7 @@ const BotManagementPage = () => {
     const loadBotsStatus = async () => {
         try {
             setLoading(true);
-            const response = await botService.get('/api/admin/bots/status');
+            const response = await adminService.getBotsStatus();
             // Преобразуем объект ботов в массив
             const botsData = response.data?.bots || {};
             const botsArray = [];
