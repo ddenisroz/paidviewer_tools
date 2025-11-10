@@ -145,7 +145,7 @@ const YoutubeIntegrationPage = () => {
     // ✅ ОПТИМИЗАЦИЯ: Мемоизируем функцию для стабильности зависимостей
     const loadExistingObsUrl = useCallback(async () => {
         try {
-            const response = await api.get('/api/tts/obs-url');
+            const response = await youtubeService.getObsUrl();
             if (response.data.obs_token) {
                 const frontendUrl = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173';
                 const url = `${frontendUrl}/youtube-obs/${response.data.obs_token}`;
@@ -187,7 +187,7 @@ const YoutubeIntegrationPage = () => {
 
     const handleClearQueue = async () => {
         try {
-            await api.post('/api/youtube/clear');
+            await youtubeService.clearQueue();
             toast.success("Очередь очищена.");
             setIsClearDialogOpen(false); // Закрываем диалог
             loadQueue();

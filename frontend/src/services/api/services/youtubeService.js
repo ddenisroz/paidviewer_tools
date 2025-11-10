@@ -99,5 +99,21 @@ export const youtubeService = {
   async generateObsUrl() {
     return apiClient.post('/api/youtube/generate-obs-url');
   },
+
+  /**
+   * Регенерировать OBS URL для YouTube
+   * @returns {Promise<AxiosResponse>}
+   */
+  async regenerateObsUrl() {
+    return apiClient.post('/api/youtube/regenerate-obs-url');
+  },
+
+  /**
+   * Очистить очередь YouTube
+   * @returns {Promise<AxiosResponse>}
+   */
+  async clearQueue() {
+    return apiClient.post('/api/youtube/clear');
+  },
 };
 
