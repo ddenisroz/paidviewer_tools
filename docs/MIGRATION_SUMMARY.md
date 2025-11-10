@@ -10,8 +10,8 @@
 
 ### Миграция компонентов
 - **Контексты**: 7/7 (100%) ✅
-- **Компоненты**: 41/50+ (~82%) ✅
-- **Сервисы создано**: 12
+- **Компоненты**: 43/50+ (~86%) ✅
+- **Сервисы создано**: 13
 - **Queries создано**: 50+
 - **Удалено дублирования**: ~1300+ строк кода
 - **Прямых вызовов botService**: 0 (только в microservices.js) ✅
@@ -90,6 +90,7 @@
 - ✅ StorageManagementPage
 - ✅ MonitoringPage
 - ✅ BlockedChannelsPage
+- ✅ SupportTicketsPage
 
 ### Модальные окна
 - ✅ DeleteAccountModal
@@ -168,6 +169,7 @@ Context → React Query Hook → Service → API
 - `frontend/src/services/api/services/chatboxService.js`
 - `frontend/src/services/api/services/lootboxService.js`
 - `frontend/src/services/api/services/adminService.js`
+- `frontend/src/services/api/services/supportService.js`
 - `frontend/src/services/api/services/pointsService.js`
 
 ### Queries
