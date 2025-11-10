@@ -87,10 +87,11 @@
 - ✅ `DataContext.jsx` - мигрирован на `streamService` и React Query (useStreamHistory, useTwitchStreamInfo, useVkStreamInfo, useUpdateStream)
 - ✅ `UserSettingsContext.jsx` - мигрирован на `userSettingsService` и React Query (useUserSettings, useSaveUserSettings)
 - ✅ `ChatContext.jsx` - мигрирован на `chatService` и React Query (useChatHistory, useBotStatus, useConnectBot, useDisconnectBot)
+- ✅ `TtsContext.jsx` - мигрирован на `ttsService` и React Query (useTtsStatus, useTtsHealth, useToggleTts, useGlobalVoices)
+- ✅ `TtsHealthContext.jsx` - объединен с `TtsContext.jsx` (логика health check интегрирована)
 
 **Осталось:**
-- [ ] `TtsContext.jsx` - мигрировать на `ttsService` и React Query
-- [ ] `TtsHealthContext.jsx` - объединить с `TtsContext.jsx`
+- Все контексты мигрированы! ✅
 
 ---
 
@@ -129,7 +130,7 @@
 - **Сервисов:** 10
 - **Queries:** 45+
 - **Мигрировано компонентов:** 16/50+
-- **Мигрировано контекстов:** 6/9 (67%)
+- **Мигрировано контекстов:** 7/7 (100%) ✅
 - **Удалено дублирования:** ~800+ строк
 
 ---

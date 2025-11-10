@@ -494,37 +494,31 @@ export const ChatProvider = ({ children }) => {
         });
     }, [isConnected, wsSendMessage]);
 
-    // Функция для подключения бота
-    const connectBotToChannels = useCallback(async (platforms = []) => {
-        if (!isAuthenticated) return;
-        
-        try {
-            const response = await connectBot(platforms);
-            if (response.success) {
+    // React Query mutations для управления ботом
+    const connectBotMutation = useConnectBot({
+        onSuccess: (response) => {
+            if (response.data?.success) {
                 setBotStatus('connected');
                 addToast({
                     type: 'success',
                     title: 'Бот подключен',
-                    message: `Бот успешно подключен к ${platforms.join(', ')}`
+                    message: 'Бот успешно подключен'
                 });
             }
-        } catch (error) {
+        },
+        onError: (error) => {
             logger.error('Error connecting bot:', error);
             addToast({
                 type: 'error',
                 title: 'Ошибка подключения',
                 message: 'Не удалось подключить бота к каналам'
             });
-        }
-    }, [isAuthenticated, addToast]);
+        },
+    });
 
-    // Функция для отключения бота
-    const disconnectBotFromChannels = useCallback(async () => {
-        if (!isAuthenticated) return;
-        
-        try {
-            const response = await disconnectBot();
-            if (response.success) {
+    const disconnectBotMutation = useDisconnectBot({
+        onSuccess: (response) => {
+            if (response.data?.success) {
                 setBotStatus('disconnected');
                 addToast({
                     type: 'success',
@@ -532,15 +526,28 @@ export const ChatProvider = ({ children }) => {
                     message: 'Бот успешно отключен от всех каналов'
                 });
             }
-        } catch (error) {
+        },
+        onError: (error) => {
             logger.error('Error disconnecting bot:', error);
             addToast({
                 type: 'error',
                 title: 'Ошибка отключения',
                 message: 'Не удалось отключить бота от каналов'
             });
-        }
-    }, [isAuthenticated, addToast]);
+        },
+    });
+
+    // Функция для подключения бота (обертка для совместимости)
+    const connectBotToChannels = useCallback(async (platforms = []) => {
+        if (!isAuthenticated) return;
+        connectBotMutation.mutate();
+    }, [isAuthenticated, connectBotMutation]);
+
+    // Функция для отключения бота (обертка для совместимости)
+    const disconnectBotFromChannels = useCallback(async () => {
+        if (!isAuthenticated) return;
+        disconnectBotMutation.mutate();
+    }, [isAuthenticated, disconnectBotMutation]);
 
     // React Query hook для статуса бота
     const { data: botStatusData, refetch: refetchBotStatus } = useBotStatus({

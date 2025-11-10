@@ -519,3 +519,20 @@ export const useUnblockUser = (options = {}) => {
   });
 };
 
+/**
+ * Получить глобальные голоса TTS
+ */
+export const useGlobalVoices = (options = {}) => {
+  return useQuery({
+    queryKey: queryKeys.tts.voices.global(),
+    queryFn: async () => {
+      const response = await ttsService.getGlobalVoices();
+      return response.data;
+    },
+    staleTime: 5 * 60 * 1000, // 5 минут - голоса редко меняются
+    gcTime: 30 * 60 * 1000, // 30 минут
+    retry: 1,
+    ...options,
+  });
+};
+

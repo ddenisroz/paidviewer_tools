@@ -1,10 +1,11 @@
 // src/context/TtsContext.jsx
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { getTtsHealth, getGlobalVoices, enableTts, disableTts, getTtsStatus } from '../services/microservices';
 import { AuthContext } from './AuthContext';
 import { useToast } from '../components/ui/toast';
 import { useButtonPosition } from '../hooks/useButtonPosition';
 import { logger } from '../utils/prodLogger';
+import { useTtsStatus, useTtsHealth, useToggleTts, useGlobalVoices } from '../queries/tts/ttsQueries';
+import { useLocation } from 'react-router-dom';
 
 const TtsContext = createContext();
 
@@ -14,6 +15,7 @@ export const TtsProvider = ({ children }) => {
     const { user } = useContext(AuthContext);
     const { addToast } = useToast();
     const { getButtonPosition } = useButtonPosition();
+    const location = useLocation();
     const [ttsEnabled, setTtsEnabled] = useState(false);
     const [isWhitelisted, setIsWhitelisted] = useState(null); // null = не проверено, true/false = результат проверки
     const [voices, setVoices] = useState([]);
@@ -21,6 +23,91 @@ export const TtsProvider = ({ children }) => {
     const [notificationCallback, setNotificationCallback] = useState(null);
     const [isInitialized, setIsInitialized] = useState(false);
     const [isToggling, setIsToggling] = useState(false); // Флаг для предотвращения множественных вызовов
+    
+    // Проверяем, является ли пользователь гостем
+    const isGuest = user?.is_guest || user?.id === -1;
+    
+    // Проверяем, является ли это TTS страницей
+    const ttsRelatedPaths = ['/dashboard/tts', '/tts'];
+    const isTtsPage = ttsRelatedPaths.some(path => location.pathname.startsWith(path));
+    
+    // React Query hooks
+    const channelName = user?.isGuest ? user.username : null;
+    
+    // Health check - только для не-гостевых пользователей и на TTS страницах
+    const { data: healthData, isLoading: isCheckingHealth } = useTtsHealth({
+        enabled: !isGuest && isTtsPage,
+        refetchInterval: 30 * 1000, // 30 секунд
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        onSuccess: (data) => {
+            const healthResponse = data?.data || data;
+            const isHealthy = healthResponse?.tts_engine_loaded === true;
+            if (isHealthy) {
+                setEngineStatus({ loaded: true, error: null });
+            } else {
+                setEngineStatus({ loaded: false, error: "TTS движок не готов" });
+            }
+        },
+        onError: (error) => {
+            logger.error("TTS Health check failed:", error);
+            setEngineStatus({ loaded: false, error: "Не удается подключиться к TTS сервису" });
+        },
+    });
+    
+    // TTS Status
+    const { data: statusData, refetch: refetchStatus } = useTtsStatus(channelName, {
+        enabled: !!user,
+        refetchInterval: 30 * 1000, // 30 секунд
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        onSuccess: (data) => {
+            const statusResponse = data?.data || data;
+            if (statusResponse) {
+                setTtsEnabled(statusResponse.enabled || false);
+                setIsWhitelisted(statusResponse.is_whitelisted || false);
+                if (statusResponse.has_local_setup) {
+                    localStorage.setItem('tts_has_local_setup', 'true');
+                } else {
+                    localStorage.setItem('tts_has_local_setup', 'false');
+                }
+            }
+        },
+    });
+    
+    // Global Voices - загружаем только если движок готов
+    const { data: voicesData } = useGlobalVoices({
+        enabled: !!user && engineStatus.loaded,
+        onSuccess: (data) => {
+            const voicesResponse = data?.voices || data;
+            if (Array.isArray(voicesResponse)) {
+                setVoices(voicesResponse);
+            } else if (voicesResponse?.success && Array.isArray(voicesResponse.voices)) {
+                setVoices(voicesResponse.voices);
+            }
+        },
+    });
+    
+    // Toggle TTS mutation
+    const toggleTtsMutation = useToggleTts({
+        onSuccess: (data, enabled) => {
+            setTtsEnabled(enabled);
+            window.dispatchEvent(new CustomEvent('tts-status-changed', { 
+                detail: { enabled } 
+            }));
+            const message = enabled ? "Озвучка сообщений включена." : "Озвучка сообщений отключена.";
+            if (notificationCallback) {
+                notificationCallback(message, "success");
+            }
+        },
+        onError: (error) => {
+            logger.error("Failed to toggle TTS status:", error);
+            const message = "Не удалось изменить статус озвучки.";
+            if (notificationCallback) {
+                notificationCallback(message);
+            }
+        },
+    });
 
     // Функция для регистрации callback уведомлений
     const setNotificationHandler = useCallback((callback) => {
@@ -29,114 +116,25 @@ export const TtsProvider = ({ children }) => {
         }
     }, []);
 
-    // Инициализация при первом запуске - теперь полагаемся на TtsHealthContext
+    // Инициализация - данные загружаются автоматически через React Query
     useEffect(() => {
-        if (!isInitialized) {
-            // Просто отмечаем как инициализированный, health проверка в TtsHealthContext
+        if (!isInitialized && user) {
             setIsInitialized(true);
         }
-    }, [isInitialized]);
+    }, [isInitialized, user]);
 
-    // Дополнительная инициализация при появлении пользователя - ТОЛЬКО ОДИН РАЗ
-    const userInitializedRef = useRef(false);
-    useEffect(() => {
-        // Делаем инициализацию только один раз после появления пользователя
-        if (isInitialized && user && !userInitializedRef.current) {
-            userInitializedRef.current = true;
-            
-            // Вызываем функции напрямую, без зависимости
-            const initUserTts = async () => {
-                try {
-                    // CRITICAL: Проверяем статус TTS и whitelist ВСЕГДА (независимо от engineStatus)
-                    const channelName = user?.isGuest ? user.username : null;
-                    const response = await getTtsStatus(channelName);
-                    if (response.data) {
-                        setTtsEnabled(response.data.enabled);
-                        // IMPORTANT: Set isWhitelisted from API response
-                        setIsWhitelisted(response.data.is_whitelisted || false);
-                        // Сохраняем has_local_setup в localStorage для других компонентов
-                        if (response.data.has_local_setup) {
-                            localStorage.setItem('tts_has_local_setup', 'true');
-                        } else {
-                            localStorage.setItem('tts_has_local_setup', 'false');
-                        }
-                    }
-                } catch (error) {
-                    logger.error('Failed to get TTS status:', error);
-                }
-                
-                // Загружаем голоса только если движок готов
-                if (engineStatus.loaded) {
-                    try {
-                        const voicesResponse = await getGlobalVoices();
-                        if (voicesResponse.success) {
-                            setVoices(voicesResponse.voices || []);
-                        }
-                    } catch (error) {
-                        logger.error('Failed to load voices:', error);
-                    }
-                }
-            };
-            
-            initUserTts();
-        }
-    }, [isInitialized, user]); // Убрали engineStatus.loaded из зависимостей
-
-    const checkEngineStatus = useCallback(async () => {
-        try {
-            const response = await getTtsHealth();
-            
-            // Проверяем и статус, и готовность движка
-            if (response.status === 'healthy' && response.tts_engine_loaded) {
-                setEngineStatus({ loaded: true, error: null });
-            } else {
-                const errorMsg = response.status !== 'healthy' 
-                    ? "TTS сервис недоступен" 
-                    : "TTS движок не готов";
-                setEngineStatus({ loaded: false, error: errorMsg });
-            }
-        } catch (error) {
-            setEngineStatus({ loaded: false, error: "Не удается подключиться к TTS сервису" });
-            logger.error("TTS Health check failed:", error);
-        }
-    }, []);
-
-    // Синхронизация с TtsHealthContext
-    const syncWithHealthContext = useCallback((isHealthy) => {
-        // Проверяем, изменилось ли значение
-        const newStatus = isHealthy ? 
-            { loaded: true, error: null } : 
-            { loaded: false, error: "TTS сервис недоступен" };
-        
-        // Обновляем только если статус изменился
-        setEngineStatus(prevStatus => {
-            if (prevStatus.loaded !== newStatus.loaded || prevStatus.error !== newStatus.error) {
-                return newStatus;
-            }
-            return prevStatus;
-        });
-    }, []);
-
+    // Обертка для проверки статуса (для обратной совместимости)
     const checkTtsStatus = useCallback(async () => {
         if (user) {
-            try {
-                const channelName = user?.isGuest ? user.username : null;
-                const response = await getTtsStatus(channelName);
-                const { enabled, is_whitelisted, has_local_setup } = response.data;
-                setTtsEnabled(enabled);
-                setIsWhitelisted(is_whitelisted || false);
-                // Сохраняем has_local_setup в localStorage для других компонентов
-                if (has_local_setup) {
-                    localStorage.setItem('tts_has_local_setup', 'true');
-                } else {
-                    localStorage.setItem('tts_has_local_setup', 'false');
-                }
-            } catch (error) {
-                logger.error("Could not get TTS status:", error);
-                setTtsEnabled(false);
-            }
+            await refetchStatus();
         }
-    }, [user]);
+    }, [user, refetchStatus]);
+    
+    // Обертка для проверки health (для обратной совместимости)
+    const checkTtsHealth = useCallback(async () => {
+        // Health проверяется автоматически через useTtsHealth
+        return { isHealthy: engineStatus.loaded, isChecking: isCheckingHealth };
+    }, [engineStatus.loaded, isCheckingHealth]);
 
     // Слушаем изменения от TtsQuickSettings (shortcuts на главной странице)
     useEffect(() => {
@@ -149,22 +147,11 @@ export const TtsProvider = ({ children }) => {
         return () => window.removeEventListener('tts-status-changed', handleTtsStatusChange);
     }, []);
 
+    // Обертка для загрузки голосов (для обратной совместимости)
     const loadVoices = useCallback(async () => {
-        if (user && engineStatus.loaded) {
-             try {
-                const response = await getGlobalVoices();
-                setVoices(response.data);
-            } catch (error) {
-                logger.error("Failed to load voices:", error);
-                const message = "Не удалось загрузить список голосов.";
-                if (notificationCallback) {
-                    notificationCallback(message);
-                } else {
-                    // showNotification(message, 'error'); // This line was removed from imports
-                }
-            }
-        }
-    }, [user, engineStatus.loaded]);
+        // Голоса загружаются автоматически через useGlobalVoices
+        // Функция оставлена для обратной совместимости
+    }, []);
 
 
     // Убираем автоматические запросы - они будут вызываться только при явном обращении к TTS функциям
@@ -183,143 +170,45 @@ export const TtsProvider = ({ children }) => {
     // }, [engineStatus.loaded, checkTtsStatus, loadVoices]);
 
 
+    // Обновляем isToggling из mutation
+    useEffect(() => {
+        setIsToggling(toggleTtsMutation.isPending);
+    }, [toggleTtsMutation.isPending]);
+
     const toggleTts = useCallback(async (event = null) => {
         // Предотвращаем множественные вызовы
-        if (isToggling) {
+        if (isToggling || toggleTtsMutation.isPending) {
             return;
         }
         
-        setIsToggling(true);
-        
-        try {
-            if (!engineStatus.loaded) {
-                // TtsContext: TTS engine not loaded, notificationCallback:', !!notificationCallback);
-                // TtsContext: Engine status:', engineStatus);
-                // Показываем более точное сообщение об ошибке
-                const errorMessage = engineStatus.error || "TTS движок не готов. Попробуйте обновить страницу.";
-                if (notificationCallback) {
-                    notificationCallback(errorMessage);
-                } else {
-                    const position = getButtonPosition(event);
-                    // showNotification(errorMessage, 'error', 4000, position); // This line was removed from imports
-                }
-                return;
+        if (!engineStatus.loaded) {
+            const errorMessage = engineStatus.error || "TTS движок не готов. Попробуйте обновить страницу.";
+            if (notificationCallback) {
+                notificationCallback(errorMessage);
             }
+            return;
+        }
 
-            if (!isWhitelisted) {
-                // TtsContext: Channel not whitelisted, notificationCallback:', !!notificationCallback);
-                const message = "Ваш канал не в белом списке для использования TTS.";
-                if (notificationCallback) {
-                    // TtsContext: Using notification callback for whitelist');
-                    notificationCallback(message);
-                } else {
-                    // TtsContext: Using fallback notification for whitelist');
-                    const position = getButtonPosition(event);
-                    // showNotification(message, 'warning', 4000, position); // This line was removed from imports
-                }
-                return;
-            }
-
-            if (ttsEnabled) {
-                await disableTts();
-                setTtsEnabled(false);
-                
-                // Уведомляем shortcuts на главной странице
-                window.dispatchEvent(new CustomEvent('tts-status-changed', { 
-                    detail: { enabled: false } 
-                }));
-                
-                const message = "Озвучка сообщений отключена.";
-                if (notificationCallback) {
-                    notificationCallback(message, "success");
-                } else {
-                    const position = getButtonPosition(event);
-                    // showNotification(message, "success", 4000, position); // This line was removed from imports
-                }
-            } else {
-                await enableTts();
-                setTtsEnabled(true);
-                
-                // Уведомляем shortcuts на главной странице
-                window.dispatchEvent(new CustomEvent('tts-status-changed', { 
-                    detail: { enabled: true } 
-                }));
-                
-                const message = "Озвучка сообщений включена.";
-                if (notificationCallback) {
-                    notificationCallback(message, "success");
-                } else {
-                    const position = getButtonPosition(event);
-                    // showNotification(message, "success", 4000, position); // This line was removed from imports
-                }
-            }
-        } catch (error) {
-            logger.error("Failed to toggle TTS status:", error);
-            const message = "Не удалось изменить статус озвучки.";
+        if (!isWhitelisted) {
+            const message = "Ваш канал не в белом списке для использования TTS.";
             if (notificationCallback) {
                 notificationCallback(message);
-            } else {
-                const position = getButtonPosition(event);
-                // showNotification(message, 'error', 4000, position); // This line was removed from imports
             }
-        } finally {
-            // Сбрасываем флаг с минимальной задержкой для предотвращения спама
-            setTimeout(() => {
-                setIsToggling(false);
-            }, 200); // 200ms задержка
-        }
-    }, [engineStatus.loaded, isWhitelisted, ttsEnabled, notificationCallback, getButtonPosition, isToggling]);
-
-    // Функция для инициализации TTS (вызывается только при переходе на TTS страницы)
-    const initializeTts = useCallback(async () => {
-        // TtsContext: initializeTts called, isInitialized:', isInitialized, 'engine status:', engineStatus);
-        
-        // Если уже инициализирован, не делаем повторную инициализацию
-        if (isInitialized) {
-            // TtsContext: Already initialized, skipping...');
             return;
         }
-        
-        // CRITICAL: Check TTS status and whitelist ALWAYS (independently of engine status)
-        // This fixes the issue where isWhitelisted stays null until engine loads
-        if (user) {
-            try {
-                // Проверяем статус TTS и whitelist
-                const channelName = user?.isGuest ? user.username : null;
-                const response = await getTtsStatus(channelName);
-                if (response.data) {
-                    setTtsEnabled(response.data.enabled);
-                    // IMPORTANT: Set isWhitelisted from API response
-                    // Backend returns: is_whitelisted OR has_local_setup
-                    setIsWhitelisted(response.data.is_whitelisted || false);
-                    // Save has_local_setup to localStorage for other components
-                    if (response.data.has_local_setup) {
-                        localStorage.setItem('tts_has_local_setup', 'true');
-                    } else {
-                        localStorage.setItem('tts_has_local_setup', 'false');
-                    }
-                }
-            } catch (error) {
-                logger.error('Failed to get TTS status:', error);
-            }
+
+        // Используем mutation для переключения
+        toggleTtsMutation.mutate(!ttsEnabled);
+    }, [engineStatus.loaded, isWhitelisted, ttsEnabled, notificationCallback, isToggling, toggleTtsMutation]);
+
+    // Функция для инициализации TTS (обертка для обратной совместимости)
+    const initializeTts = useCallback(async () => {
+        // Данные загружаются автоматически через React Query
+        // Функция оставлена для обратной совместимости
+        if (!isInitialized && user) {
+            setIsInitialized(true);
         }
-        
-        // Загружаем голоса только если движок готов
-        if (engineStatus.loaded && user) {
-            try {
-                // Загружаем голоса
-                const voicesResponse = await getGlobalVoices();
-                if (voicesResponse.success) {
-                    setVoices(voicesResponse.voices || []);
-                }
-            } catch (error) {
-                logger.error('Failed to load voices:', error);
-            }
-        }
-        
-        // Отмечаем как инициализированный
-        setIsInitialized(true);
-    }, [isInitialized, engineStatus.loaded, user]);
+    }, [isInitialized, user]);
 
     // Мемоизируем значение контекста для предотвращения лишних re-renders
     const value = useMemo(() => ({
@@ -334,7 +223,9 @@ export const TtsProvider = ({ children }) => {
         loadVoices,
         initializeTts,
         setNotificationHandler,
-        syncWithHealthContext,
+        checkTtsStatus,
+        checkTtsHealth,
+        isCheckingHealth,
     }), [
         ttsEnabled,
         isWhitelisted,
@@ -346,7 +237,9 @@ export const TtsProvider = ({ children }) => {
         loadVoices,
         initializeTts,
         setNotificationHandler,
-        syncWithHealthContext,
+        checkTtsStatus,
+        checkTtsHealth,
+        isCheckingHealth,
     ]);
 
     return (
