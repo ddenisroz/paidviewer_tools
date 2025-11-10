@@ -1,21 +1,24 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { botService } from '../services/microservices';
+import { dropsService } from '../services/api/services/dropsService';
+import { queryKeys } from '../queries/queryKeys';
 import { toast } from 'sonner';
 import { logger } from '../utils/prodLogger';
 import { useEffect, useState, useMemo } from 'react';
 
 /**
  * Хук для работы с конфигурацией drops
+ * @deprecated Используйте useDropsConfig и useUpdateDropsConfig из queries/drops/dropsQueries
+ * Оставлен для обратной совместимости с компонентами, использующими isInitialLoad и saveMutation
  */
 export const useDropsConfig = (channelName) => {
   const queryClient = useQueryClient();
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const { data: config, isLoading } = useQuery({
-    queryKey: ['drops-config', channelName],
+    queryKey: queryKeys.drops.config(channelName),
     queryFn: async () => {
       if (!channelName) return null;
-      const response = await botService.get(`/api/drops/config/${channelName}`);
+      const response = await dropsService.getConfig(channelName);
       return response.data.success ? response.data.data : null;
     },
     enabled: !!channelName,
@@ -24,7 +27,7 @@ export const useDropsConfig = (channelName) => {
 
   const saveMutation = useMutation({
     mutationFn: async (payload) => {
-      return await botService.put(`/api/drops/config/${channelName}`, payload);
+      return await dropsService.updateConfig(channelName, payload);
     },
     onMutate: async (payload) => {
       await queryClient.cancelQueries({ queryKey: ['drops-config', channelName] });
