@@ -26,6 +26,9 @@ export * from './points/pointsQueries';
 // User Settings
 export * from './userSettings/userSettingsQueries';
 
+// Chat
+export * from './chat/chatQueries';
+
 // Query Keys
 export { queryKeys } from './queryKeys';
 

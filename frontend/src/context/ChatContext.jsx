@@ -1,13 +1,14 @@
 // src/context/ChatContext.jsx
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useReducer, useMemo } from 'react';
 import { API_BASE_URL } from '../constants';
-import { connectBot, disconnectBot, getBotStatus, TTS_SERVICE_URL } from '../services/microservices';
+import { TTS_SERVICE_URL } from '../services/microservices';
 import { AuthContext, useAuth } from './AuthContext';
 import { useToast } from '../components/ui/toast';
 import { useIntegrations } from './IntegrationsContext';
 import useSharedWebSocket from '../hooks/useSharedWebSocket';
-import api from '../services/api';
 import { logger } from '../utils/prodLogger';
+import { useChatHistory, useBotStatus, useConnectBot, useDisconnectBot } from '../queries/chat/chatQueries';
+import { chatService } from '../services/api/services/chatService';
 
 const ChatContext = createContext();
 
@@ -117,10 +118,8 @@ export const ChatProvider = ({ children }) => {
             
             try {
                 logger.info('📜 Loading chat history from API (WebSocket fallback)...');
-                const response = await api.get('/api/chat/history', {
-                    params: {
-                        limit: parseInt(import.meta.env.VITE_CHAT_MAX_MESSAGES || '200', 10)
-                    }
+                const response = await chatService.getChatHistory({
+                    limit: parseInt(import.meta.env.VITE_CHAT_MAX_MESSAGES || '200', 10)
                 });
                 
                 if (response.data.success && response.data.messages && response.data.messages.length > 0) {
@@ -543,20 +542,39 @@ export const ChatProvider = ({ children }) => {
         }
     }, [isAuthenticated, addToast]);
 
-    // Функция для получения статуса бота
-    const getBotConnectionStatus = useCallback(async () => {
-        if (!isAuthenticated) return;
-        
-        try {
-            const response = await getBotStatus();
-            setBotStatus(response.status);
-            return response;
-        } catch (error) {
+    // React Query hook для статуса бота
+    const { data: botStatusData, refetch: refetchBotStatus } = useBotStatus({
+        enabled: isAuthenticated,
+        refetchInterval: 30000, // 30 секунд
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        onSuccess: (data) => {
+            const statusResponse = data?.data || data;
+            if (statusResponse.connected) {
+                setBotStatus('connected');
+            } else {
+                setBotStatus('disconnected');
+            }
+        },
+        onError: (error) => {
             logger.error('Error getting bot status:', error);
             setBotStatus('disconnected');
-            return { status: 'disconnected' };
+        },
+    });
+
+    // Функция для получения статуса подключения бота (обертка для совместимости)
+    const getBotConnectionStatus = useCallback(async () => {
+        if (!isAuthenticated) return { status: 'disconnected' };
+        const result = await refetchBotStatus();
+        const statusResponse = result.data?.data || result.data;
+        if (statusResponse?.connected) {
+            setBotStatus('connected');
+            return { status: 'connected', ...statusResponse };
+        } else {
+            setBotStatus('disconnected');
+            return { status: 'disconnected', ...statusResponse };
         }
-    }, [isAuthenticated]);
+    }, [isAuthenticated, refetchBotStatus]);
 
     // Функция для очистки сообщений
     const clearMessages = useCallback(() => {
