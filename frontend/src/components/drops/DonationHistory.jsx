@@ -1,35 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { History, DollarSign } from 'lucide-react';
-import { botService } from '../../services/microservices';
+import { useDropsHistory } from '../../queries/drops/dropsQueries';
 
 const DonationHistory = ({ user, platform, channelName }) => {
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    loadHistory();
-  }, [user, platform, channelName]);
-
-  const loadHistory = async () => {
-    if (!user || !platform || !channelName) return;
-
-    try {
-      setLoading(true);
-      const response = await botService.get(`/api/drops/history/${channelName}`, {
-        params: { platform, drops_type: 'donation', limit: 20 }
-      });
-      
-      if (response.data.success) {
-        setHistory(response.data.data);
-      }
-    } catch (error) {
-      // Silent fail - optional component
-    } finally {
-      setLoading(false);
+  const { data: historyData, isLoading: loading } = useDropsHistory(
+    channelName,
+    { platform, drops_type: 'donation', limit: 20 },
+    {
+      enabled: !!user && !!platform && !!channelName,
+      retry: false, // Silent fail - optional component
     }
-  };
+  );
+
+  const history = historyData?.data || [];
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
