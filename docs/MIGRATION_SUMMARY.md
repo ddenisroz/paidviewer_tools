@@ -97,6 +97,8 @@
 - ✅ ChatCard
 - ✅ GuestTtsCard
 - ✅ useBotStatus hook
+- ✅ LootboxSystem
+- ✅ LootboxManagement
 
 ---
 
@@ -162,6 +164,7 @@ Context → React Query Hook → Service → API
 - `frontend/src/services/api/services/userSettingsService.js`
 - `frontend/src/services/api/services/chatService.js`
 - `frontend/src/services/api/services/chatboxService.js`
+- `frontend/src/services/api/services/lootboxService.js`
 - `frontend/src/services/api/services/adminService.js`
 - `frontend/src/services/api/services/pointsService.js`
 
