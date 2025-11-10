@@ -116,7 +116,7 @@ const YoutubeIntegrationPage = () => {
     // Перегенерация URL для YouTube OBS
     const regenerateYoutubeObsUrl = async () => {
         try {
-            const response = await api.post('/api/youtube/regenerate-obs-url');
+            const response = await youtubeService.regenerateObsUrl();
             const url = response.data.youtube_obs_url;
             setYoutubeObsUrl(url);
             setIsObsUrlVisible(true);
