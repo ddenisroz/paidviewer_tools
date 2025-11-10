@@ -12,6 +12,7 @@ export { chatService } from './chatService';
 export { integrationsService } from './integrationsService';
 export { chatboxService } from './chatboxService';
 export { lootboxService } from './lootboxService';
+export { supportService } from './supportService';
 
 // Экспорт API клиентов для прямого доступа (если необходимо)
 export { apiClient, ttsApiClient } from '../client';

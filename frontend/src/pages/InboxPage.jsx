@@ -11,6 +11,7 @@ import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
 import { toast } from 'sonner';
 import { logger } from '../utils/prodLogger';
+import { supportService } from '../services/api/services/supportService';
 import { getErrorMessage, getOperationMessage } from '../services/microservices';
 import { validators, createFormErrors, isFormValid } from '../utils/formValidation';
 import { useAuth } from '../context/AuthContext';
@@ -62,17 +63,8 @@ const InboxPage = () => {
   const loadTickets = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/support/my-tickets`, {
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setTickets(data.tickets || []);
-      } else {
-        const errorMsg = getOperationMessage('load_tickets', { response });
-        toast.error(errorMsg);
-      }
+      const response = await supportService.getMyTickets();
+      setTickets(response.data.tickets || []);
     } catch (error) {
       logger.error('Error loading tickets:', error);
       const errorMsg = error.status === 503 
@@ -86,16 +78,8 @@ const InboxPage = () => {
 
   const loadTicketResponses = async (ticketId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/support/tickets/${ticketId}/responses`, {
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setResponses(data.responses || []);
-      } else {
-        toast.error('Ошибка при загрузке ответов');
-      }
+      const response = await supportService.getTicketResponses(ticketId);
+      setResponses(response.data.responses || []);
     } catch (error) {
       logger.error('Error loading responses:', error);
       toast.error('Ошибка при загрузке ответов');

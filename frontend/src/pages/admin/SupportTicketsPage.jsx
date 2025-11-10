@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE_URL } from '../../constants';
+import { supportService } from '../../services/api/services/supportService';
 import { MessageCircle, Search, Filter, Clock, CheckCircle, XCircle, AlertCircle, Eye, EyeOff, Send, Archive } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -29,16 +29,8 @@ const SupportTicketsPage = () => {
   const loadTickets = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/admin/support/tickets?status=${statusFilter}`, {
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setTickets(data.tickets || []);
-      } else {
-        toast.error('Ошибка при загрузке тикетов');
-      }
+      const response = await supportService.getAdminTickets({ status: statusFilter });
+      setTickets(response.data.tickets || []);
     } catch (error) {
       logger.error('Error loading tickets:', error);
       toast.error('Ошибка при загрузке тикетов');
@@ -53,16 +45,8 @@ const SupportTicketsPage = () => {
 
   const loadTicketResponses = async (ticketId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/support/tickets/${ticketId}`, {
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setResponses(data.responses || []);
-      } else {
-        toast.error('Ошибка при загрузке ответов');
-      }
+      const response = await supportService.getAdminTicket(ticketId);
+      setResponses(response.data.responses || []);
     } catch (error) {
       logger.error('Error loading responses:', error);
       toast.error('Ошибка при загрузке ответов');
@@ -74,13 +58,7 @@ const SupportTicketsPage = () => {
 
     setIsSubmittingResponse(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/support/tickets/${selectedTicket.id}/responses?message=${encodeURIComponent(newResponse)}`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await supportService.sendAdminResponse(selectedTicket.id, newResponse);
 
       if (response.ok) {
         toast.success('Ответ отправлен');
@@ -133,13 +111,7 @@ const SupportTicketsPage = () => {
 
   const handleArchiveTicket = async (ticketId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/support/tickets/${ticketId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include'
-      });
+      const response = await supportService.deleteTicket(ticketId);
 
       if (response.ok) {
         setTickets(prev => prev.map(ticket => 
@@ -158,13 +130,7 @@ const SupportTicketsPage = () => {
 
   const handleUnarchiveTicket = async (ticketId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/support/tickets/${ticketId}/unarchive`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include'
-      });
+      const response = await supportService.unarchiveTicket(ticketId);
 
       if (response.ok) {
         setTickets(prev => prev.map(ticket => 
