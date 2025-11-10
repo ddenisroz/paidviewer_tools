@@ -91,19 +91,7 @@ const VoiceManagementPageContent = () => {
     // TTS инициализация происходит автоматически в TtsContext, не нужно вызывать здесь
 
     // React Query: проверяем whitelist статус пользователя
-    const { data: whitelistStatusData } = useQuery({
-        queryKey: ['voices-whitelist-status'],
-        queryFn: async () => {
-            if (!user) {
-                return {
-                    is_whitelisted: false,
-                    can_manage_voices: false,
-                    message: "Пользователь не авторизован"
-                };
-            }
-            const response = await botService.get('/api/voices/whitelist-status');
-            return response.data;
-        },
+    const { data: whitelistStatusData } = useWhitelistStatus({
         enabled: !!user,
         staleTime: 5 * 60 * 1000, // 5 минут
         refetchOnMount: false,
