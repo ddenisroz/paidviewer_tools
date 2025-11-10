@@ -46,20 +46,22 @@ const DropsWidget = () => {
       setIsPreviewMode(true);
       setStatus('Режим предпросмотра - нажмите кнопку для тестирования анимации');
       // Загружаем настройки виджета для предпросмотра
-      const apiUrl = import.meta.env.VITE_BOT_SERVICE_URL;
-      if (apiUrl && token) {
+      if (token) {
         // Пытаемся получить настройки через токен
-        fetch(`${apiUrl}/api/drops/user-from-token/${token}`)
-          .then(res => res.json())
-          .then(data => {
+        dropsService.getUserFromToken(token)
+          .then(res => {
+            const data = res.data;
             if (data.channel_name && data.platform) {
               setChannelName(data.channel_name);
               setPlatform(data.platform);
-              return fetch(`${apiUrl}/api/drops/config/${data.channel_name}?platform=${data.platform}&widget_token=${token}`);
+              return dropsService.getConfigWithToken(data.channel_name, {
+                platform: data.platform,
+                widget_token: token
+              });
             }
           })
-          .then(res => res?.json())
-          .then(configData => {
+          .then(res => {
+            const configData = res?.data;
             if (configData?.success && configData.data) {
               widgetConfig.current = {
                 spinning_duration: configData.data.widget_spinning_duration_ms || 1500,
@@ -199,20 +201,17 @@ const DropsWidget = () => {
   const loadMythicalSession = async (channel = channelName) => {
     if (!channel || !token) return;
     
-    const apiUrl = import.meta.env.VITE_BOT_SERVICE_URL;
     try {
-      const response = await fetch(`${apiUrl}/api/drops/mythical-session/${channel}?widget_token=${token}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.data) {
-          setMythicalSession(data.data);
-          startMythicalTimer(data.data.time_remaining_seconds);
-        } else {
-          setMythicalSession(null);
-          setMythicalTimer(null);
-          if (mythicalTimerInterval.current) {
-            clearInterval(mythicalTimerInterval.current);
-          }
+      const response = await dropsService.getMythicalSession(channel, token);
+      const data = response.data;
+      if (data.success && data.data) {
+        setMythicalSession(data.data);
+        startMythicalTimer(data.data.time_remaining_seconds);
+      } else {
+        setMythicalSession(null);
+        setMythicalTimer(null);
+        if (mythicalTimerInterval.current) {
+          clearInterval(mythicalTimerInterval.current);
         }
       }
     } catch (error) {
@@ -247,14 +246,15 @@ const DropsWidget = () => {
   };
 
   const loadRewardsForQuality = async (quality, channelName, platform) => {
-    const apiUrl = import.meta.env.VITE_BOT_SERVICE_URL;
     try {
-      const response = await fetch(`${apiUrl}/api/drops/rewards/${channelName}?platform=${platform}&quality=${quality}&widget_token=${token}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.data) {
-          return data.data.filter(r => r.is_active); // Только активные награды
-        }
+      const response = await dropsService.getRewardsForWidget(channelName, {
+        platform,
+        quality,
+        widget_token: token
+      });
+      const data = response.data;
+      if (data.success && data.data) {
+        return data.data.filter(r => r.is_active); // Только активные награды
       }
     } catch (error) {
       logger.error('Error loading rewards:', error);
