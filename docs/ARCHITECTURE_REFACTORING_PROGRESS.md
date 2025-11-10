@@ -78,14 +78,16 @@
 
 ### 4. Миграция контекстов на новые сервисы
 
-**Статус:** ⚠️ **НЕ НАЧАТО**
+**Статус:** ✅ **ЧАСТИЧНО ВЫПОЛНЕНО** (3/9 контекстов)
 
-**Требуется:**
+**Выполнено:**
+- ✅ `PlayerContext.jsx` - мигрирован на `youtubeService` и React Query (useYoutubeQueue, useSkipYoutubeVideo)
+- ✅ `AuthContext.jsx` - мигрирован на `authService` и React Query (useAuthStatus, useLogout)
+- ✅ `IntegrationsContext.jsx` - мигрирован на `integrationsService` и `ttsService`
+
+**Осталось:**
 - [ ] `DataContext.jsx` - мигрировать на `streamService` и React Query
-- [ ] `PlayerContext.jsx` - мигрировать на `youtubeService` и React Query
-- [ ] `UserSettingsContext.jsx` - мигрировать на соответствующий сервис и React Query
-- [ ] `AuthContext.jsx` - мигрировать на `authService` и React Query
-- [ ] `IntegrationsContext.jsx` - мигрировать на `integrationsService` и React Query
+- [ ] `UserSettingsContext.jsx` - мигрировать на `userSettingsService` и React Query
 - [ ] `ChatContext.jsx` - мигрировать на `chatService` и React Query
 - [ ] `TtsContext.jsx` - мигрировать на `ttsService` и React Query
 - [ ] `TtsHealthContext.jsx` - объединить с `TtsContext.jsx`
@@ -127,8 +129,8 @@
 - **Сервисов:** 10
 - **Queries:** 45+
 - **Мигрировано компонентов:** 16/50+
-- **Мигрировано контекстов:** 0/9
-- **Удалено дублирования:** ~600+ строк
+- **Мигрировано контекстов:** 3/9 (33%)
+- **Удалено дублирования:** ~800+ строк
 
 ---
 
