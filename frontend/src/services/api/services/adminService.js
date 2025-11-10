@@ -24,6 +24,30 @@ export const adminService = {
   },
 
   /**
+   * Получить статистику кеша
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async getCacheStats() {
+    return apiClient.get('/api/monitoring/cache/stats');
+  },
+
+  /**
+   * Очистить кеш
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async clearCache() {
+    return apiClient.post('/api/monitoring/cache/clear');
+  },
+
+  /**
+   * Очистить истекшие записи кеша
+   * @returns {Promise<import('axios').AxiosResponse>}
+   */
+  async cleanupExpiredCache() {
+    return apiClient.post('/api/monitoring/cache/cleanup');
+  },
+
+  /**
    * Получить статус ботов
    * @returns {Promise<import('axios').AxiosResponse>}
    */

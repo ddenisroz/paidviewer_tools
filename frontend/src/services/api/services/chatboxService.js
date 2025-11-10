@@ -35,5 +35,14 @@ export const chatboxService = {
   async getSettingsByToken(token) {
     return apiClient.get(`/api/chatbox/settings/by-token/${token}`);
   },
+
+  /**
+   * Сохранить конфигурацию виджета чата
+   * @param {Object} config - Конфигурация виджета
+   * @returns {Promise<AxiosResponse>}
+   */
+  async saveWidgetConfig(config) {
+    return apiClient.post('/api/widgets/chat/config', config);
+  },
 };
 

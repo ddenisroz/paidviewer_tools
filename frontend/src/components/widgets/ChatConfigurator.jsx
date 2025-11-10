@@ -8,6 +8,7 @@ import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { logger } from '../../utils/prodLogger';
+import { chatboxService } from '../../services/api/services/chatboxService';
 
 const ChatConfigurator = () => {
     const [config, setConfig] = useState({
@@ -68,17 +69,9 @@ const ChatConfigurator = () => {
     const saveConfig = async () => {
         setIsLoading(true);
         try {
-            const response = await fetch('/api/widgets/chat/config', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(config)
-            });
-            
-            const result = await response.json();
+            const response = await chatboxService.saveWidgetConfig(config);
             // URL теперь включает user_id
-            setPreviewUrl(result.url);
+            setPreviewUrl(response.data.url);
             alert('Конфигурация сохранена!');
         } catch (error) {
             logger.error('Error saving config:', error);

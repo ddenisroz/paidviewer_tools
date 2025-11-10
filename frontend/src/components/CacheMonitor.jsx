@@ -4,7 +4,7 @@ import { RefreshCw, Trash2, Activity } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { API_BASE_URL } from '../constants';
+import { adminService } from '../services/api/services/adminService';
 import { logger } from '../utils/prodLogger';
 import { useInterval } from '../hooks/useInterval';
 
@@ -19,20 +19,12 @@ const CacheMonitor = () => {
     const fetchStats = async () => {
         try {
             setLoading(true);
-            const response = await fetch(`${API_BASE_URL}/api/monitoring/cache/stats`, {
-                credentials: 'include'
-            });
+            const response = await adminService.getCacheStats();
+            setStats(response.data);
             
-            if (response.ok) {
-                const data = await response.json();
-                setStats(data);
-                
-                // Проверяем является ли пользователь админом (можно добавить это в context)
-                // Пока просто проверяем наличие успешного ответа
-                setIsAdmin(true);
-            } else {
-                toast.error('Ошибка загрузки статистики кеша');
-            }
+            // Проверяем является ли пользователь админом (можно добавить это в context)
+            // Пока просто проверяем наличие успешного ответа
+            setIsAdmin(true);
         } catch (error) {
             logger.error('Error fetching cache stats:', error);
             toast.error('Ошибка подключения к серверу');
@@ -43,18 +35,13 @@ const CacheMonitor = () => {
 
     const clearCache = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/monitoring/cache/clear`, {
-                method: 'POST',
-                credentials: 'include'
-            });
+            const response = await adminService.clearCache();
             
-            const data = await response.json();
-            
-            if (data.success) {
+            if (response.data.success) {
                 toast.success('Кеш очищен');
                 fetchStats();
             } else {
-                toast.error(data.error || 'Ошибка очистки кеша');
+                toast.error(response.data.error || 'Ошибка очистки кеша');
             }
         } catch (error) {
             logger.error('Error clearing cache:', error);
@@ -64,18 +51,13 @@ const CacheMonitor = () => {
 
     const cleanupExpired = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/monitoring/cache/cleanup`, {
-                method: 'POST',
-                credentials: 'include'
-            });
+            const response = await adminService.cleanupExpiredCache();
             
-            const data = await response.json();
-            
-            if (data.success) {
+            if (response.data.success) {
                 toast.success('Истёкшие записи удалены');
                 fetchStats();
             } else {
-                toast.error(data.error || 'Ошибка очистки');
+                toast.error(response.data.error || 'Ошибка очистки');
             }
         } catch (error) {
             logger.error('Error cleaning up cache:', error);
