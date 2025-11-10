@@ -113,15 +113,11 @@ const SupportTicketsPage = () => {
     try {
       const response = await supportService.deleteTicket(ticketId);
 
-      if (response.ok) {
-        setTickets(prev => prev.map(ticket => 
-          ticket.id === ticketId ? { ...ticket, is_archived: true } : ticket
-        ));
-        toast.success('Тикет архивирован');
-        loadTickets(); // Перезагружаем список
-      } else {
-        toast.error('Ошибка архивирования тикета');
-      }
+      setTickets(prev => prev.map(ticket => 
+        ticket.id === ticketId ? { ...ticket, is_archived: true } : ticket
+      ));
+      toast.success('Тикет архивирован');
+      loadTickets(); // Перезагружаем список
     } catch (error) {
       logger.error('Error archiving ticket:', error);
       toast.error('Ошибка архивирования тикета');
@@ -132,14 +128,10 @@ const SupportTicketsPage = () => {
     try {
       const response = await supportService.unarchiveTicket(ticketId);
 
-      if (response.ok) {
-        setTickets(prev => prev.map(ticket => 
-          ticket.id === ticketId ? { ...ticket, is_archived: false } : ticket
-        ));
-        toast.success('Тикет извлечен из архива');
-      } else {
-        toast.error('Ошибка извлечения тикета из архива');
-      }
+      setTickets(prev => prev.map(ticket => 
+        ticket.id === ticketId ? { ...ticket, is_archived: false } : ticket
+      ));
+      toast.success('Тикет извлечен из архива');
     } catch (error) {
       logger.error('Error unarchiving ticket:', error);
       toast.error('Ошибка извлечения тикета из архива');

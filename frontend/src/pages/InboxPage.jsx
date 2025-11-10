@@ -115,21 +115,10 @@ const InboxPage = () => {
       const formData = new FormData();
       formData.append('message', messageText);
 
-      const response = await fetch(`${API_BASE_URL}/api/support/tickets/${selectedTicket.id}/respond`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData
-      });
-
-      if (response.ok) {
-        // ✅ Успешно отправлено - перезагружаем реальные данные
-        await loadTicketResponses(selectedTicket.id);
-        await loadTickets();
-      } else {
-        // ❌ Ошибка - откатываем optimistic update
-        setResponses(prev => prev.filter(r => r.id !== optimisticResponse.id));
-        toast.error('Ошибка при отправке ответа');
-      }
+      const response = await supportService.respondToTicket(selectedTicket.id, formData);
+      // ✅ Успешно отправлено - перезагружаем реальные данные
+      await loadTicketResponses(selectedTicket.id);
+      await loadTickets();
     } catch (error) {
       // ❌ Ошибка сети - откатываем optimistic update
       setResponses(prev => prev.filter(r => r.id !== optimisticResponse.id));
@@ -171,23 +160,10 @@ const InboxPage = () => {
       formDataToSend.append('subject', createFormData.subject);
       formDataToSend.append('message', createFormData.message);
 
-      const response = await fetch(`${API_BASE_URL}/api/support/tickets`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formDataToSend
-      });
-
-      if (response.ok) {
-        // ✅ Успешно создано - перезагружаем реальные данные
-        const result = await response.json();
-        toast.success(`Тикет #${result.ticket_id} успешно создан!`);
-        await loadTickets();
-      } else {
-        // ❌ Ошибка - откатываем optimistic update
-        setTickets(prev => prev.filter(t => t.id !== optimisticTicket.id));
-        const error = await response.json();
-        toast.error(error.detail || 'Ошибка при создании тикета');
-      }
+      const response = await supportService.createTicket(formDataToSend);
+      // ✅ Успешно создано - перезагружаем реальные данные
+      toast.success(`Тикет #${response.data.ticket_id} успешно создан!`);
+      await loadTickets();
     } catch (error) {
       // ❌ Ошибка сети - откатываем optimistic update
       setTickets(prev => prev.filter(t => t.id !== optimisticTicket.id));
