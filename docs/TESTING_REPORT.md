@@ -70,8 +70,8 @@
 
 ### Высокий приоритет
 
-1. **HomePage.jsx** - использует `botService` напрямую
-2. **Sidebar.jsx** - использует `botService.getAdminList`
+1. ✅ **HomePage.jsx** - мигрирован на `useTwitchStreamInfo`, `useVkStreamInfo`
+2. ✅ **Sidebar.jsx** - мигрирован на `useAdminList`
 3. **DeleteAccountModal.jsx** - использует `botService.post('/api/user/delete-account')`
 4. **StreakTracker.jsx** - использует `botService.get('/api/drops/config')`
 5. **DonationHistory.jsx** - использует `botService.get('/api/drops/history')`
@@ -130,9 +130,9 @@
 
 ### Код
 - **Мигрировано контекстов**: 7/7 (100%) ✅
-- **Мигрировано компонентов**: 16/50+ (~32%)
-- **Создано сервисов**: 10
-- **Создано queries**: 45+
+- **Мигрировано компонентов**: 18/50+ (~36%) ✅
+- **Создано сервисов**: 11 (добавлен adminService)
+- **Создано queries**: 46+ (добавлен useAdminList)
 - **Удалено дублирования**: ~800+ строк
 
 ### Качество
