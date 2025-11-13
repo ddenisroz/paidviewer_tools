@@ -211,13 +211,38 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
   
   const isStreakEnabledAnywhere = formData.streak_enabled_twitch || formData.streak_enabled_vk;
 
-  if (isLoading || isInitialLoad || !config) {
+  // Показываем loader только если это начальная загрузка И данные еще не загружены
+  // Если config === null после загрузки, значит бэкенд недоступен - показываем форму с дефолтными значениями
+  if (isLoading && isInitialLoad) {
     return (
       <div className="space-y-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-center">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  // Если config не загрузился (бэкенд недоступен), показываем предупреждение
+  if (!config && !isLoading) {
+    return (
+      <div className="space-y-4">
+        <Card className="border-2 border-red-500/50 bg-red-500/10">
+          <CardContent className="p-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-red-400 mb-1">
+                  Бэкенд недоступен
+                </h4>
+                <p className="text-xs text-red-200/80">
+                  Не удалось загрузить настройки стриков. Убедитесь, что бэкенд запущен на порту 8000.
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>

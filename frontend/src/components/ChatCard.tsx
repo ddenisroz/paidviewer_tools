@@ -192,9 +192,23 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
         const loadTtsSettings = async (): Promise<void> => {
             try {
                 const response = await ttsService.getPlatformSettings();
+                
+                // Проверяем, что данные существуют
+                if (!response?.data?.data) {
+                    logger.warn('⚠️ [TTS SHORTCUT] No settings data received (backend may be unavailable)');
+                    return;
+                }
+                
                 const settings = response.data.data as TtsSettings;
                 setTtsSettings(settings);
                 logger.log('✅ [TTS SHORTCUT] Settings loaded:', settings);
+                
+                // Проверяем, что enabled_platforms существует
+                if (!settings.enabled_platforms) {
+                    logger.warn('⚠️ [TTS SHORTCUT] No enabled_platforms in settings');
+                    return;
+                }
+                
                 logger.log('✅ [TTS SHORTCUT] enabled_platforms:', settings.enabled_platforms);
                 
                 // 🔄 СИНХРОНИЗАЦИЯ: Обновляем видимость платформ на основе API
@@ -215,7 +229,7 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                     vk: enabledPlatforms.includes('vk')
                 });
             } catch (error) {
-                logger.error('❌ [TTS SHORTCUT] Error loading settings:', error);
+                logger.warn('⚠️ [TTS SHORTCUT] Backend unavailable, using defaults:', error instanceof Error ? error.message : 'Unknown error');
             }
         };
         

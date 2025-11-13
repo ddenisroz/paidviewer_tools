@@ -55,8 +55,8 @@ const VoiceManagement: React.FC = () => {
     const queryClient = useQueryClient();
     
     const { user } = useAuth();
-    let audioContext: AudioContext | null = null;
-    let audioSource: AudioBufferSourceNode | null = null;
+    const audioContext: AudioContext | null = null;
+    const audioSource: AudioBufferSourceNode | null = null;
 
     // React Query: загружаем голоса для админа
     const { data: voicesData = [], isLoading: voicesLoading, error: voicesError } = useQuery<TtsVoice[]>({

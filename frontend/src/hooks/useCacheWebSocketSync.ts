@@ -47,13 +47,17 @@ const getQueryKeysForCacheKey = (cacheKey: string): (unknown[])[] => {
 export const useCacheWebSocketSync = (): null => {
   const authContext = useAuth();
   const queryClient = useQueryClient();
-  if (!authContext) {
-    return null;
-  }
-  const { user, isAuthenticated } = authContext;
+  
+  // Получаем данные из контекста (может быть null)
+  const { user, isAuthenticated } = authContext || {};
   const userId = user?.id;
 
   const handleWebSocketMessage = (data: any) => {
+    // Проверка authContext внутри обработчика
+    if (!authContext) {
+      return;
+    }
+    
     try {
       if (data.type === 'cache_invalidate') {
         logger.info(`[CACHE] Received invalidation for: ${data.cache_key}`);
@@ -79,6 +83,7 @@ export const useCacheWebSocketSync = (): null => {
     }
   };
 
+  // Хук вызывается всегда, но с null если не авторизован
   useSharedWebSocket(isAuthenticated && userId ? userId : null, handleWebSocketMessage);
   return null;
 };

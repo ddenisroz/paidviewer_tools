@@ -192,8 +192,8 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                             logger.log('🔍 [AUTO-SYNC] Candidate category:', candidate);
                             
                             // Для маппинга используем МЯГКУЮ проверку (доверяем маппингу!)
-                            const catNormalized = candidate.name.toLowerCase().replace(/[\-–—]/g, ' ').replace(/\s+/g, ' ').trim();
-                            const queryNormalized = mappedName.toLowerCase().replace(/[\-–—]/g, ' ').replace(/\s+/g, ' ').trim();
+                            const catNormalized = candidate.name.toLowerCase().replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim();
+                            const queryNormalized = mappedName.toLowerCase().replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim();
                             
                             // Разбиваем на слова для точного сравнения
                             const catWords = catNormalized.split(/\s+/);
@@ -236,8 +236,8 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                             const candidate = searchResults[0];
                             
                             // Проверяем релевантность - используем только если высокая (СТРОГАЯ проверка!)
-                            const catNormalized = candidate.name.toLowerCase().replace(/[\-–—]/g, ' ').replace(/\s+/g, ' ').trim();
-                            const queryNormalized = (twitchCategory as any).name.toLowerCase().replace(/[\-–—]/g, ' ').replace(/\s+/g, ' ').trim();
+                            const catNormalized = candidate.name.toLowerCase().replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim();
+                            const queryNormalized = (twitchCategory as any).name.toLowerCase().replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim();
                             
                             // Разбиваем на слова для точного сравнения
                             const catWords = catNormalized.split(/\s+/);
@@ -501,8 +501,8 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                         if (!mappedCategory) {
                             // Если точного нет - используем первый результат (если релевантен)
                             const candidate = searchResults[0];
-                            const catNormalized = candidate.name.toLowerCase().replace(/[\-–—]/g, ' ').replace(/\s+/g, ' ').trim();
-                            const queryNormalized = searchQuery.toLowerCase().replace(/[\-–—]/g, ' ').replace(/\s+/g, ' ').trim();
+                            const catNormalized = candidate.name.toLowerCase().replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim();
+                            const queryNormalized = searchQuery.toLowerCase().replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim();
                             
                             // Проверяем релевантность (не берем мусор!)
                             if (catNormalized === queryNormalized || 
@@ -891,10 +891,10 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                                             onChange={(e) => handleSearchChange('twitch', e.target.value)}
                                             onFocus={() => {
                                                 handleInputFocus(); // Очищаем таймер автосброса
-                                                twitchEnabled && handleSearchFocus('twitch');
+                                                if (twitchEnabled) handleSearchFocus('twitch');
                                             }}
                                             onBlur={handleInputBlur} // Запускаем таймер автосброса при потере фокуса
-                                            onClick={() => twitchEnabled && handleSearchFocus('twitch')}
+                                            onClick={() => { if (twitchEnabled) handleSearchFocus('twitch'); }}
                                             onKeyDown={(e) => handleSearchKeyDown('twitch', e)}
                                             onKeyPress={handleKeyPress}
                                             placeholder={twitchEnabled ? "Найти категорию на Twitch..." : "Интеграция отключена"}
@@ -936,10 +936,10 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                                             onChange={(e) => handleSearchChange('vk', e.target.value)} 
                                             onFocus={() => {
                                                 handleInputFocus(); // Очищаем таймер автосброса
-                                                vkEnabled && handleSearchFocus('vk');
+                                                if (vkEnabled) handleSearchFocus('vk');
                                             }}
                                             onBlur={handleInputBlur} // Запускаем таймер автосброса при потере фокуса
-                                            onClick={() => vkEnabled && handleSearchFocus('vk')}
+                                            onClick={() => { if (vkEnabled) handleSearchFocus('vk'); }}
                                             onKeyDown={(e) => handleSearchKeyDown('vk', e)}
                                             onKeyPress={handleKeyPress}
                                             placeholder={vkEnabled ? "Найти категорию на VK Live..." : "Интеграция отключена"}

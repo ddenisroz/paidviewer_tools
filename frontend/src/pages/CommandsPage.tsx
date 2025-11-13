@@ -265,7 +265,7 @@ const CommandsPage: React.FC = () => {
     
     // Все хуки должны быть вызваны до любых условных return
     const { data: commandsData, isLoading: loading, isInitialLoading: initialLoading } = useCommands({
-        enabled: isAuthenticated && (integrations?.twitch?.enabled || integrations?.vk?.enabled),
+        enabled: !!isAuthenticated && (integrations?.twitch?.enabled || integrations?.vk?.enabled),
     });
     
     const createCommandMutation = useCreateCommand();
@@ -302,6 +302,13 @@ const CommandsPage: React.FC = () => {
     
     const basicCommands = (commandsData as any)?.basic_commands || [];
     const customCommands = (commandsData as any)?.custom_commands || [];
+    
+    // Все хуки должны быть вызваны до любых условных return (правило React Hooks)
+    const basicTags = useMemo(() => {
+        return [...new Set(basicCommands.flatMap((cmd: Command) => {
+            return Array.isArray(cmd.tags) ? cmd.tags : [];
+        }))] as string[];
+    }, [basicCommands]);
     
     if (!isAuthenticated) {
         return (
@@ -358,12 +365,6 @@ const CommandsPage: React.FC = () => {
 
     const availablePlatforms = platformOptions.filter(opt => opt.enabled);
     const platformsToShow = availablePlatforms.length > 0 ? availablePlatforms : platformOptions;
-
-    const basicTags = useMemo(() => {
-        return [...new Set(basicCommands.flatMap((cmd: Command) => {
-            return Array.isArray(cmd.tags) ? cmd.tags : [];
-        }))] as string[];
-    }, [basicCommands]);
     
     const getFilteredBasicCommands = (): Command[] => {
         return basicCommands.filter((command: Command) => {

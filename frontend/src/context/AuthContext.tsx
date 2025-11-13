@@ -7,8 +7,8 @@ import { authService } from '../services/api/services/authService';
 import type { User, GuestData, UserIntegrations } from '../types/user';
 
 // Глобальный флаг для предотвращения множественных проверок аутентификации
-let globalAuthCheckInProgress = false;
-let globalLastAuthCheckTime = 0;
+const globalAuthCheckInProgress = false;
+const globalLastAuthCheckTime = 0;
 
 interface AuthStatusData {
   authenticated: boolean;

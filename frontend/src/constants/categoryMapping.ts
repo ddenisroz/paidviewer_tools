@@ -534,9 +534,9 @@ export function findMappedCategory(
 ): { id: string | number; name: string } | null {
   if (!categoryName || !Array.isArray(targetCategories)) return null;
   const normalizedInput = normalizeCategoryName(categoryName);
-  let exactMatch = targetCategories.find((cat) => cat.name && cat.name.toLowerCase() === categoryName.toLowerCase());
+  const exactMatch = targetCategories.find((cat) => cat.name && cat.name.toLowerCase() === categoryName.toLowerCase());
   if (exactMatch) return exactMatch;
-  let normalizedMatch = targetCategories.find((cat) => cat.name && normalizeCategoryName(cat.name) === normalizedInput);
+  const normalizedMatch = targetCategories.find((cat) => cat.name && normalizeCategoryName(cat.name) === normalizedInput);
   if (normalizedMatch) return normalizedMatch;
   const mappedName = categoryMapping[categoryName];
   if (mappedName) {

@@ -12,7 +12,7 @@ import type { StreamData, StreamCategory, StreamHistory, UpdateStreamPayload } f
 function normalizeString(str: string): string {
     return str
         .toLowerCase()
-        .replace(/[\-–—]/g, ' ')
+        .replace(/[-–—]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
 }
@@ -251,7 +251,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     });
 
     const { data: historyData, isLoading: isLoadingHistory, refetch: refetchHistory } = useStreamHistory({
-        enabled: isAuthenticated,
+        enabled: !!isAuthenticated,
         refetchInterval: 30000,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
@@ -279,14 +279,14 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     }, [isAuthenticated, refetchHistory]);
 
     const { data: twitchData, isLoading: isLoadingTwitch, refetch: refetchTwitch } = useTwitchStreamInfo({
-        enabled: isAuthenticated && integrations.twitch?.enabled,
+        enabled: !!isAuthenticated && !!integrations.twitch?.enabled,
         refetchInterval: 60000,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
     });
 
     const { data: vkData, isLoading: isLoadingVk, refetch: refetchVk } = useVkStreamInfo({
-        enabled: isAuthenticated && integrations.vk?.enabled,
+        enabled: !!isAuthenticated && !!integrations.vk?.enabled,
         refetchInterval: 60000,
         refetchOnMount: false,
         refetchOnWindowFocus: false,

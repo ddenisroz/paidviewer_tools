@@ -67,7 +67,7 @@ const QuickActionsBar: React.FC = () => {
 
     // ✅ НОВЫЙ КОД: Используем централизованный hook для TTS статуса
     const { data: ttsStatusResponse } = useTtsStatus(null, {
-        enabled: isAuthenticated,
+        enabled: !!isAuthenticated,
         refetchInterval: 30000,
         staleTime: 60000,
         gcTime: 5 * 60 * 1000,
@@ -113,7 +113,7 @@ const QuickActionsBar: React.FC = () => {
 
     // ✅ НОВЫЙ КОД: Используем централизованные hooks для Drops
     const { data: dropsConfigData } = useDropsConfig(channelName, {
-        enabled: isAuthenticated && isDropsEnabled && !!channelName,
+        enabled: !!isAuthenticated && isDropsEnabled && !!channelName,
         refetchInterval: 30000,
         staleTime: 60000,
         gcTime: 5 * 60 * 1000,
@@ -121,7 +121,7 @@ const QuickActionsBar: React.FC = () => {
     });
 
     const { data: rewardsData } = useDropsRewards(channelName, {
-        enabled: isAuthenticated && isDropsEnabled && !!channelName,
+        enabled: !!isAuthenticated && isDropsEnabled && !!channelName,
         refetchInterval: 30000,
         staleTime: 60000,
         gcTime: 5 * 60 * 1000,

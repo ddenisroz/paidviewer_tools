@@ -49,6 +49,16 @@ class TwitchBadgesService {
     this.loading = true;
     try {
       const response = await fetch('/api/twitch/badges/global');
+      
+      // Проверяем, что ответ - это JSON, а не HTML
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        logger.warn('⚠️ [BADGES] Backend not available (got HTML instead of JSON). Using empty badges.');
+        this.globalBadges = {};
+        this.loading = false;
+        return this.globalBadges;
+      }
+      
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -68,7 +78,7 @@ class TwitchBadgesService {
         this.globalBadges = {};
       }
     } catch (error) {
-      logger.error('❌ [BADGES] Failed to load global badges:', error);
+      logger.warn('⚠️ [BADGES] Backend not available:', error instanceof Error ? error.message : 'Unknown error');
       this.globalBadges = {};
     } finally {
       this.loading = false;
@@ -78,15 +88,22 @@ class TwitchBadgesService {
 
   private refreshBadgesInBackground(): void {
     fetch('/api/twitch/badges/global')
-      .then((response) => response.json())
+      .then((response) => {
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          logger.debug('⚠️ [BADGES] Background refresh skipped (backend not available)');
+          return null;
+        }
+        return response.json();
+      })
       .then((data) => {
-        if (data.success) {
+        if (data && data.success) {
           this.globalBadges = data.badges as BadgesDict;
           localStorage.setItem('twitch_badges_cache', JSON.stringify({ badges: this.globalBadges, timestamp: Date.now() }));
           logger.log('🔄 [BADGES] Cache refreshed');
         }
       })
-      .catch((error) => logger.warn('⚠️ [BADGES] Background refresh failed:', error));
+      .catch((error) => logger.debug('⚠️ [BADGES] Background refresh failed:', error instanceof Error ? error.message : 'Unknown error'));
   }
 
   async loadChannelBadges(broadcasterId: string): Promise<BadgesDict> {
@@ -95,6 +112,15 @@ class TwitchBadgesService {
     }
     try {
       const response = await fetch(`/api/twitch/badges/channel/${broadcasterId}`);
+      
+      // Проверяем, что ответ - это JSON, а не HTML
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        logger.warn(`⚠️ [BADGES] Backend not available for channel ${broadcasterId}. Using empty badges.`);
+        this.channelBadges[broadcasterId] = {};
+        return this.channelBadges[broadcasterId];
+      }
+      
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -107,7 +133,7 @@ class TwitchBadgesService {
         this.channelBadges[broadcasterId] = {};
       }
     } catch (error) {
-      logger.error(`❌ [BADGES] Failed to load channel badges for ${broadcasterId}:`, error);
+      logger.warn(`⚠️ [BADGES] Backend not available for channel ${broadcasterId}:`, error instanceof Error ? error.message : 'Unknown error');
       this.channelBadges[broadcasterId] = {};
     }
     return this.channelBadges[broadcasterId];

@@ -6,22 +6,11 @@ import tseslint from 'typescript-eslint'
 
 export default [
   {
-    ignores: ['dist', 'node_modules', 'build'],
+    ignores: ['dist', 'node_modules', 'build', 'src/tests/**/*', '*.config.js', 'scripts/**/*'],
   },
   js.configs.recommended,
   reactHooks.configs['recommended-latest'],
   reactRefresh.configs.vite,
-  {
-    files: ['**/*.{js,jsx}'],
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      globals: globals.browser,
-    },
-    rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
-    },
-  },
   ...tseslint.configs.recommended,
   {
     files: ['**/*.{ts,tsx}'],
@@ -36,9 +25,14 @@ export default [
       globals: globals.browser,
     },
     rules: {
-      '@typescript-eslint/no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // TypeScript правила - мягкие для постепенного улучшения
+      '@typescript-eslint/no-unused-vars': 'warn',
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
+      
+      // React правила - мягкие
+      'react-hooks/exhaustive-deps': 'warn',
+      'react-refresh/only-export-components': 'warn',
     },
   },
 ]

@@ -54,7 +54,7 @@ const messagesReducer = (state: ChatMessage[], action: MessagesAction): ChatMess
     const maxMessages = parseInt(import.meta.env.VITE_CHAT_MAX_MESSAGES || '200', 10);
     
     switch (action.type) {
-        case 'ADD_MESSAGE':
+        case 'ADD_MESSAGE': {
             const isDuplicate = state.some(msg => 
                 msg.id === action.payload.id || 
                 (msg.timestamp === action.payload.timestamp && 
@@ -68,6 +68,7 @@ const messagesReducer = (state: ChatMessage[], action: MessagesAction): ChatMess
             
             const newMessages = [...state, action.payload].slice(-maxMessages);
             return newMessages;
+        }
             
         case 'CLEAR_MESSAGES':
             return [];
@@ -172,29 +173,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }, []);
     
     const baseUrl = API_BASE_URL;
-    if (!baseUrl) {
-        logger.error('VITE_BOT_SERVICE_URL environment variable is required');
-        const defaultValue: ChatContextValue = {
-            messages: [],
-            lastJsonMessage: null,
-            isConnected: false,
-            botStatus: 'disconnected',
-            error: 'Ошибка конфигурации: отсутствует URL сервиса',
-            sendMessage: () => {},
-            connectBotToChannels: async () => {},
-            disconnectBotFromChannels: async () => {},
-            getBotConnectionStatus: async () => ({ status: 'disconnected' }),
-            clearMessages: () => {},
-            setMessages: () => {},
-            playTTS: () => {}
-        };
-        return (
-            <ChatContext.Provider value={defaultValue}>
-                {children}
-            </ChatContext.Provider>
-        );
-    }
-    
     const userId: number | string | undefined = isGuest ? (user as any)?.session_id : user?.id;
     
     useEffect(() => {
@@ -545,7 +523,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }, [isAuthenticated, disconnectBotMutation]);
 
     const { data: botStatusData, error: botStatusError, refetch: refetchBotStatus } = useBotStatus({
-        enabled: isAuthenticated,
+        enabled: !!isAuthenticated, // Преобразуем boolean | null в boolean
         refetchInterval: 30000,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
@@ -603,20 +581,41 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         }
     }, [isAuthenticated]);
 
-    const value = useMemo<ChatContextValue>(() => ({
-        messages,
-        lastJsonMessage,
-        isConnected,
-        botStatus,
-        error,
-        sendMessage,
-        connectBotToChannels,
-        disconnectBotFromChannels,
-        getBotConnectionStatus,
-        clearMessages,
-        setMessages,
-        playTTS
-    }), [messages, lastJsonMessage, isConnected, botStatus, error, sendMessage, connectBotToChannels, disconnectBotFromChannels, getBotConnectionStatus, clearMessages, setMessages, playTTS]);
+    const value = useMemo<ChatContextValue>(() => {
+        // Проверка baseUrl после всех хуков (правило React Hooks)
+        if (!baseUrl) {
+            logger.error('VITE_BOT_SERVICE_URL environment variable is required');
+            return {
+                messages: [],
+                lastJsonMessage: null,
+                isConnected: false,
+                botStatus: 'disconnected' as BotStatusType,
+                error: 'Ошибка конфигурации: отсутствует URL сервиса',
+                sendMessage: () => {},
+                connectBotToChannels: async () => {},
+                disconnectBotFromChannels: async () => {},
+                getBotConnectionStatus: async () => ({ status: 'disconnected' as BotStatusType }),
+                clearMessages: () => {},
+                setMessages: () => {},
+                playTTS: () => {}
+            };
+        }
+        
+        return {
+            messages,
+            lastJsonMessage,
+            isConnected,
+            botStatus,
+            error,
+            sendMessage,
+            connectBotToChannels,
+            disconnectBotFromChannels,
+            getBotConnectionStatus,
+            clearMessages,
+            setMessages,
+            playTTS
+        };
+    }, [baseUrl, messages, lastJsonMessage, isConnected, botStatus, error, sendMessage, connectBotToChannels, disconnectBotFromChannels, getBotConnectionStatus, clearMessages, setMessages, playTTS]);
 
     return (
         <ChatContext.Provider value={value}>

@@ -157,7 +157,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     const { lastJsonMessage } = useChat();
     
     const { data: queueData, isLoading: isLoadingQueue, refetch: refetchQueue, error: queueError } = useYoutubeQueue({
-        enabled: isAuthenticated,
+        enabled: !!isAuthenticated,
         refetchInterval: 15000,
         refetchOnMount: false,
         refetchOnWindowFocus: false,

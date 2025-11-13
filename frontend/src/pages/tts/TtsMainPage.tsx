@@ -151,7 +151,7 @@ const TtsMainPageContent: React.FC = () => {
     });
 
     const { data: ttsStatusResponse, isLoading: isLoadingTtsStatus } = useTtsStatus(null, {
-        enabled: isAuthenticated,
+        enabled: !!isAuthenticated,
         refetchInterval: 30000,
         staleTime: 60000,
         gcTime: 5 * 60 * 1000,
@@ -163,25 +163,25 @@ const TtsMainPageContent: React.FC = () => {
     const canUseF5TTS = !isF5TTSDataLoading && (hasLocalSetup || (isWhitelisted !== null && isWhitelisted !== false));
 
     const { data: ttsSettingsResponse } = useTtsSettings({
-        enabled: isAuthenticated,
+        enabled: !!isAuthenticated,
         initialData: () => getQueryCache(['tts-settings'])
     });
     const ttsSettingsData = ttsSettingsResponse?.data;
 
     const { data: audioSettingsResponse } = useTtsAudioSettings({
-        enabled: isAuthenticated,
+        enabled: !!isAuthenticated,
         initialData: () => getQueryCache(['tts-audio-settings'])
     });
     const audioSettingsData = audioSettingsResponse?.data;
 
     const { data: platformSettingsResponse } = useTtsPlatformSettings({
-        enabled: isAuthenticated,
+        enabled: !!isAuthenticated,
         initialData: () => getQueryCache(['tts-platform-settings'])
     });
     const platformSettingsData = platformSettingsResponse?.data;
 
     const { data: modeSettingsResponse } = useTtsModeSettings({
-        enabled: isAuthenticated,
+        enabled: !!isAuthenticated,
         initialData: () => getQueryCache(['tts-mode-settings'])
     });
     const modeSettingsData = modeSettingsResponse?.data;

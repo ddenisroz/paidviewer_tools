@@ -85,7 +85,7 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
     const [isSaving, setIsSaving] = useState<boolean>(false);
 
     const { data: settingsData, isLoading: isLoadingSettings, refetch: refetchSettings, error: settingsError } = useUserSettingsQuery({
-        enabled: isAuthenticated,
+        enabled: !!isAuthenticated,
     });
     
     // React Query v5: onSuccess moved to useEffect
