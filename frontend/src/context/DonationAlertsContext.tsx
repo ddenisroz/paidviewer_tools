@@ -1,0 +1,173 @@
+// src/context/DonationAlertsContext.tsx
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { API_BASE_URL } from '../constants';
+import { useAuth } from './AuthContext';
+import { saveReturnUrl } from '../utils/oauthRedirect';
+import { logger } from '../utils/prodLogger';
+
+interface DonationAlertsContextValue {
+    isConnected: boolean;
+    isLoading: boolean;
+    error: string | null;
+    connect: () => Promise<boolean>;
+    disconnect: () => Promise<boolean>;
+    checkStatus: () => Promise<void>;
+}
+
+const DonationAlertsContext = createContext<DonationAlertsContextValue | undefined>(undefined);
+
+export const useDonationAlerts = (): DonationAlertsContextValue => {
+    const context = useContext(DonationAlertsContext);
+    if (!context) {
+        throw new Error('useDonationAlerts must be used within a DonationAlertsProvider');
+    }
+    return context;
+};
+
+interface DonationAlertsProviderProps {
+    children: ReactNode;
+}
+
+export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ children }) => {
+    const { user } = useAuth();
+    const [isConnected, setIsConnected] = useState<boolean>(false);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const checkStatus = async (): Promise<void> => {
+        if (!user) {
+            setIsConnected(false);
+            return;
+        }
+
+        try {
+            setIsLoading(true);
+            setError(null);
+            
+            const response = await fetch(`${API_BASE_URL}/api/donationalerts/status`, {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                setIsConnected(data.connected || false);
+            } else {
+                setIsConnected(false);
+            }
+        } catch (err) {
+            logger.error('Error checking DonationAlerts status:', err);
+            setIsConnected(false);
+            setError('Ошибка проверки статуса');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const connect = async (): Promise<boolean> => {
+        if (!user) {
+            setError('Необходима авторизация');
+            return false;
+        }
+
+        try {
+            setIsLoading(true);
+            setError(null);
+            
+            const response = await fetch(`${API_BASE_URL}/api/donationalerts/connect`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Ошибка подключения: ${response.status} - ${errorText}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.auth_url) {
+                saveReturnUrl();
+                window.location.href = data.auth_url;
+                return true;
+            } else {
+                throw new Error('URL авторизации не получен');
+            }
+        } catch (err: any) {
+            logger.error('Error connecting to DonationAlerts:', err);
+            setError(err.message);
+            return false;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const disconnect = async (): Promise<boolean> => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            
+            const response = await fetch(`${API_BASE_URL}/api/donationalerts/disconnect`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                setIsConnected(false);
+                return true;
+            } else {
+                throw new Error('Ошибка отключения');
+            }
+        } catch (err: any) {
+            logger.error('Error disconnecting from DonationAlerts:', err);
+            setError(err.message);
+            return false;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        checkStatus();
+    }, [user]);
+
+    useEffect(() => {
+        const handleDonationAlertsConnected = (event: CustomEvent): void => {
+            if (event.detail && event.detail.success) {
+                setIsConnected(true);
+                setError(null);
+                checkStatus();
+            }
+        };
+
+        window.addEventListener('donationalerts_connected', handleDonationAlertsConnected as EventListener);
+        
+        return () => {
+            window.removeEventListener('donationalerts_connected', handleDonationAlertsConnected as EventListener);
+        };
+    }, []);
+
+    const value: DonationAlertsContextValue = {
+        isConnected,
+        isLoading,
+        error,
+        connect,
+        disconnect,
+        checkStatus
+    };
+
+    return (
+        <DonationAlertsContext.Provider value={value}>
+            {children}
+        </DonationAlertsContext.Provider>
+    );
+};
+

@@ -6,13 +6,29 @@
  * Награда за баллы платформы
  */
 export interface PlatformReward {
-  id: number;
-  name: string;
+  id: string | number;
+  name?: string;
+  title?: string;
   description?: string;
+  prompt?: string;
   cost: number;
+  price?: number;
   platform: 'twitch' | 'vk';
   channel_name?: string;
-  enabled: boolean;
+  enabled?: boolean;
+  is_enabled?: boolean;
+  background_color?: string;
+  // VK Live специфичные поля
+  repair_timeout?: number;
+  max_uses_count?: number;
+  max_uses_count_per_user?: number;
+  is_message_required?: boolean;
+  // Twitch специфичные поля
+  global_cooldown?: { seconds: number };
+  global_cooldown_seconds?: number;
+  max_per_stream?: number;
+  max_per_user_per_stream?: number;
+  should_redemptions_skip_request_queue?: boolean;
   created_at?: string;
 }
 
@@ -30,5 +46,31 @@ export interface PointsTransaction {
   reward_id?: number;
   reward_name?: string;
   created_at: string;
+}
+
+/**
+ * Запрос на награду (Demand/Redemption)
+ */
+export interface RewardDemand {
+  id: string;
+  reward?: {
+    id: string;
+    name?: string;
+    title?: string;
+  };
+  user?: {
+    nick?: string;
+    name?: string;
+  };
+  message?: string | any;
+  message_parts?: Array<string | {
+    text?: { content: string };
+    mention?: { nick: string };
+    link?: { content: string };
+    smile?: { name: string };
+    content?: string;
+  }>;
+  created_at?: number | string;
+  status?: string;
 }
 

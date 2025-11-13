@@ -21,6 +21,11 @@ export interface ChatCommand {
 }
 
 /**
+ * Алиас для обратной совместимости
+ */
+export type Command = ChatCommand;
+
+/**
  * Override команды
  */
 export interface CommandOverride {

@@ -21,7 +21,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@400;500;600;700;800;900&display=swap">
     
     <!-- Resource hints для ускорения загрузки -->
-    <link rel="modulepreload" href="/src/main.jsx">
+    <link rel="modulepreload" href="/src/main.tsx">
     
     <!-- Fallback: if stylesheet fails, we already have inline CSS with system fonts -->
     
@@ -62,7 +62,7 @@
       }
       
       /* Fonts are preloaded, body is always visible */
-      /* Class fonts-loaded is added immediately in main.jsx */
+      /* Class fonts-loaded is added immediately in main.tsx */
       
       /* Base font sizes to prevent FOUT - using rem units for consistency */
       /* These sizes match exactly with Tailwind defaults */
@@ -115,6 +115,6 @@
         }
       </style>
     </div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -6,6 +6,7 @@
 export * from './api';
 export * from './user';
 export * from './tts';
+export * from './stream';
 export * from './drops';
 export * from './youtube';
 export * from './chat';

@@ -41,6 +41,8 @@ export interface DropsReward {
   description?: string;
   quality: 'common' | 'rare' | 'epic' | 'legendary' | 'mythical';
   probability?: number;
+  platform?: 'twitch' | 'vk';
+  is_active?: boolean;
   channel_name?: string;
   created_at?: string;
 }
@@ -54,11 +56,27 @@ export interface DropsHistory {
   platform: 'twitch' | 'vk';
   user_id: number;
   username: string;
+  viewer_name: string;
   reward_id?: number;
   reward_name?: string;
   reward_quality?: string;
+  quality?: {
+    name?: string;
+    color?: string;
+  };
+  drops_type?: string;
+  donation_amount?: number;
+  streak_days?: number;
+  messages_count?: number;
   opened_at: string;
+  created_at: string;
 }
+
+/**
+ * Алиасы для обратной совместимости
+ */
+export type DonationEntry = DropsHistory;
+export type HistoryEntry = DropsHistory;
 
 /**
  * Статистика стрика
@@ -74,3 +92,53 @@ export interface StreakStats {
   messages_count: number;
 }
 
+/**
+ * Стрик для Drops
+ */
+export interface DropsStreak {
+  channel_name: string;
+  platform: 'twitch' | 'vk';
+  user_id: number;
+  username: string;
+  viewer_name: string;
+  current_streak: number;
+  max_streak: number;
+  longest_streak: number;
+  messages_this_stream: number;
+  last_message_date?: string;
+  last_activity?: string;
+  messages_count: number;
+}
+
+/**
+ * Алиас для обратной совместимости
+ */
+export type Streak = DropsStreak;
+
+
+/**
+ * Форма данных для донатов
+ */
+export interface DonationFormData {
+  donation_enabled: boolean;
+  donation_amount_common: number;
+  donation_amount_rare: number;
+  donation_amount_epic: number;
+  donation_amount_legendary: number;
+  [key: string]: any;
+}
+
+/**
+ * Форма данных для стриков
+ */
+export interface StreakFormData {
+  streak_enabled_twitch: boolean;
+  streak_enabled_vk: boolean;
+  streak_days_common: number;
+  streak_days_rare: number;
+  streak_days_epic: number;
+  streak_days_legendary: number;
+  streak_messages_required: number;
+  streak_reset_on_skip: boolean;
+  [key: string]: any;
+}

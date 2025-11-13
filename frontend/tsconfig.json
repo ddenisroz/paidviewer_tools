@@ -23,9 +23,9 @@
     "alwaysStrict": false,
     
     // === Дополнительные проверки ===
-    "noUnusedLocals": true,       // Предупреждать о неиспользуемых переменных
-    "noUnusedParameters": true,   // Предупреждать о неиспользуемых параметрах
-    "noImplicitReturns": true,    // Требовать return во всех путях
+    "noUnusedLocals": false,       // Отключено для постепенной миграции
+    "noUnusedParameters": false,   // Отключено для постепенной миграции
+    "noImplicitReturns": false,    // Отключено для постепенной миграции
     "noFallthroughCasesInSwitch": true,
     
     // === Пути и алиасы ===
@@ -48,7 +48,7 @@
     "inlineSources": false,
     
     // === Дополнительные типы ===
-    "types": ["vite/client", "node"]
+    "types": ["vite/client", "node", "jest", "@testing-library/jest-dom"]
   },
   "include": [
     "src/**/*",
@@ -58,7 +58,12 @@
   "exclude": [
     "node_modules",
     "dist",
-    "build"
+    "build",
+    "src/tests/**/*",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.test.js",
+    "**/*.test.jsx"
   ],
   "ts-node": {
     "esm": true

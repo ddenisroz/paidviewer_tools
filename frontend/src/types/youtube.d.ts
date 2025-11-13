@@ -14,15 +14,23 @@ export interface YoutubeSettings {
 }
 
 /**
+ * Alias для совместимости
+ */
+export type YouTubeSettings = YoutubeSettings;
+
+/**
  * Видео в очереди YouTube
  */
 export interface YoutubeVideo {
   id: string;
+  video_id?: string; // Alias для id
   title: string;
   url: string;
   thumbnail?: string;
   duration?: number;
   added_by?: string;
+  requester_name?: string; // Alias для added_by
+  user_id?: number;
   added_at?: string;
   is_playing?: boolean;
   is_played?: boolean;
@@ -36,4 +44,9 @@ export interface YoutubeQueue {
   current_video?: YoutubeVideo;
   is_playing: boolean;
 }
+
+/**
+ * Элемент очереди YouTube (alias для совместимости)
+ */
+export type YouTubeQueueItem = YoutubeVideo;
 

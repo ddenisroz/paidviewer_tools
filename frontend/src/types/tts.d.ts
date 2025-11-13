@@ -22,6 +22,11 @@ export interface TtsSettings {
   speed?: number;
   pitch?: number;
   voice_id?: number;
+  enable_7tv?: boolean;
+  enable_twitch?: boolean;
+  filter_replies?: boolean;
+  filter_mentions?: boolean;
+  version?: number;
   platform_settings?: {
     twitch?: TtsPlatformSettings;
     vk?: TtsPlatformSettings;
@@ -52,6 +57,13 @@ export interface TtsVoice {
   is_global?: boolean;
   user_id?: number;
   created_at?: string;
+  voice_type?: 'global' | 'user';
+  owner_id?: number;
+  cfg_strength?: number;
+  speed_preset?: 'very_slow' | 'slow' | 'normal' | 'fast' | 'very_fast';
+  reference_text?: string;
+  samples_count?: number;
+  [key: string]: any;
 }
 
 /**
@@ -81,8 +93,10 @@ export interface BlockedUser {
  */
 export interface LocalTtsConfig {
   enabled: boolean;
+  use_local?: boolean;
   host?: string;
   port?: number;
+  endpoint_url?: string;
   api_key?: string;
   test_connection?: boolean;
 }

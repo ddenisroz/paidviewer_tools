@@ -3,6 +3,31 @@
  */
 
 /**
+ * Интеграции пользователя
+ */
+export interface UserIntegrations {
+  twitch?: {
+    connected: boolean;
+    username?: string;
+    channel_name?: string;
+  };
+  vk?: {
+    connected: boolean;
+    username?: string;
+    channel_name?: string;
+  };
+  youtube?: {
+    connected: boolean;
+    channel_id?: string;
+  };
+  donationalerts?: {
+    connected: boolean;
+    user_id?: number;
+  };
+  [key: string]: any;
+}
+
+/**
  * Пользователь
  */
 export interface User {
@@ -13,8 +38,21 @@ export interface User {
   vk_username?: string;
   vk_channel_name?: string;
   is_admin?: boolean;
+  is_guest?: boolean;
+  is_blocked?: boolean;
+  is_whitelisted?: boolean;
+  platform?: 'twitch' | 'vk' | 'youtube';
+  integrations?: UserIntegrations;
   created_at?: string;
   updated_at?: string;
+  total_integrations?: number;
+  whitelisted_platforms?: ('twitch' | 'vk')[];
+  whitelisted_channels?: {
+    twitch?: string;
+    vk?: string;
+  };
+  session_id?: string;
+  [key: string]: any;
 }
 
 /**
@@ -24,6 +62,35 @@ export interface UserSettings {
   theme?: 'light' | 'dark' | 'auto';
   language?: string;
   notifications_enabled?: boolean;
+  chat_enabled?: boolean;
+  chat_max_messages?: number;
+  chat_show_timestamps?: boolean;
+  chat_show_platform?: boolean;
+  chat_show_user_roles?: boolean;
+  chat_animation_duration?: number;
+  chat_animation_type?: string;
+  chat_message_fade_seconds?: number;
+  obs_width?: number;
+  obs_height?: number;
+  obs_font_size?: number;
+  obs_font_family?: string;
+  obs_font_weight?: string;
+  obs_background_color?: string;
+  obs_background_image?: string | null;
+  obs_text_color?: string;
+  obs_border_radius?: number;
+  obs_border_color?: string;
+  obs_border_width?: number;
+  obs_message_bg?: string;
+  obs_message_border_radius?: number;
+  obs_message_margin?: number;
+  obs_message_padding?: number;
+  obs_moderator_color?: string;
+  obs_vip_color?: string;
+  obs_subscriber_color?: string;
+  obs_normal_color?: string;
+  combine_titles?: boolean;
+  combine_categories?: boolean;
   [key: string]: any;
 }
 
@@ -36,3 +103,12 @@ export interface UserSession {
   token?: string;
 }
 
+/**
+ * Данные гостевого режима
+ */
+export interface GuestData {
+  username: string;
+  channel?: string;
+  platform: 'twitch' | 'vk';
+  isGuest?: boolean;
+}
