@@ -16,7 +16,8 @@ class YouTubeService:
     """
     
     def __init__(self):
-        self.api_key = os.getenv('YOUTUBE_API_KEY')
+        from core.config import settings
+        self.api_key = settings.youtube_api_key
         self.base_url = "https://www.googleapis.com/youtube/v3"
         
     async def get_video_info(self, video_url: str) -> Optional[Dict[str, Any]]:

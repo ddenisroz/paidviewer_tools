@@ -297,7 +297,8 @@ class AdminAPI:
                 from bots.twitch_bot import Bot
                 from core.connection_manager import get_connection_manager
                 
-                bot_token = os.getenv("TWITCH_BOT_TOKEN")
+                from core.config import settings
+                bot_token = settings.twitch_bot_token
                 if not bot_token:
                     return {"error": "TWITCH_BOT_TOKEN not configured"}
                 
@@ -342,7 +343,8 @@ class AdminAPI:
                 from bots.vk_live_bot import VKLiveBot
                 from core.connection_manager import get_connection_manager
                 
-                vk_token = os.getenv("VK_LIVE_USER_TOKEN")
+                from core.config import settings
+                vk_token = settings.vk_live_user_token
                 if not vk_token:
                     return {"error": "VK_LIVE_USER_TOKEN not configured"}
                 

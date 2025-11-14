@@ -111,6 +111,9 @@ class Settings(BaseSettings):
     google_tts_api_key: Optional[str] = Field(default=None, description="Google Cloud TTS API key")
     huggingface_token: Optional[str] = Field(default=None, description="HuggingFace API token")
     
+    # === GTTS SETTINGS ===
+    gtts_voice: str = Field(default="com", description="gTTS accent/voice (tld parameter)")
+    
     # === LOGGING ===
     log_file: str = Field(default="logs/bot_service.log", description="Log file path")
     enable_json_logs: bool = Field(default=False, description="Enable JSON formatted logs")

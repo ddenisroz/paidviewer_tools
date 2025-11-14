@@ -138,8 +138,9 @@ class TokenRefreshService:
             # Расшифровываем refresh_token
             refresh_token = decrypt_token(token.refresh_token)
             
-            client_id = os.getenv("TWITCH_CLIENT_ID")
-            client_secret = os.getenv("TWITCH_CLIENT_SECRET")
+            from core.config import settings
+            client_id = settings.twitch_client_id
+            client_secret = settings.twitch_client_secret
             
             if not client_id or not client_secret:
                 logger.error("Twitch credentials not configured")
@@ -215,9 +216,10 @@ class TokenRefreshService:
             # Расшифровываем refresh_token
             refresh_token = decrypt_token(token.refresh_token)
             
-            client_id = os.getenv("VK_CLIENT_ID")
-            client_secret = os.getenv("VK_CLIENT_SECRET")
-            redirect_uri = os.getenv("VK_REDIRECT_URI", "http://localhost:8000/auth/vk/callback")
+            from core.config import settings
+            client_id = settings.vk_client_id
+            client_secret = settings.vk_client_secret
+            redirect_uri = settings.vk_redirect_uri
             
             if not client_id or not client_secret:
                 logger.error("VK credentials not configured")
@@ -287,8 +289,9 @@ class TokenRefreshService:
             
             refresh_token = decrypt_token(token.refresh_token)
             
-            client_id = os.getenv("DONATIONALERTS_CLIENT_ID")
-            client_secret = os.getenv("DONATIONALERTS_CLIENT_SECRET")
+            from core.config import settings
+            client_id = settings.donationalerts_client_id
+            client_secret = settings.donationalerts_client_secret
             
             if not client_id or not client_secret:
                 logger.error("DonationAlerts credentials not configured")

@@ -172,8 +172,9 @@ class PsychologyService:
             # Подготавливаем текст для анализа (первые 500 символов)
             analysis_text = messages_text[:500]
             
+            from core.config import settings
             headers = {
-                "Authorization": f"Bearer {os.getenv('HUGGINGFACE_TOKEN', 'hf_your_token_here')}",
+                "Authorization": f"Bearer {settings.huggingface_token or 'hf_your_token_here'}",
                 "Content-Type": "application/json"
             }
             

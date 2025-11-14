@@ -127,6 +127,7 @@ class BasicTTS:
         text: str, 
         volume_level: float = 50.0,
         speed: float = 1.0,
+        voice: str = 'com',
         **kwargs
     ) -> Optional[str]:
         """
@@ -136,6 +137,7 @@ class BasicTTS:
             text: Текст для озвучки
             volume_level: Уровень громкости (0-100)
             speed: Скорость речи (0.5-2.0, по умолчанию 1.0)
+            voice: Акцент/голос (tld параметр): 'com', 'co.uk', 'com.au', 'co.in', 'ca', 'ru' и т.д.
             **kwargs: Дополнительные параметры (игнорируются для совместимости)
         
         Returns:
@@ -162,8 +164,14 @@ class BasicTTS:
             # Определяем slow параметр на основе speed
             slow_mode = speed < 0.8
             
-            tts = gTTS(text=processed_text, lang=language, slow=slow_mode)
+            # Определяем tld (акцент) на основе voice параметра
+            # Поддерживаемые акценты: com, co.uk, com.au, co.in, ca, ru и т.д.
+            tld = voice if voice else 'com'
+            
+            tts = gTTS(text=processed_text, lang=language, slow=slow_mode, tld=tld)
             tts.save(str(temp_mp3))
+            
+            logger.info(f"🎙️ gTTS: язык={language}, акцент={tld}, slow={slow_mode}")
             
             logger.info(f"✅ gTTS аудио сгенерировано: {temp_mp3}")
             

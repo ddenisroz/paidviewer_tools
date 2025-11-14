@@ -17,10 +17,11 @@ class DatabaseCleanupService:
     def __init__(self, db: Session):
         self.db = db
         
-        # Настройки лимитов (читаем из .env или используем значения по умолчанию)
-        self.MAX_CHAT_MESSAGES_PER_USER = int(os.getenv('CHAT_MESSAGES_DB_LIMIT_PER_USER', '3000'))
-        self.MAX_TOTAL_CHAT_MESSAGES = int(os.getenv('CHAT_MESSAGES_DB_LIMIT_TOTAL', '100000'))
-        self.CHAT_MESSAGES_RETENTION_DAYS = int(os.getenv('CHAT_MESSAGES_RETENTION_DAYS', '30'))
+        # Настройки лимитов (из централизованной конфигурации)
+        from core.config import settings
+        self.MAX_CHAT_MESSAGES_PER_USER = settings.chat_messages_db_limit_per_user
+        self.MAX_TOTAL_CHAT_MESSAGES = settings.chat_messages_db_limit_total
+        self.CHAT_MESSAGES_RETENTION_DAYS = settings.chat_messages_retention_days
         
         # Анализы больше не хранятся в БД
         self.MAX_PSYCHOLOGY_ANALYSES = 0
@@ -385,8 +386,9 @@ class DatabaseCleanupService:
             
             # PostgreSQL: используем pg_dump
             import subprocess
+            from core.config import settings as app_settings
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            database_url = os.getenv('DATABASE_URL', '')
+            database_url = app_settings.database_url
             if not database_url or 'postgresql://' not in database_url:
                 return {'success': False, 'error': 'PostgreSQL DATABASE_URL not configured'}
             
@@ -446,7 +448,8 @@ class DatabaseCleanupService:
                 return {'success': False, 'error': 'No backups found'}
             
             # PostgreSQL: используем psql для восстановления
-            database_url = os.getenv('DATABASE_URL', '')
+            from core.config import settings as app_settings
+            database_url = app_settings.database_url
             if not database_url or 'postgresql://' not in database_url:
                 return {'success': False, 'error': 'PostgreSQL DATABASE_URL not configured'}
             
