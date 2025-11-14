@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from auth.auth import get_current_user, get_current_user_optional
 from core.session_manager import session_manager
+from platforms.registry import platform_registry
 from pydantic import BaseModel
 from typing import Optional
 import logging
@@ -360,12 +361,13 @@ async def search_twitch_categories(
 ):
     """Поиск категорий Twitch"""
     try:
-        from api.twitch_api import TwitchAPI
-        from core.connection_manager import get_connection_manager
-        connection_manager = get_connection_manager()
-        twitch_api = TwitchAPI(connection_manager)
+        # Use platform registry
+        platform = platform_registry.get('twitch')
+        if not platform:
+            logger.error("Twitch platform not registered")
+            return JSONResponse(content={"categories": []}, status_code=500)
         
-        categories = await twitch_api.search_categories(search)
+        categories = await platform.search_categories(search)
         
         if categories is None:
             return JSONResponse(content={"categories": []})
@@ -378,3 +380,135 @@ async def search_twitch_categories(
 
 # УДАЛЕНО: Дублирует endpoint из vk_api.py
 # Теперь используется /api/vk/categories из vk_api.py с полным логированием
+
+@router.get("/platforms/{platform_name}/categories")
+async def search_platform_categories(
+    platform_name: str,
+    search: str = "",
+    user: dict = Depends(get_current_user_optional)
+):
+    """
+    Generic endpoint to search categories for any platform
+    
+    Args:
+        platform_name: Platform name (twitch, vk, kick, etc.)
+        search: Search query
+        user: Current user (optional)
+    """
+    try:
+        # Validate platform
+        if not platform_registry.is_valid_platform(platform_name):
+            logger.warning(f"Unknown platform requested: {platform_name}")
+            return JSONResponse(
+                content={"error": f"Unknown platform: {platform_name}"},
+                status_code=400
+            )
+        
+        # Get platform instance
+        platform = platform_registry.get(platform_name)
+        if not platform:
+            logger.error(f"Platform {platform_name} not available")
+            return JSONResponse(
+                content={"error": f"Platform {platform_name} not available"},
+                status_code=500
+            )
+        
+        # Check if platform supports categories
+        if not platform.config.supports_categories:
+            logger.warning(f"Platform {platform_name} does not support categories")
+            return JSONResponse(
+                content={"categories": []},
+                status_code=200
+            )
+        
+        # Search categories
+        categories = await platform.search_categories(search)
+        
+        return JSONResponse(content={"categories": categories or []})
+        
+    except Exception as e:
+        logger.error(f"Error searching {platform_name} categories: {e}")
+        return JSONResponse(
+            content={"categories": []},
+            status_code=500
+        )
+
+@router.post("/platforms/{platform_name}/stream/update")
+async def update_platform_stream(
+    platform_name: str,
+    title: Optional[str] = None,
+    category_id: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Generic endpoint to update stream info for any platform
+    
+    Args:
+        platform_name: Platform name (twitch, vk, kick, etc.)
+        title: New stream title (optional)
+        category_id: New category ID (optional)
+        user: Current user
+    """
+    try:
+        user_id = user.get("id")
+        
+        # Validate platform
+        if not platform_registry.is_valid_platform(platform_name):
+            logger.warning(f"Unknown platform requested: {platform_name}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown platform: {platform_name}"
+            )
+        
+        # Get platform instance
+        platform = platform_registry.get(platform_name)
+        if not platform:
+            logger.error(f"Platform {platform_name} not available")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Platform {platform_name} not available"
+            )
+        
+        results = []
+        
+        # Update title if provided
+        if title is not None:
+            logger.info(f"Updating {platform_name} title for user {user_id}: {title}")
+            success = await platform.update_stream_title(user_id, title)
+            if not success:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Failed to update {platform_name} stream title"
+                )
+            results.append(f"{platform_name} title updated")
+        
+        # Update category if provided
+        if category_id is not None:
+            logger.info(f"Updating {platform_name} category for user {user_id}: {category_id}")
+            success = await platform.update_stream_category(user_id, category_id)
+            if not success:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Failed to update {platform_name} stream category"
+                )
+            results.append(f"{platform_name} category updated")
+        
+        if not results:
+            return JSONResponse(content={
+                "success": True,
+                "message": "No changes to update"
+            })
+        
+        return JSONResponse(content={
+            "success": True,
+            "message": ", ".join(results)
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating {platform_name} stream: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )

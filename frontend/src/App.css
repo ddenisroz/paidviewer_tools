@@ -1,6 +1,49 @@
+/* Import visual feedback system - must be before @tailwind */
+@import './styles/visual-feedback.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Spacing Utility Classes - Use these for consistent spacing */
+@layer utilities {
+  /* Card spacing utilities */
+  .card-padding {
+    padding: var(--card-padding);
+  }
+  
+  .card-gap {
+    gap: var(--card-gap);
+  }
+  
+  /* Section spacing utilities */
+  .section-gap {
+    gap: var(--section-gap);
+  }
+  
+  .section-spacing {
+    margin-bottom: var(--section-gap);
+  }
+  
+  /* Form spacing utilities */
+  .form-field-gap {
+    gap: var(--form-field-gap);
+  }
+  
+  .form-spacing {
+    margin-bottom: var(--form-field-gap);
+  }
+  
+  /* List spacing utilities */
+  .list-gap {
+    gap: var(--list-item-gap);
+  }
+  
+  /* Button spacing utilities */
+  .button-padding {
+    padding: var(--button-padding-y) var(--button-padding-x);
+  }
+}
 
 /* View Transitions API - современные плавные переходы между страницами */
 @view-transition {
@@ -118,6 +161,28 @@ body {
     /* Font rendering optimization */
     --font-smoothing: antialiased;
     --font-feature-settings: 'cv11', 'ss01';
+    
+    /* Spacing System - 8px grid for consistent spacing across the application */
+    /* Use these variables for padding, margin, gap, and other spacing properties */
+    --spacing-0: 0;           /* 0px - No spacing */
+    --spacing-1: 0.5rem;      /* 8px - Minimal spacing */
+    --spacing-2: 1rem;        /* 16px - Small spacing */
+    --spacing-3: 1.5rem;      /* 24px - Medium spacing */
+    --spacing-4: 2rem;        /* 32px - Large spacing */
+    --spacing-5: 2.5rem;      /* 40px - Extra large spacing */
+    --spacing-6: 3rem;        /* 48px - XXL spacing */
+    --spacing-8: 4rem;        /* 64px - Section spacing */
+    --spacing-10: 5rem;       /* 80px - Large section spacing */
+    --spacing-12: 6rem;       /* 96px - Page spacing */
+    
+    /* Component-specific spacing presets */
+    --card-padding: var(--spacing-4);           /* 32px - Standard card padding */
+    --card-gap: var(--spacing-3);               /* 24px - Gap between card elements */
+    --section-gap: var(--spacing-6);            /* 48px - Gap between sections */
+    --form-field-gap: var(--spacing-2);         /* 16px - Gap between form fields */
+    --button-padding-x: var(--spacing-3);       /* 24px - Button horizontal padding */
+    --button-padding-y: var(--spacing-2);       /* 16px - Button vertical padding */
+    --list-item-gap: var(--spacing-2);          /* 16px - Gap between list items */
   }
  
   .dark {

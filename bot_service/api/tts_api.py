@@ -13,12 +13,11 @@ import httpx
 import logging
 import time
 import re
-import zipfile
 import shutil
 from pathlib import Path
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel, Field, HttpUrl, validator
+from pydantic import BaseModel, Field, validator
 from fastapi import APIRouter, Depends, HTTPException, Request, Form, File, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -38,7 +37,7 @@ from services.advanced_rate_limiter import advanced_rate_limiter as database_rat
 from core.security_modern import limiter
 
 # Utils
-from utils.enhanced_logger import log_request, log_response, tts_logger
+from utils.enhanced_logger import log_request, log_response
 
 logger = logging.getLogger('bot_service')
 
@@ -590,8 +589,11 @@ async def save_tts_settings(
         # Отправляем WebSocket уведомление для синхронизации фронтенда
         try:
             from services.memory_websocket_manager import memory_websocket_manager
+            from utils.websocket_broadcast import broadcast_settings_change
+            
             user_id = current_user.get('id')
             if user_id and user_id != -1:  # Только для авторизованных пользователей
+                # Legacy cache invalidation event
                 cache_invalidation_event = {
                     "type": "cache_invalidate",
                     "cache_key": "tts_settings",
@@ -599,6 +601,23 @@ async def save_tts_settings(
                     "version": result.get("version", 1)  # ✅ Отправляем новую версию
                 }
                 await memory_websocket_manager.send_to_user(user_id, cache_invalidation_event)
+                
+                # New state sync broadcast
+                settings_data = {
+                    "enable7TV": request.enable7TV,
+                    "enableTwitch": request.enableTwitch,
+                    "enableLexiconFilter": request.enableLexiconFilter,
+                    "enableCustomLexicon": request.enableCustomLexicon,
+                    "engine": request.engine,
+                    "voice": request.voice,
+                    "listeningMode": request.listeningMode,
+                    "maxMessageLength": request.maxMessageLength,
+                    "skipCommands": request.skipCommands,
+                    "useLocalTTS": request.useLocalTTS,
+                    "filterReplies": request.filterReplies,
+                    "filterMentions": request.filterMentions,
+                }
+                await broadcast_settings_change(user_id, "tts_settings", settings_data)
                 logger.debug(f"🔄 [TTS SETTINGS] Sent cache invalidation to user {user_id} with version {result.get('version')}")
         except Exception as ws_error:
             logger.warning(f"Failed to send WebSocket notification for TTS settings: {ws_error}")

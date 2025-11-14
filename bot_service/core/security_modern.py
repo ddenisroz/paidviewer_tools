@@ -13,7 +13,7 @@ from functools import wraps
 # Современные библиотеки безопасности
 from cryptography.fernet import Fernet
 from jose import JWTError, jwt
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from fastapi import HTTPException, Request, status, Depends

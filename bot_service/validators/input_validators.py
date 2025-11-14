@@ -140,6 +140,112 @@ def sanitize_input(text: str, max_length: int = 1000, allow_special: bool = Fals
     return text.strip()
 
 
+def sanitize_stream_title(title: str) -> str:
+    """
+    Санитизирует название стрима
+    
+    Args:
+        title: Название стрима
+    
+    Returns:
+        Очищенное название
+    """
+    if not title:
+        return ""
+    
+    # Удаляем HTML теги
+    title = re.sub(r'<[^>]*>', '', title)
+    
+    # Удаляем script-подобный контент
+    title = re.sub(r'javascript:', '', title, flags=re.IGNORECASE)
+    title = re.sub(r'on\w+\s*=', '', title, flags=re.IGNORECASE)
+    
+    # Удаляем управляющие символы
+    title = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', title)
+    
+    # Ограничиваем длину
+    if len(title) > 140:
+        title = title[:140]
+    
+    return title.strip()
+
+
+def sanitize_tts_message(message: str) -> str:
+    """
+    Санитизирует TTS сообщение
+    
+    Args:
+        message: TTS сообщение
+    
+    Returns:
+        Очищенное сообщение
+    """
+    if not message:
+        return ""
+    
+    # Удаляем HTML теги
+    message = re.sub(r'<[^>]*>', '', message)
+    
+    # Удаляем управляющие символы
+    message = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', message)
+    
+    # Ограничиваем длину
+    if len(message) > 500:
+        message = message[:500]
+    
+    return message.strip()
+
+
+def sanitize_voice_name(name: str) -> str:
+    """
+    Санитизирует название голоса
+    
+    Args:
+        name: Название голоса
+    
+    Returns:
+        Очищенное название
+    """
+    if not name:
+        return ""
+    
+    # Разрешаем только буквы, цифры, пробелы, дефисы и подчеркивания
+    name = re.sub(r'[^a-zA-Zа-яА-ЯёЁ0-9\s_-]', '', name)
+    
+    # Ограничиваем длину
+    if len(name) > 50:
+        name = name[:50]
+    
+    return name.strip()
+
+
+def sanitize_file_name(filename: str) -> str:
+    """
+    Санитизирует имя файла
+    
+    Args:
+        filename: Имя файла
+    
+    Returns:
+        Очищенное имя файла
+    """
+    if not filename:
+        return ""
+    
+    # Удаляем попытки обхода пути
+    filename = filename.replace('..', '')
+    filename = re.sub(r'[/\\]', '', filename)
+    
+    # Удаляем опасные символы
+    filename = re.sub(r'[<>:"|?*\x00-\x1f]', '', filename)
+    
+    # Ограничиваем длину
+    if len(filename) > 255:
+        filename = filename[:255]
+    
+    return filename.strip()
+
+
 def sanitize_sql_string(text: str) -> str:
     """
     Санитизирует строку для использования в raw SQL (дополнение к ORM)

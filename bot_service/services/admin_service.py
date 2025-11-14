@@ -380,15 +380,15 @@ class AdminAPI:
         """Перезагрузить TTS движок"""
         try:
             import httpx
+            from core.config import settings
             
-            # Получаем URL TTS сервиса
-            from constants import DEFAULT_TTS_SERVICE_URL
-            tts_service_url = os.getenv("TTS_SERVICE_URL")
+            # Получаем URL TTS сервиса из настроек
+            tts_service_url = settings.tts_service_url
             if not tts_service_url:
-                raise ValueError("TTS_SERVICE_URL environment variable is required")
+                raise ValueError("TTS_SERVICE_URL is not configured")
             
-            # Отправляем запрос на перезагрузку TTS движка
-            async with httpx.AsyncClient() as client:
+            # Отправляем запрос на перезагрузку TTS движка с таймаутом
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(f"{tts_service_url}/api/tts/restart")
                 
                 if response.status_code == 200:

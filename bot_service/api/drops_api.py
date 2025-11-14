@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, validator
 import random
 import time
 
-from core.database import get_db, DropsConfig, DropsReward, DropsQuality, DropsType, UserStreak, DropsHistory, MythicalDropsSession, DonationAlert, UserToken, User
+from core.database import get_db, DropsConfig, DropsReward, DropsQuality, UserStreak, DropsHistory, MythicalDropsSession, DonationAlert, UserToken, User
 from auth.auth import get_current_user, get_current_user_optional
 from core.datetime_utils import utcnow_naive
 from utils.enhanced_logger import log_request, log_response, drops_logger
@@ -871,12 +871,17 @@ async def open_drops(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Открывает лутбокс для зрителя"""
+    """Opens a lootbox for a viewer
+    
+    This endpoint calculates the drop result on the backend before returning to frontend.
+    The frontend animation widget will animate towards the predetermined result.
+    """
     try:
-        from services.drops_service import DropsService
+        from services.drops_service import DropsService, DropsCalculationService
         drops_service = DropsService(db)
+        calc_service = DropsCalculationService(db)
         
-        # Получаем конфигурацию для канала (используем первый доступный канал)
+        # Get configuration for the channel
         config = db.query(DropsConfig).filter(
             DropsConfig.user_id == current_user["id"]
         ).first()
@@ -884,39 +889,145 @@ async def open_drops(
         if not config:
             raise HTTPException(status_code=404, detail="Конфигурация Drops не найдена")
         
-        result = None
+        # Determine quality based on drops type
+        quality_name = None
         
         if request.drops_type == "streak":
-            result = drops_service.process_streak_drops(
-                current_user["id"], config.channel_name, config.platform,
-                request.viewer_id, request.viewer_name
+            # Get user streak to determine quality
+            streak = drops_service.get_user_streak(
+                user_id=current_user["id"],
+                channel_name=config.channel_name,
+                platform=config.platform,
+                viewer_id=request.viewer_id
             )
+            
+            if not streak or streak.current_streak < config.streak_days_common:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Недостаточный стрик. Требуется минимум {config.streak_days_common} дней"
+                )
+            
+            # Determine quality by streak days
+            if streak.current_streak >= config.streak_days_legendary:
+                quality_name = "Legendary"
+            elif streak.current_streak >= config.streak_days_epic:
+                quality_name = "Epic"
+            elif streak.current_streak >= config.streak_days_rare:
+                quality_name = "Rare"
+            else:
+                quality_name = "Common"
+                
         elif request.drops_type == "donation":
-            result = drops_service.process_donation_drops(
-                current_user["id"], config.channel_name, config.platform,
-                request.viewer_id, request.viewer_name, request.donation_amount
-            )
+            if not request.donation_amount:
+                raise HTTPException(status_code=400, detail="Сумма доната не указана")
+            
+            # Determine quality by donation amount
+            if request.donation_amount >= config.donation_amount_legendary:
+                quality_name = "Legendary"
+            elif request.donation_amount >= config.donation_amount_epic:
+                quality_name = "Epic"
+            elif request.donation_amount >= config.donation_amount_rare:
+                quality_name = "Rare"
+            elif request.donation_amount >= config.donation_amount_common:
+                quality_name = "Common"
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Недостаточная сумма доната. Минимум {config.donation_amount_common}"
+                )
+                
         elif request.drops_type == "mythical":
-            result = drops_service.process_mythical_drops(
-                current_user["id"], config.channel_name, config.platform,
-                request.viewer_id, request.viewer_name
-            )
-        
-        if result:
-            return {
-                "success": True,
-                "data": result
-            }
+            quality_name = "Mythical"
+            
+            # Check if mythical can be activated
+            if not drops_service._can_activate_mythical(config):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Мифический лутбокс еще не доступен"
+                )
         else:
-            return {
-                "success": False,
-                "message": "Лутбокс не доступен"
+            raise HTTPException(status_code=400, detail="Неизвестный тип лутбокса")
+        
+        # Calculate drop result on backend
+        try:
+            drop_result = calc_service.calculate_drop(
+                user_id=current_user["id"],
+                channel_name=config.channel_name,
+                platform=config.platform,
+                quality_name=quality_name
+            )
+        except ValueError as e:
+            logger.error(f"❌ [DROPS] Failed to calculate drop: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+        
+        # Get quality object for history
+        quality = db.query(DropsQuality).filter(
+            DropsQuality.name == quality_name
+        ).first()
+        
+        # Save result to database
+        history_entry = DropsHistory(
+            user_id=current_user["id"],
+            channel_name=config.channel_name,
+            platform=config.platform,
+            viewer_id=request.viewer_id,
+            viewer_name=request.viewer_name,
+            lootbox_type=request.drops_type,
+            quality_id=quality.id if quality else None,
+            reward_id=drop_result["reward_id"],
+            reward_name=drop_result["reward_name"],
+            reward_type=drop_result["reward_type"],
+            reward_value=drop_result["reward_value"],
+            donation_amount=request.donation_amount if request.drops_type == "donation" else None,
+            streak_days=request.streak_days if request.drops_type == "streak" else None,
+            messages_count=request.messages_count if request.drops_type == "streak" else None
+        )
+        
+        db.add(history_entry)
+        db.commit()
+        db.refresh(history_entry)
+        
+        logger.info(
+            f"✅ [DROPS] Opened {request.drops_type} lootbox for {request.viewer_name}: "
+            f"{drop_result['reward_name']} ({quality_name})"
+        )
+        
+        # Broadcast result via WebSocket
+        try:
+            from services.memory_websocket_manager import memory_websocket_manager
+            
+            ws_message = {
+                "type": "drops_opened",
+                "data": {
+                    "viewer_name": request.viewer_name,
+                    "drops_type": request.drops_type,
+                    "quality": quality_name,
+                    "reward": drop_result,
+                    "history_id": history_entry.id
+                }
             }
+            
+            await memory_websocket_manager.send_to_user(current_user["id"], ws_message)
+            logger.debug(f"🔄 [DROPS] Sent WebSocket notification to user {current_user['id']}")
+        except Exception as ws_error:
+            logger.warning(f"Failed to send WebSocket notification for drops: {ws_error}")
+        
+        # Return predetermined result to frontend
+        return {
+            "success": True,
+            "data": {
+                "type": request.drops_type,
+                "viewer_name": request.viewer_name,
+                "quality": quality_name,
+                "reward": drop_result,
+                "history_id": history_entry.id
+            }
+        }
             
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error opening drops: {e}")
+        logger.error(f"Error opening drops: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Ошибка открытия лутбокса")
 
 @router.get("/stats/{channel_name}")

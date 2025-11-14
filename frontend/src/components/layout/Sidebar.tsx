@@ -4,6 +4,7 @@ import { Home, Mic, Youtube, Coins, Headphones, Settings, Shield, MessageSquare,
 import { useAuth } from '../../context/AuthContext';
 import { useAdminList } from '../../queries/admin/adminQueries';
 import { logger } from '../../utils/prodLogger';
+import { createPreloadHandler } from '../../utils/preloadRoute';
 
 interface NavSubItem {
     to: string;
@@ -24,6 +25,21 @@ interface SidebarNavItemProps {
     setOpenSection: (section: string | null) => void;
     onMobileMenuClose: () => void;
 }
+
+// Route preload mapping - maps routes to their lazy loaders
+const routePreloaders: Record<string, () => void> = {
+    '/dashboard': createPreloadHandler(() => import('../../pages/HomePage'), 'home'),
+    '/dashboard/tts': createPreloadHandler(() => import('../../pages/tts/TtsMainPage'), 'tts-main'),
+    '/dashboard/tts/voices': createPreloadHandler(() => import('../../pages/tts/VoiceManagementPage'), 'tts-voices'),
+    '/dashboard/tts/local': createPreloadHandler(() => import('../../pages/tts/LocalTTSSettingsPage'), 'tts-local'),
+    '/dashboard/youtube': createPreloadHandler(() => import('../../pages/media/YoutubeIntegrationPage'), 'youtube'),
+    '/dashboard/points': createPreloadHandler(() => import('../../pages/PointsManagementPage'), 'points'),
+    '/dashboard/drops': createPreloadHandler(() => import('../../pages/drops/DropsMainPage'), 'drops'),
+    '/dashboard/chat-analysis': createPreloadHandler(() => import('../../pages/AnalyticsPage'), 'analytics'),
+    '/dashboard/commands': createPreloadHandler(() => import('../../pages/CommandsPage'), 'commands'),
+    '/dashboard/settings': createPreloadHandler(() => import('../../pages/SettingsPage'), 'settings'),
+    '/dashboard/dolbaebadmintts': createPreloadHandler(() => import('../../pages/admin/AdminPage'), 'admin'),
+};
 
 const getNavItems = (isYourchy: boolean): NavItem[] => {
     const baseItems: NavItem[] = [
@@ -145,6 +161,11 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                                     setOpenSection(null); // Закрываем submenu при клике
                                     onMobileMenuClose();
                                 }}
+                                onMouseEnter={() => {
+                                    // Preload route on hover
+                                    const preloader = routePreloaders[subItem.to];
+                                    if (preloader) preloader();
+                                }}
                                 className={({ isActive }) =>
                                     `flex items-center gap-3 px-4 py-2.5 text-base font-medium transition-colors ${
                                         isActive
@@ -169,6 +190,13 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
             to={item.to || '#'}
             end
             onClick={onMobileMenuClose}
+            onMouseEnter={() => {
+                // Preload route on hover
+                if (item.to) {
+                    const preloader = routePreloaders[item.to];
+                    if (preloader) preloader();
+                }
+            }}
             className={({ isActive }) =>
                 `w-full flex items-center gap-4 px-4 py-2.5 text-lg font-semibold transition-colors ${
                     isActive

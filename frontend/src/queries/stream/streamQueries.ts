@@ -51,13 +51,47 @@ export const useUpdateTwitchStreamTitle = (options?: UseMutationOptions<any, Axi
 
   return useMutation({
     mutationFn: (title: string) => streamService.updateTwitchStreamTitle(title),
+    onMutate: async (newTitle: string) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: queryKeys.stream.twitchInfo() });
+      
+      // Snapshot previous value
+      const previousStreamInfo = queryClient.getQueryData(queryKeys.stream.twitchInfo());
+      
+      // Optimistically update
+      queryClient.setQueryData(queryKeys.stream.twitchInfo(), (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            title: newTitle
+          }
+        };
+      });
+      
+      // Return context for rollback
+      return { previousStreamInfo };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.stream.twitchInfo() });
-      toast.success('Название стрима обновлено');
+      if (!options?.onSuccess) {
+        toast.success('Название стрима обновлено');
+      }
     },
-    onError: (error: AxiosError) => {
+    onError: (error: AxiosError, newTitle, context: { previousStreamInfo?: any } | undefined) => {
+      // Rollback on error
+      if (context?.previousStreamInfo) {
+        queryClient.setQueryData(queryKeys.stream.twitchInfo(), context.previousStreamInfo);
+      }
       logger.error('Error updating Twitch stream title:', error);
-      toast.error('Ошибка обновления названия стрима');
+      if (!options?.onError) {
+        toast.error('Ошибка обновления названия стрима');
+      }
+    },
+    onSettled: () => {
+      // Refetch to ensure consistency
+      queryClient.invalidateQueries({ queryKey: queryKeys.stream.twitchInfo() });
     },
     ...options,
   });
@@ -71,13 +105,47 @@ export const useUpdateTwitchStreamCategory = (options?: UseMutationOptions<any, 
 
   return useMutation({
     mutationFn: (categoryId: string) => streamService.updateTwitchStreamCategory(categoryId),
+    onMutate: async (newCategoryId: string) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: queryKeys.stream.twitchInfo() });
+      
+      // Snapshot previous value
+      const previousStreamInfo = queryClient.getQueryData(queryKeys.stream.twitchInfo());
+      
+      // Optimistically update
+      queryClient.setQueryData(queryKeys.stream.twitchInfo(), (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            game_id: newCategoryId
+          }
+        };
+      });
+      
+      // Return context for rollback
+      return { previousStreamInfo };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.stream.twitchInfo() });
-      toast.success('Категория стрима обновлена');
+      if (!options?.onSuccess) {
+        toast.success('Категория стрима обновлена');
+      }
     },
-    onError: (error: AxiosError) => {
+    onError: (error: AxiosError, newCategoryId, context: { previousStreamInfo?: any } | undefined) => {
+      // Rollback on error
+      if (context?.previousStreamInfo) {
+        queryClient.setQueryData(queryKeys.stream.twitchInfo(), context.previousStreamInfo);
+      }
       logger.error('Error updating Twitch stream category:', error);
-      toast.error('Ошибка обновления категории стрима');
+      if (!options?.onError) {
+        toast.error('Ошибка обновления категории стрима');
+      }
+    },
+    onSettled: () => {
+      // Refetch to ensure consistency
+      queryClient.invalidateQueries({ queryKey: queryKeys.stream.twitchInfo() });
     },
     ...options,
   });
@@ -91,13 +159,47 @@ export const useUpdateVkStreamTitle = (options?: UseMutationOptions<any, AxiosEr
 
   return useMutation({
     mutationFn: (title: string) => streamService.updateVkStreamTitle(title),
+    onMutate: async (newTitle: string) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: queryKeys.stream.vkInfo() });
+      
+      // Snapshot previous value
+      const previousStreamInfo = queryClient.getQueryData(queryKeys.stream.vkInfo());
+      
+      // Optimistically update
+      queryClient.setQueryData(queryKeys.stream.vkInfo(), (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            title: newTitle
+          }
+        };
+      });
+      
+      // Return context for rollback
+      return { previousStreamInfo };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.stream.vkInfo() });
-      toast.success('Название стрима обновлено');
+      if (!options?.onSuccess) {
+        toast.success('Название стрима обновлено');
+      }
     },
-    onError: (error: AxiosError) => {
+    onError: (error: AxiosError, newTitle, context: { previousStreamInfo?: any } | undefined) => {
+      // Rollback on error
+      if (context?.previousStreamInfo) {
+        queryClient.setQueryData(queryKeys.stream.vkInfo(), context.previousStreamInfo);
+      }
       logger.error('Error updating VK stream title:', error);
-      toast.error('Ошибка обновления названия стрима');
+      if (!options?.onError) {
+        toast.error('Ошибка обновления названия стрима');
+      }
+    },
+    onSettled: () => {
+      // Refetch to ensure consistency
+      queryClient.invalidateQueries({ queryKey: queryKeys.stream.vkInfo() });
     },
     ...options,
   });
@@ -111,13 +213,47 @@ export const useUpdateVkStreamCategory = (options?: UseMutationOptions<any, Axio
 
   return useMutation({
     mutationFn: (categoryId: string) => streamService.updateVkStreamCategory(categoryId),
+    onMutate: async (newCategoryId: string) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: queryKeys.stream.vkInfo() });
+      
+      // Snapshot previous value
+      const previousStreamInfo = queryClient.getQueryData(queryKeys.stream.vkInfo());
+      
+      // Optimistically update
+      queryClient.setQueryData(queryKeys.stream.vkInfo(), (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            category_id: newCategoryId
+          }
+        };
+      });
+      
+      // Return context for rollback
+      return { previousStreamInfo };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.stream.vkInfo() });
-      toast.success('Категория стрима обновлена');
+      if (!options?.onSuccess) {
+        toast.success('Категория стрима обновлена');
+      }
     },
-    onError: (error: AxiosError) => {
+    onError: (error: AxiosError, newCategoryId, context: { previousStreamInfo?: any } | undefined) => {
+      // Rollback on error
+      if (context?.previousStreamInfo) {
+        queryClient.setQueryData(queryKeys.stream.vkInfo(), context.previousStreamInfo);
+      }
       logger.error('Error updating VK stream category:', error);
-      toast.error('Ошибка обновления категории стрима');
+      if (!options?.onError) {
+        toast.error('Ошибка обновления категории стрима');
+      }
+    },
+    onSettled: () => {
+      // Refetch to ensure consistency
+      queryClient.invalidateQueries({ queryKey: queryKeys.stream.vkInfo() });
     },
     ...options,
   });
@@ -173,6 +309,46 @@ export const useUpdateStream = (options?: UseMutationOptions<any, AxiosError, Re
 
   return useMutation({
     mutationFn: (payload: Record<string, any>) => streamService.updateStream(payload),
+    onMutate: async (newData: Record<string, any>) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: queryKeys.stream.all });
+      
+      // Snapshot previous values
+      const previousTwitchInfo = queryClient.getQueryData(queryKeys.stream.twitchInfo());
+      const previousVkInfo = queryClient.getQueryData(queryKeys.stream.vkInfo());
+      
+      // Optimistically update based on platform
+      if (newData.platform === 'twitch' || newData.platform === 'both') {
+        queryClient.setQueryData(queryKeys.stream.twitchInfo(), (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              ...(newData.title && { title: newData.title }),
+              ...(newData.game_id && { game_id: newData.game_id })
+            }
+          };
+        });
+      }
+      
+      if (newData.platform === 'vk' || newData.platform === 'both') {
+        queryClient.setQueryData(queryKeys.stream.vkInfo(), (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              ...(newData.title && { title: newData.title }),
+              ...(newData.category_id && { category_id: newData.category_id })
+            }
+          };
+        });
+      }
+      
+      // Return context for rollback
+      return { previousTwitchInfo, previousVkInfo };
+    },
     onSuccess: () => {
       // Инвалидируем все stream queries
       queryClient.invalidateQueries({ queryKey: queryKeys.stream.all });
@@ -180,12 +356,23 @@ export const useUpdateStream = (options?: UseMutationOptions<any, AxiosError, Re
         toast.success('Изменения сохранены');
       }
     },
-    onError: (error: AxiosError) => {
+    onError: (error: AxiosError, newData, context: { previousTwitchInfo?: any; previousVkInfo?: any } | undefined) => {
+      // Rollback on error
+      if (context?.previousTwitchInfo) {
+        queryClient.setQueryData(queryKeys.stream.twitchInfo(), context.previousTwitchInfo);
+      }
+      if (context?.previousVkInfo) {
+        queryClient.setQueryData(queryKeys.stream.vkInfo(), context.previousVkInfo);
+      }
       logger.error('Error updating stream:', error);
       if (!options?.onError) {
         const errorMessage = (error.response?.data as any)?.detail || (error.response?.data as any)?.message || 'Не удалось сохранить изменения';
         toast.error(errorMessage);
       }
+    },
+    onSettled: () => {
+      // Refetch to ensure consistency
+      queryClient.invalidateQueries({ queryKey: queryKeys.stream.all });
     },
     ...options,
   });

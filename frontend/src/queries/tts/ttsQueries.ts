@@ -43,17 +43,48 @@ export const useSaveTtsSettings = (options?: UseMutationOptions<any, AxiosError,
 
   return useMutation({
     mutationFn: (settings: Partial<TtsSettings>) => ttsService.saveSettings(settings),
+    onMutate: async (newSettings: Partial<TtsSettings>) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: queryKeys.tts.settings() });
+      
+      // Snapshot previous value
+      const previousSettings = queryClient.getQueryData(queryKeys.tts.settings());
+      
+      // Optimistically update
+      queryClient.setQueryData(queryKeys.tts.settings(), (old: any) => ({
+        ...old,
+        data: {
+          ...(old?.data || {}),
+          ...newSettings
+        }
+      }));
+      
+      // Return context for rollback
+      return { previousSettings };
+    },
     onSuccess: (response) => {
       // Обновляем кэш
       if ((response.data as any)?.success) {
         queryClient.setQueryData(queryKeys.tts.settings(), response.data);
         queryClient.invalidateQueries({ queryKey: queryKeys.tts.all });
       }
-      toast.success('Настройки TTS сохранены');
+      if (!options?.onSuccess) {
+        toast.success('Настройки TTS сохранены');
+      }
     },
-    onError: (error: AxiosError) => {
+    onError: (error: AxiosError, newSettings, context: { previousSettings?: any } | undefined) => {
+      // Rollback on error
+      if (context?.previousSettings) {
+        queryClient.setQueryData(queryKeys.tts.settings(), context.previousSettings);
+      }
       logger.error('Error saving TTS settings:', error);
-      toast.error('Ошибка сохранения настроек TTS');
+      if (!options?.onError) {
+        toast.error('Ошибка сохранения настроек TTS');
+      }
+    },
+    onSettled: () => {
+      // Refetch to ensure consistency
+      queryClient.invalidateQueries({ queryKey: queryKeys.tts.settings() });
     },
     ...options,
   });

@@ -660,10 +660,9 @@ class TTSService:
         try:
             # Проверяем существование голоса в TTS Service
             import httpx
-            import os
-            from constants import DEFAULT_TTS_SERVICE_URL
+            from core.config import settings
             
-            tts_service_url = os.getenv('TTS_SERVICE_URL', DEFAULT_TTS_SERVICE_URL)
+            tts_service_url = settings.tts_service_url
             
             try:
                 async with httpx.AsyncClient(timeout=5.0) as client:

@@ -1,0 +1,83 @@
+# docker-compose.bot.yml
+# Bot Service deployment (Machine 2 - Remote Server)
+# Connects to remote TTS service via Cloudflare Tunnel
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: tts_postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-tts_bot}
+      POSTGRES_USER: ${DB_USER:-tts_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-tts_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Bot Service - Main API
+  bot_service:
+    build:
+      context: ./bot_service
+      dockerfile: Dockerfile.prod
+    container_name: tts_bot_service
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./bot_service/.env
+    environment:
+      # Override with PostgreSQL
+      - DATABASE_URL=postgresql://${DB_USER:-tts_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-tts_bot}
+      # TTS service via Cloudflare Tunnel
+      - TTS_SERVICE_URL=${TTS_SERVICE_URL:-https://tts.yourdomain.com}
+    volumes:
+      - ./bot_service/data:/app/data
+      - ./bot_service/logs:/app/logs
+      - ./bot_service/backups:/app/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend - React UI with Nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        - VITE_BOT_SERVICE_URL=${BACKEND_URL:-https://api.yourdomain.com}
+        - VITE_BOT_SERVICE_WS_URL=${BACKEND_WS_URL:-wss://api.yourdomain.com}
+        - VITE_TTS_SERVICE_URL=${TTS_SERVICE_URL:-https://tts.yourdomain.com}
+    container_name: tts_frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - bot_service
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  default:
+    name: tts_bot_network
+    driver: bridge

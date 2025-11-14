@@ -225,18 +225,6 @@ async def csp_report(request: Request):
     try:
         body = await request.json()
         logger.warning(f"CSP Violation: {body}")
-        
-        # Можно сохранить в БД для дальнейшего анализа
-        # csp_violation = CSPViolation(
-        #     document_uri=body.get('csp-report', {}).get('document-uri'),
-        #     violated_directive=body.get('csp-report', {}).get('violated-directive'),
-        #     original_policy=body.get('csp-report', {}).get('original-policy'),
-        #     blocked_uri=body.get('csp-report', {}).get('blocked-uri'),
-        #     timestamp=datetime.utcnow()
-        # )
-        # db.add(csp_violation)
-        # db.commit()
-        
         return {"success": True, "message": "CSP violation reported"}
     except Exception as e:
         logger.error(f"Error processing CSP report: {e}")

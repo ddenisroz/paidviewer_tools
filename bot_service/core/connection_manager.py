@@ -176,6 +176,40 @@ class ConnectionManager(ConnectionManagerCore):
             del self.active_connections[user_id]
             logger.debug(f"Removed disconnected user: {user_id}")
 
+    async def broadcast_settings_update(self, user_id: str, setting_type: str, settings: dict):
+        """Broadcast settings update to user's connections"""
+        message = {
+            "type": f"{setting_type}_updated",
+            "data": {
+                "settings": settings
+            }
+        }
+        await self.send_to_user(user_id, message)
+        logger.debug(f"Broadcasted {setting_type} update to user {user_id}")
+
+    async def broadcast_stream_info_update(self, user_id: str, platform: str, stream_info: dict):
+        """Broadcast stream info update to user's connections"""
+        message = {
+            "type": "stream_info_updated",
+            "data": {
+                "platform": platform,
+                "stream_info": stream_info
+            }
+        }
+        await self.send_to_user(user_id, message)
+        logger.debug(f"Broadcasted stream info update to user {user_id}")
+
+    async def broadcast_tts_status_change(self, user_id: str, enabled: bool):
+        """Broadcast TTS status change to user's connections"""
+        message = {
+            "type": "tts_status_changed",
+            "data": {
+                "enabled": enabled
+            }
+        }
+        await self.send_to_user(user_id, message)
+        logger.debug(f"Broadcasted TTS status change to user {user_id}: {enabled}")
+
     def register_client_connection(self, user_id: str, connection_type: str):
         """Зарегистрировать клиентское соединение"""
         logger.info(f"Client connection registered: {user_id} ({connection_type})")

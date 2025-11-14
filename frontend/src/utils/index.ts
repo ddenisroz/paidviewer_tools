@@ -1,5 +1,7 @@
 import { VALIDATION, TIMEOUTS, REGEX } from '../constants';
 import { logger } from '../utils/prodLogger';
+import { formatDate as formatDateUtil, formatRelativeTime as formatRelativeTimeUtil } from './formatUtils';
+import { capitalize as capitalizeUtil, truncateString as truncateUtil, stripHtml as stripHtmlUtil } from './stringUtils';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -99,54 +101,20 @@ export const formatString = (template: string, values: Record<string, string | n
   });
 };
 
-export const capitalize = (str: string): string => {
-  if (!str) return str;
-  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
-};
+// Re-export capitalize from stringUtils to avoid duplication
+export const capitalize = capitalizeUtil;
 
-export const truncate = (str: string, maxLength: number): string => {
-  if (!str || str.length <= maxLength) return str;
-  return str.slice(0, Math.max(0, maxLength - 3)) + '...';
-};
+// Re-export truncate from stringUtils to avoid duplication
+export const truncate = truncateUtil;
 
-export const stripHtml = (html: string): string => {
-  if (!html) return '';
-  return html.replace(/<[^>]*>/g, '');
-};
+// Re-export stripHtml from stringUtils to avoid duplication
+export const stripHtml = stripHtmlUtil;
 
-export const formatDate = (date: Date | string | number, options: Intl.DateTimeFormatOptions = {}): string => {
-  if (!date) return '';
-  const dateObj = new Date(date);
-  if (Number.isNaN(dateObj.getTime())) return '';
-  const defaultOptions: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    ...options,
-  };
-  return dateObj.toLocaleDateString('ru-RU', defaultOptions);
-};
+// Re-export formatDate from formatUtils to avoid duplication
+export const formatDate = formatDateUtil;
 
-export const getRelativeTime = (date: Date | string | number): string => {
-  if (!date) return '';
-  const dateObj = new Date(date);
-  if (Number.isNaN(dateObj.getTime())) return '';
-  const now = new Date();
-  const diffInMs = now.getTime() - dateObj.getTime();
-  const diffInSeconds = Math.floor(diffInMs / 1000);
-  const diffInMinutes = Math.floor(diffInSeconds / 60);
-  const diffInHours = Math.floor(diffInMinutes / 60);
-  const diffInDays = Math.floor(diffInHours / 24);
-
-  if (diffInSeconds < 60) return 'только что';
-  if (diffInMinutes < 60) return `${diffInMinutes} мин. назад`;
-  if (diffInHours < 24) return `${diffInHours} ч. назад`;
-  if (diffInDays < 30) return `${diffInDays} дн. назад`;
-
-  return formatDate(date, { year: 'numeric', month: 'short', day: 'numeric' });
-};
+// Re-export getRelativeTime from formatUtils to avoid duplication
+export const getRelativeTime = formatRelativeTimeUtil;
 
 export const createTimer = (callback: () => void, delay: number): (() => void) => {
   const timerId = setTimeout(callback, delay);

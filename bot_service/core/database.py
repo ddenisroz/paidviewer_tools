@@ -28,18 +28,19 @@ if not IS_POSTGRESQL:
 
 try:
     # ╨б╨╛╨╖╨┤╨░╨╡╨╝ ╨┤╨▓╨╕╨╢╨╛╨║ SQLAlchemy для PostgreSQL
+    # ✅ TASK 7.4: Optimized connection pooling for better performance
     # PostgreSQL: connection pooling ╨┤╨╗╤П ╨╗╤Г╤З╤И╨╡╨╣ ╨┐╤А╨╛╨╕╨╖╨▓╨╛╨┤╨╕╤В╨╡╨╗╤М╨╜╨╛╤Б╤В╨╕
     engine = create_engine(
         DATABASE_URL,
-        pool_size=20,          # ╨С╨░╨╖╨╛╨▓╤Л╨╣ ╤А╨░╨╖╨╝╨╡╤А ╨┐╤Г╨╗╨░ ╤Б╨╛╨╡╨┤╨╕╨╜╨╡╨╜╨╕╨╣
-        max_overflow=40,       # ╨Ф╨╛╨┐╨╛╨╗╨╜╨╕╤В╨╡╨╗╤М╨╜╤Л╨╡ ╤Б╨╛╨╡╨┤╨╕╨╜╨╡╨╜╨╕╤П ╨┐╤А╨╕ ╨╜╨░╨│╤А╤Г╨╖╨║╨╡
-        pool_pre_ping=True,    # ╨Я╤А╨╛╨▓╨╡╤А╨║╨░ ╤Б╨╛╨╡╨┤╨╕╨╜╨╡╨╜╨╕╨╣ ╨┐╨╡╤А╨╡╨┤ ╨╕╤Б╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╨╜╨╕╨╡╨╝
-        pool_recycle=3600,     # ╨Я╨╡╤А╨╡╨╕╤Б╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╨╜╨╕╨╡ ╤Б╨╛╨╡╨┤╨╕╨╜╨╡╨╜╨╕╨╣ ╨║╨░╨╢╨┤╤Л╨╣ ╤З╨░╤Б
+        pool_size=20,          # ╨С╨░╨╖╨╛╨▓╤Л╨╣ ╤А╨░╨╖╨╝╨╡╤А ╨┐╤Г╨╗╨░ ╤Б╨╛╨╡╨┤╨╕╨╜╨╡╨╜╨╕╨╣ (20 persistent connections)
+        max_overflow=40,       # ╨Ф╨╛╨┐╨╛╨╗╨╜╨╕╤В╨╡╨╗╤М╨╜╤Л╨╡ ╤Б╨╛╨╡╨┤╨╕╨╜╨╡╨╜╨╕╤П ╨┐╤А╨╕ ╨╜╨░╨│╤А╤Г╨╖╨║╨╡ (up to 60 total)
+        pool_pre_ping=True,    # ╨Я╤А╨╛╨▓╨╡╤А╨║╨░ ╤Б╨╛╨╡╨┤╨╕╨╜╨╡╨╜╨╕╨╣ ╨┐╨╡╤А╨╡╨┤ ╨╕╤Б╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╨╜╨╕╨╡╨╝ (detect stale connections)
+        pool_recycle=3600,     # ╨Я╨╡╤А╨╡╨╕╤Б╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╨╜╨╕╨╡ ╤Б╨╛╨╡╨┤╨╕╨╜╨╡╨╜╨╕╨╣ ╨║╨░╨╢╨┤╤Л╨╣ ╤З╨░╤Б (prevent connection timeouts)
         pool_reset_on_return='commit',  # ✅ ОПТИМИЗАЦИЯ: Сбрасывать транзакции при возврате в пул
         echo=False,
         # ✅ ОПТИМИЗАЦИЯ: Настройки для PostgreSQL
         connect_args={
-            "connect_timeout": 10,  # Таймаут подключения
+            "connect_timeout": 10,  # Таймаут подключения (10 seconds)
             "application_name": "bot_service",  # Имя приложения для мониторинга
             "options": "-c statement_timeout=30000"  # Таймаут выполнения запросов (30 сек)
         }
@@ -64,6 +65,19 @@ try:
         id = Column(Integer, primary_key=True, index=True)
         is_admin = Column(Boolean, default=False)
         is_active = Column(Boolean, default=True)
+        
+        # Application role (admin, user, guest)
+        role = Column(String, default='user', nullable=False, index=True)  # 'admin', 'user', 'guest'
+        
+        # Platform-specific roles (Twitch)
+        twitch_is_broadcaster = Column(Boolean, default=False)  # Channel owner on Twitch
+        twitch_is_moderator = Column(Boolean, default=False)    # Moderator on Twitch
+        twitch_is_vip = Column(Boolean, default=False)          # VIP on Twitch
+        twitch_is_subscriber = Column(Boolean, default=False)   # Subscriber on Twitch
+        
+        # Platform-specific roles (VK)
+        vk_is_owner = Column(Boolean, default=False)            # Channel owner on VK
+        vk_is_moderator = Column(Boolean, default=False)        # Moderator on VK
 
         obs_token = Column(String, nullable=True)  # OBS ╤В╨╛╨║╨╡╨╜ ╨┤╨╗╤П ╨┐╨╛╤Б╤В╨╛╤П╨╜╨╜╨╛╨╣ ╤Б╤Б╤Л╨╗╨║╨╕
         is_blocked = Column(Boolean, default=False)  # ╨Ч╨░╨▒╨╗╨╛╨║╨╕╤А╨╛╨▓╨░╨╜ ╨╗╨╕ ╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╤М

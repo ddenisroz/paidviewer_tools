@@ -5,7 +5,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { API_BASE_URL, TTS_SERVICE_URL } from '../../constants';
 import { logger } from '../../utils/prodLogger';
-import { getErrorMessage } from '../../utils/errorMessages';
+import { handleApiError, shouldRetryRequest } from '../../utils/apiErrorHandler';
 
 /**
  * Конфигурация для создания API клиента
@@ -46,7 +46,7 @@ function createApiClient({ baseURL, withCredentials = true, timeout = 30000 }: A
     }
   );
 
-  // Response interceptor - обработка ошибок
+  // Response interceptor - обработка ошибок и retry logic
   client.interceptors.response.use(
     (response: AxiosResponse) => {
       // Логирование ответов в dev режиме
@@ -55,18 +55,8 @@ function createApiClient({ baseURL, withCredentials = true, timeout = 30000 }: A
       }
       return response;
     },
-    (error: AxiosError) => {
-      // Централизованная обработка ошибок
-      const errorMessage = getErrorMessage(error);
-      
-      // Логирование ошибок
-      logger.error('[API] Response error:', {
-        url: error.config?.url,
-        method: error.config?.method,
-        status: error.response?.status,
-        message: errorMessage,
-        error,
-      });
+    async (error: AxiosError) => {
+      const originalRequest = error.config as any;
 
       // Обработка 401 - не авторизован
       if (error.response?.status === 401) {
@@ -81,7 +71,41 @@ function createApiClient({ baseURL, withCredentials = true, timeout = 30000 }: A
           // Перенаправляем на страницу логина только для основного приложения
           window.location.href = '/login';
         }
+        return Promise.reject(error);
       }
+
+      // Retry logic с экспоненциальной задержкой
+      if (!originalRequest._retry) {
+        originalRequest._retry = 0;
+      }
+
+      const maxRetries = 2;
+      const shouldRetry = shouldRetryRequest(error) && originalRequest._retry < maxRetries;
+
+      if (shouldRetry) {
+        originalRequest._retry += 1;
+        
+        // Вычисляем задержку с экспоненциальным ростом
+        const delay = Math.min(1000 * Math.pow(2, originalRequest._retry - 1), 10000);
+        
+        logger.debug(`[API] Retry attempt ${originalRequest._retry}/${maxRetries} after ${delay}ms`);
+        
+        // Ждем перед повторной попыткой
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        // Повторяем запрос
+        return client(originalRequest);
+      }
+
+      // Если не повторяем или исчерпали попытки, обрабатываем ошибку
+      // Не показываем toast здесь - это делается в компонентах через handleApiError
+      // Просто логируем
+      logger.error('[API] Response error:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        status: error.response?.status,
+        retries: originalRequest._retry || 0,
+      });
 
       // Пробрасываем ошибку дальше для обработки в компонентах
       return Promise.reject(error);

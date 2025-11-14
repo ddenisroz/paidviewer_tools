@@ -1,32 +1,90 @@
-fastapi
-uvicorn
-python-dotenv
-sqlalchemy
-alembic
-aiohttp
-aiofiles
-httpx
-twitchio
-pytube
-PyJWT
-cryptography
-gtts
-pydub
+# === CORE FRAMEWORK === (Updated: 2025-11-15)
+fastapi==0.121.2
+uvicorn==0.38.0
+starlette==0.48.0
+pydantic==2.10.6
+pydantic-core==2.27.2
+pydantic-settings==2.11.0
+
+# === DATABASE === (Updated: 2025-11-15)
+sqlalchemy==2.0.44
+alembic==1.17.1
+psycopg2-binary==2.9.11
+
+# === SECURITY & AUTH === (Updated: 2025-11-15)
+cryptography==46.0.3
+python-jose[cryptography]==3.5.0
+PyJWT==2.10.1
+passlib==1.7.4
+bcrypt==5.0.0
+
+# === ASYNC & NETWORKING === (Updated: 2025-11-15)
+aiohttp==3.13.2
+aiofiles==24.1.0
+httpx==0.28.1
+httpcore==1.0.9
+
+# === CONFIGURATION === (Updated: 2025-11-15)
+python-dotenv==1.2.1
+
+# === LOGGING & MONITORING === (Updated: 2025-11-15)
+structlog==25.5.0
+sentry-sdk==2.44.0
+prometheus-client==0.23.1
+psutil==7.1.0
+
+# === RATE LIMITING === (Updated: 2025-11-15)
+slowapi==0.1.9
+limits==5.6.0
+cachetools==6.2.0
+
+# === CHAT BOTS ===
+twitchio==2.10.0
 # redis - removed, using database instead
 # aioredis - removed, using database instead
-prometheus-client
-structlog
-psutil
 
-# === DATABASE ===
-# PostgreSQL driver (required)
-psycopg2-binary>=2.9.9
+# === TTS & AUDIO ===
+gtts==2.5.4
+pydub==0.25.1
 
-# Modern security and configuration libraries
-cryptography==41.0.7
-python-jose[cryptography]
-# === RATE LIMITING ===
-slowapi>=0.1.9
-limits>=2.3
-pydantic-settings
-cachetools
+# === AI/ML === (Updated: 2025-11-15)
+torch==2.6.0+cu124
+torchaudio==2.6.0+cu124
+torchvision==0.21.0+cu124
+transformers==4.57.1
+accelerate==1.11.0
+faster-whisper==1.2.1
+ctranslate2==4.6.1
+onnxruntime==1.23.1
+
+# === F5-TTS DEPENDENCIES ===
+f5-tts==1.1.9
+gradio==5.49.0
+einops==0.8.1
+vocos==0.1.0
+librosa==0.11.0
+soundfile==0.13.1
+
+# === GOOGLE CLOUD === (Updated: 2025-11-15)
+google-api-core==2.28.1
+google-auth==2.43.0
+google-cloud-core==2.5.0
+google-cloud-storage==2.19.0
+
+# === UTILITIES ===
+pytube==15.0.0
+requests==2.32.5
+certifi==2025.11.12
+click==8.1.8
+typer==0.20.0
+rich==13.9.4
+
+# === TESTING === (Updated: 2025-11-15)
+pytest==8.4.2
+pytest-asyncio==1.3.0
+pytest-cov==7.0.0
+pytest-mock==3.15.1
+coverage==7.11.3
+
+# === DEVELOPMENT === (Updated: 2025-11-15)
+ruff==0.14.5

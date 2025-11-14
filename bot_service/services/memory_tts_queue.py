@@ -2,12 +2,17 @@
 """
 Простая очередь TTS задач в памяти
 Заменяет Redis TTS Queue
+
+Task 5.4: Добавлен контроль генерации TTS на основе активных соединений
+- Проверка is_user_connected() перед добавлением задачи
+- Отключение TTS при отключении пользователя
+- Повторное включение при переподключении
 """
 import asyncio
 import logging
 import time
 import uuid
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Set
 from dataclasses import dataclass
 from enum import Enum
 
@@ -39,6 +44,10 @@ class TTSTask:
 class MemoryTTSQueue:
     """
     Простая очередь TTS задач в памяти
+    
+    Task 5.4: Добавлен контроль на основе активных соединений
+    - disabled_users: Set пользователей с отключенной генерацией TTS
+    - Проверка соединений перед добавлением задачи
     """
     
     def __init__(self, max_size: int = 1000):
@@ -47,6 +56,8 @@ class MemoryTTSQueue:
         self.pending_queue = asyncio.Queue(maxsize=max_size)
         self.completed_tasks: Dict[str, TTSTask] = {}
         self._running = False
+        # Task 5.4: Отслеживание пользователей с отключенной генерацией TTS
+        self.disabled_users: Set[int] = set()
         
     async def start(self):
         """Запуск очереди"""
@@ -74,6 +85,8 @@ class MemoryTTSQueue:
         """
         Добавить задачу в очередь
         
+        Task 5.4: Добавлена проверка активных соединений перед добавлением задачи
+        
         Args:
             user_id: ID пользователя
             text: Текст для синтеза
@@ -85,12 +98,25 @@ class MemoryTTSQueue:
             
         Returns:
             str: ID задачи
+            
+        Raises:
+            RuntimeError: Если очередь не запущена, переполнена, или пользователь не подключен
         """
         if not self._running:
             raise RuntimeError("Queue is not running")
             
         if self.pending_queue.qsize() >= self.max_size:
             raise RuntimeError("Queue is full")
+        
+        # Task 5.4: Проверка активных соединений пользователя
+        if not self.is_user_connected(user_id):
+            logger.info(f"Skipping TTS for user {user_id} - no active connections")
+            raise RuntimeError(f"User {user_id} has no active connections")
+        
+        # Task 5.4: Проверка, не отключена ли генерация TTS для пользователя
+        if user_id in self.disabled_users:
+            logger.info(f"Skipping TTS for user {user_id} - TTS generation disabled")
+            raise RuntimeError(f"TTS generation disabled for user {user_id}")
             
         task_id = str(uuid.uuid4())
         
@@ -274,6 +300,51 @@ class MemoryTTSQueue:
                 
         if old_tasks:
             logger.info(f"Cleaned up {len(old_tasks)} old tasks")
+    
+    def is_user_connected(self, user_id: int) -> bool:
+        """
+        Task 5.4: Проверить, есть ли у пользователя активные соединения
+        
+        Args:
+            user_id: ID пользователя
+            
+        Returns:
+            bool: True если пользователь подключен
+        """
+        try:
+            from services.memory_websocket_manager import memory_websocket_manager
+            
+            # Проверяем наличие активных соединений через WebSocket Manager
+            return user_id in memory_websocket_manager.user_connections and \
+                   len(memory_websocket_manager.user_connections[user_id]) > 0
+        except Exception as e:
+            logger.error(f"Error checking user connection: {e}")
+            # В случае ошибки разрешаем генерацию (fail-open)
+            return True
+    
+    async def disable_for_user(self, user_id: int):
+        """
+        Task 5.4: Отключить генерацию TTS для пользователя
+        
+        Вызывается когда пользователь полностью отключается (все соединения закрыты)
+        
+        Args:
+            user_id: ID пользователя
+        """
+        self.disabled_users.add(user_id)
+        logger.info(f"Disabled TTS generation for user {user_id}")
+    
+    async def enable_for_user(self, user_id: int):
+        """
+        Task 5.4: Включить генерацию TTS для пользователя
+        
+        Вызывается когда пользователь переподключается
+        
+        Args:
+            user_id: ID пользователя
+        """
+        self.disabled_users.discard(user_id)
+        logger.info(f"Enabled TTS generation for user {user_id}")
 
 # Глобальный экземпляр
 memory_tts_queue = MemoryTTSQueue()

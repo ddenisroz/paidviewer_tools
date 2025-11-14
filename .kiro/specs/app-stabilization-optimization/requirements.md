@@ -35,11 +35,11 @@ This specification addresses the stabilization and optimization of the TTS_TTV_0
 
 #### Acceptance Criteria
 
-1. THE Application SHALL remove all unused imports from Python and JavaScript files
-2. THE Application SHALL delete files that are not referenced by any active code path
-3. THE Application SHALL consolidate duplicate utility functions into single shared implementations
-4. THE Application SHALL remove commented-out code blocks that exceed 5 lines
-5. THE Application SHALL eliminate dead code paths identified by static analysis tools
+1. THE Backend SHALL remove all unused imports from Python files and THE Frontend SHALL remove all unused imports from JavaScript files
+2. THE Backend SHALL delete Python files that are not referenced by any active code path and THE Frontend SHALL delete JavaScript files that are not referenced by any active code path
+3. THE Backend SHALL consolidate duplicate utility functions into single shared implementations and THE Frontend SHALL consolidate duplicate utility functions into single shared implementations
+4. THE Backend SHALL remove commented-out code blocks that exceed 5 lines and THE Frontend SHALL remove commented-out code blocks that exceed 5 lines
+5. THE Backend SHALL eliminate dead code paths identified by static analysis tools and THE Frontend SHALL eliminate dead code paths identified by static analysis tools
 
 ### Requirement 3
 
@@ -72,10 +72,10 @@ This specification addresses the stabilization and optimization of the TTS_TTV_0
 #### Acceptance Criteria
 
 1. WHEN a user toggles a setting in the Frontend, THE Frontend SHALL send the update to the Backend and wait for confirmation before updating the UI
-2. WHEN the Backend updates a setting, THE Backend SHALL broadcast the change via WebSocket to all connected Frontend clients
-3. THE Frontend SHALL reconcile state on reconnection by fetching current settings from the Backend
-4. THE Application SHALL prevent race conditions by implementing optimistic updates with rollback on failure
-5. THE Frontend SHALL display a visual indicator when settings are out of sync with the Backend
+2. WHEN the Backend updates a setting, THE Backend SHALL broadcast the change via WebSocket to all connected Frontend clients within 500 milliseconds
+3. WHEN the Frontend reconnects after disconnection, THE Frontend SHALL reconcile state by fetching current settings from the Backend
+4. THE Frontend SHALL implement optimistic updates with automatic rollback on failure to prevent race conditions
+5. WHEN settings are out of sync with the Backend, THE Frontend SHALL display a visual indicator to the user
 
 ### Requirement 6
 
@@ -85,9 +85,9 @@ This specification addresses the stabilization and optimization of the TTS_TTV_0
 
 1. THE Backend SHALL validate all API request payloads using Pydantic models before processing
 2. THE Frontend SHALL validate all form inputs using zod schemas before submission
-3. THE Backend SHALL return detailed validation error messages with field-level information
-4. THE Frontend SHALL display validation errors inline next to the relevant form fields
-5. THE Application SHALL sanitize all user-generated content to prevent XSS attacks
+3. WHEN validation fails, THE Backend SHALL return detailed validation error messages with field-level information
+4. WHEN validation fails, THE Frontend SHALL display validation errors inline next to the relevant form fields
+5. THE Backend SHALL sanitize all user-generated content to prevent XSS attacks and THE Frontend SHALL sanitize all user-generated content to prevent XSS attacks
 
 ### Requirement 7
 
@@ -97,9 +97,9 @@ This specification addresses the stabilization and optimization of the TTS_TTV_0
 
 1. THE Frontend SHALL limit re-renders by using React.memo and useMemo for expensive computations
 2. THE Frontend SHALL debounce user input handlers to reduce API calls by at least 80 percent
-3. THE Backend SHALL implement connection pooling for database access to reduce overhead
-4. THE Backend SHALL use async/await patterns to prevent blocking operations
-5. THE Application SHALL monitor memory usage and log warnings when usage exceeds 500 MB
+3. THE Backend SHALL implement connection pooling for database access with minimum pool size of 5 connections
+4. THE Backend SHALL use async/await patterns for all I/O operations to maintain responsiveness
+5. WHEN memory usage exceeds 500 MB, THE Backend SHALL log warnings with current memory statistics
 
 ### Requirement 8
 
@@ -107,11 +107,11 @@ This specification addresses the stabilization and optimization of the TTS_TTV_0
 
 #### Acceptance Criteria
 
-1. THE Backend SHALL log all errors with timestamp, user ID, endpoint, and stack trace
-2. THE Frontend SHALL send critical errors to the Backend logging endpoint for centralized tracking
-3. THE Application SHALL implement log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL) consistently
+1. WHEN an error occurs, THE Backend SHALL log the error with timestamp, user ID, endpoint, and stack trace
+2. WHEN a critical error occurs, THE Frontend SHALL send the error to the Backend logging endpoint for centralized tracking
+3. THE Backend SHALL implement log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL) consistently and THE Frontend SHALL implement log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL) consistently
 4. THE Backend SHALL rotate log files daily and retain logs for 30 days
-5. THE Application SHALL redact sensitive information (tokens, passwords) from all log outputs
+5. THE Backend SHALL redact sensitive information (tokens, passwords) from all log outputs and THE Frontend SHALL redact sensitive information (tokens, passwords) from all log outputs
 
 ### Requirement 9
 
@@ -131,8 +131,8 @@ This specification addresses the stabilization and optimization of the TTS_TTV_0
 
 #### Acceptance Criteria
 
-1. THE Application SHALL audit all npm packages and remove those not imported in any file
-2. THE Application SHALL audit all Python packages and remove those not imported in any file
-3. THE Application SHALL update all dependencies to their latest stable versions
-4. THE Application SHALL replace heavy dependencies with lighter alternatives where possible
-5. THE Application SHALL document the purpose of each remaining dependency in package.json and requirements.txt
+1. THE Frontend SHALL audit all npm packages and remove those not imported in any file
+2. THE Backend SHALL audit all Python packages and remove those not imported in any file
+3. THE Frontend SHALL update all npm dependencies to their latest stable versions and THE Backend SHALL update all Python dependencies to their latest stable versions
+4. THE Frontend SHALL replace heavy dependencies with lighter alternatives where possible and THE Backend SHALL replace heavy dependencies with lighter alternatives where possible
+5. THE Frontend SHALL document the purpose of each remaining dependency in package.json and THE Backend SHALL document the purpose of each remaining dependency in requirements.txt

@@ -80,6 +80,8 @@ class MemoryWebSocketManager:
         """
         Добавить WebSocket соединение
         
+        Task 5.4: Добавлена логика включения TTS при подключении пользователя
+        
         Args:
             websocket: WebSocket соединение
             user_id: ID пользователя
@@ -104,6 +106,7 @@ class MemoryWebSocketManager:
         self.connections[conn_id] = connection
         
         # Добавляем в индексы
+        is_first_connection = user_id not in self.user_connections
         if user_id not in self.user_connections:
             self.user_connections[user_id] = set()
         self.user_connections[user_id].add(conn_id)
@@ -112,12 +115,18 @@ class MemoryWebSocketManager:
             self.channel_connections[channel] = set()
         self.channel_connections[channel].add(conn_id)
         
+        # Task 5.4: Если это первое соединение пользователя, включаем TTS
+        if is_first_connection:
+            await self._handle_user_connect(user_id)
+        
         logger.info(f"WebSocket connection added: {conn_id}")
         return conn_id
         
     async def remove_connection(self, conn_id: str):
         """
         Удалить WebSocket соединение
+        
+        Task 5.4: Добавлена логика отключения TTS при полном отключении пользователя
         
         Args:
             conn_id: ID соединения
@@ -126,12 +135,16 @@ class MemoryWebSocketManager:
             return
             
         connection = self.connections[conn_id]
+        user_id = connection.user_id
         
         # Удаляем из индексов
-        if connection.user_id in self.user_connections:
-            self.user_connections[connection.user_id].discard(conn_id)
-            if not self.user_connections[connection.user_id]:
-                del self.user_connections[connection.user_id]
+        if user_id in self.user_connections:
+            self.user_connections[user_id].discard(conn_id)
+            # Task 5.4: Если у пользователя больше нет соединений, отключаем TTS
+            if not self.user_connections[user_id]:
+                del self.user_connections[user_id]
+                # Отключаем генерацию TTS для этого пользователя
+                await self._handle_user_disconnect(user_id)
                 
         if connection.channel in self.channel_connections:
             self.channel_connections[connection.channel].discard(conn_id)
@@ -222,8 +235,28 @@ class MemoryWebSocketManager:
         for conn_id in disconnected:
             await self.remove_connection(conn_id)
                 
+    async def handle_ping(self, conn_id: str):
+        """
+        Task 6.4: Обработка ping от клиента
+        
+        Args:
+            conn_id: ID соединения
+        """
+        if conn_id in self.connections:
+            connection = self.connections[conn_id]
+            connection.last_ping = time.time()
+            try:
+                await connection.websocket.send_json({"type": "pong"})
+            except Exception as e:
+                logger.error(f"Error sending pong to {conn_id}: {e}")
+                await self.remove_connection(conn_id)
+    
     async def _ping_loop(self):
-        """Цикл ping для проверки соединений"""
+        """
+        Task 6.4: Цикл проверки соединений
+        
+        Проверяет активность соединений и удаляет неактивные
+        """
         while self._running:
             try:
                 current_time = time.time()
@@ -232,12 +265,18 @@ class MemoryWebSocketManager:
                 for conn_id, connection in self.connections.items():
                     if not connection.is_active:
                         continue
-                        
-                    # Проверяем, нужно ли отправить ping
-                    if current_time - connection.last_ping > self._ping_interval:
+                    
+                    # Проверяем время последнего ping (60 секунд таймаут)
+                    time_since_last_ping = current_time - connection.last_ping
+                    if time_since_last_ping > 60:
+                        logger.warning(f"Connection {conn_id} inactive for {time_since_last_ping}s, removing")
+                        inactive_connections.append(conn_id)
+                        continue
+                    
+                    # Отправляем ping каждые 30 секунд
+                    if time_since_last_ping > self._ping_interval:
                         try:
-                            # FastAPI WebSocket не имеет метода ping, используем send_text
-                            await connection.websocket.send_text('{"type": "ping"}')
+                            await connection.websocket.send_json({"type": "ping"})
                             connection.last_ping = current_time
                         except Exception as e:
                             logger.warning(f"Ping failed for {conn_id}: {e}")
@@ -299,6 +338,50 @@ class MemoryWebSocketManager:
                 })
                 
         return connections
+    
+    def is_user_connected(self, user_id: int) -> bool:
+        """
+        Task 5.4: Проверить, есть ли у пользователя активные соединения
+        
+        Args:
+            user_id: ID пользователя
+            
+        Returns:
+            bool: True если пользователь подключен
+        """
+        return user_id in self.user_connections and len(self.user_connections[user_id]) > 0
+    
+    async def _handle_user_connect(self, user_id: int):
+        """
+        Task 5.4: Обработка подключения пользователя
+        
+        Включает генерацию TTS для пользователя
+        
+        Args:
+            user_id: ID пользователя
+        """
+        try:
+            from services.memory_tts_queue import memory_tts_queue
+            await memory_tts_queue.enable_for_user(user_id)
+            logger.info(f"User {user_id} connected - TTS generation enabled")
+        except Exception as e:
+            logger.error(f"Error handling user connect: {e}")
+    
+    async def _handle_user_disconnect(self, user_id: int):
+        """
+        Task 5.4: Обработка полного отключения пользователя
+        
+        Отключает генерацию TTS когда у пользователя не осталось активных соединений
+        
+        Args:
+            user_id: ID пользователя
+        """
+        try:
+            from services.memory_tts_queue import memory_tts_queue
+            await memory_tts_queue.disable_for_user(user_id)
+            logger.info(f"User {user_id} fully disconnected - TTS generation disabled")
+        except Exception as e:
+            logger.error(f"Error handling user disconnect: {e}")
 
 # Глобальный экземпляр
 memory_websocket_manager = MemoryWebSocketManager()

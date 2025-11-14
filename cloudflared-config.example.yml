@@ -1,0 +1,26 @@
+# Cloudflare Tunnel Configuration Example
+# Copy this file to cloudflared-config.yml and fill in your values
+# Get your tunnel credentials from: https://dash.cloudflare.com/
+
+# Your tunnel ID (get from Cloudflare dashboard)
+tunnel: your-tunnel-id-here
+
+# Path to credentials file
+credentials-file: /etc/cloudflared/credentials.json
+
+# Ingress rules - define what traffic goes where
+ingress:
+  # Route tts.yourdomain.com to TTS service
+  - hostname: tts.yourdomain.com
+    service: http://tts_service:8001
+    # OR for TTS Simple:
+    # service: http://tts_service_simple:8001
+  
+  # Catch-all rule (required)
+  - service: http_status:404
+
+# Optional: Logging
+# loglevel: info
+
+# Optional: Metrics
+# metrics: 0.0.0.0:2000

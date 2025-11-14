@@ -1,0 +1,63 @@
+# docker-compose.tts-simple.yml
+# TTS Service Simple - Lightweight personal TTS with F5-TTS
+# Machine 1 - Local PC with GPU + Cloudflare Tunnel
+# No Redis required - perfect for single user
+
+version: '3.8'
+
+services:
+  # TTS Service Simple - Personal TTS
+  tts_service_simple:
+    build:
+      context: ./tts_service_simple
+      dockerfile: Dockerfile
+    container_name: tts_service_simple
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./tts_service_simple/.env
+    environment:
+      - TTS_SIMPLE_PORT=8001
+      - F5_TTS_DEVICE=cuda
+      - GLOBAL_VOICES_REPO=${GLOBAL_VOICES_REPO:-https://tts-voices.example.com}
+    volumes:
+      - ./tts_service_simple:/app
+      - ./models/f5_tts:/app/models
+      - ./voices:/app/voices
+      - ./audio:/app/audio
+      - ./tts_service_simple/logs:/app/logs
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Cloudflare Tunnel for secure remote access
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared-config.yml:/etc/cloudflared/config.yml:ro
+      - ./cloudflared-credentials.json:/etc/cloudflared/credentials.json:ro
+    restart: unless-stopped
+    depends_on:
+      - tts_service_simple
+
+volumes:
+  tts_cache:
+    driver: local
+
+networks:
+  default:
+    name: tts_simple_network
+    driver: bridge

@@ -3,6 +3,7 @@ import { WS_BASE_URL } from '../constants';
 import { WEBSOCKET_CONSTANTS } from '../constants/websocket';
 
 type MessageHandler = (message: any) => void;
+type ConnectionStatusHandler = (status: 'connected' | 'disconnected' | 'reconnecting' | 'failed') => void;
 
 class SharedWebSocketManager {
   private ws: WebSocket | null;
@@ -13,12 +14,16 @@ class SharedWebSocketManager {
   private maxReconnectAttempts: number;
   private reconnectTimeout: ReturnType<typeof setTimeout> | null;
   private messageHandlers: Set<MessageHandler>;
+  private connectionStatusHandlers: Set<ConnectionStatusHandler>;
   private leaderHeartbeatInterval: ReturnType<typeof setInterval> | null;
   private leaderCheckInterval: ReturnType<typeof setInterval> | null;
+  private wsHeartbeatInterval: ReturnType<typeof setInterval> | null;
   private lastLeaderHeartbeat: number;
+  private lastWsHeartbeat: number;
   private leaderResponseReceived: boolean;
   public userId?: string | number;
   private logger: Logger;
+  private connectionStatus: 'connected' | 'disconnected' | 'reconnecting' | 'failed';
 
   constructor() {
     this.ws = null;
@@ -29,10 +34,14 @@ class SharedWebSocketManager {
     this.maxReconnectAttempts = WEBSOCKET_CONSTANTS.RECONNECT.MAX_ATTEMPTS;
     this.reconnectTimeout = null;
     this.messageHandlers = new Set();
+    this.connectionStatusHandlers = new Set();
     this.leaderHeartbeatInterval = null;
     this.leaderCheckInterval = null;
+    this.wsHeartbeatInterval = null;
     this.lastLeaderHeartbeat = Date.now();
+    this.lastWsHeartbeat = Date.now();
     this.leaderResponseReceived = false;
+    this.connectionStatus = 'disconnected';
     this.logger = new Logger('SHARED_WS');
     this.logger.info(`[${this.tabId}] Tab initialized`);
   }
@@ -70,9 +79,12 @@ class SharedWebSocketManager {
     this.isLeader = true;
     this.logger.info(`[${this.tabId}] 👑 Became LEADER - opening WebSocket`);
     this._connectWebSocket();
+    
+    // Leader heartbeat to other tabs (every 2 seconds)
     this.leaderHeartbeatInterval = setInterval(() => {
       this.channel?.postMessage({ type: 'leader_heartbeat', tabId: this.tabId, timestamp: Date.now() });
     }, 2000);
+    
     this.channel?.postMessage({ type: 'leader_elected', tabId: this.tabId });
   }
 
@@ -80,14 +92,23 @@ class SharedWebSocketManager {
     if (!this.isLeader) return;
     this.isLeader = false;
     this.logger.info(`[${this.tabId}] Resigned as leader`);
+    
+    // Clear all intervals
     if (this.leaderHeartbeatInterval) {
       clearInterval(this.leaderHeartbeatInterval);
       this.leaderHeartbeatInterval = null;
     }
+    if (this.wsHeartbeatInterval) {
+      clearInterval(this.wsHeartbeatInterval);
+      this.wsHeartbeatInterval = null;
+    }
+    
+    // Close WebSocket
     if (this.ws) {
       this.ws.close();
       this.ws = null;
     }
+    
     this.channel?.postMessage({ type: 'leader_resigned', tabId: this.tabId });
   }
 
@@ -145,6 +166,22 @@ class SharedWebSocketManager {
           this._notifyHandlers(data.message);
         }
         break;
+      case 'ws_connected':
+        if (data.tabId !== this.tabId) {
+          this._updateConnectionStatus('connected');
+        }
+        break;
+      case 'connection_status':
+        if (data.tabId !== this.tabId) {
+          this._updateConnectionStatus(data.status);
+        }
+        break;
+      case 'ws_connection_failed':
+        if (data.tabId !== this.tabId) {
+          this.logger.error(`[${this.tabId}] Connection failed: ${data.message}`);
+          this._updateConnectionStatus('failed');
+        }
+        break;
       default:
         this.logger.debug?.(`[${this.tabId}] Unknown message type: ${data.type}`);
     }
@@ -159,33 +196,69 @@ class SharedWebSocketManager {
       this.logger.debug?.(`[${this.tabId}] WebSocket already connected`);
       return;
     }
+    
     try {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsBaseUrl = WS_BASE_URL || `${protocol}//${window.location.hostname}:8000`;
       const wsUrl = `${wsBaseUrl}/ws/chat/${this.userId}`;
+      
       this.logger.info(`[${this.tabId}] 🔌 Connecting WebSocket: ${wsUrl}`);
+      this._updateConnectionStatus('reconnecting');
+      
       this.ws = new WebSocket(wsUrl);
+      
       this.ws.onopen = () => {
         this.logger.info(`[${this.tabId}] ✅ WebSocket connected`);
         this.reconnectAttempts = 0;
+        this.lastWsHeartbeat = Date.now();
+        this._updateConnectionStatus('connected');
+        
+        // Start WebSocket heartbeat (ping/pong every 30 seconds)
+        this._startWebSocketHeartbeat();
+        
+        // Notify other tabs
         this.channel?.postMessage({ type: 'ws_connected', tabId: this.tabId });
+        
+        // Trigger state reconciliation
+        this._reconcileState();
       };
+      
       this.ws.onmessage = (event: MessageEvent<string>) => {
         try {
           const data = JSON.parse(event.data);
+          
+          // Handle pong response
+          if (data.type === 'pong') {
+            this.lastWsHeartbeat = Date.now();
+            this.logger.debug?.(`[${this.tabId}] Received pong from server`);
+            return;
+          }
+          
+          // Update last heartbeat on any message
+          this.lastWsHeartbeat = Date.now();
+          
+          // Notify handlers
           this._notifyHandlers(data);
+          
+          // Broadcast to other tabs
           this.channel?.postMessage({ type: 'ws_message', message: data, tabId: this.tabId });
         } catch (error) {
           this.logger.error(`[${this.tabId}] Failed to parse message:`, error);
         }
       };
+      
       this.ws.onerror = (error) => {
         this.logger.error(`[${this.tabId}] ❌ WebSocket error:`, error);
       };
+      
       this.ws.onclose = () => {
         this.logger.warn(`[${this.tabId}] WebSocket closed`);
+        this._stopWebSocketHeartbeat();
         this.ws = null;
+        this._updateConnectionStatus('disconnected');
+        
         if (this.isLeader && this.reconnectAttempts < this.maxReconnectAttempts) {
+          // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (max)
           const delay = Math.min(
             WEBSOCKET_CONSTANTS.RECONNECT.INITIAL_DELAY *
               Math.pow(WEBSOCKET_CONSTANTS.RECONNECT.BACKOFF_MULTIPLIER, this.reconnectAttempts),
@@ -193,15 +266,25 @@ class SharedWebSocketManager {
           );
           this.reconnectAttempts++;
           this.logger.info(`[${this.tabId}] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+          
           this.reconnectTimeout = setTimeout(() => {
             if (this.isLeader) {
               this._connectWebSocket();
             }
           }, delay);
+        } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+          this.logger.error(`[${this.tabId}] Max reconnection attempts reached`);
+          this._updateConnectionStatus('failed');
+          this.channel?.postMessage({ 
+            type: 'ws_connection_failed', 
+            tabId: this.tabId,
+            message: 'Unable to connect to server. Please refresh the page.' 
+          });
         }
       };
     } catch (error) {
       this.logger.error(`[${this.tabId}] Failed to create WebSocket:`, error);
+      this._updateConnectionStatus('failed');
     }
   }
 
@@ -213,6 +296,36 @@ class SharedWebSocketManager {
     this.messageHandlers.delete(handler);
   }
 
+  addConnectionStatusHandler(handler: ConnectionStatusHandler): void {
+    this.connectionStatusHandlers.add(handler);
+  }
+
+  removeConnectionStatusHandler(handler: ConnectionStatusHandler): void {
+    this.connectionStatusHandlers.delete(handler);
+  }
+
+  getConnectionStatus(): 'connected' | 'disconnected' | 'reconnecting' | 'failed' {
+    return this.connectionStatus;
+  }
+
+  private _updateConnectionStatus(status: 'connected' | 'disconnected' | 'reconnecting' | 'failed'): void {
+    this.connectionStatus = status;
+    this.connectionStatusHandlers.forEach((handler) => {
+      try {
+        handler(status);
+      } catch (error) {
+        this.logger.error(`[${this.tabId}] Connection status handler error:`, error);
+      }
+    });
+    
+    // Broadcast status to other tabs
+    this.channel?.postMessage({ 
+      type: 'connection_status', 
+      status, 
+      tabId: this.tabId 
+    });
+  }
+
   private _notifyHandlers(message: any): void {
     this.messageHandlers.forEach((handler) => {
       try {
@@ -221,6 +334,47 @@ class SharedWebSocketManager {
         this.logger.error(`[${this.tabId}] Handler error:`, error);
       }
     });
+  }
+
+  private _startWebSocketHeartbeat(): void {
+    // Clear existing interval if any
+    this._stopWebSocketHeartbeat();
+    
+    // Send ping every 30 seconds
+    this.wsHeartbeatInterval = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        try {
+          this.ws.send(JSON.stringify({ type: 'ping' }));
+          this.logger.debug?.(`[${this.tabId}] Sent ping to server`);
+          
+          // Check if we received a response recently
+          const timeSinceLastHeartbeat = Date.now() - this.lastWsHeartbeat;
+          if (timeSinceLastHeartbeat > 60000) { // 60 seconds without response
+            this.logger.warn(`[${this.tabId}] No heartbeat response for ${timeSinceLastHeartbeat}ms, reconnecting...`);
+            this.ws.close();
+          }
+        } catch (error) {
+          this.logger.error(`[${this.tabId}] Failed to send ping:`, error);
+        }
+      }
+    }, 30000); // 30 seconds
+  }
+
+  private _stopWebSocketHeartbeat(): void {
+    if (this.wsHeartbeatInterval) {
+      clearInterval(this.wsHeartbeatInterval);
+      this.wsHeartbeatInterval = null;
+    }
+  }
+
+  private _reconcileState(): void {
+    // Notify handlers that state should be reconciled
+    this._notifyHandlers({
+      type: 'state_reconciliation_required',
+      timestamp: Date.now()
+    });
+    
+    this.logger.info(`[${this.tabId}] State reconciliation triggered`);
   }
 
   send(data: any): void {
@@ -237,18 +391,29 @@ class SharedWebSocketManager {
 
   cleanup(): void {
     this.logger.info(`[${this.tabId}] Cleaning up...`);
+    
+    // Clear all intervals and timeouts
     if (this.leaderCheckInterval) {
       clearInterval(this.leaderCheckInterval);
+      this.leaderCheckInterval = null;
     }
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
     }
+    
+    // Resign as leader (this will also clear leader heartbeat and ws heartbeat)
     this._resignLeader();
+    
+    // Close broadcast channel
     if (this.channel) {
       this.channel.close();
       this.channel = null;
     }
+    
+    // Clear handlers
     this.messageHandlers.clear();
+    this.connectionStatusHandlers.clear();
   }
 }
 

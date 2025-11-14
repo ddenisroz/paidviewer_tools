@@ -95,7 +95,8 @@ async def get_chatbox_settings(
         db.refresh(settings)
     
     # Формируем полную ссылку для OBS
-    widget_url = f"http://localhost:5173/chat-overlay?token={settings.widget_token}"
+    from core.config import settings as app_settings
+    widget_url = f"{app_settings.frontend_url}/chat-overlay?token={settings.widget_token}"
     
     response = ChatBoxSettingsResponse(
         id=settings.id,
@@ -192,7 +193,7 @@ async def save_chatbox_settings(
     db.refresh(settings)
     
     # Формируем ссылку для OBS
-    widget_url = f"http://localhost:5173/chat-overlay?token={settings.widget_token}"
+    widget_url = f"{app_settings.frontend_url}/chat-overlay?token={settings.widget_token}"
     
     response = ChatBoxSettingsResponse(
         id=settings.id,

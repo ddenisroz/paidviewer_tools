@@ -112,11 +112,14 @@ class CommandExecutor:
         """
         Проверить права пользователя на выполнение команды с учетом иерархии ролей
         
-        Иерархия:
-        - all/everyone: доступно всем (включая всех выше)
-        - vip: доступно VIP, модераторам, владельцу
-        - moderator: доступно модераторам, владельцу
-        - broadcaster/owner: только владелец
+        Иерархия (от высшей к низшей):
+        - broadcaster/owner (level 5): владелец канала
+        - moderator (level 4): модератор канала
+        - vip (level 3): VIP пользователь
+        - subscriber (level 2): подписчик
+        - viewer (level 1): обычный зритель
+        
+        Высшие роли наследуют права низших ролей.
         
         Args:
             command: Команда для проверки
@@ -127,7 +130,10 @@ class CommandExecutor:
             True если есть права, False иначе
         """
         try:
-            # Broadcaster всегда имеет доступ
+            # Import permission system
+            from core.permissions import PlatformRole, PLATFORM_ROLE_HIERARCHY
+            
+            # Broadcaster/Owner всегда имеет доступ
             if is_broadcaster:
                 return True
             
@@ -140,44 +146,71 @@ class CommandExecutor:
             if 'all' in allowed or 'everyone' in allowed:
                 return True
             
-            # Иерархия ролей
+            # Определяем уровень пользователя (максимальный из его ролей)
+            user_level = 1  # По умолчанию viewer
             user_roles_lower = [r.lower() for r in user_roles]
-            is_moderator = 'moderator' in user_roles_lower or 'mod' in user_roles_lower
-            is_vip = 'vip' in user_roles_lower
-            is_subscriber = 'subscriber' in user_roles_lower or 'sub' in user_roles_lower
             
-            # Проверка иерархии
-            for role in allowed:
-                role_lower = role.lower()
+            for role_str in user_roles_lower:
+                try:
+                    # Нормализуем роль
+                    if role_str in ['broadcaster', 'owner']:
+                        role = PlatformRole.BROADCASTER
+                    elif role_str in ['moderator', 'mod']:
+                        role = PlatformRole.MODERATOR
+                    elif role_str == 'vip':
+                        role = PlatformRole.VIP
+                    elif role_str in ['subscriber', 'sub']:
+                        role = PlatformRole.SUBSCRIBER
+                    else:
+                        role = PlatformRole.VIEWER
+                    
+                    level = PLATFORM_ROLE_HIERARCHY.get(role, 1)
+                    user_level = max(user_level, level)
+                except:
+                    continue
+            
+            # Определяем требуемый уровень (минимальный из разрешенных ролей)
+            required_level = 1  # По умолчанию viewer
+            
+            for role_str in allowed:
+                role_lower = role_str.lower()
                 
                 # Если команда для всех зрителей - доступна всем
                 if role_lower in ['all', 'everyone', 'viewer']:
-                    return True
+                    required_level = 1
+                    break
                 
-                # Если команда для VIP - доступна VIP, модераторам, владельцу
-                if role_lower == 'vip':
-                    if is_vip or is_moderator:
-                        return True
-                
-                # Если команда для модератора - доступна модераторам, владельцу
-                if role_lower == 'moderator' or role_lower == 'mod':
-                    if is_moderator:
-                        return True
-                
-                # Если команда для подписчика - доступна подписчикам, VIP, модераторам, владельцу
-                if role_lower in ['subscriber', 'sub']:
-                    if is_subscriber or is_vip or is_moderator:
-                        return True
-                
-                # Прямое совпадение роли (для обратной совместимости)
-                if role_lower in user_roles_lower:
-                    return True
+                # Определяем уровень требуемой роли
+                try:
+                    if role_lower in ['broadcaster', 'owner']:
+                        role = PlatformRole.BROADCASTER
+                    elif role_lower in ['moderator', 'mod']:
+                        role = PlatformRole.MODERATOR
+                    elif role_lower == 'vip':
+                        role = PlatformRole.VIP
+                    elif role_lower in ['subscriber', 'sub']:
+                        role = PlatformRole.SUBSCRIBER
+                    else:
+                        role = PlatformRole.VIEWER
+                    
+                    level = PLATFORM_ROLE_HIERARCHY.get(role, 1)
+                    required_level = max(required_level, level)
+                except:
+                    continue
             
-            self.logger.debug(f"✗ Permission denied: command requires {allowed}, user has {user_roles_lower}")
-            return False
+            # Проверяем, достаточен ли уровень пользователя
+            has_permission = user_level >= required_level
+            
+            if not has_permission:
+                self.logger.debug(
+                    f"✗ Permission denied: command requires level {required_level} ({allowed}), "
+                    f"user has level {user_level} ({user_roles_lower})"
+                )
+            
+            return has_permission
             
         except Exception as e:
-            self.logger.error(f"Error checking user role: {e}")
+            self.logger.error(f"Error checking user role: {e}", exc_info=True)
             return False
     
     def get_command_response(self, command: BotCommand) -> str:

@@ -12,6 +12,255 @@ from services.stream_session_service import StreamSessionService
 
 logger = logging.getLogger(__name__)
 
+
+class DropsCalculationService:
+    """Service for calculating drops results with probability-based logic
+    
+    This service separates business logic (probability calculation) from UI (animation widget).
+    All drop results are calculated on the backend before being sent to the frontend.
+    """
+    
+    def __init__(self, db: Session):
+        self.db = db
+    
+    def calculate_drop(
+        self,
+        user_id: int,
+        channel_name: str,
+        platform: str,
+        quality_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """Calculate a drop result based on quality
+        
+        Args:
+            user_id: ID of the channel owner
+            channel_name: Name of the channel
+            platform: Platform (twitch/vk)
+            quality_name: Quality tier (Common, Rare, Epic, Legendary, Mythical)
+            
+        Returns:
+            Dictionary with drop result including:
+            - reward_id: ID of the selected reward
+            - reward_name: Name of the reward
+            - reward_type: Type of reward (points, voice, command, custom)
+            - reward_value: Value of the reward
+            - quality: Quality tier
+            - image_url: URL to reward image
+            - sound_file: Path to sound file
+            - sound_volume: Volume for sound playback
+            
+        Raises:
+            ValueError: If quality not found or no rewards available
+        """
+        logger.info(f"🎲 [DROPS CALC] Calculating drop for {channel_name} (quality: {quality_name})")
+        
+        # Get quality by name
+        quality = self.db.query(DropsQuality).filter(
+            DropsQuality.name == quality_name
+        ).first()
+        
+        if not quality:
+            logger.error(f"❌ [DROPS CALC] Quality '{quality_name}' not found")
+            raise ValueError(f"Quality '{quality_name}' not found")
+        
+        # Get all active rewards for this quality
+        rewards = self.db.query(DropsReward).filter(
+            DropsReward.user_id == user_id,
+            DropsReward.channel_name == channel_name,
+            DropsReward.quality_id == quality.id,
+            DropsReward.is_active == True
+        ).all()
+        
+        if not rewards:
+            logger.error(f"❌ [DROPS CALC] No rewards found for quality '{quality_name}'")
+            raise ValueError(f"No rewards available for quality '{quality_name}'")
+        
+        # Calculate weighted random selection
+        selected_reward = self._weighted_random_choice(rewards)
+        
+        if not selected_reward:
+            logger.error(f"❌ [DROPS CALC] Failed to select reward")
+            raise ValueError("Failed to select reward")
+        
+        logger.info(
+            f"✅ [DROPS CALC] Selected reward: {selected_reward.name} "
+            f"(weight: {selected_reward.weight}, quality: {quality_name})"
+        )
+        
+        return {
+            "reward_id": selected_reward.id,
+            "reward_name": selected_reward.name,
+            "reward_type": selected_reward.reward_type,
+            "reward_value": selected_reward.reward_value,
+            "quality": quality_name,
+            "quality_color": quality.color,
+            "image_url": selected_reward.image_url,
+            "sound_file": selected_reward.sound_file,
+            "sound_volume": selected_reward.sound_volume,
+            "description": selected_reward.description
+        }
+    
+    def get_probabilities(
+        self,
+        user_id: int,
+        channel_name: str,
+        quality_name: str
+    ) -> Dict[str, float]:
+        """Get probability distribution for rewards of a given quality
+        
+        Args:
+            user_id: ID of the channel owner
+            channel_name: Name of the channel
+            quality_name: Quality tier
+            
+        Returns:
+            Dictionary mapping reward_id to probability (0.0 to 1.0)
+        """
+        logger.debug(f"📊 [DROPS CALC] Getting probabilities for {channel_name} (quality: {quality_name})")
+        
+        # Get quality
+        quality = self.db.query(DropsQuality).filter(
+            DropsQuality.name == quality_name
+        ).first()
+        
+        if not quality:
+            logger.warning(f"⚠️ [DROPS CALC] Quality '{quality_name}' not found")
+            return {}
+        
+        # Get all active rewards
+        rewards = self.db.query(DropsReward).filter(
+            DropsReward.user_id == user_id,
+            DropsReward.channel_name == channel_name,
+            DropsReward.quality_id == quality.id,
+            DropsReward.is_active == True
+        ).all()
+        
+        if not rewards:
+            logger.warning(f"⚠️ [DROPS CALC] No rewards found for quality '{quality_name}'")
+            return {}
+        
+        # Calculate total weight
+        total_weight = sum(reward.weight for reward in rewards)
+        
+        if total_weight == 0:
+            logger.warning(f"⚠️ [DROPS CALC] Total weight is 0, using uniform distribution")
+            uniform_prob = 1.0 / len(rewards)
+            return {reward.id: uniform_prob for reward in rewards}
+        
+        # Calculate probabilities
+        probabilities = {
+            reward.id: reward.weight / total_weight
+            for reward in rewards
+        }
+        
+        logger.debug(f"📊 [DROPS CALC] Probabilities: {probabilities}")
+        
+        return probabilities
+    
+    def validate_probabilities(
+        self,
+        user_id: int,
+        channel_name: str,
+        quality_name: str
+    ) -> Tuple[bool, Optional[str]]:
+        """Validate that probabilities sum to 1.0 and all rewards have valid weights
+        
+        Args:
+            user_id: ID of the channel owner
+            channel_name: Name of the channel
+            quality_name: Quality tier
+            
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        logger.debug(f"✔️ [DROPS CALC] Validating probabilities for {channel_name} (quality: {quality_name})")
+        
+        # Get quality
+        quality = self.db.query(DropsQuality).filter(
+            DropsQuality.name == quality_name
+        ).first()
+        
+        if not quality:
+            return False, f"Quality '{quality_name}' not found"
+        
+        # Get all active rewards
+        rewards = self.db.query(DropsReward).filter(
+            DropsReward.user_id == user_id,
+            DropsReward.channel_name == channel_name,
+            DropsReward.quality_id == quality.id,
+            DropsReward.is_active == True
+        ).all()
+        
+        if not rewards:
+            return False, f"No rewards found for quality '{quality_name}'"
+        
+        # Check for invalid weights
+        invalid_weights = [r for r in rewards if r.weight <= 0]
+        if invalid_weights:
+            reward_names = [r.name for r in invalid_weights]
+            return False, f"Rewards with invalid weights (<=0): {', '.join(reward_names)}"
+        
+        # Calculate total weight
+        total_weight = sum(reward.weight for reward in rewards)
+        
+        if total_weight == 0:
+            return False, "Total weight is 0"
+        
+        # Calculate probabilities and verify they sum to ~1.0
+        probabilities = self.get_probabilities(user_id, channel_name, quality_name)
+        total_probability = sum(probabilities.values())
+        
+        # Allow small floating point error
+        if not (0.99 <= total_probability <= 1.01):
+            return False, f"Probabilities sum to {total_probability:.4f}, expected 1.0"
+        
+        logger.debug(f"✅ [DROPS CALC] Probabilities valid for {channel_name} (quality: {quality_name})")
+        
+        return True, None
+    
+    def _weighted_random_choice(self, rewards: List[DropsReward]) -> Optional[DropsReward]:
+        """Select a random reward based on weights
+        
+        Algorithm:
+            1. Sum all weights: total_weight
+            2. Generate random number: 0 <= random_value < total_weight
+            3. Iterate through rewards, accumulating weights
+            4. When accumulated weight > random_value, return current reward
+            
+        Args:
+            rewards: List of DropsReward objects
+            
+        Returns:
+            Selected reward or None if list is empty
+        """
+        if not rewards:
+            return None
+        
+        # Calculate total weight
+        total_weight = sum(reward.weight for reward in rewards)
+        
+        if total_weight == 0:
+            logger.warning("⚠️ [DROPS CALC] Total weight is 0, using uniform distribution")
+            return random.choice(rewards)
+        
+        # Generate random value
+        random_value = random.random() * total_weight
+        current_weight = 0
+        
+        # Select reward
+        for reward in rewards:
+            current_weight += reward.weight
+            if random_value < current_weight:
+                logger.debug(
+                    f"🎯 [DROPS CALC] Selected '{reward.name}' "
+                    f"(weight={reward.weight}/{total_weight}, random={random_value:.2f})"
+                )
+                return reward
+        
+        # Fallback (should not happen mathematically)
+        logger.warning("⚠️ [DROPS CALC] Fallback to last reward")
+        return rewards[-1]
+
 class DropsService:
     """Сервис для управления системой Drops"""
     

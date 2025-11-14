@@ -5,10 +5,7 @@ import logging
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from starlette.middleware.sessions import SessionMiddleware
 from fastapi.staticfiles import StaticFiles
-import tempfile
 
 # Импорты перенесены внутрь функций для избежания циклических импортов
 
@@ -34,6 +31,10 @@ def create_app() -> FastAPI:
         description="Сервис для управления TTS ботом",
         version="2.0.0"
     )
+    
+    # Добавляем централизованные обработчики исключений
+    from core.exception_handlers import setup_exception_handlers
+    setup_exception_handlers(app)
     
     # Добавляем rate limiting
     from core.security_modern import limiter, rate_limit_handler
@@ -62,20 +63,6 @@ def create_app() -> FastAPI:
         allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
         max_age=3600,  # Кэшировать preflight запросы на 1 час
     )
-    
-    # Trusted Host Middleware (отключаем в тестовом режиме)
-    # Временно отключаем для тестов
-    # if os.getenv("TESTING") != "true":
-    #     app.add_middleware(
-    #         TrustedHostMiddleware, 
-    #         allowed_hosts=["localhost", "127.0.0.1", "*.localhost", "testserver", "testclient"]
-    #     )
-    
-    # Session Middleware - ОТКЛЮЧЕН, используем собственную систему сессий через cookies
-    # secret_key = os.getenv("SECRET_KEY")
-    # if not secret_key:
-    #     raise ValueError("SECRET_KEY environment variable is required for security")
-    # app.add_middleware(SessionMiddleware, secret_key=secret_key)
     
     # Статические файлы
     from .project_paths import FRONTEND_ROOT, TEMP_DIR

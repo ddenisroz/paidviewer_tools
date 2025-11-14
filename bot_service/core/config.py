@@ -1,0 +1,251 @@
+# bot_service/core/config.py
+"""
+Centralized configuration management using pydantic-settings
+Replaces hardcoded values and os.getenv() calls throughout the application
+"""
+import logging
+from typing import Optional, List
+from pydantic import Field, field_validator, computed_field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
+
+class Settings(BaseSettings):
+    """Application settings with validation and type safety"""
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"
+    )
+    
+    # === ENVIRONMENT ===
+    environment: str = Field(default="development", description="Environment: development, production")
+    debug: bool = Field(default=True, description="Enable debug mode")
+    log_level: str = Field(default="INFO", description="Logging level")
+    
+    # === SECURITY ===
+    secret_key: str = Field(
+        default="your-secret-key-here-generate-with-openssl-rand-hex-32",
+        description="Secret key for JWT token signing"
+    )
+    algorithm: str = Field(default="HS256", description="JWT algorithm")
+    token_encryption_key: str = Field(
+        default="your-encryption-key-here-generate-with-fernet",
+        description="Fernet key for OAuth token encryption"
+    )
+    
+    # === SERVICE URLS ===
+    bot_service_host: str = Field(default="0.0.0.0", description="Bot service host")
+    bot_service_port: int = Field(default=8000, description="Bot service port")
+    backend_url: str = Field(default="http://localhost:8000", description="Backend URL")
+    frontend_url: str = Field(default="http://localhost:5173", description="Frontend URL")
+    tts_service_url: str = Field(default="http://localhost:8001", description="TTS service URL")
+    cors_origins: str = Field(
+        default="http://localhost:5173,http://localhost:3000",
+        description="CORS allowed origins (comma-separated)"
+    )
+    
+    # === DATABASE ===
+    database_url: str = Field(
+        default="sqlite:///./data/bot_service.db",
+        description="Database connection URL"
+    )
+    chat_messages_db_limit_per_user: int = Field(
+        default=3000,
+        description="Maximum messages per user"
+    )
+    chat_messages_db_limit_total: int = Field(
+        default=100000,
+        description="Maximum total messages in database"
+    )
+    chat_messages_retention_days: int = Field(
+        default=30,
+        description="Message retention period in days"
+    )
+    
+    # === RATE LIMITING ===
+    rate_limit_enabled: bool = Field(default=True, description="Enable rate limiting")
+    max_requests_per_minute: int = Field(default=60, description="Max requests per minute")
+    rate_limit_default: str = Field(default="60/minute", description="Default rate limit")
+    rate_limit_login: str = Field(default="5/15minute", description="Login rate limit")
+    rate_limit_tts: str = Field(default="30/minute", description="TTS rate limit")
+    max_login_attempts: int = Field(default=10, description="Max login attempts")
+    
+    # === TWITCH INTEGRATION ===
+    twitch_client_id: Optional[str] = Field(default=None, description="Twitch client ID")
+    twitch_client_secret: Optional[str] = Field(default=None, description="Twitch client secret")
+    twitch_redirect_uri: str = Field(
+        default="http://localhost:8000/auth/twitch/callback",
+        description="Twitch OAuth redirect URI"
+    )
+    twitch_bot_token: Optional[str] = Field(default=None, description="Twitch bot OAuth token")
+    
+    # === VK LIVE INTEGRATION ===
+    vk_client_id: Optional[str] = Field(default=None, description="VK client ID")
+    vk_client_secret: Optional[str] = Field(default=None, description="VK client secret")
+    vk_redirect_uri: str = Field(
+        default="http://localhost:8000/auth/vk/callback",
+        description="VK OAuth redirect URI"
+    )
+    vk_auth_base_url: str = Field(
+        default="https://auth.live.vkvideo.ru/app/oauth2/authorize",
+        description="VK auth base URL"
+    )
+    vk_live_user_token: Optional[str] = Field(default=None, description="VK Live user token")
+    
+    # === YOUTUBE INTEGRATION ===
+    youtube_api_key: Optional[str] = Field(default=None, description="YouTube Data API key")
+    
+    # === DONATION ALERTS INTEGRATION ===
+    donationalerts_client_id: Optional[str] = Field(default=None, description="DonationAlerts client ID")
+    donationalerts_client_secret: Optional[str] = Field(default=None, description="DonationAlerts client secret")
+    donationalerts_redirect_uri: str = Field(
+        default="http://localhost:8000/auth/donationalerts/callback",
+        description="DonationAlerts OAuth redirect URI"
+    )
+    
+    # === EXTERNAL APIS ===
+    google_tts_api_key: Optional[str] = Field(default=None, description="Google Cloud TTS API key")
+    huggingface_token: Optional[str] = Field(default=None, description="HuggingFace API token")
+    
+    # === LOGGING ===
+    log_file: str = Field(default="logs/bot_service.log", description="Log file path")
+    enable_json_logs: bool = Field(default=False, description="Enable JSON formatted logs")
+    enable_log_rotation: bool = Field(default=True, description="Enable log rotation")
+    
+    # === TESTING ===
+    testing: bool = Field(default=False, description="Enable testing mode")
+    
+    # === COMPUTED FIELDS ===
+    @computed_field
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Parse CORS origins string into list"""
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+    
+    @computed_field
+    @property
+    def is_production(self) -> bool:
+        """Check if running in production"""
+        return self.environment.lower() == "production"
+    
+    @computed_field
+    @property
+    def is_development(self) -> bool:
+        """Check if running in development"""
+        return self.environment.lower() == "development"
+    
+    # === VALIDATORS ===
+    @field_validator('secret_key')
+    @classmethod
+    def validate_secret_key(cls, v: str, info) -> str:
+        """Validate secret key is changed in production"""
+        environment = info.data.get('environment', 'development')
+        default_key = "your-secret-key-here-generate-with-openssl-rand-hex-32"
+        
+        if environment.lower() == 'production' and v == default_key:
+            raise ValueError(
+                "🚨 PRODUCTION ERROR: SECRET_KEY must be changed from default value! "
+                "Generate with: openssl rand -hex 32"
+            )
+        
+        if len(v) < 32:
+            logger.warning(f"⚠️ SECRET_KEY is short ({len(v)} chars), recommended 32+ characters")
+        
+        return v
+    
+    @field_validator('token_encryption_key')
+    @classmethod
+    def validate_encryption_key(cls, v: str, info) -> str:
+        """Validate encryption key is changed in production"""
+        environment = info.data.get('environment', 'development')
+        default_key = "your-encryption-key-here-generate-with-fernet"
+        
+        if environment.lower() == 'production' and v == default_key:
+            raise ValueError(
+                "🚨 PRODUCTION ERROR: TOKEN_ENCRYPTION_KEY must be changed from default value! "
+                "Generate with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+            )
+        
+        return v
+    
+    @field_validator('database_url')
+    @classmethod
+    def validate_database_url(cls, v: str, info) -> str:
+        """Validate database URL format"""
+        if not v:
+            raise ValueError("DATABASE_URL is required")
+        
+        environment = info.data.get('environment', 'development')
+        
+        # Warn if using SQLite in production
+        if environment.lower() == 'production' and v.startswith('sqlite'):
+            logger.warning(
+                "⚠️ Using SQLite in production is not recommended. "
+                "Consider using PostgreSQL for better performance and reliability."
+            )
+        
+        return v
+    
+    @field_validator('bot_service_port')
+    @classmethod
+    def validate_port(cls, v: int) -> int:
+        """Validate port number"""
+        if not 1 <= v <= 65535:
+            raise ValueError(f"Port must be between 1 and 65535, got {v}")
+        return v
+    
+    @field_validator('max_requests_per_minute')
+    @classmethod
+    def validate_rate_limit(cls, v: int) -> int:
+        """Validate rate limit"""
+        if v < 1:
+            raise ValueError("Rate limit must be at least 1")
+        return v
+    
+    @field_validator('chat_messages_db_limit_per_user', 'chat_messages_db_limit_total')
+    @classmethod
+    def validate_positive(cls, v: int) -> int:
+        """Validate positive integers"""
+        if v < 1:
+            raise ValueError("Value must be positive")
+        return v
+
+
+def validate_settings():
+    """Validate critical settings on startup"""
+    required_for_production = [
+        'secret_key',
+        'token_encryption_key',
+        'database_url',
+    ]
+    
+    if settings.is_production:
+        missing = []
+        for key in required_for_production:
+            value = getattr(settings, key, None)
+            if not value or value.startswith('your-'):
+                missing.append(key.upper())
+        
+        if missing:
+            raise ValueError(
+                f"🚨 PRODUCTION ERROR: Missing or invalid required settings: {', '.join(missing)}"
+            )
+    
+    logger.info("✅ Configuration validated successfully")
+
+
+# Global settings instance
+settings = Settings()
+
+# Validate on import
+try:
+    validate_settings()
+    logger.info(f"🔧 Configuration loaded: environment={settings.environment}, debug={settings.debug}")
+except Exception as e:
+    logger.error(f"❌ Configuration validation failed: {e}")
+    if settings.is_production:
+        raise

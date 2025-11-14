@@ -1,0 +1,146 @@
+# docker-compose.tts-advanced.yml
+# TTS Service (Advanced) with F5-TTS and GPU Worker Pool
+# Machine 1 - Local PC with GPU + Cloudflare Tunnel
+
+version: '3.8'
+
+services:
+  # Redis for GPU Worker Pool
+  redis:
+    image: redis:7-alpine
+    container_name: tts_redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:-change_this_password}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-change_this_password}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # TTS Service - Main API
+  tts_service:
+    build:
+      context: ./tts_service
+      dockerfile: Dockerfile.prod
+    container_name: tts_service
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./tts_service/.env
+    environment:
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-change_this_password}@redis:6379/0
+      - GPU_REDIS_URL=redis://:${REDIS_PASSWORD:-change_this_password}@redis:6379/0
+    volumes:
+      - ./tts_service:/app
+      - ./models/f5_tts:/app/models
+      - ./voices:/app/voices
+      - ./audio:/app/audio
+      - ./tts_service/logs:/app/logs
+      - tts_cache:/app/f5_tts_cache
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # GPU Workers (4 workers for parallel processing)
+  tts_worker_1:
+    build:
+      context: ./tts_service
+      dockerfile: Dockerfile.prod
+    container_name: tts_worker_1
+    command: python worker.py
+    env_file:
+      - ./tts_service/.env
+    environment:
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-change_this_password}@redis:6379/0
+      - GPU_REDIS_URL=redis://:${REDIS_PASSWORD:-change_this_password}@redis:6379/0
+      - WORKER_ID=worker_1
+    volumes:
+      - ./tts_service:/app
+      - ./models/f5_tts:/app/models
+      - ./voices:/app/voices
+      - ./audio:/app/audio
+      - ./tts_service/logs:/app/logs
+      - tts_cache:/app/f5_tts_cache
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  tts_worker_2:
+    build:
+      context: ./tts_service
+      dockerfile: Dockerfile.prod
+    container_name: tts_worker_2
+    command: python worker.py
+    env_file:
+      - ./tts_service/.env
+    environment:
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-change_this_password}@redis:6379/0
+      - GPU_REDIS_URL=redis://:${REDIS_PASSWORD:-change_this_password}@redis:6379/0
+      - WORKER_ID=worker_2
+    volumes:
+      - ./tts_service:/app
+      - ./models/f5_tts:/app/models
+      - ./voices:/app/voices
+      - ./audio:/app/audio
+      - ./tts_service/logs:/app/logs
+      - tts_cache:/app/f5_tts_cache
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Cloudflare Tunnel for secure remote access
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared-config.yml:/etc/cloudflared/config.yml:ro
+      - ./cloudflared-credentials.json:/etc/cloudflared/credentials.json:ro
+    restart: unless-stopped
+    depends_on:
+      - tts_service
+
+volumes:
+  redis_data:
+    driver: local
+  tts_cache:
+    driver: local
+
+networks:
+  default:
+    name: tts_advanced_network
+    driver: bridge

@@ -8,7 +8,7 @@ from pydantic import BaseModel, validator
 from typing import List, Optional
 from core.database import get_db, BotCommand
 from auth.auth import get_current_user, get_current_user_optional
-from utils.enhanced_logger import log_api_call, log_request, log_response, commands_logger
+from utils.enhanced_logger import log_request, log_response, commands_logger
 from validators.input_validators import sanitize_input
 from core.security_modern import limiter
 

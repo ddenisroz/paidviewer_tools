@@ -4,11 +4,9 @@ import os
 import sys
 import asyncio
 import logging
-import httpx
 import urllib3
 from pathlib import Path
 from contextlib import asynccontextmanager
-from datetime import datetime
 from fastapi import FastAPI, WebSocket, Depends, Request, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -29,7 +27,7 @@ if str(BOT_SERVICE_ROOT) not in sys.path:
     sys.path.insert(0, str(BOT_SERVICE_ROOT))
 
 # Теперь можем импортировать core.project_paths
-from core.project_paths import BOT_SERVICE_ROOT, PROJECT_ROOT
+from core.project_paths import BOT_SERVICE_ROOT
 
 # Загружаем .env
 env_path = BOT_SERVICE_ROOT / '.env'
@@ -37,6 +35,7 @@ load_dotenv(dotenv_path=env_path, override=True)
 
 # Импорты из новых модулей
 from core.app_config import create_app, setup_logging
+from core.config import settings  # Centralized configuration
 
 # Настройка логирования
 setup_logging()
@@ -48,12 +47,11 @@ from core.background_tasks import background_tasks
 from core.database import get_db, init_db, User, UserToken
 from core.connection_manager import get_connection_manager
 from core.session_manager import session_manager
-from auth.auth import get_current_user, get_current_user_optional
+from auth.auth import get_current_user
 # Rate limiting handled by slowapi
 from bots.twitch_bot import Bot  # Используется в initialize_twitch_bot()
 from bots.vk_live_bot import VKLiveBot  # Используется в initialize_vk_live_bot()
 from services.memory_tts_queue import memory_tts_queue
-from core.security_modern import limiter, rate_limit_handler
 from services.memory_websocket_manager import memory_websocket_manager
 # Удален database_session_storage - дублирует session_manager
 # Удален modern_monitor - используем enhanced_logger
@@ -81,23 +79,23 @@ from api.obs_integration_api import router as obs_integration_router
 from api.system_api import router as system_router
 from api.user_settings_api import router as user_settings_router
 from api.chatbox_api import router as chatbox_router
-from api.monitoring_api import router as monitoring_router
+
 from api.admin_api import router as admin_router
 from api.active_channels_api import router as active_channels_router
 from api.stream_history_api import router as stream_history_router
 from api.donationalerts_api import router as donationalerts_router
 from api.guest_api import router as guest_router
+from api.platforms_api import router as platforms_router
 from api.system_logs_api import router as system_logs_router
 from api.proxy_api import router as proxy_router
+from api.error_reporting_api import router as error_reporting_router
 
-from core.token_utils import get_user_token_from_db, validate_platform_token
+from core.token_utils import validate_platform_token
 
 async def initialize_twitch_bot():
     """Инициализация Twitch бота"""
     try:
-        import os
-        
-        twitch_token = os.getenv("TWITCH_BOT_TOKEN")
+        twitch_token = settings.twitch_bot_token
         if not twitch_token:
             logger.warning("TWITCH_BOT_TOKEN not configured, skipping Twitch bot initialization")
             return
@@ -128,9 +126,7 @@ async def initialize_vk_live_bot():
     - UserToken(platform='vk') = токен стримера для управления (из OAuth)
     """
     try:
-        import os
-        
-        vk_token = os.getenv("VK_LIVE_USER_TOKEN")  # Токен БОТА для чата
+        vk_token = settings.vk_live_user_token  # Токен БОТА для чата
         if not vk_token:
             logger.warning("VK_LIVE_USER_TOKEN not configured, skipping VK Live bot initialization")
             logger.info("💡 VK_LIVE_USER_TOKEN is the BOT account token for chat. Get it from VK Live for your bot account.")
@@ -237,23 +233,7 @@ async def lifespan(app: FastAPI):
         await background_tasks.start_all_tasks()
         logger.info("Background tasks started")
         
-        # --- Monitoring System ---
-        # NOTE: Basic monitoring через enhanced_logger уже активен (см. ниже)
-        # Дополнительный external мониторинг (Prometheus, Grafana) может быть добавлен позже
-        
-        # --- Backup System ---
-        # NOTE: Автоматические backup выполняются на уровне БД
-        # Application-level backup может быть добавлен через BackgroundTasks если нужно
-        
         logger.info("=== BOT SERVICE STARTED WITH ENHANCED LOGGING ===")
-        
-        # Запуск современного мониторинга (удалено - используем enhanced_logger)
-        # try:
-        #     # modern_monitor.start_monitoring(interval=30)  # Удалено
-        #     logger.info("✅ Enhanced logging system active")
-        # except Exception as e:
-        #     logger.error(f"Failed to start monitoring: {e}")
-        
         logger.info("✅ Enhanced logging system active")
         
         # Инициализация ботов при старте (как в оригинальном монолите)
@@ -690,11 +670,24 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
     try:
         while True:
             data = await websocket.receive_text()
-            logger.info(f"📨 Received from user {user_id}: {data}")
             
-            # Отвечаем на ping
-            if data == '{"type":"ping"}':
-                await websocket.send_text('{"type":"pong"}')
+            # Task 6.4: Обработка ping/pong для heartbeat механизма
+            try:
+                import json
+                message = json.loads(data)
+                
+                if message.get("type") == "ping":
+                    # Обновляем время последнего ping и отправляем pong
+                    await memory_websocket_manager.handle_ping(conn_id)
+                    logger.debug(f"🏓 Ping/Pong with user {user_id}")
+                    continue
+                    
+                # Обработка других типов сообщений
+                logger.info(f"📨 Received from user {user_id}: {message.get('type', 'unknown')}")
+                
+            except json.JSONDecodeError:
+                # Если не JSON, логируем как есть
+                logger.info(f"📨 Received from user {user_id}: {data}")
                 
     except Exception as e:
         logger.info(f"🔌 WebSocket disconnected for user {user_id}: {e}")
@@ -954,6 +947,8 @@ app.include_router(donationalerts_router)
 app.include_router(guest_router)
 app.include_router(system_logs_router)
 app.include_router(proxy_router)
+app.include_router(platforms_router)
+app.include_router(error_reporting_router)
 
 # Static files - настроены в create_app()
 
