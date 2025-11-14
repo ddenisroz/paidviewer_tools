@@ -6,7 +6,7 @@
 
 ## 1. Требования
 
-- Python 3.11+
+- Python 3.10+
 - Node.js 18+
 - PostgreSQL (или SQLite для dev)
 - Git

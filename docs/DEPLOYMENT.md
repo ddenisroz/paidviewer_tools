@@ -88,7 +88,7 @@ TTS_TTV_0.03 поддерживает гибкие deployment сценарии:
 - Безопасный доступ через Cloudflare Tunnel
 
 **Требования:**
-- Machine 1: GPU (CUDA), 8GB+ VRAM, Python 3.11+
+- Machine 1: GPU (CUDA), 8GB+ VRAM, Python 3.10+
 - Machine 2: 2GB+ RAM, Docker
 
 ---
@@ -128,7 +128,7 @@ TTS_TTV_0.03 поддерживает гибкие deployment сценарии:
 - Скачивание глобальных голосов из репозитория
 
 **Требования:**
-- Machine 1: GPU (CUDA), 8GB+ VRAM, Python 3.11+
+- Machine 1: GPU (CUDA), 8GB+ VRAM, Python 3.10+
 - Machine 2: 2GB+ RAM, Docker
 
 ---

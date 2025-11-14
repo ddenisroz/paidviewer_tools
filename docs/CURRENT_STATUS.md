@@ -325,7 +325,7 @@
 ## Архитектура
 
 ### Backend
-- **Framework:** FastAPI (Python 3.11+)
+- **Framework:** FastAPI (Python 3.10+)
 - **Database:** SQLite (dev) / PostgreSQL (prod)
 - **ORM:** SQLAlchemy + Alembic
 - **Auth:** JWT + OAuth2 (Fernet encryption)

@@ -193,7 +193,7 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 
 ## Технологии
 
-**Backend:** Python 3.11+, FastAPI, SQLAlchemy, Alembic, pydantic-settings  
+**Backend:** Python 3.10+, FastAPI, SQLAlchemy, Alembic, pydantic-settings  
 **Frontend:** React 19, Vite, Tailwind CSS, shadcn/ui, React Query, Zod  
 **Database:** SQLite (dev) / PostgreSQL (prod)  
 **TTS:** Google Cloud TTS / F5-TTS (Advanced) / F5-TTS (Simple)  
