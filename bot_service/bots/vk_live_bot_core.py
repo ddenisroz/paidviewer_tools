@@ -37,7 +37,7 @@ class VKLiveBotCore:
         self.ws_task: Optional[asyncio.Task] = None
         
         # Инициализируем TTS API для обработки сообщений
-        from api.tts_api import TTSAPI
+        from features.tts.tts_api import TTSAPI
         self.tts_api = TTSAPI()
         
         # Универсальная система команд
