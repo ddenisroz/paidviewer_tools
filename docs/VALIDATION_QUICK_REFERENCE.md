@@ -190,4 +190,4 @@ async def create_command(request: CommandCreateRequest):
 
 ## Full Documentation
 
-See `docs/VALIDATION_SYSTEM.md` for complete documentation.
+See `docs/architecture/VALIDATION_SYSTEM.md` for complete documentation.

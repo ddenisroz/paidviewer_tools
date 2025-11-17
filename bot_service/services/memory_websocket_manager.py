@@ -361,7 +361,7 @@ class MemoryWebSocketManager:
             user_id: ID пользователя
         """
         try:
-            from services.memory_tts_queue import memory_tts_queue
+            from features.tts.memory_tts_queue import memory_tts_queue
             await memory_tts_queue.enable_for_user(user_id)
             logger.info(f"User {user_id} connected - TTS generation enabled")
         except Exception as e:
@@ -377,7 +377,7 @@ class MemoryWebSocketManager:
             user_id: ID пользователя
         """
         try:
-            from services.memory_tts_queue import memory_tts_queue
+            from features.tts.memory_tts_queue import memory_tts_queue
             await memory_tts_queue.disable_for_user(user_id)
             logger.info(f"User {user_id} fully disconnected - TTS generation disabled")
         except Exception as e:

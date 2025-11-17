@@ -176,9 +176,37 @@ class LootboxWidget {
   private async animateFrames(rarity: Rarity): Promise<void> {
     const frames = this.animationFrames[rarity] || this.animationFrames.common;
     const imageElement = document.getElementById('lootbox-image') as HTMLImageElement;
+    
+    // ✅ OPTIMIZATION: Preload all frames for smooth animation
+    const preloadedImages = await this.preloadFrames(rarity, frames);
+    
     for (let i = 0; i < frames.length; i++) {
-      imageElement.src = `/images/lootboxes/${rarity}/${frames[i]}`;
+      // Use preloaded images for instant display
+      if (preloadedImages[i]) {
+        imageElement.src = preloadedImages[i].src;
+      } else {
+        imageElement.src = `/images/lootboxes/${rarity}/${frames[i]}`;
+      }
       await this.sleep(200);
+    }
+  }
+
+  private async preloadFrames(rarity: Rarity, frames: string[]): Promise<HTMLImageElement[]> {
+    // ✅ OPTIMIZATION: Preload images in parallel for faster loading
+    const promises = frames.map(frame => {
+      return new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error(`Failed to load ${frame}`));
+        img.src = `/images/lootboxes/${rarity}/${frame}`;
+      });
+    });
+    
+    try {
+      return await Promise.all(promises);
+    } catch (error) {
+      logger.error('Error preloading frames:', error);
+      return [];
     }
   }
 

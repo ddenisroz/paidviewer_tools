@@ -5,6 +5,8 @@ import { TTS_SERVICE_URL } from '../constants';
 import { useAuth } from './AuthContext';
 import { useToast } from '../components/ui/toast';
 import { useIntegrations } from './IntegrationsContext';
+import { useAudioPriority } from './AudioPriorityContext';
+import { useTtsPlayer } from './TtsPlayerContext';
 import useSharedWebSocket from '../hooks/useSharedWebSocket';
 import { logger } from '../utils/prodLogger';
 import { useBotStatus, useConnectBot, useDisconnectBot } from '../queries/chat/chatQueries';
@@ -29,10 +31,16 @@ interface TtsAudioMessage extends WebSocketMessage {
         audio_url: string;
         volume?: number;
         tts_type?: string;
+        text?: string;
+        username?: string;
+        platform?: string;
     };
     audio_url?: string;
     volume?: number;
     tts_type?: string;
+    text?: string;
+    username?: string;
+    platform?: string;
 }
 
 interface BotStatusMessage extends WebSocketMessage {
@@ -114,6 +122,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     const { user, isAuthenticated, isGuest, isCheckingAuth } = useAuth();
     const { integrations, isLoading: integrationsLoading } = useIntegrations();
     const { addToast } = useToast();
+    const { requestAudioFocus, releaseAudioFocus } = useAudioPriority();
+    const { addToQueue } = useTtsPlayer();
     
     const loadMessagesFromStorage = (): ChatMessage[] => {
         try {
@@ -302,80 +312,19 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
                         }
                     }
                     
-                    const playAudioViaWebAudioAPI = async (): Promise<void> => {
-                        try {
-                            if (!audioUnlocked.current) {
-                                throw new Error('User interaction required');
-                            }
-                            
-                            if (!audioContext.current || audioContext.current.state === 'closed') {
-                                audioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-                                logger.info('🎵 AudioContext created for TTS playback');
-                            }
-                            
-                            if (audioContext.current.state === 'suspended') {
-                                await audioContext.current.resume();
-                                logger.info('🔊 AudioContext resumed');
-                            }
-                            
-                            if (audioContext.current.state !== 'running') {
-                                throw new Error('AudioContext not running');
-                            }
-                            
-                            logger.debug(`📥 Fetching audio from: ${audioUrl}`);
-                            const response = await fetch(audioUrl);
-                            
-                            if (!response.ok) {
-                                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                            }
-                            
-                            const arrayBuffer = await response.arrayBuffer();
-                            logger.debug(`✅ Audio fetched, size: ${arrayBuffer.byteLength} bytes`);
-                            
-                            const audioBuffer = await audioContext.current.decodeAudioData(arrayBuffer);
-                            logger.debug(`✅ Audio decoded, duration: ${audioBuffer.duration}s, sample rate: ${audioBuffer.sampleRate}Hz`);
-                            
-                            const source = audioContext.current.createBufferSource();
-                            const gainNode = audioContext.current.createGain();
-                            
-                            source.buffer = audioBuffer;
-                            gainNode.gain.value = (audioData.volume || 50) / 100;
-                            
-                            source.connect(gainNode);
-                            gainNode.connect(audioContext.current.destination);
-                            
-                            source.start(0);
-                            logger.info(`✅ TTS audio playing via Web Audio API: ${audioData.tts_type}`);
-                            
-                        } catch (err: any) {
-                            logger.warn('Web Audio API failed, falling back to Audio element:', err.message);
-                            logger.warn('Audio URL:', audioUrl);
-                            logger.warn('Error details:', err);
-                            
-                            const audio = new Audio(audioUrl);
-                            audio.volume = (audioData.volume || 50) / 100;
-                            
-                            const playPromise = audio.play();
-                            if (playPromise !== undefined) {
-                                playPromise.catch(playErr => {
-                                    if (playErr.name === 'NotAllowedError' && !autoplayToastShown.current) {
-                                        autoplayToastShown.current = true;
-                                        addToast({
-                                            type: 'info',
-                                            title: '🔊 Разрешите озвучку',
-                                            message: 'Кликните в любом месте страницы для активации TTS',
-                                            duration: 5000
-                                        });
-                                    }
-                                });
-                            }
-                        }
-                    };
+                    // Add to TTS player queue instead of playing directly
+                    addToQueue({
+                        text: audioData.text || 'TTS Message',
+                        audioUrl: audioUrl,
+                        volume: audioData.volume || 50,
+                        username: audioData.username,
+                        platform: audioData.platform
+                    });
                     
-                    playAudioViaWebAudioAPI();
+                    logger.info(`✅ [TTS] Added to queue: ${audioData.text?.substring(0, 50) || 'TTS Message'}...`);
                     
                 } catch (err) {
-                    logger.error('Error creating TTS playback:', err);
+                    logger.error('Error adding TTS to queue:', err);
                 }
             } else {
                 logger.warn('TTS audio event received but no audio_url provided');

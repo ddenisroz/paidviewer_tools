@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Gift, Plus, Edit, Trash2, Loader2, Power, PowerOff, Settings, AlertCircle, CheckCircle2, XCircle, Clock, MessageCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useIntegrations } from '../context/IntegrationsContext';
-import { TwitchIcon, VKIcon } from '../components/PlatformIcons';
+import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import pointsApi from '../services/pointsApi';
 import { PLATFORM_COLORS } from '../constants/uiConstants';
 import { logger } from '../utils/prodLogger';
-import PageWrapper from '../components/PageWrapper';
+import PageWrapper from '../shared/components/PageWrapper';
 import type { PlatformReward, RewardDemand } from '../types/points';
 
 interface RewardFormData {

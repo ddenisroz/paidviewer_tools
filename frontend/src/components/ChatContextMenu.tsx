@@ -110,7 +110,7 @@ const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
     return ReactDOM.createPortal(
         <div
             ref={menuRef}
-            className="fixed bg-popover border border-border rounded-md shadow-2xl py-1 z-[99999] min-w-[180px] animate-in fade-in slide-in-from-top-2 duration-150 backdrop-blur-sm"
+            className="fixed bg-popover border border-border rounded-md shadow-2xl py-1 z-[99999] min-w-44 animate-in fade-in slide-in-from-top-2 duration-150 backdrop-blur-sm"
             style={{
                 left: `${position.x}px`,
                 top: `${position.y}px`,

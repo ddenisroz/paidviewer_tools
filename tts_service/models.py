@@ -12,6 +12,7 @@ class VoiceSchema(BaseModel):
     owner_id: Optional[int] = None
     is_public: bool
     is_active: bool
+    is_global: bool = False
     created_at: Optional[dt.datetime] = None
     
     # Настройки генерации TTS

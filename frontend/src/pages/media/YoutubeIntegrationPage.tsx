@@ -7,12 +7,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { toast } from 'sonner';
+import YouTube from 'react-youtube';
 import { usePlayer } from '../../context/PlayerContext';
 import { useChat } from '../../context/ChatContext';
 import { useAuth } from '../../context/AuthContext';
 import { youtubeService } from '../../services/api/services/youtubeService';
 import { logger } from '../../utils/prodLogger';
-import PageWrapper from '../../components/PageWrapper';
+import PageWrapper from '../../shared/components/PageWrapper';
 import type { YoutubeVideo } from '../../types/youtube';
 
 type PlaybackMode = 'browser' | 'obs';
@@ -32,6 +33,8 @@ const YoutubeIntegrationPage: React.FC = () => {
         toggleMute,
         nextVideo,
         handlePlayerReady,
+        handlePlayerStateChange,
+        handlePlayerError,
         setPlayerRef,
         setIsTheaterMode,
         loadQueue
@@ -42,9 +45,11 @@ const YoutubeIntegrationPage: React.FC = () => {
     const [youtubeObsUrl, setYoutubeObsUrl] = useState<string>('');
     const { lastJsonMessage } = useChat();
     
-    const handlePlayerReadyWithRef = (event: any): void => {
+    // Handler for the embedded player on this page
+    const handlePagePlayerReady = (event: any): void => {
         setPlayerRef(event.target);
         handlePlayerReady(event);
+        logger.debug('📺 [YouTube Page] Player ready');
     };
 
     const loadYoutubeSettings = useCallback(async (): Promise<void> => {
@@ -222,12 +227,34 @@ const YoutubeIntegrationPage: React.FC = () => {
                                     {playbackMode === 'browser' ? (
                                         <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
                                             {currentVideo ? (
-                                                <div className="w-full h-full flex items-center justify-center bg-muted">
-                                                    <div className="text-center px-4">
-                                                        <p className="text-muted-foreground text-xs mb-1">Видео воспроизводится в глобальном плеере</p>
-                                                        <p className="text-xs text-muted-foreground/70">Управление доступно в мини-плеере внизу страницы</p>
-                                                    </div>
-                                                </div>
+                                                <YouTube
+                                                    videoId={currentVideo.video_id || currentVideo.id}
+                                                    onReady={handlePagePlayerReady}
+                                                    onStateChange={handlePlayerStateChange}
+                                                    onError={handlePlayerError}
+                                                    opts={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        playerVars: {
+                                                            autoplay: 1,
+                                                            controls: 1,
+                                                            disablekb: 0,
+                                                            enablejsapi: 1,
+                                                            fs: 1,
+                                                            iv_load_policy: 3,
+                                                            modestbranding: 1,
+                                                            playsinline: 1,
+                                                            rel: 0,
+                                                            showinfo: 0,
+                                                            cc_load_policy: 0,
+                                                            hl: 'ru',
+                                                            origin: window.location.origin,
+                                                            widget_referrer: window.location.origin
+                                                        }
+                                                    }}
+                                                    key={`page-player-${currentVideo.video_id || currentVideo.id}-${Date.now()}`}
+                                                    className="w-full h-full"
+                                                />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center bg-muted">
                                                     <p className="text-muted-foreground text-xs">Нет видео для воспроизведения.</p>
@@ -435,7 +462,42 @@ const YoutubeIntegrationPage: React.FC = () => {
                                     Выйти из полного экрана
                                 </Button>
                             </div>
-                            <div className="aspect-video bg-black rounded-lg"></div>
+                            <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                                {currentVideo ? (
+                                    <YouTube
+                                        videoId={currentVideo.video_id || currentVideo.id}
+                                        onReady={handlePagePlayerReady}
+                                        onStateChange={handlePlayerStateChange}
+                                        onError={handlePlayerError}
+                                        opts={{
+                                            width: '100%',
+                                            height: '100%',
+                                            playerVars: {
+                                                autoplay: 1,
+                                                controls: 1,
+                                                disablekb: 0,
+                                                enablejsapi: 1,
+                                                fs: 1,
+                                                iv_load_policy: 3,
+                                                modestbranding: 1,
+                                                playsinline: 1,
+                                                rel: 0,
+                                                showinfo: 0,
+                                                cc_load_policy: 0,
+                                                hl: 'ru',
+                                                origin: window.location.origin,
+                                                widget_referrer: window.location.origin
+                                            }
+                                        }}
+                                        key={`theater-player-${currentVideo.video_id || currentVideo.id}-${Date.now()}`}
+                                        className="w-full h-full"
+                                    />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-muted">
+                                        <p className="text-muted-foreground">Нет видео для воспроизведения.</p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         <div className="col-span-1 h-full">

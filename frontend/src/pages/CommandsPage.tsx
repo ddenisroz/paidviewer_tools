@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
     Terminal, 
     Edit2, 
@@ -31,7 +32,9 @@ import {
     Radio,
     Tag,
     AlertCircle,
-    Plus
+    Plus,
+    CheckCircle2,
+    XCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -45,7 +48,7 @@ import {
     useToggleCommand,
 } from '../queries/commands/commandsQueries';
 import { PageLoader } from '@/components/ui/loader';
-import PageWrapper from '../components/PageWrapper';
+import PageWrapper from '../shared/components/PageWrapper';
 
 interface Command {
     id?: number;
@@ -97,7 +100,7 @@ interface TagConfig {
 interface CommandCardProps {
     command: Command;
     type: 'basic' | 'custom';
-    onToggle: (commandName: string, data: { is_enabled: boolean }) => void;
+    onToggle: (commandName: string, data: { is_enabled: boolean }, commandId?: number) => void;
     onEdit: (command: Command) => void;
     onDelete?: (commandId: number) => void;
 }
@@ -136,7 +139,7 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
             const normalizedValue = opt.value?.split(',').sort().join(',');
             return normalizedValue === normalizedRole;
         });
-        return option ? option.label : role;
+        return option ? option.label : `⚠️ ${role}`;
     };
 
     const getPlatformLabel = (platforms: string | undefined): string => {
@@ -173,7 +176,7 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                             </Badge>
                             <Switch
                                 checked={command.is_enabled}
-                                onCheckedChange={(checked) => onToggle(command.command_name, { is_enabled: checked })}
+                                onCheckedChange={(checked) => onToggle(command.command_name, { is_enabled: checked }, command.id)}
                                 className="transition-all duration-300 ease-in-out"
                             />
                         </div>
@@ -195,8 +198,8 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                     </div>
                 )}
 
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-3 text-muted-foreground">
                         <div className="flex items-center gap-1">
                             {getRoleIcon(command.allowed_roles || 'all')}
                             <span>{getRoleLabel(command.allowed_roles || 'all')}</span>
@@ -206,8 +209,17 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                             <span>{command.cooldown_seconds || 0}с</span>
                         </div>
                     </div>
-                    <div className="text-right">
-                        {getPlatformLabel(command.platforms || 'twitch,vk')}
+                    <div className="flex items-center gap-1.5">
+                        {(command.platforms || 'twitch,vk').includes('twitch') && (
+                            <Badge variant="outline" className="text-xs px-1.5 py-0 bg-purple-500/10 text-purple-600 border-purple-500/20">
+                                Twitch
+                            </Badge>
+                        )}
+                        {(command.platforms || 'twitch,vk').includes('vk') && (
+                            <Badge variant="outline" className="text-xs px-1.5 py-0 bg-red-500/10 text-red-600 border-red-500/20">
+                                VK
+                            </Badge>
+                        )}
                     </div>
                 </div>
 
@@ -258,6 +270,96 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
 
 CommandCard.displayName = 'CommandCard';
 
+interface PlatformStatusBannerProps {
+    integrations: {
+        twitch: { enabled: boolean; username: string | null };
+        vk: { enabled: boolean; username: string | null };
+    };
+}
+
+const PlatformStatusBanner: React.FC<PlatformStatusBannerProps> = ({ integrations }) => {
+    const twitchConnected = integrations?.twitch?.enabled;
+    const vkConnected = integrations?.vk?.enabled;
+    const bothConnected = twitchConnected && vkConnected;
+    const noneConnected = !twitchConnected && !vkConnected;
+
+    if (bothConnected) {
+        return (
+            <Alert className="mb-6 border-green-500/50 bg-green-500/10">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-sm">
+                    <div className="flex items-center gap-4">
+                        <span className="font-medium">Платформы подключены:</span>
+                        <div className="flex items-center gap-3">
+                            <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-purple-500/20">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Twitch {integrations.twitch.username && `(@${integrations.twitch.username})`}
+                            </Badge>
+                            <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                VK Live {integrations.vk.username && `(@${integrations.vk.username})`}
+                            </Badge>
+                        </div>
+                        <span className="text-muted-foreground">Команды доступны на всех платформах</span>
+                    </div>
+                </AlertDescription>
+            </Alert>
+        );
+    }
+
+    if (noneConnected) {
+        return (
+            <Alert className="mb-6 border-red-500/50 bg-red-500/10">
+                <XCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-sm">
+                    <div className="flex items-center justify-between">
+                        <span>Нет подключенных платформ. Подключите Twitch или VK Live для использования команд.</span>
+                        <Button variant="outline" size="sm" onClick={() => window.location.href = '/settings'}>
+                            Настройки
+                        </Button>
+                    </div>
+                </AlertDescription>
+            </Alert>
+        );
+    }
+
+    return (
+        <Alert className="mb-6 border-yellow-500/50 bg-yellow-500/10">
+            <AlertCircle className="h-4 w-4 text-yellow-600" />
+            <AlertDescription className="text-sm">
+                <div className="flex items-center gap-4">
+                    <span className="font-medium">Частичное подключение:</span>
+                    <div className="flex items-center gap-3">
+                        {twitchConnected ? (
+                            <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-purple-500/20">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Twitch {integrations.twitch.username && `(@${integrations.twitch.username})`}
+                            </Badge>
+                        ) : (
+                            <Badge variant="outline" className="bg-gray-500/10 text-gray-600 border-gray-500/20">
+                                <XCircle className="h-3 w-3 mr-1" />
+                                Twitch не подключен
+                            </Badge>
+                        )}
+                        {vkConnected ? (
+                            <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                VK Live {integrations.vk.username && `(@${integrations.vk.username})`}
+                            </Badge>
+                        ) : (
+                            <Badge variant="outline" className="bg-gray-500/10 text-gray-600 border-gray-500/20">
+                                <XCircle className="h-3 w-3 mr-1" />
+                                VK Live не подключен
+                            </Badge>
+                        )}
+                    </div>
+                    <span className="text-muted-foreground">Команды доступны только на подключенных платформах</span>
+                </div>
+            </AlertDescription>
+        </Alert>
+    );
+};
+
 const CommandsPage: React.FC = () => {
     const navigate = useNavigate();
     const { isAuthenticated } = useAuth();
@@ -278,6 +380,8 @@ const CommandsPage: React.FC = () => {
     const [selectedBasicTags, setSelectedBasicTags] = useState<string[]>([]);
     const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
     const [tagSearchTerm, setTagSearchTerm] = useState<string>('');
+    const [platformFilter, setPlatformFilter] = useState<string>('all'); // 'all', 'twitch', 'vk'
+    const [customSearchTerm, setCustomSearchTerm] = useState<string>('');
     
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState<boolean>(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState<boolean>(false);
@@ -371,15 +475,26 @@ const CommandsPage: React.FC = () => {
             const matchesSearch = command.command_name.toLowerCase().includes(basicSearchTerm.toLowerCase()) ||
                                 command.description?.toLowerCase().includes(basicSearchTerm.toLowerCase());
             
-            if (selectedBasicTags.length === 0) {
-                return matchesSearch;
-            }
-            
-            const matchesTags = selectedBasicTags.some(selectedTag => 
+            const matchesTags = selectedBasicTags.length === 0 || selectedBasicTags.some(selectedTag => 
                 command.tags && Array.isArray(command.tags) && command.tags.includes(selectedTag)
             );
             
-            return matchesSearch && matchesTags;
+            const matchesPlatform = platformFilter === 'all' || 
+                                  (command.platforms || 'twitch,vk').includes(platformFilter);
+            
+            return matchesSearch && matchesTags && matchesPlatform;
+        });
+    };
+
+    const getFilteredCustomCommands = (): Command[] => {
+        return customCommands.filter((command: Command) => {
+            const matchesSearch = command.command_name.toLowerCase().includes(customSearchTerm.toLowerCase()) ||
+                                command.response_text?.toLowerCase().includes(customSearchTerm.toLowerCase());
+            
+            const matchesPlatform = platformFilter === 'all' || 
+                                  (command.platforms || 'twitch,vk').includes(platformFilter);
+            
+            return matchesSearch && matchesPlatform;
         });
     };
 
@@ -463,8 +578,12 @@ const CommandsPage: React.FC = () => {
         }
     };
 
-    const handleToggleCommand = (commandName: string, data: { is_enabled: boolean }): void => {
-        toggleCommandMutation.mutate({ commandName, data });
+    const handleToggleCommand = (commandName: string, data: { is_enabled: boolean }, commandId?: number): void => {
+        if (!commandId) {
+            console.error('Command ID is required for toggle operation');
+            return;
+        }
+        toggleCommandMutation.mutate({ commandName, data: { ...data, command_id: commandId } });
     };
 
     const handleDeleteCommand = (commandId: number): void => {
@@ -503,6 +622,7 @@ const CommandsPage: React.FC = () => {
 
     return (
         <PageWrapper>
+            <PlatformStatusBanner integrations={integrations} />
             <Tabs defaultValue="basic" className="space-y-6">
                 <TabsList>
                     <TabsTrigger value="basic">Базовые команды</TabsTrigger>
@@ -518,6 +638,24 @@ const CommandsPage: React.FC = () => {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="text-sm text-muted-foreground">
+                                    Показано команд: <span className="font-medium text-foreground">{getFilteredBasicCommands().length}</span> из {basicCommands.length}
+                                </div>
+                                {(basicSearchTerm || selectedBasicTags.length > 0 || platformFilter !== 'all') && (
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={() => {
+                                            setBasicSearchTerm('');
+                                            setSelectedBasicTags([]);
+                                            setPlatformFilter('all');
+                                        }}
+                                    >
+                                        Сбросить фильтры
+                                    </Button>
+                                )}
+                            </div>
                             <div className="flex flex-col sm:flex-row gap-4 mb-6">
                                 <div className="flex-1">
                                     <div className="relative">
@@ -530,6 +668,35 @@ const CommandsPage: React.FC = () => {
                                         />
                                     </div>
                                 </div>
+                                
+                                <Select value={platformFilter} onValueChange={setPlatformFilter}>
+                                    <SelectTrigger className="w-[180px]">
+                                        <SelectValue placeholder="Все платформы" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Все платформы</SelectItem>
+                                        <SelectItem value="twitch">
+                                            <div className="flex items-center gap-2">
+                                                {integrations?.twitch?.enabled ? (
+                                                    <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                                ) : (
+                                                    <XCircle className="h-3 w-3 text-gray-400" />
+                                                )}
+                                                Twitch
+                                            </div>
+                                        </SelectItem>
+                                        <SelectItem value="vk">
+                                            <div className="flex items-center gap-2">
+                                                {integrations?.vk?.enabled ? (
+                                                    <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                                ) : (
+                                                    <XCircle className="h-3 w-3 text-gray-400" />
+                                                )}
+                                                VK Live
+                                            </div>
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
                                 
                                 <div className="relative">
                                     <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
@@ -758,6 +925,69 @@ const CommandsPage: React.FC = () => {
                             </Dialog>
                         </CardHeader>
                         <CardContent>
+                            {customCommands.length > 0 && (
+                                <>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="text-sm text-muted-foreground">
+                                            Показано команд: <span className="font-medium text-foreground">{getFilteredCustomCommands().length}</span> из {customCommands.length}
+                                        </div>
+                                        {(customSearchTerm || platformFilter !== 'all') && (
+                                            <Button 
+                                                variant="ghost" 
+                                                size="sm" 
+                                                onClick={() => {
+                                                    setCustomSearchTerm('');
+                                                    setPlatformFilter('all');
+                                                }}
+                                            >
+                                                Сбросить фильтры
+                                            </Button>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                                    <div className="flex-1">
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                                            <Input
+                                                placeholder="Поиск кастомных команд..."
+                                                value={customSearchTerm}
+                                                onChange={(e) => setCustomSearchTerm(e.target.value)}
+                                                className="pl-10"
+                                            />
+                                        </div>
+                                    </div>
+                                    
+                                    <Select value={platformFilter} onValueChange={setPlatformFilter}>
+                                        <SelectTrigger className="w-[180px]">
+                                            <SelectValue placeholder="Все платформы" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">Все платформы</SelectItem>
+                                            <SelectItem value="twitch">
+                                                <div className="flex items-center gap-2">
+                                                    {integrations?.twitch?.enabled ? (
+                                                        <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                                    ) : (
+                                                        <XCircle className="h-3 w-3 text-gray-400" />
+                                                    )}
+                                                    Twitch
+                                                </div>
+                                            </SelectItem>
+                                            <SelectItem value="vk">
+                                                <div className="flex items-center gap-2">
+                                                    {integrations?.vk?.enabled ? (
+                                                        <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                                    ) : (
+                                                        <XCircle className="h-3 w-3 text-gray-400" />
+                                                    )}
+                                                    VK Live
+                                                </div>
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                </>
+                            )}
                             {!loading && customCommands.length === 0 ? (
                                 <div className="text-center py-12 space-y-4">
                                     <Terminal className="h-16 w-16 mx-auto text-muted-foreground opacity-50" />
@@ -770,7 +1000,7 @@ const CommandsPage: React.FC = () => {
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-all duration-200">
-                                    {customCommands.map((command: Command) => (
+                                    {getFilteredCustomCommands().map((command: Command) => (
                                         <div key={command.id || command.command_name} className="transition-all duration-200">
                                             <CommandCard
                                                 command={command}

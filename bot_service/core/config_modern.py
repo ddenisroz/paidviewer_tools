@@ -5,7 +5,7 @@
 """
 import logging
 from typing import Optional
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
@@ -73,10 +73,11 @@ class ModernConfig(BaseSettings):
     debug: bool = Field(default=False, description="Debug mode")
     log_level: str = Field(default="INFO", description="Log level")
     
-    @validator('secret_key')
-    def validate_secret_key(cls, v, values):
+    @field_validator('secret_key')
+    @classmethod
+    def validate_secret_key(cls, v, info):
         """❌ КРИТИЧНО: SECRET_KEY должен быть изменен с default в production!"""
-        environment = values.get('environment', 'development')
+        environment = info.data.get('environment', 'development')
         if environment == 'production' and v == "your-super-secret-jwt-key-here":
             raise ValueError(
                 "🚨 PRODUCTION ERROR: SECRET_KEY must be changed from default value! "
@@ -86,10 +87,11 @@ class ModernConfig(BaseSettings):
             logger.warning(f"⚠️ SECRET_KEY is too short ({len(v)} chars), recommended 32+ characters")
         return v
     
-    @validator('token_encryption_key')
-    def validate_encryption_key(cls, v, values):
+    @field_validator('token_encryption_key')
+    @classmethod
+    def validate_encryption_key(cls, v, info):
         """❌ КРИТИЧНО: TOKEN_ENCRYPTION_KEY должен быть изменен с default в production!"""
-        environment = values.get('environment', 'development')
+        environment = info.data.get('environment', 'development')
         default_key = "tsWOwRqyIbRBATNPyONTd0K1sHLzVPbEeVFmMc7T8II="
         if environment == 'production' and v == default_key:
             raise ValueError(
@@ -98,29 +100,33 @@ class ModernConfig(BaseSettings):
             )
         return v
     
-    @validator('jwt_secret_key')
-    def validate_jwt_secret(cls, v, values):
+    @field_validator('jwt_secret_key')
+    @classmethod
+    def validate_jwt_secret(cls, v, info):
         # Если jwt_secret_key не задан, используем secret_key
-        if not v and 'secret_key' in values:
-            v = values['secret_key']
+        if not v and 'secret_key' in info.data:
+            v = info.data['secret_key']
         
         if v == "your-super-secret-jwt-key-here":
             logger.warning("⚠️ Using default JWT secret key! Change JWT_SECRET_KEY in production!")
         return v
     
-    @validator('rate_limit_requests_per_minute')
+    @field_validator('rate_limit_requests_per_minute')
+    @classmethod
     def validate_rate_limit(cls, v):
         if v < 1:
             raise ValueError("Rate limit must be at least 1")
         return v
     
-    @validator('tts_max_text_length')
+    @field_validator('tts_max_text_length')
+    @classmethod
     def validate_tts_length(cls, v):
         if v < 10:
             raise ValueError("TTS text length must be at least 10 characters")
         return v
     
-    @validator('tts_priority_level')
+    @field_validator('tts_priority_level')
+    @classmethod
     def validate_tts_priority(cls, v):
         if not 1 <= v <= 4:
             raise ValueError("TTS priority level must be between 1 and 4")

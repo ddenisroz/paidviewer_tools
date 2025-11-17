@@ -807,6 +807,7 @@ async def upload_user_voice_endpoint(
             reference_text=reference_text or None,
             owner_id=user_id,
             is_active=True,
+            is_global=False,  # User-uploaded voices are not global
             cfg_strength=config.cfg_strength,  # Используем значение из конфига (по умолчанию 2.5)
             speed_preset='normal'  # Константа для скорости по умолчанию
         )
@@ -1060,4 +1061,155 @@ async def update_user_voice_settings_endpoint(
         raise
     except Exception as e:
         logger.error(f"Update voice settings error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Global voices endpoints
+
+@tts_api.get("/voices/global")
+async def get_global_voices(db: Session = Depends(get_db)):
+    """Get all global voices (admin-uploaded voices available to all users)"""
+    try:
+        voices = db.query(VoiceModel).filter(
+            VoiceModel.is_global == True,
+            VoiceModel.is_active == True
+        ).all()
+        
+        return [
+            {
+                "id": voice.id,
+                "name": voice.name,
+                "voice_type": voice.voice_type,
+                "is_global": voice.is_global,
+                "is_active": voice.is_active,
+                "cfg_strength": voice.cfg_strength,
+                "speed_preset": voice.speed_preset,
+                "reference_text": voice.reference_text,
+                "created_at": voice.created_at.isoformat() if voice.created_at else None
+            }
+            for voice in voices
+        ]
+    except Exception as e:
+        logger.error(f"Error fetching global voices: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@tts_api.get("/voices/{voice_id}")
+async def get_voice_by_id(voice_id: int, db: Session = Depends(get_db)):
+    """Get a specific voice by ID"""
+    try:
+        voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
+        
+        if not voice:
+            raise HTTPException(status_code=404, detail="Voice not found")
+        
+        return {
+            "id": voice.id,
+            "name": voice.name,
+            "voice_type": voice.voice_type,
+            "owner_id": voice.owner_id,
+            "is_global": voice.is_global,
+            "is_active": voice.is_active,
+            "cfg_strength": voice.cfg_strength,
+            "speed_preset": voice.speed_preset,
+            "reference_text": voice.reference_text,
+            "created_at": voice.created_at.isoformat() if voice.created_at else None
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching voice: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@tts_api.put("/user/voices/{voice_id}/settings")
+async def update_user_voice_settings(
+    voice_id: int,
+    settings: dict,
+    db: Session = Depends(get_db)
+):
+    """Update settings for a user's custom voice"""
+    try:
+        voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
+        
+        if not voice:
+            raise HTTPException(status_code=404, detail="Voice not found")
+        
+        # Only allow updating custom voices (not global)
+        if voice.is_global:
+            raise HTTPException(
+                status_code=403,
+                detail="Cannot modify global voice settings. Use personal settings instead."
+            )
+        
+        # Update settings
+        if 'cfg_strength' in settings:
+            voice.cfg_strength = settings['cfg_strength']
+        if 'speed_preset' in settings:
+            voice.speed_preset = settings['speed_preset']
+        
+        db.commit()
+        db.refresh(voice)
+        
+        logger.info(f"✅ Updated custom voice {voice_id} settings")
+        
+        return {
+            "success": True,
+            "message": "Voice settings updated",
+            "settings": {
+                "cfg_strength": voice.cfg_strength,
+                "speed_preset": voice.speed_preset
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating voice settings: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@tts_api.delete("/user/voices/{voice_id}")
+async def delete_user_voice(
+    voice_id: int,
+    user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Delete a user's custom voice"""
+    try:
+        voice = db.query(VoiceModel).filter(
+            VoiceModel.id == voice_id,
+            VoiceModel.owner_id == user_id,
+            VoiceModel.is_global == False
+        ).first()
+        
+        if not voice:
+            raise HTTPException(
+                status_code=404,
+                detail="Voice not found or access denied"
+            )
+        
+        # Delete the voice file
+        if voice.file_path and os.path.exists(voice.file_path):
+            try:
+                os.remove(voice.file_path)
+                logger.info(f"✅ Deleted voice file: {voice.file_path}")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to delete voice file: {e}")
+        
+        # Delete from database
+        db.delete(voice)
+        db.commit()
+        
+        logger.info(f"✅ User {user_id} deleted custom voice {voice_id}")
+        
+        return {
+            "success": True,
+            "message": "Voice deleted successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting voice: {e}")
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))

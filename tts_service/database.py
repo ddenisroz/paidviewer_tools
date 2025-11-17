@@ -59,6 +59,7 @@ class Voice(Base):
     owner_id = Column(Integer, ForeignKey('users.id'), nullable=True)
     is_public = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
+    is_global = Column(Boolean, default=False)  # True for admin-uploaded global voices, False for user voices
     created_at = Column(DateTime(timezone=True), default=func.now())
     
     # Настройки генерации TTS (настраиваемые пользователем)

@@ -1,0 +1,193 @@
+:root {
+    /* Настраиваемые переменные */
+    --widget-width: 400px;
+    --widget-height: 300px;
+    --background-color: rgba(0, 0, 0, 0.8);
+    --background-image: none;
+    --border-radius: 8px;
+    --border-color: #333;
+    --border-width: 2px;
+    
+    /* Стили сообщений */
+    --message-bg: rgba(255, 255, 255, 0.1);
+    --message-border-radius: 4px;
+    --message-margin: 4px;
+    --message-padding: 8px;
+    
+    /* Шрифты */
+    --font-family: 'Arial', sans-serif;
+    --font-size: 14px;
+    --font-weight: normal;
+    --text-color: #ffffff;
+    
+    /* Анимации */
+    --animation-duration: 0.3s;
+    --animation-type: slide-in;
+    
+    /* Цвета по ролям */
+    --moderator-color: #00ff00;
+    --vip-color: #ff6b6b;
+    --subscriber-color: #4ecdc4;
+    --normal-color: #ffffff;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    font-family: var(--font-family);
+    overflow: hidden;
+}
+
+.chat-container {
+    width: var(--widget-width);
+    height: var(--widget-height);
+    background: var(--background-color);
+    background-image: var(--background-image);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 10px;
+    box-sizing: border-box;
+    overflow: hidden;
+    position: relative;
+}
+
+.chat-messages {
+    height: 100%;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--message-margin);
+}
+
+.chat-message {
+    background: var(--message-bg);
+    border-radius: var(--message-border-radius);
+    padding: var(--message-padding);
+    color: var(--text-color);
+    font-size: var(--font-size);
+    font-weight: var(--font-weight);
+    word-wrap: break-word;
+    opacity: 0;
+    transform: translateX(-100%);
+    transition: all var(--animation-duration) ease-out;
+}
+
+.chat-message.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* Анимации по типу */
+.chat-message.slide-in {
+    animation: slideIn var(--animation-duration) ease-out;
+}
+
+.chat-message.fade-in {
+    animation: fadeIn var(--animation-duration) ease-out;
+}
+
+.chat-message.bounce-in {
+    animation: bounceIn var(--animation-duration) ease-out;
+}
+
+/* Цвета по ролям */
+.chat-message.moderator {
+    color: var(--moderator-color);
+    border-left: 3px solid var(--moderator-color);
+}
+
+.chat-message.vip {
+    color: var(--vip-color);
+    border-left: 3px solid var(--vip-color);
+}
+
+.chat-message.subscriber {
+    color: var(--subscriber-color);
+    border-left: 3px solid var(--subscriber-color);
+}
+
+.chat-message.normal {
+    color: var(--normal-color);
+}
+
+/* Стили элементов сообщения */
+.username {
+    font-weight: bold;
+    margin-right: 8px;
+}
+
+.role-badge {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    margin-right: 6px;
+}
+
+.platform-indicator {
+    font-size: 12px;
+    margin-right: 4px;
+}
+
+.timestamp {
+    font-size: 11px;
+    opacity: 0.7;
+    margin-left: 8px;
+}
+
+.message-text {
+    word-break: break-word;
+}
+
+/* Анимации */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes bounceIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.3);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    70% {
+        transform: scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Скрытие полос прокрутки */
+.chat-messages::-webkit-scrollbar {
+    width: 0px;
+    background: transparent;
+}
+
+/* Эмодзи поддержка */
+.chat-message img.emoji {
+    height: 1.2em;
+    width: 1.2em;
+    vertical-align: middle;
+    margin: 0 2px;
+}

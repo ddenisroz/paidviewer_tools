@@ -1,145 +1,190 @@
 # Project Structure
 
-## Root Layout
+## Root Organization
 
 ```
-├── bot_service/          # Backend FastAPI service
-├── tts_service/          # TTS microservice (F5-TTS)
-├── tts_service_simple/   # Simplified TTS service
-├── frontend/             # React frontend
-├── docs/                 # Documentation
+├── bot_service/          # Backend service (FastAPI)
+├── frontend/             # Frontend application (React + Vite)
+├── tts_service/          # Advanced TTS service (F5-TTS, multi-user)
+├── tts_service_simple/   # Simple TTS service (F5-TTS, single-user)
+├── docs/                 # Comprehensive documentation
+├── legacy/               # Archived legacy code
 ├── logs/                 # Application logs
 ├── scripts/              # Utility scripts
-├── docker-compose.*.yml  # Docker configurations
-└── nginx*.conf           # Nginx configurations
+└── docker-compose.*.yml  # Docker configurations
 ```
 
 ## Backend Structure (bot_service/)
 
 ```
 bot_service/
-├── api/                  # API endpoints (REST)
-│   ├── tts_api.py       # TTS synthesis endpoints
-│   ├── youtube_api_endpoints.py
-│   ├── points_api_endpoints.py
-│   ├── drops_api.py
-│   ├── commands_api.py
-│   └── support_api.py
-├── auth/                 # Authentication logic
-│   ├── auth.py          # JWT validation, get_current_user
-│   ├── twitch_auth.py   # Twitch OAuth flow
-│   └── vk_auth.py       # VK Live OAuth flow
-├── bots/                 # Chat bot integrations
-│   ├── twitch_bot.py    # Twitch chat bot
-│   └── vk_bot.py        # VK Live chat bot
-├── core/                 # Core utilities
-│   ├── database.py      # SQLAlchemy models and DB setup
-│   ├── middleware.py    # Security headers, logging
-│   ├── security_modern.py  # Rate limiting
-│   └── session_manager.py  # Session management
-├── services/             # Business logic layer
-│   ├── tts_service/     # TTS processing (gTTS, F5-TTS)
-│   ├── queue_service.py # Queue management
-│   ├── points_service.py
-│   └── websocket_helper.py  # WebSocket broadcasting
-├── validators/           # Input validation
-│   └── input_validators.py  # XSS/SQLi sanitization
-├── utils/                # Shared utilities
-│   ├── db_utils.py      # Database helpers
-│   └── enhanced_logger.py  # Structured logging
-├── models/               # Data models
-├── alembic/              # Database migrations
-├── main.py               # Application entry point
-└── requirements.txt      # Python dependencies
+├── api/                  # API endpoints
+│   ├── admin/           # Admin-only endpoints
+│   └── user/            # User endpoints
+├── auth/                # OAuth 2.0 handlers (Twitch, VK)
+├── bots/                # Chat bot implementations
+│   ├── twitch_bot.py
+│   └── vk_bot.py
+├── platforms/           # Platform abstraction layer
+│   ├── base.py         # StreamingPlatform interface
+│   ├── registry.py     # Platform registry
+│   ├── twitch.py       # Twitch implementation
+│   └── vk.py           # VK implementation
+├── services/            # Business logic layer
+├── core/                # Core functionality
+│   ├── config.py       # Centralized configuration (pydantic-settings)
+│   ├── database.py     # SQLAlchemy models
+│   ├── websocket_manager.py
+│   └── permissions.py  # Role-based access control
+├── models/              # Pydantic validation models
+├── validators/          # Input validation and sanitization
+├── utils/               # Helper utilities
+├── middleware/          # FastAPI middleware
+├── alembic/             # Database migrations
+├── tests/               # Backend tests
+├── main.py              # Application entry point
+└── requirements.txt     # Python dependencies
 ```
 
-## Frontend Structure (frontend/src/)
+### Key Backend Patterns
+
+- **API Endpoints**: Use FastAPI routers with dependency injection
+- **Authentication**: `Depends(get_current_user)` for protected routes
+- **Database**: SQLAlchemy ORM with async support, use `Depends(get_db)` for sessions
+- **Validation**: Pydantic models in `models/validation_models.py`
+- **Configuration**: Import from `core.config import settings` (never use `os.getenv()`)
+- **Logging**: Use `structlog` with contextual information
+
+## Frontend Structure (frontend/)
 
 ```
-frontend/src/
-├── pages/                # Page components (routes)
-│   ├── HomePage.jsx     # Dashboard
-│   ├── tts/             # TTS-related pages
-│   ├── media/           # YouTube, Points, Drops pages
-│   ├── ChatWindow.jsx   # Chat interface
-│   └── admin/           # Admin panel pages
-├── components/           # Reusable components
-│   ├── tts/             # TTS-specific components
-│   ├── chat/            # Chat-specific components
-│   ├── layout/          # Header, Sidebar, Footer
-│   ├── ui/              # shadcn/ui base components
-│   └── admin/           # Admin panel components
-├── context/              # React Context providers
-│   ├── AuthContext.jsx  # Authentication (GLOBAL)
-│   ├── TtsContext.jsx   # TTS state (LOCAL)
-│   ├── ChatContext.jsx  # Chat state (GLOBAL)
-│   ├── UserSettingsContext.jsx  # User settings (GLOBAL)
-│   └── IntegrationsContext.jsx  # Platform integrations (GLOBAL)
-├── services/             # API client layer
-│   ├── microservices.js # Main API client (axios)
-│   ├── websocket.js     # WebSocket connection
-│   ├── twitchApi.js     # Twitch API wrapper
-│   └── youtubeApi.js    # YouTube API wrapper
-├── hooks/                # Custom React hooks
-│   ├── useWebSocket.js  # WebSocket hook
-│   ├── useAutoSave.js   # Auto-save with debounce
-│   ├── useDropsConfig.js
-│   └── useChatScroll.js
-├── utils/                # Utility functions
-│   ├── prodLogger.js    # Production logger
-│   ├── platformUtils.js # Platform helpers
-│   ├── oauthRedirect.js # OAuth flow helpers
-│   └── formatUtils.js   # Formatting utilities
-├── constants/            # Constants and configuration
-│   ├── categoryMapping.js  # Twitch ↔ VK category mapping
-│   ├── categoryAliases.js  # Game name aliases
-│   ├── drops.js         # Drops system constants
-│   └── websocket.js     # WebSocket event constants
-└── App.jsx               # Root component
+frontend/
+├── src/
+│   ├── components/      # React components
+│   │   ├── ui/         # shadcn/ui base components
+│   │   ├── tts/        # TTS-specific components
+│   │   ├── admin/      # Admin panel components
+│   │   └── widgets/    # OBS widgets
+│   ├── pages/           # Page components (route-level)
+│   │   ├── Dashboard.tsx
+│   │   ├── tts/        # TTS pages
+│   │   ├── admin/      # Admin pages
+│   │   └── drops/      # Drops pages
+│   ├── context/         # React Context providers
+│   │   ├── UserContext.tsx
+│   │   ├── ChatContext.tsx
+│   │   └── IntegrationsContext.tsx
+│   ├── services/        # API client services
+│   │   └── api.ts      # Axios instance and API calls
+│   ├── hooks/           # Custom React hooks
+│   │   ├── useFormValidation.ts
+│   │   └── useWebSocket.ts
+│   ├── utils/           # Utility functions
+│   │   ├── validationSchemas.ts  # Zod schemas
+│   │   ├── sanitization.ts       # Input sanitization
+│   │   └── sharedWebSocket.ts    # WebSocket with Leader Election
+│   ├── constants/       # Constants and mappings
+│   │   ├── categoryMapping.ts    # Twitch ↔ VK category mapping
+│   │   └── categoryAliases.ts    # Search aliases
+│   ├── lib/             # Third-party library configs
+│   └── App.tsx          # Root component
+├── public/              # Static assets
+├── dist/                # Build output
+└── package.json         # Node dependencies
 ```
 
-## Key Architectural Patterns
+### Key Frontend Patterns
 
-### Backend Patterns
+- **TypeScript Migration**: In progress (`.tsx` for new files, `.jsx` being migrated)
+- **Components**: Use shadcn/ui components, follow Design System (8px grid)
+- **State**: Context API for global state, React Query for server state
+- **Forms**: react-hook-form + Zod validation
+- **Styling**: Tailwind CSS with design system classes
+- **API Calls**: Use `services/api.ts` with error handling
+- **Routing**: Lazy loading for code splitting (`React.lazy()`)
 
-1. **API Endpoint Pattern**: All endpoints in `api/` folder, use FastAPI dependency injection
-2. **Service Layer**: Business logic separated in `services/`
-3. **Authentication**: JWT validation via `Depends(get_current_user)`
-4. **Database Access**: SQLAlchemy ORM with `Depends(get_db)`
-5. **Input Validation**: All user input sanitized via `validators/input_validators.py`
+## Documentation Structure (docs/)
 
-### Frontend Patterns
+```
+docs/
+├── ARCHITECTURE_GUIDE.md        # System architecture
+├── LLM_DEVELOPMENT_RULES.md     # AI development guidelines
+├── DO_NOT_TOUCH.md              # Protected systems
+├── DESIGN_SYSTEM.md             # UI design system
+├── VALIDATION_SYSTEM.md         # Validation patterns
+├── CURRENT_STATUS.md            # Current implementation status
+├── DEVELOPER_GUIDE.md           # Developer onboarding
+├── DEPLOYMENT.md                # Deployment guide
+├── QUICK_START.md               # Quick start guide
+└── [feature-specific docs]      # Individual feature docs
+```
 
-1. **Context API**: Global state in Context providers (Auth, Chat, Settings)
-2. **React Query**: Data fetching and caching for API calls
-3. **Custom Hooks**: Reusable logic extracted to `hooks/`
-4. **Component Organization**: Pages use components, components use ui primitives
-5. **Constants**: Hardcoded values extracted to `constants/`
+## Critical Files - DO NOT MODIFY
 
-## Critical Files (DO NOT MODIFY)
+See `docs/DO_NOT_TOUCH.md` for comprehensive list. Key protected systems:
 
-See `docs/DO_NOT_TOUCH.md` for detailed list. Key protected systems:
-
-1. **TTS System** (8 files, 1500+ lines) - Platform toggles, synchronization
-2. **Category System** (6 files, 893+ lines) - Stream category mapping, smart search
-3. **Authentication Flow** - OAuth handlers, token management
-4. **WebSocket System** - SharedWebSocket, leader election
-
-## Documentation
-
-All documentation in `docs/` folder:
-- `CURRENT_STATUS.md` - Current project state (READ FIRST)
-- `LLM_DEVELOPMENT_RULES.md` - Development rules for AI (MANDATORY)
-- `DO_NOT_TOUCH.md` - Protected files list
-- `ARCHITECTURE_OVERVIEW.md` - System architecture
-- `DEVELOPER_GUIDE.md` - Development patterns
+1. **TTS System** (8 files) - Platform settings, synchronization, filters
+2. **Category System** (5 files) - Stream category mapping and search
+3. **WebSocket System** (3 files) - Leader Election, connection management
+4. **Performance Optimizations** - Code splitting, virtualization, memoization
+5. **Error Handling** - Error boundaries, retry logic
+6. **Drops System** - Server-side calculation logic
+7. **Configuration System** - `core/config.py`, `.env.example` files
 
 ## Naming Conventions
 
-- **Python files**: `snake_case.py`
-- **React files**: `PascalCase.jsx` or `.tsx`
-- **Python classes**: `PascalCase`
-- **Python functions**: `snake_case`
+### Backend (Python)
+- **Files**: `snake_case.py`
+- **Classes**: `PascalCase`
+- **Functions**: `snake_case`
 - **Constants**: `UPPER_CASE`
-- **React components**: `PascalCase`
-- **React hooks**: `useCamelCase`
+- **Private**: `_leading_underscore`
+
+### Frontend (TypeScript/JavaScript)
+- **Files**: `PascalCase.tsx` (components), `camelCase.ts` (utilities)
+- **Components**: `PascalCase`
+- **Functions**: `camelCase`
+- **Hooks**: `useCamelCase`
+- **Constants**: `UPPER_CASE` or `camelCase`
+
+## Environment Files
+
+```
+bot_service/.env          # Backend configuration
+tts_service/.env          # TTS service configuration
+frontend/.env             # Frontend configuration
+
+*.env.example             # Templates for each service
+```
+
+Never commit `.env` files. Always use `.env.example` as templates.
+
+## Testing Structure
+
+```
+bot_service/tests/        # Backend tests
+  ├── test_api/          # API endpoint tests
+  ├── test_services/     # Service layer tests
+  └── conftest.py        # Pytest fixtures
+
+frontend/src/tests/       # Frontend tests (if present)
+```
+
+## Build Artifacts (Ignored)
+
+- `frontend/dist/` - Vite build output
+- `frontend/node_modules/` - Node dependencies
+- `bot_service/__pycache__/` - Python bytecode
+- `bot_service/.pytest_cache/` - Pytest cache
+- `.venv/` - Python virtual environment
+- `logs/` - Application logs
+
+## Key Architectural Principles
+
+1. **Platform Abstraction**: Use `platforms/` layer for multi-platform support
+2. **Validation**: Defense in depth (frontend Zod + backend Pydantic)
+3. **Configuration**: Centralized via environment variables
+4. **Separation of Concerns**: API → Services → Database
+5. **Error Handling**: Comprehensive error boundaries and logging
+6. **Performance**: Code splitting, lazy loading, virtualization
+7. **Security**: Input sanitization, rate limiting, JWT authentication

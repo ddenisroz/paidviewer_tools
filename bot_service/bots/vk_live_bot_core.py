@@ -255,7 +255,7 @@ class VKLiveBotCore:
             
             # 1.5. ✅ НОВОЕ: Увеличиваем счетчик сообщений для стриков (только если стрик включен)
             try:
-                from services.drops_service import DropsService
+                from features.drops.drops_service import DropsService
                 from core.database import get_db, User
                 from sqlalchemy import func
                 

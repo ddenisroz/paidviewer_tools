@@ -1,0 +1,22 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Design System Check
+echo "🎨 Checking Design System compliance..."
+npm run check:design
+
+# If check fails, show helpful message
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "❌ Design System check failed!"
+  echo ""
+  echo "💡 To fix automatically, run:"
+  echo "   npm run migrate:design:apply"
+  echo ""
+  echo "📚 Or check the guide:"
+  echo "   docs/DESIGN_SYSTEM.md"
+  echo ""
+  exit 1
+fi
+
+echo "✅ Design System check passed!"

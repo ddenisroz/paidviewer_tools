@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { TwitchIcon, VKIcon } from '../components/PlatformIcons';
+import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
 import { useAuth } from '../context/AuthContext';
 import MessageContent from '../components/MessageContent';
 import { twitchBadgesService } from '../services/twitchBadges';

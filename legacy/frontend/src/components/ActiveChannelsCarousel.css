@@ -1,0 +1,56 @@
+@keyframes scroll-smooth {
+    0% {
+        transform: translateY(0);
+    }
+    100% {
+        transform: translateY(-50%);
+    }
+}
+
+.animate-scroll-smooth {
+    animation: scroll-smooth 30s linear infinite;
+}
+
+.animate-scroll-smooth:hover {
+    animation-play-state: paused;
+}
+
+/* Стили для вертикальной карусели в стиле "Уже подключились" */
+.vertical-carousel {
+    background: transparent;
+    backdrop-filter: none;
+    border: none;
+    box-shadow: none;
+}
+
+.carousel-item {
+    background: transparent;
+    border: none;
+    transition: none;
+}
+
+.carousel-item:hover {
+    background: transparent;
+    transform: none;
+}
+
+.avatar-border {
+    border: none;
+}
+
+.avatar-border.live {
+    border: none;
+}
+
+.live-badge {
+    background: linear-gradient(45deg, #ef4444, #dc2626);
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 4px;
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+}

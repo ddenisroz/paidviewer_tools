@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { chatboxService } from '../services/api/services/chatboxService';
-import { TwitchIcon, VKIcon } from './PlatformIcons';
+import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
 import { toast } from 'sonner';
 import { twitchBadgesService } from '../services/twitchBadges';
 import { logger } from '../utils/prodLogger';
@@ -56,13 +56,17 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
         font_family: 'Inter',
         font_size: 16,
         text_stroke_width: 0,
+        text_stroke_color: '#000000',
         background_opacity: 0.5,
+        background_color: '#000000',
         max_messages: 20,
         message_spacing: 4,
         animation_type: 'fade',
+        animation_duration: 300,
         message_fade_seconds: 60,
         chat_direction: 'vertical',
         chat_width: 100,
+        border_radius: 8,
         show_platform_icons: true,
         show_badges: true,
         // v0.03 - новые настройки для 7TV эмодзи и ссылок
@@ -90,13 +94,17 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                 font_family: 'Inter',
                 font_size: 16,
                 text_stroke_width: 0,
+                text_stroke_color: '#000000',
                 background_opacity: 0.5,
+                background_color: '#000000',
                 max_messages: 20,
                 message_spacing: 4,
                 animation_type: 'fade',
+                animation_duration: 300,
                 message_fade_seconds: 60,
                 chat_direction: 'vertical',
                 chat_width: 100,
+                border_radius: 8,
                 show_platform_icons: true,
                 show_badges: true,
                 show_7tv_emotes: true,
@@ -146,25 +154,26 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
             
             // ✅ Нормализуем данные - убеждаемся что числа это числа
             const normalizedSettings: ChatBoxSettings = {
-                font_family: data.font_family || 'Arial',
+                font_family: data.font_family || 'Inter',
                 font_size: parseInt(String(data.font_size)) || 16,
                 text_stroke_width: parseInt(String(data.text_stroke_width)) || 0,
+                text_stroke_color: data.text_stroke_color || '#000000',
                 background_opacity: parseFloat(String(data.background_opacity)) ?? 0.5,
+                background_color: data.background_color || '#000000',
                 max_messages: parseInt(String(data.max_messages)) || 20,
                 message_spacing: parseInt(String(data.message_spacing)) || 4,
                 animation_type: data.animation_type || 'fade',
+                animation_duration: parseInt(String(data.animation_duration)) || 300,
                 message_fade_seconds: parseInt(String(data.message_fade_seconds)) || 60,
                 chat_width: parseInt(String(data.chat_width)) || 100,
                 chat_direction: data.chat_direction || 'vertical',
+                border_radius: parseInt(String(data.border_radius)) || 8,
                 show_platform_icons: data.show_platform_icons ?? true,
                 show_badges: data.show_badges ?? true,
                 show_7tv_emotes: data.show_7tv_emotes ?? true,
                 show_links: data.show_links ?? true,
                 widget_url: data.widget_url || '',
-                version: data.version || 1,
-                background_color: data.background_color,
-                text_stroke_color: data.text_stroke_color,
-                border_radius: data.border_radius
+                version: data.version || 1
             };
             
             setSettings(normalizedSettings);
@@ -193,13 +202,17 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                 font_family: savedData.font_family || settings.font_family,
                 font_size: parseInt(String(savedData.font_size)) || 16,
                 text_stroke_width: parseInt(String(savedData.text_stroke_width)) || 0,
+                text_stroke_color: savedData.text_stroke_color || '#000000',
                 background_opacity: parseFloat(String(savedData.background_opacity)) ?? 0.5,
+                background_color: savedData.background_color || '#000000',
                 max_messages: parseInt(String(savedData.max_messages)) || 20,
                 message_fade_seconds: parseInt(String(savedData.message_fade_seconds)) || 60,
                 message_spacing: parseInt(String(savedData.message_spacing)) || 4,
                 animation_type: savedData.animation_type || 'fade',
+                animation_duration: parseInt(String(savedData.animation_duration)) || 300,
                 chat_width: parseInt(String(savedData.chat_width)) || 100,
                 chat_direction: savedData.chat_direction || 'vertical',
+                border_radius: parseInt(String(savedData.border_radius)) || 8,
                 show_platform_icons: savedData.show_platform_icons ?? true,
                 show_badges: savedData.show_badges ?? true,
                 show_7tv_emotes: savedData.show_7tv_emotes ?? true,
@@ -243,9 +256,9 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
         }
     };
     
-    const handleChange = (field: keyof ChatBoxSettings, value: any) => {
+    const handleChange = React.useCallback((field: keyof ChatBoxSettings, value: any) => {
         setSettings(prev => ({ ...prev, [field]: value }));
-    };
+    }, []);
     
     if (!isOpen) return null;
     
@@ -290,8 +303,8 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
         'Comfortaa'           // Круглый дружелюбный
     ];
     
-    // Пример сообщений для preview
-    const previewMessages: PreviewMessage[] = [
+    // Пример сообщений для preview - useMemo для предотвращения пересоздания
+    const previewMessages: PreviewMessage[] = React.useMemo(() => [
         { 
             id: 1, 
             platform: 'twitch', 
@@ -319,7 +332,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
             role: 'subscriber',
             badges: ['subscriber/12', 'sub-gifter/1']
         }
-    ];
+    ], []);
     
     const modalContent = (
         <>
@@ -774,7 +787,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                         <Button
                             onClick={() => handleSave(false)}
                             disabled={saving}
-                            className="bg-purple-600 hover:bg-purple-700 min-w-[120px]"
+                            className="bg-purple-600 hover:bg-purple-700 min-w-32"
                         >
                             {saving ? (
                                 <>
@@ -912,4 +925,5 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
 };
 
 export default ChatBoxSettingsModal;
+
 

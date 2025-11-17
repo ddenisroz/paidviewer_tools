@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Edit3, CheckCircle, XCircle, Save, Loader, Link, Unlink } from 'lucide-react';
-import { TwitchIcon, VKIcon } from './PlatformIcons';
+import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
 import { useData } from '../context/DataContext';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useUserSettings } from '../context/UserSettingsContext';
@@ -374,4 +374,5 @@ const StreamTitleCard: React.FC<StreamTitleCardProps> = ({ onLinkStateChange }) 
 };
 
 export default StreamTitleCard;
+
 

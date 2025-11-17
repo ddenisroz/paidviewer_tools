@@ -4,17 +4,18 @@
 import re
 import html
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, validator, Field
+from pydantic import BaseModel, field_validator, Field, ConfigDict
 from fastapi import HTTPException, status
 
 class BaseValidator(BaseModel):
     """Базовый валидатор с общими правилами"""
     
-    class Config:
+    model_config = ConfigDict(
         # Запрещаем дополнительные поля
-        extra = "forbid"
+        extra="forbid",
         # Валидируем присваивание
-        validate_assignment = True
+        validate_assignment=True
+    )
 
 class VoiceUploadValidator(BaseValidator):
     """Валидатор для загрузки голосов"""
@@ -22,13 +23,15 @@ class VoiceUploadValidator(BaseValidator):
     description: Optional[str] = Field(None, max_length=500)
     file_size: int = Field(..., gt=0, le=10 * 1024 * 1024)  # Максимум 10MB
     
-    @validator('name')
+    @field_validator('name')
+    @classmethod
     def validate_name(cls, v):
         if not re.match(r'^[a-zA-Z0-9а-яА-Я\s\-_]+$', v):
             raise ValueError('Name contains invalid characters')
         return v.strip()
     
-    @validator('description')
+    @field_validator('description')
+    @classmethod
     def validate_description(cls, v):
         if v is not None:
             # Удаляем потенциально опасные символы
@@ -41,7 +44,8 @@ class TTSMessageValidator(BaseValidator):
     voice_id: Optional[int] = Field(None, gt=0)
     speed: Optional[float] = Field(1.0, ge=0.5, le=2.0)
     
-    @validator('text')
+    @field_validator('text')
+    @classmethod
     def validate_text(cls, v):
         # Удаляем потенциально опасные символы
         v = re.sub(r'[<>"\']', '', v)
@@ -66,7 +70,8 @@ class AdminUserValidator(BaseValidator):
     username: Optional[str] = Field(None, max_length=100)
     permissions: Optional[Dict[str, Any]] = Field(None)
     
-    @validator('platform_user_id')
+    @field_validator('platform_user_id')
+    @classmethod
     def validate_platform_user_id(cls, v):
         if not re.match(r'^[a-zA-Z0-9_\-]+$', v):
             raise ValueError('Invalid platform user ID format')
@@ -77,7 +82,8 @@ class FilteredWordValidator(BaseValidator):
     word: str = Field(..., min_length=1, max_length=50)
     is_regex: bool = Field(False)
     
-    @validator('word')
+    @field_validator('word')
+    @classmethod
     def validate_word(cls, v):
         if not v.strip():
             raise ValueError('Word cannot be empty')

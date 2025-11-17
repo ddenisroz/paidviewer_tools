@@ -162,24 +162,48 @@ const ChatConfigurator: React.FC = () => {
                                 </TabsList>
                                 
                                 <TabsContent value="appearance" className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-5">
                                         <div>
-                                            <Label htmlFor="width">Ширина (px)</Label>
-                                            <Input
-                                                id="width"
-                                                type="number"
-                                                value={config.width}
-                                                onChange={(e) => updateConfig('width', parseInt(e.target.value))}
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label htmlFor="height">Высота (px)</Label>
-                                            <Input
-                                                id="height"
-                                                type="number"
-                                                value={config.height}
-                                                onChange={(e) => updateConfig('height', parseInt(e.target.value))}
-                                            />
+                                            <h4 className="text-sm font-medium mb-3 text-muted-foreground">Размеры</h4>
+                                            <div className="space-y-4">
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <Label htmlFor="width" className="text-sm">Ширина</Label>
+                                                        <span className="text-sm text-muted-foreground font-mono">{config.width}px</span>
+                                                    </div>
+                                                    <Slider
+                                                        id="width"
+                                                        value={[config.width]}
+                                                        onValueChange={([value]) => updateConfig('width', value)}
+                                                        min={200}
+                                                        max={1200}
+                                                        step={10}
+                                                    />
+                                                    <div className="flex justify-between text-xs text-muted-foreground/60">
+                                                        <span>200</span>
+                                                        <span>1200</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <Label htmlFor="height" className="text-sm">Высота</Label>
+                                                        <span className="text-sm text-muted-foreground font-mono">{config.height}px</span>
+                                                    </div>
+                                                    <Slider
+                                                        id="height"
+                                                        value={[config.height]}
+                                                        onValueChange={([value]) => updateConfig('height', value)}
+                                                        min={100}
+                                                        max={800}
+                                                        step={10}
+                                                    />
+                                                    <div className="flex justify-between text-xs text-muted-foreground/60">
+                                                        <span>100</span>
+                                                        <span>800</span>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                     
@@ -194,17 +218,22 @@ const ChatConfigurator: React.FC = () => {
                                         />
                                     </div>
                                     
-                                    <div>
-                                        <Label htmlFor="borderRadius">Скругление углов (px)</Label>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <Label htmlFor="borderRadius" className="text-sm">Скругление углов</Label>
+                                            <span className="text-sm text-muted-foreground font-mono">{config.borderRadius}px</span>
+                                        </div>
                                         <Slider
+                                            id="borderRadius"
                                             value={[config.borderRadius]}
                                             onValueChange={([value]) => updateConfig('borderRadius', value)}
+                                            min={0}
                                             max={20}
                                             step={1}
-                                            className="w-full"
                                         />
-                                        <div className="text-sm text-gray-500 mt-1">
-                                            {config.borderRadius}px
+                                        <div className="flex justify-between text-xs text-muted-foreground/60">
+                                            <span>0</span>
+                                            <span>20</span>
                                         </div>
                                     </div>
                                     
@@ -224,34 +253,43 @@ const ChatConfigurator: React.FC = () => {
                                         </Select>
                                     </div>
                                     
-                                    <div>
-                                        <Label htmlFor="fontSize">Размер шрифта (px)</Label>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <Label htmlFor="fontSize" className="text-sm">Размер шрифта</Label>
+                                            <span className="text-sm text-muted-foreground font-mono">{config.fontSize}px</span>
+                                        </div>
                                         <Slider
+                                            id="fontSize"
                                             value={[config.fontSize]}
                                             onValueChange={([value]) => updateConfig('fontSize', value)}
-                                            max={24}
                                             min={8}
+                                            max={24}
                                             step={1}
-                                            className="w-full"
                                         />
-                                        <div className="text-sm text-gray-500 mt-1">
-                                            {config.fontSize}px
+                                        <div className="flex justify-between text-xs text-muted-foreground/60">
+                                            <span>8</span>
+                                            <span>24</span>
                                         </div>
                                     </div>
                                 </TabsContent>
                                 
                                         <TabsContent value="messages" className="space-y-4">
                                             <div>
-                                                <Label htmlFor="maxMessages">Максимум сообщений</Label>
+                                                <div className="flex items-center justify-between">
+                                                    <Label htmlFor="maxMessages" className="text-sm">Максимум сообщений</Label>
+                                                    <span className="text-sm text-muted-foreground font-mono">{config.maxMessages}</span>
+                                                </div>
                                                 <Slider
+                                                    id="maxMessages"
                                                     value={[config.maxMessages]}
                                                     onValueChange={([value]) => updateConfig('maxMessages', value)}
+                                                    min={10}
                                                     max={100}
                                                     step={5}
-                                                    className="w-full"
                                                 />
-                                                <div className="text-sm text-gray-500 mt-1">
-                                                    {config.maxMessages} сообщений
+                                                <div className="flex justify-between text-xs text-muted-foreground/60">
+                                                    <span>10</span>
+                                                    <span>100</span>
                                                 </div>
                                             </div>
                                             
@@ -314,17 +352,21 @@ const ChatConfigurator: React.FC = () => {
                                     </div>
                                     
                                     <div>
-                                        <Label htmlFor="animationDuration">Скорость анимации (сек)</Label>
+                                        <div className="flex items-center justify-between">
+                                            <Label htmlFor="animationDuration" className="text-sm">Скорость анимации</Label>
+                                            <span className="text-sm text-muted-foreground font-mono">{config.animationDuration.toFixed(1)}с</span>
+                                        </div>
                                         <Slider
+                                            id="animationDuration"
                                             value={[config.animationDuration]}
                                             onValueChange={([value]) => updateConfig('animationDuration', value)}
-                                            max={2}
                                             min={0.1}
+                                            max={2}
                                             step={0.1}
-                                            className="w-full"
                                         />
-                                        <div className="text-sm text-gray-500 mt-1">
-                                            {config.animationDuration}с
+                                        <div className="flex justify-between text-xs text-muted-foreground/60">
+                                            <span>0.1</span>
+                                            <span>2.0</span>
                                         </div>
                                     </div>
                                     

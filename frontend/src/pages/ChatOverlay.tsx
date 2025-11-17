@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { TwitchIcon, VKIcon } from '../components/PlatformIcons';
+import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
 import { chatService } from '../services/api/services/chatService';
 import { chatboxService } from '../services/api/services/chatboxService';
 import MessageContent from '../components/MessageContent';
@@ -14,6 +14,193 @@ interface Emotes {
     channelEmotes: Map<string, any>;
     globalEmotes: Map<string, any>;
 }
+
+// Memoized message component to prevent unnecessary re-renders
+interface ChatMessageItemProps {
+    msg: ChatMessage;
+    index: number;
+    settings: ChatBoxSettings;
+    lastAddedMessageId: string | null;
+    emotes: Emotes;
+    onNicknameClick: (e: React.MouseEvent, username: string, platform: 'twitch' | 'vk' | 'youtube') => void;
+    truncateWords: (text: string | undefined, maxWords: number) => string;
+}
+
+const ChatMessageItem = memo<ChatMessageItemProps>(({ 
+    msg, 
+    index, 
+    settings, 
+    lastAddedMessageId, 
+    emotes, 
+    onNicknameClick,
+    truncateWords 
+}) => {
+    const messageId = msg.id || `${msg.timestamp}-${(msg as any).author || msg.author_name}-${msg.message || (msg as any).content}`;
+    const isNewMessage = messageId === lastAddedMessageId;
+    
+    const messageStyle = useMemo(() => {
+        const baseStyle: React.CSSProperties = {
+            borderRadius: `${settings?.border_radius || 8}px`,
+            whiteSpace: settings.chat_direction === 'horizontal' ? 'nowrap' : 'normal',
+            wordBreak: settings.chat_direction === 'horizontal' ? 'normal' : 'keep-all',
+            overflowWrap: 'anywhere',
+            flexShrink: 0,
+            minWidth: settings.chat_direction === 'horizontal' ? 'fit-content' : 'auto',
+            maxWidth: settings.chat_direction === 'horizontal' ? '600px' : 'auto',
+            padding: settings.chat_direction === 'horizontal' ? '6px 10px' : '0',
+            backgroundColor: settings.chat_direction === 'horizontal' ? 'rgba(0, 0, 0, 0.3)' : 'transparent',
+            marginTop: index > 0 && settings.chat_direction !== 'horizontal' ? `${settings?.message_spacing || 4}px` : '0'
+        };
+        
+        if (isNewMessage) {
+            const animationType = settings?.animation_type || 'fade';
+            const animationDuration = settings?.animation_duration || 300;
+            
+            const animationName = 
+                animationType === 'fade' ? 'fadeIn' :
+                animationType === 'slide-right' ? 'slideRight' :
+                animationType === 'slide-left' ? 'slideLeft' :
+                animationType === 'scale' ? 'scale' :
+                animationType === 'bounce' ? 'bounce' :
+                'fadeIn';
+            
+            return {
+                ...baseStyle,
+                animation: `${animationName} ${animationDuration}ms ease-out`
+            };
+        }
+        
+        return baseStyle;
+    }, [isNewMessage, settings, index]);
+    
+    return (
+        <div 
+            key={messageId}
+            style={messageStyle}
+        >
+            {settings?.show_platform_icons && (
+                msg.platform === 'twitch' ? (
+                    <TwitchIcon 
+                        style={{ 
+                            color: '#9147FF',
+                            width: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
+                            height: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
+                            display: 'inline-block',
+                            verticalAlign: 'text-bottom',
+                            marginRight: '4px'
+                        }} 
+                    />
+                ) : (
+                    <VKIcon 
+                        style={{ 
+                            color: '#EF4444',
+                            width: `${Math.round(Math.max(12, Math.min(24, settings?.font_size || 16)) * 0.85)}px`,
+                            height: `${Math.round(Math.max(12, Math.min(24, settings?.font_size || 16)) * 0.85)}px`,
+                            display: 'inline-block',
+                            verticalAlign: 'text-bottom',
+                            marginRight: '4px'
+                        }} 
+                    />
+                )
+            )}
+            
+            {settings?.show_badges && (msg as any).badges && Array.isArray((msg as any).badges) && (msg as any).badges.length > 0 && (
+                <>
+                    {(msg as any).badges.map((badge: string, idx: number) => {
+                        const [badgeId, version] = badge.split('/');
+                        const badgeUrl = twitchBadgesService.getBadgeUrl(badgeId, version, '1x');
+                        
+                        if (!badgeUrl) return null;
+                        
+                        const badgeSize = Math.max(14, Math.min(28, (settings?.font_size || 16) * 1.1));
+                        return (
+                            <img 
+                                key={idx} 
+                                src={badgeUrl}
+                                alt={badgeId}
+                                title={badge}
+                                style={{ 
+                                    width: `${badgeSize}px`, 
+                                    height: `${badgeSize}px`,
+                                    display: 'inline-block',
+                                    verticalAlign: 'text-bottom',
+                                    marginRight: '2px'
+                                }}
+                                onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                            />
+                        );
+                    })}
+                </>
+            )}
+            
+            {settings?.show_avatars && (msg as any).avatar_url && (
+                <img
+                    src={(msg as any).avatar_url}
+                    alt={msg.author_name || (msg as any).author}
+                    style={{
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        display: 'inline-block',
+                        verticalAlign: 'text-bottom',
+                        marginRight: '6px'
+                    }}
+                />
+            )}
+            
+            <span style={{ 
+                ...(settings.text_stroke_width && settings.text_stroke_width > 0 ? {
+                    WebkitTextStroke: `${settings.text_stroke_width}px ${settings.text_stroke_color || '#000000'}`,
+                    paintOrder: 'stroke fill'
+                } : {})
+            }}>
+                <span 
+                    onClick={(e) => onNicknameClick(e, msg.author_name || (msg as any).author || 'Unknown', msg.platform)}
+                    style={{ 
+                        color: msg.platform === 'twitch' ? '#9146FF' : '#FF0000',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        userSelect: 'none'
+                    }}
+                    title="Кликните для открытия меню"
+                >
+                    {msg.author_name || (msg as any).author}
+                </span>
+                {': '}
+                <span style={{ color: settings.text_color }}>
+                    {settings.chat_direction === 'horizontal' ? (
+                        truncateWords(msg.message || (msg as any).content, 6)
+                    ) : (
+                        <MessageContent 
+                            message={msg.message || (msg as any).content || ''} 
+                            channelEmotes={settings?.show_7tv_emotes !== false ? emotes.channelEmotes : new Map()}
+                            globalEmotes={settings?.show_7tv_emotes !== false ? emotes.globalEmotes : new Map()}
+                            showLinks={settings?.show_links !== false}
+                        />
+                    )}
+                </span>
+            </span>
+        </div>
+    );
+}, (prevProps, nextProps) => {
+    // Custom comparison function for memo
+    // Only re-render if these specific props change
+    return (
+        prevProps.msg.id === nextProps.msg.id &&
+        prevProps.index === nextProps.index &&
+        prevProps.lastAddedMessageId === nextProps.lastAddedMessageId &&
+        prevProps.settings.font_size === nextProps.settings.font_size &&
+        prevProps.settings.animation_type === nextProps.settings.animation_type &&
+        prevProps.settings.chat_direction === nextProps.settings.chat_direction &&
+        prevProps.settings.show_platform_icons === nextProps.settings.show_platform_icons &&
+        prevProps.settings.show_badges === nextProps.settings.show_badges &&
+        prevProps.settings.show_7tv_emotes === nextProps.settings.show_7tv_emotes
+    );
+});
+
+ChatMessageItem.displayName = 'ChatMessageItem';
 
 const ChatOverlay: React.FC = () => {
     const [searchParams] = useSearchParams();
@@ -127,36 +314,7 @@ const ChatOverlay: React.FC = () => {
         };
     }, [settings?.font_family]);
     
-    const getMessageStyle = useCallback((msg: ChatMessage): React.CSSProperties => {
-        const messageId = msg.id || `${msg.timestamp}-${(msg as any).author || msg.author_name}-${msg.message || (msg as any).content}`;
-        const isNewMessage = messageId === lastAddedMessageId;
-        
-        const baseStyle: React.CSSProperties = {
-            borderRadius: `${settings?.border_radius || 8}px`
-        };
-        
-        if (isNewMessage) {
-            const animationType = settings?.animation_type || 'fade';
-            const animationDuration = settings?.animation_duration || 300;
-            
-            logger.log(`🎬 [ANIMATION] Applying ${animationType} (${animationDuration}ms) to message:`, (msg.message || (msg as any).content)?.substring(0, 30));
-            
-            const animationName = 
-                animationType === 'fade' ? 'fadeIn' :
-                animationType === 'slide-right' ? 'slideRight' :
-                animationType === 'slide-left' ? 'slideLeft' :
-                animationType === 'scale' ? 'scale' :
-                animationType === 'bounce' ? 'bounce' :
-                'fadeIn';
-            
-            return {
-                ...baseStyle,
-                animation: `${animationName} ${animationDuration}ms ease-out`
-            };
-        }
-        
-        return baseStyle;
-    }, [lastAddedMessageId, settings]);
+
     
     const loadSettings = useCallback(async (isPolling: boolean = false): Promise<void> => {
         if (!token) return;
@@ -169,12 +327,16 @@ const ChatOverlay: React.FC = () => {
                 ...data,
                 font_size: parseInt(String(data.font_size)) || 16,
                 text_stroke_width: parseInt(String(data.text_stroke_width)) || 0,
+                text_stroke_color: data.text_stroke_color || '#000000',
                 background_opacity: parseFloat(String(data.background_opacity)) ?? 0.5,
+                background_color: data.background_color || '#000000',
                 max_messages: parseInt(String(data.max_messages)) || 20,
                 message_spacing: parseInt(String(data.message_spacing)) || 4,
                 animation_type: (data.animation_type || 'fade') as 'fade' | 'slide-right' | 'slide-left' | 'scale' | 'bounce',
                 animation_duration: parseInt(String(data.animation_duration)) || 300,
-                chat_direction: (data.chat_direction || 'vertical') as 'vertical' | 'horizontal'
+                chat_direction: (data.chat_direction || 'vertical') as 'vertical' | 'horizontal',
+                chat_width: parseInt(String(data.chat_width)) || 100,
+                border_radius: parseInt(String(data.border_radius)) || 8
             };
             
             if (!isPolling) {
@@ -298,14 +460,18 @@ const ChatOverlay: React.FC = () => {
                     ...data.data,
                     font_size: parseInt(String(data.data?.font_size)) || prevSettings.font_size || 16,
                     text_stroke_width: parseInt(String(data.data?.text_stroke_width)) || prevSettings.text_stroke_width || 0,
+                    text_stroke_color: data.data?.text_stroke_color || prevSettings.text_stroke_color || '#000000',
                     background_opacity: parseFloat(String(data.data?.background_opacity)) ?? prevSettings.background_opacity ?? 0.5,
+                    background_color: data.data?.background_color || prevSettings.background_color || '#000000',
                     max_messages: parseInt(String(data.data?.max_messages)) || prevSettings.max_messages || 20,
                     message_spacing: parseInt(String(data.data?.message_spacing)) || prevSettings.message_spacing || 4,
                     message_fade_seconds: parseInt(String(data.data?.message_fade_seconds)) || prevSettings.message_fade_seconds || 60,
                     animation_duration: parseInt(String(data.data?.animation_duration)) || prevSettings.animation_duration || 300,
+                    chat_width: parseInt(String(data.data?.chat_width)) || prevSettings.chat_width || 100,
                     border_radius: parseInt(String(data.data?.border_radius)) || prevSettings.border_radius || 8
                 };
                 
+                logger.log('🔄 [CHATBOX] Settings updated:', updatedSettings);
                 return updatedSettings;
             });
             return;
@@ -502,21 +668,12 @@ const ChatOverlay: React.FC = () => {
         );
     }
     
-    const getMessageSpacing = (index: number): React.CSSProperties => {
-        if (settings?.chat_direction === 'horizontal') {
-            return {};
-        }
-        return {
-            marginTop: index > 0 ? `${settings?.message_spacing || 4}px` : '0'
-        };
-    };
-    
-    const truncateWords = (text: string | undefined, maxWords: number = 6): string => {
+    const truncateWords = useCallback((text: string | undefined, maxWords: number = 6): string => {
         if (!text) return '';
         const words = text.trim().split(/\s+/);
         if (words.length <= maxWords) return text;
         return words.slice(0, maxWords).join(' ') + '...';
-    };
+    }, []);
     
     const handleNicknameClick = (e: React.MouseEvent, username: string, platform: 'twitch' | 'vk' | 'youtube'): void => {
         e.preventDefault();
@@ -655,127 +812,16 @@ const ChatOverlay: React.FC = () => {
                     >
                         {settings.chat_direction !== 'horizontal' && <div style={{ flexGrow: 1 }} />}
                         {messages.map((msg, index) => (
-                            <div 
+                            <ChatMessageItem
                                 key={msg.id || `${msg.platform}-${msg.timestamp}-${msg.author_name || (msg as any).author}`}
-                                style={{
-                                    ...getMessageStyle(msg), 
-                                    ...getMessageSpacing(index),
-                                    whiteSpace: settings.chat_direction === 'horizontal' ? 'nowrap' : 'normal',
-                                    wordBreak: settings.chat_direction === 'horizontal' ? 'normal' : 'keep-all',
-                                    overflowWrap: 'anywhere',
-                                    flexShrink: 0,
-                                    minWidth: settings.chat_direction === 'horizontal' ? 'fit-content' : 'auto',
-                                    maxWidth: settings.chat_direction === 'horizontal' ? '600px' : 'auto',
-                                    padding: settings.chat_direction === 'horizontal' ? '6px 10px' : '0',
-                                    backgroundColor: settings.chat_direction === 'horizontal' ? 'rgba(0, 0, 0, 0.3)' : 'transparent',
-                                    borderRadius: settings.chat_direction === 'horizontal' ? `${settings?.border_radius || 8}px` : '0'
-                                }}
-                            >
-                                {settings?.show_platform_icons && (
-                                    msg.platform === 'twitch' ? (
-                                        <TwitchIcon 
-                                            style={{ 
-                                                color: '#9147FF',
-                                                width: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
-                                                height: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
-                                                display: 'inline-block',
-                                                verticalAlign: 'text-bottom',
-                                                marginRight: '4px'
-                                            }} 
-                                        />
-                                    ) : (
-                                        <VKIcon 
-                                            style={{ 
-                                                color: '#EF4444',
-                                                width: `${Math.round(Math.max(12, Math.min(24, settings?.font_size || 16)) * 0.85)}px`,
-                                                height: `${Math.round(Math.max(12, Math.min(24, settings?.font_size || 16)) * 0.85)}px`,
-                                                display: 'inline-block',
-                                                verticalAlign: 'text-bottom',
-                                                marginRight: '4px'
-                                            }} 
-                                        />
-                                    )
-                                )}
-                                
-                                {settings?.show_badges && (msg as any).badges && Array.isArray((msg as any).badges) && (msg as any).badges.length > 0 && (
-                                    <>
-                                        {(msg as any).badges.map((badge: string, idx: number) => {
-                                            const [badgeId, version] = badge.split('/');
-                                            const badgeUrl = twitchBadgesService.getBadgeUrl(badgeId, version, '1x');
-                                            
-                                            if (!badgeUrl) return null;
-                                            
-                                            const badgeSize = Math.max(14, Math.min(28, (settings?.font_size || 16) * 1.1));
-                                            return (
-                                                <img 
-                                                    key={idx} 
-                                                    src={badgeUrl}
-                                                    alt={badgeId}
-                                                    title={badge}
-                                                    style={{ 
-                                                        width: `${badgeSize}px`, 
-                                                        height: `${badgeSize}px`,
-                                                        display: 'inline-block',
-                                                        verticalAlign: 'text-bottom',
-                                                        marginRight: '2px'
-                                                    }}
-                                                    onError={(e) => {
-                                                        (e.target as HTMLImageElement).style.display = 'none';
-                                                    }}
-                                                />
-                                            );
-                                        })}
-                                    </>
-                                )}
-                                
-                                {settings?.show_avatars && (msg as any).avatar_url && (
-                                    <img
-                                        src={(msg as any).avatar_url}
-                                        alt={msg.author_name || (msg as any).author}
-                                        style={{
-                                            width: '24px',
-                                            height: '24px',
-                                            borderRadius: '50%',
-                                            display: 'inline-block',
-                                            verticalAlign: 'text-bottom',
-                                            marginRight: '6px'
-                                        }}
-                                    />
-                                )}
-                                
-                                <span style={{ 
-                                    ...(settings.text_stroke_width && settings.text_stroke_width > 0 ? {
-                                        WebkitTextStroke: `${settings.text_stroke_width}px ${settings.text_stroke_color || '#000000'}`,
-                                        paintOrder: 'stroke fill'
-                                    } : {})
-                                }}>
-                                    <span 
-                                        onClick={(e) => handleNicknameClick(e, msg.author_name || (msg as any).author || 'Unknown', msg.platform)}
-                                        style={{ 
-                                            color: msg.platform === 'twitch' ? '#9146FF' : '#FF0000',
-                                            fontWeight: '600',
-                                            cursor: 'pointer',
-                                            userSelect: 'none'
-                                        }}
-                                        title="Кликните для открытия меню"
-                                    >
-                                        {msg.author_name || (msg as any).author}
-                                    </span>
-                                    {': '}
-                                    <span style={{ color: settings.text_color }}>
-                                        {settings.chat_direction === 'horizontal' ? (
-                                            truncateWords(msg.message || (msg as any).content, 6)
-                                        ) : (
-                                            <MessageContent 
-                                                message={msg.message || (msg as any).content || ''} 
-                                                channelEmotes={settings?.show_7tv_emotes !== false ? emotes.channelEmotes : new Map()}
-                                                globalEmotes={settings?.show_7tv_emotes !== false ? emotes.globalEmotes : new Map()}
-                                                showLinks={settings?.show_links !== false}
-                                            />
-                                        )}
-                                    </span>
-                                </span>
-                            </div>
+                                msg={msg}
+                                index={index}
+                                settings={settings}
+                                lastAddedMessageId={lastAddedMessageId}
+                                emotes={emotes}
+                                onNicknameClick={handleNicknameClick}
+                                truncateWords={truncateWords}
+                            />
                         ))}
                         <div ref={messagesEndRef} />
                     </div>

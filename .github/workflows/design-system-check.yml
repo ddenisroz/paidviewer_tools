@@ -1,0 +1,53 @@
+name: Design System Check
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'frontend/src/**/*.tsx'
+      - 'frontend/src/**/*.jsx'
+      - 'frontend/src/**/*.css'
+
+jobs:
+  check-design-system:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Check Design System compliance
+      run: npm run check:design
+      
+    - name: Comment PR
+      if: failure()
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `## ❌ Design System Check Failed
+            
+            Your changes don't comply with the Design System rules.
+            
+            ### 🔧 To fix:
+            \`\`\`bash
+            npm run migrate:design:apply
+            \`\`\`
+            
+            ### 📚 Documentation:
+            - [Design System Guide](./docs/DESIGN_SYSTEM.md)
+            - [Quick Start](./QUICK_START.md)
+            
+            Please review and fix the issues before merging.`
+          })

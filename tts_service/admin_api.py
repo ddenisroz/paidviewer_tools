@@ -7,10 +7,12 @@ from tts_service.tts_engine import tts_engine_manager
 from tts_service.file_manager import file_manager
 from tts_service.background_tasks import background_task_manager
 from tts_service.stats_service import stats_service
+from tts_service.auth import get_admin_user
 from monitoring import tts_monitor
 import logging
 import os
 from pathlib import Path
+from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +119,8 @@ async def toggle_voice(voice_id: int, db: Session = Depends(get_db)):
 async def upload_voice(
     file: UploadFile = File(...),
     name: str = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Dict[str, Any] = Depends(get_admin_user)
 ):
     """Загрузить новый голос для AI TTS с автоматической конвертацией и транскрибацией"""
     import tempfile
@@ -205,6 +208,8 @@ async def upload_voice(
             file_path=str(final_voice_path),
             reference_text=reference_text or None,
             is_active=True,
+            is_global=True,  # Admin-uploaded voices are global
+            owner_id=None,  # Global voices have no owner
             cfg_strength=config.cfg_strength,  # Используем значение из конфига (по умолчанию 2.5)
             speed_preset='normal'  # Константа для скорости по умолчанию
         )
@@ -212,7 +217,7 @@ async def upload_voice(
         db.commit()
         db.refresh(new_voice)
         
-        logger.info(f"✅ Voice '{voice_name}' uploaded successfully (ID: {new_voice.id})")
+        logger.info(f"✅ Global voice '{voice_name}' uploaded successfully by admin user {current_user.get('user_id')} (Voice ID: {new_voice.id})")
         
         return {
             "status": "success",
@@ -557,3 +562,129 @@ async def restart_system():
             "status": "error",
             "error": str(e)
         }
+
+
+# Additional admin endpoints for voice management
+
+@admin_router.put("/voices/{voice_id}/settings")
+async def update_voice_settings(
+    voice_id: int,
+    settings: dict,
+    current_user: Dict[str, Any] = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Update settings for a voice (admin only)"""
+    try:
+        voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
+        
+        if not voice:
+            raise HTTPException(status_code=404, detail="Voice not found")
+        
+        # Update settings
+        if 'cfg_strength' in settings:
+            voice.cfg_strength = settings['cfg_strength']
+        if 'speed_preset' in settings:
+            voice.speed_preset = settings['speed_preset']
+        if 'reference_text' in settings:
+            voice.reference_text = settings['reference_text']
+        
+        db.commit()
+        db.refresh(voice)
+        
+        logger.info(f"✅ Admin updated voice {voice_id} settings")
+        
+        return {
+            "success": True,
+            "message": "Voice settings updated",
+            "settings": {
+                "cfg_strength": voice.cfg_strength,
+                "speed_preset": voice.speed_preset,
+                "reference_text": voice.reference_text
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating voice settings: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@admin_router.delete("/voices/{voice_id}")
+async def delete_voice(
+    voice_id: int,
+    current_user: Dict[str, Any] = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a voice (admin only)"""
+    try:
+        voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
+        
+        if not voice:
+            raise HTTPException(status_code=404, detail="Voice not found")
+        
+        # Delete the voice file
+        if voice.file_path and os.path.exists(voice.file_path):
+            try:
+                os.remove(voice.file_path)
+                logger.info(f"✅ Deleted voice file: {voice.file_path}")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to delete voice file: {e}")
+        
+        # Delete from database
+        db.delete(voice)
+        db.commit()
+        
+        logger.info(f"✅ Admin deleted voice {voice_id}")
+        
+        return {
+            "success": True,
+            "message": "Voice deleted successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting voice: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@admin_router.put("/voices/{voice_id}/rename")
+async def rename_voice_endpoint(
+    voice_id: int,
+    new_name: str,
+    current_user: Dict[str, Any] = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Rename a voice (admin only)"""
+    try:
+        voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
+        
+        if not voice:
+            raise HTTPException(status_code=404, detail="Voice not found")
+        
+        # Check for duplicates
+        existing_voice = db.query(VoiceModel).filter(
+            VoiceModel.name == new_name,
+            VoiceModel.id != voice_id
+        ).first()
+        if existing_voice:
+            raise HTTPException(status_code=400, detail=f"Voice with name '{new_name}' already exists")
+        
+        old_name = voice.name
+        voice.name = new_name
+        db.commit()
+        
+        logger.info(f"✅ Admin renamed voice {voice_id} from '{old_name}' to '{new_name}'")
+        
+        return {
+            "success": True,
+            "message": f"Voice renamed from '{old_name}' to '{new_name}'",
+            "new_name": new_name
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error renaming voice: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))

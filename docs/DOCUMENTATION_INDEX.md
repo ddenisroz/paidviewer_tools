@@ -1,7 +1,9 @@
 # Индекс Документации TTS_TTV_0.02
 
-**Последнее обновление:** 15 ноября 2025  
-**Версия:** 3.1.0
+**Последнее обновление:** 17 ноября 2025  
+**Версия:** 4.0.0
+
+**Note:** For legacy documentation (v0.02 pre-refactoring), see [../legacy/LEGACY_CONTENTS.md](../legacy/LEGACY_CONTENTS.md)
 
 ---
 
@@ -10,25 +12,28 @@
 ### Статус проекта
 - **`CURRENT_STATUS.md`** - текущий статус проекта, последние изменения
 - **`CHANGELOG.md`** - история всех изменений по сессиям
-- **`README.md`** - описание проекта, quick start
+- **`README.md`** (root) - описание проекта, quick start
 - **`reports/`** - технические отчеты и анализы (см. reports/README.md)
+- **`archive/reports/`** - архивные отчеты и чеклисты
 
 ### Руководства разработчика
 - **`DEVELOPER_GUIDE.md`** - гайд для новых разработчиков
-- **`ARCHITECTURE_GUIDE.md`** - общая архитектура системы
+- **`architecture/ARCHITECTURE_GUIDE.md`** - общая архитектура системы
 - **`LLM_DEVELOPMENT_RULES.md`** - правила для AI-ассистентов
 - **`DO_NOT_TOUCH.md`** - критические файлы, не трогать!
 
-### Deployment
+### Deployment & Setup
 - **`DEPLOYMENT.md`** - инструкции по деплою
-- **`QUICK_START.md`** - быстрый старт для разработки
+- **`guides/QUICK_START.md`** - быстрый старт для разработки
+- **`guides/QUICK_SETUP.md`** - быстрая настройка
+- **`guides/SETUP_GUIDE.md`** - полное руководство по настройке
 
 ---
 
 ## TTS (Text-to-Speech)
 
 ### Основные документы
-- **`TTS_ARCHITECTURE.md`** - архитектура TTS системы
+- **`architecture/TTS_ARCHITECTURE.md`** - архитектура TTS системы
 - **`VOICE_UPLOAD_UNIFIED.md`** - единая система загрузки голосов
 
 ### Специализированные документы
@@ -79,7 +84,7 @@
 ## Админ-Панель
 
 ### Основные документы
-- **`ADMIN_PANEL_ENDPOINTS_STATUS.md`** - статус всех endpoints админки
+- **`api/ADMIN_PANEL_ENDPOINTS_STATUS.md`** - статус всех endpoints админки
 
 ### Специализированные
 - **`ADMIN_VOICE_MANAGEMENT.md`** - управление голосами
@@ -90,16 +95,16 @@
 ## Техническая документация
 
 ### Архитектура
-- **`ARCHITECTURE_GUIDE.md`** - общая архитектура
+- **`architecture/ARCHITECTURE_GUIDE.md`** - общая архитектура
+- **`architecture/VALIDATION_SYSTEM.md`** - система валидации
+- **`architecture/CACHING_SYSTEM.md`** - система кэширования
+- **`architecture/DESIGN_SYSTEM.md`** - дизайн система
+- **`architecture/SHARED_WEBSOCKET.md`** - shared WebSocket с Leader Election
+- **`architecture/TTS_ARCHITECTURE.md`** - архитектура TTS
 - **`TOKEN_SYSTEM_UNIFIED.md`** - система токенов (OAuth)
-- **`CACHING_SYSTEM.md`** - система кэширования
 
-### WebSocket
-- **`SHARED_WEBSOCKET.md`** - shared WebSocket с Leader Election
-
-### Status Reports
-- **`COMPREHENSIVE_AUDIT_2025_11_03.md`** - комплексный аудит от 3 ноября 2025
-- **`ADMIN_PANEL_ENDPOINTS_STATUS.md`** - статус endpoints
+### API
+- **`api/ADMIN_PANEL_ENDPOINTS_STATUS.md`** - статус endpoints
 
 ---
 

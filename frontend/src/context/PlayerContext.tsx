@@ -412,6 +412,45 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         };
     }, [loadQueue]);
 
+    // Audio priority system - pause/resume/duck YouTube when TTS plays
+    const originalVolumeRef = useRef<number>(100);
+    
+    useEffect(() => {
+        const handleAudioPriorityChange = (event: CustomEvent): void => {
+            const { action, reason } = event.detail;
+            logger.debug(`🎵 [YouTube] Audio priority change: ${action} (${reason})`);
+            
+            if (action === 'pause_youtube' && state.playerRef && state.isPlaying) {
+                logger.debug('⏸️ [YouTube] Pausing for TTS');
+                state.playerRef.pauseVideo();
+                dispatch({ type: 'SET_PLAYING', payload: false });
+            } else if (action === 'resume_youtube' && state.playerRef && !state.isPlaying && state.currentVideo) {
+                logger.debug('▶️ [YouTube] Resuming after TTS');
+                state.playerRef.playVideo();
+                dispatch({ type: 'SET_PLAYING', payload: true });
+            } else if (action === 'duck_youtube' && state.playerRef) {
+                // Save current volume and reduce to 20%
+                originalVolumeRef.current = state.volume;
+                const duckedVolume = Math.floor(state.volume * 0.2);
+                logger.debug(`🔉 [YouTube] Ducking volume from ${state.volume} to ${duckedVolume}`);
+                state.playerRef.setVolume(duckedVolume);
+                dispatch({ type: 'SET_VOLUME', payload: duckedVolume });
+            } else if (action === 'unduck_youtube' && state.playerRef) {
+                // Restore original volume
+                const restoredVolume = originalVolumeRef.current;
+                logger.debug(`🔊 [YouTube] Restoring volume to ${restoredVolume}`);
+                state.playerRef.setVolume(restoredVolume);
+                dispatch({ type: 'SET_VOLUME', payload: restoredVolume });
+            }
+        };
+        
+        window.addEventListener('audio_priority_change', handleAudioPriorityChange as EventListener);
+        
+        return () => {
+            window.removeEventListener('audio_priority_change', handleAudioPriorityChange as EventListener);
+        };
+    }, [state.playerRef, state.isPlaying, state.currentVideo, state.volume]);
+
     const setIsTheaterMode = (value: boolean): void => {
         dispatch({ type: 'SET_THEATER_MODE', payload: value });
     };

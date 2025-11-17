@@ -9,9 +9,9 @@ from core.connection_manager import ConnectionManager
 from utils.role_checker import RoleChecker
 from .twitch_bot_core import TwitchBotCore
 from .universal_command_handler import UniversalCommandHandler
-from api.tts_api import TTSAPI
-from api.youtube_api import YouTubeAPI
-from services.drops_service import DropsService
+from features.tts.tts_api import TTSAPI
+from features.youtube.youtube_api_legacy import YouTubeAPI
+from features.drops.drops_service import DropsService
 
 logger = logging.getLogger('bot_service')
 

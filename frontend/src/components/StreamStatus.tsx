@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Twitch, MessageCircle, Users, Wifi, WifiOff } from 'lucide-react';
-import { VKIcon } from './PlatformIcons';
+import { VKIcon } from '../shared/components/PlatformIcons';
 
 interface StreamStatusProps {
     integrations?: {
@@ -79,11 +79,11 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
             <Card className={`${twitchEnabled ? 'border-purple-500/20 bg-purple-500/5' : 'border-muted-foreground/20 bg-muted/5'}`}>
                 <CardContent className="p-4">
                     <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                            <Twitch className="h-6 w-6 text-purple-500" />
-                            <div className="font-medium text-sm">Twitch</div>
+                        <div className="flex items-center gap-3 min-w-0">
+                            <Twitch className="h-6 w-6 text-purple-500 flex-shrink-0" />
+                            <div className="font-medium text-sm whitespace-nowrap">Twitch</div>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-shrink-0">
                             {twitchEnabled ? (
                                 twitchStream?.isLive ? (
                                     <>
@@ -118,11 +118,11 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
             <Card className={`${vkEnabled ? 'border-red-500/20 bg-red-500/5' : 'border-muted-foreground/20 bg-muted/5'}`}>
                 <CardContent className="p-4">
                     <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                            <VKIcon className="h-6 w-6 text-red-500" />
-                            <div className="font-medium text-sm">VK Live</div>
+                        <div className="flex items-center gap-3 min-w-0">
+                            <VKIcon className="h-6 w-6 text-red-500 flex-shrink-0" />
+                            <div className="font-medium text-sm whitespace-nowrap">VK Live</div>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-shrink-0">
                             {vkEnabled ? (
                                 vkStream?.isLive ? (
                                     <>

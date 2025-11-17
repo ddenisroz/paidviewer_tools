@@ -3,7 +3,7 @@
 import logging
 from typing import Optional, Any, Dict, List
 from datetime import datetime, timedelta
-from core.command_executor import CommandExecutor
+from features.commands.command_executor import CommandExecutor
 from core.database import get_db, BotCommand
 from utils.platform_role_checker import PlatformRoleChecker
 
@@ -272,7 +272,7 @@ class UniversalCommandHandler:
             video_url = args
             
             # Импортируем сервисы
-            from services.queue_service import QueueService
+            from features.youtube.queue_service import QueueService
             queue_service = QueueService()
             
             # Получаем user_id владельца канала из базы данных
@@ -488,7 +488,7 @@ class UniversalCommandHandler:
     async def _handle_skip(self, ctx, bot, args, platform, db):
         """Handler для !skip (Twitch)"""
         try:
-            from services.queue_service import QueueService
+            from features.youtube.queue_service import QueueService
             from core.database import User
             
             # Получаем user_id владельца канала
@@ -524,7 +524,7 @@ class UniversalCommandHandler:
     async def _handle_skip_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
         """Handler для !skip (VK)"""
         try:
-            from services.queue_service import QueueService
+            from features.youtube.queue_service import QueueService
             from core.database import User
             
             # Получаем user_id владельца канала
@@ -563,7 +563,7 @@ class UniversalCommandHandler:
     async def _handle_clear(self, ctx, bot, args, platform, db):
         """Handler для !clear (Twitch)"""
         try:
-            from services.queue_service import QueueService
+            from features.youtube.queue_service import QueueService
             from core.database import User, YouTubeQueue
             
             # Получаем user_id владельца канала
@@ -632,7 +632,7 @@ class UniversalCommandHandler:
     async def _handle_queue(self, ctx, bot, args, platform, db):
         """Handler для !queue (Twitch)"""
         try:
-            from services.queue_service import QueueService
+            from features.youtube.queue_service import QueueService
             from core.database import User
             
             # Получаем user_id владельца канала
@@ -672,7 +672,7 @@ class UniversalCommandHandler:
     async def _handle_wronglink(self, ctx, bot, args, platform, db):
         """Handler для !wronglink (Twitch) - удаление последнего своего видео"""
         try:
-            from services.queue_service import QueueService
+            from features.youtube.queue_service import QueueService
             from core.database import User
             
             # Получаем user_id владельца канала
@@ -708,7 +708,7 @@ class UniversalCommandHandler:
     async def _handle_wronglink_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
         """Handler для !wronglink (VK) - удаление последнего своего видео"""
         try:
-            from services.queue_service import QueueService
+            from features.youtube.queue_service import QueueService
             from core.database import User
             
             # Получаем user_id владельца канала
@@ -744,7 +744,7 @@ class UniversalCommandHandler:
     async def _handle_queue_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
         """Handler для !queue (VK)"""
         try:
-            from services.queue_service import QueueService
+            from features.youtube.queue_service import QueueService
             from core.database import User
             
             # Получаем user_id владельца канала

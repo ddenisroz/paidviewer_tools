@@ -244,7 +244,7 @@ assert 'broadcaster' in roles  # Алиас
 - `bot_service/utils/platform_role_checker.py` - Реализация проверки ролей
 - `bot_service/core/command_executor.py` - Использование ролей в командах
 - `frontend/src/pages/CommandsPage.jsx` - UI выбора ролей
-- `docs/ARCHITECTURE_GUIDE.md` - Общая архитектура
+- `docs/architecture/ARCHITECTURE_GUIDE.md` - Общая архитектура
 - `docs/vk/VK_STREAMING_PROTOCOL.md` - VK API документация
 
 ---

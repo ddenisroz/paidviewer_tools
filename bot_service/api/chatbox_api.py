@@ -4,7 +4,7 @@ import logging
 import secrets
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from core.database import get_db, ChatBoxSettings
 from auth.auth import get_current_user
@@ -21,6 +21,8 @@ class ChatBoxSettingsCreate(BaseModel):
     font_family: str = Field(default='Inter, system-ui, sans-serif')
     font_size: int = Field(default=16, ge=8, le=32)  # от 8 до 32px
     font_weight: str = Field(default='normal')
+    text_stroke_width: int = Field(default=0, ge=0, le=3)  # Толщина контура текста в px (0-3)
+    text_stroke_color: str = Field(default='#000000')  # Цвет контура текста
     
     # Фон
     background_color: str = Field(default='#000000')
@@ -57,13 +59,12 @@ class ChatBoxSettingsCreate(BaseModel):
 
 class ChatBoxSettingsResponse(ChatBoxSettingsCreate):
     """Модель ответа с настройками ChatBox"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     user_id: int
     widget_token: str
     widget_url: str  # Полная ссылка для OBS
-    
-    class Config:
-        from_attributes = True
 
 
 def generate_widget_token() -> str:
@@ -106,6 +107,8 @@ async def get_chatbox_settings(
         font_family=settings.font_family,
         font_size=settings.font_size,
         font_weight=settings.font_weight,
+        text_stroke_width=settings.text_stroke_width or 0,
+        text_stroke_color=settings.text_stroke_color or '#000000',
         background_color=settings.background_color,
         background_opacity=settings.background_opacity,
         max_messages=settings.max_messages,
@@ -124,7 +127,8 @@ async def get_chatbox_settings(
         message_fade_seconds=settings.message_fade_seconds,
         show_7tv_emotes=settings.show_7tv_emotes,
         show_links=settings.show_links,
-        auto_load_images=settings.auto_load_images
+        auto_load_images=settings.auto_load_images,
+        version=settings.version if hasattr(settings, 'version') else 1
     )
     
     logger.info(f"📦 [CHATBOX] Settings retrieved for user {user_id}")
@@ -203,6 +207,8 @@ async def save_chatbox_settings(
         font_family=settings.font_family,
         font_size=settings.font_size,
         font_weight=settings.font_weight,
+        text_stroke_width=settings.text_stroke_width or 0,
+        text_stroke_color=settings.text_stroke_color or '#000000',
         background_color=settings.background_color,
         background_opacity=settings.background_opacity,
         max_messages=settings.max_messages,
@@ -221,7 +227,8 @@ async def save_chatbox_settings(
         message_fade_seconds=settings.message_fade_seconds,
         show_7tv_emotes=settings.show_7tv_emotes,
         show_links=settings.show_links,
-        auto_load_images=settings.auto_load_images
+        auto_load_images=settings.auto_load_images,
+        version=settings.version if hasattr(settings, 'version') else 1
     )
     
     logger.info(f"📦 [CHATBOX] Settings saved for user {user_id}")
@@ -292,6 +299,8 @@ async def get_settings_by_token(
         "font_family": settings.font_family,
         "font_size": settings.font_size,
         "font_weight": settings.font_weight,
+        "text_stroke_width": settings.text_stroke_width or 0,
+        "text_stroke_color": settings.text_stroke_color or '#000000',
         "background_color": settings.background_color,
         "background_opacity": settings.background_opacity,
         "max_messages": settings.max_messages,
@@ -306,9 +315,11 @@ async def get_settings_by_token(
         "animation_duration": settings.animation_duration,
         "animation_type": settings.animation_type,
         "chat_direction": settings.chat_direction,
+        "chat_width": settings.chat_width,
         "message_fade_seconds": settings.message_fade_seconds,
         "show_7tv_emotes": settings.show_7tv_emotes,
         "show_links": settings.show_links,
-        "auto_load_images": settings.auto_load_images
+        "auto_load_images": settings.auto_load_images,
+        "version": settings.version if hasattr(settings, 'version') else 1
     }
 

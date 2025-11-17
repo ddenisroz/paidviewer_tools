@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useDonationAlerts } from '../context/DonationAlertsContext';
 import { useAuth } from '../context/AuthContext';
-import { TwitchIcon, VKIcon } from './PlatformIcons';
+import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
 import { Gift, AlertCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '../utils/prodLogger';
@@ -126,9 +126,11 @@ const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenCha
                         <div className="flex items-center justify-between py-2">
                             <div className="flex items-center space-x-2">
                                 <img 
-                                    src="/src/images/logos/DA_Alert_Color.svg" 
+                                    src="/images/logos/DA_Alert_Color.svg" 
                                     alt="DonationAlerts" 
                                     className="h-5 w-5"
+                                    loading="lazy"
+                                    decoding="async"
                                     onError={(e) => {
                                         const target = e.target as HTMLImageElement;
                                         target.style.display = 'none';
@@ -186,4 +188,5 @@ const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenCha
 };
 
 export default IntegrationsDialog;
+
 

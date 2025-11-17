@@ -31,8 +31,26 @@ npm run dev:bot       # Bot Service (localhost:8000)
 npm run dev:tts       # TTS Service (localhost:8001) - опционально
 ```
 
-**Полный гайд:** [QUICK_START.md](docs/QUICK_START.md)  
-**Deployment:** [DEPLOYMENT.md](docs/DEPLOYMENT.md)
+**Полный гайд:** [QUICK_START.md](QUICK_START.md)  
+**Deployment:** [DEPLOYMENT.md](docs/DEPLOYMENT.md)  
+**Design System:** [DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) ⭐ NEW
+
+---
+
+## 🎨 Design System & Quality
+
+Проект использует единую систему дизайна с автоматическими проверками:
+
+```bash
+# Проверить соответствие Design System
+npm run check:design
+
+# Автоматически исправить проблемы
+npm run migrate:design:apply
+```
+
+**Документация:** [DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)  
+**Примеры:** [DesignSystemExample.tsx](frontend/src/components/examples/DesignSystemExample.tsx)
 
 ---
 
@@ -85,6 +103,14 @@ npm run dev:tts       # TTS Service (localhost:8001) - опционально
 
 **Полный индекс:** [docs/README.md](docs/README.md)
 
+### Legacy Code Archive
+
+The `legacy/` folder contains archived code from version 0.02 (pre-refactoring). This is a complete snapshot preserved for reference purposes.
+
+**See:** [legacy/LEGACY_CONTENTS.md](legacy/LEGACY_CONTENTS.md) for detailed documentation.
+
+⚠️ **Note:** Legacy code is read-only and should not be used in current development.
+
 ---
 
 ## Структура проекта
@@ -122,6 +148,7 @@ npm run dev:tts       # TTS Service (localhost:8001) - опционально
 │   └── ...               # Personal TTS for single user
 │
 ├── docs/                 # Документация
+├── legacy/               # Archived legacy code (v0.02 pre-refactoring)
 ├── .env.example          # Environment template
 └── migrate.sh/ps1        # Migration script
 ```

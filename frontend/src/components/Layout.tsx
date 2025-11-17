@@ -3,15 +3,20 @@ import Sidebar from './layout/Sidebar';
 import Header from './layout/Header';
 import CookieConsent from './CookieConsent';
 import GlobalPlayer from './GlobalPlayer';
-import { composeProviders } from '../utils/composeProviders';
+import GlobalTtsPlayer from './GlobalTtsPlayer';
+import { composeProviders } from '../shared/utils/composeProviders';
 import { TtsProvider } from '../context/TtsContext';
 import { DataProvider } from '../context/DataContext';
 import { PlayerProvider, usePlayer } from '../context/PlayerContext';
 import { DonationAlertsProvider } from '../context/DonationAlertsContext';
+import { AudioPriorityProvider } from '../context/AudioPriorityContext';
+import { TtsPlayerProvider } from '../context/TtsPlayerContext';
 
 // 📦 Layout-specific провайдеры
 // Эти контексты нужны только внутри dashboard layout
 const LayoutProviders = composeProviders(
+  AudioPriorityProvider,
+  TtsPlayerProvider,
   TtsProvider,
   DataProvider,
   PlayerProvider,
@@ -45,6 +50,8 @@ const LayoutContent: React.FC = () => {
         </main>
       </div>
       
+      {/* Глобальный TTS плеер (фиксирован справа внизу) */}
+      <GlobalTtsPlayer />
       
       {/* Уведомление о cookies рендерим один раз здесь */}
       <CookieConsent />

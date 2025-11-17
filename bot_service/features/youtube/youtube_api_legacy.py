@@ -1,0 +1,190 @@
+# bot_service/youtube_api.py
+import re
+import logging
+from typing import Optional, Dict, Any
+from pytube import YouTube
+from pytube.exceptions import PytubeError
+from urllib.error import URLError
+
+logger = logging.getLogger(__name__)
+
+class YouTubeAPI:
+    def __init__(self):
+        pass
+
+    def clean_url(self, url: str) -> str:
+        """Очистить URL от невидимых символов и лишних параметров"""
+        # Удаляем невидимые символы и пробелы
+        url = url.strip()
+        # Удаляем все невидимые Unicode символы
+        url = ''.join(char for char in url if char.isprintable())
+        
+        # Извлекаем только video_id и создаем чистый URL
+        video_id = self.extract_video_id(url)
+        if video_id:
+            return f"https://www.youtube.com/watch?v={video_id}"
+        
+        return url
+    
+    def extract_video_id(self, url: str) -> Optional[str]:
+        """Извлечь ID видео из YouTube URL"""
+        # Сначала очищаем от невидимых символов
+        url = ''.join(char for char in url if char.isprintable()).strip()
+        
+        patterns = [
+            r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([a-zA-Z0-9_-]{11})',
+            r'youtube\.com/watch\?.*v=([a-zA-Z0-9_-]{11})',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, url)
+            if match:
+                return match.group(1)
+        
+        return None
+
+    def get_video_info(self, url: str) -> Optional[Dict[str, Any]]:
+        """Получить информацию о YouTube видео"""
+        try:
+            video_id = self.extract_video_id(url)
+            if not video_id:
+                logger.error(f"Invalid YouTube URL: {url}")
+                return None
+
+            yt = YouTube(url)
+            
+            # Получаем информацию о видео
+            video_info = {
+                "video_id": video_id,
+                "title": yt.title,
+                "url": url,
+                "duration": yt.length,
+                "thumbnail_url": yt.thumbnail_url,
+                "author": yt.author,
+                "views": yt.views,
+                "description": yt.description[:500] if yt.description else "",  # Ограничиваем описание
+            }
+            
+            logger.info(f"YouTube video info extracted: {video_info['title']}")
+            return video_info
+            
+        except PytubeError as e:
+            logger.error(f"Pytube error for URL {url}: {e}")
+            return None
+        except URLError as e:
+            logger.error(f"URL error for {url}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error for URL {url}: {e}")
+            return None
+
+    def validate_url(self, url: str) -> bool:
+        """Проверить, является ли URL валидным YouTube URL"""
+        video_id = self.extract_video_id(url)
+        return video_id is not None
+
+    def get_thumbnail_url(self, video_id: str, quality: str = "medium") -> str:
+        """Получить URL миниатюры видео"""
+        quality_map = {
+            "default": "default",
+            "medium": "mqdefault", 
+            "high": "hqdefault",
+            "standard": "sddefault",
+            "maxres": "maxresdefault"
+        }
+        
+        quality_key = quality_map.get(quality, "mqdefault")
+        return f"https://img.youtube.com/vi/{video_id}/{quality_key}.jpg"
+
+    async def add_to_queue(self, url: str, requester_name: str, channel_name: str = "twitch", platform: str = "twitch") -> Dict[str, Any]:
+        """Добавить видео в очередь (для команды !sr)"""
+        try:
+            # Очищаем URL от невидимых символов и лишних параметров
+            url = self.clean_url(url)
+            logger.info(f"🧹 Cleaned URL: {url}")
+            
+            # Проверяем валидность URL
+            if not self.validate_url(url):
+                return {"success": False, "error": "Неверный YouTube URL"}
+            
+            # Получаем информацию о видео
+            video_info = self.get_video_info(url)
+            if not video_info:
+                # Fallback: создаем базовую запись если не удалось получить инфо
+                video_id = self.extract_video_id(url)
+                if not video_id:
+                    return {"success": False, "error": "Не удалось извлечь ID видео"}
+                    
+                logger.warning(f"Could not fetch video info for {url}, using fallback")
+                video_info = {
+                    "video_id": video_id,
+                    "title": f"YouTube Video {video_id}",
+                    "url": url,
+                    "duration": 0,
+                    "thumbnail_url": f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
+                    "author": "Unknown Channel"
+                }
+            
+            # Используем QueueService для добавления в очередь
+            from features.youtube.queue_service import QueueService
+            from core.database import get_db
+            
+            queue_service = QueueService()
+            db = next(get_db())
+            
+            # Определяем user_id по имени канала (для Twitch) - case-insensitive
+            from core.database import User
+            from sqlalchemy import func
+            user = db.query(User).filter(func.lower(User.twitch_username) == channel_name.lower()).first()
+            user_id = user.id if user else 1  # Используем ID 1 если пользователь не найден
+            
+            result = await queue_service.add_video_to_queue(
+                user_id=user_id,
+                video_url=url,
+                channel_name=channel_name,
+                platform=platform,
+                requester_name=requester_name,
+                requester_id=requester_name,
+                is_paid=False,
+                points_cost=None,
+                db=db
+            )
+            
+            if result.get("success"):
+                # Отправляем WebSocket уведомление об обновлении очереди
+                try:
+                    from core.connection_manager import get_connection_manager
+                    from features.youtube.queue_service import QueueService
+                    import asyncio
+                    
+                    connection_manager = get_connection_manager()
+                    queue_service_instance = QueueService()
+                    queue_items = queue_service_instance.get_queue(user_id, db)
+                    
+                    asyncio.create_task(
+                        connection_manager.send_to_user(
+                            str(user_id),
+                            {
+                                "type": "youtube_queue_update",
+                                "queue": queue_items,
+                                "timestamp": __import__('time').time()
+                            }
+                        )
+                    )
+                    logger.debug(f"📺 Sent youtube_queue_update to user {user_id} (from command)")
+                except Exception as ws_error:
+                    logger.error(f"Error sending websocket notification: {ws_error}")
+                
+                queue_item = result.get("queue_item", {})
+                return {
+                    "success": True,
+                    "title": video_info["title"],
+                    "position": queue_item.get("position", 1),
+                    "queue_item": queue_item
+                }
+            else:
+                return {"success": False, "error": result.get("error", "Ошибка добавления в очередь")}
+                
+        except Exception as e:
+            logger.error(f"Error adding video to queue: {e}")
+            return {"success": False, "error": str(e)}

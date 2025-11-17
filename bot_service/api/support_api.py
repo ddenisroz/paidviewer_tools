@@ -2,7 +2,7 @@
 """API для системы поддержки"""
 from fastapi import APIRouter, Depends, HTTPException, Request, Form
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from core.database import get_db, User, SupportTicket, TicketResponse
 from auth.auth import get_current_user
 from validators.input_validators import sanitize_input
@@ -16,17 +16,32 @@ class CreateTicketRequest(BaseModel):
     message: str
     priority: str = "normal"
     
-    @validator('subject')
+    @field_validator('subject')
+
+    
+    @classmethod
+
+    
     def sanitize_subject(cls, v):
         """Санитизация темы тикета"""
         return sanitize_input(v, max_length=100)
     
-    @validator('message')
+    @field_validator('message')
+
+    
+    @classmethod
+
+    
     def sanitize_message(cls, v):
         """Санитизация сообщения"""
         return sanitize_input(v, max_length=2000)
     
-    @validator('priority')
+    @field_validator('priority')
+
+    
+    @classmethod
+
+    
     def validate_priority(cls, v):
         """Валидация приоритета"""
         if v not in ['low', 'normal', 'high', 'critical']:
@@ -36,7 +51,12 @@ class CreateTicketRequest(BaseModel):
 class RespondTicketRequest(BaseModel):
     message: str
     
-    @validator('message')
+    @field_validator('message')
+
+    
+    @classmethod
+
+    
     def sanitize_message(cls, v):
         """Санитизация сообщения ответа"""
         return sanitize_input(v, max_length=2000)

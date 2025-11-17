@@ -348,7 +348,7 @@ F12 → Console → ищи красные ошибки
 ## Обязательное чтение перед работой
 
 1. `docs/CURRENT_STATUS.md` - ЧТО РАБОТАЕТ
-2. `docs/ARCHITECTURE_GUIDE.md` - как устроен проект
+2. `docs/architecture/ARCHITECTURE_GUIDE.md` - как устроен проект
 3. `docs/DEVELOPER_GUIDE.md` - как разрабатывать
 
 ---

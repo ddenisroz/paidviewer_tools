@@ -678,7 +678,9 @@ async def handle_tts_for_message(
                     "voice": result.get("voice", "unknown"),
                     "volume": final_volume_level,  # ✅ Исправлено: было volume_level
                     "tts_type": tts_type,
-                    "duration": result.get("duration", 0)
+                    "duration": result.get("duration", 0),
+                    "text": text,  # Add message text for display
+                    "username": username  # Add username for display
                 },
                     channel_name=channel_identifier,
                     platform=platform
@@ -728,6 +730,8 @@ async def broadcast_tts_audio(
                 "volume": audio_data.get("volume", TTS_DEFAULT_VOLUME),
                 "tts_type": audio_data.get("tts_type", "unknown"),
                 "duration": audio_data.get("duration", 0),
+                "text": audio_data.get("text", ""),  # Message text for display
+                "username": audio_data.get("username", ""),  # Username for display
                 "channel": channel_name,
                 "platform": platform,
                 "timestamp": datetime.now().isoformat()

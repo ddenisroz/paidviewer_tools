@@ -33,32 +33,49 @@ export const deleteUserVoice = (voiceId: string, userId: number): Promise<AxiosR
 export const testVoice = (voiceId: number, text: string): Promise<AxiosResponse<ApiResponse>> => 
   ttsService.testVoice(voiceId, text);
 
-// Заглушки для методов, которые пока не реализованы в ttsService
-// TODO: Реализовать эти методы в ttsService
-export const getAdminVoices = (): Promise<AxiosResponse<ApiResponse<TtsVoice[]>>> => 
-  ttsService.getGlobalVoices(); // Временно используем getGlobalVoices
+// Admin voice management functions
+export const getAdminVoices = async (): Promise<AxiosResponse<ApiResponse<TtsVoice[]>>> => {
+  const { apiClient } = await import('./api/client');
+  return apiClient.get('/api/voices/admin/global');
+};
 
-export const updateVoiceSettings = (voiceId: number, settings: Record<string, any>): Promise<AxiosResponse<ApiResponse>> => 
-  Promise.reject(new Error('updateVoiceSettings not implemented yet'));
+export const updateVoiceSettings = async (voiceId: number, settings: Record<string, any>): Promise<AxiosResponse<ApiResponse>> => {
+  const { apiClient } = await import('./api/client');
+  return apiClient.put(`/api/voices/admin/global/${voiceId}`, settings);
+};
 
-export const transcribeVoice = (voiceId: number): Promise<AxiosResponse<ApiResponse>> => 
-  Promise.reject(new Error('transcribeVoice not implemented yet'));
+export const transcribeVoice = async (voiceId: number): Promise<AxiosResponse<ApiResponse>> => {
+  const { apiClient } = await import('./api/client');
+  return apiClient.post(`/api/voices/admin/global/${voiceId}/transcribe`);
+};
 
-export const retranscribeVoice = (voiceId: number): Promise<AxiosResponse<ApiResponse>> => 
-  Promise.reject(new Error('retranscribeVoice not implemented yet'));
+export const retranscribeVoice = async (voiceId: number): Promise<AxiosResponse<ApiResponse>> => {
+  const { apiClient } = await import('./api/client');
+  return apiClient.post(`/api/voices/admin/global/${voiceId}/retranscribe`);
+};
 
-export const retranscribeUserVoice = (voiceId: number, userId: number, referenceText?: string): Promise<AxiosResponse<ApiResponse>> => 
-  Promise.reject(new Error('retranscribeUserVoice not implemented yet'));
+export const retranscribeUserVoice = async (voiceId: number, userId: number, referenceText?: string): Promise<AxiosResponse<ApiResponse>> => {
+  const { apiClient } = await import('./api/client');
+  return apiClient.post(`/api/voices/user/${voiceId}/retranscribe`, { user_id: userId, reference_text: referenceText });
+};
 
-export const renameVoice = (voiceId: number, newName: string): Promise<AxiosResponse<ApiResponse>> => 
-  Promise.reject(new Error('renameVoice not implemented yet'));
+export const renameVoice = async (voiceId: number, newName: string): Promise<AxiosResponse<ApiResponse>> => {
+  const { apiClient } = await import('./api/client');
+  return apiClient.put(`/api/voices/admin/global/${voiceId}/rename`, { new_name: newName });
+};
 
-export const renameUserVoice = (voiceId: number, userId: number, newName: string): Promise<AxiosResponse<ApiResponse>> => 
-  Promise.reject(new Error('renameUserVoice not implemented yet'));
+export const renameUserVoice = async (voiceId: number, userId: number, newName: string): Promise<AxiosResponse<ApiResponse>> => {
+  const { apiClient } = await import('./api/client');
+  return apiClient.put(`/api/voices/user/${voiceId}/rename`, { user_id: userId, new_name: newName });
+};
 
-export const getUsers = (): Promise<AxiosResponse<ApiResponse>> => 
-  Promise.reject(new Error('getUsers not implemented yet'));
+export const getUsers = async (): Promise<AxiosResponse<ApiResponse>> => {
+  const { apiClient } = await import('./api/client');
+  return apiClient.get('/api/admin/users/list');
+};
 
-export const updateUserVoiceSettings = (voiceId: number, userId: number, settings: Record<string, any>): Promise<AxiosResponse<ApiResponse>> => 
-  Promise.reject(new Error('updateUserVoiceSettings not implemented yet'));
+export const updateUserVoiceSettings = async (voiceId: number, userId: number, settings: Record<string, any>): Promise<AxiosResponse<ApiResponse>> => {
+  const { apiClient } = await import('./api/client');
+  return apiClient.put(`/api/voices/user/settings/${voiceId}`, settings);
+};
 

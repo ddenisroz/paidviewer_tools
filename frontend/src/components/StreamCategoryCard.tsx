@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tag, CheckCircle, XCircle, Save, Loader, Link, Unlink } from 'lucide-react';
 import { useDebounce } from '../hooks/useDebounce';
-import { TwitchIcon, VKIcon } from './PlatformIcons';
+import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
 import { useData } from '../context/DataContext';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useUserSettings } from '../context/UserSettingsContext';
@@ -992,4 +992,5 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
 };
 
 export default StreamCategoryCard;
+
 

@@ -422,7 +422,7 @@ const QuickActionsBar: React.FC = () => {
                 <button
                     onClick={handleTtsToggle}
                     disabled={isToggling}
-                    className={`w-[160px] h-11 flex items-center justify-center gap-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    className={`w-40 h-10 flex items-center justify-center gap-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
                         ttsState
                             ? 'bg-green-600 hover:bg-green-700 text-white border border-green-500'
                             : 'bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-gray-200 border border-gray-700'
@@ -444,7 +444,7 @@ const QuickActionsBar: React.FC = () => {
                     <button
                         onClick={handleStreakToggle}
                         disabled={isToggling || !channelName}
-                        className={`w-[160px] h-11 flex items-center justify-center gap-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+                        className={`w-40 h-10 flex items-center justify-center gap-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
                             streakEnabled
                                 ? 'bg-green-600 hover:bg-green-700 text-white border border-green-500'
                                 : 'bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-gray-200 border border-gray-700'
@@ -467,7 +467,7 @@ const QuickActionsBar: React.FC = () => {
                     <button
                         onClick={handleDonationToggle}
                         disabled={isToggling || !channelName}
-                        className={`w-[160px] h-11 flex items-center justify-center gap-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+                        className={`w-40 h-10 flex items-center justify-center gap-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
                             // 🚀 FIX: Кнопка всегда кликабельна, но показывает серый стиль если DonationAlerts не подключен
                             !isDonationAlertsConnected
                                 ? 'bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-300 border border-gray-700 cursor-pointer'

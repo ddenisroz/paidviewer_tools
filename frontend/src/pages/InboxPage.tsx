@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { logger } from '../utils/prodLogger';
 import { supportService } from '../services/api/services/supportService';
 import { useAuth } from '../context/AuthContext';
-import PageWrapper from '../components/PageWrapper';
+import PageWrapper from '../shared/components/PageWrapper';
 
 interface Ticket {
   id: number;

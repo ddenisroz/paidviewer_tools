@@ -53,6 +53,14 @@ export default defineConfig({
             if (id.includes('axios')) {
               return 'http-client';
             }
+            // Form libraries
+            if (id.includes('react-hook-form') || id.includes('@hookform')) {
+              return 'forms';
+            }
+            // Validation libraries
+            if (id.includes('zod')) {
+              return 'validation';
+            }
             // Остальные vendor зависимости
             return 'vendor';
           }
@@ -68,6 +76,17 @@ export default defineConfig({
           // UI components - один чанк для всех
           if (id.includes('/components/ui/')) {
             return 'ui-components';
+          }
+          
+          // Feature-based chunks
+          if (id.includes('/features/admin/')) {
+            return 'admin-feature';
+          }
+          if (id.includes('/features/tts/')) {
+            return 'tts-feature';
+          }
+          if (id.includes('/features/drops/')) {
+            return 'drops-feature';
           }
           
           // Admin pages отдельно (используются редко)
@@ -100,6 +119,9 @@ export default defineConfig({
     
     // Оптимизация ассетов
     assetsInlineLimit: 4096, // Инлайним маленькие файлы
+    
+    // Дополнительная оптимизация
+    reportCompressedSize: false, // Ускоряет сборку
   },
   
   // Оптимизация для разработки

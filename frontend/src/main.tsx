@@ -7,7 +7,7 @@ import './App.css'
 import './styles/design-system.css'
 
 // Lazy load non-critical providers для ускорения начальной загрузки
-import { composeProviders } from './utils/composeProviders'
+import { composeProviders } from './shared/utils/composeProviders'
 import { ToastProvider } from './components/ui/toast'
 import { AuthProvider } from './context/AuthContext'
 import { IntegrationsProvider } from './context/IntegrationsContext'

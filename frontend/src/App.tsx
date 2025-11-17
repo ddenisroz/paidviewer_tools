@@ -2,7 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 
-import AuthGuard from './components/AuthGuard';
+import AuthGuard from './shared/components/AuthGuard';
 import Layout from './components/Layout';
 import AppErrorBoundary from './components/ErrorBoundary/AppErrorBoundary';
 import RouteErrorBoundary from './components/ErrorBoundary/RouteErrorBoundary';
@@ -19,19 +19,19 @@ import DonationAlertsCallback from './pages/DonationAlertsCallback';
 const HomePage = lazy(() => import('./pages/HomePage'));
 const GuestPage = lazy(() => import('./pages/GuestPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
-const TtsMainPage = lazy(() => import('./pages/tts/TtsMainPage'));
-const VoiceManagementPage = lazy(() => import('./pages/tts/VoiceManagementPage'));
-const LocalTTSSettingsPage = lazy(() => import('./pages/tts/LocalTTSSettingsPage'));
+const TtsMainPage = lazy(() => import('./features/tts/pages/TtsMainPage'));
+const VoiceManagementPage = lazy(() => import('./features/tts/pages/VoiceManagementPage'));
+const LocalTTSSettingsPage = lazy(() => import('./features/tts/pages/LocalTTSSettingsPage'));
 const PointsManagementPage = lazy(() => import('./pages/PointsManagementPage'));
 const YoutubeIntegrationPage = lazy(() => import('./pages/media/YoutubeIntegrationPage'));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 const CommandsPage = lazy(() => import('./pages/CommandsPage'));
-const ObsTtsPage = lazy(() => import('./pages/tts/ObsTtsPage'));
-const ObsYoutubePage = lazy(() => import('./pages/tts/ObsYoutubePage'));
+const ObsTtsPage = lazy(() => import('./features/tts/pages/ObsTtsPage'));
+const ObsYoutubePage = lazy(() => import('./features/tts/pages/ObsYoutubePage'));
 const ChatOverlay = lazy(() => import('./pages/ChatOverlay'));
 const ChatWindow = lazy(() => import('./pages/ChatWindow'));
-const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
-const DropsMainPage = lazy(() => import('./pages/drops/DropsMainPage'));
+const AdminPage = lazy(() => import('./features/admin/pages/AdminPage'));
+const DropsMainPage = lazy(() => import('./features/drops/pages/DropsMainPage'));
 const DropsWidget = lazy(() => import('./pages/obs/DropsWidget'));
 
 const App: React.FC = () => {
@@ -44,7 +44,7 @@ const App: React.FC = () => {
             <ConnectionStatus />
             
             <Toaster 
-                position="top-right"
+                position="bottom-right"
                 richColors
                 expand={true}
                 duration={4000}

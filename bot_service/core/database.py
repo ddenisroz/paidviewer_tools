@@ -2,7 +2,7 @@
 import os
 import logging
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey, JSON, Text, Float, text, Index, UniqueConstraint, CheckConstraint
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
 from datetime import datetime
 from typing import Optional
@@ -539,31 +539,6 @@ try:
         
         created_at = Column(DateTime, default=utcnow_naive)
         updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
-    class UserVoiceSettings(Base):
-        """╨Ь╨╛╨┤╨╡╨╗╤М ╨┐╨╡╤А╤Б╨╛╨╜╨░╨╗╤М╨╜╤Л╤Е ╨╜╨░╤Б╤В╤А╨╛╨╡╨║ ╨│╨╛╨╗╨╛╤Б╨╛╨▓ ╨┤╨╗╤П ╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╨╡╨╣
-        
-        ╨Я╨╛╨╖╨▓╨╛╨╗╤П╨╡╤В ╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╤П╨╝ ╨┐╨╡╤А╨╡╨╛╨┐╤А╨╡╨┤╨╡╨╗╤П╤В╤М ╨┤╨╡╤Д╨╛╨╗╤В╨╜╤Л╨╡ ╨╜╨░╤Б╤В╤А╨╛╨╣╨║╨╕ ╨│╨╛╨╗╨╛╤Б╨╛╨▓ ╨┤╨╗╤П ╤Б╨╡╨▒╤П.
-        ╨Ф╨╗╤П ╨│╨╗╨╛╨▒╨░╨╗╤М╨╜╤Л╤Е ╨│╨╛╨╗╨╛╤Б╨╛╨▓: ╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╤М ╨╜╨░╤Б╤В╤А╨░╨╕╨▓╨░╨╡╤В ╨┐╨╛╨┤ ╤Б╨╡╨▒╤П (╨╜╨╡ ╨▓╨╗╨╕╤П╨╡╤В ╨╜╨░ ╨┤╤А╤Г╨│╨╕╤Е)
-        ╨Ф╨╗╤П ╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╤М╤Б╨║╨╕╤Е ╨│╨╛╨╗╨╛╤Б╨╛╨▓: ╨╜╨░╤Б╤В╤А╨╛╨╣╨║╨╕ ╤Г╨╢╨╡ ╨╡╤Б╤В╤М ╨▓ Voice ╤В╨░╨▒╨╗╨╕╤Ж╨╡ TTS Service
-        """
-        __tablename__ = 'user_voice_settings'
-        __table_args__ = (
-            UniqueConstraint('user_id', 'voice_id', name='uq_user_voice'),
-            {'extend_existing': True}
-        )
-        id = Column(Integer, primary_key=True, index=True)
-        user_id = Column(Integer, ForeignKey('users.id'), nullable=False)  # ╨Я╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╤М
-        voice_id = Column(Integer, nullable=False)  # ID ╨│╨╛╨╗╨╛╤Б╨░ ╨╕╨╖ TTS Service
-        voice_name = Column(String, nullable=True)  # ╨Э╨░╨╖╨▓╨░╨╜╨╕╨╡ ╨│╨╛╨╗╨╛╤Б╨░ (╨┤╨╗╤П ╨║╤Н╤И╨░)
-        
-        # ╨Я╨╡╤А╤Б╨╛╨╜╨░╨╗╤М╨╜╤Л╨╡ ╨╜╨░╤Б╤В╤А╨╛╨╣╨║╨╕ (╨┐╨╡╤А╨╡╨╛╨┐╤А╨╡╨┤╨╡╨╗╤П╤О╤В ╨┤╨╡╤Д╨╛╨╗╤В╨╜╤Л╨╡ ╨╕╨╖ Voice)
-        cfg_strength = Column(Float, nullable=True)  # ╨б╤В╨░╨▒╨╕╨╗╤М╨╜╨╛╤Б╤В╤М ╤Б╨╕╨╜╤В╨╡╨╖╨░ (None = ╨╕╤Б╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╤М ╨┤╨╡╤Д╨╛╨╗╤В)
-        speed_preset = Column(String, nullable=True)  # ╨б╨║╨╛╤А╨╛╤Б╤В╤М ╤А╨╡╤З╨╕ (None = ╨╕╤Б╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╤М ╨┤╨╡╤Д╨╛╨╗╤В)
-        volume = Column(Float, nullable=True)  # ╨Ш╨╜╨┤╨╕╨▓╨╕╨┤╤Г╨░╨╗╤М╨╜╨░╤П ╨│╤А╨╛╨╝╨║╨╛╤Б╤В╤М ╨│╨╛╨╗╨╛╤Б╨░ (0-100, None = ╨╕╤Б╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╤М ╨╛╨▒╤Й╤Г╤О)
-        
-        created_at = Column(DateTime, default=utcnow_naive)
-        updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
-
     class AdminUser(Base):
         """╨Ь╨╛╨┤╨╡╨╗╤М ╨░╨┤╨╝╨╕╨╜╨╕╤Б╤В╤А╨░╤В╨╛╤А╨╛╨▓ ╤Б╨╕╤Б╤В╨╡╨╝╤Л"""
         __tablename__ = 'admin_users'
@@ -897,6 +872,33 @@ class DropsHistory(Base):
     chat_message_id = Column(Integer, nullable=True)  # ID ╤Б╨╛╨╛╨▒╤Й╨╡╨╜╨╕╤П ╨▓ ╤З╨░╤В╨╡
     
     created_at = Column(DateTime, default=utcnow_naive, index=True)
+
+
+class UserVoiceSettings(Base):
+    """Personal settings for voices (both custom and global)
+    
+    For global voices: stores user's personal settings (speed, volume, CFG) that apply only to them.
+    For custom voices: this table is not used (settings are stored in TTS service).
+    """
+    __tablename__ = 'user_voice_settings'
+    __table_args__ = (
+        UniqueConstraint('user_id', 'voice_id', name='uq_user_voice_settings'),
+        {'extend_existing': True}
+    )
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    voice_id = Column(Integer, nullable=False, index=True)  # ID голоса из TTS service
+    voice_name = Column(String, nullable=False)  # Имя голоса для удобства
+    
+    # Personal settings for this voice
+    cfg_strength = Column(Float, nullable=True)  # Stability/CFG strength (0.1-10.0)
+    speed_preset = Column(Float, nullable=True)  # Speed preset (0.5-2.0)
+    volume = Column(Float, nullable=True)  # Volume (0-100)
+    
+    created_at = Column(DateTime, default=utcnow_naive)
+    updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
+
 
 class MythicalDropsSession(Base):
     """╨б╨╡╤Б╤Б╨╕╨╕ ╨╝╨╕╤Д╨╕╤З╨╡╤Б╨║╨╕╤Е Drops"""

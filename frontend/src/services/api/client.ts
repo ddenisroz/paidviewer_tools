@@ -6,6 +6,7 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } f
 import { API_BASE_URL, TTS_SERVICE_URL } from '../../constants';
 import { logger } from '../../utils/prodLogger';
 import { handleApiError, shouldRetryRequest } from '../../utils/apiErrorHandler';
+import { requestDeduplicator } from '../../utils/requestDeduplication';
 
 /**
  * Конфигурация для создания API клиента
@@ -28,7 +29,7 @@ function createApiClient({ baseURL, withCredentials = true, timeout = 30000 }: A
     timeout,
   });
 
-  // Request interceptor - добавляем логирование и настройки
+  // Request interceptor - добавляем логирование, настройки и дедупликацию
   client.interceptors.request.use(
     (config) => {
       // Логирование запросов в dev режиме
@@ -38,6 +39,13 @@ function createApiClient({ baseURL, withCredentials = true, timeout = 30000 }: A
           data: config.data,
         });
       }
+
+      // Добавляем ключ для дедупликации GET запросов
+      if (config.method?.toLowerCase() === 'get') {
+        const dedupeKey = `${config.method}:${config.url}:${JSON.stringify(config.params || {})}`;
+        (config as any).__dedupeKey = dedupeKey;
+      }
+
       return config;
     },
     (error: AxiosError) => {
@@ -99,13 +107,18 @@ function createApiClient({ baseURL, withCredentials = true, timeout = 30000 }: A
 
       // Если не повторяем или исчерпали попытки, обрабатываем ошибку
       // Не показываем toast здесь - это делается в компонентах через handleApiError
-      // Просто логируем
-      logger.error('[API] Response error:', {
-        url: error.config?.url,
-        method: error.config?.method,
-        status: error.response?.status,
-        retries: originalRequest._retry || 0,
-      });
+      // Логируем только неожиданные ошибки (не 403, 404)
+      const status = error.response?.status;
+      const isExpectedError = status === 403 || status === 404;
+      
+      if (!isExpectedError || import.meta.env.DEV) {
+        logger.error('[API] Response error:', {
+          url: error.config?.url,
+          method: error.config?.method,
+          status: status,
+          retries: originalRequest._retry || 0,
+        });
+      }
 
       // Пробрасываем ошибку дальше для обработки в компонентах
       return Promise.reject(error);

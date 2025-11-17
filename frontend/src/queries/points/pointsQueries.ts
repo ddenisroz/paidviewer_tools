@@ -15,13 +15,30 @@ import type { ApiResponse } from '../../types';
 export const usePlatformRewards = (platform: string, options?: Omit<UseQueryOptions<any, AxiosError>, 'queryKey' | 'queryFn'>) => {
   return useQuery({
     queryKey: queryKeys.points.platformRewards(platform),
-    queryFn: () => pointsService.getPlatformRewards(platform),
+    queryFn: async () => {
+      try {
+        return await pointsService.getPlatformRewards(platform);
+      } catch (error) {
+        const axiosError = error as AxiosError;
+        // Логируем только если это не 403 (ожидаемая ошибка для не-партнёров)
+        if (axiosError?.response?.status !== 403) {
+          logger.error('[API] Response error:', {
+            url: axiosError.config?.url,
+            method: axiosError.config?.method,
+            status: axiosError.response?.status,
+            retries: axiosError.config?.['axios-retry']?.retryCount || 0
+          });
+        }
+        throw error;
+      }
+    },
     enabled: !!platform && (options?.enabled !== false),
     staleTime: 30 * 1000, // 30 секунд
     gcTime: 5 * 60 * 1000, // 5 минут
     retry: (failureCount, error) => {
-      // Не повторяем запрос при 403 (партнер/аффилиат требуется)
-      if ((error as AxiosError)?.response?.status === 403) {
+      // Не повторяем запрос при 403 (партнер/аффилиат требуется) или 404
+      const status = (error as AxiosError)?.response?.status;
+      if (status === 403 || status === 404) {
         return false;
       }
       return failureCount < 2;

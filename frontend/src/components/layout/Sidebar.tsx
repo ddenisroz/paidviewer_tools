@@ -29,16 +29,16 @@ interface SidebarNavItemProps {
 // Route preload mapping - maps routes to their lazy loaders
 const routePreloaders: Record<string, () => void> = {
     '/dashboard': createPreloadHandler(() => import('../../pages/HomePage'), 'home'),
-    '/dashboard/tts': createPreloadHandler(() => import('../../pages/tts/TtsMainPage'), 'tts-main'),
-    '/dashboard/tts/voices': createPreloadHandler(() => import('../../pages/tts/VoiceManagementPage'), 'tts-voices'),
-    '/dashboard/tts/local': createPreloadHandler(() => import('../../pages/tts/LocalTTSSettingsPage'), 'tts-local'),
+    '/dashboard/tts': createPreloadHandler(() => import('../../features/tts/pages/TtsMainPage'), 'tts-main'),
+    '/dashboard/tts/voices': createPreloadHandler(() => import('../../features/tts/pages/VoiceManagementPage'), 'tts-voices'),
+    '/dashboard/tts/local': createPreloadHandler(() => import('../../features/tts/pages/LocalTTSSettingsPage'), 'tts-local'),
     '/dashboard/youtube': createPreloadHandler(() => import('../../pages/media/YoutubeIntegrationPage'), 'youtube'),
     '/dashboard/points': createPreloadHandler(() => import('../../pages/PointsManagementPage'), 'points'),
-    '/dashboard/drops': createPreloadHandler(() => import('../../pages/drops/DropsMainPage'), 'drops'),
+    '/dashboard/drops': createPreloadHandler(() => import('../../features/drops/pages/DropsMainPage'), 'drops'),
     '/dashboard/chat-analysis': createPreloadHandler(() => import('../../pages/AnalyticsPage'), 'analytics'),
     '/dashboard/commands': createPreloadHandler(() => import('../../pages/CommandsPage'), 'commands'),
     '/dashboard/settings': createPreloadHandler(() => import('../../pages/SettingsPage'), 'settings'),
-    '/dashboard/dolbaebadmintts': createPreloadHandler(() => import('../../pages/admin/AdminPage'), 'admin'),
+    '/dashboard/dolbaebadmintts': createPreloadHandler(() => import('../../features/admin/pages/AdminPage'), 'admin'),
 };
 
 const getNavItems = (isYourchy: boolean): NavItem[] => {

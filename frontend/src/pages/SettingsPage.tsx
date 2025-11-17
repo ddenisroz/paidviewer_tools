@@ -6,12 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Inbox, Settings, Gift, AlertCircle, Trash2 } from 'lucide-react';
-import { TwitchIcon, VKIcon } from '../components/PlatformIcons';
+import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useDonationAlerts } from '../context/DonationAlertsContext';
 import { useAuth } from '../context/AuthContext';
+import { useAudioPriority } from '../context/AudioPriorityContext';
 import InboxPage from './InboxPage';
-import PageWrapper from '../components/PageWrapper';
+import PageWrapper from '../shared/components/PageWrapper';
 import DeleteAccountModal from '../components/DeleteAccountModal';
 
 type TabType = 'settings' | 'tickets';
@@ -21,6 +22,7 @@ const SettingsPage: React.FC = () => {
     const { user, isAuthenticated } = useAuth();
     const { integrations, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
     const { isConnected: daConnected, isLoading: daLoading, connect: daConnect, disconnect: daDisconnect } = useDonationAlerts();
+    const { ttsPreference, setTtsPreference } = useAudioPriority();
     const [activeTab, setActiveTab] = useState<TabType>('settings');
     const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
 
@@ -136,9 +138,11 @@ const SettingsPage: React.FC = () => {
                 <Card className="flex flex-col items-center justify-between gap-3 p-4">
                     <div className="flex items-center gap-2">
                         <img 
-                            src="/src/images/logos/DA_Alert_Color.svg" 
+                            src="/images/logos/DA_Alert_Color.svg" 
                             alt="DonationAlerts" 
                             className="h-5 w-5"
+                            loading="lazy"
+                            decoding="async"
                             onError={(e) => {
                                 const target = e.target as HTMLImageElement;
                                 target.style.display = 'none';
@@ -161,6 +165,66 @@ const SettingsPage: React.FC = () => {
                     />
                 </Card>
             </div>
+
+            {/* Audio Priority Settings */}
+            <Card className="p-4">
+                <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                        <Settings className="h-5 w-5 text-muted-foreground" />
+                        <h3 className="text-base font-semibold">Приоритет аудио</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                        Выберите, как YouTube должен вести себя, когда воспроизводится TTS
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <button
+                            onClick={() => setTtsPreference('pause')}
+                            className={`p-4 rounded-lg border-2 transition-all ${
+                                ttsPreference === 'pause'
+                                    ? 'border-primary bg-primary/10'
+                                    : 'border-gray-700 hover:border-gray-600'
+                            }`}
+                        >
+                            <div className="space-y-2">
+                                <div className="font-semibold">Пауза</div>
+                                <div className="text-xs text-muted-foreground">
+                                    YouTube полностью останавливается во время TTS
+                                </div>
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => setTtsPreference('duck')}
+                            className={`p-4 rounded-lg border-2 transition-all ${
+                                ttsPreference === 'duck'
+                                    ? 'border-primary bg-primary/10'
+                                    : 'border-gray-700 hover:border-gray-600'
+                            }`}
+                        >
+                            <div className="space-y-2">
+                                <div className="font-semibold">Приглушение</div>
+                                <div className="text-xs text-muted-foreground">
+                                    YouTube продолжает играть, но тише (20% громкости)
+                                </div>
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => setTtsPreference('none')}
+                            className={`p-4 rounded-lg border-2 transition-all ${
+                                ttsPreference === 'none'
+                                    ? 'border-primary bg-primary/10'
+                                    : 'border-gray-700 hover:border-gray-600'
+                            }`}
+                        >
+                            <div className="space-y-2">
+                                <div className="font-semibold">Без изменений</div>
+                                <div className="text-xs text-muted-foreground">
+                                    YouTube и TTS играют одновременно
+                                </div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </Card>
 
             {/* User Info and Danger Zone */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

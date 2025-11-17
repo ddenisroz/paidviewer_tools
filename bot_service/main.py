@@ -51,18 +51,18 @@ from auth.auth import get_current_user
 # Rate limiting handled by slowapi
 from bots.twitch_bot import Bot  # Используется в initialize_twitch_bot()
 from bots.vk_live_bot import VKLiveBot  # Используется в initialize_vk_live_bot()
-from services.memory_tts_queue import memory_tts_queue
+from features.tts.memory_tts_queue import memory_tts_queue
 from services.memory_websocket_manager import memory_websocket_manager
 # Удален database_session_storage - дублирует session_manager
 # Удален modern_monitor - используем enhanced_logger
 
 # Импорты роутеров
-from api.tts_api import tts_router, voices_router, user_voices_router, local_tts_router
-from api.youtube_api_endpoints import youtube_router
-from api.drops_api import router as drops_router
+from features.tts.tts_api import tts_router, voices_router, user_voices_router, local_tts_router
+from features.youtube.youtube_api import youtube_router
+from features.drops.drops_api import router as drops_router
 from api.moderation_api import router as moderation_router
 from api.database_management_api import router as database_router
-from api.commands_api import router as commands_router
+from features.commands.commands_api import router as commands_router
 from api.points_api_endpoints import points_router
 from api.session_api import router as session_api_router
 from api.support_api import router as support_router
@@ -89,6 +89,7 @@ from api.platforms_api import router as platforms_router
 from api.system_logs_api import router as system_logs_router
 from api.proxy_api import router as proxy_router
 from api.error_reporting_api import router as error_reporting_router
+from api.auth_api import router as auth_api_router
 
 from core.token_utils import validate_platform_token
 
@@ -949,6 +950,7 @@ app.include_router(system_logs_router)
 app.include_router(proxy_router)
 app.include_router(platforms_router)
 app.include_router(error_reporting_router)
+app.include_router(auth_api_router)
 
 # Static files - настроены в create_app()
 

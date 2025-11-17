@@ -413,12 +413,12 @@ alembic upgrade head
 
 ### Основные
 - **[README.md](../README.md)** - Главный README
-- **[QUICK_START.md](QUICK_START.md)** - Полная установка
-- **[ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md)** - Архитектура
+- **[QUICK_START.md](guides/QUICK_START.md)** - Полная установка
+- **[ARCHITECTURE_GUIDE.md](architecture/ARCHITECTURE_GUIDE.md)** - Архитектура
 
 ### Специализированные
-- **[TTS_ARCHITECTURE.md](TTS_ARCHITECTURE.md)** - TTS система
-- **[SHARED_WEBSOCKET.md](SHARED_WEBSOCKET.md)** - WebSocket
+- **[TTS_ARCHITECTURE.md](architecture/TTS_ARCHITECTURE.md)** - TTS система
+- **[SHARED_WEBSOCKET.md](architecture/SHARED_WEBSOCKET.md)** - WebSocket
 - **[SECURITY_LOGIC.md](SECURITY_LOGIC.md)** - Безопасность
 - **[DROPS_SYSTEM.md](DROPS_SYSTEM.md)** - Drops система
 

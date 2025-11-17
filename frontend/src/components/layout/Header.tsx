@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../../context/AuthContext';
 import { useIntegrations } from '../../context/IntegrationsContext';
 import { Button } from '../ui/button';
-import { TwitchIcon, VKIcon } from '../PlatformIcons';
+import { TwitchIcon, VKIcon } from '../../shared/components/PlatformIcons';
 import { authService } from '../../services/api/services/authService';
 import { integrationsService } from '../../services/api/services/integrationsService';
 import { saveReturnUrl } from '../../utils/oauthRedirect';

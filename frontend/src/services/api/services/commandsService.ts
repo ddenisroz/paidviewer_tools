@@ -57,12 +57,15 @@ export const commandsService = {
   /**
    * Переключить команду
    * @param commandName - Имя команды
-   * @param data - Данные для обновления
+   * @param data - Данные для обновления (должен содержать command_id)
    * @returns Promise с ответом API
    */
   async toggleCommand(commandName: string, data: Record<string, any>): Promise<AxiosResponse<ApiResponse>> {
-    // Backend использует PUT для обновления команд
-    return apiClient.put(`/api/commands/${commandName}`, data);
+    // Backend требует command_id, а не command_name
+    if (!data.command_id) {
+      throw new Error('command_id is required for toggle operation');
+    }
+    return apiClient.put(`/api/commands/${data.command_id}`, data);
   },
 };
 

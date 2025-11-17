@@ -20,24 +20,6 @@ export default {
       },
     },
     extend: {
-      spacing: {
-        // 8px grid spacing system - maps to CSS variables
-        // Use these for consistent spacing: p-1, m-2, gap-3, space-y-4, etc.
-        '0': 'var(--spacing-0)',      // 0px
-        '1': 'var(--spacing-1)',      // 8px
-        '2': 'var(--spacing-2)',      // 16px
-        '3': 'var(--spacing-3)',      // 24px
-        '4': 'var(--spacing-4)',      // 32px
-        '5': 'var(--spacing-5)',      // 40px
-        '6': 'var(--spacing-6)',      // 48px
-        '8': 'var(--spacing-8)',      // 64px
-        '10': 'var(--spacing-10)',    // 80px
-        '12': 'var(--spacing-12)',    // 96px
-        
-        // Component-specific spacing utilities
-        'card': 'var(--card-padding)',
-        'section': 'var(--section-gap)',
-      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

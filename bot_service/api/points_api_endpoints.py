@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from starlette.requests import Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 import logging
 
 from core.database import get_db
@@ -73,17 +73,32 @@ class CreateRewardRequest(BaseModel):
     is_enabled: Optional[bool] = True
     should_redemptions_skip_request_queue: Optional[bool] = False
     
-    @validator('title')
+    @field_validator('title')
+
+    
+    @classmethod
+
+    
     def sanitize_title(cls, v):
         """Санитизация названия награды"""
         return sanitize_input(v, max_length=45)
     
-    @validator('description')
+    @field_validator('description')
+
+    
+    @classmethod
+
+    
     def sanitize_description(cls, v):
         """Санитизация описания награды"""
         return sanitize_input(v, max_length=200)
     
-    @validator('prompt')
+    @field_validator('prompt')
+
+    
+    @classmethod
+
+    
     def sanitize_prompt(cls, v):
         """Санитизация подсказки"""
         if v is not None:

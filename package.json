@@ -18,7 +18,11 @@
     "restart:bot": "docker-compose -f docker-compose.prod.yml restart bot_service",
     "restart:frontend": "docker-compose -f docker-compose.prod.yml restart frontend",
     "stop": "docker-compose -f docker-compose.prod.yml down",
-    "start": "docker-compose -f docker-compose.prod.yml up -d"
+    "start": "docker-compose -f docker-compose.prod.yml up -d",
+    "check:design": "node scripts/check-design-system.js",
+    "lint:design": "npm run check:design",
+    "migrate:design": "node scripts/migrate-to-design-system.js",
+    "migrate:design:apply": "node scripts/migrate-to-design-system.js --apply"
   },
   "keywords": [
     "tts",

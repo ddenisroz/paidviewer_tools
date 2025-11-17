@@ -1,7 +1,7 @@
 import { VALIDATION, TIMEOUTS, REGEX } from '../constants';
 import { logger } from '../utils/prodLogger';
-import { formatDate as formatDateUtil, formatRelativeTime as formatRelativeTimeUtil } from './formatUtils';
-import { capitalize as capitalizeUtil, truncateString as truncateUtil, stripHtml as stripHtmlUtil } from './stringUtils';
+import { formatDate as formatDateUtil, formatRelativeTime as formatRelativeTimeUtil } from '../shared/utils/formatUtils';
+import { capitalize as capitalizeUtil, truncateString as truncateUtil, stripHtml as stripHtmlUtil } from '../shared/utils/stringUtils';
 
 export interface ValidationResult {
   isValid: boolean;

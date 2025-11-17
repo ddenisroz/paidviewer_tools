@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Wrench, Settings, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import PageWrapper from '../components/PageWrapper';
+import PageWrapper from '../shared/components/PageWrapper';
 import { useAuth } from '../context/AuthContext';
 
 const AnalyticsPage: React.FC = () => {

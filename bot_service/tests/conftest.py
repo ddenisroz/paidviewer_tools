@@ -11,6 +11,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
+from dotenv import load_dotenv
 
 # Добавляем путь к проекту
 project_root = Path(__file__).parent.parent.parent
@@ -21,6 +22,10 @@ if str(project_root) not in sys.path:
 bot_service_root = Path(__file__).parent.parent
 if str(bot_service_root) not in sys.path:
     sys.path.insert(0, str(bot_service_root))
+
+# Load .env file before importing any modules that need environment variables
+env_path = bot_service_root / '.env'
+load_dotenv(dotenv_path=env_path, override=True)
 
 from core.database import Base, get_db
 from core.session_manager import session_manager

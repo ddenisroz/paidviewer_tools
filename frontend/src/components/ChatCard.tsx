@@ -15,7 +15,7 @@ import {
     EyeOff,
     ExternalLink
 } from 'lucide-react';
-import { TwitchIcon, VKIcon } from './PlatformIcons';
+import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
@@ -1550,7 +1550,7 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                         {showScrollButton && (
                             <button
                                 onClick={scrollToBottom}
-                                className="absolute bottom-6 right-6 bg-purple-600 hover:bg-purple-700 text-white rounded-full p-3 shadow-lg transition-all duration-200 hover:scale-110 z-10"
+                                className="absolute bottom-6 right-6 bg-purple-600 hover:bg-purple-700 text-white rounded-full p-3 shadow-lg transition-colors duration-200 z-10"
                                 title="Промотать вниз"
                             >
                                 <ArrowDown className="w-5 h-5" />
@@ -1613,4 +1613,5 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
 };
 
 export default ChatCard;
+
 

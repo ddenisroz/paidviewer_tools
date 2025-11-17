@@ -8,8 +8,8 @@ from typing import List, Set, Optional
 from twitchio.ext import commands
 from core.connection_manager import ConnectionManager
 from core.database import BotCommand
-from api.tts_api import TTSAPI
-from api.youtube_api import YouTubeAPI
+from features.tts.tts_api import TTSAPI
+from features.youtube.youtube_api_legacy import YouTubeAPI
 from utils.role_checker import RoleChecker
 from constants import DEFAULT_BACKEND_URL
 
@@ -110,7 +110,7 @@ class TwitchBotCore(commands.Bot):
             
             # ✅ НОВОЕ: Увеличиваем счетчик сообщений для стриков (только если стрик включен)
             try:
-                from services.drops_service import DropsService
+                from features.drops.drops_service import DropsService
                 from core.database import get_db, User
                 
                 # Ищем user_id владельца канала по имени канала
