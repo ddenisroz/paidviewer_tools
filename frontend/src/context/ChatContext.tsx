@@ -122,7 +122,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     const { user, isAuthenticated, isGuest, isCheckingAuth } = useAuth();
     const { integrations, isLoading: integrationsLoading } = useIntegrations();
     const { addToast } = useToast();
-    const { requestAudioFocus, releaseAudioFocus } = useAudioPriority();
     const { addToQueue } = useTtsPlayer();
     
     const loadMessagesFromStorage = (): ChatMessage[] => {
