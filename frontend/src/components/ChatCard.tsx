@@ -28,6 +28,7 @@ import { chatService } from '../services/api/services/chatService';
 import { getAllEmotesForChannel } from '../utils/emotes';
 import { twitchBadgesService } from '../services/twitchBadges';
 import ChatBoxSettingsModal from './ChatBoxSettingsModal';
+import MessageContent from './MessageContent';
 import { logger } from '../utils/prodLogger';
 import { useTimeout } from '../hooks/useTimeout';
 import { CHAT_CONSTANTS } from '../constants/drops';
@@ -105,9 +106,16 @@ interface ContextMenuState {
     message: ChatMessage;
 }
 
+interface EmoteData {
+    id: string;
+    name: string;
+    url: string;
+    animated: boolean;
+}
+
 interface EmotesState {
-    channelEmotes: Map<string, any>;
-    globalEmotes: Map<string, any>;
+    channelEmotes: Map<string, EmoteData>;
+    globalEmotes: Map<string, EmoteData>;
 }
 
 interface PrevIntegrationsRef {
@@ -119,27 +127,9 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
     const { user, isGuest } = useAuth();
     const { messages: chatMessages, isConnected, setMessages } = useChat();
     
-    // Фильтрация сообщений + TTS настройки платформ
-    const getInitialVisibility = (): PlatformVisibility => {
-        try {
-            const cached = localStorage.getItem('tts_platform_settings');
-            if (cached) {
-                const parsed = JSON.parse(cached);
-                const enabledPlatforms = parsed.enabled_platforms || [];
-                return {
-                    twitch: enabledPlatforms.includes('twitch'),
-                    vk: enabledPlatforms.includes('vk')
-                };
-            }
-        } catch (e) {
-            logger.error('Failed to parse cached platform settings:', e);
-        }
-        return { twitch: true, vk: true };
-    };
-    
-    const initialVisibility = getInitialVisibility();
-    const [twitchChatVisible, setTwitchChatVisible] = useState<boolean>(initialVisibility.twitch);
-    const [vkChatVisible, setVkChatVisible] = useState<boolean>(initialVisibility.vk);
+    // Фильтрация сообщений + TTS настройки платформ (из БД, не из localStorage)
+    const [twitchChatVisible, setTwitchChatVisible] = useState<boolean>(false);
+    const [vkChatVisible, setVkChatVisible] = useState<boolean>(false);
     
     // TTS настройки (для синхронизации с кнопками-шорткатами)
     const [ttsSettings, setTtsSettings] = useState<TtsSettings>({
@@ -156,10 +146,21 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
         return saved !== null ? JSON.parse(saved) : true;
     });
     
+    // Отображение картинок/ссылок в чате - сохраняется в localStorage
+    const [showImages, setShowImages] = useState<boolean>(() => {
+        const saved = localStorage.getItem('chatShowImages');
+        return saved !== null ? JSON.parse(saved) : true;
+    });
+    
     // Сохраняем состояние видимости чата в localStorage при изменении
     useEffect(() => {
         localStorage.setItem('chatMessagesVisible', JSON.stringify(chatMessagesVisible));
     }, [chatMessagesVisible]);
+    
+    // Сохраняем состояние отображения картинок в localStorage при изменении
+    useEffect(() => {
+        localStorage.setItem('chatShowImages', JSON.stringify(showImages));
+    }, [showImages]);
     
     // State для отслеживания загрузки badges
     const [badgesLoaded, setBadgesLoaded] = useState<boolean>(false);
@@ -211,17 +212,10 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                 
                 logger.log('✅ [TTS SHORTCUT] enabled_platforms:', settings.enabled_platforms);
                 
-                // 🔄 СИНХРОНИЗАЦИЯ: Обновляем видимость платформ на основе API
+                // 🔄 СИНХРОНИЗАЦИЯ: Обновляем видимость платформ на основе API (единственный источник истины - БД)
                 const enabledPlatforms = settings.enabled_platforms || [];
                 setTwitchChatVisible(enabledPlatforms.includes('twitch'));
                 setVkChatVisible(enabledPlatforms.includes('vk'));
-                
-                // 🔄 Сохраняем в localStorage для быстрой инициализации
-                try {
-                    localStorage.setItem('tts_platform_settings', JSON.stringify(settings));
-                } catch (e) {
-                    logger.error('Failed to cache platform settings:', e);
-                }
                 
                 logger.log('🔄 [TTS SHORTCUT] Synced visibility from API:', {
                     enabled_platforms: enabledPlatforms,
@@ -248,9 +242,10 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                 
                 badgesLoadedRef.current = true;
                 setBadgesLoaded(true);
-            } catch (error: any) {
+            } catch (error: unknown) {
                 logger.error('❌ [BADGES] Error loading badges:', error);
-                const errorMessage = error.response?.data?.detail || error.message || 'Не удалось загрузить значки';
+                const err = error as { response?: { data?: { detail?: string } }; message?: string };
+                const errorMessage = err.response?.data?.detail || err.message || 'Не удалось загрузить значки';
                 toast.error(`Ошибка загрузки значков: ${errorMessage}`);
             }
         };
@@ -281,20 +276,13 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                 const enabledPlatformsFromAPI = (response.data as unknown as TtsSettings).enabled_platforms || [];
                 logger.log('🔄 [TTS SHORTCUT] Reloaded from API:', enabledPlatformsFromAPI);
                 
-                // Обновляем состояние из API
+                // Обновляем состояние из API (единственный источник истины - БД)
                 setTwitchChatVisible(enabledPlatformsFromAPI.includes('twitch'));
                 setVkChatVisible(enabledPlatformsFromAPI.includes('vk'));
                 setTtsSettings(prev => ({
                     ...prev,
                     enabled_platforms: enabledPlatformsFromAPI
                 }));
-                
-                // 🔄 Сохраняем в localStorage для быстрой инициализации
-                try {
-                    localStorage.setItem('tts_platform_settings', JSON.stringify(response.data));
-                } catch (e) {
-                    logger.error('Failed to cache platform settings:', e);
-                }
             } catch (error) {
                 logger.error('❌ [TTS SHORTCUT] Error reloading settings:', error);
             }
@@ -306,6 +294,43 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
             window.removeEventListener('tts-settings-changed', handleTtsSettingsChanged as EventListener);
         };
     }, [user?.id]);
+    
+    // ✅ НОВЫЙ КОД: Отключаем TTS при закрытии вкладки или выходе с сайта
+    useEffect(() => {
+        const handleBeforeUnload = async () => {
+            // Отключаем TTS при закрытии вкладки
+            try {
+                await ttsService.savePlatformSettings({
+                    enabled_platforms: []
+                });
+                logger.log('🔇 [TTS] Disabled TTS on page unload');
+            } catch (error) {
+                logger.error('❌ [TTS] Error disabling TTS on unload:', error);
+            }
+        };
+        
+        const handleVisibilityChange = async () => {
+            // Отключаем TTS когда вкладка становится невидимой (пользователь переключился на другую вкладку)
+            if (document.hidden) {
+                try {
+                    await ttsService.savePlatformSettings({
+                        enabled_platforms: []
+                    });
+                    logger.log('🔇 [TTS] Disabled TTS on visibility change');
+                } catch (error) {
+                    logger.error('❌ [TTS] Error disabling TTS on visibility change:', error);
+                }
+            }
+        };
+        
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, []);
     
     // ✅ Загружаем channel badges когда integrations становятся доступными
     useEffect(() => {
@@ -382,7 +407,7 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                 enabledPlatforms.splice(index, 1);
             }
             
-            const response = await ttsService.savePlatformSettings({
+            await ttsService.savePlatformSettings({
                 enabled_platforms: enabledPlatforms
             });
             
@@ -391,12 +416,6 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                 enabled_platforms: enabledPlatforms
             };
             setTtsSettings(updatedSettings);
-            
-            try {
-                localStorage.setItem('tts_platform_settings', JSON.stringify(response.data || { enabled_platforms: enabledPlatforms }));
-            } catch (e) {
-                logger.error('Failed to cache platform settings:', e);
-            }
             
             window.dispatchEvent(new CustomEvent('tts-settings-changed', {
                 detail: { enabledPlatforms: enabledPlatforms }
@@ -429,7 +448,7 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                 enabledPlatforms.splice(index, 1);
             }
             
-            const response = await ttsService.savePlatformSettings({
+            await ttsService.savePlatformSettings({
                 enabled_platforms: enabledPlatforms
             });
             
@@ -438,12 +457,6 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                 enabled_platforms: enabledPlatforms
             };
             setTtsSettings(updatedSettings);
-            
-            try {
-                localStorage.setItem('tts_platform_settings', JSON.stringify(response.data || { enabled_platforms: enabledPlatforms }));
-            } catch (e) {
-                logger.error('Failed to cache platform settings:', e);
-            }
             
             window.dispatchEvent(new CustomEvent('tts-settings-changed', {
                 detail: { enabledPlatforms: enabledPlatforms }
@@ -745,9 +758,10 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
         try {
             const emotesData = await getAllEmotesForChannel(user?.twitch_username || '');
             setEmotes(emotesData);
-        } catch (error: any) {
+        } catch (error: unknown) {
             logger.error('Error loading emotes:', error);
-            const errorMessage = error.response?.data?.detail || error.message || 'Не удалось загрузить эмодзи';
+            const err = error as { response?: { data?: { detail?: string } }; message?: string };
+            const errorMessage = err.response?.data?.detail || err.message || 'Не удалось загрузить эмодзи';
             toast.error(`Ошибка загрузки эмодзи: ${errorMessage}`);
         }
     };
@@ -787,10 +801,11 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                     });
                     
                     const data = response.data.data || response.data;
-                    if (response.data.success && data.messages) {
-                        logger.log(`✅ [CHAT] Loaded ${data.messages.length} Twitch messages`);
-                        const messagesWithBadges = data.messages.filter((m: ChatMessage) => m.badges && Array.isArray(m.badges) && m.badges.length > 0);
-                        logger.log(`🎖️ [CHAT HISTORY] Messages with badges: ${messagesWithBadges.length}/${data.messages.length}`);
+                    const dataWithMessages = data as { messages?: ChatMessage[] };
+                    if (response.data.success && dataWithMessages.messages) {
+                        logger.log(`✅ [CHAT] Loaded ${dataWithMessages.messages.length} Twitch messages`);
+                        const messagesWithBadges = dataWithMessages.messages.filter((m: ChatMessage) => m.badges && Array.isArray(m.badges) && m.badges.length > 0);
+                        logger.log(`🎖️ [CHAT HISTORY] Messages with badges: ${messagesWithBadges.length}/${dataWithMessages.messages.length}`);
                         if (messagesWithBadges.length > 0) {
                             logger.log('🎖️ [CHAT HISTORY] Sample badge message:', {
                                 author: messagesWithBadges[0].author,
@@ -798,7 +813,7 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                                 badgesType: typeof messagesWithBadges[0].badges
                             });
                         }
-                        historyMessages.push(...(data.messages as ChatMessage[]));
+                        historyMessages.push(...dataWithMessages.messages);
                     } else {
                         logger.log('⚠️ [CHAT] No Twitch messages in response');
                     }
@@ -819,9 +834,10 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                     });
                     
                     const data = response.data.data || response.data;
-                    if (response.data.success && data.messages) {
-                        logger.log(`✅ [CHAT] Loaded ${data.messages.length} VK messages`);
-                        historyMessages.push(...(data.messages as ChatMessage[]));
+                    const dataWithMessages = data as { messages?: ChatMessage[] };
+                    if (response.data.success && dataWithMessages.messages) {
+                        logger.log(`✅ [CHAT] Loaded ${dataWithMessages.messages.length} VK messages`);
+                        historyMessages.push(...dataWithMessages.messages);
                     } else {
                         logger.log('⚠️ [CHAT] No VK messages in response');
                     }
@@ -839,9 +855,10 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
             } else {
                 logger.log('📜 [CHAT] No history messages found');
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             logger.error('❌ Error loading chat history:', error);
-            const errorMessage = error.response?.data?.detail || error.message || 'Не удалось загрузить историю чата';
+            const err = error as { response?: { data?: { detail?: string } }; message?: string };
+            const errorMessage = err.response?.data?.detail || err.message || 'Не удалось загрузить историю чата';
             toast.error(`Ошибка загрузки истории: ${errorMessage}`);
         }
     };
@@ -852,20 +869,22 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
             
             const response = await chatService.getMutedUsers();
             const data = response.data.data || response.data;
+            const dataWithUsers = data as { blocked_users?: Array<{ platform: string; username: string }> };
             
             if (response.data.success) {
                 const blockedSet = new Set<string>();
                 
-                (data.blocked_users || []).forEach((u: { platform: string; username: string }) => {
+                (dataWithUsers.blocked_users || []).forEach((u: { platform: string; username: string }) => {
                     blockedSet.add(`${u.platform}:${u.username.toLowerCase()}`);
                 });
                 
                 logger.log(`🔇 [CHAT] Loaded ${blockedSet.size} muted users:`, Array.from(blockedSet));
                 setTtsBlockedUsers(blockedSet);
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             logger.error('Error loading blocked users:', error);
-            const errorMessage = error.response?.data?.detail || error.message || 'Не удалось загрузить список заблокированных пользователей';
+            const err = error as { response?: { data?: { detail?: string } }; message?: string };
+            const errorMessage = err.response?.data?.detail || err.message || 'Не удалось загрузить список заблокированных пользователей';
             toast.error(`Ошибка загрузки: ${errorMessage}`);
         }
     };
@@ -921,7 +940,8 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                     
                     logger.log('🔇 [CHAT MUTE] Response:', response.data);
                     const data = response.data.data || response.data;
-                    const resultAction = data?.action;
+                    const dataWithAction = data as { action?: string };
+                    const resultAction = dataWithAction?.action;
                     
                     if (resultAction === 'muted') {
                         setTtsBlockedUsers(prev => new Set(prev).add(`${platform}:${username.toLowerCase()}`));
@@ -941,9 +961,10 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                     logger.warn('Unknown action:', action);
                     break;
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             logger.error('Error executing moderation action:', error);
-            toast.error(error.response?.data?.detail || 'Ошибка выполнения действия');
+            const err = error as { response?: { data?: { detail?: string } } };
+            toast.error(err.response?.data?.detail || 'Ошибка выполнения действия');
         }
     };
 
@@ -1037,10 +1058,10 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
 
     // Экспортируем функции в глобальную область для доступа из отдельного окна чата
     useEffect(() => {
-        (window as any).handleChatContextMenuAction = handleContextMenuAction;
+        (window as { handleChatContextMenuAction?: typeof handleContextMenuAction }).handleChatContextMenuAction = handleContextMenuAction;
         
         return () => {
-            delete (window as any).handleChatContextMenuAction;
+            delete (window as { handleChatContextMenuAction?: typeof handleContextMenuAction }).handleChatContextMenuAction;
         };
     }, [handleContextMenuAction]);
 
@@ -1405,6 +1426,21 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                         <Button
                             variant="outline"
                             size="sm"
+                            onClick={() => setShowImages(!showImages)}
+                            title={showImages ? 'Скрыть картинки и ссылки' : 'Показать картинки и ссылки'}
+                            className={`h-8 w-8 p-0 transition-all ${
+                                showImages 
+                                    ? 'text-blue-400 border-blue-600 hover:bg-blue-900/20' 
+                                    : 'text-gray-400 border-gray-600 hover:text-white hover:bg-gray-800'
+                            }`}
+                        >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => setChatMessagesVisible(!chatMessagesVisible)}
                             title={chatMessagesVisible ? 'Скрыть сообщения чата' : 'Показать сообщения чата'}
                             className={`h-8 w-8 p-0 transition-all ${
@@ -1535,7 +1571,13 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                                                         </span>{' '}
                                                         
                                                         <span className="break-words">
-                                                            {msg.content || msg.message || 'Нет содержимого'}
+                                                            <MessageContent
+                                                                message={msg.content || msg.message || 'Нет содержимого'}
+                                                                channelEmotes={emotes.channelEmotes}
+                                                                globalEmotes={emotes.globalEmotes}
+                                                                showLinks={showImages}
+                                                                autoLoadImages={showImages}
+                                                            />
                                                         </span>
                                                     </div>
                                                 </div>

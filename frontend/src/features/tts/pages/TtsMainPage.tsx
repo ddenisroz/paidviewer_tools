@@ -34,6 +34,7 @@ import {
 import { queryKeys } from '../../../queries/queryKeys';
 import PageWrapper from '../../../shared/components/PageWrapper';
 import { ttsService } from '../../../services/api/services/ttsService';
+import { ApiResponse } from '@/types';
 
 interface PlatformSettings {
     enabled_platforms: ('twitch' | 'vk')[];
@@ -78,7 +79,7 @@ const TtsMainPageContent: React.FC = () => {
         version: 1,
     });
     
-    const [localTtsConfig, setLocalTtsConfig] = useState<any>(null);
+    const [localTtsConfig, setLocalTtsConfig] = useState<unknown>(null);
     const [isSavingMode, setIsSavingMode] = useState<boolean>(false);
     const [isRegeneratingUrl, setIsRegeneratingUrl] = useState<boolean>(false);
     
@@ -103,7 +104,7 @@ const TtsMainPageContent: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
             logger.log('Platform settings saved');
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             logger.error('Error saving platform settings:', error);
         }
     });
@@ -112,7 +113,7 @@ const TtsMainPageContent: React.FC = () => {
         onSuccess: () => {
             logger.log('Audio settings saved');
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             logger.error('Error saving audio settings:', error);
         }
     });
@@ -121,7 +122,7 @@ const TtsMainPageContent: React.FC = () => {
         onSuccess: () => {
             logger.log('TTS settings saved');
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             logger.error('Error saving TTS settings:', error);
             if (error.response?.status === 409) {
                 toast.warning('Настройки были обновлены. Перезагружаю...');
@@ -134,7 +135,7 @@ const TtsMainPageContent: React.FC = () => {
         onSuccess: () => {
             logger.log('TTS mode settings saved');
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             logger.error('Error saving TTS mode settings:', error);
         }
     });
@@ -197,7 +198,7 @@ const TtsMainPageContent: React.FC = () => {
     useEffect(() => {
         if (ttsStatusData) {
             const enabled = ttsStatusData.enabled || false;
-            const engineType = (ttsStatusData as any).engine_type || 'gtts';
+            const engineType = (ttsStatusData as unknown).engine_type || 'gtts';
             
             const basicEnabled = enabled && engineType === 'gtts';
             const aiEnabled = enabled && (engineType === 'cloud' || engineType === 'local');
@@ -213,19 +214,31 @@ const TtsMainPageContent: React.FC = () => {
         }
     }, [ttsStatusData]);
 
+    // ✅ ИСПРАВЛЕНИЕ: Слушаем событие tts-status-changed для синхронизации с QuickActionsBar
+    useEffect(() => {
+        const handleTtsStatusChange = (event: CustomEvent<{ enabled: boolean }>) => {
+            logger.log('🔄 TtsMainPage: Received tts-status-changed event:', event.detail);
+            // Инвалидируем кэш чтобы перезагрузить данные
+            queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
+        };
+
+        window.addEventListener('tts-status-changed', handleTtsStatusChange as EventListener);
+        return () => window.removeEventListener('tts-status-changed', handleTtsStatusChange as EventListener);
+    }, [queryClient]);
+
     useEffect(() => {
         if (ttsSettingsData) {
             setTtsSettings(prev => ({
                 ...prev,
-                enable7TV: (ttsSettingsData as any).enable7TV ?? prev.enable7TV,
-                enableTwitch: (ttsSettingsData as any).enableTwitch ?? prev.enableTwitch,
-                filterReplies: (ttsSettingsData as any).filterReplies ?? prev.filterReplies,
-                filterMentions: (ttsSettingsData as any).filterMentions ?? prev.filterMentions,
-                version: (ttsSettingsData as any).version ?? prev.version,
+                enable7TV: (ttsSettingsData as unknown).enable7TV ?? prev.enable7TV,
+                enableTwitch: (ttsSettingsData as unknown).enableTwitch ?? prev.enableTwitch,
+                filterReplies: (ttsSettingsData as unknown).filterReplies ?? prev.filterReplies,
+                filterMentions: (ttsSettingsData as unknown).filterMentions ?? prev.filterMentions,
+                version: (ttsSettingsData as unknown).version ?? prev.version,
             }));
             
-            if ((ttsSettingsData as any).listeningMode) {
-                setListeningMode(prev => prev !== (ttsSettingsData as any).listeningMode ? (ttsSettingsData as any).listeningMode : prev);
+            if ((ttsSettingsData as unknown).listeningMode) {
+                setListeningMode(prev => prev !== (ttsSettingsData as unknown).listeningMode ? (ttsSettingsData as unknown).listeningMode : prev);
             }
         }
     }, [ttsSettingsData]);
@@ -263,14 +276,14 @@ const TtsMainPageContent: React.FC = () => {
         if (listeningMode === 'obs' && isAuthenticated && user?.id) {
             ttsService.generateObsUrl()
                 .then(response => {
-                    const token = (response.data as any)?.obs_token;
+                    const token = (response.data as ApiResponse)?.obs_token;
                     if (token) {
                         const url = getTtsWebSocketUrl(token);
                         setObsUrl(url);
                         logger.log('OBS URL generated:', url);
                     }
                 })
-                .catch((err: any) => {
+                .catch((err: unknown) => {
                     logger.error('Error generating OBS URL:', err);
                     toast.error('Ошибка генерации OBS URL');
                 });
@@ -287,6 +300,7 @@ const TtsMainPageContent: React.FC = () => {
         
         const newState = !isAnyTtsEnabled;
         
+        // ✅ ИСПРАВЛЕНИЕ: Оптимистичное обновление UI
         if (newState) {
             setBasicTtsEnabled(true);
         } else {
@@ -296,15 +310,19 @@ const TtsMainPageContent: React.FC = () => {
         
         toggleTtsMutation.mutate(newState, {
             onSuccess: () => {
+                // ✅ ИСПРАВЛЕНИЕ: Инвалидируем кэш для обновления всех компонентов
+                queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
                 window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: newState } }));
             },
-            onError: (error: any) => {
+            onError: (error: unknown) => {
+                // Откатываем оптимистичное обновление при ошибке
                 if (newState) {
                     setBasicTtsEnabled(false);
                 } else {
                     setBasicTtsEnabled(true);
                 }
                 logger.error('Error toggling TTS:', error);
+                toast.error('Ошибка переключения TTS');
             },
         });
     };
@@ -314,13 +332,13 @@ const TtsMainPageContent: React.FC = () => {
         
         setIsSavingMode(true);
         saveTtsModeSettingsMutation.mutate({ tts_mode: mode }, {
-            onSuccess: (response: any) => {
+            onSuccess: (response: Record<string, unknown>) => {
                 setTtsTriggerMode(mode);
                 if (response.data?.message) {
                     toast.success(response.data.message);
                 }
             },
-            onError: (error: any) => {
+            onError: (error: unknown) => {
                 logger.error('Error changing TTS mode:', error);
             },
             onSettled: () => {
@@ -332,6 +350,7 @@ const TtsMainPageContent: React.FC = () => {
     const handleBasicTtsToggle = (): void => {
         const newValue = !basicTtsEnabled;
         
+        // ✅ ИСПРАВЛЕНИЕ: Оптимистичное обновление UI
         if (newValue) {
             setBasicTtsEnabled(true);
             setAiTtsEnabled(false);
@@ -341,6 +360,9 @@ const TtsMainPageContent: React.FC = () => {
         
         toggleTtsMutation.mutate(newValue, {
             onSuccess: () => {
+                // ✅ ИСПРАВЛЕНИЕ: Инвалидируем кэш для обновления всех компонентов
+                queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
+                
                 if (newValue && aiTtsEnabled) {
                     switchEngineMutation.mutate('gtts', {
                         onSuccess: () => {
@@ -352,9 +374,11 @@ const TtsMainPageContent: React.FC = () => {
                     toast.success(newValue ? 'Google TTS включён' : 'TTS отключён');
                 }
             },
-            onError: (error: any) => {
+            onError: (error: unknown) => {
+                // Откатываем оптимистичное обновление при ошибке
                 setBasicTtsEnabled(!newValue);
                 logger.error('Error toggling basic TTS:', error);
+                toast.error('Ошибка переключения TTS');
             },
         });
     };
@@ -367,6 +391,7 @@ const TtsMainPageContent: React.FC = () => {
         
         const newValue = !aiTtsEnabled;
         
+        // ✅ ИСПРАВЛЕНИЕ: Оптимистичное обновление UI
         if (newValue) {
             setAiTtsEnabled(true);
             setBasicTtsEnabled(true);
@@ -377,6 +402,8 @@ const TtsMainPageContent: React.FC = () => {
         if (newValue && !isAnyTtsEnabled) {
             toggleTtsMutation.mutate(true, {
                 onSuccess: () => {
+                    // ✅ ИСПРАВЛЕНИЕ: Инвалидируем кэш для обновления всех компонентов
+                    queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
                     setBasicTtsEnabled(true);
                     const engineType = ttsEngine === 'local' ? 'local' : 'cloud';
                     switchEngineMutation.mutate(engineType, {
@@ -384,21 +411,26 @@ const TtsMainPageContent: React.FC = () => {
                             toast.success('F5-TTS включён');
                             window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
                         },
-                        onError: (error: any) => {
+                        onError: (error: unknown) => {
                             setAiTtsEnabled(false);
                             logger.error('Error switching engine:', error);
+                            toast.error('Ошибка переключения движка');
                         },
                     });
                 },
-                onError: (error: any) => {
+                onError: (error: unknown) => {
                     setAiTtsEnabled(false);
                     logger.error('Error enabling TTS:', error);
+                    toast.error('Ошибка включения TTS');
                 },
             });
         } else {
             const engineType = newValue ? (ttsEngine === 'local' ? 'local' : 'cloud') : 'gtts';
             switchEngineMutation.mutate(engineType, {
                 onSuccess: () => {
+                    // ✅ ИСПРАВЛЕНИЕ: Инвалидируем кэш для обновления всех компонентов
+                    queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
+                    
                     if (newValue) {
                         toast.success('F5-TTS включён');
                         window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
@@ -406,9 +438,11 @@ const TtsMainPageContent: React.FC = () => {
                         toast.success('Переключено на Google TTS');
                     }
                 },
-                onError: (error: any) => {
+                onError: (error: unknown) => {
+                    // Откатываем оптимистичное обновление при ошибке
                     setAiTtsEnabled(!newValue);
                     logger.error('Error switching engine:', error);
+                    toast.error('Ошибка переключения движка');
                 },
             });
         }
@@ -478,7 +512,7 @@ const TtsMainPageContent: React.FC = () => {
     }, [platformSettings.enabled_platforms, savePlatformSettingsMutation]);
 
     const regenerateObsUrlMutation = useRegenerateTtsObsUrl({
-        onSuccess: (response: any) => {
+        onSuccess: (response: Record<string, unknown>) => {
             const token = response.data?.obs_token;
             if (token) {
                 const url = getTtsWebSocketUrl(token);
@@ -490,7 +524,7 @@ const TtsMainPageContent: React.FC = () => {
                 toast.error('Токен не получен');
             }
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             logger.error('Error regenerating OBS URL:', error);
         },
     });
@@ -566,7 +600,7 @@ const TtsMainPageContent: React.FC = () => {
     return (
         <PageWrapper title="Text to Speech">
             <div className="space-y-4 max-w-5xl mx-auto">
-                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-700/50 bg-gradient-to-br from-gray-900/80 to-gray-800/50 backdrop-blur-sm">
+                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-700/50 bg-gradient-to-br from-gray-900/80 to-gray-800/50 backdrop-blur-sm hover:border-gray-600/50 transition-all cursor-pointer" onClick={handleGlobalTtsToggle}>
                     <div className="flex items-center gap-3">
                         <div className={`w-3 h-3 rounded-full transition-all duration-300 ${isAnyTtsEnabled ? 'bg-green-500 shadow-lg shadow-green-500/50' : 'bg-gray-600'}`} />
                         <div>
@@ -579,8 +613,8 @@ const TtsMainPageContent: React.FC = () => {
                     <Switch
                         checked={isAnyTtsEnabled}
                         onCheckedChange={handleGlobalTtsToggle}
-                        className="data-[state=checked]:bg-green-600"
-                        disabled={!isDataLoaded || (!isGuest && !isTwitchConnected && !isVkConnected)}
+                        className="data-[state=checked]:bg-green-600 pointer-events-none"
+                        disabled={false}
                     />
                 </div>
 

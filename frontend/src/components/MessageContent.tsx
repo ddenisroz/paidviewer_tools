@@ -1,11 +1,19 @@
 // frontend/src/components/MessageContent.tsx
 import React from 'react';
 import { processEmotes } from '../utils/emotes';
+import { sanitizeHtml } from '../utils/sanitize';
+
+interface EmoteData {
+    id: string;
+    name: string;
+    url: string;
+    animated: boolean;
+}
 
 interface MessageContentProps {
     message: string;
-    channelEmotes?: Map<string, string>;
-    globalEmotes?: Map<string, string>;
+    channelEmotes?: Map<string, EmoteData>;
+    globalEmotes?: Map<string, EmoteData>;
     showLinks?: boolean;
     autoLoadImages?: boolean;
 }
@@ -189,8 +197,8 @@ const renderMessageWithEmotes = (processedMessage: string, showLinks = true, aut
             );
         }
         
-        // Обычный текст
-        return <span key={index} dangerouslySetInnerHTML={{ __html: part }} />;
+        // ✅ SECURITY: Обычный текст - используем sanitizeHtml для защиты от XSS
+        return <span key={index} dangerouslySetInnerHTML={{ __html: sanitizeHtml(part) }} />;
     });
 };
 

@@ -13,18 +13,21 @@ import { AuthProvider } from './context/AuthContext'
 import { IntegrationsProvider } from './context/IntegrationsContext'
 import { ChatProvider } from './context/ChatContext'
 import { UserSettingsProvider } from './context/UserSettingsContext'
+import { AudioPriorityProvider } from './context/AudioPriorityContext'
 import { TtsPlayerProvider } from './context/TtsPlayerContext'
 import { queryClient } from './lib/queryClient'
 
 // 🎯 Core провайдеры - только самые критичные для начального рендера
 // Toast - обязательно сразу (для уведомлений)
 // Auth - обязательно сразу (проверка авторизации)
+// AudioPriorityProvider - нужен для TtsPlayerProvider
 // TtsPlayerProvider - нужен для ChatProvider
 // Остальные - загружаются после первого рендера если нужно
 const CoreProviders = composeProviders(
   ToastProvider,
   AuthProvider,
   IntegrationsProvider,
+  AudioPriorityProvider,
   TtsPlayerProvider,
   ChatProvider,
   UserSettingsProvider

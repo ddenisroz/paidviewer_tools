@@ -93,7 +93,7 @@ interface PlatformOption {
 }
 
 interface TagConfig {
-    icon: React.ComponentType<any>;
+    icon: React.ComponentType<unknown>;
     color: string;
 }
 
@@ -112,9 +112,9 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
         }
         const roleOptions: RoleOption[] = [
             { value: 'all', label: 'Все зрители', icon: <Users className="h-3 w-3" /> },
-            { value: 'vip', label: 'VIP и выше', icon: <Star className="h-3 w-3" /> },
-            { value: 'moderator', label: 'Модераторы и выше', icon: <ShieldCheck className="h-3 w-3" /> },
-            { value: 'broadcaster', label: 'Только владелец', icon: <Crown className="h-3 w-3" /> }
+            { value: 'vip', label: 'VIP+', icon: <Star className="h-3 w-3" /> },
+            { value: 'moderator', label: 'Модераторы+', icon: <ShieldCheck className="h-3 w-3" /> },
+            { value: 'broadcaster', label: 'Владелец', icon: <Crown className="h-3 w-3" /> }
         ];
         const normalizedRole = role.split(',').sort().join(',');
         const option = roleOptions.find(opt => {
@@ -130,9 +130,9 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
         }
         const roleOptions: RoleOption[] = [
             { value: 'all', label: 'Все зрители', icon: <Users className="h-3 w-3" /> },
-            { value: 'vip', label: 'VIP и выше', icon: <Star className="h-3 w-3" /> },
-            { value: 'moderator', label: 'Модераторы и выше', icon: <ShieldCheck className="h-3 w-3" /> },
-            { value: 'broadcaster', label: 'Только владелец', icon: <Crown className="h-3 w-3" /> }
+            { value: 'vip', label: 'VIP+', icon: <Star className="h-3 w-3" /> },
+            { value: 'moderator', label: 'Модераторы+', icon: <ShieldCheck className="h-3 w-3" /> },
+            { value: 'broadcaster', label: 'Владелец', icon: <Crown className="h-3 w-3" /> }
         ];
         const normalizedRole = role.split(',').sort().join(',');
         const option = roleOptions.find(opt => {
@@ -323,41 +323,8 @@ const PlatformStatusBanner: React.FC<PlatformStatusBannerProps> = ({ integration
         );
     }
 
-    return (
-        <Alert className="mb-6 border-yellow-500/50 bg-yellow-500/10">
-            <AlertCircle className="h-4 w-4 text-yellow-600" />
-            <AlertDescription className="text-sm">
-                <div className="flex items-center gap-4">
-                    <span className="font-medium">Частичное подключение:</span>
-                    <div className="flex items-center gap-3">
-                        {twitchConnected ? (
-                            <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-purple-500/20">
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
-                                Twitch {integrations.twitch.username && `(@${integrations.twitch.username})`}
-                            </Badge>
-                        ) : (
-                            <Badge variant="outline" className="bg-gray-500/10 text-gray-600 border-gray-500/20">
-                                <XCircle className="h-3 w-3 mr-1" />
-                                Twitch не подключен
-                            </Badge>
-                        )}
-                        {vkConnected ? (
-                            <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20">
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
-                                VK Live {integrations.vk.username && `(@${integrations.vk.username})`}
-                            </Badge>
-                        ) : (
-                            <Badge variant="outline" className="bg-gray-500/10 text-gray-600 border-gray-500/20">
-                                <XCircle className="h-3 w-3 mr-1" />
-                                VK Live не подключен
-                            </Badge>
-                        )}
-                    </div>
-                    <span className="text-muted-foreground">Команды доступны только на подключенных платформах</span>
-                </div>
-            </AlertDescription>
-        </Alert>
-    );
+    // ✅ ИСПРАВЛЕНИЕ: Убрана подсказка - она не нужна, пользователь и так видит подключенные платформы
+    return null;
 };
 
 const CommandsPage: React.FC = () => {
@@ -404,8 +371,8 @@ const CommandsPage: React.FC = () => {
         response_text: ''
     });
     
-    const basicCommands = (commandsData as any)?.basic_commands || [];
-    const customCommands = (commandsData as any)?.custom_commands || [];
+    const basicCommands = (commandsData as unknown)?.basic_commands || [];
+    const customCommands = (commandsData as unknown)?.custom_commands || [];
     
     // Все хуки должны быть вызваны до любых условных return (правило React Hooks)
     const basicTags = useMemo(() => {
@@ -521,8 +488,8 @@ const CommandsPage: React.FC = () => {
         const commandData = {
             name: createForm.command_name,
             response: createForm.response_text,
-            platform: createForm.platforms as any,
-            user_level: createForm.allowed_roles as any,
+            platform: createForm.platforms as unknown,
+            user_level: createForm.allowed_roles as unknown,
             cooldown: createForm.cooldown_seconds,
             enabled: createForm.is_enabled
         };
@@ -563,8 +530,8 @@ const CommandsPage: React.FC = () => {
             // Преобразуем форму в формат ChatCommand
             const commandData = {
                 response: editForm.response_text,
-                platform: editForm.platforms as any,
-                user_level: editForm.allowed_roles as any,
+                platform: editForm.platforms as unknown,
+                user_level: editForm.allowed_roles as unknown,
                 cooldown: editForm.cooldown_seconds,
                 enabled: editForm.is_enabled
             };
@@ -639,9 +606,6 @@ const CommandsPage: React.FC = () => {
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center justify-between mb-4">
-                                <div className="text-sm text-muted-foreground">
-                                    Показано команд: <span className="font-medium text-foreground">{getFilteredBasicCommands().length}</span> из {basicCommands.length}
-                                </div>
                                 {(basicSearchTerm || selectedBasicTags.length > 0 || platformFilter !== 'all') && (
                                     <Button 
                                         variant="ghost" 
@@ -883,15 +847,14 @@ const CommandsPage: React.FC = () => {
                                                     }))}
                                                 >
                                                     <SelectTrigger>
-                                                        <SelectValue placeholder="Выберите доступ" />
+                                                        <SelectValue placeholder="Выберите доступ">
+                                                            {roleOptions.find(opt => opt.value === createForm.allowed_roles)?.label || 'Выберите доступ'}
+                                                        </SelectValue>
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         {roleOptions.map(option => (
                                                             <SelectItem key={option.value} value={option.value}>
-                                                                <div className="flex items-center gap-2">
-                                                                    {option.icon}
-                                                                    {option.label}
-                                                                </div>
+                                                                {option.label}
                                                             </SelectItem>
                                                         ))}
                                                     </SelectContent>
@@ -928,9 +891,6 @@ const CommandsPage: React.FC = () => {
                             {customCommands.length > 0 && (
                                 <>
                                     <div className="flex items-center justify-between mb-4">
-                                        <div className="text-sm text-muted-foreground">
-                                            Показано команд: <span className="font-medium text-foreground">{getFilteredCustomCommands().length}</span> из {customCommands.length}
-                                        </div>
                                         {(customSearchTerm || platformFilter !== 'all') && (
                                             <Button 
                                                 variant="ghost" 
@@ -1088,15 +1048,14 @@ const CommandsPage: React.FC = () => {
                                         }))}
                                     >
                                         <SelectTrigger>
-                                            <SelectValue placeholder="Выберите доступ" />
+                                            <SelectValue placeholder="Выберите доступ">
+                                                {roleOptions.find(opt => opt.value === editForm.allowed_roles)?.label || 'Выберите доступ'}
+                                            </SelectValue>
                                         </SelectTrigger>
                                         <SelectContent>
                                             {roleOptions.map(option => (
                                                 <SelectItem key={option.value} value={option.value}>
-                                                    <div className="flex items-center gap-2">
-                                                        {option.icon}
-                                                        {option.label}
-                                                    </div>
+                                                    {option.label}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>

@@ -23,27 +23,49 @@ interface ChatSettings {
 }
 
 interface Emotes {
-    channelEmotes: Map<string, any>;
-    globalEmotes: Map<string, any>;
+    channelEmotes: Map<string, unknown>;
+    globalEmotes: Map<string, unknown>;
 }
 
 const ChatWindow: React.FC = () => {
     const { user, isAuthenticated } = useAuth();
     const { messages, isConnected } = useChat();
     
-    const [settings, setSettings] = useState<ChatSettings>({
-        font_size: 14,
-        font_family: 'Inter, sans-serif',
-        text_color: '#FFFFFF',
-        background_color: '#1a1a1a',
-        show_platform_icons: true,
-        show_badges: true,
-        show_avatars: true,
-        max_messages: 50,
-        show_7tv_emotes: true,
-        show_links: true,
-        auto_load_images: true
+    // ✅ Настройки чата - сохраняются в localStorage для UI-состояния
+    const [settings, setSettings] = useState<ChatSettings>(() => {
+        try {
+            const saved = localStorage.getItem('chatWindowSettings');
+            if (saved) {
+                return JSON.parse(saved);
+            }
+        } catch (e) {
+            logger.error('Failed to load chat window settings:', e);
+        }
+        return {
+            font_size: 14,
+            font_family: 'Inter, sans-serif',
+            text_color: '#FFFFFF',
+            background_color: '#1a1a1a',
+            show_platform_icons: true,
+            show_badges: true,
+            show_avatars: true,
+            max_messages: 50,
+            show_7tv_emotes: true,
+            show_links: true,
+            auto_load_images: true
+        };
     });
+    
+    const [showSettings, setShowSettings] = useState<boolean>(false);
+    
+    // Сохраняем настройки в localStorage при изменении
+    useEffect(() => {
+        try {
+            localStorage.setItem('chatWindowSettings', JSON.stringify(settings));
+        } catch (e) {
+            logger.error('Failed to save chat window settings:', e);
+        }
+    }, [settings]);
     
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [badgesLoaded, setBadgesLoaded] = useState<boolean>(false);
@@ -148,22 +170,183 @@ const ChatWindow: React.FC = () => {
                         </div>
                     </div>
                 </div>
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '12px',
-                    opacity: 0.7
-                }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <button
+                        onClick={() => setShowSettings(!showSettings)}
+                        style={{
+                            background: showSettings ? '#4a5568' : 'transparent',
+                            border: '1px solid #4a5568',
+                            borderRadius: '6px',
+                            padding: '6px 12px',
+                            color: '#fff',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#4a5568'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = showSettings ? '#4a5568' : 'transparent'}
+                    >
+                        ⚙️ Настройки
+                    </button>
                     <div style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        backgroundColor: isConnected ? '#00ff00' : '#ff0000'
-                    }} />
-                    {isConnected ? 'Подключено' : 'Отключено'}
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '12px',
+                        opacity: 0.7
+                    }}>
+                        <div style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            backgroundColor: isConnected ? '#00ff00' : '#ff0000'
+                        }} />
+                        {isConnected ? 'Подключено' : 'Отключено'}
+                    </div>
                 </div>
             </div>
+            
+            {/* Панель настроек */}
+            {showSettings && (
+                <div style={{
+                    padding: '16px',
+                    borderBottom: '1px solid #333',
+                    backgroundColor: '#1a1a1a',
+                    maxHeight: '300px',
+                    overflowY: 'auto'
+                }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '13px' }}>
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '6px', opacity: 0.8 }}>Размер шрифта</label>
+                            <input
+                                type="number"
+                                value={settings.font_size}
+                                onChange={(e) => setSettings({...settings, font_size: parseInt(e.target.value) || 14})}
+                                style={{
+                                    width: '100%',
+                                    padding: '6px 8px',
+                                    background: '#2d3748',
+                                    border: '1px solid #4a5568',
+                                    borderRadius: '4px',
+                                    color: '#fff'
+                                }}
+                                min="10"
+                                max="24"
+                            />
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '6px', opacity: 0.8 }}>Макс. сообщений</label>
+                            <input
+                                type="number"
+                                value={settings.max_messages}
+                                onChange={(e) => setSettings({...settings, max_messages: parseInt(e.target.value) || 50})}
+                                style={{
+                                    width: '100%',
+                                    padding: '6px 8px',
+                                    background: '#2d3748',
+                                    border: '1px solid #4a5568',
+                                    borderRadius: '4px',
+                                    color: '#fff'
+                                }}
+                                min="10"
+                                max="200"
+                            />
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '6px', opacity: 0.8 }}>Цвет текста</label>
+                            <input
+                                type="color"
+                                value={settings.text_color}
+                                onChange={(e) => setSettings({...settings, text_color: e.target.value})}
+                                style={{
+                                    width: '100%',
+                                    height: '32px',
+                                    padding: '2px',
+                                    background: '#2d3748',
+                                    border: '1px solid #4a5568',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer'
+                                }}
+                            />
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '6px', opacity: 0.8 }}>Цвет фона</label>
+                            <input
+                                type="color"
+                                value={settings.background_color}
+                                onChange={(e) => setSettings({...settings, background_color: e.target.value})}
+                                style={{
+                                    width: '100%',
+                                    height: '32px',
+                                    padding: '2px',
+                                    background: '#2d3748',
+                                    border: '1px solid #4a5568',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer'
+                                }}
+                            />
+                        </div>
+                    </div>
+                    
+                    <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <input
+                                type="checkbox"
+                                checked={settings.show_platform_icons}
+                                onChange={(e) => setSettings({...settings, show_platform_icons: e.target.checked})}
+                                style={{ cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: '13px' }}>Показывать иконки платформ</span>
+                        </label>
+                        
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <input
+                                type="checkbox"
+                                checked={settings.show_badges}
+                                onChange={(e) => setSettings({...settings, show_badges: e.target.checked})}
+                                style={{ cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: '13px' }}>Показывать значки</span>
+                        </label>
+                        
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <input
+                                type="checkbox"
+                                checked={settings.show_7tv_emotes}
+                                onChange={(e) => setSettings({...settings, show_7tv_emotes: e.target.checked})}
+                                style={{ cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: '13px' }}>Показывать 7TV смайлики</span>
+                        </label>
+                        
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <input
+                                type="checkbox"
+                                checked={settings.show_links}
+                                onChange={(e) => setSettings({...settings, show_links: e.target.checked})}
+                                style={{ cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: '13px' }}>Показывать ссылки</span>
+                        </label>
+                        
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <input
+                                type="checkbox"
+                                checked={settings.auto_load_images}
+                                onChange={(e) => setSettings({...settings, auto_load_images: e.target.checked})}
+                                style={{ cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: '13px' }}>Автоматически загружать картинки</span>
+                        </label>
+                    </div>
+                </div>
+            )}
             
             <div style={{
                 flex: 1,
@@ -194,7 +377,7 @@ const ChatWindow: React.FC = () => {
                         <div style={{ flexGrow: 1 }} />
                         {displayMessages.map((msg: ChatMessage, index: number) => (
                             <div 
-                                key={msg.id || `${msg.platform}-${msg.timestamp}-${(msg as any).author_name || (msg as any).author}`}
+                                key={msg.id || `${msg.platform}-${msg.timestamp}-${msg.author_name || msg.author}`}
                                 style={{
                                     marginTop: index > 0 ? '2px' : '0',
                                     padding: '4px 6px',
@@ -229,9 +412,9 @@ const ChatWindow: React.FC = () => {
                                     )
                                 )}
                                 
-                                {settings.show_badges && (msg as any).badges && Array.isArray((msg as any).badges) && (msg as any).badges.length > 0 && (
+                                {settings.show_badges && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (
                                     <>
-                                        {(msg as any).badges.map((badge: string, idx: number) => {
+                                        {msg.badges.map((badge: string, idx: number) => {
                                             const [badgeId, version] = badge.split('/');
                                             const badgeUrl = twitchBadgesService.getBadgeUrl(badgeId, version, '1x');
                                             
@@ -257,10 +440,10 @@ const ChatWindow: React.FC = () => {
                                     </>
                                 )}
                                 
-                                {settings.show_avatars && (msg as any).avatar_url && (
+                                {settings.show_avatars && msg.avatar_url && (
                                     <img
-                                        src={(msg as any).avatar_url}
-                                        alt={(msg as any).author_name || (msg as any).author}
+                                        src={msg.avatar_url}
+                                        alt={msg.author_name || msg.author}
                                         style={{
                                             width: '20px',
                                             height: '20px',
@@ -275,7 +458,7 @@ const ChatWindow: React.FC = () => {
                                     fontWeight: '600',
                                     flexShrink: 0
                                 }}>
-                                    {(msg as any).author_name || (msg as any).author}:
+                                    {msg.author_name || msg.author}:
                                 </span>
                                 
                                 <span style={{ color: settings.text_color, flex: 1 }}>

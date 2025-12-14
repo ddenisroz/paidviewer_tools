@@ -9,6 +9,7 @@ export interface ChatMessage {
   id: string;
   author: string;
   author_name?: string; // Альтернативное имя автора
+  avatar_url?: string; // URL аватара пользователя
   content?: string;
   message?: string; // Альтернативное поле для содержимого
   timestamp: string;
@@ -97,7 +98,7 @@ export interface ChatBoxSettings {
   channel_name?: string;
   user_id?: number;
   avatar_url?: string;
-  [key: string]: any;
+  [key: string]: string | number | boolean | undefined;
 }
 
 /**
@@ -122,8 +123,8 @@ export interface WebSocketMessage {
   message?: string;
   platform?: 'twitch' | 'vk' | 'youtube';
   messages?: ChatMessage[];
-  data?: any;
+  data?: Record<string, unknown>;
   cache_key?: string;
-  [key: string]: any;
+  [key: string]: string | number | ChatMessage[] | Record<string, unknown> | undefined;
 }
 

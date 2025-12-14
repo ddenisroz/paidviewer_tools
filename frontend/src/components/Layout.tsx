@@ -9,13 +9,10 @@ import { TtsProvider } from '../context/TtsContext';
 import { DataProvider } from '../context/DataContext';
 import { PlayerProvider, usePlayer } from '../context/PlayerContext';
 import { DonationAlertsProvider } from '../context/DonationAlertsContext';
-import { AudioPriorityProvider } from '../context/AudioPriorityContext';
-
 // 📦 Layout-specific провайдеры
 // Эти контексты нужны только внутри dashboard layout
-// TtsPlayerProvider теперь в main.tsx (нужен для ChatProvider)
+// AudioPriorityProvider и TtsPlayerProvider теперь в main.tsx (нужны для ChatProvider)
 const LayoutProviders = composeProviders(
-  AudioPriorityProvider,
   TtsProvider,
   DataProvider,
   PlayerProvider,

@@ -13,12 +13,14 @@ import { AlertTriangle, Loader2, Package, Gift } from 'lucide-react';
 import { useDropsConfig } from '../../../hooks/useDropsConfig';
 import { useAutoSave } from '../../../hooks/useAutoSave';
 import { DROPS_CONSTANTS } from '../../../constants/drops';
+import type { User, UserIntegrations } from '../../../types/user';
+import type { DropsConfig } from '../../../types/drops';
 
 interface StreakSettingsProps {
-    user: any;
+    user: User;
     channelName: string;
     hasRewards?: boolean;
-    integrations?: any;
+    integrations?: UserIntegrations;
 }
 
 interface StreakSettingsFormData {
@@ -126,12 +128,12 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
 
   const queryClient = useQueryClient();
   const { autoSave } = useAutoSave(
-    (payload: any) => saveMutation.mutate(payload),
+    (payload: Partial<DropsConfig>) => saveMutation.mutate(payload),
     1000
   );
 
-  const createPayload = (includeEnabledFlags = true): any => {
-    const payload: any = {
+  const createPayload = (includeEnabledFlags = true): Partial<DropsConfig> => {
+    const payload: Partial<DropsConfig> = {
       streak_days_common: formData.streak_days_common[0],
       streak_days_rare: formData.streak_days_rare[0],
       streak_days_epic: formData.streak_days_epic[0],
@@ -190,7 +192,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
       toast.success(`Статистика стриков сброшена (удалено ${deletedCount} записей)`);
       queryClient.invalidateQueries({ queryKey: ['drops-streak-stats', channelName] });
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       toast.error('Ошибка сброса статистики');
       logger.error('Error resetting streak statistics:', err);
     },
@@ -255,24 +257,24 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
       {!hasRewards && (
         <Card className="border-l-4 border-l-orange-500 border-orange-500/20 bg-orange-500/5">
           <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <div className="p-1.5 rounded-lg bg-orange-500/10 flex-shrink-0">
-                <AlertTriangle className="h-4 w-4 text-orange-400" />
-              </div>
-              <div className="flex-1 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="p-1.5 rounded-lg bg-orange-500/10 flex-shrink-0">
+                  <AlertTriangle className="h-4 w-4 text-orange-400" />
+                </div>
                 <p className="text-sm text-muted-foreground">
-                  Для работы системы стриков необходимо настроить содержимое сундуков на вкладке <strong className="text-foreground">"Награды"</strong>.
+                  Для работы системы стриков настройте содержимое сундуков на вкладке <strong className="text-foreground">"Награды"</strong>
                 </p>
-                <Button 
-                  onClick={() => window.location.href = '/dashboard/drops?tab=rewards'}
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs"
-                >
-                  <Package className="w-3.5 h-3.5 mr-1.5" />
-                  Настроить награды
-                </Button>
               </div>
+              <Button 
+                onClick={() => window.location.href = '/dashboard/drops?tab=rewards'}
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs flex-shrink-0"
+              >
+                <Package className="w-3.5 h-3.5 mr-1.5" />
+                Настроить
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -281,7 +283,13 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
       {/* Календарь дней стрика - поднят вверх */}
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-end flex-wrap gap-3">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            {/* Основной заголовок - слева */}
+            <div className="flex items-center gap-2">
+              <Gift className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-semibold">Система стриков</h3>
+            </div>
+            
             {/* Переключатели для каждой платформы - справа */}
             <div className="flex items-center gap-4 flex-wrap">
               {twitchAvailable && (
@@ -306,46 +314,11 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
           </div>
         </CardHeader>
         <CardContent>
-          <StreakCalendar formData={formData as any} setFormData={setFormData as any} />
+          <StreakCalendar formData={formData} setFormData={setFormData} />
         </CardContent>
       </Card>
 
-      {/* Информация о расчёте наград */}
-      {isStreakEnabledAnywhere && (
-        <Card className="border-blue-500/20 bg-gradient-to-br from-blue-500/5 to-transparent">
-          <CardContent className="pt-4 pb-4 space-y-3">
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-blue-500/10 flex-shrink-0">
-                <Gift className="w-4 h-4 text-blue-400" />
-              </div>
-              <div className="flex-1 space-y-2 text-sm">
-                <p className="text-muted-foreground leading-relaxed">
-                  Зритель получает награду за <strong className="text-foreground">{formData.streak_messages_required[0]}+ сообщений</strong> в чате. Редкость зависит от дней подряд:
-                </p>
-                
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
-                    <span className="text-muted-foreground">{formData.streak_days_common[0]} {formData.streak_days_common[0] === 1 ? 'день' : 'дня'}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
-                    <span className="text-muted-foreground">{formData.streak_days_rare[0]} {formData.streak_days_rare[0] === 1 ? 'день' : formData.streak_days_rare[0] < 5 ? 'дня' : 'дней'}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div>
-                    <span className="text-muted-foreground">{formData.streak_days_epic[0]} {formData.streak_days_epic[0] < 5 ? 'дня' : 'дней'}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
-                    <span className="text-muted-foreground">{formData.streak_days_legendary[0]} {formData.streak_days_legendary[0] < 5 ? 'дня' : 'дней'}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+
 
       {/* Общие настройки - перемещены вниз */}
       <Card>

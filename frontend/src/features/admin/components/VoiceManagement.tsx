@@ -25,6 +25,29 @@ interface VoiceManagementUser {
 type SpeedPreset = 'very_slow' | 'slow' | 'normal' | 'fast' | 'very_fast';
 type OwnerType = 'global' | 'user';
 
+interface ApiResponse {
+    data?: unknown;
+    warning?: string;
+}
+
+interface VoicesResponse {
+    global_voices?: TtsVoice[];
+    user_voices?: TtsVoice[];
+}
+
+interface AudioResponse {
+    data?: {
+        audio_url?: string;
+    };
+    audio_url?: string;
+}
+
+interface TranscribeResponse {
+    data: {
+        reference_text: string;
+    };
+}
+
 const VoiceManagement: React.FC = () => {
     const { addToast } = useToast();
     const [loading, setLoading] = useState<boolean>(true);
@@ -66,12 +89,14 @@ const VoiceManagement: React.FC = () => {
             const response = await getAdminVoices();
             logger.log('🔍 [ADMIN] Raw response:', response);
             
-            const data = (response as any)?.data || response;
+            const apiResponse = response as ApiResponse;
+            const data = apiResponse?.data || response;
             logger.log('🔍 [ADMIN] Extracted data:', data);
             
-            if ((data as any)?.warning) {
-                setTtsServiceWarning((data as any).warning);
-                logger.warn('⚠️ [ADMIN] TTS Service warning:', (data as any).warning);
+            const dataWithWarning = data as { warning?: string };
+            if (dataWithWarning?.warning) {
+                setTtsServiceWarning(dataWithWarning.warning);
+                logger.warn('⚠️ [ADMIN] TTS Service warning:', dataWithWarning.warning);
             } else {
                 setTtsServiceWarning(null);
             }
@@ -80,27 +105,39 @@ const VoiceManagement: React.FC = () => {
             if (Array.isArray(data)) {
                 voicesArray = data as TtsVoice[];
                 logger.log('✅ [ADMIN] Data is array, using directly');
-            } else if ((data as any)?.status === 'success' && Array.isArray((data as any).voices)) {
-                voicesArray = (data as any).voices as TtsVoice[];
-                logger.log('✅ [ADMIN] Found voices in data.voices (status: success)');
-            } else if (Array.isArray((data as any)?.voices)) {
-                voicesArray = (data as any).voices as TtsVoice[];
-                logger.log('✅ [ADMIN] Found voices array in data.voices');
-            } else if ((data as any)?.success && Array.isArray((data as any).voices)) {
-                voicesArray = (data as any).voices as TtsVoice[];
-                logger.log('✅ [ADMIN] Found voices in success response');
-            } else if (Array.isArray((data as any)?.data)) {
-                voicesArray = (data as any).data as TtsVoice[];
-                logger.log('✅ [ADMIN] Found voices in data.data');
-            } else if (Array.isArray((data as any)?.global_voices) || Array.isArray((data as any)?.user_voices)) {
-                voicesArray = [
-                    ...((data as any).global_voices || []),
-                    ...((data as any).user_voices || [])
-                ] as TtsVoice[];
-                logger.log('✅ [ADMIN] Combined global and user voices:', voicesArray.length);
             } else {
-                logger.warn('⚠️ [ADMIN] Could not extract voices array from response:', data);
-                voicesArray = [];
+                const dataObj = data as { status?: string; success?: boolean; voices?: TtsVoice[] | VoicesResponse; data?: TtsVoice[]; global_voices?: TtsVoice[]; user_voices?: TtsVoice[] };
+                
+                if (dataObj?.status === 'success' && Array.isArray(dataObj.voices)) {
+                    voicesArray = dataObj.voices;
+                    logger.log('✅ [ADMIN] Found voices in data.voices (status: success)');
+                } else if (Array.isArray(dataObj?.voices)) {
+                    voicesArray = dataObj.voices;
+                    logger.log('✅ [ADMIN] Found voices array in data.voices');
+                } else if (dataObj?.success && typeof dataObj.voices === 'object' && dataObj.voices !== null) {
+                    // ✅ ИСПРАВЛЕНИЕ: Обрабатываем случай когда voices - это объект с global_voices и user_voices
+                    const voicesObj = dataObj.voices as VoicesResponse;
+                    voicesArray = [
+                        ...(voicesObj.global_voices || []),
+                        ...(voicesObj.user_voices || [])
+                    ];
+                    logger.log('✅ [ADMIN] Found voices object with global/user voices:', voicesArray.length);
+                } else if (dataObj?.success && Array.isArray(dataObj.voices)) {
+                    voicesArray = dataObj.voices;
+                    logger.log('✅ [ADMIN] Found voices in success response');
+                } else if (Array.isArray(dataObj?.data)) {
+                    voicesArray = dataObj.data;
+                    logger.log('✅ [ADMIN] Found voices in data.data');
+                } else if (Array.isArray(dataObj?.global_voices) || Array.isArray(dataObj?.user_voices)) {
+                    voicesArray = [
+                        ...(dataObj.global_voices || []),
+                        ...(dataObj.user_voices || [])
+                    ];
+                    logger.log('✅ [ADMIN] Combined global and user voices:', voicesArray.length);
+                } else {
+                    logger.warn('⚠️ [ADMIN] Could not extract voices array from response:', data);
+                    voicesArray = [];
+                }
             }
             
             logger.log('✅ [ADMIN] Loaded voices:', voicesArray.length, 'voices');
@@ -118,7 +155,7 @@ const VoiceManagement: React.FC = () => {
     useEffect(() => {
         if (voicesError) {
             logger.error('❌ [ADMIN] Error loading voices:', voicesError);
-            const error = voicesError as any;
+            const error = voicesError as { message?: string; code?: string; response?: { status?: number; data?: { detail?: string } } };
             
             if (error.message?.includes('connection') || error.message?.includes('timeout') || error.code === 'ECONNREFUSED') {
                 setTtsServiceWarning(`Ошибка подключения к TTS сервису: ${error.message || 'Сервис недоступен'}`);
@@ -137,10 +174,13 @@ const VoiceManagement: React.FC = () => {
             let usersData: VoiceManagementUser[] = [];
             if (Array.isArray(response)) {
                 usersData = response as VoiceManagementUser[];
-            } else if (response && Array.isArray((response as any).data)) {
-                usersData = (response as any).data as VoiceManagementUser[];
-            } else if (response && (response as any).users) {
-                usersData = (response as any).users as VoiceManagementUser[];
+            } else {
+                const responseObj = response as unknown as { data?: VoiceManagementUser[]; users?: VoiceManagementUser[] };
+                if (Array.isArray(responseObj.data)) {
+                    usersData = responseObj.data;
+                } else if (responseObj.users) {
+                    usersData = responseObj.users;
+                }
             }
             
             return usersData;
@@ -154,7 +194,7 @@ const VoiceManagement: React.FC = () => {
     useEffect(() => {
         if (usersError) {
             logger.error('Error loading users:', usersError);
-            const error = usersError as any;
+            const error = usersError as { message?: string };
             addToast({ type: 'error', title: 'Ошибка', message: `Не удалось загрузить пользователей: ${error.message || 'Неизвестная ошибка'}` });
         }
     }, [usersError, addToast]);
@@ -275,8 +315,9 @@ const VoiceManagement: React.FC = () => {
             setOwnerId('global');
             setSelectedUserId('');
             queryClient.invalidateQueries({ queryKey: ['admin-voices'] });
-        } catch (error: any) {
-            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось загрузить голос.' });
+        } catch (error: unknown) {
+            const err = error as { message?: string };
+            addToast({ type: 'error', title: 'Ошибка', message: err.message || 'Не удалось загрузить голос.' });
         } finally {
             setIsUploading(false);
         }
@@ -292,8 +333,9 @@ const VoiceManagement: React.FC = () => {
             await deleteVoice(voiceId);
             addToast({ type: 'success', title: 'Успех', message: `Голос "${voiceToDelete.name}" удален.` });
             queryClient.invalidateQueries({ queryKey: ['admin-voices'] });
-        } catch (error: any) {
-            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось удалить голос.' });
+        } catch (error: unknown) {
+            const err = error as { message?: string };
+            addToast({ type: 'error', title: 'Ошибка', message: err.message || 'Не удалось удалить голос.' });
         }
     };
     
@@ -373,7 +415,8 @@ const VoiceManagement: React.FC = () => {
                 testText
             );
             
-            const audioUrl = (response as any).data?.audio_url || (response as any).audio_url;
+            const audioResponse = response as AudioResponse;
+            const audioUrl = audioResponse.data?.audio_url || audioResponse.audio_url;
             if (audioUrl) {
                 const fullAudioUrl = audioUrl.startsWith('http') ? audioUrl : `${TTS_SERVICE_URL}${audioUrl}`;
                 
@@ -437,10 +480,11 @@ const VoiceManagement: React.FC = () => {
                 setIsTestingVoice(false);
                 addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось получить аудио для воспроизведения.' });
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             logger.error('Test voice error:', error);
             setIsTestingVoice(false);
-            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось протестировать голос.' });
+            const err = error as { message?: string };
+            addToast({ type: 'error', title: 'Ошибка', message: err.message || 'Не удалось протестировать голос.' });
         }
     };
 
@@ -450,12 +494,13 @@ const VoiceManagement: React.FC = () => {
         setIsTranscribing(true);
         try {
             const response = await transcribeVoice(currentVoice.id);
+            const transcribeResponse = response as unknown as TranscribeResponse;
             
-            setCurrentVoice(prev => prev ? {...prev, reference_text: (response as any).data.reference_text} : null);
+            setCurrentVoice(prev => prev ? {...prev, reference_text: transcribeResponse.data.reference_text} : null);
             
             queryClient.setQueryData(['admin-voices'], (prev: TtsVoice[] = []) => prev.map(voice => 
                 voice.id === currentVoice.id 
-                    ? {...voice, reference_text: (response as any).data.reference_text}
+                    ? {...voice, reference_text: transcribeResponse.data.reference_text}
                     : voice
             ));
             
@@ -474,12 +519,13 @@ const VoiceManagement: React.FC = () => {
         setIsTranscribing(true);
         try {
             const response = await retranscribeVoice(currentVoice.id);
+            const transcribeResponse = response as unknown as TranscribeResponse;
             
-            setCurrentVoice(prev => prev ? {...prev, reference_text: (response as any).data.reference_text} : null);
+            setCurrentVoice(prev => prev ? {...prev, reference_text: transcribeResponse.data.reference_text} : null);
             
             queryClient.setQueryData(['admin-voices'], (prev: TtsVoice[] = []) => prev.map(voice => 
                 voice.id === currentVoice.id 
-                    ? {...voice, reference_text: (response as any).data.reference_text}
+                    ? {...voice, reference_text: transcribeResponse.data.reference_text}
                     : voice
             ));
             

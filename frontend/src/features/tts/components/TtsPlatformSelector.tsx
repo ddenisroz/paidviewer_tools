@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Mic, MicOff, Volume2, Monitor } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
-import { logger } from '../utils/prodLogger';
-import { useTtsPlatformSettings, useSaveTtsPlatformSettings } from '../queries/tts/ttsQueries';
+import { useAuth } from '../../../context/AuthContext';
+import { TwitchIcon, VKIcon } from '../../../shared/components/PlatformIcons';
+import { logger } from '../../../utils/prodLogger';
+import { useTtsPlatformSettings, useSaveTtsPlatformSettings } from '../../../queries/tts/ttsQueries';
 
 interface TtsPlatformSettings {
   enabled_platforms: string[];
@@ -20,21 +20,22 @@ const TtsPlatformSelector: React.FC = () => {
   const platformSettingsData = platformSettingsResponse?.data;
   
   const [settings, setSettings] = useState<TtsPlatformSettings>({
-    enabled_platforms: ['twitch', 'vk'],
-    global_enabled: true
+    enabled_platforms: [],
+    global_enabled: false
   });
 
   // ✅ НОВЫЙ КОД: Синхронизируем состояние с данными из React Query
   useEffect(() => {
     if (platformSettingsData) {
+      const data = platformSettingsData as { enabled_platforms?: string[]; global_enabled?: boolean };
       setSettings({
-        enabled_platforms: platformSettingsData.enabled_platforms || ['twitch', 'vk'],
-        global_enabled: platformSettingsData.global_enabled !== false
+        enabled_platforms: Array.isArray(data.enabled_platforms) ? data.enabled_platforms : ['twitch', 'vk'],
+        global_enabled: data.global_enabled !== false
       });
       logger.log('🔄 [TTS SELECTOR] State updated from React Query:', {
-        enabled_platforms: platformSettingsData.enabled_platforms,
-        twitch_enabled: platformSettingsData.enabled_platforms?.includes('twitch'),
-        vk_enabled: platformSettingsData.enabled_platforms?.includes('vk')
+        enabled_platforms: data.enabled_platforms,
+        twitch_enabled: Array.isArray(data.enabled_platforms) && data.enabled_platforms.includes('twitch'),
+        vk_enabled: Array.isArray(data.enabled_platforms) && data.enabled_platforms.includes('vk')
       });
     }
   }, [platformSettingsData]);
@@ -42,17 +43,18 @@ const TtsPlatformSelector: React.FC = () => {
   // ✅ НОВЫЙ КОД: Используем централизованный mutation для сохранения настроек
   const savePlatformSettingsMutation = useSaveTtsPlatformSettings({
     onSuccess: (response, variables) => {
+      const vars = variables as { enabled_platforms: string[] };
       const newSettings = {
-        enabled_platforms: variables.enabled_platforms,
+        enabled_platforms: vars.enabled_platforms,
         global_enabled: settings.global_enabled
       };
       setSettings(newSettings);
       
       // 🔄 Отправляем событие для синхронизации с нижними кнопками
       window.dispatchEvent(new CustomEvent('tts-settings-changed', {
-        detail: { enabledPlatforms: variables.enabled_platforms }
+        detail: { enabledPlatforms: vars.enabled_platforms }
       }));
-      logger.log('🔄 [TTS SELECTOR] Dispatched settings update:', variables.enabled_platforms);
+      logger.log('🔄 [TTS SELECTOR] Dispatched settings update:', vars.enabled_platforms);
       // toast уже показан в hook
     },
     onError: (error) => {
@@ -121,20 +123,7 @@ const TtsPlatformSelector: React.FC = () => {
     };
   }, []);
 
-  // ⚡ Показываем скелетон ТОЛЬКО при первой загрузке
-  if (initialLoading) {
-    return (
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
-          <div className="space-y-3">
-            <div className="h-12 bg-gray-200 rounded"></div>
-            <div className="h-12 bg-gray-200 rounded"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // ⚡ Не показываем скелетон - сразу рендерим с дефолтными значениями
 
   const platforms = [
     {
