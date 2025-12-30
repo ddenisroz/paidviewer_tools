@@ -1,20 +1,22 @@
-// src/components/StreamCategoryCard.tsx
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+﻿// src/components/StreamCategoryCard.tsx
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+
+import { CheckCircle, Link, Loader, Save, Tag, Unlink } from 'lucide-react';
 import ReactDOM from 'react-dom';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Tag, CheckCircle, XCircle, Save, Loader, Link, Unlink } from 'lucide-react';
-import { useDebounce } from '../hooks/useDebounce';
-import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
+import { Switch } from '@/components/ui/switch';
+import { toast } from '@/utils/toastManager';
+
+import { categoryMapping, findMappedCategory } from '../constants/categoryMapping';
 import { useData } from '../context/DataContext';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useUserSettings } from '../context/UserSettingsContext';
-import { useAuth } from '../context/AuthContext';
-import { findMappedCategory, categoryMapping } from '../constants/categoryMapping';
-import { toast } from 'sonner';
+import { useDebounce } from '../hooks/useDebounce';
+import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
 import { logger } from '../utils/prodLogger';
 
 interface Category {
@@ -57,7 +59,7 @@ const CategoryDropdown: React.FC<CategoryDropdownProps> = ({ platform, search, o
                     key={cat.id}
                     className="px-3 py-2 hover:bg-muted cursor-pointer flex items-center gap-3 transition-colors duration-200"
                     onClick={() => {
-                        logger.log('🎮 [CATEGORY DROPDOWN] Category clicked:', { platform, category: cat.name, id: cat.id });
+                        logger.log('[CATEGORY DROPDOWN] Category clicked:', { platform, category: cat.name, id: cat.id });
                         onSelect(platform, cat);
                     }}
                 >
@@ -92,12 +94,12 @@ interface StreamCategoryCardProps {
 }
 
 const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChange }) => {
-    const { user, isAuthenticated } = useAuth();
-    const { integrations, isLoading: integrationsLoading } = useIntegrations();
+    const { integrations } = useIntegrations();
     const { initialData, currentData, setCurrentData, saveChanges, status, categories, searchCategories } = useData();
     const { getCombineSettings, updateSetting } = useUserSettings();
     const { combine_categories: combineCategories, combine_titles: combineTitles } = getCombineSettings();
-    // 🚀 ANTI-FLASH: Используем useMemo для вычисления isLinked напрямую из combineCategories
+    
+    // ANTI-FLASH: Используем useMemo для вычисления isLinked напрямую из combineCategories
     // Это гарантирует, что значение всегда синхронизировано и нет видимого переключения
     const isLinked = useMemo(() => combineCategories || false, [combineCategories]);
     const [searchTerms, setSearchTerms] = useState<{ twitch: string; vk: string }>({ twitch: '', vk: '' });
@@ -145,7 +147,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
 
     // Component state processed
 
-    // 🚀 ANTI-FLASH: Уведомляем родительский компонент об изменении isLinked
+    // ANTI-FLASH: Уведомляем родительский компонент об изменении isLinked
     // isLinked теперь вычисляется напрямую из combineCategories через useMemo, поэтому нет видимого переключения
     useEffect(() => {
         if (onLinkStateChange) {
@@ -164,14 +166,15 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                 const twitchCategory = currentData.twitch?.category;
                 
                 if (twitchCategory) {
-                    logger.log('🔍 [AUTO-SYNC] ===== START AUTO-SYNC =====');
-                    logger.log('🔍 [AUTO-SYNC] Twitch category:', twitchCategory);
-                    logger.log('🔍 [AUTO-SYNC] Twitch category name:', (twitchCategory as any).name);
+                    const twitchCat = twitchCategory as Category;
+                    logger.log('[AUTO-SYNC] ===== START AUTO-SYNC =====');
+                    logger.log('[AUTO-SYNC] Twitch category:', twitchCategory);
+                    logger.log('[AUTO-SYNC] Twitch category name:', twitchCat.name);
                     
                     // Применяем маппинг категорий (Just Chatting → Говорим и смотрим)
-                    const mappedName = categoryMapping[(twitchCategory as any).name];
-                    logger.log('🔍 [AUTO-SYNC] Mapping lookup result:', {
-                        twitchName: (twitchCategory as any).name,
+                    const mappedName = categoryMapping[twitchCat.name];
+                    logger.log('[AUTO-SYNC] Mapping lookup result:', {
+                        twitchName: twitchCat.name,
                         mappedName: mappedName,
                         hasMappedName: !!mappedName
                     });
@@ -181,15 +184,15 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                     
                     // Сначала пробуем маппинг
                     if (mappedName) {
-                        logger.log('🔍 [AUTO-SYNC] Trying mapped name:', mappedName);
+                        logger.log('[AUTO-SYNC] Trying mapped name:', mappedName);
                         searchResults = await searchCategories('vk', mappedName) as Category[];
-                        logger.log('🔍 [AUTO-SYNC] Mapped search results:', searchResults);
-                        logger.log('🔍 [AUTO-SYNC] Mapped search results count:', searchResults?.length || 0);
-                        logger.log('🔍 [AUTO-SYNC] First result:', searchResults?.[0]);
+                        logger.log('[AUTO-SYNC] Mapped search results:', searchResults);
+                        logger.log('[AUTO-SYNC] Mapped search results count:', searchResults?.length || 0);
+                        logger.log('[AUTO-SYNC] First result:', searchResults?.[0]);
                         
                         if (searchResults && searchResults.length > 0) {
                             const candidate = searchResults[0];
-                            logger.log('🔍 [AUTO-SYNC] Candidate category:', candidate);
+                            logger.log('[AUTO-SYNC] Candidate category:', candidate);
                             
                             // Для маппинга используем МЯГКУЮ проверку (доверяем маппингу!)
                             const catNormalized = candidate.name.toLowerCase().replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -212,12 +215,12 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                             
                             if (isGoodMatch) {
                                 vkCategory = candidate;
-                                logger.log('✅ [AUTO-SYNC] Found via mapping (good match):', vkCategory.name);
+                                logger.log('[OK] [AUTO-SYNC] Found via mapping (good match):', vkCategory.name);
                             } else {
                                 // Для маппинга берем первый результат даже если релевантность низкая
                                 // (маппинг создан вручную - доверяем ему)
                                 vkCategory = candidate;
-                                logger.log('⚠️ [AUTO-SYNC] Using mapped category despite low text match:', {
+                                logger.log('[WARN] [AUTO-SYNC] Using mapped category despite low text match:', {
                                     mapped: mappedName,
                                     found: candidate.name,
                                     reason: 'Manual mapping takes priority'
@@ -228,16 +231,16 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                     
                     // Если по маппингу не нашли - пробуем оригинальное название
                     if (!vkCategory) {
-                        logger.log('🔍 [AUTO-SYNC] Trying original name:', (twitchCategory as any).name);
-                        searchResults = await searchCategories('vk', (twitchCategory as any).name) as Category[];
-                        logger.log('🔍 [AUTO-SYNC] Original search results:', searchResults?.length || 0);
+                        logger.log('[AUTO-SYNC] Trying original name:', twitchCat.name);
+                        searchResults = await searchCategories('vk', twitchCat.name) as Category[];
+                        logger.log('[AUTO-SYNC] Original search results:', searchResults?.length || 0);
                         
                         if (searchResults && searchResults.length > 0) {
                             const candidate = searchResults[0];
                             
                             // Проверяем релевантность - используем только если высокая (СТРОГАЯ проверка!)
                             const catNormalized = candidate.name.toLowerCase().replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim();
-                            const queryNormalized = (twitchCategory as any).name.toLowerCase().replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim();
+                            const queryNormalized = twitchCat.name.toLowerCase().replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim();
                             
                             // Разбиваем на слова для точного сравнения
                             const catWords = catNormalized.split(/\s+/);
@@ -251,10 +254,10 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                             
                             if (isGoodMatch) {
                                 vkCategory = candidate;
-                                logger.log('✅ [AUTO-SYNC] Found via original name (good match):', vkCategory.name);
+                                logger.log('[OK] [AUTO-SYNC] Found via original name (good match):', vkCategory.name);
                             } else {
-                                logger.warn('⚠️ [AUTO-SYNC] Found category but relevance too low:', {
-                                    query: (twitchCategory as any).name,
+                                logger.warn('[WARN] [AUTO-SYNC] Found category but relevance too low:', {
+                                    query: twitchCat.name,
                                     found: candidate.name,
                                     normalized: { query: queryNormalized, category: catNormalized }
                                 });
@@ -263,20 +266,20 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                     }
                     
                     if (searchResults && searchResults.length > 0) {
-                        logger.log('🔍 [AUTO-SYNC] Top 3 results:', searchResults.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
+                        logger.log('[AUTO-SYNC] Top 3 results:', searchResults.slice(0, 3).map(c => ({ name: c.name, id: c.id })));
                     }
                     
                     if (vkCategory) {
                         // Нашли VK категорию!
-                        logger.log('✅ [AUTO-SYNC] Found VK category by name:', {
-                            twitch: (twitchCategory as any).name,
+                        logger.log('[OK] [AUTO-SYNC] Found VK category by name:', {
+                            twitch: twitchCat.name,
                             vk: vkCategory.name,
                             vkId: vkCategory.id
                         });
                     
-                    setCurrentData((prev: any) => ({
+                    setCurrentData(prev => ({
                         ...prev,
-                        vk: { ...prev.vk, category: vkCategory }
+                        vk: { ...prev.vk, category: { ...vkCategory, id: String(vkCategory.id) } }
                     }));
                     
                         const vkPayload = {
@@ -292,11 +295,11 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                         
                         // Отправляем только Twitch категорию, VK категорию меняем только если нашли подходящую
                         const payload = {
-                            twitch: { category_id: (twitchCategory as any).id },
+                            twitch: { category_id: String(twitchCat.id) },
                             vk: vkPayload
                         };
                         
-                        logger.log('💾 [AUTO-SYNC] Final payload (both platforms):', payload);
+                        logger.log('[SAVE] [AUTO-SYNC] Final payload (both platforms):', payload);
                         
                         // Уведомление об успешной автосинхронизации
                         toast.success(`Категории синхронизированы: Twitch → VK Live (${vkCategory.name})`);
@@ -304,18 +307,18 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                         saveChanges(payload, 'saveCategory');
                     } else {
                         // НЕ НАШЛИ VK категорию - меняем ТОЛЬКО Twitch, VK оставляем как есть
-                        logger.warn('⚠️ [AUTO-SYNC] Could not find VK category for:', (twitchCategory as any).name);
-                        logger.warn('💡 [AUTO-SYNC] Only Twitch category will be updated. VK category unchanged.');
+                        logger.warn('[WARN] [AUTO-SYNC] Could not find VK category for:', twitchCat.name);
+                        logger.warn('[TIP] [AUTO-SYNC] Only Twitch category will be updated. VK category unchanged.');
                         
-                    const payload: any = {
-                            twitch: { category_id: (twitchCategory as any).id }
+                    const payload = {
+                            twitch: { category_id: String(twitchCat.id) }
                             // VK НЕ включаем - оставляем как было!
                         };
                         
-                        logger.log('💾 [AUTO-SYNC] Final payload (Twitch only):', payload);
+                        logger.log('[SAVE] [AUTO-SYNC] Final payload (Twitch only):', payload);
                         
                         // Уведомление что VK категория не найдена
-                        toast.warning(`VK Live категория для "${(twitchCategory as any).name}" не найдена. Обновлена только Twitch категория.`);
+                        toast.warning(`VK Live категория для "${twitchCat.name}" не найдена. Обновлена только Twitch категория.`);
                         
                     saveChanges(payload, 'saveCategory');
                     }
@@ -328,8 +331,10 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
 
     // Инициализация searchTerms при монтировании и изменении данных
     useEffect(() => {
-        const twitchCategoryName = currentData.twitch?.category ? ((currentData.twitch.category as any).name || '') : '';
-        const vkCategoryName = currentData.vk?.category ? ((currentData.vk.category as any).name || '') : '';
+        const twitchCat = currentData.twitch?.category as Category | undefined;
+        const vkCat = currentData.vk?.category as Category | undefined;
+        const twitchCategoryName = twitchCat?.name || '';
+        const vkCategoryName = vkCat?.name || '';
         
         setSearchTerms({
             twitch: twitchCategoryName,
@@ -340,7 +345,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
     useEffect(() => {
         // Only search when the dropdown is open and there's a search term
         if (debouncedTwitchSearch && debouncedTwitchSearch.length >= 2 && showDropdown.twitch && twitchEnabled) {
-            logger.log('🔍 Debounced Twitch search:', debouncedTwitchSearch);
+            logger.log('[SEARCH] Debounced Twitch search:', debouncedTwitchSearch);
             searchCategories('twitch', debouncedTwitchSearch);
         }
     }, [debouncedTwitchSearch, showDropdown.twitch, searchCategories, twitchEnabled]);
@@ -348,7 +353,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
     useEffect(() => {
         // Only search when the dropdown is open and there's a search term
         if (debouncedVkSearch && debouncedVkSearch.length >= 2 && showDropdown.vk && vkEnabled) {
-            logger.log('🔍 Debounced VK search:', debouncedVkSearch);
+            logger.log('[SEARCH] Debounced VK search:', debouncedVkSearch);
             searchCategories('vk', debouncedVkSearch);
         }
     }, [debouncedVkSearch, showDropdown.vk, searchCategories, vkEnabled]);
@@ -363,8 +368,10 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
             if (!isClickInsidePortal && !isClickInsideCard) {
                 // logger.log('StreamCategoryCard: Click outside, closing dropdowns');
                 // Возвращаем к исходным значениям при клике вне области
-                const originalTwitch = currentData.twitch?.category ? ((currentData.twitch.category as any).name || '') : '';
-                const originalVk = currentData.vk?.category ? ((currentData.vk.category as any).name || '') : '';
+                const twitchCat = currentData.twitch?.category as Category | undefined;
+                const vkCat = currentData.vk?.category as Category | undefined;
+                const originalTwitch = twitchCat?.name || '';
+                const originalVk = vkCat?.name || '';
                 setSearchTerms({ twitch: originalTwitch, vk: originalVk });
                 setShowDropdown({ twitch: false, vk: false });
             }
@@ -388,8 +395,10 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                 // Закрываем dropdown только если фокус ушел полностью из области
                 setTimeout(() => {
                     if (!dropdownRef.current?.contains(document.activeElement)) {
-                        const originalTwitch = currentData.twitch?.category ? ((currentData.twitch.category as any).name || '') : '';
-                        const originalVk = currentData.vk?.category ? ((currentData.vk.category as any).name || '') : '';
+                        const twitchCat = currentData.twitch?.category as Category | undefined;
+                        const vkCat = currentData.vk?.category as Category | undefined;
+                        const originalTwitch = twitchCat?.name || '';
+                        const originalVk = vkCat?.name || '';
                         setSearchTerms({ twitch: originalTwitch, vk: originalVk });
                         setShowDropdown({ twitch: false, vk: false });
                     }
@@ -406,7 +415,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
     }, [currentData]);
 
     const handleSearchChange = (platform: string, value: string) => {
-        logger.log('⌨️ Search change:', { platform, value, length: value.length });
+        logger.log('[INPUT] Search change:', { platform, value, length: value.length });
         
         // НЕ убираем пробелы - они нужны для поиска категорий с пробелами
         const trimmedValue = value; // Убрали .trim() - пробелы разрешены!
@@ -427,7 +436,9 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
         setShowDropdown({ twitch: false, vk: false, [platform]: true });
         
         // Очищаем поле при фокусе, если в нем текущее значение категории
-        const currentCategoryName = (currentData as any)[platform]?.category ? (((currentData as any)[platform].category as any).name || '') : '';
+        const platformData = currentData[platform as 'twitch' | 'vk'];
+        const platformCat = platformData?.category as Category | undefined;
+        const currentCategoryName = platformCat?.name || '';
         if (searchTerms[platform as keyof typeof searchTerms] === currentCategoryName) {
             // logger.log('StreamCategoryCard: Clearing field on focus');
             setSearchTerms(prev => ({ ...prev, [platform]: '' }));
@@ -442,7 +453,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
         }
     };
 
-    const handleSearchBlur = (platform: string) => {
+    const handleSearchBlur = (_platform: string) => {
         // logger.log('StreamCategoryCard: Search blur:', { platform });
         // Не закрываем dropdown при потере фокуса - только при клике вне области
         // Это предотвращает закрытие при клике в поле ввода
@@ -451,7 +462,9 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
     const handleSearchKeyDown = (platform: string, e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Escape') {
             // logger.log('StreamCategoryCard: ESC pressed, reverting to original value');
-            const originalValue = (currentData as any)[platform]?.category ? (((currentData as any)[platform].category as any).name || '') : '';
+            const platformData = currentData[platform as 'twitch' | 'vk'];
+            const platformCat = platformData?.category as Category | undefined;
+            const originalValue = platformCat?.name || '';
             setSearchTerms(prev => ({ ...prev, [platform]: originalValue }));
             setShowDropdown(prev => ({ ...prev, [platform]: false }));
             e.currentTarget.blur(); // Убираем фокус с поля
@@ -465,16 +478,17 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
             autoSaveTimerRef.current = null;
         }
         
-        logger.log('🎮 [HANDLE SELECT] Category selected:', { platform, category: category.name, id: category.id, isLinked, bothEnabled });
+        logger.log('[HANDLE SELECT] Category selected:', { platform, category: category.name, id: category.id, isLinked, bothEnabled });
         
         if (isLinked && bothEnabled) {
             // В объединенном режиме ищем соответствующую категорию для другой платформы
             const otherPlatform: 'twitch' | 'vk' = platform === 'twitch' ? 'vk' : 'twitch';
-            const otherCategories = (categories as any)[otherPlatform] || [];
+            const categoriesTyped = categories as { twitch?: Category[]; vk?: Category[] };
+            const otherCategories = categoriesTyped[otherPlatform] || [];
             
             // Ищем соответствующую категорию на другой платформе
             let mappedCategory = findMappedCategory(category.name, platform as 'twitch' | 'vk', otherCategories);
-            logger.log('🎮 [HANDLE SELECT] Mapped category (from cache):', { otherPlatform, mappedCategory: mappedCategory?.name });
+            logger.log('[HANDLE SELECT] Mapped category (from cache):', { otherPlatform, mappedCategory: mappedCategory?.name });
             
             // Если не нашли в кеше - ИЩЕМ ЧЕРЕЗ API!
             if (!mappedCategory) {
@@ -482,7 +496,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                 const mappedName = categoryMapping[category.name];
                 const searchQuery = mappedName || category.name; // Если нет маппинга - ищем по оригинальному названию
                 
-                logger.log('🎮 [HANDLE SELECT] Not found in cache - searching API:', {
+                logger.log('[HANDLE SELECT] Not found in cache - searching API:', {
                     hasMappedName: !!mappedName,
                     mappedName,
                     searchQuery
@@ -490,7 +504,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                 
                 try {
                     const searchResults = await searchCategories(otherPlatform, searchQuery) as Category[];
-                    logger.log('🎮 [HANDLE SELECT] API search results:', searchResults?.length || 0);
+                    logger.log('[HANDLE SELECT] API search results:', searchResults?.length || 0);
                     
                     if (searchResults && searchResults.length > 0) {
                         // Проверяем точное совпадение
@@ -509,30 +523,30 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                                 catNormalized.startsWith(queryNormalized) ||
                                 queryNormalized.split(/\s+/).every(word => catNormalized.includes(word))) {
                                 mappedCategory = candidate;
-                                logger.log('🎮 [HANDLE SELECT] Using first result (relevant):', mappedCategory.name);
+                                logger.log('[HANDLE SELECT] Using first result (relevant):', mappedCategory.name);
                             } else {
-                                logger.warn('🎮 [HANDLE SELECT] First result not relevant:', {
+                                logger.warn('[HANDLE SELECT] First result not relevant:', {
                                     query: searchQuery,
                                     found: candidate.name
                                 });
                             }
                         } else {
-                            logger.log('🎮 [HANDLE SELECT] Found exact match via API:', mappedCategory.name);
+                            logger.log('[HANDLE SELECT] Found exact match via API:', mappedCategory.name);
                         }
                     } else {
-                        logger.warn('🎮 [HANDLE SELECT] No results from API for:', searchQuery);
+                        logger.warn('[HANDLE SELECT] No results from API for:', searchQuery);
                     }
                 } catch (error) {
-                    logger.error('🎮 [HANDLE SELECT] Error searching for category:', error);
+                    logger.error('[HANDLE SELECT] Error searching for category:', error);
                 }
             }
             
             if (mappedCategory) {
                 // Нашли соответствующую категорию - устанавливаем разные категории для разных платформ
-                logger.log('🎮 [HANDLE SELECT] Setting linked categories');
-                setCurrentData((prev: any) => ({
+                logger.log('[HANDLE SELECT] Setting linked categories');
+                setCurrentData(prev => ({
                     ...prev,
-                    [platform]: { ...prev[platform], category },
+                    [platform as 'twitch' | 'vk']: { ...prev[platform as 'twitch' | 'vk'], category },
                     [otherPlatform]: { ...prev[otherPlatform], category: mappedCategory },
                 }));
                 
@@ -541,10 +555,10 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
             } else {
                 // Не нашли соответствующую категорию - НЕ копируем!
                 // Пользователь может вручную выбрать категорию на другой платформе
-                logger.log('🎮 [HANDLE SELECT] Mapping not found - only updating selected platform');
-                setCurrentData((prev: any) => ({
+                logger.log('[HANDLE SELECT] Mapping not found - only updating selected platform');
+                setCurrentData(prev => ({
                     ...prev,
-                    [platform]: { ...prev[platform], category },
+                    [platform as 'twitch' | 'vk']: { ...prev[platform as 'twitch' | 'vk'], category },
                     // Другая платформа остается неизменной
                 }));
                 
@@ -556,19 +570,19 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                 toast.warning(`Категория "${category.name}" обновлена только на ${platformNames[platform]}. Для ${platformNames[otherPlatform]} категория не найдена — выберите вручную.`);
             }
         } else {
-            logger.log('🎮 [HANDLE SELECT] Setting single platform category');
-            setCurrentData((prev: any) => ({
+            logger.log('[HANDLE SELECT] Setting single platform category');
+            setCurrentData(prev => ({
                 ...prev,
-                [platform]: { ...prev[platform], category },
+                [platform as 'twitch' | 'vk']: { ...prev[platform as 'twitch' | 'vk'], category },
             }));
         }
         setSearchTerms(prev => ({ ...prev, [platform]: category.name })); // Update search bar with selected category
         setShowDropdown({ twitch: false, vk: false });
-        logger.log('🎮 [HANDLE SELECT] Category selection completed');
+        logger.log('[HANDLE SELECT] Category selection completed');
         
         // Логируем итоговое состояние после небольшой задержки (чтобы useState обновился)
         setTimeout(() => {
-            logger.log('🎮 [HANDLE SELECT] Final state after selection:', {
+            logger.log('[GAME] [HANDLE SELECT] Final state after selection:', {
                 platform,
                 categoryName: category.name,
                 categoryId: category.id
@@ -583,23 +597,26 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
     };
 
     const handleSave = (mode: 'both' | 'individual') => {
-        logger.log('💾 [SAVE] handleSave called:', { mode, isChanged, twitchEnabled, vkEnabled });
+        logger.log('[DB] [SAVE] handleSave called:', { mode, isChanged, twitchEnabled, vkEnabled });
         
         // Очищаем таймер автосброса (пользователь сохраняет вручную)
         if (autoSaveTimerRef.current) {
             clearTimeout(autoSaveTimerRef.current);
             autoSaveTimerRef.current = null;
-            logger.log('⏰ [AUTO-RESET] Timer cleared - user saved manually');
+            logger.log('[TIMEOUT] [AUTO-RESET] Timer cleared - user saved manually');
         }
         
-        const payload: any = {};
+        const payload: Record<string, unknown> = {};
+        
+        // Helper to get category ID
+        const getCatId = (cat: unknown): string | number | null => (cat as Category | undefined)?.id || null;
         
         if (mode === 'both') {
             // Объединенный режим - сохраняем соответствующие категории для каждой платформы
-            if (twitchEnabled && (currentData.twitch?.category ? ((currentData.twitch.category as any).id || null) : null) !== (initialData.twitch?.category ? ((initialData.twitch.category as any).id || null) : null)) {
-                payload.twitch = { category_id: currentData.twitch?.category ? ((currentData.twitch.category as any).id || null) : null };
+            if (twitchEnabled && getCatId(currentData.twitch?.category) !== getCatId(initialData.twitch?.category)) {
+                payload.twitch = { category_id: getCatId(currentData.twitch?.category) };
             }
-            if (vkEnabled && (currentData.vk?.category ? ((currentData.vk.category as any).id || null) : null) !== (initialData.vk?.category ? ((initialData.vk.category as any).id || null) : null)) {
+            if (vkEnabled && getCatId(currentData.vk?.category) !== getCatId(initialData.vk?.category)) {
                 // VK требует полный объект категории
                 const vkCat = currentData.vk?.category as Category | undefined;
                 
@@ -609,13 +626,13 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                 const isVkUUID = vkCat?.id && String(vkCat.id).includes('-');
                 
                 if (!isVkUUID && vkCat?.id) {
-                    logger.error('❌ [SAVE] VK category has Twitch-like ID! Skipping VK update to prevent error:', vkCat.id);
-                    logger.warn('💡 [SAVE] Only Twitch will be updated. Please select VK category manually or use toggle.');
+                    logger.error('[ERROR] [SAVE] VK category has Twitch-like ID! Skipping VK update to prevent error:', vkCat.id);
+                    logger.warn('[INFO] [SAVE] Only Twitch will be updated. Please select VK category manually or use toggle.');
                     
                     // Уведомление пользователю
                     toast.warning('VK Live категория не обновлена (неверный формат). Обновлена только Twitch категория.');
                 } else {
-                    const vkCategoryPayload = {
+                    const vkCategoryPayload: Record<string, unknown> = {
                         id: vkCat?.id || "",
                         name: vkCat?.name || vkCat?.title || "",
                         title: vkCat?.name || vkCat?.title || "",
@@ -625,7 +642,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                     // Добавляем cover_url только если он не пустой (VK API не принимает пустые строки)
                     const coverUrl = vkCat?.box_art_url || vkCat?.cover_url || "";
                     if (coverUrl) {
-                        (vkCategoryPayload as any).cover_url = coverUrl;
+                        vkCategoryPayload.cover_url = coverUrl;
                     }
                     
                 payload.vk = { 
@@ -636,11 +653,11 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
             }
         } else {
             // Индивидуальный режим - сохраняем только измененные категории
-            if (twitchEnabled && (currentData.twitch?.category ? ((currentData.twitch.category as any).id || null) : null) !== (initialData.twitch?.category ? ((initialData.twitch.category as any).id || null) : null)) {
-                payload.twitch = { category_id: currentData.twitch?.category ? ((currentData.twitch.category as any).id || null) : null };
-                logger.log('💾 [SAVE] Added Twitch to payload:', payload.twitch);
+            if (twitchEnabled && getCatId(currentData.twitch?.category) !== getCatId(initialData.twitch?.category)) {
+                payload.twitch = { category_id: getCatId(currentData.twitch?.category) };
+                logger.log('[DB] [SAVE] Added Twitch to payload:', payload.twitch);
             }
-            if (vkEnabled && (currentData.vk?.category ? ((currentData.vk.category as any).id || null) : null) !== (initialData.vk?.category ? ((initialData.vk.category as any).id || null) : null)) {
+            if (vkEnabled && getCatId(currentData.vk?.category) !== getCatId(initialData.vk?.category)) {
                 // VK требует полный объект категории (даже в раздельном режиме!)
                 const vkCat = currentData.vk?.category as Category | undefined;
                 
@@ -648,12 +665,12 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                 const isVkUUID = vkCat?.id && String(vkCat.id).includes('-');
                 
                 if (!isVkUUID && vkCat?.id) {
-                    logger.error('❌ [SAVE] VK category has Twitch-like ID! Skipping VK update:', vkCat.id);
+                    logger.error('[ERROR] [SAVE] VK category has Twitch-like ID! Skipping VK update:', vkCat.id);
                     
                     // Уведомление пользователю
                     toast.warning('VK Live категория не обновлена (неверный формат). Пожалуйста, выберите VK категорию вручную.');
                 } else {
-                    const vkCategoryPayload = {
+                    const vkCategoryPayload: Record<string, unknown> = {
                         id: vkCat?.id || "",
                         name: vkCat?.name || vkCat?.title || "",
                         title: vkCat?.name || vkCat?.title || "",
@@ -663,32 +680,32 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                     // Добавляем cover_url только если он не пустой (VK API не принимает пустые строки)
                     const coverUrl = vkCat?.box_art_url || vkCat?.cover_url || "";
                     if (coverUrl) {
-                        (vkCategoryPayload as any).cover_url = coverUrl;
+                        vkCategoryPayload.cover_url = coverUrl;
                     }
                     
                 payload.vk = { 
                         category: vkCategoryPayload,
                         category_id: vkCat?.id || null // Fallback для совместимости
                 };
-                    logger.log('💾 [SAVE] Added VK to payload (full object):', payload.vk);
+                    logger.log('[DB] [SAVE] Added VK to payload (full object):', payload.vk);
                 }
             }
         }
         
-        logger.log('💾 [SAVE] Final payload:', payload);
+        logger.log('[DB] [SAVE] Final payload:', payload);
         
         if (Object.keys(payload).length > 0) {
-            logger.log('💾 [SAVE] Calling saveChanges...');
+            logger.log('[DB] [SAVE] Calling saveChanges...');
             saveChanges(payload, 'saveCategory');
         } else {
-            logger.log('⚠️ [SAVE] Payload is empty, not saving');
+            logger.log('[WARN] [SAVE] Payload is empty, not saving');
         }
     };
 
     // LEGACY: Простая проверка изменений (работает!)
     const isChanged = useMemo(() => {
-        const getCategoryId = (category: any): string | null => {
-            return category ? (category as any).id : null;
+        const getCategoryId = (category: unknown): string | number | null => {
+            return (category as Category | undefined)?.id || null;
         };
 
         const twitchInitialId = getCategoryId(initialData.twitch?.category);
@@ -700,7 +717,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
             (twitchEnabled && twitchInitialId !== twitchCurrentId) ||
             (vkEnabled && vkInitialId !== vkCurrentId);
 
-        logger.log('🔍 [IS CHANGED] Simple check:', {
+        logger.log('[DEBUG] [IS CHANGED] Simple check:', {
             twitchEnabled,
             vkEnabled,
             twitchInitial: twitchInitialId,
@@ -713,7 +730,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
     }, [initialData.twitch?.category, initialData.vk?.category, currentData.twitch?.category, currentData.vk?.category, twitchEnabled, vkEnabled]);
 
     // Автосброс изменений через 10 секунд, если пользователь не сохранил
-    // 🚀 FIX: Запускаем таймер автосброса только после того, как пользователь убрал фокус с инпута категории
+    // [START] FIX: Запускаем таймер автосброса только после того, как пользователь убрал фокус с инпута категории
     const handleInputBlur = () => {
         // Очищаем предыдущий таймер
         if (autoSaveTimerRef.current) {
@@ -723,7 +740,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
         
         // Если есть несохранённые изменения - запускаем таймер через 200ms (для обработки клика по категории)
         if (isChanged && status.saveCategory !== 'loading' && status.saveCategory !== 'success') {
-            logger.log('⏰ [AUTO-RESET] Input blurred - starting 10s timer to reset unsaved changes');
+            logger.log('[TIMEOUT] [AUTO-RESET] Input blurred - starting 10s timer to reset unsaved changes');
             
             // Используем useTimeout для автоматической очистки
             autoSaveTimerRef.current = setTimeout(() => {
@@ -733,23 +750,25 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                     (vkEnabled && JSON.stringify(initialData.vk?.category) !== JSON.stringify(currentData.vk?.category));
                 
                 if (!stillChanged) {
-                    logger.log('⏰ [AUTO-RESET] Skipping reset - changes were already saved');
+                    logger.log('[TIMEOUT] [AUTO-RESET] Skipping reset - changes were already saved');
                     return;
                 }
                 
-                logger.log('⏰ [AUTO-RESET] 10 seconds passed - resetting to initial data');
+                logger.log('[TIMEOUT] [AUTO-RESET] 10 seconds passed - resetting to initial data');
                 
                 // Сбрасываем к исходным данным
-                setCurrentData((prev: any) => ({
+                setCurrentData(prev => ({
                     ...prev,
                     twitch: { ...prev.twitch, category: initialData.twitch?.category },
                     vk: { ...prev.vk, category: initialData.vk?.category }
                 }));
                 
                 // Обновляем инпуты
+                const initTwitchCat = initialData.twitch?.category as Category | undefined;
+                const initVkCat = initialData.vk?.category as Category | undefined;
                 setSearchTerms({
-                    twitch: initialData.twitch?.category ? ((initialData.twitch.category as any).name || '') : '',
-                    vk: initialData.vk?.category ? ((initialData.vk.category as any).name || '') : ''
+                    twitch: initTwitchCat?.name || '',
+                    vk: initVkCat?.name || ''
                 });
                 
                 // Уведомление пользователю
@@ -763,7 +782,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
         if (autoSaveTimerRef.current) {
             clearTimeout(autoSaveTimerRef.current);
             autoSaveTimerRef.current = null;
-            logger.log('⏰ [AUTO-RESET] Input focused - clearing timer');
+            logger.log('[TIMEOUT] [AUTO-RESET] Input focused - clearing timer');
         }
     };
     
@@ -777,7 +796,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
         };
     }, []);
 
-    // 🚀 ANTI-FLASH: Показываем skeleton пока данные не загружены
+    // [START] ANTI-FLASH: Показываем skeleton пока данные не загружены
     const isDataLoaded = currentData && (currentData.twitch || currentData.vk);
 
     return (
@@ -793,8 +812,8 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                         </div>
                     </div>
                 ) : (
-                <>
-                {/* Toggle объединения полей */}
+                    <>
+                    {/* Toggle объединения полей */}
                 {bothEnabled && (
                     <div className="flex items-center justify-between p-2 bg-background/10 rounded-lg mb-2">
                         <Label htmlFor="link-categories" className="flex items-center gap-2 cursor-pointer text-sm">
@@ -817,10 +836,10 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                                 <TwitchIcon /><VKIcon /> Общая категория
                             </Label>
                             <div className="flex gap-2 items-center relative">
-                                {currentData.twitch?.category && (currentData.twitch.category as any).box_art_url && (
+                                {currentData.twitch?.category && (currentData.twitch.category as Category).box_art_url && (
                                     <img 
-                                        src={(currentData.twitch.category as any).box_art_url.replace('{width}x{height}', '32x44')} 
-                                        alt={(currentData.twitch.category as any).name} 
+                                        src={(currentData.twitch.category as Category).box_art_url?.replace('{width}x{height}', '32x44')} 
+                                        alt={(currentData.twitch.category as Category).name} 
                                         className="w-6 h-8 rounded object-cover border border-border/50 flex-shrink-0"
                                     />
                                 )}
@@ -833,7 +852,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                                             // Открываем dropdown
                                             setShowDropdown({ twitch: true, vk: true });
                                             // Очищаем поле при фокусе если в нем название текущей категории
-                                            const currentCategoryName = currentData.twitch?.category ? ((currentData.twitch.category as any).name || '') : '';
+                                            const currentCategoryName = (currentData.twitch?.category as Category | undefined)?.name || '';
                                             if (searchTerms.twitch === currentCategoryName) {
                                                 setSearchTerms(prev => ({ ...prev, twitch: '', vk: '' }));
                                                 // Выделяем весь текст для удобства
@@ -847,7 +866,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                                         onBlur={handleInputBlur} // Запускаем таймер автосброса при потере фокуса
                                         onClick={() => {
                                             // При клике также очищаем, если еще не очищено
-                                            const currentCategoryName = currentData.twitch?.category ? ((currentData.twitch.category as any).name || '') : '';
+                                            const currentCategoryName = (currentData.twitch?.category as Category | undefined)?.name || '';
                                             if (searchTerms.twitch === currentCategoryName) {
                                                 setSearchTerms(prev => ({ ...prev, twitch: '', vk: '' }));
                                             }
@@ -862,7 +881,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                                             platform="twitch" 
                                             search={searchTerms.twitch} 
                                             onSelect={handleCategorySelect} 
-                                            results={(categories as any)?.twitch || []}
+                                            results={(categories as { twitch?: Category[] })?.twitch || []}
                                             inputRef={twitchInputRef.current}
                                         />
                                     )}
@@ -878,10 +897,10 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                                     {!twitchEnabled && <span className="text-xs text-muted-foreground">(отключено)</span>}
                                 </Label>
                                 <div className="flex gap-2 items-center">
-                                    {currentData.twitch?.category && (currentData.twitch.category as any).box_art_url && (
+                                    {currentData.twitch?.category && (currentData.twitch.category as Category).box_art_url && (
                                         <img 
-                                            src={(currentData.twitch.category as any).box_art_url.replace('{width}x{height}', '32x44')} 
-                                            alt={(currentData.twitch.category as any).name} 
+                                            src={(currentData.twitch.category as Category).box_art_url?.replace('{width}x{height}', '32x44')} 
+                                            alt={(currentData.twitch.category as Category).name} 
                                             className="w-6 h-8 rounded object-cover border border-border/50 flex-shrink-0"
                                         />
                                     )}
@@ -908,7 +927,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                                                 platform="twitch" 
                                                 search={searchTerms.twitch} 
                                                 onSelect={handleCategorySelect} 
-                                                results={(categories as any)?.twitch || []}
+                                                results={(categories as { twitch?: Category[] })?.twitch || []}
                                                 inputRef={twitchInputRef.current}
                                             />
                                         )}
@@ -923,10 +942,10 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                                     {!vkEnabled && <span className="text-xs text-muted-foreground">(отключено)</span>}
                                 </Label>
                                 <div className="flex gap-2 items-center">
-                                    {currentData.vk?.category && (currentData.vk.category as any).box_art_url && (
+                                    {currentData.vk?.category && ((currentData.vk.category as Category).box_art_url || (currentData.vk.category as Category).cover_url) && (
                                         <img 
-                                            src={(currentData.vk.category as any).box_art_url} 
-                                            alt={(currentData.vk.category as any).name} 
+                                            src={(currentData.vk.category as Category).box_art_url || (currentData.vk.category as Category).cover_url} 
+                                            alt={(currentData.vk.category as Category).name} 
                                             className="w-6 h-8 rounded object-cover border border-border/50 flex-shrink-0"
                                         />
                                     )}
@@ -953,7 +972,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                                                 platform="vk" 
                                                 search={searchTerms.vk} 
                                                 onSelect={handleCategorySelect} 
-                                                results={(categories as any)?.vk || []}
+                                                results={(categories as { vk?: Category[] })?.vk || []}
                                                 inputRef={vkInputRef.current}
                                             />
                                         )}
@@ -962,8 +981,8 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = ({ onLinkStateChan
                             </div>
                         </div>
                     )}
-                </div>
-                </>
+                    </div>
+                    </>
                 )}
             </CardContent>
             

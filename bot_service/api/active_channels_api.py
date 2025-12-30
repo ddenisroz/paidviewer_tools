@@ -1,6 +1,6 @@
 # bot_service/api/active_channels_api.py
 """API для активных каналов"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from core.database import get_db, UserSettings
 from auth.auth import get_current_user
@@ -19,9 +19,9 @@ async def get_active_channels(
     try:
         # Получаем каналы с включенным чатом
         channels = db.query(UserSettings).filter(
-            UserSettings.chat_enabled == True
+            UserSettings.chat_enabled.is_(True)
         ).all()
-        
+
         channels_data = []
         for channel in channels:
             channel_data = {
@@ -29,7 +29,7 @@ async def get_active_channels(
                 'tts_enabled': getattr(channel, 'tts_enabled', False),
                 'created_at': channel.created_at.isoformat() if channel.created_at else None
             }
-            
+
             # Добавляем информацию о канале в зависимости от платформы
             if hasattr(channel, 'channel_name') and channel.channel_name:
                 channel_data.update({
@@ -41,9 +41,9 @@ async def get_active_channels(
                     'platform': 'vk',
                     'channel_name': channel.vk_channel_name
                 })
-            
+
             channels_data.append(channel_data)
-        
+
         return {
             "success": True,
             "channels": channels_data,

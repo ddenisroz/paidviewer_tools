@@ -119,22 +119,22 @@ class ChatWidget {
   private applyConfig(): void {
     const root = document.documentElement;
     const config = this.config!;
-    root.style.setProperty('--widget-width', config.width + 'px');
-    root.style.setProperty('--widget-height', config.height + 'px');
+    root.style.setProperty('--widget-width', `${config.width  }px`);
+    root.style.setProperty('--widget-height', `${config.height  }px`);
     root.style.setProperty('--background-color', config.backgroundColor);
     root.style.setProperty('--background-image', config.backgroundImage);
-    root.style.setProperty('--border-radius', config.borderRadius + 'px');
+    root.style.setProperty('--border-radius', `${config.borderRadius  }px`);
     root.style.setProperty('--border-color', config.borderColor);
-    root.style.setProperty('--border-width', config.borderWidth + 'px');
+    root.style.setProperty('--border-width', `${config.borderWidth  }px`);
     root.style.setProperty('--message-bg', config.messageBg);
-    root.style.setProperty('--message-border-radius', config.messageBorderRadius + 'px');
-    root.style.setProperty('--message-margin', config.messageMargin + 'px');
-    root.style.setProperty('--message-padding', config.messagePadding + 'px');
+    root.style.setProperty('--message-border-radius', `${config.messageBorderRadius  }px`);
+    root.style.setProperty('--message-margin', `${config.messageMargin  }px`);
+    root.style.setProperty('--message-padding', `${config.messagePadding  }px`);
     root.style.setProperty('--font-family', config.fontFamily);
-    root.style.setProperty('--font-size', config.fontSize + 'px');
+    root.style.setProperty('--font-size', `${config.fontSize  }px`);
     root.style.setProperty('--font-weight', config.fontWeight);
     root.style.setProperty('--text-color', config.textColor);
-    root.style.setProperty('--animation-duration', config.animationDuration + 's');
+    root.style.setProperty('--animation-duration', `${config.animationDuration  }s`);
     root.style.setProperty('--animation-type', config.animationType);
     root.style.setProperty('--moderator-color', config.colors.moderator);
     root.style.setProperty('--vip-color', config.colors.vip);
@@ -146,7 +146,7 @@ class ChatWidget {
   private connectWebSocket(): void {
     const urlParams = new URLSearchParams(window.location.search);
     const userId = urlParams.get('user') || 'default';
-    const base = this.config?.wsUrl || (window.location.protocol === 'https:' ? 'wss://' + window.location.host : 'ws://' + window.location.host);
+    const base = this.config?.wsUrl || (window.location.protocol === 'https:' ? `wss://${  window.location.host}` : `ws://${  window.location.host}`);
     const wsUrl = `${base}/ws/chat-widget/${userId}`;
     if (!wsUrl || wsUrl.includes('null')) {
       logger.warn('Invalid WebSocket URL:', wsUrl);
@@ -175,11 +175,11 @@ class ChatWidget {
     };
   }
 
-  private addMessage(data: any): void {
+  private addMessage(data: Record<string, unknown>): void {
     const message: ChatMessage = {
       id: Date.now() + Math.random(),
-      username: data.username,
-      message: data.message,
+      username: String(data.username || 'Unknown'),
+      message: String(data.message || ''),
       role: (data.role || 'normal') as ChatRole,
       timestamp: new Date(),
       platform: (data.platform || 'twitch') as Platform,
@@ -215,7 +215,7 @@ class ChatWidget {
       content += `<span class="role-badge">[${message.role.toUpperCase()}]</span> `;
     }
     if (message.platform) {
-      const platformIcon = message.platform === 'twitch' ? '🎮' : '🔵';
+      const platformIcon = message.platform === 'twitch' ? '[GAME]' : '[VK]';
       content += `<span class="platform-indicator">${platformIcon}</span> `;
     }
     content += `<span class="username">${this.escapeHtml(message.username)}:</span> `;
@@ -253,7 +253,7 @@ class ChatWidget {
     if (this.config?.debugMode) {
       const testMessages = [
         { username: 'StreamerBot', message: 'Добро пожаловать на стрим!', role: 'moderator' },
-        { username: 'Viewer123', message: 'Привет всем! 👋', role: 'normal' },
+        { username: 'Viewer123', message: 'Привет всем! [BYE]', role: 'normal' },
         { username: 'VIP_User', message: 'Отличный контент!', role: 'vip' },
         { username: 'Subscriber', message: 'Спасибо за стрим!', role: 'subscriber' },
         { username: 'Moderator', message: 'Помните о правилах чата', role: 'moderator' },

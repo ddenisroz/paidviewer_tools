@@ -1,15 +1,18 @@
 import React from 'react';
+
+import { Minus, Plus } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Plus, Minus } from 'lucide-react';
-import { DROPS_CONSTANTS } from '../../../constants/drops';
 
+
+import { DROPS_CONSTANTS } from '../../../constants/drops';
 import CommonClosed from '../../../images/lootboxes/common/common_closed.png';
-import RareClosed from '../../../images/lootboxes/rare/rare_closed.png';
 import EpicClosed from '../../../images/lootboxes/epic/epic_closed.png';
 import LegendaryClosed from '../../../images/lootboxes/legendary/legendary_closed.png';
+import RareClosed from '../../../images/lootboxes/rare/rare_closed.png';
 
 interface QualityConfig {
     id: string;

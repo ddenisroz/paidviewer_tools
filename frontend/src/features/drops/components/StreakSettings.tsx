@@ -1,20 +1,27 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertTriangle, Gift, Loader2, Package } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
-import { toast } from 'sonner';
-import { logger } from '../../../utils/prodLogger';
-import { dropsService } from '../../../services/api/services/dropsService';
-import StreakCalendar from './StreakCalendar';
-import { AlertTriangle, Loader2, Package, Gift } from 'lucide-react';
-import { useDropsConfig } from '../../../hooks/useDropsConfig';
-import { useAutoSave } from '../../../hooks/useAutoSave';
+import { Switch } from '@/components/ui/switch';
+import { toast } from '@/utils/toastManager';
+
 import { DROPS_CONSTANTS } from '../../../constants/drops';
-import type { User, UserIntegrations } from '../../../types/user';
+import { useAutoSave } from '../../../hooks/useAutoSave';
+import { useDropsConfig } from '../../../hooks/useDropsConfig';
+import { dropsService } from '../../../services/api/services/dropsService';
+import { logger } from '../../../utils/prodLogger';
+
+import StreakCalendar from './StreakCalendar';
+
+
+
 import type { DropsConfig } from '../../../types/drops';
+import type { User, UserIntegrations } from '../../../types/user';
 
 interface StreakSettingsProps {
     user: User;
@@ -35,8 +42,8 @@ interface StreakSettingsFormData {
 }
 
 const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasRewards = false, integrations }) => {
-  const twitchAvailable = integrations?.twitch?.enabled && user?.twitch_username;
-  const vkAvailable = integrations?.vk?.enabled && (user?.vk_username || user?.vk_channel_name);
+  const twitchAvailable = integrations?.twitch?.connected && user?.twitch_username;
+  const vkAvailable = integrations?.vk?.connected && (user?.vk_username || user?.vk_channel_name);
   
   const { config, isLoading, isInitialLoad, setIsInitialLoad, saveMutation } = useDropsConfig(channelName);
   
@@ -54,7 +61,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
   useEffect(() => {
     const handleDropsConfigChange = (event: CustomEvent) => {
       const { streak_enabled, channel, platform: eventPlatform, source } = event.detail;
-      // ✅ ИСПРАВЛЕНИЕ: Обновляем локальное состояние только если событие пришло от QuickActionsBar
+      // [OK] ИСПРАВЛЕНИЕ: Обновляем локальное состояние только если событие пришло от QuickActionsBar
       // Если событие пришло от useDropsConfig (наш собственный saveMutation), то состояние уже обновлено через setFormData
       if (channel === channelName && streak_enabled !== undefined && eventPlatform && source === 'QuickActionsBar') {
         if (eventPlatform === 'twitch') {
@@ -71,19 +78,23 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
   
   const initialFormData = useMemo(() => {
     if (!config) return null;
+    
+    // Type assertion after null check
+    const typedConfig = config as DropsConfig;
+    
     return {
-      streak_days_common: [config.streak_days_common ?? DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_COMMON],
-      streak_days_rare: [config.streak_days_rare ?? DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_RARE],
-      streak_days_epic: [config.streak_days_epic ?? DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_EPIC],
-      streak_days_legendary: [config.streak_days_legendary ?? DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_LEGENDARY],
-      streak_messages_required: [config.streak_messages_required ?? DROPS_CONSTANTS.STREAK.DEFAULT_MESSAGES_REQUIRED],
-      streak_reset_on_skip: config.streak_reset_on_skip ?? true,
-      streak_enabled_twitch: config.streak_enabled_twitch ?? false,
-      streak_enabled_vk: config.streak_enabled_vk ?? false
+      streak_days_common: [typedConfig.streak_days_common ?? DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_COMMON],
+      streak_days_rare: [typedConfig.streak_days_rare ?? DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_RARE],
+      streak_days_epic: [typedConfig.streak_days_epic ?? DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_EPIC],
+      streak_days_legendary: [typedConfig.streak_days_legendary ?? DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_LEGENDARY],
+      streak_messages_required: [typedConfig.streak_messages_required ?? DROPS_CONSTANTS.STREAK.DEFAULT_MESSAGES_REQUIRED],
+      streak_reset_on_skip: typedConfig.streak_reset_on_skip ?? true,
+      streak_enabled_twitch: typedConfig.streak_enabled_twitch ?? false,
+      streak_enabled_vk: typedConfig.streak_enabled_vk ?? false
     };
   }, [config]);
   
-  // ✅ ИНИЦИАЛИЗАЦИЯ: Загружаем данные при первой загрузке
+  // [OK] ИНИЦИАЛИЗАЦИЯ: Загружаем данные при первой загрузке
   useEffect(() => {
     if (initialFormData && isInitialLoad) {
       setFormData(initialFormData);
@@ -91,12 +102,12 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
     }
   }, [initialFormData, isInitialLoad]);
   
-  // ✅ СИНХРОНИЗАЦИЯ: Синхронизируем formData с config из React Query
+  // [OK] СИНХРОНИЗАЦИЯ: Синхронизируем formData с config из React Query
   // Обновляем все поля, включая streak_enabled (fallback если событие не было обработано)
   useEffect(() => {
     if (!isInitialLoad && config && initialFormData) {
       setFormData(prev => {
-        // ✅ Проверяем, изменились ли значения в config
+        // [OK] Проверяем, изменились ли значения в config
         const needsUpdate = 
           prev.streak_days_common[0] !== initialFormData.streak_days_common[0] ||
           prev.streak_days_rare[0] !== initialFormData.streak_days_rare[0] ||
@@ -142,7 +153,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
       streak_reset_on_skip: formData.streak_reset_on_skip
     };
     
-    // ✅ Включаем streak_enabled только если explicitly requested (для handlePlatformToggle)
+    // [OK] Включаем streak_enabled только если explicitly requested (для handlePlatformToggle)
     if (includeEnabledFlags) {
       payload.streak_enabled_twitch = formData.streak_enabled_twitch;
       payload.streak_enabled_vk = formData.streak_enabled_vk;
@@ -162,12 +173,12 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
     autoSave({ ...createPayload(), [platformKey]: enabled });
   };
   
-  // ✅ ИСПРАВЛЕНИЕ: Автосохранение только для настроек, НЕ для streak_enabled_twitch/vk
+  // [OK] ИСПРАВЛЕНИЕ: Автосохранение только для настроек, НЕ для streak_enabled_twitch/vk
   // streak_enabled_twitch/vk сохраняются отдельно через handlePlatformToggle
   // Это предотвращает повторное сохранение при обновлении из QuickActionsBar
   useEffect(() => {
     if (!isInitialLoad && config) {
-      // ✅ Создаем payload БЕЗ streak_enabled полей для автосохранения
+      // [OK] Создаем payload БЕЗ streak_enabled полей для автосохранения
       autoSave(createPayload(false));
     }
   }, [
@@ -179,7 +190,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
     formData.streak_reset_on_skip,
     isInitialLoad,
     autoSave
-    // ✅ ИСКЛЮЧЕНО: formData.streak_enabled_twitch, formData.streak_enabled_vk
+    // [OK] ИСКЛЮЧЕНО: formData.streak_enabled_twitch, formData.streak_enabled_vk
     // Эти поля сохраняются отдельно через handlePlatformToggle
   ]);
 
@@ -188,7 +199,8 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
       return await dropsService.resetStreak(channelName);
     },
     onSuccess: (response) => {
-      const deletedCount = response?.data?.data?.deleted_count || 0;
+      const responseData = response?.data as { data?: { deleted_count?: number } } | undefined;
+      const deletedCount = responseData?.data?.deleted_count || 0;
       toast.success(`Статистика стриков сброшена (удалено ${deletedCount} записей)`);
       queryClient.invalidateQueries({ queryKey: ['drops-streak-stats', channelName] });
     },
@@ -211,7 +223,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
     resetStatsMutation.mutate();
   };
   
-  const isStreakEnabledAnywhere = formData.streak_enabled_twitch || formData.streak_enabled_vk;
+  const _isStreakEnabledAnywhere = formData.streak_enabled_twitch || formData.streak_enabled_vk;
 
   // Показываем loader только если это начальная загрузка И данные еще не загружены
   // Если config === null после загрузки, значит бэкенд недоступен - показываем форму с дефолтными значениями
@@ -314,7 +326,10 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
           </div>
         </CardHeader>
         <CardContent>
-          <StreakCalendar formData={formData} setFormData={setFormData} />
+          <StreakCalendar 
+            formData={formData as unknown as { streak_days_common: number[]; streak_days_rare: number[]; streak_days_epic: number[]; streak_days_legendary: number[]; [key: string]: number[] }} 
+            setFormData={setFormData as unknown as React.Dispatch<React.SetStateAction<{ streak_days_common: number[]; streak_days_rare: number[]; streak_days_epic: number[]; streak_days_legendary: number[]; [key: string]: number[] }>>} 
+          />
         </CardContent>
       </Card>
 
@@ -358,7 +373,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
         </CardContent>
       </Card>
 
-      {/* ✅ Убрали кнопку "Сохранить" - автосохранение работает автоматически */}
+      {/* [OK] Убрали кнопку "Сохранить" - автосохранение работает автоматически */}
       {/* Кнопка сброса статистики */}
       <div className="flex items-center gap-3 justify-end">
         <Button 

@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
-import { useAuth } from '../context/AuthContext';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+
 import MessageContent from '../components/MessageContent';
-import { twitchBadgesService } from '../services/twitchBadges';
+import { useAuth } from '../context/AuthContext';
 import { useChat } from '../context/ChatContext';
-import { logger } from '../utils/prodLogger';
+import { twitchBadgesService } from '../services/twitchBadges';
+import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
 import { getAllEmotesForChannel } from '../utils/emotes';
+import { logger } from '../utils/prodLogger';
+
 import type { ChatMessage } from '../types/chat';
 
 interface ChatSettings {
@@ -31,7 +33,7 @@ const ChatWindow: React.FC = () => {
     const { user, isAuthenticated } = useAuth();
     const { messages, isConnected } = useChat();
     
-    // ✅ Настройки чата - сохраняются в localStorage для UI-состояния
+    // [OK] Настройки чата - сохраняются в localStorage для UI-состояния
     const [settings, setSettings] = useState<ChatSettings>(() => {
         try {
             const saved = localStorage.getItem('chatWindowSettings');
@@ -132,7 +134,7 @@ const ChatWindow: React.FC = () => {
                 fontFamily: 'Inter, sans-serif',
                 gap: '16px'
             }}>
-                <div style={{ fontSize: '48px' }}>🔐</div>
+                <div style={{ fontSize: '48px' }}>[AUTH]</div>
                 <div style={{ fontSize: '18px' }}>Требуется авторизация</div>
                 <div style={{ fontSize: '14px', opacity: 0.7 }}>
                     Пожалуйста, войдите в систему
@@ -162,7 +164,7 @@ const ChatWindow: React.FC = () => {
                 backgroundColor: '#111'
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ fontSize: '24px' }}>💬</div>
+                    <div style={{ fontSize: '24px' }}>[CHAT]</div>
                     <div>
                         <div style={{ fontWeight: 'bold' }}>Чат</div>
                         <div style={{ fontSize: '12px', opacity: 0.7 }}>
@@ -189,7 +191,7 @@ const ChatWindow: React.FC = () => {
                         onMouseEnter={(e) => e.currentTarget.style.background = '#4a5568'}
                         onMouseLeave={(e) => e.currentTarget.style.background = showSettings ? '#4a5568' : 'transparent'}
                     >
-                        ⚙️ Настройки
+                        Настройки
                     </button>
                     <div style={{
                         display: 'flex',
@@ -365,7 +367,7 @@ const ChatWindow: React.FC = () => {
                         textAlign: 'center'
                     }}>
                         <div>
-                            <div style={{ fontSize: '48px', marginBottom: '16px' }}>💬</div>
+                            <div style={{ fontSize: '48px', marginBottom: '16px' }}>[CHAT]</div>
                             <div>Ожидание сообщений...</div>
                             <div style={{ fontSize: '0.8em', marginTop: '8px' }}>
                                 Сообщения появятся здесь автоматически
@@ -463,7 +465,7 @@ const ChatWindow: React.FC = () => {
                                 
                                 <span style={{ color: settings.text_color, flex: 1 }}>
                                     <MessageContent 
-                                        message={msg.message} 
+                                        message={msg.message ?? ''} 
                                         channelEmotes={settings.show_7tv_emotes ? emotes.channelEmotes : new Map()}
                                         globalEmotes={settings.show_7tv_emotes ? emotes.globalEmotes : new Map()}
                                         showLinks={settings.show_links}
@@ -485,7 +487,7 @@ const ChatWindow: React.FC = () => {
                 opacity: 0.6,
                 textAlign: 'center'
             }}>
-                💡 Это окно использует общее WebSocket соединение (Leader Election)
+                [INFO] Это окно использует общее WebSocket соединение (Leader Election)
             </div>
         </div>
     );

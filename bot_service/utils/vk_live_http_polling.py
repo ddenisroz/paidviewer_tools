@@ -6,14 +6,13 @@ import asyncio
 import aiohttp
 import logging
 from typing import Optional, Callable, Dict, Set
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 
 class VKLiveHTTPPolling:
     """HTTP polling клиент для VK Live чата (альтернатива WebSocket)"""
-    
+
     def __init__(self, access_token: str, channel_url: str):
         """
         Args:
@@ -29,18 +28,18 @@ class VKLiveHTTPPolling:
         self.last_message_time: int = 0  # Timestamp последнего сообщения
         self.error_count: int = 0  # Счетчик последовательных ошибок
         self.max_errors: int = 10  # Максимум ошибок перед увеличением интервала
-        
+
     async def start(self, message_handler: Callable):
         """Запустить polling сообщений"""
         if self.is_running:
             logger.warning(f"Polling already running for {self.channel_url}")
             return
-            
+
         self.message_handler = message_handler
         self.is_running = True
         self.poll_task = asyncio.create_task(self._poll_loop())
-        logger.info(f"✅ Started HTTP polling for VK Live channel: {self.channel_url}")
-        
+        logger.info(f"[OK] Started HTTP polling for VK Live channel: {self.channel_url}")
+
     async def stop(self):
         """Остановить polling"""
         self.is_running = False
@@ -52,32 +51,32 @@ class VKLiveHTTPPolling:
                 pass
             self.poll_task = None
         logger.info(f"🛑 Stopped HTTP polling for channel: {self.channel_url}")
-        
+
     async def _poll_loop(self):
         """Основной цикл polling"""
         poll_interval = 0.5  # Запрашиваем каждые 500ms для быстрой реакции (как Twitch WebSocket)
         max_interval = 30.0  # Максимальный интервал при ошибках (30 секунд)
-        
+
         try:
             while self.is_running:
                 try:
                     await self._fetch_and_process_messages()
                     # Успешный запрос - сбрасываем счетчик ошибок
                     if self.error_count > 0:
-                        logger.info(f"✅ VK Live polling recovered after {self.error_count} errors")
+                        logger.info(f"[OK] VK Live polling recovered after {self.error_count} errors")
                         self.error_count = 0
-                        
+
                 except asyncio.CancelledError:
                     raise  # Пробрасываем CancelledError выше
                 except Exception as e:
                     self.error_count += 1
-                    logger.error(f"❌ Error in polling loop ({self.error_count}/{self.max_errors}): {e}")
-                    
+                    logger.error(f"[ERROR] Error in polling loop ({self.error_count}/{self.max_errors}): {e}")
+
                     # При превышении лимита показываем stack trace
                     if self.error_count >= self.max_errors:
                         import traceback
                         logger.error(traceback.format_exc())
-                
+
                 # Вычисляем интервал: экспоненциальный backoff при ошибках
                 if self.error_count > 0:
                     # Интервал растет: 0.5 -> 1 -> 2 -> 4 -> 8 -> 16 -> max_interval
@@ -86,13 +85,13 @@ class VKLiveHTTPPolling:
                         logger.warning(f"⏱️ Increased polling interval to {current_interval}s due to errors")
                 else:
                     current_interval = poll_interval
-                
+
                 # Ждем перед следующим запросом
                 await asyncio.sleep(current_interval)
-                
+
         except asyncio.CancelledError:
             logger.info(f"Polling loop cancelled for {self.channel_url}")
-            
+
     async def _fetch_and_process_messages(self):
         """Получить и обработать новые сообщения"""
         try:
@@ -105,16 +104,16 @@ class VKLiveHTTPPolling:
                 "channel_url": self.channel_url,
                 "limit": 20  # Получаем последние 20 сообщений
             }
-            
+
             # Создаем SSL context с отключенной верификацией для dev API
             import ssl
             ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
-            
+
             # Timeout: 10 секунд на соединение, 30 секунд на чтение
             timeout = aiohttp.ClientTimeout(total=30, connect=10)
-            
+
             async with aiohttp.ClientSession(
                 connector=aiohttp.TCPConnector(ssl=ssl_context),
                 timeout=timeout
@@ -123,57 +122,57 @@ class VKLiveHTTPPolling:
                     if response.status == 200:
                         data = await response.json()
                         messages = data.get("data", {}).get("chat_messages", [])
-                        
+
                         # Обрабатываем сообщения в обратном порядке (от старых к новым)
                         for message in reversed(messages):
                             await self._process_message(message)
-                            
+
                     elif response.status == 401:
-                        logger.warning(f"🔄 VK Live OAuth token expired, needs refresh")
+                        logger.warning("[REFRESH] VK Live OAuth token expired, needs refresh")
                     elif response.status == 403:
-                        logger.error(f"❌ Forbidden: No access to channel {self.channel_url}")
+                        logger.error(f"[ERROR] Forbidden: No access to channel {self.channel_url}")
                     else:
                         error_text = await response.text()
-                        logger.error(f"❌ Error fetching messages: {response.status} - {error_text}")
-                        
+                        logger.error(f"[ERROR] Error fetching messages: {response.status} - {error_text}")
+
         except Exception as e:
             logger.error(f"Error fetching VK Live messages: {e}")
-            
+
     async def _process_message(self, message: Dict):
         """Обработать одно сообщение"""
         try:
             message_id = message.get("id")
             created_at = message.get("created_at", 0)
-            
+
             # ВАЖНО: Инициализируем last_message_time при первом запуске
             if self.last_message_time == 0:
                 # Получаем текущее время в секундах (VK использует Unix timestamp)
                 import time
                 self.last_message_time = int(time.time()) - 10  # Последние 10 секунд
                 logger.info(f"📅 Initialized polling timestamp: {self.last_message_time}")
-            
+
             # Пропускаем уже обработанные сообщения
             if message_id in self.seen_message_ids:
                 return
-                
+
             # Пропускаем старые сообщения (до запуска бота)
             if created_at <= self.last_message_time:
                 return
-                
+
             # Помечаем как обработанное
             self.seen_message_ids.add(message_id)
-            
+
             # Обновляем время последнего сообщения
             if created_at > self.last_message_time:
                 self.last_message_time = created_at
-                
+
             # Извлекаем данные автора
             author = message.get("author", {})
             author_nick = author.get("nick", "Unknown")
             author_id = author.get("id", 0)
             is_moderator = author.get("is_moderator", False)
             is_owner = author.get("is_owner", False)
-            
+
             # Извлекаем текст сообщения из parts
             message_text = ""
             parts = message.get("parts", [])
@@ -181,22 +180,22 @@ class VKLiveHTTPPolling:
                 if "text" in part:
                     text_content = part["text"].get("content", "")
                     message_text += text_content
-                # ✅ Также обрабатываем другие типы parts (упоминания, смайлы и т.д.)
+                # [OK] Также обрабатываем другие типы parts (упоминания, смайлы и т.д.)
                 elif "mention" in part:
                     message_text += f"@{part['mention'].get('nick', '')}"
                 elif "smile" in part:
                     message_text += f":{part['smile'].get('name', '')}:"
-                # ✅ Если есть другие типы parts (например, ссылки), добавляем их
+                # [OK] Если есть другие типы parts (например, ссылки), добавляем их
                 elif "link" in part:
                     link_url = part["link"].get("url", "")
                     if link_url:
                         message_text += link_url
-                    
-            # ✅ НЕ пропускаем сообщения, даже если текст пустой - возможно это только ссылка или эмодзи
+
+            # [OK] НЕ пропускаем сообщения, даже если текст пустой - возможно это только ссылка или эмодзи
             # Проверяем наличие хотя бы одного part
             if not message_text and not parts:
                 return  # Пропускаем только если вообще нет parts
-                
+
             # Формируем объект сообщения для обработчика
             processed_message = {
                 "id": message_id,
@@ -211,17 +210,17 @@ class VKLiveHTTPPolling:
                 "channel": self.channel_url,
                 "platform": "vk"
             }
-            
+
             # Отправляем в обработчик
             if self.message_handler:
                 logger.info(f"📩 [VK HTTP] {author_nick}: {message_text}")
                 await self.message_handler(processed_message)
-                
+
         except Exception as e:
             logger.error(f"Error processing VK message: {e}")
             import traceback
             logger.error(traceback.format_exc())
-            
+
     async def send_message(self, text: str) -> bool:
         """Отправить сообщение в чат"""
         try:
@@ -242,23 +241,23 @@ class VKLiveHTTPPolling:
                     }
                 ]
             }
-            
+
             # Создаем SSL context с отключенной верификацией для dev API
             import ssl
             ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
-            
+
             async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
                 async with session.post(url, headers=headers, params=params, json=body) as response:
                     if response.status == 200:
-                        logger.info(f"✅ VK message sent: {text}")
+                        logger.info(f"[OK] VK message sent: {text}")
                         return True
                     else:
                         error_text = await response.text()
-                        logger.error(f"❌ Failed to send VK message: {response.status} - {error_text}")
+                        logger.error(f"[ERROR] Failed to send VK message: {response.status} - {error_text}")
                         return False
-                        
+
         except Exception as e:
             logger.error(f"Error sending VK message: {e}")
             return False

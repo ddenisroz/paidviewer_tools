@@ -1,11 +1,14 @@
-import React from 'react';
-import { Button } from '@/components/ui/button';
+import React, { useState } from 'react';
+
+import { z } from 'zod';
+
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Loader2 } from 'lucide-react';
-import { useFormValidation } from '@/hooks/useFormValidation';
+import { Label } from '@/components/ui/label';
+import { FormBuilder } from '@/shared/components';
 import { voiceUploadSchema } from '@/utils/validationSchemas';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+
+
+type VoiceUploadFormData = z.infer<typeof voiceUploadSchema>;
 
 interface VoiceUploadFormProps {
   onSubmit: (data: { voice_name: string; reference_text?: string; file: File }) => Promise<void>;
@@ -20,21 +23,15 @@ export const VoiceUploadForm: React.FC<VoiceUploadFormProps> = ({
   onFileChange,
   isSubmitting = false,
 }) => {
-  const form = useFormValidation({
-    schema: voiceUploadSchema,
-    mode: 'onChange',
-    defaultValues: {
-      voice_name: '',
-      reference_text: '',
-    },
-  });
+  const [fileError, setFileError] = useState<string>('');
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: VoiceUploadFormData) => {
     if (!file) {
-      form.setError('root', { message: 'Выберите аудио файл' });
+      setFileError('Выберите аудио файл');
       return;
     }
 
+    setFileError('');
     await onSubmit({
       voice_name: data.voice_name,
       reference_text: data.reference_text,
@@ -43,71 +40,58 @@ export const VoiceUploadForm: React.FC<VoiceUploadFormProps> = ({
   };
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="voice_name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Название голоса</FormLabel>
-              <FormControl>
-                <Input placeholder="Например: Мой голос" {...field} />
-              </FormControl>
-              <FormDescription>
-                Используйте понятное название для идентификации голоса
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
+    <div className="space-y-4">
+      <FormBuilder
+        schema={voiceUploadSchema}
+        fields={[
+          {
+            name: 'voice_name',
+            label: 'Название голоса',
+            type: 'text',
+            placeholder: 'Например: Мой голос',
+            description: 'Используйте понятное название для идентификации голоса',
+          },
+          {
+            name: 'reference_text',
+            label: 'Референсный текст (опционально)',
+            type: 'textarea',
+            placeholder: 'Текст, который произносится в аудио файле',
+            rows: 3,
+            description: 'Помогает улучшить качество синтеза для этого голоса',
+          },
+        ]}
+        defaultValues={{
+          voice_name: '',
+          reference_text: '',
+        }}
+        onSubmit={handleSubmit}
+        submitLabel="Загрузить голос"
+        loading={isSubmitting}
+        formClassName="space-y-4"
+      />
+      
+      {/* File upload field - outside FormBuilder */}
+      <div className="space-y-2 -mt-4">
+        <Label>Аудио файл</Label>
+        <Input
+          type="file"
+          accept="audio/*"
+          onChange={(e) => {
+            onFileChange(e.target.files?.[0] || null);
+            setFileError('');
+          }}
         />
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Аудио файл</label>
-          <Input
-            type="file"
-            accept="audio/*"
-            onChange={(e) => onFileChange(e.target.files?.[0] || null)}
-          />
-          {file && (
-            <p className="text-sm text-muted-foreground">
-              Выбран: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
-            </p>
-          )}
-          {!file && form.formState.errors.root && (
-            <p className="text-sm font-medium text-destructive">
-              {form.formState.errors.root.message}
-            </p>
-          )}
-        </div>
-
-        <FormField
-          control={form.control}
-          name="reference_text"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Референсный текст (опционально)</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Текст, который произносится в аудио файле"
-                  rows={3}
-                  className="resize-none"
-                  {...field}
-                />
-              </FormControl>
-              <FormDescription>
-                Помогает улучшить качество синтеза для этого голоса
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <Button type="submit" disabled={isSubmitting} className="w-full">
-          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Загрузить голос
-        </Button>
-      </form>
-    </Form>
+        {file && (
+          <p className="text-sm text-muted-foreground">
+            Выбран: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+          </p>
+        )}
+        {fileError && (
+          <p className="text-sm font-medium text-destructive">
+            {fileError}
+          </p>
+        )}
+      </div>
+    </div>
   );
 };

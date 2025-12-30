@@ -1,0 +1,36 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // === СТРОГАЯ ТИПИЗАЦИЯ ===
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    
+    // === ДОПОЛНИТЕЛЬНЫЕ ПРОВЕРКИ ===
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    
+    // === ТОЧНАЯ ПРОВЕРКА ТИПОВ ===
+    "exactOptionalPropertyTypes": true,
+    "useUnknownInCatchVariables": true
+  },
+  "include": [
+    // Начинаем с критичных файлов
+    "src/services/**/*.ts",
+    "src/queries/**/*.ts",
+    "src/hooks/**/*.ts",
+    "src/context/**/*.tsx",
+    "src/utils/apiErrorHandler.ts",
+    "src/utils/validationSchemas.ts"
+  ]
+}

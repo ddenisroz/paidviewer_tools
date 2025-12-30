@@ -4,6 +4,40 @@
 
 Этот документ описывает единую систему дизайна проекта. Используйте эти правила для создания согласованного UI.
 
+**Последнее обновление:** 18 декабря 2025
+
+## 📦 Централизованные константы
+
+Все константы дизайн-системы находятся в файле `frontend/src/constants/designSystem.ts`.
+
+```typescript
+import { 
+  BUTTON_SIZES, 
+  INPUT_SIZES, 
+  SPACING, 
+  PLATFORM_COLORS,
+  STATUS_COLORS,
+  ADMIN_SECTION_COLORS,
+  TABLE_CLASSES 
+} from '@/constants/designSystem';
+```
+
+### Доступные константы
+
+| Константа | Описание |
+|-----------|----------|
+| `BUTTON_SIZES` | Размеры кнопок (sm, default, lg, icon, iconSm) |
+| `INPUT_SIZES` | Размеры полей ввода (sm, default, lg) |
+| `SPACING` | Отступы между элементами (xs, sm, md, lg, xl) |
+| `CARD_PADDING` | Padding для карточек (sm, default, lg) |
+| `FONT_SIZES` | Размеры шрифтов (xs, sm, base, lg, xl, 2xl, 3xl) |
+| `PLATFORM_COLORS` | Цвета платформ (twitch, vk, donationalerts) |
+| `STATUS_COLORS` | Цвета статусов (success, error, warning, info, neutral) |
+| `ADMIN_SECTION_COLORS` | Цвета секций админки |
+| `TABLE_CLASSES` | Стандартные классы для таблиц |
+| `FORM_CLASSES` | Стандартные классы для форм |
+| `TRANSITIONS` | Анимации и переходы |
+
 ## 📏 Система отступов (Spacing)
 
 Используем **8px grid system**. Все отступы кратны 4px или 8px.
@@ -83,25 +117,44 @@
 ### Размеры
 
 ```jsx
+import { BUTTON_SIZES } from '@/constants/designSystem';
+
 // Маленькая кнопка (32px высота)
-<Button size="sm" className="h-8 px-3 text-xs">
+<Button size="sm" className={BUTTON_SIZES.sm}>
   Маленькая
 </Button>
 
 // Стандартная кнопка (40px высота) - ИСПОЛЬЗУЙТЕ ПО УМОЛЧАНИЮ
-<Button size="default" className="h-10 px-4 py-2">
+<Button size="default" className={BUTTON_SIZES.default}>
   Стандартная
 </Button>
 
 // Большая кнопка (48px высота)
-<Button size="lg" className="h-12 px-8">
+<Button size="lg" className={BUTTON_SIZES.lg}>
   Большая
 </Button>
 
-// Кнопка-иконка (40x40px)
-<Button size="icon" className="h-10 w-10">
+// Кнопка-иконка (40x40px) - для иконок в header/toolbar
+<Button size="icon" className={BUTTON_SIZES.icon}>
   <Icon />
 </Button>
+
+// Маленькая кнопка-иконка (32x32px) - для action buttons в таблицах
+<Button size="icon" className={BUTTON_SIZES.iconSm}>
+  <Icon className="h-4 w-4" />
+</Button>
+```
+
+### Константы размеров
+
+```typescript
+BUTTON_SIZES = {
+  sm: 'h-8 px-3 text-xs',      // 32px
+  default: 'h-10 px-4 py-2',   // 40px - СТАНДАРТ
+  lg: 'h-12 px-8',             // 48px
+  icon: 'h-10 w-10 p-0',       // 40x40px - для иконок
+  iconSm: 'h-8 w-8 p-0',       // 32x32px - маленькие иконки
+}
 ```
 
 ### Варианты
@@ -184,6 +237,50 @@
 <div className="bg-accent">          {/* Акцент для hover */}
 ```
 
+### Цвета платформ
+
+```jsx
+import { PLATFORM_COLORS } from '@/constants/designSystem';
+
+// Twitch
+<Button className={`${PLATFORM_COLORS.twitch.bg} ${PLATFORM_COLORS.twitch.bgHover}`}>
+  Twitch
+</Button>
+
+// VK Live
+<Button className={`${PLATFORM_COLORS.vk.bg} ${PLATFORM_COLORS.vk.bgHover}`}>
+  VK Live
+</Button>
+
+// DonationAlerts
+<Button className={`${PLATFORM_COLORS.donationalerts.bg} ${PLATFORM_COLORS.donationalerts.bgHover}`}>
+  DonationAlerts
+</Button>
+```
+
+### Цвета статусов
+
+```jsx
+import { STATUS_COLORS } from '@/constants/designSystem';
+
+<span className={STATUS_COLORS.success}>Успешно</span>
+<span className={STATUS_COLORS.error}>Ошибка</span>
+<span className={STATUS_COLORS.warning}>Предупреждение</span>
+<span className={STATUS_COLORS.info}>Информация</span>
+```
+
+### Цвета секций админки
+
+```jsx
+import { ADMIN_SECTION_COLORS } from '@/constants/designSystem';
+
+// Разные цвета для разных секций
+<Tab className={ADMIN_SECTION_COLORS.voices}>Голоса</Tab>
+<Tab className={ADMIN_SECTION_COLORS.users}>Пользователи</Tab>
+<Tab className={ADMIN_SECTION_COLORS.bots}>Боты</Tab>
+<Tab className={ADMIN_SECTION_COLORS.logs}>Логи</Tab>
+```
+
 ## 📐 Сетки и Layout
 
 ### Стандартные сетки
@@ -259,8 +356,51 @@
 // ✅ ХОРОШО: <Button className="hover:bg-accent">
 ```
 
+## 📊 Таблицы
+
+### Стандартные классы для таблиц
+
+```jsx
+import { TABLE_CLASSES } from '@/constants/designSystem';
+
+<Table>
+  <TableHeader>
+    <TableRow>
+      <TableHead className={TABLE_CLASSES.header}>Имя</TableHead>
+      <TableHead className={TABLE_CLASSES.header}>Email</TableHead>
+      <TableHead className={TABLE_CLASSES.header}>Действия</TableHead>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    {users.map(user => (
+      <TableRow key={user.id} className={TABLE_CLASSES.row}>
+        <TableCell className={TABLE_CLASSES.cell}>{user.name}</TableCell>
+        <TableCell className={TABLE_CLASSES.cell}>{user.email}</TableCell>
+        <TableCell className={TABLE_CLASSES.cell}>
+          <Button className={TABLE_CLASSES.actionButton}>
+            <Edit className="h-4 w-4" />
+          </Button>
+        </TableCell>
+      </TableRow>
+    ))}
+  </TableBody>
+</Table>
+```
+
+### Константы таблиц
+
+```typescript
+TABLE_CLASSES = {
+  header: 'text-left p-3 font-semibold text-sm',
+  cell: 'p-3 text-sm',
+  row: 'border-b border-gray-700 hover:bg-gray-800/50',
+  actionButton: 'h-8 w-8 p-0',  // 32x32px для action buttons
+}
+```
+
 ## ✅ Чек-лист для новых компонентов
 
+- [ ] Используются константы из `designSystem.ts`
 - [ ] Используются стандартные размеры кнопок (h-8, h-10, h-12)
 - [ ] Используются стандартные отступы (gap-4, gap-6, p-4, p-6)
 - [ ] Используются CSS переменные для цветов
@@ -269,6 +409,7 @@
 - [ ] Анимации используют стандартные duration (150ms, 200ms, 300ms)
 - [ ] Карточки используют стандартный padding (p-6)
 - [ ] Формы используют space-y-2 между полями
+- [ ] Action buttons в таблицах используют h-8 w-8 (32x32px)
 
 ## 🚫 Что НЕ делать
 

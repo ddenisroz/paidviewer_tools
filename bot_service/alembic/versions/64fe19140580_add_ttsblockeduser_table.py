@@ -33,14 +33,14 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_tts_blocked_users_channel_name'), 'tts_blocked_users', ['channel_name'], unique=False)
     op.create_index(op.f('ix_tts_blocked_users_id'), 'tts_blocked_users', ['id'], unique=False)
-    
+
     # Use batch mode for SQLite constraint changes
     with op.batch_alter_table('filtered_words') as batch_op:
         batch_op.create_unique_constraint('uq_user_word_platform', ['user_id', 'word', 'platform'])
-    
+
     with op.batch_alter_table('user_tokens') as batch_op:
         batch_op.drop_column('username')
-    
+
     with op.batch_alter_table('users') as batch_op:
         batch_op.alter_column('id',
                    existing_type=sa.INTEGER(),
@@ -59,13 +59,13 @@ def downgrade() -> None:
                    existing_type=sa.INTEGER(),
                    nullable=True,
                    autoincrement=True)
-    
+
     with op.batch_alter_table('user_tokens') as batch_op:
         batch_op.add_column(sa.Column('username', sa.VARCHAR(), nullable=True))
-    
+
     with op.batch_alter_table('filtered_words') as batch_op:
         batch_op.drop_constraint('uq_user_word_platform', type_='unique')
-    
+
     # Drop TTSBlockedUser table
     op.drop_index(op.f('ix_tts_blocked_users_id'), table_name='tts_blocked_users')
     op.drop_index(op.f('ix_tts_blocked_users_channel_name'), table_name='tts_blocked_users')

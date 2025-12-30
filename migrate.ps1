@@ -43,7 +43,7 @@ if ($missingEnv.Count -gt 0) {
     }
     
     Write-Host ""
-    Write-Host "⚠️  Please edit the .env files with your configuration before continuing." -ForegroundColor Yellow
+    Write-Host "[WARN] Please edit the .env files with your configuration before continuing." -ForegroundColor Yellow
     Write-Host "   Run this script again after editing." -ForegroundColor Yellow
     exit 1
 }
@@ -86,9 +86,9 @@ print(Fernet.generate_key().decode())
             $ttsSimpleEnv | Set-Content "tts_service_simple\.env"
         }
         
-        Write-Host "✓ Generated security keys" -ForegroundColor Green
+        Write-Host "[OK] Generated security keys" -ForegroundColor Green
     } else {
-        Write-Host "❌ Failed to generate encryption key. Please install cryptography:" -ForegroundColor Red
+        Write-Host "[ERROR] Failed to generate encryption key. Please install cryptography:" -ForegroundColor Red
         Write-Host "   pip install cryptography" -ForegroundColor Yellow
         exit 1
     }
@@ -137,7 +137,7 @@ Write-Host "Installing bot_service dependencies..." -ForegroundColor Yellow
 Push-Location bot_service
 pip install -r requirements.txt
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Failed to install bot_service dependencies" -ForegroundColor Red
+    Write-Host "[ERROR] Failed to install bot_service dependencies" -ForegroundColor Red
     Pop-Location
     exit 1
 }
@@ -149,7 +149,7 @@ Write-Host "Installing frontend dependencies..." -ForegroundColor Yellow
 Push-Location frontend
 npm install
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Failed to install frontend dependencies" -ForegroundColor Red
+    Write-Host "[ERROR] Failed to install frontend dependencies" -ForegroundColor Red
     Pop-Location
     exit 1
 }
@@ -162,7 +162,7 @@ Write-Host "Running database migrations..." -ForegroundColor Cyan
 Push-Location bot_service
 alembic upgrade head
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "⚠️  Database migration failed. This is normal for first-time setup." -ForegroundColor Yellow
+    Write-Host "[WARN] Database migration failed. This is normal for first-time setup." -ForegroundColor Yellow
 }
 Pop-Location
 Write-Host "✓ Database ready" -ForegroundColor Green

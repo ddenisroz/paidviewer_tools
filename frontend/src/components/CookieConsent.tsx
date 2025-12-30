@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 const CookieConsent: React.FC = () => {
     const [isVisible, setIsVisible] = useState(false);
@@ -22,18 +22,15 @@ const CookieConsent: React.FC = () => {
     return (
         <div className="fixed bottom-4 left-4 z-50 max-w-xs">
             <div className="relative bg-slate-900/95 backdrop-blur-sm border border-slate-700/50 rounded-xl p-3 shadow-2xl animate-in slide-in-from-left-4 duration-500">
-                {/* Иконка печенья (перемещена) */}
-                <div className="absolute top-2 right-2">
-                    <div className="w-6 h-6 bg-amber-500/20 rounded-full flex items-center justify-center">
-                        <span className="text-amber-400 text-sm">🍪</span>
+                {/* Иконка печенья */}
+                <div className="absolute -top-2 -right-2">
+                    <div className="bg-amber-500/20 rounded-full px-2 py-1 flex items-center justify-center">
+                        <span className="text-amber-400 text-xs whitespace-nowrap">COOKIE</span>
                     </div>
                 </div>
                 
                 {/* Контент */}
                 <div>
-                    <h3 className="text-xs font-semibold text-foreground mb-1 pr-10">
-                        Использование Cookies
-                    </h3>
                     <p className="text-xs text-muted-foreground leading-relaxed mb-2 pr-10">
                         Сайт использует Cookies для передачи данных об авторизации на сервер.
                     </p>

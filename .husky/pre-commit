@@ -1,11 +1,35 @@
 #!/bin/sh
 . "$(dirname "$0")/_/husky.sh"
 
+echo "🔍 Running pre-commit checks..."
+echo ""
+
+# Change to frontend directory
+cd frontend || exit 1
+
+# Run all checks using the check:all script
+echo "🚀 Running all checks (lint + format + type-check)..."
+npm run check:all
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "❌ Pre-commit checks failed!"
+  echo ""
+  echo "💡 To fix issues:"
+  echo "   - Lint errors: npm run lint:fix"
+  echo "   - Format errors: npm run format"
+  echo "   - Type errors: check TypeScript errors and fix manually"
+  echo ""
+  exit 1
+fi
+echo "✅ All checks passed!"
+echo ""
+
+# Return to root for design system check
+cd ..
+
 # Design System Check
 echo "🎨 Checking Design System compliance..."
 npm run check:design
-
-# If check fails, show helpful message
 if [ $? -ne 0 ]; then
   echo ""
   echo "❌ Design System check failed!"
@@ -18,5 +42,7 @@ if [ $? -ne 0 ]; then
   echo ""
   exit 1
 fi
+echo "✅ Design System passed!"
+echo ""
 
-echo "✅ Design System check passed!"
+echo "🎉 All checks passed! Committing..."

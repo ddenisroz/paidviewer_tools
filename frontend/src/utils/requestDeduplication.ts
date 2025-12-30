@@ -9,7 +9,7 @@ interface PendingRequest<T> {
 }
 
 class RequestDeduplicator {
-  private pendingRequests: Map<string, PendingRequest<any>> = new Map();
+  private pendingRequests: Map<string, PendingRequest<unknown>> = new Map();
   private readonly CACHE_DURATION = 100; // 100ms window for deduplication
 
   /**
@@ -18,11 +18,11 @@ class RequestDeduplicator {
    */
   async deduplicate<T>(key: string, requestFn: () => Promise<T>): Promise<T> {
     const now = Date.now();
-    const pending = this.pendingRequests.get(key);
+    const pending = this.pendingRequests.get(key) as PendingRequest<T> | undefined;
 
     // If there's a pending request within the cache duration, return it
     if (pending && now - pending.timestamp < this.CACHE_DURATION) {
-      return pending.promise;
+      return pending.promise as Promise<T>;
     }
 
     // Create new request

@@ -15,29 +15,29 @@ logger = logging.getLogger(__name__)
 def update_vk_username():
     """Обновляет vk_username напрямую в базе данных"""
     db = next(get_db())
-    
+
     try:
         # Находим пользователя с VK username "Zavtra_Zavod"
         user = db.query(User).filter(User.id == 1).first()
-        
+
         if not user:
-            logger.error("❌ User с id=1 не найден")
+            logger.error("[ERROR] User с id=1 не найден")
             return
-        
-        logger.info(f"📊 Текущий vk_username: {user.vk_username}")
-        
+
+        logger.info(f"[STATS] Текущий vk_username: {user.vk_username}")
+
         if user.vk_username == "Zavtra_Zavod":
             # Обновляем на правильное значение из channel.url
             user.vk_username = "yourchy"
             db.commit()
-            logger.info(f"✅ Обновлено: Zavtra_Zavod → yourchy")
+            logger.info("[OK] Обновлено: Zavtra_Zavod → yourchy")
         else:
-            logger.info(f"ℹ️ vk_username уже корректный: {user.vk_username}")
-        
-        logger.info("\n✅ Обновление завершено!")
-        
+            logger.info(f"[INFO] vk_username уже корректный: {user.vk_username}")
+
+        logger.info("\n[OK] Обновление завершено!")
+
     except Exception as e:
-        logger.error(f"❌ Критическая ошибка: {e}")
+        logger.error(f"[ERROR] Критическая ошибка: {e}")
         db.rollback()
     finally:
         db.close()

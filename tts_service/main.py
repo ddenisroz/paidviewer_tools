@@ -33,7 +33,7 @@ def main():
         # Uvicorn требует log_level в НИЖНЕМ регистре (info, debug, warning, error)
         uvicorn_log_level = os.getenv("TTS_LOG_LEVEL", "info").lower()
         
-        logger.info(f"🚀 Starting TTS Service on {host}:{port}")
+        logger.info(f"[START] Starting TTS Service on {host}:{port}")
         
         # Запускаем сервер
         uvicorn.run(
@@ -47,7 +47,7 @@ def main():
         )
         
     except Exception as e:
-        logger.error(f"❌ Failed to start TTS Service: {e}")
+        logger.error(f"[ERROR] Failed to start TTS Service: {e}")
         raise
 
 if __name__ == "__main__":

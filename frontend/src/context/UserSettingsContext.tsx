@@ -1,9 +1,12 @@
 // src/context/UserSettingsContext.tsx
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { useAuth } from './AuthContext';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+
+import { useSaveUserSettings, useUserSettings as useUserSettingsQuery } from '../queries/userSettings/userSettingsQueries';
 import cacheManager, { CACHE_CONFIG } from '../utils/cacheManager';
 import Logger from '../utils/prodLogger';
-import { useUserSettings as useUserSettingsQuery, useSaveUserSettings } from '../queries/userSettings/userSettingsQueries';
+
+import { useAuth } from './AuthContext';
+
 import type { UserSettings } from '../types/user';
 
 const logger = new Logger('USER_SETTINGS');
@@ -54,9 +57,9 @@ interface UserSettingsContextValue {
     isSaving: boolean;
     loadSettings: () => Promise<void>;
     saveSettings: (newSettings: Partial<UserSettings>) => Promise<boolean>;
-    updateSetting: (key: keyof UserSettings, value: any) => Promise<boolean>;
+    updateSetting: (key: keyof UserSettings, value: unknown) => Promise<boolean>;
     updateSettings: (settingsToUpdate: Partial<UserSettings>) => Promise<boolean>;
-    getSetting: <T = any>(key: keyof UserSettings, defaultValue?: T) => T | null;
+    getSetting: <T = unknown>(key: keyof UserSettings, defaultValue?: T) => T | null;
     getChatSettings: () => ChatSettings | null;
     getObsSettings: () => ObsSettings | null;
     getCombineSettings: () => CombineSettings;
@@ -91,9 +94,13 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
     // React Query v5: onSuccess moved to useEffect
     useEffect(() => {
         if (settingsData) {
-            setSettings(settingsData);
-            if (settingsData) {
-                cacheManager.set(CACHE_CONFIG.USER_SETTINGS, settingsData, { userId: user?.id });
+            const data = settingsData as { data?: UserSettings } | UserSettings;
+            const settings = 'data' in data && data.data ? data.data : (data as UserSettings);
+            if (settings && typeof settings === 'object' && !('data' in settings)) {
+                setSettings(settings);
+                cacheManager.set(CACHE_CONFIG.USER_SETTINGS, settings, { userId: user?.id });
+            } else {
+                setSettings(null);
             }
         }
     }, [settingsData, user?.id]);
@@ -110,11 +117,7 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
         setIsLoading(isLoadingSettings);
     }, [isLoadingSettings]);
 
-    useEffect(() => {
-        if (settingsData) {
-            setSettings(settingsData);
-        }
-    }, [settingsData]);
+
 
     const loadSettings = useCallback(async (): Promise<void> => {
         if (!isAuthenticated) {
@@ -126,9 +129,12 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
     }, [isAuthenticated, refetchSettings]);
 
     const saveSettingsMutation = useSaveUserSettings({
-        onSuccess: (response: any) => {
-            const savedSettings = response.data?.settings || response.data;
-            setSettings(savedSettings);
+        onSuccess: (response: unknown) => {
+            const data = response as { data?: { settings?: UserSettings } | UserSettings };
+            const savedSettings = data.data && typeof data.data === 'object' && 'settings' in data.data 
+                ? data.data.settings 
+                : data.data;
+            setSettings(savedSettings as UserSettings);
             if (savedSettings) {
                 cacheManager.set(CACHE_CONFIG.USER_SETTINGS, savedSettings, { userId: user?.id });
             }
@@ -154,7 +160,7 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
         });
     }, [isAuthenticated, saveSettingsMutation]);
 
-    const updateSetting = useCallback(async (key: keyof UserSettings, value: any): Promise<boolean> => {
+    const updateSetting = useCallback(async (key: keyof UserSettings, value: unknown): Promise<boolean> => {
         const success = await saveSettings({ [key]: value } as Partial<UserSettings>);
         return success;
     }, [saveSettings]);
@@ -164,7 +170,7 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
         return success;
     }, [saveSettings]);
 
-    const getSetting = useCallback(<T = any,>(key: keyof UserSettings, defaultValue: T | null = null): T | null => {
+    const getSetting = useCallback(<T = unknown,>(key: keyof UserSettings, defaultValue: T | null = null): T | null => {
         return (settings?.[key] as T) ?? defaultValue;
     }, [settings]);
 
@@ -219,7 +225,7 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
             };
         }
         
-        const cachedSettings = cacheManager.get(CACHE_CONFIG.USER_SETTINGS, { ignoreExpired: true });
+        const cachedSettings = cacheManager.get(CACHE_CONFIG.USER_SETTINGS, { ignoreExpired: true }) as UserSettings | null;
         if (cachedSettings) {
             return {
                 combine_titles: cachedSettings.combine_titles ?? false,
@@ -237,10 +243,10 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
     useEffect(() => {
         const unsubscribe = cacheManager.subscribe(
             CACHE_CONFIG.USER_SETTINGS.key,
-            (updatedData: any) => {
-                if (updatedData) {
+            (updatedData: unknown) => {
+                if (updatedData && typeof updatedData === 'object') {
                     logger.debug('[USER_SETTINGS] Multi-tab update received');
-                    setSettings(updatedData);
+                    setSettings(updatedData as UserSettings);
                 } else {
                     logger.debug('[USER_SETTINGS] Cache invalidated from another tab');
                     loadSettings();

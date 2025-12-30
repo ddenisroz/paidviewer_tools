@@ -1,26 +1,34 @@
 /**
  * User Settings Queries - централизованные React Query queries для User Settings
  */
-import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
-import { queryKeys } from '../queryKeys';
-import { userSettingsService } from '../../services/api/services/userSettingsService';
+import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
+
+import { userSettingsService } from '../../services/api/services/userSettingsService';
 import { logger } from '../../utils/prodLogger';
-import type { AxiosError } from 'axios';
+import { queryKeys } from '../queryKeys';
+
 import type { ApiResponse } from '../../types';
+import type { AxiosError } from 'axios';
+
+// User settings type
+interface UserSettings {
+  [key: string]: unknown;
+}
 
 /**
  * Получить настройки пользователя
  */
-export const useUserSettings = (options?: Omit<UseQueryOptions<any, AxiosError>, 'queryKey' | 'queryFn'>) => {
-  return useQuery({
+export const useUserSettings = (options?: Omit<UseQueryOptions<UserSettings, AxiosError>, 'queryKey' | 'queryFn'>) => {
+  return useQuery<UserSettings, AxiosError>({
     queryKey: queryKeys.userSettings.settings(),
     queryFn: async () => {
       const response = await userSettingsService.getUserSettings();
-      return (response.data as any)?.settings || response.data;
+      const data = response.data as ApiResponse<UserSettings>;
+      return (data?.data || data) as UserSettings;
     },
-    staleTime: 5 * 60 * 1000, // 5 минут
-    gcTime: 30 * 60 * 1000, // 30 минут
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     retry: 1,
@@ -31,20 +39,19 @@ export const useUserSettings = (options?: Omit<UseQueryOptions<any, AxiosError>,
 /**
  * Сохранить настройки пользователя
  */
-export const useSaveUserSettings = (options?: UseMutationOptions<any, AxiosError, Record<string, any>, unknown>) => {
+export const useSaveUserSettings = (options?: UseMutationOptions<ApiResponse, AxiosError, Record<string, unknown>, { previousSettings?: UserSettings }>) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (settings: Record<string, any>) => userSettingsService.saveUserSettings(settings),
-    onMutate: async (newSettings: Record<string, any>) => {
-      // Отменяем исходящие запросы
+  return useMutation<ApiResponse, AxiosError, Record<string, unknown>, { previousSettings?: UserSettings }>({
+    mutationFn: async (settings: Record<string, unknown>) => {
+      const response = await userSettingsService.saveUserSettings(settings);
+      return response.data;
+    },
+    onMutate: async (newSettings: Record<string, unknown>) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.userSettings.settings() });
+      const previousSettings = queryClient.getQueryData<UserSettings>(queryKeys.userSettings.settings());
       
-      // Сохраняем предыдущее значение для отката
-      const previousSettings = queryClient.getQueryData(queryKeys.userSettings.settings());
-      
-      // Оптимистично обновляем кэш
-      queryClient.setQueryData(queryKeys.userSettings.settings(), (old: any) => ({
+      queryClient.setQueryData<UserSettings>(queryKeys.userSettings.settings(), (old) => ({
         ...old,
         ...newSettings,
       }));
@@ -52,29 +59,27 @@ export const useSaveUserSettings = (options?: UseMutationOptions<any, AxiosError
       return { previousSettings };
     },
     onSuccess: (response) => {
-      // Обновляем кэш с данными с сервера
-      const settings = (response.data as any)?.settings || response.data;
+      const data = response as ApiResponse<UserSettings>;
+      const settings = data?.data || response;
       queryClient.setQueryData(queryKeys.userSettings.settings(), settings);
       if (!options?.onSuccess) {
-          toast.success('Настройки сохранены');
+        toast.success('Настройки сохранены');
       }
     },
-    onError: (error: AxiosError, newSettings, context: { previousSettings?: any } | undefined) => {
-      // Откатываем к предыдущему значению при ошибке
+    onError: (error: AxiosError, _newSettings, context) => {
       if (context?.previousSettings) {
         queryClient.setQueryData(queryKeys.userSettings.settings(), context.previousSettings);
       }
       logger.error('Error saving user settings:', error);
       if (!options?.onError) {
-        const errorMessage = (error.response?.data as any)?.detail || (error.response?.data as any)?.message || 'Не удалось сохранить настройки';
+        const errorData = error.response?.data as Record<string, unknown> | undefined;
+        const errorMessage = (errorData?.detail || errorData?.message || 'Не удалось сохранить настройки') as string;
         toast.error(errorMessage);
       }
     },
     onSettled: () => {
-      // Инвалидируем кэш для синхронизации
       queryClient.invalidateQueries({ queryKey: queryKeys.userSettings.settings() });
     },
     ...options,
   });
 };
-

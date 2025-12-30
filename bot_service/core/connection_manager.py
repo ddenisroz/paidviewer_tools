@@ -1,10 +1,9 @@
 # bot_service/core/connection_manager.py
 """Главный файл ConnectionManager - объединяет все модули"""
 import logging
-from typing import Dict, Set, List, TYPE_CHECKING
+from typing import List, TYPE_CHECKING
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
-from datetime import datetime
 from .connection_manager_core import ConnectionManagerCore
 
 if TYPE_CHECKING:
@@ -20,12 +19,12 @@ def get_connection_manager():
     global _connection_manager_instance
     if _connection_manager_instance is None:
         _connection_manager_instance = ConnectionManager()
-        logger.info("🔧 Created global ConnectionManager instance")
+        logger.info("[FIX] Created global ConnectionManager instance")
     return _connection_manager_instance
 
 class ConnectionManager(ConnectionManagerCore):
     """Главный класс управления соединениями"""
-    
+
     def __init__(self):
         super().__init__()
         logger.info("[CONNECTION] ConnectionManager initialized")
@@ -56,21 +55,20 @@ class ConnectionManager(ConnectionManagerCore):
             await websocket.accept()
             self.obs_connections[token] = websocket
             logger.info(f"OBS WebSocket connected: {token[:10]}...")
-            
-            # 🚀 FIX: Отменяем отложенное отключение TTS при подключении OBS
+
+            # [START] FIX: Отменяем отложенное отключение TTS при подключении OBS
             # Получаем user_id из токена
             from auth.auth import verify_jwt_token
-            from core.database import get_db, User
-            
+
             try:
                 payload = verify_jwt_token(token)
                 if payload and 'user_id' in payload:
                     user_id = payload['user_id']
                     self.cancel_tts_disconnect(user_id)
-                    logger.info(f"✅ [OBS CONNECT] Cancelled TTS disconnect for user {user_id} (OBS connected)")
+                    logger.info(f"[OK] [OBS CONNECT] Cancelled TTS disconnect for user {user_id} (OBS connected)")
             except Exception as e:
                 logger.debug(f"Could not extract user_id from OBS token: {e}")
-            
+
         except Exception as e:
             logger.error(f"Error connecting OBS WebSocket: {e}")
 
@@ -82,12 +80,12 @@ class ConnectionManager(ConnectionManagerCore):
                 await websocket.close()
                 del self.obs_connections[token]
                 logger.info(f"OBS WebSocket disconnected: {token[:10]}...")
-                
-                # 🚀 FIX: Планируем отключение TTS если нет других активных соединений
+
+                # [START] FIX: Планируем отключение TTS если нет других активных соединений
                 # Получаем user_id из токена
                 from auth.auth import verify_jwt_token
                 from core.database import get_db, User
-                
+
                 try:
                     payload = verify_jwt_token(token)
                     if payload and 'user_id' in payload:
@@ -105,7 +103,7 @@ class ConnectionManager(ConnectionManagerCore):
                             db.close()
                 except Exception as e:
                     logger.debug(f"Could not extract user_id from OBS token: {e}")
-                    
+
         except Exception as e:
             logger.error(f"Error disconnecting OBS WebSocket: {e}")
 
@@ -170,7 +168,7 @@ class ConnectionManager(ConnectionManagerCore):
             except Exception as e:
                 logger.error(f"Error broadcasting to user {user_id}: {e}")
                 disconnected.append(user_id)
-        
+
         # Удаляем отключенных пользователей
         for user_id in disconnected:
             del self.active_connections[user_id]
@@ -222,25 +220,25 @@ class ConnectionManager(ConnectionManagerCore):
         """Восстановить активные сессии из БД"""
         try:
             from core.database import UserSession
-            
+
             # Получаем все активные сессии
             active_sessions = db.query(UserSession).filter(
                 UserSession.is_active == True
             ).all()
-            
+
             restored_count = 0
             for session in active_sessions:
                 device_info = session.device_info or {}
                 monitored_channel = device_info.get('monitored_channel')
-                
+
                 if monitored_channel:
                     # Добавляем сессию в connection manager
                     self.add_active_session(monitored_channel, session.session_id)
                     restored_count += 1
                     logger.info(f"Restored session {session.session_id} for channel {monitored_channel}")
-            
+
             logger.info(f"Restored {restored_count} active sessions from database")
-            
+
         except Exception as e:
             logger.error(f"Error restoring sessions from DB: {e}")
 
@@ -249,20 +247,20 @@ class ConnectionManager(ConnectionManagerCore):
         try:
             # Получаем ВСЕ каналы с активным Twitch токеном
             from core.database import User, UserToken
-            
+
             # Ищем пользователей с активным Twitch токеном
             twitch_users = db.query(User).join(UserToken).filter(
                 UserToken.platform == 'twitch',
-                UserToken.is_active == True,
+                UserToken.is_active.is_(True),
                 User.twitch_username.isnot(None)
             ).all()
-            
+
             twitch_channels = []
             for user in twitch_users:
                 if user.twitch_username:
                     twitch_channels.append(user.twitch_username.lower())
-            
-            logger.info(f"🎮 Found {len(twitch_channels)} Twitch channels to listen: {twitch_channels}")
+
+            logger.info(f"[GAME] Found {len(twitch_channels)} Twitch channels to listen: {twitch_channels}")
             return twitch_channels
         except Exception as e:
             logger.error(f"Error getting Twitch channels: {e}", exc_info=True)
@@ -273,21 +271,21 @@ class ConnectionManager(ConnectionManagerCore):
         try:
             # Получаем ВСЕ каналы с активным VK токеном
             from core.database import User, UserToken
-            
+
             # Ищем пользователей с активным VK токеном
             vk_users = db.query(User).join(UserToken).filter(
                 UserToken.platform == 'vk',
-                UserToken.is_active == True,
+                UserToken.is_active.is_(True),
                 User.vk_channel_name.isnot(None)
             ).all()
-            
+
             vk_channels = []
             for user in vk_users:
                 # Используем vk_channel_name как основной идентификатор канала
                 channel_name = user.vk_channel_name or user.vk_username
                 if channel_name:
                     vk_channels.append(channel_name)
-            
+
             logger.info(f"📺 Found {len(vk_channels)} VK Live channels to listen: {vk_channels}")
             return vk_channels
         except Exception as e:
@@ -318,15 +316,15 @@ class ConnectionManager(ConnectionManagerCore):
                 try:
                     # websocket.close() - синхронный метод
                     pass
-                except:
+                except Exception:
                     pass
-            
+
             self.active_connections.clear()
             self.obs_connections.clear()
             self.youtube_obs_connections.clear()
             self.audio_connections.clear()
             self.active_sessions.clear()
-            
+
             logger.info("ConnectionManager cleanup completed")
         except Exception as e:
             logger.error(f"Error during ConnectionManager cleanup: {e}")

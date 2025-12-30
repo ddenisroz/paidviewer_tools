@@ -1,5 +1,5 @@
-import { useForm, UseFormProps, UseFormReturn, FieldValues } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { FieldValues, useForm, UseFormProps, UseFormReturn } from 'react-hook-form';
 import { ZodSchema } from 'zod';
 
 interface UseFormValidationProps<T extends FieldValues> extends Omit<UseFormProps<T>, 'resolver'> {
@@ -27,8 +27,10 @@ export function useFormValidation<T extends FieldValues>({
   schema,
   mode = 'onChange',
   ...props
-}: UseFormValidationProps<T>): UseFormReturn<T> {
+}: UseFormValidationProps<T>): UseFormReturn<T, unknown, T> {
+  // @ts-expect-error - Zod resolver and generic type incompatibility
   return useForm<T>({
+    // @ts-expect-error - Zod resolver type incompatibility with react-hook-form
     resolver: zodResolver(schema),
     mode,
     ...props,

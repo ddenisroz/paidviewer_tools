@@ -3,7 +3,7 @@
 Обеспечивает четкое разделение гостей и авторизованных пользователей
 """
 import logging
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -17,14 +17,14 @@ class UserIdentityService:
     Сервис для работы с идентификацией пользователей.
     Обеспечивает четкое разделение гостей и авторизованных пользователей.
     """
-    
+
     @staticmethod
     def get_user_type(user: Dict[str, Any]) -> UserType:
         """Определяет тип пользователя"""
         if user.get('is_guest', False):
             return UserType.GUEST
         return UserType.AUTHENTICATED
-    
+
     @staticmethod
     def get_user_identifier(user: Dict[str, Any]) -> str:
         """
@@ -33,7 +33,7 @@ class UserIdentityService:
         Для авторизованных: user_id (число как строка)
         """
         user_type = UserIdentityService.get_user_type(user)
-        
+
         if user_type == UserType.GUEST:
             session_id = user.get('session_id')
             if not session_id:
@@ -44,7 +44,7 @@ class UserIdentityService:
             if not user_id:
                 raise ValueError("Authenticated user must have id")
             return str(user_id)
-    
+
     @staticmethod
     def get_database_filters(user: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -53,7 +53,7 @@ class UserIdentityService:
         Для авторизованных: {"user_id": user_id}
         """
         user_type = UserIdentityService.get_user_type(user)
-        
+
         if user_type == UserType.GUEST:
             session_id = user.get('session_id')
             if not session_id:
@@ -64,7 +64,7 @@ class UserIdentityService:
             if not user_id:
                 raise ValueError("Authenticated user must have id")
             return {"user_id": user_id}
-    
+
     @staticmethod
     def create_settings_record_data(user: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -73,7 +73,7 @@ class UserIdentityService:
         Для авторизованных: {"user_id": user_id, "session_id": None}
         """
         user_type = UserIdentityService.get_user_type(user)
-        
+
         if user_type == UserType.GUEST:
             session_id = user.get('session_id')
             if not session_id:
@@ -84,7 +84,7 @@ class UserIdentityService:
             if not user_id:
                 raise ValueError("Authenticated user must have id")
             return {"user_id": user_id, "session_id": None}
-    
+
     @staticmethod
     def get_websocket_user_id(user: Dict[str, Any]) -> str:
         """
@@ -93,7 +93,7 @@ class UserIdentityService:
         Для авторизованных: user_id как строка
         """
         user_type = UserIdentityService.get_user_type(user)
-        
+
         if user_type == UserType.GUEST:
             session_id = user.get('session_id')
             if not session_id:
@@ -104,7 +104,7 @@ class UserIdentityService:
             if not user_id:
                 raise ValueError("Authenticated user must have id")
             return str(user_id)
-    
+
     @staticmethod
     def get_rate_limit_id(user: Dict[str, Any]) -> str:
         """
@@ -113,7 +113,7 @@ class UserIdentityService:
         Для авторизованных: user_id как строка
         """
         return UserIdentityService.get_websocket_user_id(user)
-    
+
     @staticmethod
     def get_tts_channel_name(user: Dict[str, Any]) -> str:
         """
@@ -122,7 +122,7 @@ class UserIdentityService:
         Для авторизованных: "user_{user_id}"
         """
         user_type = UserIdentityService.get_user_type(user)
-        
+
         if user_type == UserType.GUEST:
             session_id = user.get('session_id')
             if not session_id:
@@ -133,28 +133,28 @@ class UserIdentityService:
             if not user_id:
                 raise ValueError("Authenticated user must have id")
             return f"user_{user_id}"
-    
+
     @staticmethod
     def log_user_operation(operation: str, user: Dict[str, Any], **kwargs):
         """Логирует операцию с указанием типа пользователя"""
         user_type = UserIdentityService.get_user_type(user)
         identifier = UserIdentityService.get_user_identifier(user)
-        
+
         log_data = {
             "operation": operation,
             "user_type": user_type.value,
             "identifier": identifier,
             **kwargs
         }
-        
+
         logger.info(f"User operation: {log_data}")
-    
+
     @staticmethod
     def validate_user_data(user: Dict[str, Any]) -> bool:
         """Валидирует данные пользователя"""
         try:
             user_type = UserIdentityService.get_user_type(user)
-            
+
             if user_type == UserType.GUEST:
                 if not user.get('session_id'):
                     logger.error("Guest user missing session_id")
@@ -163,7 +163,7 @@ class UserIdentityService:
                 if not user.get('id'):
                     logger.error("Authenticated user missing id")
                     return False
-            
+
             return True
         except Exception as e:
             logger.error(f"User data validation failed: {e}")

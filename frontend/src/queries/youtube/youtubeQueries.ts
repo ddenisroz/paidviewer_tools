@@ -1,24 +1,36 @@
 /**
  * YouTube Queries - централизованные React Query queries для YouTube
  */
-import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
-import { queryKeys } from '../queryKeys';
-import { youtubeService } from '../../services/api/services/youtubeService';
+import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
+
+import { youtubeService } from '../../services/api/services/youtubeService';
 import { logger } from '../../utils/prodLogger';
+import { queryKeys } from '../queryKeys';
+import { unwrapResponse } from '../queryUtils';
+
+
+import type { ApiResponse, YouTubeSettings } from '../../types';
 import type { AxiosError } from 'axios';
-import type { ApiResponse, YouTubeQueueItem, YouTubeSettings } from '../../types';
+
+interface YoutubeQueue {
+  queue: unknown[];
+  current_video: unknown | null;
+}
 
 /**
  * Получить очередь YouTube
  */
-export const useYoutubeQueue = (options?: Omit<UseQueryOptions<any, AxiosError>, 'queryKey' | 'queryFn'>) => {
-  return useQuery({
+export const useYoutubeQueue = (options?: Omit<UseQueryOptions<YoutubeQueue, AxiosError>, 'queryKey' | 'queryFn'>) => {
+  return useQuery<YoutubeQueue, AxiosError>({
     queryKey: queryKeys.youtube.queue(),
-    queryFn: () => youtubeService.getQueue(),
-    staleTime: 15 * 1000, // 15 секунд
-    gcTime: 5 * 60 * 1000, // 5 минут
-    refetchInterval: 15 * 1000, // 15 секунд
+    queryFn: async () => {
+      const response = await unwrapResponse(youtubeService.getQueue());
+      return response as unknown as YoutubeQueue;
+    },
+    staleTime: 15 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchInterval: 15 * 1000,
     ...options,
   });
 };
@@ -26,27 +38,27 @@ export const useYoutubeQueue = (options?: Omit<UseQueryOptions<any, AxiosError>,
 /**
  * Добавить видео в очередь YouTube
  */
-export const useAddYoutubeVideo = (options?: UseMutationOptions<any, AxiosError, string | { video_url?: string; url?: string; is_paid?: boolean; points_cost?: number }, unknown>) => {
+export const useAddYoutubeVideo = (options?: Omit<UseMutationOptions<ApiResponse, AxiosError, string | { video_url?: string; url?: string; is_paid?: boolean; points_cost?: number }, unknown>, 'mutationFn'>) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (data: string | { video_url?: string; url?: string; is_paid?: boolean; points_cost?: number }) => {
-      // Поддерживаем как строку (URL), так и объект
+  return useMutation<ApiResponse, AxiosError, string | { video_url?: string; url?: string; is_paid?: boolean; points_cost?: number }, unknown>({
+    mutationFn: (data) => {
       if (typeof data === 'string') {
-        return youtubeService.addToQueue({ video_url: data });
+        return unwrapResponse(youtubeService.addToQueue({ video_url: data }));
       }
-      return youtubeService.addToQueue(data);
+      return unwrapResponse(youtubeService.addToQueue(data));
     },
-    onSuccess: () => {
+    onSuccess: (_data, _variables, _context) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.youtube.queue() });
       if (!options?.onSuccess) {
         toast.success('Видео добавлено в очередь');
       }
     },
-    onError: (error: AxiosError) => {
+    onError: (error: AxiosError, _variables, _context) => {
       logger.error('Error adding video to queue:', error);
       if (!options?.onError) {
-        const errorMessage = (error.response?.data as any)?.detail || (error.response?.data as any)?.message || 'Ошибка добавления видео в очередь';
+        const errorData = error.response?.data as Record<string, unknown> | undefined;
+        const errorMessage = (errorData?.detail || errorData?.message || 'Ошибка добавления видео в очередь') as string;
         toast.error(errorMessage);
       }
     },
@@ -57,18 +69,18 @@ export const useAddYoutubeVideo = (options?: UseMutationOptions<any, AxiosError,
 /**
  * Удалить видео из очереди YouTube
  */
-export const useDeleteYoutubeVideo = (options?: UseMutationOptions<any, AxiosError, number, unknown>) => {
+export const useDeleteYoutubeVideo = (options?: Omit<UseMutationOptions<ApiResponse, AxiosError, number, unknown>, 'mutationFn'>) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (queueId: number) => youtubeService.removeFromQueue(queueId),
-    onSuccess: () => {
+  return useMutation<ApiResponse, AxiosError, number, unknown>({
+    mutationFn: (queueId: number) => unwrapResponse(youtubeService.removeFromQueue(queueId)),
+    onSuccess: (_data, _variables, _context) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.youtube.queue() });
       if (!options?.onSuccess) {
         toast.success('Видео удалено из очереди');
       }
     },
-    onError: (error: AxiosError) => {
+    onError: (error: AxiosError, _variables, _context) => {
       logger.error('Error removing video from queue:', error);
       if (!options?.onError) {
         toast.error('Ошибка удаления видео из очереди');
@@ -86,18 +98,18 @@ export const useRemoveYoutubeVideo = useDeleteYoutubeVideo;
 /**
  * Очистить очередь YouTube
  */
-export const useClearYoutubeQueue = (options?: UseMutationOptions<any, AxiosError, void, unknown>) => {
+export const useClearYoutubeQueue = (options?: Omit<UseMutationOptions<ApiResponse, AxiosError, void, unknown>, 'mutationFn'>) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: () => youtubeService.clearQueue(),
-    onSuccess: () => {
+  return useMutation<ApiResponse, AxiosError, void, unknown>({
+    mutationFn: () => unwrapResponse(youtubeService.clearQueue()),
+    onSuccess: (_response, _variables, _context) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.youtube.queue() });
       if (!options?.onSuccess) {
         toast.success('Очередь очищена');
       }
     },
-    onError: (error: AxiosError) => {
+    onError: (error: AxiosError, _variables, _context) => {
       logger.error('Error clearing queue:', error);
       if (!options?.onError) {
         toast.error('Ошибка очистки очереди');
@@ -110,18 +122,18 @@ export const useClearYoutubeQueue = (options?: UseMutationOptions<any, AxiosErro
 /**
  * Отметить видео как проигранное
  */
-export const useMarkYoutubeVideoAsPlayed = (options?: UseMutationOptions<any, AxiosError, number, unknown>) => {
+export const useMarkYoutubeVideoAsPlayed = (options?: Omit<UseMutationOptions<ApiResponse, AxiosError, number, unknown>, 'mutationFn'>) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (queueId: number) => youtubeService.markAsPlayed(queueId),
-    onSuccess: () => {
+  return useMutation<ApiResponse, AxiosError, number, unknown>({
+    mutationFn: (queueId: number) => unwrapResponse(youtubeService.markAsPlayed(queueId)),
+    onSuccess: (_data, _variables, _context) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.youtube.queue() });
       if (!options?.onSuccess) {
         toast.success('Видео отмечено как проигранное');
       }
     },
-    onError: (error: AxiosError) => {
+    onError: (error: AxiosError, _variables, _context) => {
       logger.error('Error marking video as played:', error);
       if (!options?.onError) {
         toast.error('Ошибка обновления статуса видео');
@@ -134,18 +146,18 @@ export const useMarkYoutubeVideoAsPlayed = (options?: UseMutationOptions<any, Ax
 /**
  * Перейти к следующему видео YouTube
  */
-export const useNextYoutubeVideo = (options?: UseMutationOptions<any, AxiosError, void, unknown>) => {
+export const useNextYoutubeVideo = (options?: Omit<UseMutationOptions<ApiResponse, AxiosError, void, unknown>, 'mutationFn'>) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: () => youtubeService.nextVideo(),
-    onSuccess: () => {
+  return useMutation<ApiResponse, AxiosError, void, unknown>({
+    mutationFn: () => unwrapResponse(youtubeService.nextVideo()),
+    onSuccess: (_response, _variables, _context) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.youtube.queue() });
       if (!options?.onSuccess) {
         toast.success('Переход к следующему видео');
       }
     },
-    onError: (error: AxiosError) => {
+    onError: (error: AxiosError, _variables, _context) => {
       logger.error('Error going to next video:', error);
       if (!options?.onError) {
         toast.error('Ошибка перехода к следующему видео');
@@ -163,12 +175,15 @@ export const useSkipYoutubeVideo = useNextYoutubeVideo;
 /**
  * Получить настройки YouTube
  */
-export const useYoutubeSettings = (options?: Omit<UseQueryOptions<any, AxiosError>, 'queryKey' | 'queryFn'>) => {
-  return useQuery({
+export const useYoutubeSettings = (options?: Omit<UseQueryOptions<YouTubeSettings, AxiosError>, 'queryKey' | 'queryFn'>) => {
+  return useQuery<YouTubeSettings, AxiosError>({
     queryKey: queryKeys.youtube.settings(),
-    queryFn: () => youtubeService.getSettings(),
-    staleTime: 60 * 1000, // 1 минута
-    gcTime: 10 * 60 * 1000, // 10 минут
+    queryFn: async () => {
+      const response = await unwrapResponse(youtubeService.getSettings());
+      return response as unknown as YouTubeSettings;
+    },
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     ...options,
   });
 };
@@ -176,20 +191,26 @@ export const useYoutubeSettings = (options?: Omit<UseQueryOptions<any, AxiosErro
 /**
  * Сохранить настройки YouTube
  */
-export const useSaveYoutubeSettings = (options?: UseMutationOptions<any, AxiosError, Partial<YouTubeSettings>, unknown>) => {
+export const useSaveYoutubeSettings = (options?: Omit<UseMutationOptions<YouTubeSettings, AxiosError, Partial<YouTubeSettings>, unknown>, 'mutationFn'>) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (settings: Partial<YouTubeSettings>) => youtubeService.saveSettings(settings),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.youtube.settings() });
-      toast.success('Настройки YouTube сохранены');
+  return useMutation<YouTubeSettings, AxiosError, Partial<YouTubeSettings>, unknown>({
+    mutationFn: async (settings: Partial<YouTubeSettings>) => {
+      const response = await unwrapResponse(youtubeService.saveSettings(settings));
+      return response as unknown as YouTubeSettings;
     },
-    onError: (error: AxiosError) => {
+    onSuccess: (_response, _settings, _context) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.youtube.settings() });
+      if (!options?.onSuccess) {
+        toast.success('Настройки YouTube сохранены');
+      }
+    },
+    onError: (error: AxiosError, _settings, _context) => {
       logger.error('Error saving YouTube settings:', error);
-      toast.error('Ошибка сохранения настроек YouTube');
+      if (!options?.onError) {
+        toast.error('Ошибка сохранения настроек YouTube');
+      }
     },
     ...options,
   });
 };
-

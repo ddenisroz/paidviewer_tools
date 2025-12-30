@@ -168,6 +168,7 @@ def check_command_cooldown(command: BotCommand, user_id: str, cooldowns: Dict) -
     """
     try:
         from datetime import datetime, timedelta
+        from core.datetime_utils import utcnow_naive
         
         if command.cooldown_seconds <= 0:
             return True  # No cooldown
@@ -183,7 +184,7 @@ def check_command_cooldown(command: BotCommand, user_id: str, cooldowns: Dict) -
         last_used = cooldowns[command_id][user_id]
         cooldown_expires = last_used + timedelta(seconds=command.cooldown_seconds)
         
-        return datetime.utcnow() >= cooldown_expires
+        return utcnow_naive() >= cooldown_expires
         
     except Exception as e:
         logger.error(f"Error checking command cooldown: {e}", exc_info=True)
@@ -204,6 +205,7 @@ def get_cooldown_remaining(command: BotCommand, user_id: str, cooldowns: Dict) -
     """
     try:
         from datetime import datetime, timedelta
+        from core.datetime_utils import utcnow_naive
         
         if command.cooldown_seconds <= 0:
             return 0
@@ -215,7 +217,7 @@ def get_cooldown_remaining(command: BotCommand, user_id: str, cooldowns: Dict) -
         
         last_used = cooldowns[command_id][user_id]
         cooldown_expires = last_used + timedelta(seconds=command.cooldown_seconds)
-        now = datetime.utcnow()
+        now = utcnow_naive()
         
         if now >= cooldown_expires:
             return 0
@@ -239,13 +241,14 @@ def update_command_cooldown(command: BotCommand, user_id: str, cooldowns: Dict):
     """
     try:
         from datetime import datetime
+        from core.datetime_utils import utcnow_naive
         
         command_id = str(command.id)
         
         if command_id not in cooldowns:
             cooldowns[command_id] = {}
         
-        cooldowns[command_id][user_id] = datetime.utcnow()
+        cooldowns[command_id][user_id] = utcnow_naive()
         
     except Exception as e:
         logger.error(f"Error updating command cooldown: {e}", exc_info=True)

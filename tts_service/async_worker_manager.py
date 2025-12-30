@@ -245,7 +245,7 @@ class AsyncWorkerManager:
                     # Подтверждаем сообщение даже при ошибке
                     try:
                         self.redis_client.xack(self.input_stream, self.consumer_group, stream_id)
-                    except:
+                    except Exception:
                         pass
             
             return tasks

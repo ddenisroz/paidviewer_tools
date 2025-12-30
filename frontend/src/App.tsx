@@ -1,23 +1,23 @@
-import React, { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React, { lazy, Suspense } from 'react';
+
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'sonner';
 
-import AuthGuard from './shared/components/AuthGuard';
-import Layout from './components/Layout';
 import AppErrorBoundary from './components/ErrorBoundary/AppErrorBoundary';
 import RouteErrorBoundary from './components/ErrorBoundary/RouteErrorBoundary';
-import { useCacheWebSocketSync } from './hooks/useCacheWebSocketSync';
+import Layout from './components/Layout';
 import { ConnectionStatus } from './components/layout/ConnectionStatus';
-import { PageSkeleton, DashboardSkeleton, AdminSkeleton, FormSkeleton } from './components/ui/PageSkeleton';
+import { AdminSkeleton, DashboardSkeleton, FormSkeleton, PageSkeleton } from './components/ui/PageSkeleton';
+import { useCacheWebSocketSync } from './hooks/useCacheWebSocketSync';
 
 // Critical pages - загружаем сразу (только auth flow)
-import LoginPage from './pages/LoginPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 import DonationAlertsCallback from './pages/DonationAlertsCallback';
+import LoginPage from './pages/LoginPage';
+import AuthGuard from './shared/components/AuthGuard';
 
 // All other pages - lazy loading for better initial load performance
 const HomePage = lazy(() => import('./pages/HomePage'));
-const GuestPage = lazy(() => import('./pages/GuestPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const TtsMainPage = lazy(() => import('./features/tts/pages/TtsMainPage'));
 const VoiceManagementPage = lazy(() => import('./features/tts/pages/VoiceManagementPage'));
@@ -43,17 +43,21 @@ const App: React.FC = () => {
             {/* Task 6.5: Connection status indicator */}
             <ConnectionStatus />
             
+            {/* Smart Toast Manager - bottom-right, не перекрывает контент */}
             <Toaster 
                 position="bottom-right"
                 richColors
-                expand={true}
-                duration={4000}
+                expand={false}
+                visibleToasts={3}
+                duration={2500}
+                closeButton
                 toastOptions={{
                     className: 'toast-notification',
                     style: {
                         background: 'hsl(var(--card))',
                         border: '1px solid hsl(var(--border))',
                         color: 'hsl(var(--foreground))',
+                        pointerEvents: 'auto',
                     },
                     classNames: {
                         toast: 'toast-base',
@@ -75,13 +79,6 @@ const App: React.FC = () => {
                         <Route path="/login" element={
                             <RouteErrorBoundary routeName="Login">
                                 <LoginPage />
-                            </RouteErrorBoundary>
-                        } />
-                        <Route path="/guest" element={
-                            <RouteErrorBoundary routeName="Guest">
-                                <Suspense fallback={<PageSkeleton />}>
-                                    <GuestPage />
-                                </Suspense>
                             </RouteErrorBoundary>
                         } />
                         <Route path="/auth/callback" element={

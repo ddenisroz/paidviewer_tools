@@ -3,13 +3,16 @@
  * Демонстрирует правильное использование Design System
  */
 import React from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '../ui/card';
+
+import { Edit, Plus, Save, Trash2 } from 'lucide-react';
+
+import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Badge } from '../ui/badge';
 import { Switch } from '../ui/switch';
-import { Save, Trash2, Edit, Plus } from 'lucide-react';
+
 
 export const DesignSystemExample: React.FC = () => {
   return (
@@ -289,36 +292,36 @@ export const DesignSystemExample: React.FC = () => {
       {/* Anti-patterns */}
       <Card className="border-red-500/50">
         <CardHeader>
-          <CardTitle className="text-red-500">❌ Что НЕ делать</CardTitle>
+          <CardTitle className="text-red-500">[ERROR] Что НЕ делать</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
             <p className="text-sm font-medium mb-2">Произвольные значения:</p>
             <code className="text-xs bg-muted p-2 rounded block">
-              {`<div className="p-[13px] gap-[17px]"> // ❌ ПЛОХО`}
+              {`<div className="p-[13px] gap-[17px]"> // [ERROR] ПЛОХО`}
             </code>
             <code className="text-xs bg-muted p-2 rounded block mt-2">
-              {`<div className="p-4 gap-4"> // ✅ ХОРОШО`}
+              {`<div className="p-4 gap-4"> // [OK] ХОРОШО`}
             </code>
           </div>
 
           <div>
             <p className="text-sm font-medium mb-2">Несогласованные размеры:</p>
             <code className="text-xs bg-muted p-2 rounded block">
-              {`<Button className="h-9">...</Button> // ❌ ПЛОХО`}
+              {`<Button className="h-9">...</Button> // [ERROR] ПЛОХО`}
             </code>
             <code className="text-xs bg-muted p-2 rounded block mt-2">
-              {`<Button className="h-10">...</Button> // ✅ ХОРОШО`}
+              {`<Button className="h-10">...</Button> // [OK] ХОРОШО`}
             </code>
           </div>
 
           <div>
             <p className="text-sm font-medium mb-2">Inline styles:</p>
             <code className="text-xs bg-muted p-2 rounded block">
-              {`<div style={{ padding: '16px' }}> // ❌ ПЛОХО`}
+              {`<div style={{ padding: '16px' }}> // [ERROR] ПЛОХО`}
             </code>
             <code className="text-xs bg-muted p-2 rounded block mt-2">
-              {`<div className="p-4"> // ✅ ХОРОШО`}
+              {`<div className="p-4"> // [OK] ХОРОШО`}
             </code>
           </div>
         </CardContent>

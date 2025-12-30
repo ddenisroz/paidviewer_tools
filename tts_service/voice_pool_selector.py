@@ -19,7 +19,7 @@ def get_enabled_voices_for_user(user_id: int, db: Session) -> List[VoiceModel]:
         # Проверяем есть ли записи о включенных голосах
         enabled_records = db.query(UserVoiceEnabled).filter(
             UserVoiceEnabled.user_id == user_id,
-            UserVoiceEnabled.is_enabled == True
+            UserVoiceEnabled.is_enabled.is_(True)
         ).all()
         
         if enabled_records:
@@ -27,14 +27,14 @@ def get_enabled_voices_for_user(user_id: int, db: Session) -> List[VoiceModel]:
             voice_ids = [record.voice_id for record in enabled_records]
             voices = db.query(VoiceModel).filter(
                 VoiceModel.id.in_(voice_ids),
-                VoiceModel.is_active == True
+                VoiceModel.is_active.is_(True)
             ).all()
             logger.info(f"Found {len(voices)} enabled voices for user {user_id}")
             return voices
         else:
             # Нет настроек - возвращаем все активные голоса (дефолтное поведение)
             voices = db.query(VoiceModel).filter(
-                VoiceModel.is_active == True
+                VoiceModel.is_active.is_(True)
             ).all()
             logger.info(f"No voice preferences found for user {user_id}, returning all {len(voices)} active voices")
             return voices
@@ -42,7 +42,7 @@ def get_enabled_voices_for_user(user_id: int, db: Session) -> List[VoiceModel]:
     except Exception as e:
         logger.error(f"Error getting enabled voices for user {user_id}: {e}")
         # В случае ошибки возвращаем все активные голоса
-        return db.query(VoiceModel).filter(VoiceModel.is_active == True).all()
+        return db.query(VoiceModel).filter(VoiceModel.is_active.is_(True)).all()
 
 
 def select_random_voice_from_pool(user_id: int, db: Session) -> Optional[str]:
@@ -87,7 +87,7 @@ def get_voice_or_random_from_pool(
         # Проверяем включен ли указанный голос
         voice = db.query(VoiceModel).filter(
             VoiceModel.name == voice_name,
-            VoiceModel.is_active == True
+            VoiceModel.is_active.is_(True)
         ).first()
         
         if not voice:

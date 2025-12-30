@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from starlette.requests import Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, field_validator
-from typing import List, Optional
+from typing import Optional
 from core.database import get_db, BotCommand
 from auth.auth import get_current_user, get_current_user_optional
 from utils.enhanced_logger import log_request, log_response, commands_logger
@@ -26,25 +26,25 @@ class CommandCreate(BaseModel):
     allowed_roles: str = "all"    # comma-separated
     cooldown_seconds: int = 0
     is_enabled: bool = True
-    
+
     @field_validator('command_name')
 
-    
+
     @classmethod
 
-    
+
     def sanitize_command_name(cls, v):
         """Санитизация имени команды"""
         if not v or not v.strip():
             raise ValueError('Command name cannot be empty')
         return sanitize_input(v, max_length=20)
-    
+
     @field_validator('response_text')
 
-    
+
     @classmethod
 
-    
+
     def sanitize_response_text(cls, v):
         """Санитизация текста ответа"""
         return sanitize_input(v, max_length=500)
@@ -56,13 +56,13 @@ class CommandUpdate(BaseModel):
     allowed_roles: Optional[str] = None
     cooldown_seconds: Optional[int] = None
     response_text: Optional[str] = None
-    
+
     @field_validator('response_text')
 
-    
+
     @classmethod
 
-    
+
     def sanitize_response_text(cls, v):
         """Санитизация текста ответа при обновлении"""
         if v is not None:
@@ -113,17 +113,17 @@ async def _get_commands_impl(current_user: dict, db: Session):
     # Для гостей показываем только глобальные команды
     user_id = current_user.get('id') if current_user else None
     is_guest = (user_id == -1 or user_id is None)
-    
+
     log_request("/api/commands", "GET", None, user_id)
     commands_logger.info(f"Getting commands for {'guest' if is_guest else f'user {user_id}'}")
-    
+
     try:
         # 1. Получаем ГЛОБАЛЬНЫЕ команды (доступны всем, включая гостей)
         global_commands = db.query(BotCommand).filter(
             BotCommand.command_type == 'global',
             BotCommand.user_id == None
         ).all()
-        
+
         # 2. Для гостей - НЕ ЗАГРУЖАЕМ overrides и custom команды
         if is_guest:
             override_commands = []
@@ -134,13 +134,13 @@ async def _get_commands_impl(current_user: dict, db: Session):
                 BotCommand.command_type == 'override',
                 BotCommand.user_id == current_user["id"]
             ).all()
-            
+
             # 3. Получаем КАСТОМНЫЕ команды пользователя
             custom_commands = db.query(BotCommand).filter(
                 BotCommand.command_type == 'custom',
                 BotCommand.user_id == current_user["id"]
             ).all()
-        
+
         # Преобразуем команды в нужный формат
         def command_to_dict(cmd, command_type_label):
             """Вспомогательная функция для преобразования команды"""
@@ -154,7 +154,7 @@ async def _get_commands_impl(current_user: dict, db: Session):
                     tags = [tag.strip() for tag in cmd.tags.split(',') if tag.strip()]
                 else:
                     tags = [cmd.tags.strip()]
-            
+
             return {
                 "id": cmd.id,
                 "command_name": cmd.command_name,
@@ -171,21 +171,21 @@ async def _get_commands_impl(current_user: dict, db: Session):
                 "updated_at": cmd.updated_at.isoformat() if cmd.updated_at else None,
                 "tags": tags
             }
-        
+
         # Формируем глобальные команды
         global_commands_data = [command_to_dict(cmd, "global") for cmd in global_commands]
-        
+
         # Формируем user overrides
         override_commands_data = [command_to_dict(cmd, "override") for cmd in override_commands]
-        
+
         # Для basic_commands объединяем global + overrides
         # Overrides имеют приоритет над global командами с тем же именем
         basic_commands_dict = {}
-        
+
         # Сначала добавляем глобальные команды
         for cmd_data in global_commands_data:
             basic_commands_dict[cmd_data["command_name"]] = cmd_data
-        
+
         # Затем перезаписываем overrides (они имеют приоритет)
         for cmd_data in override_commands_data:
             # Для override используем parent_command_id чтобы найти имя глобальной команды
@@ -193,12 +193,12 @@ async def _get_commands_impl(current_user: dict, db: Session):
             if parent_cmd:
                 # Override перезаписывает глобальную команду
                 basic_commands_dict[parent_cmd["command_name"]] = cmd_data
-        
+
         basic_commands_data = list(basic_commands_dict.values())
-        
+
         # Формируем кастомные команды
         custom_commands_data = [command_to_dict(cmd, "custom") for cmd in custom_commands]
-        
+
         result = {
             "success": True,
             "global_commands": global_commands_data,  # Глобальные команды
@@ -209,7 +209,7 @@ async def _get_commands_impl(current_user: dict, db: Session):
         commands_logger.info(f"✓ Returned {len(global_commands_data)} global + {len(override_commands_data)} overrides + {len(basic_commands_data)} merged basic + {len(custom_commands_data)} custom commands")
         log_response("/api/commands", 200, result)
         return result
-        
+
     except Exception as e:
         commands_logger.error(f"✗ Error getting commands: {e}", exc_info=True)
         log_response("/api/commands", 500, {"error": str(e)})
@@ -233,22 +233,22 @@ async def _create_command_impl(command_data: CommandCreate, current_user: dict, 
             BotCommand.command_type == 'custom',
             BotCommand.user_id == current_user["id"]
         ).count()
-        
+
         if custom_commands_count >= 5:
             raise HTTPException(
-                status_code=400, 
-                detail=f"Достигнут лимит кастомных команд (максимум 5). Удалите ненужные команды перед созданием новых."
+                status_code=400,
+                detail="Достигнут лимит кастомных команд (максимум 5). Удалите ненужные команды перед созданием новых."
             )
-        
+
         # Проверяем, не существует ли уже такая команда
         existing_command = db.query(BotCommand).filter(
             BotCommand.command_name == command_data.command_name,
             BotCommand.user_id == current_user["id"]
         ).first()
-        
+
         if existing_command:
             raise HTTPException(status_code=400, detail="Команда с таким именем уже существует")
-        
+
         # Санитизируем входные данные
         try:
             sanitized_response_text = sanitize_input(command_data.response_text, max_length=1000, allow_special=False)
@@ -256,7 +256,7 @@ async def _create_command_impl(command_data: CommandCreate, current_user: dict, 
         except Exception as e:
             logger.warning(f"Validation error for user {current_user['id']}: {e}")
             raise HTTPException(status_code=400, detail=f"Некорректные данные: {str(e)}")
-        
+
         # Создаем новую команду
         new_command = BotCommand(
             user_id=current_user["id"],
@@ -269,11 +269,11 @@ async def _create_command_impl(command_data: CommandCreate, current_user: dict, 
             cooldown_seconds=command_data.cooldown_seconds,
             is_enabled=command_data.is_enabled
         )
-        
+
         db.add(new_command)
         db.commit()
         db.refresh(new_command)
-        
+
         return {
             "success": True,
             "message": "Команда создана успешно",
@@ -282,7 +282,7 @@ async def _create_command_impl(command_data: CommandCreate, current_user: dict, 
                 "command_name": new_command.command_name
             }
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -305,19 +305,19 @@ async def update_command(
         command = db.query(BotCommand).filter(
             BotCommand.id == command_id
         ).first()
-        
+
         if not command:
             raise HTTPException(status_code=404, detail="Команда не найдена")
-        
+
         # Проверяем права доступа
         # Глобальные команды изменять нельзя
         if command.command_type == "global":
             raise HTTPException(status_code=403, detail="Нельзя изменять глобальные команды. Создайте override.")
-        
+
         # Кастомные и override команды - только свои
         if command.user_id != current_user["id"]:
             raise HTTPException(status_code=403, detail="Нет прав для изменения этой команды")
-        
+
         # Обновляем поля
         if command_data.is_enabled is not None:
             command.is_enabled = command_data.is_enabled
@@ -334,14 +334,14 @@ async def update_command(
             except Exception as e:
                 logger.warning(f"Validation error for user {current_user['id']}: {e}")
                 raise HTTPException(status_code=400, detail=f"Некорректные данные: {str(e)}")
-        
+
         db.commit()
-        
+
         return {
             "success": True,
             "message": "Команда обновлена успешно"
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -365,39 +365,39 @@ async def create_command_override(
             BotCommand.user_id == None,
             BotCommand.command_name == override_data.command_name
         ).first()
-        
+
         if not global_command:
             raise HTTPException(
-                status_code=404, 
+                status_code=404,
                 detail=f"Глобальная команда '{override_data.command_name}' не найдена"
             )
-        
+
         # 2. Проверяем нет ли уже override для этой команды
         existing_override = db.query(BotCommand).filter(
             BotCommand.command_type == 'override',
             BotCommand.user_id == current_user["id"],
             BotCommand.command_name == override_data.command_name
         ).first()
-        
+
         if existing_override:
             raise HTTPException(
                 status_code=400,
                 detail=f"Override для команды '{override_data.command_name}' уже существует. Используйте PUT для обновления."
             )
-        
+
         # 3. Проверяем что alias не занят
         if override_data.alias:
             alias_conflict = db.query(BotCommand).filter(
                 BotCommand.user_id == current_user["id"],
                 BotCommand.alias == override_data.alias
             ).first()
-            
+
             if alias_conflict:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Алиас '{override_data.alias}' уже используется"
                 )
-        
+
         # 4. Создаем override
         new_override = BotCommand(
             user_id=current_user["id"],
@@ -414,13 +414,13 @@ async def create_command_override(
             tags=global_command.tags,
             description=global_command.description
         )
-        
+
         db.add(new_override)
         db.commit()
         db.refresh(new_override)
-        
+
         commands_logger.info(f"✓ Created override for command '{override_data.command_name}' by user {current_user['id']}")
-        
+
         return {
             "success": True,
             "message": f"Override для команды '{override_data.command_name}' создан успешно",
@@ -431,7 +431,7 @@ async def create_command_override(
                 "parent_command_id": new_override.parent_command_id
             }
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -453,24 +453,24 @@ async def delete_command(
         command = db.query(BotCommand).filter(
             BotCommand.id == command_id
         ).first()
-        
+
         if not command:
             raise HTTPException(status_code=404, detail="Команда не найдена")
-        
+
         # Проверяем права доступа
         if command.command_type == "basic":
             raise HTTPException(status_code=403, detail="Нельзя удалить базовую команду")
         if command.user_id != current_user["id"]:
             raise HTTPException(status_code=403, detail="Нет прав для удаления этой команды")
-        
+
         db.delete(command)
         db.commit()
-        
+
         return {
             "success": True,
             "message": "Команда удалена успешно"
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:

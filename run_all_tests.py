@@ -84,7 +84,7 @@ def main():
     print("="*70 + "\n")
     
     for name, success, result in results:
-        status = "✅ PASS" if success else "❌ FAIL"
+        status = "[PASS]" if success else "[FAIL]"
         print(f"{status} - {name}")
         if result != "No results found":
             print(f"       {result.strip()}")
@@ -93,10 +93,10 @@ def main():
     print(f"TOTAL: {total_passed} tests passed, {total_failed} tests failed")
     
     if total_failed == 0:
-        print("🎉 ALL TESTS PASSED!")
+        print("[OK] ALL TESTS PASSED!")
     else:
         pass_rate = (total_passed / (total_passed + total_failed)) * 100
-        print(f"📊 Pass Rate: {pass_rate:.1f}%")
+        print(f"[STATS] Pass Rate: {pass_rate:.1f}%")
     
     print("="*70 + "\n")
     

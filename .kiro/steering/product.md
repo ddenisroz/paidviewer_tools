@@ -1,32 +1,74 @@
 # Product Overview
 
-TTS_TTV_0.02 is a production-ready text-to-speech bot for streamers on Twitch and VK Live platforms.
+TTS_TTV is a Text-to-Speech bot platform for streamers supporting Twitch and VK Live.
 
-## Core Features
+## TTS System
+- Google Cloud TTS (облачный синтез)
+- F5-TTS Advanced (GPU, централизованный для нескольких пользователей)
+- F5-TTS Simple (GPU, персональный для одного пользователя)
+- Персональные настройки голоса для каждого пользователя
+- Блокировка пользователей от TTS
+- Режимы прослушивания: website / OBS widget
+- Channel Points режим для TTS
 
-- **Multi-Platform Support**: Twitch and VK Live with unified platform abstraction layer
-- **TTS Engines**: Google Cloud TTS (cloud), F5-TTS Advanced (centralized GPU), F5-TTS Simple (personal GPU)
-- **YouTube Integration**: Queue management and player for song requests
-- **Channel Points System**: Twitch and VK Live rewards integration
-- **Drops System**: Lootbox mechanics with streak tracking and donation integration
-- **DonationAlerts**: Automatic integration for donation-triggered TTS
-- **Guest Mode**: View-only access without authentication
-- **Custom Commands**: Global, override, and custom command support
-- **Permission System**: Role-based access control (admin/user/guest)
-- **Admin Panel**: User management, voice management, analytics
-- **OBS Widgets**: Chat, TTS, YouTube, and Drops overlays
+## Platform Integrations
+- Twitch: OAuth, чат, команды, бейджи, роли, predictions, polls
+- VK Live: OAuth, чат, команды, баллы канала, WebSocket
+- DonationAlerts: OAuth, автоматические события при донатах
+- YouTube: очередь видео, плеер, настройки
 
-## Architecture
+## Drops System
+- Lootbox с настраиваемыми наградами и вероятностями
+- Streak система (привязана к стримам, не дням)
+- Donation drops (награды за донаты)
+- Мифический сундук (доступен только во время стрима)
+- Платформо-специфичные стрики (отдельно Twitch/VK)
+- Виджет для OBS с анимациями
 
-Three-service architecture:
-- **bot_service**: FastAPI backend handling OAuth, chat bots, business logic, WebSocket
-- **frontend**: React 19 + Vite SPA with TypeScript migration in progress
-- **tts_service**: Optional F5-TTS service (Advanced or Simple variants)
+## Bot Commands
+- Глобальные команды (для всех пользователей)
+- Override команды (переопределение глобальных)
+- Custom команды (пользовательские)
+- Permission система на основе ролей платформы
+- Теги команд для организации
 
-## Target Users
+## Channel Points
+- Twitch Channel Points rewards
+- VK Live баллы канала
+- Создание/редактирование/удаление наград
+- Управление запросами наград
 
-Streamers who want professional TTS functionality with multi-platform support, customization options, and monetization features.
+## OBS Widgets
+- Chat overlay с кастомизацией
+- TTS player widget
+- YouTube player widget
+- Drops widget с анимациями
+- Настройки анимаций и стилей
 
-## Current Status
+## Admin Panel
+- Управление пользователями
+- Управление голосами (глобальные/пользовательские)
+- Whitelist/Blacklist каналов
+- Системные логи
+- Bot token management
+- Database health monitoring
 
-Version 0.03 - Production ready with comprehensive optimization, error handling, and performance improvements.
+## Security
+- Role-based access control (Admin/User/Guest)
+- Rate limiting (slowapi)
+- Input sanitization (XSS/SQLi защита)
+- CSRF protection
+- Token encryption (Fernet)
+- Auth type system (Full/Basic авторизация)
+
+## Performance
+- Code splitting и lazy loading
+- WebSocket с Leader Election (одно соединение на браузер)
+- React Query кэширование
+- Virtualization для длинных списков
+- Optimistic updates
+
+## Deployment Modes
+- Advanced: Centralized F5-TTS для нескольких пользователей (GPU)
+- Simple: Personal F5-TTS для одного пользователя (GPU)
+- Cloud: Google TTS only (без GPU)

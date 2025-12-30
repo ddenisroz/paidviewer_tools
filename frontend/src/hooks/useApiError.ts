@@ -1,6 +1,8 @@
 import { useCallback } from 'react';
+
 import { AxiosError } from 'axios';
-import { handleApiError, ErrorHandlerOptions, ApiError } from '../utils/apiErrorHandler';
+
+import { ApiError, ErrorHandlerOptions, handleApiError } from '../utils/apiErrorHandler';
 
 /**
  * Hook для обработки ошибок API в компонентах
@@ -22,8 +24,9 @@ export function useApiError() {
     if (!error) return null;
 
     // Проверяем, что это AxiosError
-    if ((error as any).isAxiosError) {
-      return handleApiError(error as AxiosError, options);
+    const axiosError = error as AxiosError;
+    if (axiosError.isAxiosError) {
+      return handleApiError(axiosError, options);
     }
 
     // Если это не AxiosError, просто логируем
@@ -47,7 +50,7 @@ export function useApiError() {
  *   );
  * };
  */
-export function useApiCall<T = any>() {
+export function useApiCall<T = unknown>() {
   const { handleError } = useApiError();
 
   const execute = useCallback(async (

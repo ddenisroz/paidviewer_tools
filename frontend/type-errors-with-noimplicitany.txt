@@ -1,0 +1,103 @@
+﻿src/components/ChatBoxSettingsModal.tsx(110,54): error TS2345: Argument of type 'AxiosResponse<ApiResponse<unknown>, any, {}>' is not assignable to parameter of type '{ data: ChatBoxSettings | { data?: ChatBoxSettings | undefined; }; }'.
+  Types of property 'data' are incompatible.
+    Type 'ApiResponse<unknown>' is not assignable to type 'ChatBoxSettings | { data?: ChatBoxSettings | undefined; }'.
+      Type 'ApiResponse<unknown>' is not assignable to type '{ data?: ChatBoxSettings | undefined; }'.
+        Types of property 'data' are incompatible.
+          Type 'unknown' is not assignable to type 'ChatBoxSettings | undefined'.
+src/components/ChatBoxSettingsModal.tsx(127,65): error TS2345: Argument of type 'AxiosResponse<ApiResponse<unknown>, any, {}>' is not assignable to parameter of type '{ data: ChatBoxSettings | { data?: ChatBoxSettings | undefined; }; }'.
+  Types of property 'data' are incompatible.
+    Type 'ApiResponse<unknown>' is not assignable to type 'ChatBoxSettings | { data?: ChatBoxSettings | undefined; }'.
+      Type 'ApiResponse<unknown>' is not assignable to type '{ data?: ChatBoxSettings | undefined; }'.
+        Types of property 'data' are incompatible.
+          Type 'unknown' is not assignable to type 'ChatBoxSettings | undefined'.
+src/components/lootbox/ImageLootboxTab.tsx(59,61): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'Lootbox'.
+src/context/AuthContext.tsx(209,54): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'string | number'.
+  Type 'undefined' is not assignable to type 'string | number'.
+src/features/drops/components/DropsHistory.tsx(79,7): error TS18048: 'entry.reward_name' is possibly 'undefined'.
+src/features/drops/components/DropsHistory.tsx(197,44): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/features/drops/components/RewardsManager.tsx(225,7): error TS2322: Type 'number | null | undefined' is not assignable to type 'number | null'.
+  Type 'undefined' is not assignable to type 'number | null'.
+src/features/drops/components/RewardsManager.tsx(286,73): error TS2322: Type 'unknown' is not assignable to type 'Partial<DropsReward>'.
+src/features/drops/components/RewardsManager.tsx(288,35): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'Partial<DropsReward>'.
+src/features/drops/components/StreakTracker.tsx(204,41): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/features/tts/components/BlacklistManager.tsx(68,93): error TS2352: Conversion of type 'undefined' to type '{ data?: { blocked_users?: BlockedUser[] | undefined; } | undefined; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+src/features/tts/components/TtsFilterManager.tsx(108,13): error TS2352: Conversion of type 'undefined' to type '{ data?: { blocked_users?: BlockedUser[] | undefined; } | undefined; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+src/features/tts/components/TtsFilterManager.tsx(112,13): error TS2352: Conversion of type 'undefined' to type '{ data?: { filtered_words?: unknown; words?: unknown; } | undefined; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+src/features/tts/components/TtsFilterManager.tsx(113,16): error TS2352: Conversion of type 'undefined' to type '{ data?: { filtered_words?: unknown; words?: unknown; } | undefined; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+src/features/tts/components/TtsQuickSettings.tsx(52,29): error TS2345: Argument of type 'boolean | undefined' is not assignable to parameter of type 'SetStateAction<boolean>'.
+  Type 'undefined' is not assignable to type 'SetStateAction<boolean>'.
+src/features/tts/components/TtsQuickSettings.tsx(203,17): error TS18047: 'audioContextRef.current' is possibly 'null'.
+src/features/tts/components/TtsQuickSettings.tsx(204,23): error TS18047: 'audioContextRef.current' is possibly 'null'.
+src/features/tts/components/TtsQuickSettings.tsx(208,32): error TS18047: 'audioContextRef.current' is possibly 'null'.
+src/features/tts/components/TtsQuickSettings.tsx(209,30): error TS18047: 'audioContextRef.current' is possibly 'null'.
+src/features/tts/components/TtsQuickSettings.tsx(213,30): error TS18047: 'audioContextRef.current' is possibly 'null'.
+src/features/tts/components/WordFilterManager.tsx(60,13): error TS2352: Conversion of type 'undefined' to type '{ data?: { filtered_words?: unknown; words?: unknown; } | undefined; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+src/features/tts/components/WordFilterManager.tsx(61,16): error TS2352: Conversion of type 'undefined' to type '{ data?: { filtered_words?: unknown; words?: unknown; } | undefined; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+src/features/tts/pages/LocalTTSSettingsPage.tsx(152,9): error TS2322: Type '(response: ApiResponse<{ success?: boolean; health_data?: HealthData; status_data?: StatusData; error?: string; }>) => void' is not assignable to type '(data: ApiResponse<unknown>, variables: { host?: string | undefined; port?: number | undefined; api_key?: string | undefined; }, onMutateResult: unknown, context: MutationFunctionContext) => unknown'.
+  Types of parameters 'response' and 'data' are incompatible.
+    Type 'ApiResponse<unknown>' is not assignable to type 'ApiResponse<{ success?: boolean | undefined; health_data?: HealthData | undefined; status_data?: StatusData | undefined; error?: string | undefined; }>'.
+      Type 'unknown' is not assignable to type '{ success?: boolean | undefined; health_data?: HealthData | undefined; status_data?: StatusData | undefined; error?: string | undefined; }'.
+src/features/tts/pages/LocalTTSSettingsPage.tsx(165,9): error TS2322: Type '(error: AxiosError<{ detail?: string; }>) => void' is not assignable to type '(error: AxiosError<unknown, any>, variables: { host?: string | undefined; port?: number | undefined; api_key?: string | undefined; }, onMutateResult: unknown, context: MutationFunctionContext) => unknown'.
+  Types of parameters 'error' and 'error' are incompatible.
+    Type 'AxiosError<unknown, any>' is not assignable to type 'AxiosError<{ detail?: string | undefined; }, any>'.
+      Type 'unknown' is not assignable to type '{ detail?: string | undefined; }'.
+src/features/tts/pages/LocalTTSSettingsPage.tsx(214,9): error TS2322: Type '(response: ApiResponse<{ success?: boolean; use_local?: boolean; message?: string; }>) => void' is not assignable to type '(data: ApiResponse<unknown>, variables: void, onMutateResult: unknown, context: MutationFunctionContext) => unknown'.
+  Types of parameters 'response' and 'data' are incompatible.
+    Type 'ApiResponse<unknown>' is not assignable to type 'ApiResponse<{ success?: boolean | undefined; use_local?: boolean | undefined; message?: string | undefined; }>'.
+      Type 'unknown' is not assignable to type '{ success?: boolean | undefined; use_local?: boolean | undefined; message?: string | undefined; }'.
+src/hooks/useFormValidation.ts(32,27): error TS2769: No overload matches this call.
+  Overload 1 of 4, '(schema: Zod3Type<T, FieldValues>, schemaOptions?: ParseParams | undefined, resolverOptions?: NonRawResolverOptions | undefined): Resolver<...>', gave the following error.
+    Argument of type 'ZodType<T, unknown, $ZodTypeInternals<T, unknown>>' is not assignable to parameter of type 'Zod3Type<T, FieldValues>'.
+      Types of property '_input' are incompatible.
+        Type 'unknown' is not assignable to type 'FieldValues'.
+  Overload 2 of 4, '(schema: $ZodType<unknown, FieldValues, $ZodTypeInternals<unknown, FieldValues>>, schemaOptions?: ParseContext<$ZodIssue> | undefined, resolverOptions?: NonRawResolverOptions | undefined): Resolver<...>', gave the following error.
+    Argument of type 'ZodType<T, unknown, $ZodTypeInternals<T, unknown>>' is not assignable to parameter of type '$ZodType<unknown, FieldValues, $ZodTypeInternals<unknown, FieldValues>>'.
+      Types of property '_zod' are incompatible.
+        Type '$ZodTypeInternals<T, unknown>' is not assignable to type '$ZodTypeInternals<unknown, FieldValues>'.
+          Type 'unknown' is not assignable to type 'FieldValues'.
+src/pages/ChatWindow.tsx(466,41): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/pages/HomePage.tsx(87,17): error TS2322: Type '{ twitch: { isLive: boolean; viewerCount: number; } | null; vk: { isLive: boolean; viewerCount: number; } | null; }' is not assignable to type '{ twitch?: { isLive?: boolean | undefined; viewerCount?: number | undefined; } | undefined; vk?: { isLive?: boolean | undefined; viewerCount?: number | undefined; } | undefined; }'.
+  Types of property 'twitch' are incompatible.
+    Type '{ isLive: boolean; viewerCount: number; } | null' is not assignable to type '{ isLive?: boolean | undefined; viewerCount?: number | undefined; } | undefined'.
+      Type 'null' is not assignable to type '{ isLive?: boolean | undefined; viewerCount?: number | undefined; } | undefined'.
+src/pages/media/YoutubeIntegrationPage.tsx(68,47): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'Partial<YoutubeSettings>'.
+src/queries/stream/streamQueries.ts(278,15): error TS2698: Spread types may only be created from object types.
+src/queries/stream/streamQueries.ts(279,15): error TS2698: Spread types may only be created from object types.
+src/queries/stream/streamQueries.ts(292,15): error TS2698: Spread types may only be created from object types.
+src/queries/stream/streamQueries.ts(293,15): error TS2698: Spread types may only be created from object types.
+src/queries/tts/ttsQueries.ts(77,5): error TS2322: Type '(error: AxiosError<unknown, any>, newSettings: Partial<TtsSettings>, context: { previousSettings?: ApiResponse<TtsSettings> | undefined; } | undefined) => void' is not assignable to type '(error: AxiosError<unknown, any>, variables: Partial<TtsSettings>, onMutateResult: unknown, context: MutationFunctionContext) => unknown'.
+  Types of parameters 'context' and 'onMutateResult' are incompatible.
+    Type 'unknown' is not assignable to type '{ previousSettings?: ApiResponse<TtsSettings> | undefined; } | undefined'.
+src/services/twitchBadges.ts(146,16): error TS2571: Object is of type 'unknown'.
+src/services/twitchBadges.ts(152,16): error TS2571: Object is of type 'unknown'.
+src/shared/components/FormBuilder.tsx(111,27): error TS2769: No overload matches this call.
+  Overload 1 of 4, '(schema: Zod3Type<T, FieldValues>, schemaOptions?: ParseParams | undefined, resolverOptions?: NonRawResolverOptions | undefined): Resolver<...>', gave the following error.
+    Argument of type 'ZodType<T, unknown, $ZodTypeInternals<T, unknown>>' is not assignable to parameter of type 'Zod3Type<T, FieldValues>'.
+      Types of property '_input' are incompatible.
+        Type 'unknown' is not assignable to type 'FieldValues'.
+  Overload 2 of 4, '(schema: $ZodType<unknown, FieldValues, $ZodTypeInternals<unknown, FieldValues>>, schemaOptions?: ParseContext<$ZodIssue> | undefined, resolverOptions?: NonRawResolverOptions | undefined): Resolver<...>', gave the following error.
+    Argument of type 'ZodType<T, unknown, $ZodTypeInternals<T, unknown>>' is not assignable to parameter of type '$ZodType<unknown, FieldValues, $ZodTypeInternals<unknown, FieldValues>>'.
+      Types of property '_zod' are incompatible.
+        Type '$ZodTypeInternals<T, unknown>' is not assignable to type '$ZodTypeInternals<unknown, FieldValues>'.
+          Type 'unknown' is not assignable to type 'FieldValues'.
+src/shared/components/FormBuilder.tsx(137,9): error TS2322: Type '({ field }: { field: ControllerRenderProps<T, Path<T>>; fieldState: ControllerFieldState; formState: UseFormStateReturn<T>; }) => Element | null' is not assignable to type '({ field, fieldState, formState, }: { field: ControllerRenderProps<T, Path<T>>; fieldState: ControllerFieldState; formState: UseFormStateReturn<T>; }) => ReactElement<...>'.
+  Type 'Element | null' is not assignable to type 'ReactElement<unknown, string | JSXElementConstructor<any>>'.
+    Type 'null' is not assignable to type 'ReactElement<unknown, string | JSXElementConstructor<any>>'.
+src/utils/index.ts(92,7): error TS2571: Object is of type 'unknown'.
+src/utils/index.ts(152,7): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+src/utils/index.ts(155,3): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+src/utils/performanceOptimizations.ts(234,20): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+src/utils/performanceOptimizations.ts(234,28): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+src/widgets/LootboxWidget/script.ts(102,5): error TS2322: Type 'WidgetWebSocket' is not assignable to type '{ on: (event: string, handler: (data: Record<string, unknown>) => void) => void; }'.
+  Types of property 'on' are incompatible.
+    Type '(event: string, handler: Handler) => void' is not assignable to type '(event: string, handler: (data: Record<string, unknown>) => void) => void'.
+      Types of parameters 'handler' and 'handler' are incompatible.
+        Types of parameters 'data' and 'data' are incompatible.
+          Type 'Record<string, unknown> | undefined' is not assignable to type 'Record<string, unknown>'.
+            Type 'undefined' is not assignable to type 'Record<string, unknown>'.
+src/widgets/LootboxWidget/script.ts(103,5): error TS2531: Object is possibly 'null'.

@@ -66,12 +66,12 @@ class SafeCleanupService:
                 # Если не можем импортировать, пропускаем
                 pass
                 
-            logger.info(f"✅ Safe cleanup paths configured:")
+            logger.info(f"[OK] Safe cleanup paths configured:")
             logger.info(f"  Safe to clean: {[str(p) for p in self.safe_cleanup_paths]}")
             logger.info(f"  Voice paths (protected): {[str(p) for p in self.voice_paths]}")
             
         except Exception as e:
-            logger.error(f"❌ Error setting up cleanup paths: {e}")
+            logger.error(f"[ERROR] Error setting up cleanup paths: {e}")
     
     def is_voice_file(self, file_path: Path) -> bool:
         """Проверяет, является ли файл файлом голоса (НЕ УДАЛЯТЬ!)"""
@@ -114,7 +114,7 @@ class SafeCleanupService:
                 continue
                 
             try:
-                logger.info(f"🧹 Cleaning up: {cleanup_path}")
+                logger.info(f"[CLEANUP] Cleaning up: {cleanup_path}")
                 
                 for file_path in cleanup_path.rglob("*"):
                     if not file_path.is_file():
@@ -123,7 +123,7 @@ class SafeCleanupService:
                     # Проверяем, что это НЕ файл голоса
                     if self.is_voice_file(file_path):
                         cleanup_stats['voice_files_protected'] += 1
-                        logger.debug(f"🛡️ Protected voice file: {file_path}")
+                        logger.debug(f"[SHIELD] Protected voice file: {file_path}")
                         continue
                     
                     # Проверяем расширение файла
@@ -141,26 +141,26 @@ class SafeCleanupService:
                             cleanup_stats['files_deleted'] += 1
                             cleanup_stats['bytes_freed'] += file_size
                             
-                            logger.info(f"🗑️ Deleted: {file_path} (age: {file_age/3600:.1f}h)")
+                            logger.info(f"[DELETE] Deleted: {file_path} (age: {file_age/3600:.1f}h)")
                             
                     except Exception as e:
                         cleanup_stats['errors'] += 1
-                        logger.error(f"❌ Error deleting {file_path}: {e}")
+                        logger.error(f"[ERROR] Error deleting {file_path}: {e}")
                         
             except Exception as e:
                 cleanup_stats['errors'] += 1
-                logger.error(f"❌ Error cleaning {cleanup_path}: {e}")
+                logger.error(f"[ERROR] Error cleaning {cleanup_path}: {e}")
         
         # Логируем результаты
         if cleanup_stats['files_deleted'] > 0:
             mb_freed = cleanup_stats['bytes_freed'] / (1024 * 1024)
-            logger.info(f"✅ Cleanup completed: {cleanup_stats['files_deleted']} files deleted, {mb_freed:.1f} MB freed")
+            logger.info(f"[OK] Cleanup completed: {cleanup_stats['files_deleted']} files deleted, {mb_freed:.1f} MB freed")
         
         if cleanup_stats['voice_files_protected'] > 0:
-            logger.info(f"🛡️ Protected {cleanup_stats['voice_files_protected']} voice files")
+            logger.info(f"[SHIELD] Protected {cleanup_stats['voice_files_protected']} voice files")
             
         if cleanup_stats['errors'] > 0:
-            logger.warning(f"⚠️ {cleanup_stats['errors']} errors during cleanup")
+            logger.warning(f"[WARN] {cleanup_stats['errors']} errors during cleanup")
         
         return cleanup_stats
     

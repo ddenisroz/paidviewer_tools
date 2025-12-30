@@ -1,10 +1,10 @@
 # api/user_settings_api.py
 import logging
-from typing import Dict, Any, Optional
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
-from core.database import get_db, User, UserSettings
+from core.database import get_db, UserSettings
 from auth.auth import get_current_user
 from services.user_identity_service import UserIdentityService
 from core.datetime_utils import utcnow_naive
@@ -23,7 +23,7 @@ class UserSettingsUpdate(BaseModel):
     chat_show_user_roles: Optional[bool] = None
     chat_animation_duration: Optional[int] = Field(None, ge=100, le=5000)
     chat_animation_type: Optional[str] = Field(None, pattern="^(slide|fade|none)$")
-    
+
     # Настройки OBS чата
     obs_width: Optional[int] = Field(None, ge=100, le=2000)
     obs_height: Optional[int] = Field(None, ge=100, le=2000)
@@ -40,13 +40,13 @@ class UserSettingsUpdate(BaseModel):
     obs_message_border_radius: Optional[int] = Field(None, ge=0, le=50)
     obs_message_margin: Optional[int] = Field(None, ge=0, le=20)
     obs_message_padding: Optional[int] = Field(None, ge=0, le=50)
-    
+
     # Цвета ролей для OBS
     obs_moderator_color: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
     obs_vip_color: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
     obs_subscriber_color: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
     obs_normal_color: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
-    
+
     # Настройки объединения полей (только UI настройки)
     combine_titles: Optional[bool] = None
     combine_categories: Optional[bool] = None
@@ -61,16 +61,16 @@ async def get_user_settings(
         # Валидируем данные пользователя
         if not UserIdentityService.validate_user_data(current_user):
             raise HTTPException(status_code=400, detail="Invalid user data")
-        
+
         # Получаем фильтры для БД
         user_filters = UserIdentityService.get_database_filters(current_user)
-        
+
         # Логируем операцию
         UserIdentityService.log_user_operation("get_user_settings", current_user)
-        
+
         # Ищем настройки пользователя
         settings = db.query(UserSettings).filter_by(**user_filters).first()
-        
+
         if not settings:
             # Создаем настройки по умолчанию
             settings_data = UserIdentityService.create_settings_record_data(current_user)
@@ -78,7 +78,7 @@ async def get_user_settings(
             db.add(settings)
             db.commit()
             db.refresh(settings)
-        
+
         return {
             "success": True,
             "settings": {
@@ -90,7 +90,7 @@ async def get_user_settings(
                 "chat_show_user_roles": settings.chat_show_user_roles,
                 "chat_animation_duration": settings.chat_animation_duration,
                 "chat_animation_type": settings.chat_animation_type,
-                
+
                 # Настройки OBS чата
                 "obs_width": settings.obs_width,
                 "obs_height": settings.obs_height,
@@ -107,13 +107,13 @@ async def get_user_settings(
                 "obs_message_border_radius": settings.obs_message_border_radius,
                 "obs_message_margin": settings.obs_message_margin,
                 "obs_message_padding": settings.obs_message_padding,
-                
+
                 # Цвета ролей для OBS
                 "obs_moderator_color": settings.obs_moderator_color,
                 "obs_vip_color": settings.obs_vip_color,
                 "obs_subscriber_color": settings.obs_subscriber_color,
                 "obs_normal_color": settings.obs_normal_color,
-                
+
                 # Настройки объединения полей
                 "combine_titles": settings.combine_titles,
                 "combine_categories": settings.combine_categories,
@@ -134,48 +134,48 @@ async def update_user_settings(
         # Валидируем данные пользователя
         if not UserIdentityService.validate_user_data(current_user):
             raise HTTPException(status_code=400, detail="Invalid user data")
-        
+
         # Получаем фильтры для БД
         user_filters = UserIdentityService.get_database_filters(current_user)
-        
+
         # Логируем операцию
         UserIdentityService.log_user_operation("update_user_settings", current_user)
-        
+
         # Ищем настройки пользователя
         settings = db.query(UserSettings).filter_by(**user_filters).first()
-        
+
         if not settings:
             # Создаем новые настройки
             settings_data = UserIdentityService.create_settings_record_data(current_user)
             settings = UserSettings(**settings_data)
             db.add(settings)
-        
+
         # Обновляем только переданные поля
         update_data = settings_update.dict(exclude_unset=True)
         for field, value in update_data.items():
             if hasattr(settings, field):
                 setattr(settings, field, value)
-        
+
         settings.updated_at = utcnow_naive()
         db.commit()
         db.refresh(settings)
-        
+
         # Логируем обновление настроек
         user_identifier = UserIdentityService.get_user_identifier(current_user)
         logger.info(f"User {user_identifier} updated settings: {list(update_data.keys())}")
-        
-        # 🔄 Отправляем WebSocket событие для инвалидации кэша на фронтенде
+
+        # [REFRESH] Отправляем WebSocket событие для инвалидации кэша на фронтенде
         from services.memory_websocket_manager import memory_websocket_manager
-        
+
         cache_invalidation_event = {
             "type": "cache_invalidate",
             "cache_key": "cache_user_settings",
             "reason": "settings_updated"
         }
-        
+
         await memory_websocket_manager.send_to_user(current_user["id"], cache_invalidation_event)
-        logger.debug(f"🔄 [USER_SETTINGS] Sent cache invalidation to user {current_user['id']}")
-        
+        logger.debug(f"[REFRESH] [USER_SETTINGS] Sent cache invalidation to user {current_user['id']}")
+
         return {
             "success": True,
             "message": "Настройки успешно сохранены",
@@ -196,11 +196,11 @@ async def get_chat_settings(
         # Валидируем данные пользователя
         if not UserIdentityService.validate_user_data(current_user):
             raise HTTPException(status_code=400, detail="Invalid user data")
-        
+
         # Получаем фильтры для БД
         user_filters = UserIdentityService.get_database_filters(current_user)
         settings = db.query(UserSettings).filter_by(**user_filters).first()
-        
+
         if not settings:
             # Возвращаем настройки по умолчанию
             return {
@@ -215,7 +215,7 @@ async def get_chat_settings(
                     "animation_type": "slide"
                 }
             }
-        
+
         return {
             "success": True,
             "chat_settings": {
@@ -242,11 +242,11 @@ async def get_obs_settings(
         # Валидируем данные пользователя
         if not UserIdentityService.validate_user_data(current_user):
             raise HTTPException(status_code=400, detail="Invalid user data")
-        
+
         # Получаем фильтры для БД
         user_filters = UserIdentityService.get_database_filters(current_user)
         settings = db.query(UserSettings).filter_by(**user_filters).first()
-        
+
         if not settings:
             # Возвращаем настройки по умолчанию
             return {
@@ -273,7 +273,7 @@ async def get_obs_settings(
                     "normal_color": "#ffffff"
                 }
             }
-        
+
         return {
             "success": True,
             "obs_settings": {

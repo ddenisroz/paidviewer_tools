@@ -5,13 +5,15 @@
  */
 
 import React, { useState } from 'react';
+
+import { Check, Loader2, X } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { SuccessCheckmark } from '@/components/ui/success-checkmark';
+import { Switch } from '@/components/ui/switch';
 import { useVisualFeedback } from '@/hooks/useVisualFeedback';
-import { Check, X, Loader2 } from 'lucide-react';
 
 export const VisualFeedbackExample: React.FC = () => {
   const [showCheckmark, setShowCheckmark] = useState(false);

@@ -1,18 +1,28 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
 import { useSearchParams } from 'react-router-dom';
-import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
-import { chatService } from '../services/api/services/chatService';
-import { chatboxService } from '../services/api/services/chatboxService';
+
 import MessageContent from '../components/MessageContent';
-import { twitchBadgesService } from '../services/twitchBadges';
 import useSharedWebSocket from '../hooks/useSharedWebSocket';
-import { logger } from '../utils/prodLogger';
+import { chatboxService } from '../services/api/services/chatboxService';
+import { chatService } from '../services/api/services/chatService';
+import { twitchBadgesService } from '../services/twitchBadges';
+import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
 import { getAllEmotesForChannel } from '../utils/emotes';
-import type { ChatMessage, ChatBoxSettings, ContextMenu, WebSocketMessage } from '../types/chat';
+import { logger } from '../utils/prodLogger';
+
+import type { ApiResponse } from '../types/api';
+import type { ChatBoxSettings, ChatMessage, ContextMenu, WebSocketMessage } from '../types/chat';
+import type { AxiosError } from 'axios';
+
+interface ChatHistoryApiResponse {
+    success: boolean;
+    messages: ChatMessage[];
+}
 
 interface Emotes {
-    channelEmotes: Map<string, any>;
-    globalEmotes: Map<string, any>;
+    channelEmotes: Map<string, unknown>;
+    globalEmotes: Map<string, unknown>;
 }
 
 // Memoized message component to prevent unnecessary re-renders
@@ -35,7 +45,7 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
     onNicknameClick,
     truncateWords 
 }) => {
-    const messageId = msg.id || `${msg.timestamp}-${(msg as any).author || msg.author_name}-${msg.message || (msg as any).content}`;
+    const messageId = msg.id || `${msg.timestamp}-${msg.author || msg.author_name}-${msg.message || msg.content}`;
     const isNewMessage = messageId === lastAddedMessageId;
     
     const messageStyle = useMemo(() => {
@@ -104,9 +114,9 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
                 )
             )}
             
-            {settings?.show_badges && (msg as any).badges && Array.isArray((msg as any).badges) && (msg as any).badges.length > 0 && (
+            {settings?.show_badges && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (
                 <>
-                    {(msg as any).badges.map((badge: string, idx: number) => {
+                    {msg.badges.map((badge: string, idx: number) => {
                         const [badgeId, version] = badge.split('/');
                         const badgeUrl = twitchBadgesService.getBadgeUrl(badgeId, version, '1x');
                         
@@ -135,10 +145,10 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
                 </>
             )}
             
-            {settings?.show_avatars && (msg as any).avatar_url && (
+            {settings?.show_avatars && msg.avatar_url && (
                 <img
-                    src={(msg as any).avatar_url}
-                    alt={msg.author_name || (msg as any).author}
+                    src={msg.avatar_url}
+                    alt={msg.author_name || msg.author}
                     style={{
                         width: '24px',
                         height: '24px',
@@ -157,7 +167,7 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
                 } : {})
             }}>
                 <span 
-                    onClick={(e) => onNicknameClick(e, msg.author_name || (msg as any).author || 'Unknown', msg.platform)}
+                    onClick={(e) => onNicknameClick(e, msg.author_name || msg.author || 'Unknown', msg.platform)}
                     style={{ 
                         color: msg.platform === 'twitch' ? '#9146FF' : '#FF0000',
                         fontWeight: '600',
@@ -166,15 +176,15 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
                     }}
                     title="Кликните для открытия меню"
                 >
-                    {msg.author_name || (msg as any).author}
+                    {msg.author_name || msg.author}
                 </span>
                 {': '}
                 <span style={{ color: settings.text_color }}>
                     {settings.chat_direction === 'horizontal' ? (
-                        truncateWords(msg.message || (msg as any).content, 6)
+                        truncateWords(msg.message || msg.content, 6)
                     ) : (
                         <MessageContent 
-                            message={msg.message || (msg as any).content || ''} 
+                            message={msg.message || msg.content || ''} 
                             channelEmotes={settings?.show_7tv_emotes !== false ? emotes.channelEmotes : new Map()}
                             globalEmotes={settings?.show_7tv_emotes !== false ? emotes.globalEmotes : new Map()}
                             showLinks={settings?.show_links !== false}
@@ -224,7 +234,7 @@ const ChatOverlay: React.FC = () => {
     const containerStyle = useMemo<React.CSSProperties>(() => {
         if (!settings) return {};
         
-        logger.log('🎨 [STYLES] Recalculating containerStyle with font_family:', settings?.font_family);
+        logger.log('[STYLES] Recalculating containerStyle with font_family:', settings?.font_family);
         
         return {
             width: `${settings?.chat_width || 100}vw`,
@@ -287,13 +297,13 @@ const ChatOverlay: React.FC = () => {
         const isSystemFont = systemFonts.some(sf => fontFamily.includes(sf));
         
         if (isSystemFont) {
-            logger.log(`🔤 [FONT] Using system font: ${fontFamily}`);
+            logger.log(`[FONT] Using system font: ${fontFamily}`);
             return;
         }
         
         const existingLink = document.querySelector(`link[href*="${fontFamily.replace(/\s+/g, '+')}"]`);
         if (existingLink) {
-            logger.log(`🔤 [FONT] Font already loaded: ${fontFamily}`);
+            logger.log(`[FONT] Font already loaded: ${fontFamily}`);
             return;
         }
         
@@ -301,15 +311,15 @@ const ChatOverlay: React.FC = () => {
         link.rel = 'stylesheet';
         link.href = `https://fonts.googleapis.com/css2?family=${fontFamily.replace(/\s+/g, '+')}:wght@400;500;600;700&display=swap`;
         
-        logger.log(`🔤 [FONT] Loading Google Font: ${fontFamily}`);
-        logger.log(`🔗 [FONT] URL: ${link.href}`);
+        logger.log(`[FONT] Loading Google Font: ${fontFamily}`);
+        logger.log(`[LINK] [FONT] URL: ${link.href}`);
         
         document.head.appendChild(link);
         
         return () => {
             if (document.head.contains(link)) {
                 document.head.removeChild(link);
-                logger.log(`🗑️ [FONT] Removed font: ${fontFamily}`);
+                logger.log(`[DELETE] [FONT] Removed font: ${fontFamily}`);
             }
         };
     }, [settings?.font_family]);
@@ -321,7 +331,8 @@ const ChatOverlay: React.FC = () => {
         
         try {
             const response = await chatboxService.getSettingsByToken(token);
-            const data = response.data.data || response.data;
+            const responseData = response.data as ApiResponse<ChatBoxSettings>;
+            const data = responseData.data || {} as ChatBoxSettings;
             
             const normalizedSettings: ChatBoxSettings = {
                 ...data,
@@ -340,8 +351,8 @@ const ChatOverlay: React.FC = () => {
             };
             
             if (!isPolling) {
-                logger.log(`✅ [SETTINGS] Animation: ${normalizedSettings.animation_type} (${normalizedSettings.animation_duration}ms)`);
-                logger.log(`✅ [SETTINGS] Chat direction: ${normalizedSettings.chat_direction}`);
+                logger.log(`[OK] [SETTINGS] Animation: ${normalizedSettings.animation_type} (${normalizedSettings.animation_duration}ms)`);
+                logger.log(`[OK] [SETTINGS] Chat direction: ${normalizedSettings.chat_direction}`);
             }
             
             setSettings(normalizedSettings);
@@ -352,14 +363,14 @@ const ChatOverlay: React.FC = () => {
                 if (data.channel_name) {
                     setChannelName(data.channel_name);
                     await twitchBadgesService.loadChannelBadges(data.channel_name);
-                    logger.log(`✅ [BADGES] Loaded badges for channel: ${data.channel_name}`);
+                    logger.log(`[OK] [BADGES] Loaded badges for channel: ${data.channel_name}`);
                     
                     if (normalizedSettings.show_7tv_emotes !== false) {
                         try {
                             const emotesData = await getAllEmotesForChannel(data.channel_name);
                             setEmotes(emotesData);
-                            logger.log(`✅ [7TV] Loaded emotes for channel: ${data.channel_name}`);
-                        } catch (error: any) {
+                            logger.log(`[OK] [7TV] Loaded emotes for channel: ${data.channel_name}`);
+                        } catch (error: unknown) {
                             logger.error('Error loading 7TV emotes:', error);
                         }
                     }
@@ -367,11 +378,12 @@ const ChatOverlay: React.FC = () => {
                 
                 setUserId(normalizedSettings.user_id || null);
             }
-        } catch (error: any) {
-            logger.error('❌ Error loading ChatBox settings:', error);
-            logger.error('Full error:', error.response?.data || error.message);
+        } catch (error: unknown) {
+            const axiosError = error as AxiosError<{ detail?: string }>;
+            logger.error('[ERROR] Error loading ChatBox settings:', error);
+            logger.error('Full error:', axiosError.response?.data || axiosError.message);
             if (!isPolling) {
-                setError(`Ошибка загрузки настроек: ${error.response?.data?.detail || error.message}`);
+                setError(`Ошибка загрузки настроек: ${axiosError.response?.data?.detail || axiosError.message}`);
             }
         } finally {
             if (!isPolling) {
@@ -401,17 +413,18 @@ const ChatOverlay: React.FC = () => {
         
         const timeoutId = setTimeout(async () => {
             if (messages.length === 0 && !historyLoadedRef.current) {
-                logger.log('📜 [CHATOVERLAY] WebSocket history not received, loading via API...');
+                logger.log('[CHATOVERLAY] WebSocket history not received, loading via API...');
                 try {
                     const response = await chatService.getChatHistory({
                         limit: settings.max_messages || 50
                     });
                     
-                    if ((response.data as any).success && (response.data as any).messages && (response.data as any).messages.length > 0) {
+                    const apiResponse = response.data as ChatHistoryApiResponse;
+                    if (apiResponse.success && apiResponse.messages && apiResponse.messages.length > 0) {
                         const uniqueMessages: ChatMessage[] = [];
                         const seenIds = new Set<string>();
                         
-                        for (const msg of (response.data as any).messages) {
+                        for (const msg of apiResponse.messages) {
                             const uniqueKey = msg.id || `${msg.timestamp}-${msg.author}-${msg.message}`;
                             if (!seenIds.has(uniqueKey)) {
                                 seenIds.add(uniqueKey);
@@ -421,7 +434,7 @@ const ChatOverlay: React.FC = () => {
                         
                         setMessages(uniqueMessages);
                         processedMessageIds.current = new Set(uniqueMessages.map(msg => 
-                            msg.id || `${msg.timestamp}-${(msg as any).author}-${msg.message || (msg as any).content}`
+                            msg.id || `${msg.timestamp}-${msg.author}-${msg.message || msg.content}`
                         ));
                         historyLoadedRef.current = true;
                         
@@ -429,10 +442,10 @@ const ChatOverlay: React.FC = () => {
                             messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
                         }, 100);
                         
-                        logger.log(`📜 [CHATOVERLAY] Loaded ${uniqueMessages.length} messages via API fallback`);
+                        logger.log(`[CHATOVERLAY] Loaded ${uniqueMessages.length} messages via API fallback`);
                     }
-                } catch (error: any) {
-                    logger.error('❌ [CHATOVERLAY] Error loading history via API:', error);
+                } catch (error: unknown) {
+                    logger.error('[ERROR] [CHATOVERLAY] Error loading history via API:', error);
                 }
             }
         }, 3000);
@@ -442,36 +455,37 @@ const ChatOverlay: React.FC = () => {
     
     const handleWebSocketMessage = useCallback((data: WebSocketMessage): void => {
         if (data.type === 'cache_invalidate') {
-            logger.log('🔄 [CACHE] Received cache invalidation:', data.cache_key);
+            logger.log('[REFRESH] [CACHE] Received cache invalidation:', data.cache_key);
             if (data.cache_key === 'cache_chatbox_settings') {
-                logger.log('🔄 [CHATBOX] Reloading settings due to backend update...');
+                logger.log('[REFRESH] [CHATBOX] Reloading settings due to backend update...');
                 loadSettings(true);
             }
             return;
         }
         
         if (data.type === 'chatbox_settings_updated') {
-            logger.log('🔄 [CHATBOX] Received settings update event');
+            logger.log('[REFRESH] [CHATBOX] Received settings update event');
             
+            const updateData = data.data as Partial<ChatBoxSettings> | undefined;
             setSettings(prevSettings => {
                 if (!prevSettings) return prevSettings;
                 const updatedSettings: ChatBoxSettings = {
                     ...prevSettings,
-                    ...data.data,
-                    font_size: parseInt(String(data.data?.font_size)) || prevSettings.font_size || 16,
-                    text_stroke_width: parseInt(String(data.data?.text_stroke_width)) || prevSettings.text_stroke_width || 0,
-                    text_stroke_color: data.data?.text_stroke_color || prevSettings.text_stroke_color || '#000000',
-                    background_opacity: parseFloat(String(data.data?.background_opacity)) ?? prevSettings.background_opacity ?? 0.5,
-                    background_color: data.data?.background_color || prevSettings.background_color || '#000000',
-                    max_messages: parseInt(String(data.data?.max_messages)) || prevSettings.max_messages || 20,
-                    message_spacing: parseInt(String(data.data?.message_spacing)) || prevSettings.message_spacing || 4,
-                    message_fade_seconds: parseInt(String(data.data?.message_fade_seconds)) || prevSettings.message_fade_seconds || 60,
-                    animation_duration: parseInt(String(data.data?.animation_duration)) || prevSettings.animation_duration || 300,
-                    chat_width: parseInt(String(data.data?.chat_width)) || prevSettings.chat_width || 100,
-                    border_radius: parseInt(String(data.data?.border_radius)) || prevSettings.border_radius || 8
+                    ...updateData,
+                    font_size: parseInt(String(updateData?.font_size)) || prevSettings.font_size || 16,
+                    text_stroke_width: parseInt(String(updateData?.text_stroke_width)) || prevSettings.text_stroke_width || 0,
+                    text_stroke_color: updateData?.text_stroke_color || prevSettings.text_stroke_color || '#000000',
+                    background_opacity: parseFloat(String(updateData?.background_opacity)) ?? prevSettings.background_opacity ?? 0.5,
+                    background_color: updateData?.background_color || prevSettings.background_color || '#000000',
+                    max_messages: parseInt(String(updateData?.max_messages)) || prevSettings.max_messages || 20,
+                    message_spacing: parseInt(String(updateData?.message_spacing)) || prevSettings.message_spacing || 4,
+                    message_fade_seconds: parseInt(String(updateData?.message_fade_seconds)) || prevSettings.message_fade_seconds || 60,
+                    animation_duration: parseInt(String(updateData?.animation_duration)) || prevSettings.animation_duration || 300,
+                    chat_width: parseInt(String(updateData?.chat_width)) || prevSettings.chat_width || 100,
+                    border_radius: parseInt(String(updateData?.border_radius)) || prevSettings.border_radius || 8
                 };
                 
-                logger.log('🔄 [CHATBOX] Settings updated:', updatedSettings);
+                logger.log('[REFRESH] [CHATBOX] Settings updated:', updatedSettings);
                 return updatedSettings;
             });
             return;
@@ -494,7 +508,7 @@ const ChatOverlay: React.FC = () => {
             setMessages(prev => {
                 const isDuplicate = prev.some(msg => 
                     msg.id === data.id || 
-                    (msg.timestamp === String(data.timestamp) && ((msg as any).author === data.author || msg.author_name === data.author_name) && (msg.message || (msg as any).content) === data.message)
+                    (msg.timestamp === String(data.timestamp) && (msg.author === data.author || msg.author_name === data.author_name) && (msg.message || msg.content) === data.message)
                 );
                 
                 if (isDuplicate) return prev;
@@ -506,8 +520,8 @@ const ChatOverlay: React.FC = () => {
                     message: data.message || '',
                     timestamp: String(data.timestamp || Date.now()),
                     platform: data.platform || 'twitch',
-                    badges: (data as any).badges
-                } as ChatMessage;
+                    badges: (data as WebSocketMessage & { badges?: string[] }).badges
+                };
                 
                 const newMessages = [...prev, newMessage];
                 const maxMessages = settings?.max_messages || 20;
@@ -515,7 +529,7 @@ const ChatOverlay: React.FC = () => {
                 
                 if (processedMessageIds.current.size > maxMessages * 2) {
                     const recentIds = new Set(result.map(msg => 
-                        msg.id || `${msg.timestamp}-${(msg as any).author || msg.author_name}-${msg.message || (msg as any).content}`
+                        msg.id || `${msg.timestamp}-${msg.author || msg.author_name}-${msg.message || msg.content}`
                     ));
                     processedMessageIds.current = recentIds;
                 }
@@ -524,13 +538,13 @@ const ChatOverlay: React.FC = () => {
             });
         } 
         else if (data.type === 'chat_history') {
-            logger.log(`📜 Loaded ${data.messages?.length || 0} messages from history`);
+            logger.log(`[CHAT] Loaded ${data.messages?.length || 0} messages from history`);
             
             const uniqueMessages: ChatMessage[] = [];
             const seenIds = new Set<string>();
             
             for (const msg of (data.messages || [])) {
-                const uniqueKey = msg.id || `${msg.timestamp}-${(msg as any).author || msg.author_name}-${msg.message || (msg as any).content}`;
+                const uniqueKey = msg.id || `${msg.timestamp}-${msg.author || msg.author_name}-${msg.message || msg.content}`;
                 if (!seenIds.has(uniqueKey)) {
                     seenIds.add(uniqueKey);
                     uniqueMessages.push(msg);
@@ -539,7 +553,7 @@ const ChatOverlay: React.FC = () => {
             
             setMessages(uniqueMessages);
             processedMessageIds.current = new Set(uniqueMessages.map(msg => 
-                msg.id || `${msg.timestamp}-${(msg as any).author || msg.author_name}-${msg.message || (msg as any).content}`
+                msg.id || `${msg.timestamp}-${msg.author || msg.author_name}-${msg.message || msg.content}`
             ));
             historyLoadedRef.current = true;
             
@@ -549,7 +563,7 @@ const ChatOverlay: React.FC = () => {
         }
     }, [settings, loadSettings]);
     
-    useSharedWebSocket(userId, handleWebSocketMessage);
+    useSharedWebSocket(userId, handleWebSocketMessage as (message: Record<string, unknown>) => void);
     
     useEffect(() => {
         if (messagesEndRef.current) {
@@ -580,7 +594,7 @@ const ChatOverlay: React.FC = () => {
                 });
                 
                 if (filtered.length < prev.length) {
-                    logger.log(`🗑️ [FADE] Removed ${prev.length - filtered.length} old messages (>${fadeSeconds}s)`);
+                    logger.log(`[DELETE] [FADE] Removed ${prev.length - filtered.length} old messages (>${fadeSeconds}s)`);
                 }
                 
                 return filtered;
@@ -597,6 +611,24 @@ const ChatOverlay: React.FC = () => {
             return () => document.removeEventListener('click', handleClickOutside);
         }
     }, [contextMenu]);
+    
+    // Move hooks before early returns to comply with rules-of-hooks
+    const truncateWords = useCallback((text: string | undefined, maxWords: number = 6): string => {
+        if (!text) return '';
+        const words = text.trim().split(/\s+/);
+        if (words.length <= maxWords) return text;
+        return `${words.slice(0, maxWords).join(' ')  }...`;
+    }, []);
+    
+    const handleNicknameClick = useCallback((e: React.MouseEvent, username: string, platform: 'twitch' | 'vk' | 'youtube'): void => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const x = e.clientX + 5;
+        const y = e.clientY + 5;
+        
+        setContextMenu({ x, y, username, platform });
+    }, []);
     
     if (loading) {
         return (
@@ -635,7 +667,7 @@ const ChatOverlay: React.FC = () => {
                 textAlign: 'center',
                 gap: '16px'
             }}>
-                <div style={{ fontSize: '48px' }}>❌</div>
+                <div style={{ fontSize: '48px' }}>[ERROR]</div>
                 <div style={{ fontSize: '18px', fontWeight: 'bold' }}>Ошибка загрузки настроек</div>
                 <div style={{ fontSize: '14px', maxWidth: '600px', background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '8px' }}>
                     {error}
@@ -661,29 +693,12 @@ const ChatOverlay: React.FC = () => {
                 textAlign: 'center',
                 gap: '16px'
             }}>
-                <div style={{ fontSize: '48px' }}>⚠️</div>
+                <div style={{ fontSize: '48px' }}>[WARN]</div>
                 <div style={{ fontSize: '18px' }}>Настройки не найдены</div>
                 <div style={{ fontSize: '12px', opacity: 0.7 }}>Токен: {token}</div>
             </div>
         );
     }
-    
-    const truncateWords = useCallback((text: string | undefined, maxWords: number = 6): string => {
-        if (!text) return '';
-        const words = text.trim().split(/\s+/);
-        if (words.length <= maxWords) return text;
-        return words.slice(0, maxWords).join(' ') + '...';
-    }, []);
-    
-    const handleNicknameClick = (e: React.MouseEvent, username: string, platform: 'twitch' | 'vk' | 'youtube'): void => {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        const x = e.clientX + 5;
-        const y = e.clientY + 5;
-        
-        setContextMenu({ x, y, username, platform });
-    };
     
     return (
         <>
@@ -788,7 +803,7 @@ const ChatOverlay: React.FC = () => {
                         fontSize: `${settings.font_size}px`
                     }}>
                         <div>
-                            <div style={{ fontSize: '48px', marginBottom: '16px' }}>💬</div>
+                            <div style={{ fontSize: '48px', marginBottom: '16px' }}>[CHAT]</div>
                             <div>Ожидание сообщений...</div>
                             <div style={{ fontSize: '0.8em', marginTop: '8px' }}>
                                 Сообщения появятся здесь автоматически
@@ -813,7 +828,7 @@ const ChatOverlay: React.FC = () => {
                         {settings.chat_direction !== 'horizontal' && <div style={{ flexGrow: 1 }} />}
                         {messages.map((msg, index) => (
                             <ChatMessageItem
-                                key={msg.id || `${msg.platform}-${msg.timestamp}-${msg.author_name || (msg as any).author}`}
+                                key={msg.id || `${msg.platform}-${msg.timestamp}-${msg.author_name || msg.author}`}
                                 msg={msg}
                                 index={index}
                                 settings={settings}
@@ -863,7 +878,7 @@ const ChatOverlay: React.FC = () => {
                                     channel_name: channelName || 'unknown'
                                 });
                                 setContextMenu(null);
-                            } catch (error: any) {
+                            } catch (error: unknown) {
                                 logger.error('Ошибка блокировки TTS:', error);
                             }
                         }}
@@ -881,7 +896,7 @@ const ChatOverlay: React.FC = () => {
                         onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#2a2a2a'}
                         onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = 'transparent'}
                     >
-                        🔇 Заглушить
+                        Заглушить
                     </button>
                     
                     <button
@@ -893,7 +908,7 @@ const ChatOverlay: React.FC = () => {
                                     channel_name: channelName || 'unknown'
                                 });
                                 setContextMenu(null);
-                            } catch (error: any) {
+                            } catch (error: unknown) {
                                 logger.error('Ошибка разблокировки TTS:', error);
                             }
                         }}
@@ -911,7 +926,7 @@ const ChatOverlay: React.FC = () => {
                         onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#2a2a2a'}
                         onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = 'transparent'}
                     >
-                        🔊 Разглушить
+                        [VOLUME] Разглушить
                     </button>
                 </div>
             )}

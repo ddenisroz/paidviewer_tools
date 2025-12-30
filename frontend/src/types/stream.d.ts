@@ -12,7 +12,7 @@ export interface StreamCategory {
   type?: string;
   box_art_url?: string;
   cover_url?: string;
-  [key: string]: any;
+  [key: string]: string | number | undefined;
 }
 
 /**

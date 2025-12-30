@@ -115,7 +115,7 @@ class TTSEngineManager:
 
     def is_ready(self) -> bool:
         """Проверка готовности движка"""
-        # ✅ Упрощенная проверка: если движок инициализирован и существует, он готов
+        # [OK] Упрощенная проверка: если движок инициализирован и существует, он готов
         if not self.is_initialized or self.tts_engine is None:
             return False
         
@@ -170,7 +170,7 @@ class TTSEngineManager:
             return {"success": False, "error": "TTS engine not initialized"}
         
         try:
-            logger.info(f"🎙️ Synthesizing for {channel_name} | {author}: '{text[:50]}...'")
+            logger.info(f"[MIC] Synthesizing for {channel_name} | {author}: '{text[:50]}...'")
             
             # Получаем информацию о голосе из БД
             from tts_service.database import SessionLocal, Voice as VoiceModel
@@ -199,7 +199,7 @@ class TTSEngineManager:
                 ref_text = voice_record.reference_text or ""
                 
                 # Извлекаем voice_settings из tts_settings если есть
-                # 🚀 FIX: Гарантируем, что voice_settings всегда будет словарем, даже если в tts_settings он None
+                # [START] FIX: Гарантируем, что voice_settings всегда будет словарем, даже если в tts_settings он None
                 if tts_settings and isinstance(tts_settings, dict):
                     voice_settings_raw = tts_settings.get("voice_settings")
                     # Если voice_settings_raw это словарь, используем его, иначе используем пустой словарь
@@ -207,9 +207,9 @@ class TTSEngineManager:
                 else:
                     voice_settings = {}
                 
-                # 🚀 FIX: Безопасное извлечение параметров с fallback на значения из voice_record
+                # [START] FIX: Безопасное извлечение параметров с fallback на значения из voice_record
                 # voice_settings уже гарантированно словарь (не None), поэтому можно безопасно использовать .get()
-                # ✅ ЛОГИКА: Если персональных настроек нет, используются дефолтные из Voice (настроенные админом)
+                # [OK] ЛОГИКА: Если персональных настроек нет, используются дефолтные из Voice (настроенные админом)
                 # config уже импортирован в начале файла
                 DEFAULT_CFG_STRENGTH = config.cfg_strength  # Используем значение из конфига (по умолчанию 2.5)
                 DEFAULT_SPEED_PRESET = 'normal'  # Константа для скорости по умолчанию
@@ -217,24 +217,24 @@ class TTSEngineManager:
                 cfg_strength = voice_settings.get("cfg_strength")
                 if cfg_strength is None:
                     cfg_strength = voice_record.cfg_strength or DEFAULT_CFG_STRENGTH  # Fallback: Voice -> Config -> 2.5
-                    logger.debug(f"🎛️ Using default cfg_strength from Voice '{voice_record.name}': {cfg_strength} (config default: {DEFAULT_CFG_STRENGTH})")
+                    logger.debug(f"[SETTINGS] Using default cfg_strength from Voice '{voice_record.name}': {cfg_strength} (config default: {DEFAULT_CFG_STRENGTH})")
                 else:
-                    logger.debug(f"🎛️ Using personal cfg_strength: {cfg_strength} (default from Voice: {voice_record.cfg_strength})")
+                    logger.debug(f"[SETTINGS] Using personal cfg_strength: {cfg_strength} (default from Voice: {voice_record.cfg_strength})")
                 
                 speed_preset = voice_settings.get("speed_preset")
                 if speed_preset is None:
                     speed_preset = voice_record.speed_preset or DEFAULT_SPEED_PRESET  # Fallback: Voice -> 'normal'
-                    logger.debug(f"🎛️ Using default speed_preset from Voice '{voice_record.name}': {speed_preset} (config default: {DEFAULT_SPEED_PRESET})")
+                    logger.debug(f"[SETTINGS] Using default speed_preset from Voice '{voice_record.name}': {speed_preset} (config default: {DEFAULT_SPEED_PRESET})")
                 else:
-                    logger.debug(f"🎛️ Using personal speed_preset: {speed_preset} (default from Voice: {voice_record.speed_preset})")
+                    logger.debug(f"[SETTINGS] Using personal speed_preset: {speed_preset} (default from Voice: {voice_record.speed_preset})")
                 
-                # ✅ volume обрабатывается отдельно через параметр функции (уже применен в websocket_helper.py)
+                # [OK] volume обрабатывается отдельно через параметр функции (уже применен в websocket_helper.py)
                 # volume передается как параметр volume_level и применяется к аудио после синтеза
                 
                 if voice_settings:
-                    logger.info(f"🎛️ Final voice settings: cfg={cfg_strength}, speed={speed_preset}, volume={volume}% (personal settings applied)")
+                    logger.info(f"[SETTINGS] Final voice settings: cfg={cfg_strength}, speed={speed_preset}, volume={volume}% (personal settings applied)")
                 else:
-                    logger.info(f"🎛️ Using default voice settings from Voice '{voice_record.name}': cfg={cfg_strength}, speed={speed_preset}, volume={volume}% (admin defaults)")
+                    logger.info(f"[SETTINGS] Using default voice settings from Voice '{voice_record.name}': cfg={cfg_strength}, speed={speed_preset}, volume={volume}% (admin defaults)")
                 
             finally:
                 db.close()
@@ -245,20 +245,20 @@ class TTSEngineManager:
                 None,
                 self.tts_engine.synthesize_speech,
                 text,
-                ref_audio_path,  # ✅ Путь к референсному аудио из БД
-                ref_text,  # ✅ Референсный текст из БД
+                ref_audio_path,  # [OK] Путь к референсному аудио из БД
+                ref_text,  # [OK] Референсный текст из БД
                 None,  # speed (определяется автоматически)
                 None,  # nfe_step (определяется автоматически)
                 None,  # fix_duration
                 False,  # remove_silence
                 None,  # seed
-                cfg_strength,  # ✅ Применяем персональный cfg_strength
+                cfg_strength,  # [OK] Применяем персональный cfg_strength
                 None,  # target_rms (определяется автоматически)
-                speed_preset  # ✅ Применяем персональный speed_preset
+                speed_preset  # [OK] Применяем персональный speed_preset
             )
             
             if audio_path and Path(audio_path).exists():
-                logger.info(f"✅ Speech synthesized: {audio_path}")
+                logger.info(f"[OK] Speech synthesized: {audio_path}")
                 # Формируем URL для аудио относительно audio директории
                 # config уже импортирован глобально в начале файла
                 audio_path_obj = Path(audio_path).resolve()
@@ -281,11 +281,11 @@ class TTSEngineManager:
                     "tts_type": "f5"
                 }
             else:
-                logger.error("❌ TTS synthesis failed: no audio file generated")
+                logger.error("[ERROR] TTS synthesis failed: no audio file generated")
                 return {"success": False, "error": "No audio file generated"}
                 
         except Exception as e:
-            logger.error(f"❌ TTS synthesis error: {e}", exc_info=True)
+            logger.error(f"[ERROR] TTS synthesis error: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
     
     async def synthesize_with_conversion_async(

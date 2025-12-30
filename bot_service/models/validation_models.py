@@ -2,9 +2,8 @@
 Enhanced Pydantic Models with Comprehensive Validation
 Provides detailed validation for all API requests
 """
-from pydantic import BaseModel, Field, validator, root_validator
-from typing import Optional, List, Dict, Any
-from datetime import datetime
+from pydantic import BaseModel, Field, validator
+from typing import Optional, List, Dict
 import re
 from validators.input_validators import (
     sanitize_stream_title,
@@ -18,7 +17,7 @@ from validators.input_validators import (
 
 class BaseValidationModel(BaseModel):
     """Base model with common validation rules"""
-    
+
     class Config:
         # Forbid extra fields
         extra = "forbid"
@@ -45,7 +44,7 @@ class StreamTitleUpdateRequest(BaseValidationModel):
         regex=r'^(twitch|vk|both)$',
         description="Target platform"
     )
-    
+
     @validator('title')
     def sanitize_title(cls, v):
         """Sanitize and validate title"""
@@ -75,12 +74,12 @@ class StreamCategoryUpdateRequest(BaseValidationModel):
         regex=r'^(twitch|vk)$',
         description="Target platform"
     )
-    
+
     @validator('category_id')
     def validate_category_id(cls, v, values):
         """Validate category ID format"""
         platform = values.get('platform')
-        
+
         if platform == 'vk':
             # VK uses UUID format
             uuid_pattern = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
@@ -90,7 +89,7 @@ class StreamCategoryUpdateRequest(BaseValidationModel):
             # Twitch uses numeric IDs
             if not v.isdigit():
                 raise ValueError('Invalid Twitch category ID format (must be numeric)')
-        
+
         return v
 
 
@@ -115,7 +114,7 @@ class TtsSettingsUpdateRequest(BaseValidationModel):
         ge=0,
         description="Minimum donation amount"
     )
-    
+
     @validator('volume', 'speed', 'max_message_length', 'min_donation_amount')
     def validate_numeric_fields(cls, v, field):
         """Ensure numeric fields are within bounds"""
@@ -132,7 +131,7 @@ class TtsPlatformSettingsRequest(BaseValidationModel):
         ...,
         description="List of enabled platforms"
     )
-    
+
     @validator('enabled_platforms')
     def validate_platforms(cls, v):
         """Validate platform list"""
@@ -159,7 +158,7 @@ class TtsMessageRequest(BaseValidationModel):
     )
     voice_id: Optional[int] = Field(None, gt=0, description="Voice ID")
     speed: Optional[float] = Field(1.0, ge=0.5, le=2.0, description="Speed (0.5-2.0)")
-    
+
     @validator('text')
     def sanitize_text(cls, v):
         """Sanitize TTS message"""
@@ -184,7 +183,7 @@ class VoiceUploadRequest(BaseValidationModel):
         max_length=500,
         description="Reference text for voice cloning"
     )
-    
+
     @validator('voice_name')
     def sanitize_name(cls, v):
         """Sanitize voice name"""
@@ -192,7 +191,7 @@ class VoiceUploadRequest(BaseValidationModel):
         if not sanitized:
             raise ValueError('Voice name cannot be empty after sanitization')
         return sanitized
-    
+
     @validator('reference_text')
     def sanitize_reference(cls, v):
         """Sanitize reference text"""
@@ -220,7 +219,7 @@ class FilteredWordRequest(BaseValidationModel):
         max_length=100,
         description="Replacement text"
     )
-    
+
     @validator('word')
     def sanitize_word(cls, v):
         """Sanitize and validate word"""
@@ -228,7 +227,7 @@ class FilteredWordRequest(BaseValidationModel):
         if not sanitized:
             raise ValueError('Word cannot be empty')
         return sanitized
-    
+
     @validator('replacement')
     def sanitize_replacement(cls, v):
         """Sanitize replacement text"""
@@ -256,12 +255,12 @@ class BlockUserRequest(BaseValidationModel):
         description="Block reason"
     )
     permanent: Optional[bool] = Field(True, description="Permanent block")
-    
+
     @validator('username')
     def validate_username_field(cls, v):
         """Validate username"""
         return validate_username(v)
-    
+
     @validator('reason')
     def sanitize_reason(cls, v):
         """Sanitize reason"""
@@ -299,29 +298,29 @@ class DropsConfigUpdateRequest(BaseValidationModel):
         le=86400,
         description="Cooldown in seconds (0-86400)"
     )
-    
+
     @validator('probabilities')
     def validate_probabilities(cls, v):
         """Validate probability distribution"""
         if v is None:
             return v
-        
+
         required_keys = {'common', 'rare', 'epic', 'legendary'}
         if not required_keys.issubset(v.keys()):
             raise ValueError(f'Missing required probability keys: {required_keys}')
-        
+
         # Validate each probability
         for key, prob in v.items():
             if not isinstance(prob, (int, float)):
                 raise ValueError(f'Probability for {key} must be a number')
             if prob < 0 or prob > 100:
                 raise ValueError(f'Probability for {key} must be between 0 and 100')
-        
+
         # Validate sum
         total = sum(v.values())
         if abs(total - 100) > 0.01:
             raise ValueError(f'Probabilities must sum to 100 (got {total})')
-        
+
         return v
 
 
@@ -340,7 +339,7 @@ class DropsRewardRequest(BaseValidationModel):
     )
     value: Optional[float] = Field(None, ge=0, description="Reward value")
     is_active: Optional[bool] = Field(True, description="Is reward active")
-    
+
     @validator('name')
     def sanitize_name(cls, v):
         """Sanitize reward name"""
@@ -376,12 +375,12 @@ class CommandCreateRequest(BaseValidationModel):
         description="Cooldown in seconds (0-3600)"
     )
     is_enabled: Optional[bool] = Field(True, description="Is command enabled")
-    
+
     @validator('command_name')
     def validate_command(cls, v):
         """Validate command name"""
         return validate_command_name(v)
-    
+
     @validator('response_text')
     def sanitize_response(cls, v):
         """Sanitize response text"""
@@ -440,7 +439,7 @@ class RewardCreateRequest(BaseValidationModel):
         le=86400,
         description="Global cooldown (0-86400)"
     )
-    
+
     @validator('title')
     def sanitize_title(cls, v):
         """Sanitize reward title"""
@@ -448,7 +447,7 @@ class RewardCreateRequest(BaseValidationModel):
         if not sanitized:
             raise ValueError('Title cannot be empty')
         return sanitized
-    
+
     @validator('description')
     def sanitize_description(cls, v):
         """Sanitize reward description"""
@@ -480,7 +479,7 @@ class SupportTicketRequest(BaseValidationModel):
         regex=r'^(low|medium|high)$',
         description="Ticket priority"
     )
-    
+
     @validator('subject', 'message')
     def sanitize_text_fields(cls, v, field):
         """Sanitize text fields"""
@@ -518,7 +517,7 @@ class UserSettingsUpdateRequest(BaseValidationModel):
         regex=r'^(ru|en)$',
         description="Interface language"
     )
-    
+
     @validator('display_name')
     def sanitize_display_name(cls, v):
         """Sanitize display name"""
@@ -528,24 +527,8 @@ class UserSettingsUpdateRequest(BaseValidationModel):
 
 
 # ============================================================================
-# GUEST MODE MODELS
-# ============================================================================
+# Guest mode removed - all users must authenticate via OAuth
 
-class GuestConnectRequest(BaseValidationModel):
-    """Request to connect in guest mode"""
-    channel_name: str = Field(
-        ...,
-        min_length=1,
-        max_length=50,
-        regex=r'^[a-zA-Z0-9_]+$',
-        description="Channel name"
-    )
-    platform: str = Field(
-        ...,
-        regex=r'^(twitch|vk)$',
-        description="Platform"
-    )
-    
     @validator('channel_name')
     def validate_channel(cls, v):
         """Validate channel name"""
@@ -612,7 +595,7 @@ class FrontendErrorReport(BaseValidationModel):
         max_length=500,
         description="User agent string"
     )
-    
+
     @validator('message', 'stack')
     def sanitize_error_fields(cls, v, field):
         """Sanitize error fields"""

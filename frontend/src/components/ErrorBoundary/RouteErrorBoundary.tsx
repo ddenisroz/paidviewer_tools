@@ -1,8 +1,11 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RefreshCw, ArrowLeft } from 'lucide-react';
-import { Button } from '../ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card';
+
+import { AlertTriangle, ArrowLeft, RefreshCw } from 'lucide-react';
+
+import { handleBoundaryError } from '../../utils/errorUtils';
 import { logger } from '../../utils/prodLogger';
+import { Button } from '../ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 
 interface Props {
   children: ReactNode;
@@ -27,22 +30,25 @@ class RouteErrorBoundary extends Component<Props, State> {
     };
   }
 
-  static getDerivedStateFromError(error: Error): Partial<State> {
+  static getDerivedStateFromError(_error: Error): Partial<State> {
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     const { routeName } = this.props;
-    logger.error(`🔴 [RouteErrorBoundary] Error in route ${routeName || 'unknown'}:`, error);
-    logger.error('🔴 [RouteErrorBoundary] Component stack:', errorInfo.componentStack);
+    logger.error(`[ERROR] [RouteErrorBoundary] Error in route ${routeName || 'unknown'}:`, error);
+    logger.error('[ERROR] [RouteErrorBoundary] Component stack:', errorInfo.componentStack);
     
     this.setState({ error });
+
+    // Use centralized error handler
+    handleBoundaryError(error, errorInfo);
 
     // Report to backend
     this.reportError(error, errorInfo);
   }
 
-  reportError = async (error: Error, errorInfo: ErrorInfo) => {
+  reportError = async (error: Error, errorInfo: ErrorInfo): Promise<void> => {
     try {
       await fetch('/api/errors/report', {
         method: 'POST',
@@ -57,23 +63,23 @@ class RouteErrorBoundary extends Component<Props, State> {
           timestamp: new Date().toISOString(),
         }),
       }).catch(() => {});
-    } catch (e) {
+    } catch {
       // Ignore
     }
   };
 
-  handleReset = () => {
+  handleReset = (): void => {
     this.setState({
       hasError: false,
       error: null,
     });
   };
 
-  handleGoBack = () => {
+  handleGoBack = (): void => {
     window.history.back();
   };
 
-  render() {
+  render(): ReactNode {
     if (this.state.hasError) {
       const { error } = this.state;
       const { routeName } = this.props;

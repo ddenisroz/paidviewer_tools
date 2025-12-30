@@ -18,6 +18,8 @@ export interface ChatCommand {
   usage_count?: number;
   created_at?: string;
   updated_at?: string;
+  tags?: string[];
+  command_type?: 'global' | 'override' | 'custom';
 }
 
 /**

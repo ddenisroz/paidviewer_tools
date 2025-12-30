@@ -33,11 +33,11 @@ npm run dev:tts       # TTS Service (localhost:8001) - опционально
 
 **Полный гайд:** [QUICK_START.md](QUICK_START.md)  
 **Deployment:** [DEPLOYMENT.md](docs/DEPLOYMENT.md)  
-**Design System:** [DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) ⭐ NEW
+**Design System:** [DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) [NEW]
 
 ---
 
-## 🎨 Design System & Quality
+## Design System & Quality
 
 Проект использует единую систему дизайна с автоматическими проверками:
 
@@ -59,40 +59,43 @@ npm run migrate:design:apply
 | Функция | Статус | Описание |
 |---------|--------|----------|
 | **TTS Engines** | | |
-| Google TTS | ✅ Ready | Облачный синтез через Google Cloud |
-| F5-TTS (Advanced) | ✅ Ready | Высококачественный синтез (GPU) |
-| F5-TTS (Simple) | ✅ Ready | Персональный TTS для одного пользователя |
+| Google TTS | Ready | Облачный синтез через Google Cloud |
+| F5-TTS (Advanced) | Ready | Высококачественный синтез (GPU) |
+| F5-TTS (Simple) | Ready | Персональный TTS для одного пользователя |
 | **Платформы** | | |
-| Twitch | ✅ Ready | OAuth, чат, команды, бейджи, роли |
-| VK Live | ✅ Ready | OAuth, чат, команды, баллы, роли |
-| Platform Abstraction | ✅ Ready | Легкое добавление новых платформ (Kick, YouTube Live) |
+| Twitch | Ready | OAuth, чат, команды, бейджи, роли |
+| VK Live | Ready | OAuth, чат, команды, баллы, роли |
+| Platform Abstraction | Ready | Легкое добавление новых платформ (Kick, YouTube Live) |
 | **Функции** | | |
-| YouTube | ✅ Ready | Очередь заказов, плеер |
-| Баллы канала | ✅ Ready | Twitch + VK Live награды |
-| Drops система | ✅ Ready | Lootbox, streak, donation (server-side) |
-| DonationAlerts | ✅ Ready | Автоматическая интеграция |
-| Гостевой режим | ✅ Ready | Просмотр без авторизации |
-| Кастомные команды | ✅ Ready | Глобальные, override, custom |
+| YouTube | Ready | Очередь заказов, плеер |
+| Баллы канала | Ready | Twitch + VK Live награды |
+| Drops система | Ready | Lootbox, streak, donation (server-side) |
+| DonationAlerts | Ready | Автоматическая интеграция |
+| Гостевой режим | Ready | Просмотр без авторизации |
+| Кастомные команды | Ready | Глобальные, override, custom |
 | **Управление** | | |
-| Permission System | ✅ Ready | Role-based access control (admin/user/guest) |
-| Админ панель | ✅ Ready | Управление пользователями, голосами |
-| OBS виджеты | ✅ Ready | Chat, TTS, YouTube, Drops |
+| Permission System | Ready | Role-based access control (admin/user/guest) |
+| Админ панель | Ready | Управление пользователями, голосами |
+| OBS виджеты | Ready | Chat, TTS, YouTube, Drops |
 | **Производительность** | | |
-| Code Splitting | ✅ Ready | Lazy loading для быстрой загрузки |
-| WebSocket Optimization | ✅ Ready | Одно соединение на браузер (leader election) |
-| Error Handling | ✅ Ready | Graceful error handling, no crashes |
-| State Sync | ✅ Ready | Optimistic updates с rollback |
+| Code Splitting | Ready | Lazy loading для быстрой загрузки |
+| WebSocket Optimization | Ready | Одно соединение на браузер (leader election) |
+| Error Handling | Ready | Graceful error handling, no crashes |
+| State Sync | Ready | Optimistic updates с rollback |
 
 ---
 
 ## Документация
 
+### 📋 Мастер-план проекта
+- **[PROJECT_MASTER_PLAN.md](PROJECT_MASTER_PLAN.md)** - Полный анализ проекта, технический долг, план улучшений
+
 ### Для обычных пользователей
-- **[Быстрый старт](docs/QUICK_START.md)**
+- **[Быстрый старт](docs/guides/QUICK_START.md)**
 - **[Текущий статус](docs/CURRENT_STATUS.md)**
 
 ### Для разработчиков
-- **[Архитектура](docs/ARCHITECTURE_OVERVIEW.md)**
+- **[Архитектура](docs/architecture/ARCHITECTURE_GUIDE.md)**
 - **[Руководство](docs/DEVELOPER_GUIDE.md)**
 - **[Changelog](docs/CHANGELOG.md)**
 
@@ -109,7 +112,7 @@ The `legacy/` folder contains archived code from version 0.02 (pre-refactoring).
 
 **See:** [legacy/LEGACY_CONTENTS.md](legacy/LEGACY_CONTENTS.md) for detailed documentation.
 
-⚠️ **Note:** Legacy code is read-only and should not be used in current development.
+**Note:** Legacy code is read-only and should not be used in current development.
 
 ---
 
@@ -207,14 +210,14 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 
 ## Безопасность
 
-- ✅ **Rate Limiting** - защита от DDoS (60/min default, 5/15min login)
-- ✅ **Input Sanitization** - XSS/SQLi защита на frontend и backend
-- ✅ **JWT + OAuth2** - безопасная аутентификация
-- ✅ **CSRF Protection** - защита от атак
-- ✅ **Retry Logic** - устойчивость к сетевому отказу (exponential backoff)
-- ✅ **Encryption** - токены зашифрованы в БД (Fernet)
-- ✅ **Permission System** - Role-based access control
-- ✅ **Input Validation** - Pydantic (backend) + Zod (frontend)
+- **Rate Limiting** - защита от DDoS (60/min default, 5/15min login)
+- **Input Sanitization** - XSS/SQLi защита на frontend и backend
+- **JWT + OAuth2** - безопасная аутентификация
+- **CSRF Protection** - защита от атак
+- **Retry Logic** - устойчивость к сетевому отказу (exponential backoff)
+- **Encryption** - токены зашифрованы в БД (Fernet)
+- **Permission System** - Role-based access control
+- **Input Validation** - Pydantic (backend) + Zod (frontend)
 
 ---
 
@@ -222,7 +225,7 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 
 **Backend:** Python 3.10+, FastAPI, SQLAlchemy, Alembic, pydantic-settings  
 **Frontend:** React 19, Vite, Tailwind CSS, shadcn/ui, React Query, Zod  
-**Database:** SQLite (dev) / PostgreSQL (prod)  
+**Database:** PostgreSQL  
 **TTS:** Google Cloud TTS / F5-TTS (Advanced) / F5-TTS (Simple)  
 **WebSocket:** FastAPI WebSocket (SharedWebSocket с Leader Election)  
 **Интеграции:** Twitch, VK Live, YouTube, DonationAlerts  
@@ -251,4 +254,4 @@ MIT License - Свободен для использования и модифи
 
 ---
 
-**Последнее обновление:** 15 ноября 2025 | **Версия:** 0.03
+**Последнее обновление:** 18 декабря 2025 | **Версия:** 0.03

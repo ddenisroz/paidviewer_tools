@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from core.database import get_db, User
 from auth.auth import get_current_user
-from datetime import datetime, timedelta
+from core.datetime_utils import utcnow_naive
 # from monitoring.modern_monitor import modern_monitor  # Удалено - используем enhanced_logger
 import logging
 import secrets
@@ -18,7 +18,7 @@ async def health_check():
     """Проверка здоровья системы"""
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": utcnow_naive().isoformat(),
         "version": "1.0.0"
     }
 
@@ -32,7 +32,7 @@ async def system_status(
         # Базовая статистика
         total_users = db.query(User).count()
         active_users = db.query(User).filter(User.is_active == True).count()
-        
+
         return {
             "success": True,
             "status": {
@@ -84,7 +84,7 @@ async def system_info():
         "description": "Text-to-Speech Bot Service with Multi-Platform Support",
         "features": [
             "Twitch Integration",
-            "VK Live Integration", 
+            "VK Live Integration",
             "TTS Synthesis",
             "WebSocket Support",
             "Admin Panel"
@@ -101,16 +101,16 @@ async def generate_api_key(
         # Проверяем права доступа
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
-        
+
         # Генерируем новый API ключ
         api_key = secrets.token_urlsafe(32)
-        
+
         # Обновляем API ключ пользователя в БД
         user_obj = db.query(User).filter(User.id == user['id']).first()
         if user_obj:
             user_obj.api_key = api_key
             db.commit()
-            
+
             logger.info(f"New API key generated for user {user['id']}")
             return {
                 "success": True,
@@ -119,7 +119,7 @@ async def generate_api_key(
             }
         else:
             raise HTTPException(status_code=404, detail="User not found")
-            
+
     except Exception as e:
         logger.error(f"Error generating API key: {e}")
         db.rollback()
@@ -135,16 +135,15 @@ async def get_system_logs(
         # Проверяем права доступа
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
-        
-        import os
+
         from pathlib import Path
-        
+
         # Путь к логам
         logs_dir = Path("logs")
-        
+
         # Читаем логи из разных файлов (приоритет: ошибки, затем общие логи)
         all_logs = []
-        
+
         # 1. Читаем логи ошибок (самые важные)
         error_log_file = logs_dir / "errors" / "bot_service_errors.log"
         if error_log_file.exists():
@@ -154,7 +153,7 @@ async def get_system_logs(
                     all_logs.extend([f"[ERROR] {line.strip()}" for line in error_lines[-lines//2:] if line.strip()])
             except Exception as e:
                 logger.warning(f"Could not read error log file: {e}")
-        
+
         # 2. Читаем основные логи приложения
         app_log_file = logs_dir / "app" / "bot_service.log"
         if app_log_file.exists():
@@ -165,11 +164,11 @@ async def get_system_logs(
                     all_logs.extend([line.strip() for line in app_lines[-lines:] if line.strip()])
             except Exception as e:
                 logger.warning(f"Could not read app log file: {e}")
-        
+
         # Сортируем по времени (если есть timestamp) и берем последние N строк
         all_logs.sort(reverse=True)  # Новые сверху
         result_logs = all_logs[:lines]
-        
+
         # Если логов нет, возвращаем информативное сообщение
         if not result_logs:
             return {
@@ -177,12 +176,12 @@ async def get_system_logs(
                 "logs": [
                     "INFO - Логи пусты. Логи будут появляться здесь по мере работы системы.",
                     "INFO - Логи сохраняются в папке bot_service/logs/",
-                    f"INFO - Проверьте файлы: logs/app/bot_service.log и logs/errors/bot_service_errors.log"
+                    "INFO - Проверьте файлы: logs/app/bot_service.log и logs/errors/bot_service_errors.log"
                 ],
                 "total_lines": 3,
                 "note": "No logs found yet"
             }
-        
+
         return {
             "success": True,
             "logs": result_logs,
@@ -205,7 +204,7 @@ async def restart_system(
         # Проверяем права доступа
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
-        
+
         # В реальной системе здесь бы был перезапуск
         logger.warning(f"System restart requested by user {user['id']}")
         return {

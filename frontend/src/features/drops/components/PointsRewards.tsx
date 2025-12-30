@@ -1,23 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+﻿import React, { useEffect, useState } from 'react';
+
+import { Coins, Edit, Loader2, Plus, Power, PowerOff, Trash2 } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Edit, Trash2, Loader2, Power, PowerOff, Coins } from 'lucide-react';
-import { toast } from 'sonner';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from '@/utils/toastManager';
+
 import { useIntegrations } from '../../../context/IntegrationsContext';
-import { usePlatformRewards, useCreatePlatformReward, useUpdatePlatformReward, useDeletePlatformReward, useTogglePlatformReward } from '../../../queries/points/pointsQueries';
+import { useCreatePlatformReward, useDeletePlatformReward, usePlatformRewards, useTogglePlatformReward, useUpdatePlatformReward } from '../../../queries/points/pointsQueries';
 
 interface PointsRewardsProps {
-    user: any;
+    user: Record<string, unknown>;
     platform?: string;
     channelName: string;
-    integrations?: any;
+    integrations?: {
+        twitch?: { enabled?: boolean; connected?: boolean };
+        vk?: { enabled?: boolean; connected?: boolean };
+    };
 }
 
 interface Reward {
@@ -79,7 +84,7 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
   const twitchAvailable = actualIntegrations?.twitch?.enabled && user?.twitch_username;
   const vkAvailable = actualIntegrations?.vk?.enabled && (user?.vk_username || user?.vk_channel_name);
   
-  // ✅ УПРОЩЕНИЕ: Автоматически определяем платформу (приоритет: Twitch -> VK)
+  // [OK] УПРОЩЕНИЕ: Автоматически определяем платформу (приоритет: Twitch -> VK)
   useEffect(() => {
     if (!selectedPlatform) {
       if (platform) {
@@ -103,8 +108,8 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
   // Обработка ошибок
   useEffect(() => {
     if (isError && rewardsError) {
-      const error = rewardsError as any;
-      // ✅ Обработка 403 - партнер/аффилиат требуется
+      const error = rewardsError as { response?: { status?: number; data?: { detail?: string; message?: string } } };
+      // [OK] Обработка 403 - партнер/аффилиат требуется
       if (error.response?.status === 403) {
         const detail = error.response?.data?.detail || error.response?.data?.message;
         if (detail && (detail.includes('партнёр') || detail.includes('аффилейт') || detail.includes('partner') || detail.includes('affiliate'))) {
@@ -125,7 +130,7 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
     }
   }, [isError, rewardsError, rewardsData]);
 
-  const rewards: Reward[] = rewardsData?.data?.rewards || [];
+  const rewards: Reward[] = (rewardsData as { data?: { rewards?: Reward[] } })?.data?.rewards || [];
 
   const createRewardMutation = useCreatePlatformReward(selectedPlatform || '', {
     onSuccess: () => {
@@ -155,7 +160,7 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
       return;
     }
 
-    const rewardData: any = {
+    const rewardData: Record<string, unknown> = {
       title: formData.title,
       description: formData.description,
       cost: parseInt(formData.cost.toString()) || 100,

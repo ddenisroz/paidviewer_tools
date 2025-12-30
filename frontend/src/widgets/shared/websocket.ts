@@ -1,6 +1,6 @@
 import { logger } from '../../utils/prodLogger';
 
-type Handler = (data?: any) => void;
+type Handler = (data?: Record<string, unknown>) => void;
 
 declare global {
   interface Window {
@@ -47,9 +47,9 @@ class WidgetWebSocket {
         this.emit('disconnected');
         this.handleReconnect();
       };
-      this.ws.onerror = (error) => {
+      this.ws.onerror = (error: Event) => {
         logger.error('WebSocket error:', error);
-        this.emit('error', error as any);
+        this.emit('error', { error: error.type });
       };
     } catch (error) {
       logger.error('Error creating WebSocket:', error);
@@ -69,7 +69,7 @@ class WidgetWebSocket {
     }
   }
 
-  public send(data: any): boolean {
+  public send(data: Record<string, unknown>): boolean {
     if (this.isConnected && this.ws) {
       try {
         this.ws.send(JSON.stringify(data));
@@ -101,7 +101,7 @@ class WidgetWebSocket {
     }
   }
 
-  private emit(event: string, data?: any): void {
+  private emit(event: string, data?: Record<string, unknown>): void {
     if (this.messageHandlers.has(event)) {
       this.messageHandlers.get(event)!.forEach((handler) => {
         try {

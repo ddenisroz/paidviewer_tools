@@ -1,9 +1,11 @@
 // src/context/DonationAlertsContext.tsx
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+
 import { API_BASE_URL } from '../constants';
-import { useAuth } from './AuthContext';
 import { saveReturnUrl } from '../utils/oauthRedirect';
 import { logger } from '../utils/prodLogger';
+
+import { useAuth } from './AuthContext';
 
 interface DonationAlertsContextValue {
     isConnected: boolean;
@@ -98,9 +100,10 @@ export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ 
             } else {
                 throw new Error('URL авторизации не получен');
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             logger.error('Error connecting to DonationAlerts:', err);
-            setError(err.message);
+            const error = err as { message?: string };
+            setError(error.message || 'Неизвестная ошибка');
             return false;
         } finally {
             setIsLoading(false);
@@ -126,9 +129,10 @@ export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ 
             } else {
                 throw new Error('Ошибка отключения');
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             logger.error('Error disconnecting from DonationAlerts:', err);
-            setError(err.message);
+            const error = err as { message?: string };
+            setError(error.message || 'Неизвестная ошибка');
             return false;
         } finally {
             setIsLoading(false);

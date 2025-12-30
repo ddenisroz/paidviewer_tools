@@ -12,20 +12,20 @@
     "checkJs": true,              // Проверять JS файлы с помощью TypeScript
     "noEmit": true,               // Не генерировать файлы (Vite делает это)
     
-    // === Строгость типизации (постепенно увеличивать) ===
-    "strict": false,              // Начнем с false, затем включим постепенно
-    "noImplicitAny": false,       // Позволить any для постепенной миграции
-    "strictNullChecks": false,     // Позволить null/undefined для постепенной миграции
-    "strictFunctionTypes": false,
-    "strictBindCallApply": false,
+    // === Строгость типизации (постепенное включение) ===
+    "strict": true,                // Включен полный strict режим
+    "noImplicitAny": true,         // Включено - требуются явные типы
+    "strictNullChecks": true,      // Включено - проверка на null/undefined
+    "strictFunctionTypes": true,   // Оставим включенным
+    "strictBindCallApply": true,   // Оставим включенным
     "strictPropertyInitialization": false,
-    "noImplicitThis": false,
-    "alwaysStrict": false,
+    "noImplicitThis": true,        // Оставим включенным
+    "alwaysStrict": true,          // Оставим включенным
     
     // === Дополнительные проверки ===
-    "noUnusedLocals": false,       // Отключено для постепенной миграции
-    "noUnusedParameters": false,   // Отключено для постепенной миграции
-    "noImplicitReturns": false,    // Отключено для постепенной миграции
+    "noUnusedLocals": false,       // Слишком много ошибок, включим позже
+    "noUnusedParameters": false,   // Слишком много ошибок, включим позже
+    "noImplicitReturns": false,    // Слишком много ошибок, включим позже
     "noFallthroughCasesInSwitch": true,
     
     // === Пути и алиасы ===
@@ -53,7 +53,8 @@
   "include": [
     "src/**/*",
     "vite.config.js",
-    "vite.config.ts"
+    "vite.config.ts",
+    "vitest.config.ts"
   ],
   "exclude": [
     "node_modules",

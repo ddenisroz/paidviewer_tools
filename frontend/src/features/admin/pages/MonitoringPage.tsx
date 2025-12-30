@@ -1,21 +1,23 @@
 import React, { useEffect } from 'react';
+
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { 
     Activity, 
-    Cpu, 
-    HardDrive, 
-    MemoryStick, 
-    Users, 
-    MessageCircle, 
-    AlertTriangle,
+    AlertTriangle, 
+    ExternalLink, 
+    MessageCircle,
     RefreshCw,
-    ExternalLink,
     Tv,
+    Users,
     Volume2
 } from 'lucide-react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageLoader } from '@/components/ui/loader';
+
+
 import { adminService } from '../../../services/api/services/adminService';
 import { logger } from '../../../utils/prodLogger';
 
@@ -47,6 +49,10 @@ interface Metrics {
     timestamp?: string;
 }
 
+interface ApiResponse {
+    metrics?: Metrics;
+}
+
 const MonitoringPage: React.FC = () => {
     const queryClient = useQueryClient();
     
@@ -54,7 +60,7 @@ const MonitoringPage: React.FC = () => {
         queryKey: ['monitoring-metrics'],
         queryFn: async () => {
             const response = await adminService.getMonitoringMetrics();
-            return (response.data as any).metrics || null;
+            return (response.data as ApiResponse).metrics || null;
         },
         staleTime: 5 * 1000,
         refetchInterval: 30 * 1000,
@@ -76,12 +82,7 @@ const MonitoringPage: React.FC = () => {
 
 
     if (loading && !metrics) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
-                <span className="ml-2 text-gray-300">Загрузка метрик...</span>
-            </div>
-        );
+        return <PageLoader message="Загрузка метрик..." />;
     }
 
     if (error) {
@@ -131,7 +132,7 @@ const MonitoringPage: React.FC = () => {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-white">
-                            {(metrics as any)?.users?.total || 0}
+                            {metrics?.users?.total || 0}
                         </div>
                         <p className="text-xs text-gray-400 mt-1">Зарегистрировано</p>
                     </CardContent>
@@ -144,7 +145,7 @@ const MonitoringPage: React.FC = () => {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-green-400">
-                            {(metrics as any)?.users?.active || 0}
+                            {metrics?.users?.active || 0}
                         </div>
                         <p className="text-xs text-gray-400 mt-1">Активных пользователей</p>
                     </CardContent>
@@ -157,7 +158,7 @@ const MonitoringPage: React.FC = () => {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-red-400">
-                            {(metrics as any)?.users?.blocked || 0}
+                            {metrics?.users?.blocked || 0}
                         </div>
                         <p className="text-xs text-gray-400 mt-1">Заблокировано</p>
                     </CardContent>
@@ -170,7 +171,7 @@ const MonitoringPage: React.FC = () => {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-blue-400">
-                            {(metrics as any)?.sessions?.active || 0}
+                            {metrics?.sessions?.active || 0}
                         </div>
                         <p className="text-xs text-gray-400 mt-1">Активные сессии</p>
                     </CardContent>

@@ -106,7 +106,7 @@ function formatIssue(issue) {
 }
 
 function main() {
-  console.log(colorize('\n🎨 Design System Checker\n', 'blue'));
+  console.log(colorize('\n[CHECK] Design System Checker\n', 'blue'));
   
   // Находим все файлы для проверки
   const files = glob.sync('frontend/src/**/*.{tsx,jsx}', {
@@ -138,17 +138,17 @@ function main() {
   
   // Итоговая статистика
   console.log(colorize('─'.repeat(80), 'gray'));
-  console.log(colorize('\n📊 Статистика:\n', 'blue'));
+  console.log(colorize('\n[STATS] Статистика:\n', 'blue'));
   console.log(`  ${colorize('Ошибки:', 'red')}      ${issuesBySeverity.error}`);
   console.log(`  ${colorize('Предупреждения:', 'yellow')} ${issuesBySeverity.warning}`);
   console.log(`  ${colorize('Информация:', 'blue')}    ${issuesBySeverity.info}`);
   console.log(`  ${colorize('Всего:', 'gray')}        ${totalIssues}\n`);
   
   if (totalIssues === 0) {
-    console.log(colorize('✅ Все проверки пройдены!\n', 'green'));
+    console.log(colorize('[OK] Все проверки пройдены!\n', 'green'));
     process.exit(0);
   } else {
-    console.log(colorize('⚠️  Найдены проблемы. См. docs/DESIGN_SYSTEM.md\n', 'yellow'));
+    console.log(colorize('[WARN] Найдены проблемы. См. docs/DESIGN_SYSTEM.md\n', 'yellow'));
     process.exit(issuesBySeverity.error > 0 ? 1 : 0);
   }
 }
@@ -157,6 +157,6 @@ function main() {
 try {
   main();
 } catch (error) {
-  console.error(colorize(`\n❌ Ошибка: ${error.message}\n`, 'red'));
+  console.error(colorize(`\n[ERROR] Ошибка: ${error.message}\n`, 'red'));
   process.exit(1);
 }

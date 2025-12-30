@@ -101,13 +101,13 @@ function main() {
   const dryRun = !args.includes('--apply');
   const targetPath = args.find(arg => !arg.startsWith('--')) || 'frontend/src/components';
   
-  console.log(colorize('\n🔄 Design System Migration Tool\n', 'cyan'));
+  console.log(colorize('\n[MIGRATE] Design System Migration Tool\n', 'cyan'));
   
   if (dryRun) {
-    console.log(colorize('📋 DRY RUN MODE - No files will be modified', 'yellow'));
+    console.log(colorize('[DRY RUN] No files will be modified', 'yellow'));
     console.log(colorize('   Use --apply to actually modify files\n', 'gray'));
   } else {
-    console.log(colorize('✏️  APPLY MODE - Files will be modified\n', 'green'));
+    console.log(colorize('[APPLY] Files will be modified\n', 'green'));
   }
   
   // Находим все файлы для миграции
@@ -136,11 +136,11 @@ function main() {
   
   // Выводим результаты
   if (results.length === 0) {
-    console.log(colorize('✅ Все файлы уже соответствуют Design System!\n', 'green'));
+    console.log(colorize('[OK] Все файлы уже соответствуют Design System!\n', 'green'));
     process.exit(0);
   }
   
-  console.log(colorize('📝 Найденные изменения:\n', 'blue'));
+  console.log(colorize('[CHANGES] Найденные изменения:\n', 'blue'));
   
   for (const result of results) {
     console.log(colorize(`  ${result.file}`, 'cyan'));
@@ -152,16 +152,16 @@ function main() {
   
   // Итоговая статистика
   console.log(colorize('─'.repeat(80), 'gray'));
-  console.log(colorize('\n📊 Статистика:\n', 'blue'));
+  console.log(colorize('\n[STATS] Статистика:\n', 'blue'));
   console.log(`  ${colorize('Файлов изменено:', 'cyan')} ${results.length}`);
   console.log(`  ${colorize('Всего изменений:', 'cyan')} ${totalChanges}\n`);
   
   if (dryRun) {
-    console.log(colorize('💡 Чтобы применить изменения, запустите:', 'yellow'));
+    console.log(colorize('[TIP] Чтобы применить изменения, запустите:', 'yellow'));
     console.log(colorize(`   node scripts/migrate-to-design-system.js --apply\n`, 'gray'));
   } else {
-    console.log(colorize('✅ Миграция завершена!\n', 'green'));
-    console.log(colorize('💡 Рекомендуется:', 'yellow'));
+    console.log(colorize('[OK] Миграция завершена!\n', 'green'));
+    console.log(colorize('[TIP] Рекомендуется:', 'yellow'));
     console.log(colorize('   1. Проверить изменения: git diff', 'gray'));
     console.log(colorize('   2. Запустить проверку: npm run check:design', 'gray'));
     console.log(colorize('   3. Протестировать приложение\n', 'gray'));
@@ -172,7 +172,7 @@ function main() {
 try {
   main();
 } catch (error) {
-  console.error(colorize(`\n❌ Ошибка: ${error.message}\n`, 'red'));
+  console.error(colorize(`\n[ERROR] Ошибка: ${error.message}\n`, 'red'));
   console.error(error.stack);
   process.exit(1);
 }

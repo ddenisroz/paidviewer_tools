@@ -1,9 +1,9 @@
 # bot_service/services/tts_service.py
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from typing import List, Optional
+from typing import List
 import logging
-from datetime import datetime
+from core.datetime_utils import utcnow_naive
 
 from core.database import FilteredWord, AudioSettings, TTSUserSettings, TTSBlockedUser
 
@@ -22,7 +22,7 @@ class TTSService:
                     FilteredWord.is_active == True
                 )
             ).all()
-            
+
             return [
                 {
                     'id': word.id,
@@ -47,23 +47,23 @@ class TTSService:
                     FilteredWord.platform == platform
                 )
             ).first()
-            
+
             if existing:
                 logger.warning(f"Word '{word}' already exists in filter for user {user_id}")
                 return False
-            
+
             filtered_word = FilteredWord(
                 user_id=user_id,
                 word=word.lower(),
                 platform=platform
             )
-            
+
             self.db.add(filtered_word)
             self.db.commit()
-            
+
             logger.info(f"Added word '{word}' to filter for user {user_id}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error adding filtered word: {e}")
             self.db.rollback()
@@ -78,17 +78,17 @@ class TTSService:
                     FilteredWord.user_id == user_id
                 )
             ).first()
-            
+
             if not word:
                 logger.warning(f"Word with ID {word_id} not found for user {user_id}")
                 return False
-            
+
             self.db.delete(word)
             self.db.commit()
-            
+
             logger.info(f"Removed word '{word.word}' from filter for user {user_id}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error removing filtered word: {e}")
             self.db.rollback()
@@ -98,7 +98,7 @@ class TTSService:
         """Проверить, содержит ли текст отфильтрованные слова"""
         try:
             text_lower = text.lower()
-            
+
             # Получаем все активные фильтры для пользователя
             filters = self.db.query(FilteredWord).filter(
                 and_(
@@ -107,15 +107,15 @@ class TTSService:
                     FilteredWord.platform.in_(['all', platform])
                 )
             ).all()
-            
+
             # Проверяем каждое слово
             for filter_word in filters:
                 if filter_word.word.lower() in text_lower:
                     logger.info(f"Text filtered: '{text}' contains blocked word '{filter_word.word}'")
                     return True
-            
+
             return False
-            
+
         except Exception as e:
             logger.error(f"Error checking text filter: {e}")
             return False
@@ -134,7 +134,7 @@ class TTSService:
                 ).first()
             else:
                 raise ValueError("Either user_id or session_id must be provided")
-            
+
             if settings:
                 return {
                     "websiteVolume": settings.website_volume
@@ -169,11 +169,11 @@ class TTSService:
                 ).first()
             else:
                 raise ValueError("Either user_id or session_id must be provided")
-            
+
             if settings:
                 # Обновляем существующие настройки
                 settings.website_volume = website_volume
-                settings.updated_at = datetime.utcnow()
+                settings.updated_at = utcnow_naive()
             else:
                 # Создаем новые настройки для любого пользователя (включая гостей)
                 settings = AudioSettings(
@@ -182,7 +182,7 @@ class TTSService:
                     website_volume=website_volume
                 )
                 self.db.add(settings)
-            
+
             self.db.commit()
             user_identifier = f"user_id={user_id}" if user_id else f"session_id={session_id}"
             logger.info(f"Audio settings saved for {user_identifier}: website={website_volume}")
@@ -206,7 +206,7 @@ class TTSService:
                 ).first()
             else:
                 raise ValueError("Either user_id or session_id must be provided")
-            
+
             if settings:
                 return {
                     "engine": settings.engine,
@@ -264,8 +264,8 @@ class TTSService:
                 "enableCustomLexicon": False
             }
 
-    async def save_tts_settings(self, enable_7tv: bool, enable_twitch: bool, 
-                               enable_lexicon_filter: bool, enable_custom_lexicon: bool, 
+    async def save_tts_settings(self, enable_7tv: bool, enable_twitch: bool,
+                               enable_lexicon_filter: bool, enable_custom_lexicon: bool,
                                user_id: int = None, session_id: str = None,
                                engine: str = None, voice: str = None, listening_mode: str = None,
                                max_message_length: int = None, skip_commands: bool = None,
@@ -274,12 +274,12 @@ class TTSService:
                                client_version: int = None) -> dict:
         """Сохранить базовые настройки TTS пользователя"""
         try:
-            # ✅ VALIDATION: Проверяем что хотя бы один идентификатор передан
+            # [OK] VALIDATION: Проверяем что хотя бы один идентификатор передан
             if user_id is None and session_id is None:
-                logger.error("❌ Either user_id or session_id must be provided")
+                logger.error("[ERROR] Either user_id or session_id must be provided")
                 raise ValueError("Either user_id or session_id must be provided")
-            
-            # ✅ NULL CHECK: Ищем настройки по user_id или session_id
+
+            # [OK] NULL CHECK: Ищем настройки по user_id или session_id
             settings = None
             if user_id is not None:
                 settings = self.db.query(TTSUserSettings).filter(
@@ -289,22 +289,22 @@ class TTSService:
                 settings = self.db.query(TTSUserSettings).filter(
                     TTSUserSettings.session_id == session_id
                 ).first()
-            
+
             if settings:
-                # ✅ VERSION CHECK: Проверяем что версия совпадает (защита от race conditions)
+                # [OK] VERSION CHECK: Проверяем что версия совпадает (защита от race conditions)
                 if client_version is not None and hasattr(settings, 'version'):
                     if settings.version != client_version:
                         logger.warning(f"Version conflict: DB version={settings.version}, client version={client_version}")
                         # Возвращаем специальный статус для 409 Conflict
                         return {"success": False, "error": "Version conflict", "current_version": settings.version}
-                
+
                 # Обновляем существующие настройки
                 settings.enable_7tv = enable_7tv
                 settings.enable_twitch = enable_twitch
                 settings.enable_lexicon_filter = enable_lexicon_filter
                 settings.enable_custom_lexicon = enable_custom_lexicon
-                settings.updated_at = datetime.utcnow()
-                
+                settings.updated_at = utcnow_naive()
+
                 # Обновляем дополнительные поля если они переданы
                 if engine is not None:
                     settings.engine = engine
@@ -322,8 +322,8 @@ class TTSService:
                     settings.filter_replies = filter_replies
                 if filter_mentions is not None:
                     settings.filter_mentions = filter_mentions
-                
-                # ✅ INCREMENT VERSION: Инкрементируем версию после обновления
+
+                # [OK] INCREMENT VERSION: Инкрементируем версию после обновления
                 if hasattr(settings, 'version'):
                     settings.version += 1
             else:
@@ -344,12 +344,12 @@ class TTSService:
                     filter_mentions=filter_mentions if filter_mentions is not None else False
                 )
                 self.db.add(settings)
-            
+
             self.db.commit()
-            self.db.refresh(settings)  # ✅ Получаем свежие данные из БД
+            self.db.refresh(settings)  # [OK] Получаем свежие данные из БД
             logger.info(f"TTS settings saved for user {user_id}: engine={settings.engine}, voice={settings.voice}, "
                        f"mode={settings.listening_mode}, 7TV={enable_7tv}, Twitch={enable_twitch}")
-            # ✅ Возвращаем успех с новой версией
+            # [OK] Возвращаем успех с новой версией
             return {"success": True, "version": settings.version if hasattr(settings, 'version') else 1}
         except Exception as e:
             logger.error(f"Error saving TTS settings: {e}")
@@ -362,7 +362,7 @@ class TTSService:
             blocked_users = self.db.query(TTSBlockedUser).filter(
                 TTSBlockedUser.user_id == user_id
             ).all()
-            
+
             return [
                 {
                     'id': blocked.id,
@@ -389,24 +389,24 @@ class TTSService:
                     TTSBlockedUser.username == username.lower()
                 )
             ).first()
-            
+
             if existing:
                 logger.warning(f"User '{username}' already blocked for user {user_id}")
                 return False
-            
+
             blocked_user = TTSBlockedUser(
                 user_id=user_id,
                 channel_name=channel_name,
                 platform=platform,
                 username=username.lower()
             )
-            
+
             self.db.add(blocked_user)
             self.db.commit()
-            
+
             logger.info(f"Blocked user '{username}' for user {user_id}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error blocking user: {e}")
             self.db.rollback()
@@ -423,17 +423,17 @@ class TTSService:
                     TTSBlockedUser.username == username.lower()
                 )
             ).first()
-            
+
             if not blocked_user:
                 logger.warning(f"User '{username}' not found in blacklist for user {user_id}")
                 return False
-            
+
             self.db.delete(blocked_user)
             self.db.commit()
-            
+
             logger.info(f"Unblocked user '{username}' for user {user_id}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error unblocking user: {e}")
             self.db.rollback()
@@ -442,43 +442,43 @@ class TTSService:
     async def enable_tts(self, user_id: int = None, session_id: str = None) -> bool:
         """Включить TTS для пользователя (включая гостей)"""
         try:
-            logger.info(f"🎙️ [TTS Service] enable_tts called with user_id={user_id}, session_id={session_id}")
-            
+            logger.info(f"[MIC] [TTS Service] enable_tts called with user_id={user_id}, session_id={session_id}")
+
             # Для гостей TTS всегда доступен
             if session_id is not None:
-                logger.info(f"TTS enabled for guest user")
+                logger.info("TTS enabled for guest user")
                 return True
-            
+
             # Для обычных пользователей сохраняем в БД
             if user_id is None:
-                logger.error(f"❌ [TTS Service] user_id is None for authenticated user")
+                logger.error("[ERROR] [TTS Service] user_id is None for authenticated user")
                 return False
-            
+
             from core.database import User
-            # ✅ NULL CHECK: Запрашиваем пользователя
+            # [OK] NULL CHECK: Запрашиваем пользователя
             user = self.db.query(User).filter(User.id == user_id).first()
             if not user:
-                logger.error(f"❌ [TTS Service] User {user_id} not found in database")
+                logger.error(f"[ERROR] [TTS Service] User {user_id} not found in database")
                 # Создаем запись если нужно или возвращаем ошибку
                 return False
-            
-            # ✅ SAFETY CHECK: Убеждаемся что user объект корректен
+
+            # [OK] SAFETY CHECK: Убеждаемся что user объект корректен
             if not hasattr(user, 'tts_enabled'):
-                logger.error(f"❌ [TTS Service] User object missing tts_enabled attribute")
+                logger.error("[ERROR] [TTS Service] User object missing tts_enabled attribute")
                 return False
-            
+
             # Сохраняем состояние TTS в БД
             user.tts_enabled = True
             self.db.commit()
-            self.db.refresh(user)  # ✅ Обновляем объект из БД
-            
+            self.db.refresh(user)  # [OK] Обновляем объект из БД
+
             # Добавляем канал в connection manager
             from core.connection_manager import get_connection_manager
             connection_manager = get_connection_manager()
             if user.twitch_username:
                 connection_manager.enable_tts_for_channel(user.twitch_username.lower())
-                logger.info(f"✅ TTS enabled for Twitch channel: {user.twitch_username}")
-            
+                logger.info(f"[OK] TTS enabled for Twitch channel: {user.twitch_username}")
+
             # Для VK используем platform_user_id из токена
             from core.database import UserToken
             vk_token = self.db.query(UserToken).filter(
@@ -487,57 +487,57 @@ class TTSService:
             ).first()
             if vk_token and vk_token.platform_user_id:
                 connection_manager.enable_tts_for_channel(vk_token.platform_user_id)
-                logger.info(f"✅ TTS enabled for VK channel: {vk_token.platform_user_id}")
-            
-            logger.info(f"✅ TTS enabled for user {user_id}")
+                logger.info(f"[OK] TTS enabled for VK channel: {vk_token.platform_user_id}")
+
+            logger.info(f"[OK] TTS enabled for user {user_id}")
             return True
         except Exception as e:
-            logger.error(f"❌ [TTS Service] Error enabling TTS: {e}")
-            logger.error(f"❌ [TTS Service] Exception type: {type(e).__name__}")
+            logger.error(f"[ERROR] [TTS Service] Error enabling TTS: {e}")
+            logger.error(f"[ERROR] [TTS Service] Exception type: {type(e).__name__}")
             import traceback
-            logger.error(f"❌ [TTS Service] Traceback: {traceback.format_exc()}")
+            logger.error(f"[ERROR] [TTS Service] Traceback: {traceback.format_exc()}")
             self.db.rollback()
             return False
 
     async def disable_tts(self, user_id: int = None, session_id: str = None) -> bool:
         """Отключить TTS для пользователя (включая гостей)"""
         try:
-            logger.info(f"🎙️ [TTS Service] disable_tts called with user_id={user_id}, session_id={session_id}")
-            
+            logger.info(f"[MIC] [TTS Service] disable_tts called with user_id={user_id}, session_id={session_id}")
+
             # Для гостей TTS всегда доступен, но можно "отключить"
             if session_id is not None:
-                logger.info(f"TTS disabled for guest user")
+                logger.info("TTS disabled for guest user")
                 return True
-            
+
             # Для обычных пользователей сохраняем в БД
             if user_id is None:
-                logger.error(f"❌ [TTS Service] user_id is None for authenticated user")
+                logger.error("[ERROR] [TTS Service] user_id is None for authenticated user")
                 return False
-            
+
             from core.database import User
-            # ✅ NULL CHECK: Запрашиваем пользователя
+            # [OK] NULL CHECK: Запрашиваем пользователя
             user = self.db.query(User).filter(User.id == user_id).first()
             if not user:
-                logger.error(f"❌ [TTS Service] User {user_id} not found in database")
+                logger.error(f"[ERROR] [TTS Service] User {user_id} not found in database")
                 return False
-            
-            # ✅ SAFETY CHECK: Убеждаемся что user объект корректен
+
+            # [OK] SAFETY CHECK: Убеждаемся что user объект корректен
             if not hasattr(user, 'tts_enabled'):
-                logger.error(f"❌ [TTS Service] User object missing tts_enabled attribute")
+                logger.error("[ERROR] [TTS Service] User object missing tts_enabled attribute")
                 return False
-            
+
             # Сохраняем состояние TTS в БД
             user.tts_enabled = False
             self.db.commit()
-            self.db.refresh(user)  # ✅ Обновляем объект из БД
-            
+            self.db.refresh(user)  # [OK] Обновляем объект из БД
+
             # Удаляем канал из connection manager
             from core.connection_manager import get_connection_manager
             connection_manager = get_connection_manager()
             if user.twitch_username:
                 connection_manager.disable_tts_for_channel(user.twitch_username.lower())
                 logger.info(f"⏸️ TTS disabled for Twitch channel: {user.twitch_username}")
-            
+
             # Для VK используем platform_user_id из токена
             from core.database import UserToken
             vk_token = self.db.query(UserToken).filter(
@@ -547,41 +547,41 @@ class TTSService:
             if vk_token and vk_token.platform_user_id:
                 connection_manager.disable_tts_for_channel(vk_token.platform_user_id)
                 logger.info(f"⏸️ TTS disabled for VK channel: {vk_token.platform_user_id}")
-            
+
             logger.info(f"⏸️ TTS disabled for user {user_id}")
             return True
         except Exception as e:
-            logger.error(f"❌ [TTS Service] Error disabling TTS: {e}")
-            logger.error(f"❌ [TTS Service] Exception type: {type(e).__name__}")
+            logger.error(f"[ERROR] [TTS Service] Error disabling TTS: {e}")
+            logger.error(f"[ERROR] [TTS Service] Exception type: {type(e).__name__}")
             import traceback
-            logger.error(f"❌ [TTS Service] Traceback: {traceback.format_exc()}")
+            logger.error(f"[ERROR] [TTS Service] Traceback: {traceback.format_exc()}")
             self.db.rollback()
             return False
 
     async def save_listening_mode(self, user_id: int, listening_mode: str) -> bool:
         """Сохранить режим прослушивания пользователя"""
         try:
-            # ✅ VALIDATION: Проверяем входные данные
+            # [OK] VALIDATION: Проверяем входные данные
             if not user_id or not listening_mode:
                 logger.error(f"Invalid parameters: user_id={user_id}, listening_mode={listening_mode}")
                 return False
-            
+
             from core.database import User
-            # ✅ NULL CHECK: Запрашиваем пользователя
+            # [OK] NULL CHECK: Запрашиваем пользователя
             user = self.db.query(User).filter(User.id == user_id).first()
             if not user:
                 logger.error(f"User {user_id} not found")
                 return False
-            
-            # ✅ SAFETY CHECK: Убеждаемся что user объект имеет нужное поле
+
+            # [OK] SAFETY CHECK: Убеждаемся что user объект имеет нужное поле
             if not hasattr(user, 'tts_listening_mode'):
-                logger.error(f"User object missing tts_listening_mode attribute")
+                logger.error("User object missing tts_listening_mode attribute")
                 return False
-            
+
             user.tts_listening_mode = listening_mode
             self.db.commit()
-            self.db.refresh(user)  # ✅ Обновляем объект из БД
-            
+            self.db.refresh(user)  # [OK] Обновляем объект из БД
+
             logger.info(f"Listening mode saved for user {user_id}: {listening_mode}")
             return True
         except Exception as e:
@@ -595,24 +595,24 @@ class TTSService:
             from core.database import User
             import secrets
             import string
-            
+
             user = self.db.query(User).filter(User.id == user_id).first()
             if not user:
                 logger.error(f"User {user_id} not found")
                 return None
-            
+
             # Проверяем, есть ли уже токен у пользователя
             if hasattr(user, 'obs_token') and user.obs_token:
                 logger.info(f"User {user_id} already has OBS token: {user.obs_token}")
                 return user.obs_token
-            
+
             # Генерируем новый токен
             token = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
-            
+
             # Сохраняем токен в базе данных
             user.obs_token = token
             self.db.commit()
-            
+
             logger.info(f"Generated OBS token for user {user_id}: {token}")
             return token
         except Exception as e:
@@ -625,19 +625,19 @@ class TTSService:
             from core.database import User
             import secrets
             import string
-            
+
             user = self.db.query(User).filter(User.id == user_id).first()
             if not user:
                 logger.error(f"User {user_id} not found")
                 return None
-            
+
             # Генерируем новый токен
             token = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
-            
+
             # Сохраняем новый токен в базе данных
             user.obs_token = token
             self.db.commit()
-            
+
             logger.info(f"Regenerated OBS token for user {user_id}: {token}")
             return token
         except Exception as e:
@@ -661,9 +661,9 @@ class TTSService:
             # Проверяем существование голоса в TTS Service
             import httpx
             from core.config import settings
-            
+
             tts_service_url = settings.tts_service_url
-            
+
             try:
                 async with httpx.AsyncClient(timeout=5.0) as client:
                     # Проверяем глобальные голоса
@@ -671,31 +671,31 @@ class TTSService:
                     if response.status_code == 200:
                         global_voices = response.json().get('voices', [])
                         voice_exists_global = any(v.get('name') == voice_name.lower() for v in global_voices)
-                        
+
                         # Проверяем пользовательские голоса
                         response_user = await client.get(f"{tts_service_url}/api/tts/user/voices/{user_id}")
                         user_voices = []
                         if response_user.status_code == 200:
                             user_voices = response_user.json().get('voices', [])
-                        
+
                         voice_exists_user = any(v.get('name') == voice_name.lower() for v in user_voices)
-                        
+
                         if not (voice_exists_global or voice_exists_user):
                             logger.warning(f"Voice '{voice_name}' not found in TTS Service")
                             return False
             except Exception as e:
                 logger.error(f"Error checking voice in TTS Service: {e}")
                 # Не блокируем, если TTS Service недоступен - просто продолжаем
-            
+
             # Сохраняем голос в TTSUserSettings
             settings = db.query(TTSUserSettings).filter(
                 TTSUserSettings.user_id == user_id
             ).first()
-            
+
             if settings:
                 settings.voice = voice_name.lower()
-                settings.updated_at = datetime.utcnow()
-                logger.info(f"✅ Voice updated to '{voice_name}' for user {user_id}")
+                settings.updated_at = utcnow_naive()
+                logger.info(f"[OK] Voice updated to '{voice_name}' for user {user_id}")
             else:
                 # Создаем новые настройки если их нет
                 settings = TTSUserSettings(
@@ -711,12 +711,12 @@ class TTSService:
                     skip_commands=True
                 )
                 db.add(settings)
-                logger.info(f"✅ Created TTS settings with voice '{voice_name}' for user {user_id}")
-            
+                logger.info(f"[OK] Created TTS settings with voice '{voice_name}' for user {user_id}")
+
             db.commit()
             return True
-            
+
         except Exception as e:
-            logger.error(f"❌ Error setting voice: {e}", exc_info=True)
+            logger.error(f"[ERROR] Error setting voice: {e}", exc_info=True)
             db.rollback()
             return False

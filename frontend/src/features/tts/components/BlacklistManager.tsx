@@ -1,14 +1,17 @@
-// src/components/tts/BlacklistManager.tsx
-import React, { useState, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+﻿// src/components/tts/BlacklistManager.tsx
+import React, { useCallback, useState } from 'react';
+
+import { ChevronDown, Plus, UserX, X } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { X, Plus, UserX, VolumeX, ChevronDown } from 'lucide-react';
-import { toast } from 'sonner';
-import { useIntegrations } from '../../../context/IntegrationsContext';
+import { toast } from '@/utils/toastManager';
+
 import { useAuth } from '../../../context/AuthContext';
+import { useIntegrations } from '../../../context/IntegrationsContext';
 import { useBlockedUsers, useBlockUser, useUnblockUser } from '../../../queries/tts/ttsQueries';
 
 interface BlockedUser {
@@ -42,9 +45,10 @@ const BlacklistManager: React.FC = React.memo(() => {
             const platformName = variables.platform === 'twitch' ? 'Twitch' : 'VK Live';
             toast.success(`Пользователь ${variables.username} заглушен на ${platformName}`);
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             // Ошибка уже обработана в hook
-            if (error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED') {
+            const err = error as { code?: string };
+            if (err.code === 'ERR_NETWORK' || err.code === 'ERR_CONNECTION_REFUSED') {
                 // Не показываем ошибку если TTS сервис недоступен
             }
         },
@@ -55,15 +59,18 @@ const BlacklistManager: React.FC = React.memo(() => {
             const platformName = variables.platform === 'twitch' ? 'Twitch' : 'VK Live';
             toast.success(`${variables.username} разглушен на ${platformName}`);
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             // Ошибка уже обработана в hook
-            if (error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED') {
+            const err = error as { code?: string };
+            if (err.code === 'ERR_NETWORK' || err.code === 'ERR_CONNECTION_REFUSED') {
                 // Не показываем ошибку если TTS сервис недоступен
             }
         },
     });
 
-    const blacklist: BlockedUser[] = Array.isArray(blockedUsersData) ? blockedUsersData : (blockedUsersData as any)?.data?.blocked_users || [];
+    const blacklist: BlockedUser[] = Array.isArray(blockedUsersData) 
+        ? blockedUsersData 
+        : ((blockedUsersData as { data?: { blocked_users?: BlockedUser[] } } | undefined)?.data?.blocked_users ?? []);
     const adding = blockUserMutation.isPending;
 
     // Получаем доступные платформы из интеграций
@@ -131,9 +138,9 @@ const BlacklistManager: React.FC = React.memo(() => {
 
     // Получаем иконку для платформы
     const getPlatformIcon = (platform: string): string => {
-        if (platform === 'twitch') return '🟣';
-        if (platform === 'vk') return '🔵';
-        return '❓';
+        if (platform === 'twitch') return '[TW]';
+        if (platform === 'vk') return '[VK]';
+        return '[?]';
     };
 
     // Получаем цвет для платформы
@@ -202,10 +209,10 @@ const BlacklistManager: React.FC = React.memo(() => {
                                 </SelectTrigger>
                                 <SelectContent>
                                     {availablePlatforms.includes('twitch') && (
-                                        <SelectItem value="twitch">🟣 Twitch</SelectItem>
+                                        <SelectItem value="twitch">[TW] Twitch</SelectItem>
                                     )}
                                     {availablePlatforms.includes('vk') && (
-                                        <SelectItem value="vk">🔵 VK Live</SelectItem>
+                                        <SelectItem value="vk">[VK] VK Live</SelectItem>
                                     )}
                                 </SelectContent>
                             </Select>

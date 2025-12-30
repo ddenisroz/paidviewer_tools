@@ -1,10 +1,11 @@
 /**
  * Integrations Service - инкапсуляция всех Integrations API вызовов
  */
-import { apiClient } from '../client';
 import { API_BASE_URL } from '../../../constants';
-import type { AxiosResponse } from 'axios';
+import { apiClient } from '../client';
+
 import type { ApiResponse } from '../../../types';
+import type { AxiosResponse } from 'axios';
 
 /**
  * Integrations Service

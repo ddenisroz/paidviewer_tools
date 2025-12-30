@@ -1,8 +1,10 @@
 import React from 'react';
+
 import { AlertCircle, RefreshCw } from 'lucide-react';
+
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 /**
  * Fallback UI components for critical features

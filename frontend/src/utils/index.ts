@@ -1,7 +1,8 @@
-import { VALIDATION, TIMEOUTS, REGEX } from '../constants';
-import { logger } from '../utils/prodLogger';
+import { REGEX, TIMEOUTS, VALIDATION } from '../constants';
 import { formatDate as formatDateUtil, formatRelativeTime as formatRelativeTimeUtil } from '../shared/utils/formatUtils';
-import { capitalize as capitalizeUtil, truncateString as truncateUtil, stripHtml as stripHtmlUtil } from '../shared/utils/stringUtils';
+import { capitalize as capitalizeUtil, stripHtml as stripHtmlUtil, truncateString as truncateUtil } from '../shared/utils/stringUtils';
+
+import { logger } from "./prodLogger";
 
 export interface ValidationResult {
   isValid: boolean;
@@ -60,10 +61,10 @@ export const validateUrl = (url: string): ValidationResult => {
   return { isValid: true };
 };
 
-export const safeGet = <T, D>(obj: T | null | undefined, path: string, defaultValue: D = null as D): D | any => {
+export const safeGet = <T, D>(obj: T | null | undefined, path: string, defaultValue: D = null as D): D | unknown => {
   if (!obj || !path) return defaultValue;
   const keys = path.split('.');
-  let result: any = obj;
+  let result: Record<string, unknown> | unknown = obj;
   for (const key of keys) {
     if (result && typeof result === 'object' && key in result) {
       result = result[key as keyof typeof result];
@@ -78,18 +79,18 @@ export const deepClone = <T>(obj: T): T => {
   if (obj === null || typeof obj !== 'object') return obj;
   if (obj instanceof Date) return new Date(obj.getTime()) as unknown as T;
   if (Array.isArray(obj)) return obj.map((item) => deepClone(item)) as unknown as T;
-  const clonedObj: Record<string, any> = {};
-  Object.keys(obj as Record<string, any>).forEach((key) => {
-    clonedObj[key] = deepClone((obj as Record<string, any>)[key]);
+  const clonedObj: Record<string, unknown> = {};
+  Object.keys(obj as Record<string, unknown>).forEach((key) => {
+    clonedObj[key] = deepClone((obj as Record<string, unknown>)[key]);
   });
   return clonedObj as T;
 };
 
-export const removeUndefined = <T extends Record<string, any>>(obj: T): Partial<T> => {
+export const removeUndefined = <T extends Record<string, unknown>>(obj: T): Partial<T> => {
   const cleaned: Partial<T> = {};
   Object.keys(obj).forEach((key) => {
     if (obj[key] !== undefined) {
-      (cleaned as any)[key] = obj[key];
+      (cleaned as Record<string, unknown>)[key] = obj[key];
     }
   });
   return cleaned;
@@ -141,7 +142,7 @@ export const buildUrl = (base: string, params: Record<string, string | number | 
   return url.toString();
 };
 
-export const getCookie = (name: string): any => {
+export const getCookie = (name: string): string | undefined | null => {
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);
   if (parts.length === 2) {
@@ -164,7 +165,7 @@ interface CookieOptions {
   sameSite?: 'Strict' | 'Lax' | 'None';
 }
 
-export const setCookie = (name: string, value: any, options: CookieOptions = {}): void => {
+export const setCookie = (name: string, value: string | number | boolean, options: CookieOptions = {}): void => {
   const defaults: CookieOptions = { path: '/', maxAge: 86400 * 30 };
   const opts = { ...defaults, ...options };
   let cookieString = `${name}=${encodeURIComponent(JSON.stringify(value))}`;
@@ -186,7 +187,7 @@ export const removeCookie = (name: string, path: string = '/'): void => {
   document.cookie = `${name}=; path=${path}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
 };
 
-export const debounce = <Args extends any[]>(func: (...args: Args) => void, wait: number = TIMEOUTS.DEBOUNCE_DELAY) => {
+export const debounce = <Args extends unknown[]>(func: (...args: Args) => void, wait: number = TIMEOUTS.DEBOUNCE_DELAY) => {
   let timeout: ReturnType<typeof setTimeout> | undefined;
   return function executedFunction(this: unknown, ...args: Args) {
     const later = () => {
@@ -198,7 +199,7 @@ export const debounce = <Args extends any[]>(func: (...args: Args) => void, wait
   };
 };
 
-export const throttle = <Args extends any[]>(func: (...args: Args) => void, limit: number) => {
+export const throttle = <Args extends unknown[]>(func: (...args: Args) => void, limit: number) => {
   let inThrottle = false;
   return function throttled(this: unknown, ...args: Args) {
     if (!inThrottle) {

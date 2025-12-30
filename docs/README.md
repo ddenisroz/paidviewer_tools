@@ -1,180 +1,173 @@
 # TTS_TTV_0.02 Documentation
 
-**Last Updated:** November 17, 2025  
-**Project Version:** 0.03
-
-Welcome to the TTS_TTV_0.02 documentation. This is a unified streaming platform for Twitch and VK Live with text-to-speech, chat interactivity, loyalty systems, and OBS widgets.
+**Version:** 0.03  
+**Last Updated:** December 27, 2025  
+**Status:** Production Ready
 
 ---
 
-## Quick Navigation
+## 📚 Quick Links
 
-### New to the Project?
-1. **[Project README](../README.md)** - Start here for project overview
-2. **[Quick Start Guide](guides/QUICK_START.md)** - Get up and running in 5 minutes
-3. **[Developer Guide](DEVELOPER_GUIDE.md)** - Development patterns and best practices
+- **[Quick Start](QUICK_START.md)** - Get started in 5 minutes
+- **[Architecture Guide](ARCHITECTURE_GUIDE.md)** - System architecture overview
+- **[Developer Guide](DEVELOPER_GUIDE.md)** - Development guidelines
+- **[Current Status](CURRENT_STATUS.md)** - Project status and metrics
+- **[Deployment](DEPLOYMENT.md)** - Production deployment guide
+
+---
+
+## 📖 Documentation Structure
+
+### 🚀 Getting Started
+- [Quick Start](QUICK_START.md) - Installation and setup
+- [Developer Guide](DEVELOPER_GUIDE.md) - Development workflow
+- [LLM Development Rules](LLM_DEVELOPMENT_RULES.md) - AI assistant guidelines
+
+### 🏗️ Architecture
+- [Architecture Guide](ARCHITECTURE_GUIDE.md) - System design
+- [Current Status](CURRENT_STATUS.md) - Implementation status
+- [DO NOT TOUCH](DO_NOT_TOUCH.md) - Protected systems
+
+### ⚙️ Setup & Installation
+- [setup/PYTORCH_INSTALLATION.md](setup/PYTORCH_INSTALLATION.md) - PyTorch with CUDA
+- [setup/VK_LIVE_WEBSOCKET_GUIDE.md](setup/VK_LIVE_WEBSOCKET_GUIDE.md) - VK WebSocket integration
+
+### 🎨 Features
+- [features/DROPS_SYSTEM.md](features/DROPS_SYSTEM.md) - Lootbox mechanics
+- [features/VALIDATION_SYSTEM.md](features/VALIDATION_SYSTEM.md) - Input validation
+- [features/DESIGN_SYSTEM.md](features/DESIGN_SYSTEM.md) - UI design system
+- [features/SECURITY_LOGIC.md](features/SECURITY_LOGIC.md) - Security implementation
+
+### 📡 API Documentation
+- [VK Live API](vk/) - Complete VK Live API docs (18 files)
+- Twitch API - See [Twitch Dev Docs](https://dev.twitch.tv/docs/)
+- YouTube API - See [YouTube Data API](https://developers.google.com/youtube/v3)
+
+### 📝 Guides
+- [guides/BOT_OAUTH_SETUP_GUIDE.md](guides/BOT_OAUTH_SETUP_GUIDE.md) - OAuth configuration
+- [guides/CATEGORY_MAPPING_GUIDE.md](guides/CATEGORY_MAPPING_GUIDE.md) - Stream categories
+- [guides/TTS_TROUBLESHOOTING.md](guides/TTS_TROUBLESHOOTING.md) - TTS issues
+- [guides/QUICK_START_BOT_OAUTH.md](guides/QUICK_START_BOT_OAUTH.md) - Bot OAuth quick start
+- [guides/QUICK_START_OAUTH.md](guides/QUICK_START_OAUTH.md) - User OAuth quick start
+
+### 📊 Reports & Archive
+- [reports/2025-12-27-vk-api-implementation.md](reports/2025-12-27-vk-api-implementation.md) - VK API upgrade
+- [reports/2025-12-27-python312-migration.md](reports/2025-12-27-python312-migration.md) - Python 3.12 migration
+- [reports/2025-12-27-session-summary.md](reports/2025-12-27-session-summary.md) - Latest session
+
+---
+
+## 🎯 By Role
 
 ### For Developers
-1. **[Architecture Guide](architecture/ARCHITECTURE_GUIDE.md)** - System architecture overview
-2. **[Developer Guide](DEVELOPER_GUIDE.md)** - Coding patterns and conventions
-3. **[Current Status](CURRENT_STATUS.md)** - What's working and what's not
+1. [Developer Guide](DEVELOPER_GUIDE.md) - Start here
+2. [Architecture Guide](ARCHITECTURE_GUIDE.md) - Understand the system
+3. [LLM Development Rules](LLM_DEVELOPMENT_RULES.md) - AI guidelines
+4. [DO NOT TOUCH](DO_NOT_TOUCH.md) - Protected code
 
-### For AI Assistants
-1. **[LLM Development Rules](LLM_DEVELOPMENT_RULES.md)** - REQUIRED READING
-2. **[Current Status](CURRENT_STATUS.md)** - Implementation status
-3. **[Do Not Touch](DO_NOT_TOUCH.md)** - Protected systems and files
+### For DevOps
+1. [Deployment](DEPLOYMENT.md) - Production setup
+2. [Quick Start](QUICK_START.md) - Local development
+3. [setup/PYTORCH_INSTALLATION.md](setup/PYTORCH_INSTALLATION.md) - GPU setup
 
----
-
-## Documentation Structure
-
-### Guides (`guides/`)
-User-focused guides for setup and usage:
-- **[Quick Start](guides/QUICK_START.md)** - Fast setup guide
-- **[Quick Setup](guides/QUICK_SETUP.md)** - Configuration guide
-- **[Setup Guide](guides/SETUP_GUIDE.md)** - Comprehensive setup instructions
-
-### Architecture (`architecture/`)
-Technical architecture documentation:
-- **[Architecture Guide](architecture/ARCHITECTURE_GUIDE.md)** - System design overview
-- **[TTS Architecture](architecture/TTS_ARCHITECTURE.md)** - TTS system design
-- **[Validation System](architecture/VALIDATION_SYSTEM.md)** - Input validation patterns
-- **[Caching System](architecture/CACHING_SYSTEM.md)** - Caching strategies
-- **[Design System](architecture/DESIGN_SYSTEM.md)** - UI design system (8px grid)
-- **[Shared WebSocket](architecture/SHARED_WEBSOCKET.md)** - WebSocket with Leader Election
-
-### API Documentation (`api/`)
-API endpoint documentation:
-- **[Admin Panel Endpoints](api/ADMIN_PANEL_ENDPOINTS_STATUS.md)** - Admin API status
-
-### Feature Documentation
-
-#### TTS (Text-to-Speech)
-- **[TTS Architecture](architecture/TTS_ARCHITECTURE.md)** - TTS system design
-- **[TTS Channel Points Mode](TTS_CHANNEL_POINTS_MODE.md)** - Channel points integration
-- **[Local TTS Integration](LOCAL_TTS_INTEGRATION.md)** - F5-TTS setup
-- **[Voice Upload System](VOICE_UPLOAD_UNIFIED.md)** - Custom voice uploads
-- **[Voice Separation](VOICE_SEPARATION_GLOBAL_USER.md)** - Global vs user voices
-- **[Admin Voice Management](ADMIN_VOICE_MANAGEMENT.md)** - Voice administration
-- **[gTTS Voices](GTTS_VOICES.md)** - Google TTS voice options
-
-#### Security & Moderation
-- **[Security Logic](SECURITY_LOGIC.md)** - Authentication and authorization
-- **[Admin Blocking & Whitelist](ADMIN_BLOCKING_AND_WHITELIST.md)** - User moderation
-- **[Account Deletion System](ACCOUNT_DELETION_SYSTEM.md)** - GDPR compliance
-- **[Guest Mode Support](GUEST_MODE_SUPPORT.md)** - Unauthenticated access
-
-#### Channel Points & Rewards
-- **[VK Channel Points](VK_CHANNEL_POINTS_IMPLEMENTATION.md)** - VK Live rewards
-- **[Drops System](DROPS_SYSTEM.md)** - Lootbox mechanics and streaks
-
-#### Commands & Integrations
-- **[Unified Commands](UNIFIED_COMMANDS.md)** - Command system
-- **[Roles Reference](ROLES_REFERENCE.md)** - Permission roles
-- **[Category Mapping](CATEGORY_MAPPING_GUIDE.md)** - Twitch ↔ VK categories
-- **[VK Username & Admin Users](VK_USERNAME_AND_ADMIN_USERS_EXPLANATION.md)** - VK user handling
-
-#### Admin Panel
-- **[Admin Panel Endpoints](api/ADMIN_PANEL_ENDPOINTS_STATUS.md)** - API endpoints
-- **[Admin Voice Management](ADMIN_VOICE_MANAGEMENT.md)** - Voice controls
-- **[Admin Blocking](ADMIN_BLOCKING_AND_WHITELIST.md)** - User management
-
-#### System Documentation
-- **[Token System](TOKEN_SYSTEM_UNIFIED.md)** - OAuth token management
-- **[Validation Quick Reference](VALIDATION_QUICK_REFERENCE.md)** - Validation patterns
-
-### Deployment & Operations
-- **[Deployment Guide](DEPLOYMENT.md)** - Production deployment
-- **[Docker Deployment](DOCKER_DEPLOYMENT.md)** - Docker setup
-
-### Project Management
-- **[Current Status](CURRENT_STATUS.md)** - Implementation status
-- **[Changelog](CHANGELOG.md)** - Version history
-- **[Do Not Touch](DO_NOT_TOUCH.md)** - Protected systems
-- **[Project Structure Audit](PROJECT_STRUCTURE_AUDIT.md)** - Codebase organization
+### For Streamers
+1. [Quick Start](QUICK_START.md) - Get started
+2. [guides/BOT_OAUTH_SETUP_GUIDE.md](guides/BOT_OAUTH_SETUP_GUIDE.md) - Connect your channel
+3. [guides/TTS_TROUBLESHOOTING.md](guides/TTS_TROUBLESHOOTING.md) - Fix issues
 
 ---
 
-## Finding Information
+## 🔍 By Topic
 
-### By Topic
+### Authentication & OAuth
+- [guides/BOT_OAUTH_SETUP_GUIDE.md](guides/BOT_OAUTH_SETUP_GUIDE.md)
+- [guides/QUICK_START_BOT_OAUTH.md](guides/QUICK_START_BOT_OAUTH.md)
+- [guides/QUICK_START_OAUTH.md](guides/QUICK_START_OAUTH.md)
+- [vk/Авторизация.md](vk/Авторизация.md)
 
-**Getting Started**
-- Setup → [Quick Start](guides/QUICK_START.md)
-- Development → [Developer Guide](DEVELOPER_GUIDE.md)
-- Deployment → [Deployment Guide](DEPLOYMENT.md)
+### TTS System
+- [guides/TTS_TROUBLESHOOTING.md](guides/TTS_TROUBLESHOOTING.md)
+- [GTTS_VOICES.md](GTTS_VOICES.md)
+- [LOCAL_TTS_INTEGRATION.md](LOCAL_TTS_INTEGRATION.md)
+- [TTS_CHANNEL_POINTS_MODE.md](TTS_CHANNEL_POINTS_MODE.md)
 
-**Features**
-- TTS System → [TTS Architecture](architecture/TTS_ARCHITECTURE.md)
-- Drops/Lootboxes → [Drops System](DROPS_SYSTEM.md)
-- Commands → [Unified Commands](UNIFIED_COMMANDS.md)
-- Channel Points → [VK Channel Points](VK_CHANNEL_POINTS_IMPLEMENTATION.md)
+### Drops & Rewards
+- [features/DROPS_SYSTEM.md](features/DROPS_SYSTEM.md)
+- [VK_CHANNEL_POINTS_IMPLEMENTATION.md](VK_CHANNEL_POINTS_IMPLEMENTATION.md)
 
-**Technical**
-- Architecture → [Architecture Guide](architecture/ARCHITECTURE_GUIDE.md)
-- WebSocket → [Shared WebSocket](architecture/SHARED_WEBSOCKET.md)
-- Security → [Security Logic](SECURITY_LOGIC.md)
-- Validation → [Validation System](architecture/VALIDATION_SYSTEM.md)
+### Security & Validation
+- [features/SECURITY_LOGIC.md](features/SECURITY_LOGIC.md)
+- [features/VALIDATION_SYSTEM.md](features/VALIDATION_SYSTEM.md)
+- [VALIDATION_QUICK_REFERENCE.md](VALIDATION_QUICK_REFERENCE.md)
 
-**Administration**
-- Admin Panel → [Admin Panel Endpoints](api/ADMIN_PANEL_ENDPOINTS_STATUS.md)
-- User Management → [Admin Blocking](ADMIN_BLOCKING_AND_WHITELIST.md)
-- Voice Management → [Admin Voice Management](ADMIN_VOICE_MANAGEMENT.md)
+### UI/UX
+- [features/DESIGN_SYSTEM.md](features/DESIGN_SYSTEM.md)
+- [UI_COLOR_STANDARDS.md](UI_COLOR_STANDARDS.md)
 
----
-
-## Technology Stack
-
-**Backend:** FastAPI 0.121.2, Python 3.10+, SQLAlchemy 2.0.44, Alembic 1.17.1  
-**Frontend:** React 19.1.1, Vite 7.1.2, TypeScript (migration in progress), Tailwind CSS 3.4.17  
-**Database:** SQLite (dev) / PostgreSQL (prod)  
-**TTS:** Google Cloud TTS, F5-TTS 1.1.9  
-**Infrastructure:** Docker, nginx, Cloudflare Tunnel
+### VK Live Integration
+- [vk/](vk/) - Complete API documentation (18 files)
+- [setup/VK_LIVE_WEBSOCKET_GUIDE.md](setup/VK_LIVE_WEBSOCKET_GUIDE.md)
+- [VK_USERNAME_AND_ADMIN_USERS_EXPLANATION.md](VK_USERNAME_AND_ADMIN_USERS_EXPLANATION.md)
 
 ---
 
-## Project Status
+## 📦 Project Structure
 
-### Working Features
-- ✅ Multi-platform support (Twitch, VK Live, DonationAlerts)
-- ✅ TTS engines (Google Cloud TTS, F5-TTS Advanced, F5-TTS Simple)
-- ✅ Chat overlay for OBS
-- ✅ Command system (global, override, custom)
-- ✅ Drops system (lootboxes, streaks, donations)
-- ✅ YouTube integration
-- ✅ Guest mode
-- ✅ Admin panel
-- ✅ Permission system (RBAC)
-- ✅ WebSocket with Leader Election
-
-### In Development
-- 🚧 Enhanced admin panel features
-- 🚧 Donation interactivity enhancements
-- 🚧 Personality analysis system
-- 🚧 Interface improvements
+```
+TTS_TTV_0.02/
+├── bot_service/          # FastAPI backend
+├── frontend/             # React 19 + Vite frontend
+├── tts_service/          # F5-TTS Advanced (multi-user)
+├── tts_service_simple/   # F5-TTS Simple (single-user)
+├── docs/                 # This documentation
+├── scripts/              # Utility scripts
+└── docker-compose.*.yml  # Docker configurations
+```
 
 ---
 
-## Contributing
+## 🚀 Quick Commands
 
-When updating documentation:
+```bash
+# Development
+npm run dev:frontend      # Start frontend (localhost:5173)
+npm run dev:bot          # Start backend (localhost:8000)
+npm run dev:tts          # Start TTS service (localhost:8001)
 
-1. **Update relevant docs** after code changes
-2. **Update CURRENT_STATUS.md** for feature status changes
-3. **Add entries to CHANGELOG.md** for significant changes
-4. **Follow naming conventions** (see [Developer Guide](DEVELOPER_GUIDE.md))
-5. **Use relative links** for cross-references
-6. **Include code examples** with language tags
+# Production (Docker)
+npm start                # Start all services
+npm stop                 # Stop all services
+npm run logs             # View logs
+
+# Testing
+cd bot_service && pytest # Backend tests
+cd frontend && npm test  # Frontend tests
+
+# Code Quality
+npm run check:design     # Design system compliance
+cd bot_service && ruff check .  # Python linting
+```
 
 ---
 
-## Support & Resources
+## 📞 Support
 
-- **Main README:** [../README.md](../README.md)
-- **Documentation Index:** [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md) (legacy)
-- **VK Live API:** See `vk/` directory for VK-specific documentation
+- **Issues:** Check [Current Status](CURRENT_STATUS.md) first
+- **Troubleshooting:** See [guides/TTS_TROUBLESHOOTING.md](guides/TTS_TROUBLESHOOTING.md)
+- **Development:** Read [LLM_DEVELOPMENT_RULES.md](LLM_DEVELOPMENT_RULES.md)
 
 ---
 
-**Documentation Version:** 4.0.0  
-**Last Updated:** November 17, 2025
+## 📝 Recent Updates
+
+- **2025-12-27:** Python 3.12 migration, VK API improvements, project cleanup
+- **2025-11-14:** Version 0.03 - Stabilization & Optimization
+- **2025-11-09:** Code refactoring and quality improvements
+
+See [CHANGELOG.md](CHANGELOG.md) for full history.
+
+---
+
+**Version:** 0.03  
+**Status:** Production Ready  
+**Last Updated:** December 27, 2025

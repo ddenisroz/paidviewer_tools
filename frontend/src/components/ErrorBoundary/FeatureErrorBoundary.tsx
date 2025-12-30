@@ -1,8 +1,11 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+
 import { AlertCircle, RefreshCw } from 'lucide-react';
-import { Button } from '../ui/button';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+
+import { handleBoundaryError } from '../../utils/errorUtils';
 import { logger } from '../../utils/prodLogger';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Button } from '../ui/button';
 
 interface Props {
   children: ReactNode;
@@ -29,22 +32,25 @@ class FeatureErrorBoundary extends Component<Props, State> {
     };
   }
 
-  static getDerivedStateFromError(error: Error): Partial<State> {
+  static getDerivedStateFromError(_error: Error): Partial<State> {
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     const { featureName } = this.props;
-    logger.error(`⚠️ [FeatureErrorBoundary] Error in feature "${featureName}":`, error);
-    logger.error('⚠️ [FeatureErrorBoundary] Component stack:', errorInfo.componentStack);
+    logger.error(`[WARN] [FeatureErrorBoundary] Error in feature "${featureName}":`, error);
+    logger.error('[WARN] [FeatureErrorBoundary] Component stack:', errorInfo.componentStack);
     
     this.setState({ error });
+
+    // Use centralized error handler
+    handleBoundaryError(error, errorInfo);
 
     // Report to backend
     this.reportError(error, errorInfo);
   }
 
-  reportError = async (error: Error, errorInfo: ErrorInfo) => {
+  reportError = async (error: Error, errorInfo: ErrorInfo): Promise<void> => {
     try {
       await fetch('/api/errors/report', {
         method: 'POST',
@@ -59,19 +65,19 @@ class FeatureErrorBoundary extends Component<Props, State> {
           timestamp: new Date().toISOString(),
         }),
       }).catch(() => {});
-    } catch (e) {
+    } catch {
       // Ignore
     }
   };
 
-  handleReset = () => {
+  handleReset = (): void => {
     this.setState({
       hasError: false,
       error: null,
     });
   };
 
-  render() {
+  render(): ReactNode {
     if (this.state.hasError) {
       const { featureName, fallback } = this.props;
       const { error } = this.state;

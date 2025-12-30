@@ -1,19 +1,17 @@
 # api/drops_api.py
 import logging
-import json
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from pydantic import BaseModel, Field, validator
-import random
+from pydantic import BaseModel, Field
 import time
 
-from core.database import get_db, DropsConfig, DropsReward, DropsQuality, UserStreak, DropsHistory, MythicalDropsSession, DonationAlert, UserToken, User
+from core.database import get_db, DropsConfig, DropsReward, DropsQuality, UserStreak, DropsHistory, MythicalDropsSession, UserToken, User
+from core.config import settings
 from auth.auth import get_current_user, get_current_user_optional
 from core.datetime_utils import utcnow_naive
-from utils.enhanced_logger import log_request, log_response, drops_logger
+from utils.enhanced_logger import drops_logger
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +23,7 @@ class DropsConfigCreate(BaseModel):
     """Создание конфигурации Drops"""
     channel_name: str = Field(..., min_length=1, max_length=100)
     platform: str = Field(..., pattern="^(twitch|vk)$")
-    
+
     # Стрик настройки
     streak_enabled: bool = True
     streak_days_common: int = Field(1, ge=1, le=365)
@@ -33,14 +31,14 @@ class DropsConfigCreate(BaseModel):
     streak_days_epic: int = Field(7, ge=1, le=365)
     streak_days_legendary: int = Field(14, ge=1, le=365)
     streak_messages_required: int = Field(5, ge=1, le=100)
-    
+
     # Донат настройки
     donation_enabled: bool = True
     donation_amount_common: float = Field(50.0, ge=0.01, le=1000000)
     donation_amount_rare: float = Field(100.0, ge=0.01, le=1000000)
     donation_amount_epic: float = Field(500.0, ge=0.01, le=1000000)
     donation_amount_legendary: float = Field(1000.0, ge=0.01, le=1000000)
-    
+
     # Мифический лутбокс
     mythical_enabled: bool = True
     mythical_min_interval_hours: int = Field(2, ge=0, le=24)
@@ -62,19 +60,19 @@ class DropsConfigUpdate(BaseModel):
     streak_enabled_vk: Optional[bool] = None
     # Устаревшее поле (для обратной совместимости)
     streak_enabled: Optional[bool] = None  # DEPRECATED
-    
+
     donation_enabled: Optional[bool] = None
     donation_amount_common: Optional[float] = Field(None, ge=0.01, le=1000000)
     donation_amount_rare: Optional[float] = Field(None, ge=0.01, le=1000000)
     donation_amount_epic: Optional[float] = Field(None, ge=0.01, le=1000000)
     donation_amount_legendary: Optional[float] = Field(None, ge=0.01, le=1000000)
-    
+
     mythical_enabled: Optional[bool] = None
     mythical_min_interval_hours: Optional[int] = Field(None, ge=0, le=24)
     mythical_max_interval_hours: Optional[int] = Field(None, ge=0, le=24)
     mythical_window_duration_minutes: Optional[int] = Field(None, ge=1, le=60)
     mythical_donation_amount: Optional[float] = Field(None, ge=0.01, le=1000000)
-    
+
     # Настройки виджета (OBS анимация)
     widget_spinning_duration_ms: Optional[int] = Field(None, ge=500, le=5000)
     widget_opening_duration_ms: Optional[int] = Field(None, ge=500, le=3000)
@@ -116,16 +114,16 @@ class DropsOpenRequest(BaseModel):
 
 # === UTILITY FUNCTIONS ===
 
-def get_user_or_session_filters(current_user: dict) -> tuple:
-    """Возвращает user_id, session_id и is_guest для текущего пользователя"""
+def get_user_id(current_user: dict) -> int:
+    """Возвращает user_id для текущего пользователя (только авторизованные)"""
     if not current_user:
-        return None, None, False
+        return None
     
-    user_id = current_user.get('id') if current_user.get('id') and current_user.get('id') > 0 else None
-    session_id = current_user.get('session_id') if current_user.get('id') == -1 else None
-    is_guest = (current_user.get('id') == -1)
+    user_id = current_user.get('id')
+    if not user_id or user_id <= 0:
+        return None
     
-    return user_id, session_id, is_guest
+    return user_id
 
 def sanitize_html(text: str) -> str:
     """Очищает HTML теги из текста"""
@@ -164,7 +162,7 @@ def get_drops_quality_by_donation(amount: float, config: DropsConfig) -> str:
 async def get_drops_config(
     channel_name: str,
     platform: Optional[str] = None,  # Опциональный параметр, если не указан - возвращаем общий конфиг
-    widget_token: Optional[str] = None,  # ✅ Для виджета без авторизации
+    widget_token: Optional[str] = None,  # [OK] Для виджета без авторизации
     current_user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
@@ -174,13 +172,13 @@ async def get_drops_config(
     Поддерживает widget_token для доступа без авторизации (для OBS виджета).
     """
     try:
-        # ✅ Проверяем токен виджета если нет авторизованного пользователя
+        # [OK] Проверяем токен виджета если нет авторизованного пользователя
         user_id = None
         session_id = None
-        is_guest = False
-        
+
         if current_user and current_user.get("id"):
-            user_id, session_id, is_guest = get_user_or_session_filters(current_user)
+            user_id = get_user_id(current_user)
+            session_id = current_user.get("session_id")
         elif widget_token:
             # Проверяем токен виджета
             config = db.query(DropsConfig).filter(DropsConfig.widget_token == widget_token).first()
@@ -190,18 +188,18 @@ async def get_drops_config(
                 raise HTTPException(status_code=403, detail="Invalid widget token or channel mismatch")
         else:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        
+
         # Используем DropsService для получения конфига (без platform = общий конфиг)
         from .drops_service import DropsService
         drops_service = DropsService(db)
-        
+
         config = drops_service.get_config(
             user_id=user_id,
             session_id=session_id,
             channel_name=channel_name,
             platform=platform  # Если None, вернется общий конфиг (platform="global")
         )
-        
+
         if not config:
             # Создаем конфигурацию по умолчанию (общий конфиг, если platform не указан)
             config = drops_service.create_or_update_config(
@@ -211,13 +209,13 @@ async def get_drops_config(
                 platform=platform,  # Если None, создастся общий конфиг (platform="global")
                 config_data={}
             )
-        
+
         # Безопасное получение полей (на случай если миграция не применена)
         streak_reset_on_skip = getattr(config, 'streak_reset_on_skip', True)
         widget_token = getattr(config, 'widget_token', None)
         streak_enabled_twitch = getattr(config, 'streak_enabled_twitch', False)
         streak_enabled_vk = getattr(config, 'streak_enabled_vk', False)
-        
+
         return {
             "success": True,
             "data": {
@@ -252,7 +250,7 @@ async def get_drops_config(
                 "updated_at": config.updated_at
             }
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -274,12 +272,15 @@ async def update_drops_config(
     try:
         if not current_user:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        
-        user_id, session_id, is_guest = get_user_or_session_filters(current_user)
-        
+
+        user_id = get_user_id(current_user)
+        session_id = current_user.get("session_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
         from .drops_service import DropsService
         drops_service = DropsService(db)
-        
+
         # Получаем или создаем конфиг (общий, если platform не указан)
         config = drops_service.get_config(
             user_id=user_id,
@@ -287,7 +288,7 @@ async def update_drops_config(
             channel_name=channel_name,
             platform=platform  # Если None, вернется общий конфиг (platform="global")
         )
-        
+
         if not config:
             # Создаем конфигурацию по умолчанию (общий конфиг, если platform не указан)
             config = drops_service.create_or_update_config(
@@ -297,10 +298,10 @@ async def update_drops_config(
                 platform=platform,  # Если None, создастся общий конфиг (platform="global")
                 config_data={}
             )
-        
+
         # Обновляем только переданные поля
         update_data = config_data.dict(exclude_unset=True)
-        
+
         config = drops_service.create_or_update_config(
             user_id=user_id,
             session_id=session_id,
@@ -308,7 +309,7 @@ async def update_drops_config(
             platform=platform,  # Если None, обновится общий конфиг (platform="global")
             config_data=update_data
         )
-        
+
         # Отправляем WebSocket уведомление для синхронизации фронтенда
         try:
             from services.memory_websocket_manager import memory_websocket_manager
@@ -319,17 +320,17 @@ async def update_drops_config(
                     "reason": "drops_config_updated"
                 }
                 await memory_websocket_manager.send_to_user(user_id, cache_invalidation_event)
-                logger.debug(f"🔄 [DROPS CONFIG] Sent cache invalidation to user {user_id}")
+                logger.debug(f"[REFRESH] [DROPS CONFIG] Sent cache invalidation to user {user_id}")
         except Exception as ws_error:
             logger.warning(f"Failed to send WebSocket notification for drops config: {ws_error}")
-        
-        # ✅ ВАЖНО: Возвращаем полный конфиг для корректного обновления фронтенда
+
+        # [OK] ВАЖНО: Возвращаем полный конфиг для корректного обновления фронтенда
         # Безопасное получение полей (на случай если миграция не применена)
         streak_reset_on_skip = getattr(config, 'streak_reset_on_skip', True)
         widget_token = getattr(config, 'widget_token', None)
         streak_enabled_twitch = getattr(config, 'streak_enabled_twitch', False)
         streak_enabled_vk = getattr(config, 'streak_enabled_vk', False)
-        
+
         return {
             "success": True,
             "message": "Конфигурация лутбоксов обновлена",
@@ -365,7 +366,7 @@ async def update_drops_config(
                 "updated_at": config.updated_at
             }
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -399,22 +400,22 @@ async def get_drops_rewards(
                 raise HTTPException(status_code=403, detail="Invalid widget token or channel mismatch")
         else:
             raise HTTPException(status_code=401, detail="Authentication required")
-        
-        # ✅ НАГРАДЫ ОБЩИЕ ДЛЯ ВСЕХ ПЛАТФОРМ - не фильтруем по platform
+
+        # [OK] НАГРАДЫ ОБЩИЕ ДЛЯ ВСЕХ ПЛАТФОРМ - не фильтруем по platform
         query = db.query(DropsReward).filter(
             DropsReward.user_id == user_id,
             DropsReward.channel_name == channel_name
             # platform убран - награды общие для всех платформ!
         )
-        
+
         if quality:
             # Фильтруем по качеству
             quality_obj = db.query(DropsQuality).filter(DropsQuality.name == quality).first()
             if quality_obj:
                 query = query.filter(DropsReward.quality_id == quality_obj.id)
-        
+
         rewards = query.all()
-        
+
         # Получаем информацию о качествах одним запросом (оптимизация N+1)
         # Используем только те quality_id, которые реально используются в rewards
         quality_ids = {reward.quality_id for reward in rewards if reward.quality_id}
@@ -425,7 +426,7 @@ async def get_drops_rewards(
             }
         else:
             qualities = {}
-        
+
         return {
             "success": True,
             "data": [
@@ -447,7 +448,7 @@ async def get_drops_rewards(
                 for reward in rewards
             ]
         }
-        
+
     except Exception as e:
         logger.error(f"Error getting drops rewards: {e}")
         raise HTTPException(status_code=500, detail="Ошибка получения наград лутбоксов")
@@ -466,7 +467,7 @@ async def create_drops_reward(
     Параметр platform сохраняется в БД для совместимости, но не влияет на доступность награды.
     """
     try:
-        # ✅ NULL CHECK: Проверяем существование качества
+        # [OK] NULL CHECK: Проверяем существование качества
         quality = db.query(DropsQuality).filter(DropsQuality.id == reward_data.quality_id).first()
         if not quality:
             # Логируем для отладки - какие качества есть в БД
@@ -474,19 +475,19 @@ async def create_drops_reward(
             available_ids = [q.id for q in available_qualities]
             logger.warning(f"Quality with id {reward_data.quality_id} not found. Available quality IDs: {available_ids}")
             raise HTTPException(status_code=400, detail=f"Качество с ID {reward_data.quality_id} не найдено. Доступные ID: {available_ids}")
-        
-        # ✅ SAFETY CHECK: Убеждаемся что quality объект корректен
+
+        # [OK] SAFETY CHECK: Убеждаемся что quality объект корректен
         if not hasattr(quality, 'id') or not hasattr(quality, 'name'):
             raise HTTPException(status_code=500, detail="Quality object corrupted")
-        
+
         # Санитизируем входные данные
         reward_data.name = sanitize_html(reward_data.name)
         if reward_data.description:
             reward_data.description = sanitize_html(reward_data.description)
-        
-        # ✅ SAFETY: Создаем reward с проверкой
+
+        # [OK] SAFETY: Создаем reward с проверкой
         try:
-            # ✅ Награда создается с platform для совместимости, но доступна для всех платформ
+            # [OK] Награда создается с platform для совместимости, но доступна для всех платформ
             reward = DropsReward(
                 user_id=current_user["id"],
                 channel_name=channel_name,
@@ -504,35 +505,35 @@ async def create_drops_reward(
             if not reward:
                 raise ValueError("Failed to create DropsReward object")
         except Exception as creation_error:
-            logger.error(f"❌ Error creating DropsReward object: {creation_error}")
+            logger.error(f"[ERROR] Error creating DropsReward object: {creation_error}")
             raise HTTPException(status_code=500, detail="Ошибка создания объекта награды")
-        
-        # ✅ TRANSACTION: Добавляем reward в БД
+
+        # [OK] TRANSACTION: Добавляем reward в БД
         try:
             db.add(reward)
             db.commit()
-            db.refresh(reward)  # ✅ Обновляем объект из БД
+            db.refresh(reward)  # [OK] Обновляем объект из БД
         except Exception as db_error:
             db.rollback()
-            logger.error(f"❌ Error saving DropsReward to DB: {db_error}")
+            logger.error(f"[ERROR] Error saving DropsReward to DB: {db_error}")
             raise HTTPException(status_code=500, detail="Ошибка сохранения награды в базу данных")
-        
+
         # Отправляем WebSocket уведомление для синхронизации фронтенда
         try:
             from services.memory_websocket_manager import memory_websocket_manager
             user_id = current_user.get('id')
             if user_id and user_id != -1:
-                # ✅ Награды общие, инвалидируем кеш для всех платформ
+                # [OK] Награды общие, инвалидируем кеш для всех платформ
                 cache_invalidation_event = {
                     "type": "cache_invalidate",
                     "cache_key": f"drops_rewards_{channel_name}",  # Убрали platform из ключа
                     "reason": "drops_reward_created"
                 }
                 await memory_websocket_manager.send_to_user(user_id, cache_invalidation_event)
-                logger.debug(f"🔄 [DROPS REWARD] Sent cache invalidation to user {user_id}")
+                logger.debug(f"[REFRESH] [DROPS REWARD] Sent cache invalidation to user {user_id}")
         except Exception as ws_error:
             logger.warning(f"Failed to send WebSocket notification for drops reward: {ws_error}")
-        
+
         return {
             "success": True,
             "message": "Награда создана",
@@ -544,7 +545,7 @@ async def create_drops_reward(
                 "created_at": reward.created_at
             }
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -560,51 +561,51 @@ async def update_drops_reward(
 ):
     """Обновляет награду в лутбоксе"""
     try:
-        # ✅ NULL CHECK: Запрашиваем reward
+        # [OK] NULL CHECK: Запрашиваем reward
         reward = db.query(DropsReward).filter(
             DropsReward.id == reward_id,
             DropsReward.user_id == current_user["id"]
         ).first()
-        
+
         if not reward:
             raise HTTPException(status_code=404, detail="Награда не найдена")
-        
-        # ✅ SAFETY CHECK: Убеждаемся что reward объект корректен
+
+        # [OK] SAFETY CHECK: Убеждаемся что reward объект корректен
         if not hasattr(reward, 'id'):
             raise HTTPException(status_code=500, detail="Reward object corrupted")
-        
-        # ✅ SAFETY: Обновляем только переданные поля с обработкой ошибок
+
+        # [OK] SAFETY: Обновляем только переданные поля с обработкой ошибок
         try:
             update_data = reward_data.dict(exclude_unset=True)
             for field, value in update_data.items():
                 if field in ["name", "description"] and value:
                     value = sanitize_html(value)
                 setattr(reward, field, value)
-            
+
             reward.updated_at = utcnow_naive()
             db.commit()
-            db.refresh(reward)  # ✅ Обновляем объект из БД
+            db.refresh(reward)  # [OK] Обновляем объект из БД
         except Exception as update_error:
             db.rollback()
-            logger.error(f"❌ Error updating DropsReward: {update_error}")
+            logger.error(f"[ERROR] Error updating DropsReward: {update_error}")
             raise HTTPException(status_code=500, detail="Ошибка обновления награды")
-        
+
         # Отправляем WebSocket уведомление для синхронизации фронтенда
         try:
             from services.memory_websocket_manager import memory_websocket_manager
             user_id = current_user.get('id')
             if user_id and user_id != -1:
-                # ✅ Награды общие, инвалидируем кеш для всех платформ
+                # [OK] Награды общие, инвалидируем кеш для всех платформ
                 cache_invalidation_event = {
                     "type": "cache_invalidate",
                     "cache_key": f"drops_rewards_{reward.channel_name}",  # Убрали platform из ключа
                     "reason": "drops_reward_updated"
                 }
                 await memory_websocket_manager.send_to_user(user_id, cache_invalidation_event)
-                logger.debug(f"🔄 [DROPS REWARD] Sent cache invalidation to user {user_id}")
+                logger.debug(f"[REFRESH] [DROPS REWARD] Sent cache invalidation to user {user_id}")
         except Exception as ws_error:
             logger.warning(f"Failed to send WebSocket notification for drops reward: {ws_error}")
-        
+
         return {
             "success": True,
             "message": "Награда обновлена",
@@ -614,7 +615,7 @@ async def update_drops_reward(
                 "updated_at": reward.updated_at
             }
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -633,36 +634,36 @@ async def delete_drops_reward(
             DropsReward.id == reward_id,
             DropsReward.user_id == current_user["id"]
         ).first()
-        
+
         if not reward:
             raise HTTPException(status_code=404, detail="Награда не найдена")
-        
+
         channel_name = reward.channel_name
-        
+
         db.delete(reward)
         db.commit()
-        
+
         # Отправляем WebSocket уведомление для синхронизации фронтенда
         try:
             from services.memory_websocket_manager import memory_websocket_manager
             user_id = current_user.get('id')
             if user_id and user_id != -1:
-                # ✅ Награды общие, инвалидируем кеш для всех платформ
+                # [OK] Награды общие, инвалидируем кеш для всех платформ
                 cache_invalidation_event = {
                     "type": "cache_invalidate",
                     "cache_key": f"drops_rewards_{channel_name}",  # Убрали platform из ключа
                     "reason": "drops_reward_deleted"
                 }
                 await memory_websocket_manager.send_to_user(user_id, cache_invalidation_event)
-                logger.debug(f"🔄 [DROPS REWARD] Sent cache invalidation to user {user_id}")
+                logger.debug(f"[REFRESH] [DROPS REWARD] Sent cache invalidation to user {user_id}")
         except Exception as ws_error:
             logger.warning(f"Failed to send WebSocket notification for drops reward: {ws_error}")
-        
+
         return {
             "success": True,
             "message": "Награда удалена"
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -682,36 +683,36 @@ async def upload_reward_image(
             DropsReward.id == reward_id,
             DropsReward.user_id == current_user["id"]
         ).first()
-        
+
         if not reward:
             raise HTTPException(status_code=404, detail="Награда не найдена")
-        
+
         # Проверяем тип файла
         if not image_file.content_type or not image_file.content_type.startswith('image/'):
             raise HTTPException(status_code=400, detail="Файл должен быть изображением")
-        
+
         # Сохраняем файл
         import os
         upload_dir = f"uploads/drops/{current_user['id']}/images"
         os.makedirs(upload_dir, exist_ok=True)
-        
+
         # Генерируем имя файла
         file_extension = os.path.splitext(image_file.filename)[1] or '.png'
         filename = f"reward_{reward_id}_{int(time.time())}{file_extension}"
         file_path = os.path.join(upload_dir, filename)
-        
+
         # Сохраняем файл
         with open(file_path, "wb") as buffer:
             content = await image_file.read()
             buffer.write(content)
-        
+
         # Обновляем путь к файлу в БД
         # Формируем URL относительно статики или полный путь
         image_url = f"/static/uploads/drops/{current_user['id']}/images/{filename}"
         reward.image_url = image_url
         reward.updated_at = utcnow_naive()
         db.commit()
-        
+
         return {
             "success": True,
             "message": "Изображение загружено",
@@ -720,7 +721,7 @@ async def upload_reward_image(
                 "filename": filename
             }
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -740,31 +741,31 @@ async def upload_reward_sound(
             DropsReward.id == reward_id,
             DropsReward.user_id == current_user["id"]
         ).first()
-        
+
         if not reward:
             raise HTTPException(status_code=404, detail="Награда не найдена")
-        
+
         # Проверяем валидность файла
         from validators.file_validators import validate_sound_file
         validate_sound_file(sound_file)
-        
+
         # Сохраняем файл
         import os
         upload_dir = f"uploads/sounds/{current_user['id']}"
         os.makedirs(upload_dir, exist_ok=True)
-        
+
         filename = f"reward_{reward_id}_{sound_file.filename}"
         file_path = os.path.join(upload_dir, filename)
-        
+
         with open(file_path, "wb") as buffer:
             content = await sound_file.read()
             buffer.write(content)
-        
+
         # Обновляем путь к файлу в БД
         reward.sound_file = file_path
         reward.updated_at = utcnow_naive()
         db.commit()
-        
+
         return {
             "success": True,
             "message": "Звук загружен",
@@ -773,7 +774,7 @@ async def upload_reward_sound(
                 "filename": filename
             }
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -787,7 +788,7 @@ async def get_drops_qualities(
     """Получает список качеств лутбоксов"""
     try:
         qualities = db.query(DropsQuality).all()
-        
+
         return {
             "success": True,
             "data": [
@@ -800,7 +801,7 @@ async def get_drops_qualities(
                 for quality in qualities
             ]
         }
-        
+
     except Exception as e:
         logger.error(f"Error getting drops qualities: {e}")
         raise HTTPException(status_code=500, detail="Ошибка получения качеств лутбоксов")
@@ -824,13 +825,13 @@ async def get_drops_history(
             DropsHistory.user_id == current_user["id"],
             DropsHistory.channel_name == channel_name
         )
-        
+
         # Если platform указан, фильтруем по нему
         if platform:
             query = query.filter(DropsHistory.platform == platform)
-        
+
         history = query.order_by(DropsHistory.created_at.desc()).offset(offset).limit(limit).all()
-        
+
         # Получаем информацию о качествах одним запросом (оптимизация N+1)
         # Используем только те quality_id, которые реально используются в истории
         quality_ids = {entry.quality_id for entry in history if entry.quality_id}
@@ -841,7 +842,7 @@ async def get_drops_history(
             }
         else:
             qualities = {}
-        
+
         return {
             "success": True,
             "data": [
@@ -860,7 +861,7 @@ async def get_drops_history(
                 for entry in history
             ]
         }
-        
+
     except Exception as e:
         logger.error(f"Error getting drops history: {e}")
         raise HTTPException(status_code=500, detail="Ошибка получения истории лутбоксов")
@@ -880,18 +881,18 @@ async def open_drops(
         from .drops_service import DropsService, DropsCalculationService
         drops_service = DropsService(db)
         calc_service = DropsCalculationService(db)
-        
+
         # Get configuration for the channel
         config = db.query(DropsConfig).filter(
             DropsConfig.user_id == current_user["id"]
         ).first()
-        
+
         if not config:
             raise HTTPException(status_code=404, detail="Конфигурация Drops не найдена")
-        
+
         # Determine quality based on drops type
         quality_name = None
-        
+
         if request.drops_type == "streak":
             # Get user streak to determine quality
             streak = drops_service.get_user_streak(
@@ -900,13 +901,13 @@ async def open_drops(
                 platform=config.platform,
                 viewer_id=request.viewer_id
             )
-            
+
             if not streak or streak.current_streak < config.streak_days_common:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Недостаточный стрик. Требуется минимум {config.streak_days_common} дней"
                 )
-            
+
             # Determine quality by streak days
             if streak.current_streak >= config.streak_days_legendary:
                 quality_name = "Legendary"
@@ -916,11 +917,11 @@ async def open_drops(
                 quality_name = "Rare"
             else:
                 quality_name = "Common"
-                
+
         elif request.drops_type == "donation":
             if not request.donation_amount:
                 raise HTTPException(status_code=400, detail="Сумма доната не указана")
-            
+
             # Determine quality by donation amount
             if request.donation_amount >= config.donation_amount_legendary:
                 quality_name = "Legendary"
@@ -935,10 +936,10 @@ async def open_drops(
                     status_code=400,
                     detail=f"Недостаточная сумма доната. Минимум {config.donation_amount_common}"
                 )
-                
+
         elif request.drops_type == "mythical":
             quality_name = "Mythical"
-            
+
             # Check if mythical can be activated
             if not drops_service._can_activate_mythical(config):
                 raise HTTPException(
@@ -947,7 +948,7 @@ async def open_drops(
                 )
         else:
             raise HTTPException(status_code=400, detail="Неизвестный тип лутбокса")
-        
+
         # Calculate drop result on backend
         try:
             drop_result = calc_service.calculate_drop(
@@ -957,14 +958,14 @@ async def open_drops(
                 quality_name=quality_name
             )
         except ValueError as e:
-            logger.error(f"❌ [DROPS] Failed to calculate drop: {e}")
+            logger.error(f"[ERROR] [DROPS] Failed to calculate drop: {e}")
             raise HTTPException(status_code=500, detail=str(e))
-        
+
         # Get quality object for history
         quality = db.query(DropsQuality).filter(
             DropsQuality.name == quality_name
         ).first()
-        
+
         # Save result to database
         history_entry = DropsHistory(
             user_id=current_user["id"],
@@ -982,20 +983,20 @@ async def open_drops(
             streak_days=request.streak_days if request.drops_type == "streak" else None,
             messages_count=request.messages_count if request.drops_type == "streak" else None
         )
-        
+
         db.add(history_entry)
         db.commit()
         db.refresh(history_entry)
-        
+
         logger.info(
-            f"✅ [DROPS] Opened {request.drops_type} lootbox for {request.viewer_name}: "
+            f"[OK] [DROPS] Opened {request.drops_type} lootbox for {request.viewer_name}: "
             f"{drop_result['reward_name']} ({quality_name})"
         )
-        
+
         # Broadcast result via WebSocket
         try:
             from services.memory_websocket_manager import memory_websocket_manager
-            
+
             ws_message = {
                 "type": "drops_opened",
                 "data": {
@@ -1006,12 +1007,12 @@ async def open_drops(
                     "history_id": history_entry.id
                 }
             }
-            
+
             await memory_websocket_manager.send_to_user(current_user["id"], ws_message)
-            logger.debug(f"🔄 [DROPS] Sent WebSocket notification to user {current_user['id']}")
+            logger.debug(f"[REFRESH] [DROPS] Sent WebSocket notification to user {current_user['id']}")
         except Exception as ws_error:
             logger.warning(f"Failed to send WebSocket notification for drops: {ws_error}")
-        
+
         # Return predetermined result to frontend
         return {
             "success": True,
@@ -1023,7 +1024,7 @@ async def open_drops(
                 "history_id": history_entry.id
             }
         }
-            
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1045,7 +1046,7 @@ async def get_drops_stats(
             DropsHistory.channel_name == channel_name,
             DropsHistory.platform == platform
         ).count()
-        
+
         # Статистика по типам
         streak_drops = db.query(DropsHistory).filter(
             DropsHistory.user_id == current_user["id"],
@@ -1053,21 +1054,21 @@ async def get_drops_stats(
             DropsHistory.platform == platform,
             DropsHistory.drops_type == "streak"
         ).count()
-        
+
         donation_drops = db.query(DropsHistory).filter(
             DropsHistory.user_id == current_user["id"],
             DropsHistory.channel_name == channel_name,
             DropsHistory.platform == platform,
             DropsHistory.drops_type == "donation"
         ).count()
-        
+
         mythical_drops = db.query(DropsHistory).filter(
             DropsHistory.user_id == current_user["id"],
             DropsHistory.channel_name == channel_name,
             DropsHistory.platform == platform,
             DropsHistory.drops_type == "mythical"
         ).count()
-        
+
         # Топ зрителей
         top_viewers = db.query(
             DropsHistory.viewer_name,
@@ -1079,7 +1080,7 @@ async def get_drops_stats(
         ).group_by(DropsHistory.viewer_name).order_by(
             func.count(DropsHistory.id).desc()
         ).limit(10).all()
-        
+
         return {
             "success": True,
             "data": {
@@ -1093,7 +1094,7 @@ async def get_drops_stats(
                 ]
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Error getting drops stats: {e}")
         raise HTTPException(status_code=500, detail="Ошибка получения статистики Drops")
@@ -1115,41 +1116,44 @@ async def get_user_streaks(
         # Check if streak is enabled (проверяем общий конфиг)
         from .drops_service import DropsService
         drops_service = DropsService(db)
-        user_id, session_id, is_guest = get_user_or_session_filters(current_user)
-        
+        user_id = get_user_id(current_user)
+        session_id = current_user.get("session_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
         config = drops_service.get_config(
             user_id=user_id,
             session_id=session_id,
             channel_name=channel_name,
             platform=None  # Получаем общий конфиг
         )
-        
+
         # Проверяем, включен ли стрик хотя бы на одной платформе
         streak_enabled = False
         if config:
             streak_enabled_twitch = getattr(config, 'streak_enabled_twitch', False)
             streak_enabled_vk = getattr(config, 'streak_enabled_vk', False)
             streak_enabled = streak_enabled_twitch or streak_enabled_vk
-        
+
         # If streak is disabled, return empty list
         if not config or not streak_enabled:
             return {
                 "success": True,
                 "data": []
             }
-        
+
         # Загружаем стрики (общие для всех платформ, если platform не указан)
         query = db.query(UserStreak).filter(
             UserStreak.user_id == current_user["id"],
             UserStreak.channel_name == channel_name
         )
-        
+
         # Если platform указан, фильтруем по нему
         if platform:
             query = query.filter(UserStreak.platform == platform)
-        
+
         streaks = query.order_by(UserStreak.current_streak.desc()).offset(offset).limit(limit).all()
-        
+
         return {
             "success": True,
             "data": [
@@ -1163,7 +1167,7 @@ async def get_user_streaks(
                 for streak in streaks
             ]
         }
-        
+
     except Exception as e:
         logger.error(f"Error getting user streaks: {e}")
         raise HTTPException(status_code=500, detail="Ошибка получения стриков пользователей")
@@ -1176,14 +1180,14 @@ async def get_drops_triggers(
 ):
     """Получает список триггеров Drops (stub)"""
     try:
-        logger.info(f"📦 [DROPS] Getting triggers for user {current_user.get('id')}")
+        logger.info(f"[PACKAGE] [DROPS] Getting triggers for user {current_user.get('id')}")
         # Возвращаем пустой список триггеров - функция в разработке
         return {
             "success": True,
             "triggers": []
         }
     except Exception as e:
-        logger.error(f"❌ [DROPS] Error getting triggers: {e}")
+        logger.error(f"[ERROR] [DROPS] Error getting triggers: {e}")
         raise HTTPException(status_code=500, detail="Ошибка получения триггеров")
 
 @router.post("/triggers")
@@ -1194,14 +1198,14 @@ async def create_drops_trigger(
 ):
     """Создает новый триггер Drops (stub)"""
     try:
-        logger.info(f"📦 [DROPS] Creating trigger for user {current_user.get('id')}")
+        logger.info(f"[PACKAGE] [DROPS] Creating trigger for user {current_user.get('id')}")
         return {
             "success": True,
             "message": "Триггер будет создан",
             "trigger_id": 1
         }
     except Exception as e:
-        logger.error(f"❌ [DROPS] Error creating trigger: {e}")
+        logger.error(f"[ERROR] [DROPS] Error creating trigger: {e}")
         raise HTTPException(status_code=500, detail="Ошибка создания триггера")
 
 @router.put("/triggers/{trigger_id}")
@@ -1213,13 +1217,13 @@ async def update_drops_trigger(
 ):
     """Обновляет триггер Drops (stub)"""
     try:
-        logger.info(f"📦 [DROPS] Updating trigger {trigger_id} for user {current_user.get('id')}")
+        logger.info(f"[PACKAGE] [DROPS] Updating trigger {trigger_id} for user {current_user.get('id')}")
         return {
             "success": True,
             "message": "Триггер будет обновлен"
         }
     except Exception as e:
-        logger.error(f"❌ [DROPS] Error updating trigger: {e}")
+        logger.error(f"[ERROR] [DROPS] Error updating trigger: {e}")
         raise HTTPException(status_code=500, detail="Ошибка обновления триггера")
 
 @router.delete("/triggers/{trigger_id}")
@@ -1230,13 +1234,13 @@ async def delete_drops_trigger(
 ):
     """Удаляет триггер Drops (stub)"""
     try:
-        logger.info(f"📦 [DROPS] Deleting trigger {trigger_id} for user {current_user.get('id')}")
+        logger.info(f"[PACKAGE] [DROPS] Deleting trigger {trigger_id} for user {current_user.get('id')}")
         return {
             "success": True,
             "message": "Триггер будет удален"
         }
     except Exception as e:
-        logger.error(f"❌ [DROPS] Error deleting trigger: {e}")
+        logger.error(f"[ERROR] [DROPS] Error deleting trigger: {e}")
         raise HTTPException(status_code=500, detail="Ошибка удаления триггера")
 
 @router.post("/triggers/test/{trigger_id}")
@@ -1247,13 +1251,13 @@ async def test_drops_trigger(
 ):
     """Тестирует триггер Drops (stub)"""
     try:
-        logger.info(f"📦 [DROPS] Testing trigger {trigger_id} for user {current_user.get('id')}")
+        logger.info(f"[PACKAGE] [DROPS] Testing trigger {trigger_id} for user {current_user.get('id')}")
         return {
             "success": True,
             "message": "Триггер тестируется"
         }
     except Exception as e:
-        logger.error(f"❌ [DROPS] Error testing trigger: {e}")
+        logger.error(f"[ERROR] [DROPS] Error testing trigger: {e}")
         raise HTTPException(status_code=500, detail="Ошибка тестирования триггера")
 
 @router.get("/user-from-token/{token}")
@@ -1265,18 +1269,18 @@ async def get_user_from_token(
     try:
         # Ищем конфигурацию по токену виджета
         config = db.query(DropsConfig).filter(DropsConfig.widget_token == token).first()
-        
+
         if not config or not config.user_id:
             logger.warning(f"Drops widget: Config not found for token: {token[:8]}...")
             raise HTTPException(status_code=404, detail="Invalid widget token")
-        
+
         return {
             "user_id": config.user_id,
             "channel_name": config.channel_name,
             "platform": config.platform or "global",
             "success": True
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1292,26 +1296,25 @@ async def generate_widget_url(
     """Генерирует или возвращает существующий URL для OBS виджета"""
     try:
         import secrets
-        import os
-        
+
         # Получаем channel_name из пользователя
         user = db.query(User).filter(User.id == current_user["id"]).first()
-        
+
         if not user:
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail="Пользователь не найден"
             )
-        
+
         # Определяем channel_name (приоритет: twitch -> vk)
         channel_name = user.twitch_username or user.vk_channel_name or user.username or "unknown"
-        
+
         if channel_name == "unknown":
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail="Необходимо подключить платформу (Twitch/VK) для создания виджета"
             )
-        
+
         # Ищем общий конфиг пользователя (platform="global" или None)
         from .drops_service import DropsService
         drops_service = DropsService(db)
@@ -1321,14 +1324,14 @@ async def generate_widget_url(
             channel_name=channel_name,
             platform=None  # Используем общий конфиг
         )
-        
+
         # Если есть токен и не требуется регенерация, возвращаем существующий
         widget_token_value = None
         if config and hasattr(config, 'widget_token'):
             widget_token_value = config.widget_token
-        
+
         if config and widget_token_value and not regenerate:
-            frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+            frontend_url = settings.frontend_url
             widget_url = f"{frontend_url}/drops-widget/{widget_token_value}"
             return {
                 "success": True,
@@ -1337,10 +1340,10 @@ async def generate_widget_url(
                     "token": widget_token_value
                 }
             }
-        
+
         # Генерируем новый токен
         token = secrets.token_urlsafe(32)
-        
+
         # Сохраняем токен в конфигурацию
         if config:
             try:
@@ -1354,7 +1357,7 @@ async def generate_widget_url(
                     config.widget_token = token
             except Exception as e:
                 logger.warning(f"Cannot set widget_token: {e}. Field may not exist in database. Creating migration needed.")
-        
+
         # Если конфигурации нет, создаем общий конфиг (platform=None -> "global")
         if not config:
             config = drops_service.create_or_update_config(
@@ -1364,7 +1367,7 @@ async def generate_widget_url(
                 platform=None,  # Создаем общий конфиг (platform="global")
                 config_data={}
             )
-            
+
             # Пытаемся сохранить токен через прямой SQL UPDATE если поле существует
             # Это безопаснее, чем через ORM, если столбец еще не существует
             try:
@@ -1378,12 +1381,12 @@ async def generate_widget_url(
                     config.widget_token = token
             except Exception as e:
                 logger.warning(f"Cannot set widget_token on new config: {e}. Field may not exist in database. Creating migration needed.")
-        
+
         db.commit()
-        
-        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+        frontend_url = settings.frontend_url
         widget_url = f"{frontend_url}/drops-widget/{token}"
-        
+
         return {
             "success": True,
             "data": {
@@ -1391,7 +1394,7 @@ async def generate_widget_url(
                 "token": token
             }
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1408,46 +1411,46 @@ async def donationalerts_webhook(
     try:
         from .drops_service import DropsService
         from core.database import DonationAlert
-        
+
         # Получаем данные из вебхука
         data = await request.json()
-        
+
         # Извлекаем информацию о донате
         donation_amount = data.get('amount', 0)
         donor_name = data.get('username', 'Anonymous')
         donor_id = data.get('user_id', 'unknown')
         message = data.get('message', '')
         alert_id = data.get('id', '')  # Уникальный ID от DonationAlerts
-        
-        logger.info(f"🎁 [DONATION DROPS] Received donation: {donor_name} - {donation_amount}₽")
-        
+
+        logger.info(f"[REWARD] [DONATION DROPS] Received donation: {donor_name} - {donation_amount}₽")
+
         # Получаем пользователя по DonationAlerts ID
         user_token = db.query(UserToken).filter(
             UserToken.platform == 'donationalerts',
             UserToken.platform_user_id == str(data.get('user_id', ''))
         ).first()
-        
+
         if not user_token:
             logger.warning(f"No user found for DonationAlerts ID: {data.get('user_id')}")
             return {"success": False, "message": "User not found"}
-        
+
         # Получаем username пользователя для channel_name
         user = db.query(User).filter(User.id == user_token.user_id).first()
         if not user:
             logger.warning(f"User not found for user_id: {user_token.user_id}")
             return {"success": False, "message": "User record not found"}
-        
+
         # Используем username того канала который подключен (twitch или vk)
         channel_name = user.twitch_username or user.vk_channel_name or 'default'
-        
+
         # === СОХРАНЯЕМ ДОНАТ В БД ===
-        # ✅ Используем транзакцию для атомарности операции
+        # [OK] Используем транзакцию для атомарности операции
         try:
-            # ✅ Проверяем дублирование с блокировкой для предотвращения race condition
+            # [OK] Проверяем дублирование с блокировкой для предотвращения race condition
             existing_donation = db.query(DonationAlert).filter(
                 DonationAlert.alert_id == alert_id
-            ).with_for_update().first()  # ✅ Lock для предотвращения дублирования
-            
+            ).with_for_update().first()  # [OK] Lock для предотвращения дублирования
+
             if not existing_donation:
                 # Создаем новую запись о донате
                 donation_record = DonationAlert(
@@ -1460,13 +1463,13 @@ async def donationalerts_webhook(
                     is_processed=False
                 )
                 db.add(donation_record)
-                logger.info(f"✅ [DONATION RECORD] Saved donation {alert_id} from {donor_name}")
+                logger.info(f"[OK] [DONATION RECORD] Saved donation {alert_id} from {donor_name}")
             else:
-                logger.info(f"ℹ️ [DONATION RECORD] Donation {alert_id} already recorded")
-                
+                logger.info(f"[INFO] [DONATION RECORD] Donation {alert_id} already recorded")
+
             # Инициализируем DropsService
             drops_service = DropsService(db)
-            
+
             # Обрабатываем донат Drops
             result = drops_service.process_donation_drops(
                 user_id=user_token.user_id,
@@ -1476,23 +1479,23 @@ async def donationalerts_webhook(
                 viewer_name=donor_name,
                 donation_amount=donation_amount
             )
-            
-            # ✅ Атомарный commit всех изменений (донат + drops)
+
+            # [OK] Атомарный commit всех изменений (донат + drops)
             db.commit()
-            
+
         except Exception as e:
-            # ✅ Rollback при любой ошибке
+            # [OK] Rollback при любой ошибке
             db.rollback()
-            logger.error(f"❌ Error processing donation {alert_id}: {e}", exc_info=True)
+            logger.error(f"[ERROR] Error processing donation {alert_id}: {e}", exc_info=True)
             # Не прерываем обработку, но логируем ошибку
-        
+
         if result:
-            logger.info(f"🎁 [DONATION DROPS] {donor_name} получил {result['reward']} ({result['quality']})")
-            
+            logger.info(f"[REWARD] [DONATION DROPS] {donor_name} получил {result['reward']} ({result['quality']})")
+
             # Отправляем событие в WebSocket для OBS виджета
             from utils.websocket_helper import broadcast_drops_event
             await broadcast_drops_event(result)
-            
+
             return {
                 "success": True,
                 "message": "Drops processed successfully",
@@ -1503,7 +1506,7 @@ async def donationalerts_webhook(
                 "success": False,
                 "message": "No drops available for this donation"
             }
-            
+
     except Exception as e:
         logger.error(f"Error processing DonationAlerts webhook: {e}")
         return {
@@ -1532,34 +1535,34 @@ async def get_active_mythical_session(
             session_id = current_user.get("session_id")
         else:
             raise HTTPException(status_code=401, detail="Authentication required")
-        
+
         # Ищем активную сессию
         query = db.query(MythicalDropsSession).filter(
             MythicalDropsSession.channel_name == channel_name,
             MythicalDropsSession.is_active == True,
             MythicalDropsSession.expires_at > utcnow_naive()
         )
-        
+
         if user_id:
             query = query.filter(MythicalDropsSession.user_id == user_id)
         elif session_id:
             query = query.filter(MythicalDropsSession.session_id == session_id)
         else:
             return {"success": False, "data": None}
-        
+
         session = query.first()
-        
+
         if not session:
             return {
                 "success": True,
                 "data": None
             }
-        
+
         # Вычисляем оставшееся время
         now = utcnow_naive()
         time_remaining = (session.expires_at - now).total_seconds()
         time_remaining = max(0, int(time_remaining))
-        
+
         return {
             "success": True,
             "data": {
@@ -1588,11 +1591,14 @@ async def reset_streak_statistics(
 ):
     """Сбрасывает всю статистику стриков для канала для всех платформ (только статистика, не настройки)"""
     try:
-        user_id, session_id, is_guest = get_user_or_session_filters(current_user)
-        
+        user_id = get_user_id(current_user)
+        session_id = current_user.get("session_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
         from .drops_service import DropsService
         drops_service = DropsService(db)
-        
+
         # Проверяем, что конфигурация существует и принадлежит пользователю (общий конфиг)
         config = drops_service.get_config(
             user_id=user_id,
@@ -1600,37 +1606,37 @@ async def reset_streak_statistics(
             channel_name=channel_name,
             platform=None  # Проверяем общий конфиг
         )
-        
+
         if not config:
             raise HTTPException(status_code=404, detail="Конфигурация не найдена")
-        
+
         # Удаляем все записи UserStreak для этого канала (для всех платформ)
         query = db.query(UserStreak).filter(
             UserStreak.channel_name == channel_name
         )
-        
+
         if user_id:
             query = query.filter(UserStreak.user_id == user_id)
         elif session_id:
             query = query.filter(UserStreak.session_id == session_id)
         else:
             raise HTTPException(status_code=400, detail="Не удалось определить пользователя")
-        
+
         deleted_count = query.delete(synchronize_session=False)
         db.commit()
-        
-        drops_logger.info(f"🗑️ [STREAK RESET] Удалено {deleted_count} записей стриков для {channel_name} (все платформы)")
-        
+
+        drops_logger.info(f"[DELETE] [STREAK RESET] Удалено {deleted_count} записей стриков для {channel_name} (все платформы)")
+
         return {
             "success": True,
-            "message": f"Статистика стриков сброшена",
+            "message": "Статистика стриков сброшена",
             "data": {
                 "channel_name": channel_name,
                 "platform": platform,
                 "deleted_count": deleted_count
             }
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:

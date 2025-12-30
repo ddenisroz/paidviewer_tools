@@ -6,6 +6,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Импорт magic для проверки реального типа файла
+try:
+    import magic
+    MAGIC_AVAILABLE = True
+except ImportError:
+    logger.warning("python-magic not installed. Magic number validation disabled.")
+    MAGIC_AVAILABLE = False
+
 # Константы для лимитов файлов
 MAX_VOICE_FILE_SIZE_MB = 5  # 5 MB для голосов
 MAX_REWARD_SOUND_FILE_SIZE_MB = 2  # 2 MB для звуков наград
@@ -31,6 +39,52 @@ ALLOWED_IMAGE_TYPES = {
     'image/webp',
     'image/gif',
 }
+
+
+def validate_file_magic_number(
+    file_path: str,
+    allowed_types: set
+) -> Tuple[bool, str]:
+    """
+    Проверяет реальный тип файла по magic numbers (сигнатуре файла).
+    
+    Это критичная проверка безопасности, которая предотвращает загрузку
+    вредоносных файлов (.exe, .sh) переименованных в .wav/.mp3.
+    
+    Args:
+        file_path: Путь к файлу для проверки
+        allowed_types: Множество разрешенных MIME types
+        
+    Returns:
+        (is_valid, error_message)
+    """
+    if not MAGIC_AVAILABLE:
+        logger.warning("[WARN] Magic number validation skipped (python-magic not installed)")
+        return True, ""  # Fallback если библиотека не установлена
+
+    try:
+        # Проверяем что файл существует
+        if not os.path.exists(file_path):
+            return False, "File not found"
+
+        # Получаем реальный MIME type по содержимому файла
+        mime = magic.from_file(file_path, mime=True)
+
+        # Проверяем что тип разрешен
+        if mime not in allowed_types:
+            logger.warning(
+                f"🚫 [SECURITY] Invalid file magic number detected: {mime}, "
+                f"file: {os.path.basename(file_path)}"
+            )
+            return False, f"Invalid file content type: {mime}. File may be malicious."
+
+        logger.info(f"[OK] Valid file magic number: {mime}")
+        return True, ""
+
+    except Exception as e:
+        logger.error(f"[ERROR] Error checking magic number: {e}")
+        # В случае ошибки проверки - отклоняем файл (fail-safe)
+        return False, f"Error validating file: {str(e)}"
 
 
 class FileValidator:

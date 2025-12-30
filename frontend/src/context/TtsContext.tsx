@@ -1,10 +1,15 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { AuthContext } from './AuthContext';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+
+import { useLocation } from 'react-router-dom';
+
 import { useToast } from '../components/ui/toast';
 import { useButtonPosition } from '../hooks/useButtonPosition';
+import { useGlobalVoices, useToggleTts, useTtsHealth, useTtsStatus } from '../queries/tts/ttsQueries';
 import { logger } from '../utils/prodLogger';
-import { useTtsStatus, useTtsHealth, useToggleTts, useGlobalVoices } from '../queries/tts/ttsQueries';
-import { useLocation } from 'react-router-dom';
+
+import { AuthContext } from './AuthContext';
+
+
 import type { TtsVoice } from '../types/tts';
 
 interface EngineStatus {
@@ -20,7 +25,7 @@ interface TtsContextValue {
     engineStatus: EngineStatus;
     isInitialized: boolean;
     isToggling: boolean;
-    toggleTts: (event?: any) => Promise<void>;
+    toggleTts: (event?: unknown) => Promise<void>;
     loadVoices: () => Promise<void>;
     initializeTts: () => Promise<void>;
     setNotificationHandler: (callback: ((message: string, type?: string) => void) | null) => void;
@@ -44,9 +49,13 @@ interface TtsProviderProps {
 }
 
 export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
-    const { user } = useContext(AuthContext);
-    const { addToast } = useToast();
-    const { getButtonPosition } = useButtonPosition();
+    const authContext = useContext(AuthContext);
+    if (!authContext) {
+        throw new Error('TtsProvider must be used within AuthProvider');
+    }
+    const { user } = authContext;
+    const { addToast: _addToast } = useToast();
+    const { getButtonPosition: _getButtonPosition } = useButtonPosition();
     const location = useLocation();
     const [ttsEnabled, setTtsEnabled] = useState<boolean>(false);
     const [isWhitelisted, setIsWhitelisted] = useState<boolean | null>(null);
@@ -73,7 +82,7 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
     // React Query v5: onSuccess moved to useEffect
     useEffect(() => {
         if (healthData) {
-            const healthResponse = healthData?.data || healthData;
+            const healthResponse = (healthData?.data || healthData) as { tts_engine_loaded?: boolean };
             const isHealthy = healthResponse?.tts_engine_loaded === true;
             if (isHealthy) {
                 setEngineStatus({ loaded: true, error: null });
@@ -100,7 +109,7 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
     // React Query v5: onSuccess moved to useEffect
     useEffect(() => {
         if (statusData) {
-            const statusResponse = statusData?.data || statusData;
+            const statusResponse = (statusData?.data || statusData) as { enabled?: boolean; is_whitelisted?: boolean; has_local_setup?: boolean };
             if (statusResponse) {
                 setTtsEnabled(statusResponse.enabled || false);
                 setIsWhitelisted(statusResponse.is_whitelisted || false);
@@ -120,17 +129,17 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
     // React Query v5: onSuccess moved to useEffect
     useEffect(() => {
         if (voicesData) {
-            const voicesResponse = (voicesData as any)?.voices || voicesData;
+            const voicesResponse = (voicesData as { voices?: TtsVoice[] })?.voices || voicesData;
             if (Array.isArray(voicesResponse)) {
                 setVoices(voicesResponse);
-            } else if (voicesResponse?.success && Array.isArray(voicesResponse.voices)) {
-                setVoices(voicesResponse.voices);
+            } else if (typeof voicesResponse === 'object' && voicesResponse !== null && 'success' in voicesResponse && 'voices' in voicesResponse && Array.isArray((voicesResponse as { voices: TtsVoice[] }).voices)) {
+                setVoices((voicesResponse as { voices: TtsVoice[] }).voices);
             }
         }
     }, [voicesData]);
     
     const toggleTtsMutation = useToggleTts({
-        onSuccess: (data: any, enabled: boolean) => {
+        onSuccess: (data: unknown, enabled: boolean) => {
             setTtsEnabled(enabled);
             window.dispatchEvent(new CustomEvent('tts-status-changed', { 
                 detail: { enabled } 
@@ -140,7 +149,7 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
                 notificationCallback(message, "success");
             }
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             logger.error("Failed to toggle TTS status:", error);
             const message = "Не удалось изменить статус озвучки.";
             if (notificationCallback) {
@@ -173,7 +182,7 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
 
     useEffect(() => {
         const handleTtsStatusChange = (event: CustomEvent<{ enabled: boolean }>) => {
-            logger.log('🔄 TtsContext: Received tts-status-changed event:', event.detail);
+            logger.log('[REFRESH] TtsContext: Received tts-status-changed event:', event.detail);
             setTtsEnabled(event.detail.enabled);
         };
 
@@ -189,7 +198,7 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
         setIsToggling(toggleTtsMutation.isPending);
     }, [toggleTtsMutation.isPending]);
 
-    const toggleTts = useCallback(async (event: any = null): Promise<void> => {
+    const toggleTts = useCallback(async (_event: unknown = null): Promise<void> => {
         if (isToggling || toggleTtsMutation.isPending) {
             return;
         }

@@ -1,5 +1,6 @@
 // src/shared/components/LoadingSpinner.tsx
 import React from 'react';
+
 import { Loader2 } from 'lucide-react';
 
 interface LoadingSpinnerProps {

@@ -2,8 +2,13 @@
  * Утилиты для валидации никнеймов
  */
 
+import * as React from 'react';
+
 import { apiClient } from '../services/api/client';
+
 import { logger } from './prodLogger';
+
+// Для использования в не-React контексте
 
 /**
  * Правила валидации никнейма
@@ -67,11 +72,12 @@ export async function checkUsernameAvailability(username: string): Promise<{ ava
     }
 
     return { available: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error checking username availability:', error);
     
+    const axiosError = error as { response?: { status?: number } };
     // Если endpoint не существует, возвращаем true (backward compatibility)
-    if (error.response?.status === 404) {
+    if (axiosError.response?.status === 404) {
       logger.warn('Username check endpoint not found, skipping check');
       return { available: true };
     }
@@ -160,6 +166,3 @@ export function useUsernameValidation() {
     isValid: available === true && !error,
   };
 }
-
-// Для использования в не-React контексте
-import * as React from 'react';

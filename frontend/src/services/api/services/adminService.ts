@@ -2,8 +2,9 @@
  * Admin Service - инкапсуляция всех Admin API вызовов
  */
 import { apiClient } from '../client';
-import type { AxiosResponse } from 'axios';
+
 import type { ApiResponse } from '../../../types';
+import type { AxiosResponse } from 'axios';
 
 /**
  * Admin Service
@@ -62,7 +63,7 @@ export const adminService = {
    * @param params - Параметры запроса (lines)
    * @returns Promise с ответом API
    */
-  async getSystemLogs(params: Record<string, any> = {}): Promise<AxiosResponse<ApiResponse>> {
+  async getSystemLogs(params: Record<string, unknown> = {}): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.get('/api/system/logs', { params });
   },
 
@@ -105,7 +106,7 @@ export const adminService = {
    * @param params - Параметры запроса
    * @returns Promise с ответом API
    */
-  async getAdminLogs(params: Record<string, any> = {}): Promise<AxiosResponse<ApiResponse>> {
+  async getAdminLogs(params: Record<string, unknown> = {}): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.get('/api/admin/logs', { params });
   },
 
@@ -174,7 +175,7 @@ export const adminService = {
    * @param params - Параметры запроса (page, limit, search)
    * @returns Promise с ответом API
    */
-  async getUsers(params: Record<string, any> = {}): Promise<AxiosResponse<ApiResponse>> {
+  async getUsers(params: Record<string, unknown> = {}): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.get('/api/admin/users', { params });
   },
 
@@ -192,7 +193,7 @@ export const adminService = {
    * @param data - Данные для обновления
    * @returns Promise с ответом API
    */
-  async updateUser(userId: number, data: Record<string, any>): Promise<AxiosResponse<ApiResponse>> {
+  async updateUser(userId: number, data: Record<string, unknown>): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.put(`/api/admin/users/${userId}`, data);
   },
 
@@ -204,6 +205,15 @@ export const adminService = {
    */
   async blockUser(userId: number, data: { reason?: string }): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.post(`/api/admin/users/${userId}/block`, data);
+  },
+
+  /**
+   * Разблокировать пользователя (админ)
+   * @param userId - ID пользователя
+   * @returns Promise с ответом API
+   */
+  async unblockUser(userId: number): Promise<AxiosResponse<ApiResponse>> {
+    return apiClient.post(`/api/admin/users/${userId}/unblock`);
   },
 
   /**

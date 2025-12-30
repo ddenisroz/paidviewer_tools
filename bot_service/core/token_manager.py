@@ -18,7 +18,7 @@ class TokenManager:
     Проверяет только is_active флаг токена.
     Безопасность через деактивацию токенов при новом логине.
     """
-    
+
     @staticmethod
     def get_user_token(
         user_id: int,
@@ -41,24 +41,24 @@ class TokenManager:
             str: Access token или None (если токен не найден или is_active=False)
         """
         try:
-            logger.debug(f"📦 [TOKEN MANAGER] Getting token for user {user_id}, platform {platform}")
+            logger.debug(f"[PACKAGE] [TOKEN MANAGER] Getting token for user {user_id}, platform {platform}")
             tokens = get_user_token_from_db(user_id, platform, db)
-            
+
             if not tokens:
-                logger.warning(f"❌ [TOKEN MANAGER] No token found for user {user_id}, platform {platform}")
+                logger.warning(f"[ERROR] [TOKEN MANAGER] No token found for user {user_id}, platform {platform}")
                 return None
-            
+
             if not tokens.get("access_token"):
-                logger.warning(f"❌ [TOKEN MANAGER] Token exists but access_token is empty for user {user_id}, platform {platform}")
+                logger.warning(f"[ERROR] [TOKEN MANAGER] Token exists but access_token is empty for user {user_id}, platform {platform}")
                 return None
-            
-            logger.debug(f"✅ [TOKEN MANAGER] Token retrieved for user {user_id}, platform {platform}")
+
+            logger.debug(f"[OK] [TOKEN MANAGER] Token retrieved for user {user_id}, platform {platform}")
             return tokens["access_token"]
-            
+
         except Exception as e:
-            logger.error(f"❌ [TOKEN MANAGER] Error getting token for user {user_id}, platform {platform}: {e}")
+            logger.error(f"[ERROR] [TOKEN MANAGER] Error getting token for user {user_id}, platform {platform}: {e}")
             return None
-    
+
     @staticmethod
     def get_user_token_data(
         user_id: int,
@@ -81,11 +81,11 @@ class TokenManager:
             dict: Данные токена (platform_user_id, access_token, refresh_token, expires_at, etc.)
         """
         try:
-            logger.debug(f"📦 [TOKEN MANAGER] Getting token DATA for user {user_id}, platform {platform}")
+            logger.debug(f"[PACKAGE] [TOKEN MANAGER] Getting token DATA for user {user_id}, platform {platform}")
             return get_user_token_from_db(user_id, platform, db)
-            
+
         except Exception as e:
-            logger.error(f"❌ [TOKEN MANAGER] Error getting token data for user {user_id}, platform {platform}: {e}")
+            logger.error(f"[ERROR] [TOKEN MANAGER] Error getting token data for user {user_id}, platform {platform}: {e}")
             return None
 
 

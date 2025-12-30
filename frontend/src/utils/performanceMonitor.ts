@@ -112,5 +112,5 @@ export const performanceMonitor = new PerformanceMonitor();
 
 // Expose to window for debugging in development
 if (import.meta.env.DEV) {
-  (window as any).performanceMonitor = performanceMonitor;
+  (window as Window & { performanceMonitor?: PerformanceMonitor }).performanceMonitor = performanceMonitor;
 }

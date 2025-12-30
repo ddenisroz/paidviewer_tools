@@ -1,13 +1,16 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
-import { useAuth } from './AuthContext';
-import { useIntegrations } from './IntegrationsContext';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+
 import { useToast } from '../components/ui/toast';
 import { expandQueryWithAliases } from '../constants/categoryAliases';
+import { useStreamHistory, useTwitchStreamInfo, useUpdateStream, useVkStreamInfo } from '../queries/stream/streamQueries';
+import { streamService } from '../services/api/services/streamService';
 import { logger } from '../utils/prodLogger';
 import { getQueryCache, setQueryCache } from '../utils/queryPersist';
-import { useStreamHistory, useTwitchStreamInfo, useVkStreamInfo, useUpdateStream } from '../queries/stream/streamQueries';
-import { streamService } from '../services/api/services/streamService';
-import type { StreamData, StreamCategory, StreamHistory, UpdateStreamPayload } from '../types/stream';
+
+import { useAuth } from './AuthContext';
+import { useIntegrations } from './IntegrationsContext';
+
+import type { StreamCategory, StreamData, StreamHistory, UpdateStreamPayload } from '../types/stream';
 
 function normalizeString(str: string): string {
     return str
@@ -269,11 +272,11 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         }
     }, [historyData]);
 
-    const loadStreamHistory = useCallback(async (force: boolean = false): Promise<void> => {
+    const loadStreamHistory = useCallback(async (_force: boolean = false): Promise<void> => {
         if (!isAuthenticated) {
             return;
         }
-        if (force) {
+        if (_force) {
             await refetchHistory();
         }
     }, [isAuthenticated, refetchHistory]);
@@ -299,15 +302,15 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         };
 
         if (twitchData?.data) {
-            const twitch = twitchData.data as any;
+            const twitch = twitchData.data as { title?: string; game_id?: string; game?: string };
             data.twitch.title = twitch.title || '';
-            data.twitch.category = twitch.game_id ? { id: twitch.game_id, name: twitch.game } : null;
+            data.twitch.category = twitch.game_id ? { id: twitch.game_id, name: twitch.game || '' } : null;
         }
 
         if (vkData?.data) {
-            const vk = vkData.data as any;
+            const vk = vkData.data as { title?: string; category_id?: string; category?: string };
             data.vk.title = vk.title || '';
-            data.vk.category = vk.category_id ? { id: vk.category_id, name: vk.category } : null;
+            data.vk.category = vk.category_id ? { id: vk.category_id, name: vk.category || '' } : null;
         }
 
         return data;
@@ -366,17 +369,13 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
                     changesFound = true;
                 }
                 if (initialData.vk.category?.id !== currentData.vk.category?.id) {
-                    const vkCategoryPayload = {
+                    const vkCategoryPayload: { id: string; name: string; title: string; type: string; cover_url?: string } = {
                         id: currentData.vk.category!.id,
                         name: currentData.vk.category!.name,
                         title: currentData.vk.category!.name,
-                        type: currentData.vk.category!.type || "games"
+                        type: (currentData.vk.category as { type?: string }).type || "games",
+                        cover_url: (currentData.vk.category as { box_art_url?: string; cover_url?: string }).box_art_url || (currentData.vk.category as { cover_url?: string }).cover_url || ""
                     };
-                    
-                    const coverUrl = currentData.vk.category!.box_art_url || currentData.vk.category!.cover_url || "";
-                    if (coverUrl) {
-                        (vkCategoryPayload as any).cover_url = coverUrl;
-                    }
                     
                     payload.vk!.category = vkCategoryPayload;
                     payload.vk!.category_id = currentData.vk.category?.id;
@@ -399,18 +398,19 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
             return;
         }
 
-        logger.log('📤 [DataContext] Final payload before sending:', JSON.stringify(payload, null, 2));
+        logger.log('[SEND] [DataContext] Final payload before sending:', JSON.stringify(payload, null, 2));
 
-        updateStreamMutation.mutate(payload, {
+        updateStreamMutation.mutate(payload as unknown as Record<string, unknown>, {
             onSuccess: () => {
                 setStatus(prev => ({ ...prev, [statusType]: 'success' }));
                 setTimeout(() => setStatus(prev => ({ ...prev, [statusType]: 'idle' })), 3000);
             },
-            onError: (error: any) => {
+            onError: (error: unknown) => {
                 setStatus(prev => ({ ...prev, [statusType]: 'error' }));
-                logger.error('❌ [DATA CONTEXT] Error saving changes:', error);
+                logger.error('[ERROR] [DATA CONTEXT] Error saving changes:', error);
                 
-                if (error.response?.status === 401) {
+                const errorResponse = error as { response?: { status?: number } };
+                if (errorResponse.response?.status === 401) {
                     addToast({ 
                         type: 'error', 
                         title: 'Токен истек', 
@@ -420,7 +420,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
                     addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось сохранить изменения. Данные откатываются...' });
                 }
                 
-                logger.log('🔄 [DATA CONTEXT] Rolling back to server data...');
+                logger.log('[REFRESH] [DATA CONTEXT] Rolling back to server data...');
                 loadStreamData(true);
                 setTimeout(() => setStatus(prev => ({ ...prev, [statusType]: 'idle' })), 3000);
             },
@@ -459,7 +459,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         setLoading(prev => ({ ...prev, categories: true }));
         try {
             const expandedQueries = expandQueryWithAliases(query);
-            logger.log('🔍 DataContext: Expanded queries:', { original: query, expanded: expandedQueries });
+            logger.log('[DEBUG] DataContext: Expanded queries:', { original: query, expanded: expandedQueries });
             
             const requests = expandedQueries.map(async (searchQuery: string) => {
                 try {
@@ -478,21 +478,22 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
             });
             
             const responses = await Promise.all(requests);
-            logger.log('🔍 DataContext: All API responses received');
+            logger.log('[DEBUG] DataContext: All API responses received');
             
             const allCategories = new Map<string, StreamCategory>();
             
             for (const response of responses) {
                 let categoryData: StreamCategory[] = [];
                 
-                if (platform === 'vk' && (response as any).data?.categories) {
-                    categoryData = Array.isArray((response as any).data.categories) ? (response as any).data.categories : [];
-                } else if (platform === 'twitch' && (response as any).data?.categories) {
-                    categoryData = Array.isArray((response as any).data.categories) ? (response as any).data.categories : [];
-                } else if (Array.isArray((response as any).data)) {
-                    categoryData = (response as any).data;
-                } else if ((response as any).data) {
-                    categoryData = Array.isArray((response as any).data) ? (response as any).data : [];
+                const responseData = response as { data?: { categories?: StreamCategory[] } | StreamCategory[] };
+                if (platform === 'vk' && responseData.data && typeof responseData.data === 'object' && 'categories' in responseData.data) {
+                    categoryData = Array.isArray(responseData.data.categories) ? responseData.data.categories : [];
+                } else if (platform === 'twitch' && responseData.data && typeof responseData.data === 'object' && 'categories' in responseData.data) {
+                    categoryData = Array.isArray(responseData.data.categories) ? responseData.data.categories : [];
+                } else if (responseData.data && Array.isArray(responseData.data)) {
+                    categoryData = responseData.data;
+                } else if (responseData.data && typeof responseData.data === 'object') {
+                    categoryData = Array.isArray(responseData.data) ? responseData.data : [];
                 }
                 
                 categoryData.forEach(cat => {
@@ -505,7 +506,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
             let mergedCategories = Array.from(allCategories.values());
             mergedCategories = sortCategoriesByRelevance(mergedCategories, query);
             
-            logger.log('🎯 DataContext: Smart search complete:', { 
+            logger.log('[TARGET] DataContext: Smart search complete:', { 
                 query, 
                 totalFound: mergedCategories.length,
                 top3: mergedCategories.slice(0, 3).map(c => c.name)
@@ -514,9 +515,10 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
             setCategories(prev => ({...prev, [platform]: mergedCategories}));
             
             return mergedCategories;
-        } catch (error: any) {
+        } catch (error: unknown) {
             logger.error(`Error searching ${platform} categories:`, error);
-            if (error.response?.status === 401) {
+            const errorResponse = error as { response?: { status?: number }; message?: string };
+            if (errorResponse.response?.status === 401) {
                 logger.log('DataContext: Authentication required for category search');
                 addToast({ 
                     type: 'error', 
@@ -524,11 +526,11 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
                     message: 'Пожалуйста, войдите в систему для поиска категорий.' 
                 });
             } else {
-                logger.log('DataContext: Other error during search:', error.message);
+                logger.log('DataContext: Other error during search:', errorResponse.message);
                 addToast({ 
                     type: 'error', 
                     title: 'Ошибка поиска', 
-                    message: `Не удалось найти категории: ${error.message}` 
+                    message: `Не удалось найти категории: ${errorResponse.message || 'Неизвестная ошибка'}` 
                 });
             }
             return [];

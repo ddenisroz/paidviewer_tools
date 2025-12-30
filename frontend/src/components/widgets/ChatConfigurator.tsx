@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+// src/components/widgets/ChatConfigurator.tsx
+import React, { useState } from 'react';
+
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
-import { logger } from '../../utils/prodLogger';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { chatboxService } from '../../services/api/services/chatboxService';
 
 interface WidgetConfig {
@@ -84,14 +86,14 @@ const ChatConfigurator: React.FC = () => {
     const [previewUrl, setPreviewUrl] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    const updateConfig = (key: keyof WidgetConfig, value: any) => {
+    const updateConfig = (key: keyof WidgetConfig, value: unknown) => {
         setConfig(prev => ({
             ...prev,
             [key]: value
         }));
     };
 
-    const updateNestedConfig = (parent: 'platforms' | 'colors', key: string, value: any) => {
+    const updateNestedConfig = (parent: 'platforms' | 'colors', key: string, value: unknown) => {
         setConfig(prev => ({
             ...prev,
             [parent]: {
@@ -104,13 +106,13 @@ const ChatConfigurator: React.FC = () => {
     const saveConfig = async () => {
         setIsLoading(true);
         try {
-            const response = await chatboxService.saveWidgetConfig(config);
-            const data = response.data.data || response.data;
+            const response = await chatboxService.saveWidgetConfig(config as unknown as Record<string, unknown>);
+            const responseData = response.data as { data?: { url?: string }; url?: string };
+            const data = responseData.data || responseData;
             // URL теперь включает user_id
-            setPreviewUrl(data.url);
+            setPreviewUrl(data.url || '');
             alert('Конфигурация сохранена!');
-        } catch (error) {
-            logger.error('Error saving config:', error);
+        } catch {
             alert('Ошибка при сохранении конфигурации');
         } finally {
             setIsLoading(false);
@@ -136,7 +138,7 @@ const ChatConfigurator: React.FC = () => {
                 try {
                     const importedConfig = JSON.parse(e.target?.result as string) as WidgetConfig;
                     setConfig(importedConfig);
-                } catch (error) {
+                } catch {
                     alert('Ошибка при импорте конфигурации');
                 }
             };

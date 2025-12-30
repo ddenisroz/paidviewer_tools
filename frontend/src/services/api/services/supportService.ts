@@ -2,8 +2,9 @@
  * Support Service - инкапсуляция всех Support API вызовов
  */
 import { apiClient } from '../client';
-import type { AxiosResponse } from 'axios';
+
 import type { ApiResponse } from '../../../types';
+import type { AxiosResponse } from 'axios';
 
 /**
  * Support Service
@@ -58,7 +59,7 @@ export const supportService = {
    * @param params - Параметры запроса (status)
    * @returns Promise с ответом API
    */
-  async getAdminTickets(params: Record<string, any> = {}): Promise<AxiosResponse<ApiResponse>> {
+  async getAdminTickets(params: Record<string, unknown> = {}): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.get('/api/admin/support/tickets', { params });
   },
 

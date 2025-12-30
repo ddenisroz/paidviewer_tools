@@ -1,25 +1,21 @@
 # bot_service/core/connection_manager_core.py
 """Основная логика ConnectionManager"""
 import logging
-import time
-import json
 import asyncio
-from typing import Dict, Set, List, TYPE_CHECKING, Any, Optional
+from typing import Dict, Set, List, TYPE_CHECKING, Any
 from fastapi import WebSocket
-from starlette.websockets import WebSocketDisconnect
-from datetime import datetime
 
 # Импортируем константы для таймаутов
 from constants import TTS_RECONNECT_TIMEOUT_SECONDS
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
+    pass
 
 logger = logging.getLogger(__name__)
 
 class ConnectionManagerCore:
     """Основная логика управления соединениями"""
-    
+
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
         self.obs_connections: Dict[str, WebSocket] = {}
@@ -28,11 +24,11 @@ class ConnectionManagerCore:
         self.tts_enabled_channels: Set[str] = set()
         self.tts_enabled_twitch: Set[str] = set()
         self.tts_enabled_vk: Set[str] = set()
-        
+
         # Новая система: два типа TTS
         self.basic_tts_enabled_channels: Set[str] = set()
         self.ai_tts_enabled_channels: Set[str] = set()
-        
+
         self.blocked_bots: Set[str] = set()
         self.youtube_queues: Dict[str, list] = {}
         self.current_videos: Dict[str, dict] = {}
@@ -44,7 +40,7 @@ class ConnectionManagerCore:
         self.voice_volume_settings: Dict[str, Dict[str, float]] = {}
         self.youtube_settings: Dict[str, dict] = {}
         self.twitch_cache: Dict[str, Any] = {}
-        
+
         # Отложенные отключения TTS (user_id -> asyncio.Task)
         self.pending_tts_disconnects: Dict[int, asyncio.Task] = {}
         # Таймаут ожидания переподключения (в секундах)
@@ -57,7 +53,7 @@ class ConnectionManagerCore:
             self.active_sessions[channel_name] = set()
         self.active_sessions[channel_name].add(session_id)
         logger.debug(f"Added session {session_id} to channel {channel_name} ({platform})")
-        
+
         # Отменяем запланированное отключение TTS если бот переподключился
         try:
             from core.database import get_db, User
@@ -68,14 +64,14 @@ class ConnectionManagerCore:
                     (User.vk_username == channel_name.lower()) |
                     (User.vk_channel_name == channel_name.lower())
                 ).first()
-                
+
                 if user:
-                    logger.info(f"✅ [TTS RECONNECT] Bot reconnected to {channel_name}, cancelling TTS disconnect for user {user.id}")
+                    logger.info(f"[OK] [TTS RECONNECT] Bot reconnected to {channel_name}, cancelling TTS disconnect for user {user.id}")
                     self.cancel_tts_disconnect(user.id)
             finally:
                 db.close()
         except Exception as e:
-            logger.error(f"❌ [TTS RECONNECT] Error cancelling TTS disconnect for {channel_name}: {e}")
+            logger.error(f"[ERROR] [TTS RECONNECT] Error cancelling TTS disconnect for {channel_name}: {e}")
 
     def remove_active_session(self, channel_name: str, reason: str = "disconnect") -> bool:
         """Удалить активную сессию и запустить таймер отключения TTS если это была последняя сессия"""
@@ -84,13 +80,13 @@ class ConnectionManagerCore:
             if sessions:
                 session_id = sessions.pop()
                 logger.debug(f"Removed session {session_id} from channel {channel_name} ({reason})")
-                
+
                 # Если это была последняя сессия канала, запускаем таймер отключения TTS
                 if not sessions:  # Пустое множество
                     del self.active_sessions[channel_name]
                     logger.info(f"⏱️ [SESSION] Last session removed for {channel_name}, checking TTS disconnect")
                     self._schedule_tts_disconnect_for_channel(channel_name)
-                
+
                 return True
             else:
                 del self.active_sessions[channel_name]
@@ -98,7 +94,7 @@ class ConnectionManagerCore:
                 self._schedule_tts_disconnect_for_channel(channel_name)
                 return True
         return False
-    
+
     def _schedule_tts_disconnect_for_channel(self, channel_name: str):
         """Запланировать отключение TTS для канала (найти пользователя по имени канала)"""
         try:
@@ -111,16 +107,16 @@ class ConnectionManagerCore:
                     (User.vk_username == channel_name.lower()) |
                     (User.vk_channel_name == channel_name.lower())
                 ).first()
-                
+
                 if user:
                     logger.info(f"⏱️ [TTS DISCONNECT] Found user {user.id} for channel {channel_name}")
                     self.schedule_tts_disconnect(user.id, channel_name)
                 else:
-                    logger.warning(f"⚠️ [TTS DISCONNECT] User not found for channel {channel_name}")
+                    logger.warning(f"[WARN] [TTS DISCONNECT] User not found for channel {channel_name}")
             finally:
                 db.close()
         except Exception as e:
-            logger.error(f"❌ [TTS DISCONNECT] Error scheduling TTS disconnect for {channel_name}: {e}")
+            logger.error(f"[ERROR] [TTS DISCONNECT] Error scheduling TTS disconnect for {channel_name}: {e}")
 
     def get_active_channels(self) -> List[str]:
         """Получить список активных каналов"""
@@ -144,7 +140,7 @@ class ConnectionManagerCore:
             self.basic_tts_enabled_channels.add(channel_name)
         elif tts_type == "ai":
             self.ai_tts_enabled_channels.add(channel_name)
-        
+
         self.tts_enabled_channels.add(channel_name)
         logger.info(f"TTS enabled for channel {channel_name} (type: {tts_type})")
 
@@ -158,10 +154,10 @@ class ConnectionManagerCore:
     def is_tts_enabled(self, channel_name: str) -> bool:
         """Проверить включен ли TTS для канала"""
         is_enabled = channel_name in self.tts_enabled_channels
-        logger.warning(f"🔍 [TTS CHECK] is_tts_enabled('{channel_name}') = {is_enabled}")
-        logger.warning(f"🔍 [TTS CHECK] Current tts_enabled_channels: {self.tts_enabled_channels}")
-        logger.warning(f"🔍 [TTS CHECK] Current tts_enabled_twitch: {self.tts_enabled_twitch}")
-        logger.warning(f"🔍 [TTS CHECK] Current tts_enabled_vk: {self.tts_enabled_vk}")
+        logger.warning(f"[DEBUG] [TTS CHECK] is_tts_enabled('{channel_name}') = {is_enabled}")
+        logger.warning(f"[DEBUG] [TTS CHECK] Current tts_enabled_channels: {self.tts_enabled_channels}")
+        logger.warning(f"[DEBUG] [TTS CHECK] Current tts_enabled_twitch: {self.tts_enabled_twitch}")
+        logger.warning(f"[DEBUG] [TTS CHECK] Current tts_enabled_vk: {self.tts_enabled_vk}")
         return is_enabled
 
     def get_tts_type(self, channel_name: str) -> str:
@@ -220,41 +216,41 @@ class ConnectionManagerCore:
         """Отключить TTS с задержкой (вызывается после таймера)"""
         try:
             await asyncio.sleep(self.reconnect_timeout)
-            
-            # 🚀 FIX: Проверяем активные соединения перед отключением TTS
+
+            # [START] FIX: Проверяем активные соединения перед отключением TTS
             has_active_connections = self._has_active_connections_for_user(user_id)
-            
+
             if has_active_connections:
-                logger.info(f"✅ [TTS TIMEOUT] User {user_id} ({username}) has active connections - keeping TTS enabled")
+                logger.info(f"[OK] [TTS TIMEOUT] User {user_id} ({username}) has active connections - keeping TTS enabled")
                 return
-            
+
             # Если пользователь не переподключился и нет активных соединений, отключаем TTS
-            logger.info(f"⏰ [TTS TIMEOUT] User {user_id} ({username}) has no active connections - disabling TTS")
-            
+            logger.info(f"[TIMEOUT] [TTS TIMEOUT] User {user_id} ({username}) has no active connections - disabling TTS")
+
             # Импортируем здесь, чтобы избежать циклических импортов
             from services.tts_service import TTSService
             from core.database import get_db
-            
+
             db = next(get_db())
             try:
                 tts_service = TTSService(db)
                 await tts_service.disable_tts(user_id=user_id)
-                logger.info(f"✅ [TTS TIMEOUT] TTS disabled for user {user_id}")
+                logger.info(f"[OK] [TTS TIMEOUT] TTS disabled for user {user_id}")
             finally:
                 db.close()
-                
+
         except asyncio.CancelledError:
-            logger.info(f"✅ [TTS RECONNECT] User {user_id} reconnected - keeping TTS enabled")
+            logger.info(f"[OK] [TTS RECONNECT] User {user_id} reconnected - keeping TTS enabled")
             raise  # Важно: пробрасываем CancelledError для корректной отмены
         except Exception as e:
-            logger.error(f"❌ [TTS TIMEOUT] Error disabling TTS for user {user_id}: {e}")
+            logger.error(f"[ERROR] [TTS TIMEOUT] Error disabling TTS for user {user_id}: {e}")
         finally:
-            # ✅ ГАРАНТИРОВАННАЯ ОЧИСТКА: Удаляем задачу из pending в любом случае
+            # [OK] ГАРАНТИРОВАННАЯ ОЧИСТКА: Удаляем задачу из pending в любом случае
             # Это предотвращает утечку памяти и повторное использование завершенных задач
             if user_id in self.pending_tts_disconnects:
                 del self.pending_tts_disconnects[user_id]
-                logger.debug(f"🗑️ [TTS CLEANUP] Removed pending disconnect task for user {user_id}")
-    
+                logger.debug(f"[DELETE] [TTS CLEANUP] Removed pending disconnect task for user {user_id}")
+
     def _has_active_connections_for_user(self, user_id: int) -> bool:
         """
         Проверить, есть ли активные соединения для пользователя
@@ -270,18 +266,18 @@ class ConnectionManagerCore:
         try:
             has_listeners = False
             has_active_bots = False
-            
+
             # 1. Проверяем WebSocket соединения через memory_websocket_manager (сайт)
             from services.memory_websocket_manager import memory_websocket_manager
             user_connections = memory_websocket_manager.get_user_connections(user_id)
-            
+
             if user_connections:
                 # Проверяем, есть ли хотя бы одно активное соединение
                 active_connections = [conn for conn in user_connections if conn.get('is_active', True)]
                 if active_connections:
-                    logger.info(f"🔍 [TTS CHECK] User {user_id} has {len(active_connections)} active WebSocket connections (site)")
+                    logger.info(f"[DEBUG] [TTS CHECK] User {user_id} has {len(active_connections)} active WebSocket connections (site)")
                     has_listeners = True
-            
+
             # 2. Проверяем OBS соединения (через токены в БД)
             from core.database import get_db, User
             db = next(get_db())
@@ -290,40 +286,40 @@ class ConnectionManagerCore:
                 if user:
                     if user.obs_token and user.obs_token in self.obs_connections:
                         # Проверяем, есть ли OBS соединение с этим токеном
-                        logger.info(f"🔍 [TTS CHECK] User {user_id} has OBS connection in registry")
+                        logger.info(f"[DEBUG] [TTS CHECK] User {user_id} has OBS connection in registry")
                         has_listeners = True
-                    
-                    # 3. ✅ НОВОЕ: Проверяем активность ботов на платформах
+
+                    # 3. [OK] НОВОЕ: Проверяем активность ботов на платформах
                     if user.twitch_username:
                         # Проверяем, есть ли активные сессии Twitch бота
                         if self.is_channel_active(user.twitch_username):
-                            logger.info(f"🔍 [TTS CHECK] User {user_id} has active Twitch bot sessions for {user.twitch_username}")
+                            logger.info(f"[DEBUG] [TTS CHECK] User {user_id} has active Twitch bot sessions for {user.twitch_username}")
                             has_active_bots = True
-                    
+
                     if user.vk_username or user.vk_channel_name:
                         # Проверяем, есть ли активные сессии VK бота
                         vk_channel = user.vk_channel_name or user.vk_username
                         if vk_channel and self.is_channel_active(vk_channel):
-                            logger.info(f"🔍 [TTS CHECK] User {user_id} has active VK bot sessions for {vk_channel}")
+                            logger.info(f"[DEBUG] [TTS CHECK] User {user_id} has active VK bot sessions for {vk_channel}")
                             has_active_bots = True
-                
+
             finally:
                 db.close()
-            
+
             # TTS остается включенной только если есть И слушатели И активные боты
             result = has_listeners and has_active_bots
-            
+
             if not has_listeners:
-                logger.info(f"🔍 [TTS CHECK] User {user_id} has NO listeners (no WebSocket site, no OBS) - TTS will be disabled")
+                logger.info(f"[DEBUG] [TTS CHECK] User {user_id} has NO listeners (no WebSocket site, no OBS) - TTS will be disabled")
             elif not has_active_bots:
-                logger.info(f"🔍 [TTS CHECK] User {user_id} has NO active bot connections on platforms - TTS will be disabled")
+                logger.info(f"[DEBUG] [TTS CHECK] User {user_id} has NO active bot connections on platforms - TTS will be disabled")
             else:
-                logger.info(f"🔍 [TTS CHECK] User {user_id} has both listeners AND active bots - keeping TTS enabled")
-            
+                logger.info(f"[DEBUG] [TTS CHECK] User {user_id} has both listeners AND active bots - keeping TTS enabled")
+
             return result
-            
+
         except Exception as e:
-            logger.error(f"❌ [TTS CHECK] Error checking active connections for user {user_id}: {e}")
+            logger.error(f"[ERROR] [TTS CHECK] Error checking active connections for user {user_id}: {e}")
             # В случае ошибки отключаем TTS (безопаснее)
             return False
 
@@ -341,12 +337,12 @@ class ConnectionManagerCore:
         """
         # Если уже есть pending задача - отменяем её
         self.cancel_tts_disconnect(user_id)
-        
+
         # Создаём новую задачу с обработчиком завершения
         task = asyncio.create_task(self._delayed_tts_disable(user_id, username))
         self.pending_tts_disconnects[user_id] = task
-        
-        # ✅ ЗАЩИТА ОТ УТЕЧЕК: Добавляем callback для гарантированной очистки
+
+        # [OK] ЗАЩИТА ОТ УТЕЧЕК: Добавляем callback для гарантированной очистки
         # Даже если задача завершится с исключением или будет отменена
         def cleanup_callback(finished_task):
             # Удаляем из словаря только если это все еще та же задача
@@ -357,10 +353,10 @@ class ConnectionManagerCore:
                 except asyncio.CancelledError:
                     pass  # Это нормально, задача была отменена
                 except Exception as e:
-                    logger.error(f"❌ [TTS TASK] Unexpected error in disconnect task for user {user_id}: {e}")
-        
+                    logger.error(f"[ERROR] [TTS TASK] Unexpected error in disconnect task for user {user_id}: {e}")
+
         task.add_done_callback(cleanup_callback)
-        
+
         logger.info(f"⏱️ [TTS DISCONNECT] Scheduled TTS disable for user {user_id} ({username}) in {self.reconnect_timeout}s")
 
     def cancel_tts_disconnect(self, user_id: int):
@@ -378,6 +374,6 @@ class ConnectionManagerCore:
             task = self.pending_tts_disconnects[user_id]
             if not task.done():
                 task.cancel()
-                logger.info(f"🔄 [TTS RECONNECT] Cancelled scheduled TTS disable for user {user_id}")
+                logger.info(f"[REFRESH] [TTS RECONNECT] Cancelled scheduled TTS disable for user {user_id}")
             # Удаляем из словаря сразу, не дожидаясь callback
             del self.pending_tts_disconnects[user_id]

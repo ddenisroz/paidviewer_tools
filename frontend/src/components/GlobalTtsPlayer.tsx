@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
-import { Volume2, VolumeX, SkipForward, X, List, ChevronUp, ChevronDown, MessageSquare } from 'lucide-react';
+
+import { ChevronDown, ChevronUp, List, MessageSquare, SkipForward, X } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
+import { BUTTON_SIZES, TRANSITIONS } from '@/constants/designSystem';
+import { cn } from '@/lib/utils';
+
 import { useTtsPlayer } from '../context/TtsPlayerContext';
 
 const GlobalTtsPlayer: React.FC = () => {
@@ -15,7 +20,7 @@ const GlobalTtsPlayer: React.FC = () => {
     // Format text for display (truncate if too long)
     const formatText = (text: string, maxLength: number = 100) => {
         if (text.length <= maxLength) return text;
-        return text.substring(0, maxLength) + '...';
+        return `${text.substring(0, maxLength)  }...`;
     };
 
     return (
@@ -92,7 +97,7 @@ const GlobalTtsPlayer: React.FC = () => {
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => setShowQueue(!showQueue)}
-                                        className="text-gray-400 hover:text-white hover:bg-gray-800 border-0 p-2 h-8 w-8 relative"
+                                        className={cn(BUTTON_SIZES.iconSm, "text-gray-400 hover:text-white hover:bg-gray-800 border-0 relative", TRANSITIONS.colors)}
                                         title={showQueue ? "Скрыть очередь" : "Показать очередь"}
                                     >
                                         {showQueue ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
@@ -107,7 +112,7 @@ const GlobalTtsPlayer: React.FC = () => {
                                     variant="ghost"
                                     size="sm"
                                     onClick={skipCurrent}
-                                    className="text-gray-400 hover:text-white hover:bg-gray-800 border-0 p-2 h-8 w-8"
+                                    className={cn(BUTTON_SIZES.iconSm, "text-gray-400 hover:text-white hover:bg-gray-800 border-0", TRANSITIONS.colors)}
                                     title="Пропустить"
                                 >
                                     <SkipForward className="w-4 h-4" />
@@ -118,7 +123,7 @@ const GlobalTtsPlayer: React.FC = () => {
                                     variant="ghost"
                                     size="sm"
                                     onClick={clearQueue}
-                                    className="text-gray-400 hover:text-white hover:bg-gray-800 border-0 p-2 h-8 w-8"
+                                    className={cn(BUTTON_SIZES.iconSm, "text-gray-400 hover:text-white hover:bg-gray-800 border-0", TRANSITIONS.colors)}
                                     title="Очистить очередь"
                                 >
                                     <X className="w-4 h-4" />

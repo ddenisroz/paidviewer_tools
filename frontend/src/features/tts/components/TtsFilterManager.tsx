@@ -1,17 +1,22 @@
-// src/components/tts/TtsFilterManager.tsx
-import React, { useState, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+﻿// src/components/tts/TtsFilterManager.tsx
+import React, { useCallback, useState } from 'react';
+
+import { AlertCircle, ChevronDown, Plus, UserX, X } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, Plus, UserX, ChevronDown, AlertCircle } from 'lucide-react';
-import { toast } from 'sonner';
-import { useIntegrations } from '../../../context/IntegrationsContext';
+import { toast } from '@/utils/toastManager';
+
 import { useAuth } from '../../../context/AuthContext';
-import { useBlockedUsers, useBlockUser, useUnblockUser, useFilteredWords, useAddFilteredWord, useDeleteFilteredWord } from '../../../queries/tts/ttsQueries';
+import { useIntegrations } from '../../../context/IntegrationsContext';
+import { useAddFilteredWord, useBlockedUsers, useBlockUser, useDeleteFilteredWord, useFilteredWords, useUnblockUser } from '../../../queries/tts/ttsQueries';
+
+import type { AxiosError } from 'axios';
 
 interface BlockedUser {
     id?: number;
@@ -58,8 +63,9 @@ const TtsFilterManager: React.FC = React.memo(() => {
             const platformName = variables.platform === 'twitch' ? 'Twitch' : 'VK Live';
             toast.success(`Пользователь ${variables.username} заглушен на ${platformName}`);
         },
-        onError: (error: any) => {
-            if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
+        onError: (error: unknown) => {
+            const err = error as AxiosError;
+            if (err.code !== 'ERR_NETWORK' && err.code !== 'ERR_CONNECTION_REFUSED') {
                 // Ошибка уже обработана в hook
             }
         },
@@ -69,7 +75,7 @@ const TtsFilterManager: React.FC = React.memo(() => {
         onSuccess: (response, variables) => {
             toast.success(`Пользователь ${variables.username} разблокирован`);
         },
-        onError: (error: any) => {
+        onError: (error: AxiosError) => {
             if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
                 // Ошибка уже обработана в hook
             }
@@ -86,7 +92,7 @@ const TtsFilterManager: React.FC = React.memo(() => {
         onSuccess: () => {
             setNewWord('');
         },
-        onError: (error: any) => {
+        onError: (error: AxiosError) => {
             if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
                 // Ошибка уже обработана в hook
             }
@@ -94,15 +100,23 @@ const TtsFilterManager: React.FC = React.memo(() => {
     });
 
     const deleteWordMutation = useDeleteFilteredWord({
-        onError: (error: any) => {
+        onError: (error: AxiosError) => {
             if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
                 // Ошибка уже обработана в hook
             }
         },
     });
 
-    const blacklist: BlockedUser[] = Array.isArray(blockedUsersData) ? blockedUsersData : (blockedUsersData as any)?.data?.blocked_users || [];
-    const words: FilteredWord[] = Array.isArray(wordsData) ? wordsData : (wordsData as any)?.data?.filtered_words || (wordsData as any)?.data?.words || [];
+    const blacklist: BlockedUser[] = Array.isArray(blockedUsersData) 
+        ? blockedUsersData 
+        : ((blockedUsersData as { data?: { blocked_users?: BlockedUser[] } } | undefined)?.data?.blocked_users ?? []);
+    
+    const wordsRaw = Array.isArray(wordsData) 
+        ? wordsData 
+        : ((wordsData as { data?: { filtered_words?: unknown; words?: unknown } } | undefined)?.data?.filtered_words 
+           ?? (wordsData as { data?: { filtered_words?: unknown; words?: unknown } } | undefined)?.data?.words 
+           ?? []);
+    const words: FilteredWord[] = (Array.isArray(wordsRaw) ? wordsRaw : []) as FilteredWord[];
     const addingUser = blockUserMutation.isPending;
     const addingWord = addWordMutation.isPending;
 
@@ -123,9 +137,9 @@ const TtsFilterManager: React.FC = React.memo(() => {
 
     // Получаем иконку для платформы
     const getPlatformIcon = (platform: string): string => {
-        if (platform === 'twitch') return '🟣';
-        if (platform === 'vk') return '🔵';
-        if (platform === 'all') return '🌐';
+        if (platform === 'twitch') return '[TW]';
+        if (platform === 'vk') return '[VK]';
+        if (platform === 'all') return '[WEB]';
         return '';
     };
 

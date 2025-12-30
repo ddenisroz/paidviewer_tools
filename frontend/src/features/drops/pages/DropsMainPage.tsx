@@ -1,27 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import PageWrapper from '../../../shared/components/PageWrapper';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import React, { useEffect, useState } from 'react';
+
 import { 
-  Gift, 
-  History, 
-  Users,
+  AlertCircle, 
+  Coins, 
   DollarSign,
-  Coins,
-  Package,
+  History,
   Monitor,
+  Package,
   Settings,
-  AlertCircle
+  Users
 } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { useAuth } from '../../../context/AuthContext';
 import { useIntegrations } from '../../../context/IntegrationsContext';
-import StreakSettings from '../components/StreakSettings';
+import PageWrapper from '../../../shared/components/PageWrapper';
 import DonationSettings from '../components/DonationSettings';
+import DropsHistory from '../components/DropsHistory';
 import PointsRewards from '../components/PointsRewards';
 import RewardsManager from '../components/RewardsManager';
-import DropsHistory from '../components/DropsHistory';
+import StreakSettings from '../components/StreakSettings';
 import StreakTracker from '../components/StreakTracker';
 import WidgetSettings from '../components/WidgetSettings';
 
@@ -34,7 +36,7 @@ const DropsMainPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>((searchParams.get('tab') as TabType) || 'streak');
   const [channelName, setChannelName] = useState<string | null>(null);
-  const [rewardsCount, setRewardsCount] = useState<number>(0);
+  const [_rewardsCount, setRewardsCount] = useState<number>(0);
 
   useEffect(() => {
     if (activeTab) {
@@ -88,6 +90,29 @@ const DropsMainPage: React.FC = () => {
               <Settings className="w-4 h-4" />
               Войти в систему
             </Button>
+          </CardContent>
+        </Card>
+      </PageWrapper>
+    );
+  }
+
+  // Guard clause for null channelName or user
+  if (!channelName || !user) {
+    return (
+      <PageWrapper title="Drops система">
+        <Card className="border-gray-700">
+          <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
+            <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
+              <AlertCircle className="w-10 h-10 text-gray-500" />
+            </div>
+            <div className="space-y-2 max-w-md">
+              <h3 className="text-xl font-semibold text-gray-200">
+                Загрузка данных...
+              </h3>
+              <p className="text-gray-400 text-sm">
+                Пожалуйста, подождите
+              </p>
+            </div>
           </CardContent>
         </Card>
       </PageWrapper>

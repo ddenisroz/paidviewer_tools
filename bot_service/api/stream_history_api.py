@@ -1,10 +1,11 @@
 # bot_service/api/stream_history_api.py
 """API для истории стримов"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from core.database import get_db, ChatMessage
 from auth.auth import get_current_user
-from datetime import datetime, timedelta
+from datetime import timedelta
+from core.datetime_utils import utcnow_naive
 import logging
 
 logger = logging.getLogger(__name__)
@@ -23,32 +24,32 @@ async def get_stream_history(
     """Получить историю стримов/сообщений"""
     try:
         offset = (page - 1) * limit
-        
+
         # Базовый запрос
         query = db.query(ChatMessage)
-        
+
         # Фильтры
         if channel_name:
             query = query.filter(ChatMessage.channel_name == channel_name)
         if platform:
             query = query.filter(ChatMessage.platform == platform)
-        
+
         # Сортировка по времени (новые сначала)
         try:
             messages = query.order_by(ChatMessage.timestamp.desc()).offset(offset).limit(limit).all()
             total_messages = query.count()
         except Exception as db_error:
             # Fallback если нет колонки author_username (старая БД)
-            logger.warning(f"⚠️ Database schema mismatch: {db_error}")
-            logger.info("ℹ️ Falling back to basic query without author_username")
-            
+            logger.warning(f"[WARN] Database schema mismatch: {db_error}")
+            logger.info("[INFO] Falling back to basic query without author_username")
+
             try:
                 from sqlalchemy import text
                 # RAW SQL для PostgreSQL - используем $1, $2, ... placeholders
                 sql_query = "SELECT * FROM chat_messages WHERE 1=1"
                 params = []
                 param_index = 1
-                
+
                 if channel_name:
                     sql_query += f" AND channel_name = ${param_index}"
                     params.append(channel_name)
@@ -57,11 +58,11 @@ async def get_stream_history(
                     sql_query += f" AND platform = ${param_index}"
                     params.append(platform)
                     param_index += 1
-                
+
                 # LIMIT и OFFSET
                 sql_query += f" ORDER BY timestamp DESC LIMIT ${param_index} OFFSET ${param_index + 1}"
                 params.extend([limit, offset])
-                
+
                 result = db.execute(text(sql_query), tuple(params))
                 messages = []
                 for row in result:
@@ -76,12 +77,12 @@ async def get_stream_history(
                         'is_tts_enabled': False,
                         'tts_processed': False
                     })())
-                
+
                 # Подсчитаем total отдельно
                 count_sql = "SELECT COUNT(*) FROM chat_messages WHERE 1=1"
                 count_params = []
                 count_index = 1
-                
+
                 if channel_name:
                     count_sql += f" AND channel_name = ${count_index}"
                     count_params.append(channel_name)
@@ -90,14 +91,14 @@ async def get_stream_history(
                     count_sql += f" AND platform = ${count_index}"
                     count_params.append(platform)
                     count_index += 1
-                
+
                 count_result = db.execute(text(count_sql), tuple(count_params))
                 total_messages = list(count_result)[0][0]
-                
+
             except Exception as fallback_error:
-                logger.error(f"❌ Fallback query also failed: {fallback_error}")
+                logger.error(f"[ERROR] Fallback query also failed: {fallback_error}")
                 return {"success": False, "error": "Database schema error"}
-        
+
         messages_data = []
         for msg in messages:
             messages_data.append({
@@ -110,7 +111,7 @@ async def get_stream_history(
                 'is_tts_enabled': getattr(msg, 'is_tts_enabled', False),
                 'tts_processed': getattr(msg, 'tts_processed', False)
             })
-        
+
         return {
             "success": True,
             "messages": messages_data,
@@ -136,23 +137,23 @@ async def get_stream_stats(
     try:
         # Базовый запрос
         query = db.query(ChatMessage)
-        
+
         # Фильтры
         if channel_name:
             query = query.filter(ChatMessage.channel_name == channel_name)
         if platform:
             query = query.filter(ChatMessage.platform == platform)
-        
+
         # Статистика за последние 24 часа
-        yesterday = datetime.utcnow() - timedelta(hours=24)
+        yesterday = utcnow_naive() - timedelta(hours=24)
         messages_24h = query.filter(ChatMessage.timestamp >= yesterday).count()
-        
+
         # Общее количество сообщений
         total_messages = query.count()
-        
+
         # Уникальные зрители
         unique_viewers = query.distinct(ChatMessage.viewer_name).count()
-        
+
         return {
             "success": True,
             "stats": {

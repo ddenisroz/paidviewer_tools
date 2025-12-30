@@ -1,11 +1,15 @@
 // src/components/chat/ChatMessages.tsx
-import React, { useRef, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import React, { useEffect, useRef } from 'react';
+
+import { MessageCircle, MessageSquare, Twitch } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
-import { MessageSquare, Twitch, MessageCircle } from 'lucide-react';
-import { VKIcon } from '../PlatformIcons';
-import MessageContent from '../MessageContent';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
+import { VKIcon } from '../../shared/components/PlatformIcons';
 import ChatContextMenu from '../ChatContextMenu';
+import MessageContent from '../MessageContent';
+
 import type { ChatMessage } from '../../types/chat';
 
 interface Message extends ChatMessage {
@@ -28,7 +32,7 @@ interface ChatMessagesProps {
     setContextMenu: (menu: ContextMenu | null) => void;
     ttsBlockedUsers: Set<string>;
     setTtsBlockedUsers: React.Dispatch<React.SetStateAction<Set<string>>>;
-    emotes?: Record<string, any>;
+    emotes?: Record<string, unknown>;
     handleContextMenuAction?: (action: string, message: Message) => void;
 }
 
@@ -176,7 +180,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                     <div className="text-sm text-gray-300">
                                         <MessageContent
                                             message={message.content || message.message || ''}
-                                            channelEmotes={new Map(Object.entries(emotes))}
+                                            channelEmotes={emotes ? new Map(Object.entries(emotes)) : new Map()}
                                         />
                                     </div>
                                     

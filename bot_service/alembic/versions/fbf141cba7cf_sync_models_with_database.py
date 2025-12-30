@@ -23,10 +23,10 @@ def upgrade() -> None:
     # SQLite batch mode для ALTER операций
     with op.batch_alter_table('filtered_words', schema=None) as batch_op:
         batch_op.create_unique_constraint('uq_user_word_platform', ['user_id', 'word', 'platform'])
-    
+
     with op.batch_alter_table('user_tokens', schema=None) as batch_op:
         batch_op.drop_column('username')
-    
+
     with op.batch_alter_table('users', schema=None) as batch_op:
         batch_op.alter_column('id',
                    existing_type=sa.INTEGER(),
@@ -45,10 +45,10 @@ def downgrade() -> None:
                    existing_type=sa.INTEGER(),
                    nullable=True,
                    autoincrement=True)
-    
+
     with op.batch_alter_table('user_tokens', schema=None) as batch_op:
         batch_op.add_column(sa.Column('username', sa.VARCHAR(), nullable=True))
-    
+
     with op.batch_alter_table('filtered_words', schema=None) as batch_op:
         batch_op.drop_constraint('uq_user_word_platform', type_='unique')
     # ### end Alembic commands ###

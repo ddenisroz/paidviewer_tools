@@ -24,16 +24,16 @@ def upgrade() -> None:
     Bot service использует UserVoiceSettings для персональных настроек.
     """
     from sqlalchemy import inspect
-    
+
     conn = op.get_bind()
     inspector = inspect(conn)
     existing_tables = inspector.get_table_names()
-    
+
     if 'voices' in existing_tables:
         op.drop_table('voices')
-        print("✅ Удалена таблица 'voices' из bot_service (голоса хранятся в tts_service)")
+        print("[OK] Удалена таблица 'voices' из bot_service (голоса хранятся в tts_service)")
     else:
-        print("ℹ️ Таблица 'voices' уже отсутствует")
+        print("[INFO] Таблица 'voices' уже отсутствует")
 
 
 def downgrade() -> None:
@@ -56,7 +56,7 @@ def downgrade() -> None:
     )
     op.create_index(op.f('ix_voices_id'), 'voices', ['id'], unique=False)
     op.create_index(op.f('ix_voices_name'), 'voices', ['name'], unique=True)
-    
-    print("✅ Восстановлена таблица 'voices' (ВНИМАНИЕ: это legacy структура)")
+
+    print("[OK] Восстановлена таблица 'voices' (ВНИМАНИЕ: это legacy структура)")
 
 

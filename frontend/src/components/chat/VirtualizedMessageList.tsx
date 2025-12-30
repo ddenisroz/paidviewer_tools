@@ -1,10 +1,13 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
+
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { MessageSquare } from 'lucide-react';
-import SwipeableMessage from './SwipeableMessage';
-import { TwitchIcon, VKIcon } from '../PlatformIcons';
+
 import { twitchBadgesService } from '../../services/twitchBadges';
-import { logger } from '../../utils/prodLogger';
+import { TwitchIcon, VKIcon } from '../../shared/components/PlatformIcons';
+
+import SwipeableMessage from './SwipeableMessage';
+
 import type { ChatMessage } from '../../types/chat';
 
 interface VirtualizedMessageListProps {

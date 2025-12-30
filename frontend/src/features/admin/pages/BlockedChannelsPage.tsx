@@ -1,12 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+﻿import React, { useEffect, useState } from 'react';
+
+import { AlertCircle, Plus, Shield, Trash2 } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Plus, AlertCircle, Shield } from 'lucide-react';
-import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { toast } from '@/utils/toastManager';
+
 import { adminService } from '../../../services/api/services/adminService';
 import { logger } from '../../../utils/prodLogger';
+
+import type { ApiResponse } from '../../../types';
 
 interface BlockedChannel {
   id: number;
@@ -14,7 +19,6 @@ interface BlockedChannel {
   platform?: string;
   reason?: string;
   blocked_at?: string;
-  [key: string]: any;
 }
 
 const BlockedChannelsPage: React.FC = () => {
@@ -28,7 +32,8 @@ const BlockedChannelsPage: React.FC = () => {
     try {
       setLoading(true);
       const response = await adminService.getBlockedChannels();
-      setBlockedChannels((response.data as any).blocked_channels || []);
+      const data = response.data as ApiResponse<{ blocked_channels?: BlockedChannel[] }>;
+      setBlockedChannels(data.data?.blocked_channels || []);
     } catch (error) {
       logger.error('Error loading blocked channels:', error);
       toast.error('Ошибка загрузки заблокированных каналов');
@@ -100,8 +105,8 @@ const BlockedChannelsPage: React.FC = () => {
             Заблокированные каналы
           </h1>
           <div className="text-muted-foreground mt-2 space-y-1">
-            <p>📌 <strong>Назначение:</strong> Отключение бота от каналов, где он забанен или не нужен</p>
-            <p>🔴 Бот автоматически покинет заблокированный канал и больше не подключится</p>
+            <p>[PIN] <strong>Назначение:</strong> Отключение бота от каналов, где он забанен или не нужен</p>
+            <p>[WARN] Бот автоматически покинет заблокированный канал и больше не подключится</p>
           </div>
         </div>
         

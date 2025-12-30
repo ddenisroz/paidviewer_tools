@@ -1,23 +1,30 @@
 import React from 'react'
+
+import { QueryClientProvider } from '@tanstack/react-query'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, useLocation } from 'react-router-dom'
-import { QueryClientProvider } from '@tanstack/react-query'
+
 import App from './App'
 import './App.css'
 import './styles/design-system.css'
 
-// Lazy load non-critical providers для ускорения начальной загрузки
-import { composeProviders } from './shared/utils/composeProviders'
-import { ToastProvider } from './components/ui/toast'
-import { AuthProvider } from './context/AuthContext'
-import { IntegrationsProvider } from './context/IntegrationsContext'
-import { ChatProvider } from './context/ChatContext'
-import { UserSettingsProvider } from './context/UserSettingsContext'
-import { AudioPriorityProvider } from './context/AudioPriorityContext'
-import { TtsPlayerProvider } from './context/TtsPlayerContext'
-import { queryClient } from './lib/queryClient'
+// Initialize Sentry before React
 
-// 🎯 Core провайдеры - только самые критичные для начального рендера
+// Lazy load non-critical providers для ускорения начальной загрузки
+import { ToastProvider } from './components/ui/toast'
+import { AudioPriorityProvider } from './context/AudioPriorityContext'
+import { AuthProvider } from './context/AuthContext'
+import { ChatProvider } from './context/ChatContext'
+import { IntegrationsProvider } from './context/IntegrationsContext'
+import { TtsPlayerProvider } from './context/TtsPlayerContext'
+import { UserSettingsProvider } from './context/UserSettingsContext'
+import { queryClient } from './lib/queryClient'
+import { initSentry } from './lib/sentry'
+import { composeProviders } from './shared/utils/composeProviders'
+
+initSentry()
+
+// [TARGET] Core провайдеры - только самые критичные для начального рендера
 // Toast - обязательно сразу (для уведомлений)
 // Auth - обязательно сразу (проверка авторизации)
 // AudioPriorityProvider - нужен для TtsPlayerProvider

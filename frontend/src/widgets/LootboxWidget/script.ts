@@ -18,7 +18,7 @@ interface LootboxConfig {
 
 class LootboxWidget {
   private config: LootboxConfig | null;
-  private ws: any;
+  private ws: { on: (event: string, handler: (data?: Record<string, unknown>) => void) => void } | null;
   private isAnimating: boolean;
   private animationFrames: Record<Rarity, string[]>;
 
@@ -83,20 +83,30 @@ class LootboxWidget {
 
   private applyConfig(): void {
     const config = this.config!;
-    (window as any).WidgetConfigManager.applyConfig(config);
+    const WidgetConfigManagerInstance = (window as Window & { WidgetConfigManager?: { applyConfig: (config: Record<string, unknown>) => void } }).WidgetConfigManager;
+    if (WidgetConfigManagerInstance) {
+      WidgetConfigManagerInstance.applyConfig(config as unknown as Record<string, unknown>);
+    }
     document.documentElement.style.setProperty('--show-particles', config.showParticles ? '1' : '0');
     document.documentElement.style.setProperty('--show-glow', config.showGlow ? '1' : '0');
   }
 
   private connectWebSocket(userId: string | null): void {
-    const wsBaseUrl = window.location.protocol === 'https:' ? 'wss://' + window.location.host : 'ws://' + window.location.host;
+    const wsBaseUrl = window.location.protocol === 'https:' ? `wss://${window.location.host}` : `ws://${window.location.host}`;
     const wsUrl = `${wsBaseUrl}/ws/lootbox-widget/${userId || 'default'}`;
-    this.ws = new (window as any).WidgetWebSocket(wsUrl);
-    this.ws.on('message', (data: any) => {
-      if (data.type === 'lootbox_opened') {
-        this.showLootboxAnimation(data);
-      }
-    });
+    const WidgetWebSocketClass = (window as Window & { WidgetWebSocket?: new (url: string) => { on: (event: string, handler: (data?: Record<string, unknown>) => void) => void } }).WidgetWebSocket;
+    if (!WidgetWebSocketClass) {
+      logger.error('WidgetWebSocket not available');
+      return;
+    }
+    this.ws = new WidgetWebSocketClass(wsUrl);
+    if (this.ws) {
+      this.ws.on('message', (data?: Record<string, unknown>) => {
+        if (data && data.type === 'lootbox_opened') {
+          this.showLootboxAnimation(data);
+        }
+      });
+    }
   }
 
   private addTestControls(): void {
@@ -140,23 +150,37 @@ class LootboxWidget {
     document.body.appendChild(testContainer);
   }
 
-  private async showLootboxAnimation(data: any): Promise<void> {
+  private async showLootboxAnimation(data: Record<string, unknown>): Promise<void> {
     if (this.isAnimating) return;
     this.isAnimating = true;
-    const { username, rarity, reward } = data;
-    (document.getElementById('username') as HTMLElement).textContent = username;
-    (document.getElementById('reward') as HTMLElement).textContent = reward || this.getRandomReward(rarity);
-    const rarityEl = document.getElementById('rarity') as HTMLElement;
-    rarityEl.textContent = rarity;
-    rarityEl.className = `rarity rarity-${rarity}`;
-    const glowElement = document.getElementById('lootbox-glow') as HTMLElement;
-    glowElement.className = `lootbox-glow glow-${rarity}`;
+    const username = String(data.username || 'Unknown');
+    const rarity = String(data.rarity || 'common') as Rarity;
+    const reward = String(data.reward || this.getRandomReward(rarity));
+    
+    const usernameEl = document.getElementById('username') as HTMLElement | null;
+    const rewardEl = document.getElementById('reward') as HTMLElement | null;
+    const rarityEl = document.getElementById('rarity') as HTMLElement | null;
+    const glowElement = document.getElementById('lootbox-glow') as HTMLElement | null;
+    
+    if (usernameEl) usernameEl.textContent = username;
+    if (rewardEl) rewardEl.textContent = reward;
+    if (rarityEl) {
+      rarityEl.textContent = rarity;
+      rarityEl.className = `rarity rarity-${rarity}`;
+    }
+    if (glowElement) {
+      glowElement.className = `lootbox-glow glow-${rarity}`;
+    }
+    
     if (this.config!.soundEnabled) {
       this.playSound(rarity);
     }
     await this.animateFrames(rarity);
     this.startEffects();
-    document.getElementById('lootbox-container')!.classList.remove('hidden');
+    const containerEl = document.getElementById('lootbox-container');
+    if (containerEl) {
+      containerEl.classList.remove('hidden');
+    }
     setTimeout(() => {
       this.hideWidget();
     }, 5000);
@@ -177,7 +201,7 @@ class LootboxWidget {
     const frames = this.animationFrames[rarity] || this.animationFrames.common;
     const imageElement = document.getElementById('lootbox-image') as HTMLImageElement;
     
-    // ✅ OPTIMIZATION: Preload all frames for smooth animation
+    // [OK] OPTIMIZATION: Preload all frames for smooth animation
     const preloadedImages = await this.preloadFrames(rarity, frames);
     
     for (let i = 0; i < frames.length; i++) {
@@ -192,7 +216,7 @@ class LootboxWidget {
   }
 
   private async preloadFrames(rarity: Rarity, frames: string[]): Promise<HTMLImageElement[]> {
-    // ✅ OPTIMIZATION: Preload images in parallel for faster loading
+    // [OK] OPTIMIZATION: Preload images in parallel for faster loading
     const promises = frames.map(frame => {
       return new Promise<HTMLImageElement>((resolve, reject) => {
         const img = new Image();
@@ -231,9 +255,9 @@ class LootboxWidget {
       const distance = 100 + Math.random() * 50;
       const x = Math.cos(angle) * distance + 100;
       const y = Math.sin(angle) * distance + 100;
-      particle.style.left = x + 'px';
-      particle.style.top = y + 'px';
-      particle.style.animationDelay = Math.random() * 0.5 + 's';
+      particle.style.left = `${x  }px`;
+      particle.style.top = `${y  }px`;
+      particle.style.animationDelay = `${Math.random() * 0.5  }s`;
       particlesContainer.appendChild(particle);
       setTimeout(() => {
         particle.remove();
@@ -254,7 +278,10 @@ class LootboxWidget {
   }
 
   private hideWidget(): void {
-    document.getElementById('lootbox-container')!.classList.add('hidden');
+    const containerEl = document.getElementById('lootbox-container');
+    if (containerEl) {
+      containerEl.classList.add('hidden');
+    }
     this.isAnimating = false;
   }
 

@@ -8,7 +8,6 @@ Create Date: 2025-11-03 10:46:46.709292
 from typing import Sequence, Union
 
 from alembic import op
-import sqlalchemy as sa
 from sqlalchemy import inspect
 
 
@@ -21,11 +20,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Добавляем составные индексы для оптимизации частых запросов"""
-    
+
     # Проверяем тип БД через connection
     connection = op.get_bind()
     is_postgresql = connection.dialect.name == 'postgresql'
-    
+
     # ChatMessage индексы для частых запросов
     # Составной индекс для фильтрации по каналу и платформе с сортировкой по времени
     # Используется в get_chat_history, get_stream_history
@@ -37,7 +36,7 @@ def upgrade() -> None:
         ['channel_name', 'platform', 'timestamp'],
         unique=False
     )
-    
+
     # Составной индекс для получения истории пользователя по каналу
     # Используется в additional_api.get_chat_history
     op.create_index(
@@ -46,7 +45,7 @@ def upgrade() -> None:
         ['user_id', 'channel_name', 'timestamp'],
         unique=False
     )
-    
+
     # Индекс для фильтрации по is_deleted (часто используется)
     op.create_index(
         'idx_chat_is_deleted',
@@ -54,9 +53,9 @@ def upgrade() -> None:
         ['is_deleted'],
         unique=False
     )
-    
+
     # WhitelistedChannel - unique constraint уже создает индекс, пропускаем
-    
+
     # UserSettings - индекс для частых запросов по user_id
     # Проверяем существование перед созданием (может уже быть index=True на колонке)
     try:
@@ -65,7 +64,7 @@ def upgrade() -> None:
         if 'idx_user_settings_user_id' not in existing_user_settings_indexes:
             # Проверяем есть ли индекс на user_id вообще
             user_id_has_index = any(
-                'user_id' in idx.get('column_names', []) 
+                'user_id' in idx.get('column_names', [])
                 for idx in inspector.get_indexes('user_settings')
             )
             if not user_id_has_index:
@@ -86,14 +85,14 @@ def upgrade() -> None:
             )
         except Exception:
             pass  # Уже существует
-    
+
     # TTSUserSettings - индексы для запросов по user_id и session_id
     try:
         existing_tts_indexes = [idx['name'] for idx in inspector.get_indexes('tts_user_settings')]
-        
+
         # Проверяем есть ли индексы на этих полях
         user_id_has_index = any(
-            'user_id' in idx.get('column_names', []) 
+            'user_id' in idx.get('column_names', [])
             for idx in inspector.get_indexes('tts_user_settings')
         )
         if not user_id_has_index and 'idx_tts_settings_user_id' not in existing_tts_indexes:
@@ -103,9 +102,9 @@ def upgrade() -> None:
                 ['user_id'],
                 unique=False
             )
-        
+
         session_id_has_index = any(
-            'session_id' in idx.get('column_names', []) 
+            'session_id' in idx.get('column_names', [])
             for idx in inspector.get_indexes('tts_user_settings')
         )
         if not session_id_has_index and 'idx_tts_settings_session_id' not in existing_tts_indexes:
@@ -129,38 +128,38 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Удаляем добавленные индексы"""
-    
+
     # Удаляем индексы с обработкой ошибок (на случай если их нет)
     try:
         op.drop_index('idx_chat_channel_platform_timestamp', table_name='chat_messages')
     except Exception:
         pass
-    
+
     try:
         op.drop_index('idx_chat_user_channel_timestamp', table_name='chat_messages')
     except Exception:
         pass
-    
+
     try:
         op.drop_index('idx_chat_is_deleted', table_name='chat_messages')
     except Exception:
         pass
-    
+
     try:
         op.drop_index('idx_whitelist_channel_platform', table_name='whitelisted_channels')
     except Exception:
         pass  # Индекс может быть частью unique constraint
-    
+
     try:
         op.drop_index('idx_user_settings_user_id', table_name='user_settings')
     except Exception:
         pass
-    
+
     try:
         op.drop_index('idx_tts_settings_user_id', table_name='tts_user_settings')
     except Exception:
         pass
-    
+
     try:
         op.drop_index('idx_tts_settings_session_id', table_name='tts_user_settings')
     except Exception:

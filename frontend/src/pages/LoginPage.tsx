@@ -1,18 +1,14 @@
 // src/pages/LoginPage.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { chatService } from '../services/api/services/chatService';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Activity, Copy, Check } from 'lucide-react';
+
 import CookieConsent from '@/components/CookieConsent';
-import { logger } from '../utils/prodLogger';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+
 import { API_BASE_URL } from '../constants';
+import { useAuth } from '../context/AuthContext';
+import { logger } from '../utils/prodLogger';
 
 interface TwitchIconProps {
     className?: string;
@@ -41,34 +37,16 @@ const VKIcon: React.FC<VKIconProps> = (props) => (
     </svg>
 );
 
-interface VerificationTimers {
-    timer: NodeJS.Timeout | null;
-    verificationTimer: NodeJS.Timeout | null;
-}
-
 const LoginPage: React.FC = () => {
-    const { loginWithTwitch, loginWithVk, setGuestMode, isAuthenticated, isCheckingAuth } = useAuth();
+    const { isAuthenticated, isCheckingAuth } = useAuth();
     const navigate = useNavigate();
     const [title, setTitle] = useState<string>('');
     const [isTyping, setIsTyping] = useState<boolean>(true);
-    const [subtitleText, setSubtitleText] = useState<string>('');
+    const [subtitleText, setSubtitleText] = useState<string>('TTS озвучка');
     const [subtitleVisible, setSubtitleVisible] = useState<boolean>(false);
     const [currentFeatureIndex, setCurrentFeatureIndex] = useState<number>(0);
     const fullTitle = 'Payedviewer_tools';
-    const features = ['TTS озвучка', 'Медиа запросы', 'Анализ чата'];
-    
-    const [guestModalOpen, setGuestModalOpen] = useState<boolean>(false);
-    const [guestUsername, setGuestUsername] = useState<string>('');
-    const [guestPlatform, setGuestPlatform] = useState<'twitch' | 'vk'>('twitch');
-    const [isCheckingChannel, setIsCheckingChannel] = useState<boolean>(false);
-    const [channelError, setChannelError] = useState<string>('');
-    
-    const [verificationModalOpen, setVerificationModalOpen] = useState<boolean>(false);
-    const [verificationCode, setVerificationCode] = useState<string>('');
-    const [verificationTimeout, setVerificationTimeout] = useState<number>(60);
-    const [verificationTimers, setVerificationTimers] = useState<VerificationTimers>({ timer: null, verificationTimer: null });
-    const [isCodeCopied, setIsCodeCopied] = useState<boolean>(false);
-    const [isDisconnecting, setIsDisconnecting] = useState<boolean>(false);
+    const features = React.useMemo(() => ['TTS озвучка', 'Медиа запросы', 'Анализ чата'], []);
 
     useEffect(() => {
         if (!isCheckingAuth && isAuthenticated) {
@@ -89,171 +67,45 @@ const LoginPage: React.FC = () => {
 
     useEffect(() => {
         if (!isTyping) {
-            const showFeature = (): void => {
-                setSubtitleText(features[currentFeatureIndex]);
-                setSubtitleVisible(true);
-                
-                setTimeout(() => {
-                    setSubtitleVisible(false);
-                    setTimeout(() => {
-                        setCurrentFeatureIndex((prev) => (prev + 1) % features.length);
-                    }, 500);
-                }, 2500);
+            const currentText = features[currentFeatureIndex];
+            setSubtitleText(currentText);
+            setSubtitleVisible(true);
+            
+            const hideTimer = setTimeout(() => {
+                setSubtitleVisible(false);
+            }, 2500);
+            
+            const changeTimer = setTimeout(() => {
+                setCurrentFeatureIndex((prev) => (prev + 1) % 3);
+            }, 3000);
+            
+            return () => {
+                clearTimeout(hideTimer);
+                clearTimeout(changeTimer);
             };
-            
-            const timeoutId = setTimeout(showFeature, 500);
-            return () => clearTimeout(timeoutId);
         }
-    }, [isTyping, currentFeatureIndex]);
+    }, [isTyping, currentFeatureIndex, features]);
 
-    useEffect(() => {
-        return () => {
-            if (verificationTimers.timer) {
-                clearInterval(verificationTimers.timer);
-            }
-            if (verificationTimers.verificationTimer) {
-                clearInterval(verificationTimers.verificationTimer);
-            }
-        };
-    }, [verificationTimers]);
-
-    const handleGuestMode = (): void => {
-        setGuestModalOpen(true);
-    };
-
-    const checkChannel = async (): Promise<void> => {
-        if (!guestUsername.trim()) {
-            setChannelError('Введите никнейм канала');
-            return;
-        }
-
-        setIsCheckingChannel(true);
-        setChannelError('');
-
-        try {
-            const response = await chatService.connectGuest({
-                channel_name: guestUsername.trim(),
-                platform: guestPlatform
-            });
-            
-            logger.log('[LoginPage] Guest connect response:', response.data);
-            
-            if ((response.data as any).success && (response.data as any).verification_code) {
-                setVerificationCode((response.data as any).verification_code);
-                setVerificationTimeout((response.data as any).expires_in_seconds || 60);
-                setGuestModalOpen(false);
-                setVerificationModalOpen(true);
-                startVerificationTimer();
-            } else {
-                setChannelError('Ошибка генерации кода верификации');
-            }
-            
-        } catch (error: any) {
-            logger.error('LoginPage: Failed to connect bot:', error);
-            const errorMsg = error.response?.data?.detail || 'Канал не найден или недоступен';
-            setChannelError(errorMsg);
-        } finally {
-            setIsCheckingChannel(false);
-        }
-    };
-
-    const startVerificationTimer = (): void => {
-        const timer = setInterval(() => {
-            setVerificationTimeout(prev => {
-                if (prev <= 1) {
-                    clearInterval(timer);
-                    handleVerificationTimeout();
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-
-        const verificationTimer = setInterval(async () => {
-            if (isDisconnecting) {
-                return;
-            }
-            
-            try {
-                const response = await chatService.checkGuest({
-                    channel_name: guestUsername.trim()
-                });
-                
-                if ((response.data as any).success && (response.data as any).confirmed) {
-                    clearInterval(verificationTimer);
-                    clearInterval(timer);
-                    setVerificationTimers({ timer: null, verificationTimer: null });
-                    
-                    try {
-                        const finalizeResponse = await chatService.finalizeGuest({
-                            channel_name: guestUsername.trim()
-                        });
-                        
-                        if ((finalizeResponse.data as any).success) {
-                            await setGuestMode({
-                                username: guestUsername.trim(),
-                                platform: guestPlatform,
-                                isGuest: true
-                            });
-                            setVerificationModalOpen(false);
-                            navigate('/dashboard');
-                        }
-                    } catch (error: any) {
-                        logger.error('[LoginPage] Failed to finalize guest session:', error);
-                        setChannelError(error.response?.data?.detail || 'Ошибка входа в гостевой режим');
-                    }
-                }
-            } catch (error) {
-                logger.error('LoginPage: Failed to check verification automatically:', error);
-            }
-        }, 3000);
-
-        setVerificationTimers({ timer, verificationTimer });
-    };
-
-    const handleVerificationTimeout = async (): Promise<void> => {
-        if (isDisconnecting) {
-            return;
-        }
-        
-        setIsDisconnecting(true);
-        try {
-            await chatService.disconnectGuest({
-                channel_name: guestUsername.trim()
-            });
-        } catch (error) {
-            logger.error('LoginPage: Failed to disconnect bot:', error);
-        } finally {
-            setVerificationModalOpen(false);
-            window.location.reload();
-        }
-    };
-
-    const copyVerificationCode = async (): Promise<void> => {
-        try {
-            await navigator.clipboard.writeText(verificationCode);
-            setIsCodeCopied(true);
-            setTimeout(() => setIsCodeCopied(false), 2000);
-        } catch (error) {
-            logger.error('LoginPage: Failed to copy code:', error);
-            const textArea = document.createElement('textarea');
-            textArea.value = verificationCode;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            setIsCodeCopied(true);
-            setTimeout(() => setIsCodeCopied(false), 2000);
-        }
+    const handleLogin = (platform: 'twitch' | 'vk'): void => {
+        logger.log(`[LOGIN] Redirecting to ${platform} OAuth`);
+        const authUrl = `${API_BASE_URL}/auth/${platform}/login`;
+        window.location.href = authUrl;
     };
 
     if (isCheckingAuth) {
         return (
-            <div className="login-page-bg min-h-screen flex items-center justify-center text-white font-sans">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-400 mx-auto mb-4"></div>
-                    <p className="text-slate-400">Проверка аутентификации...</p>
-                </div>
+            <div className="login-page-bg min-h-screen flex items-center justify-center text-white font-sans p-4">
+                <Card className="login-card w-full max-w-sm shadow-2xl">
+                    <CardContent className="flex items-center justify-center py-16">
+                        <div className="flex flex-col items-center gap-3">
+                            <div className="relative w-8 h-8">
+                                <div className="absolute inset-0 rounded-full border-2 border-green-400/30"></div>
+                                <div className="absolute inset-0 rounded-full border-2 border-green-400 border-t-transparent animate-spin"></div>
+                            </div>
+                            <p className="text-slate-400 text-sm">Проверка...</p>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
         );
     }
@@ -267,16 +119,16 @@ const LoginPage: React.FC = () => {
                         {title}
                         <span className="blinking-cursor">{!isTyping ? '_' : ''}</span>
                     </h1>
-                    <p className={`text-slate-400 text-sm h-6 subtitle-fade ${subtitleVisible ? 'opacity-100' : 'opacity-0'}`}>
-                        {subtitleText}
-                    </p>
+                    <div className="relative h-6 w-full">
+                        <p className={`text-slate-400 text-sm absolute inset-0 flex items-center justify-center subtitle-fade ${subtitleVisible ? 'opacity-100' : 'opacity-0'}`}>
+                            {subtitleText}
+                        </p>
+                    </div>
                 </CardHeader>
-                <CardContent className="px-8 pb-8">
-                    <div className="space-y-4">
+                <CardContent className="px-8 pb-8 h-[140px]">
+                    <div className="space-y-4 animate-fade-in">
                         <button
-                            onClick={() => {
-                                loginWithTwitch();
-                            }}
+                            onClick={() => handleLogin('twitch')}
                             className="w-full bg-[#9146FF] hover:bg-[#7a3adc] text-white font-semibold py-3 px-5 rounded-lg transition-colors duration-300 flex items-center justify-center text-base"
                         >
                             <TwitchIcon className="mr-2 h-5 w-5" />
@@ -284,166 +136,15 @@ const LoginPage: React.FC = () => {
                         </button>
 
                         <button
-                            onClick={() => {
-                                logger.log('🔵 [LOGIN PAGE] VK Live button clicked!');
-                                loginWithVk();
-                                logger.log('🔵 [LOGIN PAGE] loginWithVk() called');
-                            }}
+                            onClick={() => handleLogin('vk')}
                             className="w-full bg-red-800 hover:bg-red-900 text-white font-semibold py-3 px-5 rounded-lg transition-colors duration-300 flex items-center justify-center text-base"
                         >
                             <VKIcon className="mr-2 h-5 w-5" />
                             Войти через VK Live
                         </button>
-                        
-                        <div className="relative py-2">
-                            <div className="absolute inset-0 flex items-center">
-                                <div className="w-full border-t border-slate-700/50"></div>
-                            </div>
-                            <div className="relative flex justify-center">
-                                <span className="bg-gradient-to-r from-[#2a2235] to-[#342a40] px-3 text-xs text-slate-300 uppercase font-medium">или</span>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={handleGuestMode}
-                            className="w-full bg-green-500/30 hover:bg-green-500/40 text-green-200 font-semibold py-3 px-5 rounded-lg transition-colors duration-300 flex items-center justify-center text-base border border-green-500/30 hover:border-green-500/50"
-                        >
-                            Гостевой режим
-                        </button>
-
                     </div>
                 </CardContent>
             </Card>
-            
-            <Dialog open={guestModalOpen} onOpenChange={setGuestModalOpen}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="text-center text-white">
-                            Гостевой режим
-                        </DialogTitle>
-                        <DialogDescription className="text-sm text-gray-400 text-center mt-2">
-                            Введите данные для входа в гостевой режим. Бот автоматически подключится к указанному каналу.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div>
-                            <Label htmlFor="platform" className="text-white">
-                                Платформа
-                            </Label>
-                            <Select value={guestPlatform} onValueChange={(value: 'twitch' | 'vk') => setGuestPlatform(value)}>
-                                <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="twitch">
-                                        <div className="flex items-center">
-                                            <TwitchIcon className="mr-2 h-4 w-4" />
-                                            Twitch
-                                        </div>
-                                    </SelectItem>
-                                    <SelectItem value="vk">
-                                        <div className="flex items-center">
-                                            <VKIcon className="mr-2 h-4 w-4" />
-                                            VK Live
-                                        </div>
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        
-                        <div>
-                            <Label htmlFor="username" className="text-white">
-                                Никнейм канала
-                            </Label>
-                            <Input
-                                id="username"
-                                type="text"
-                                placeholder="Введите никнейм канала"
-                                value={guestUsername}
-                                onChange={(e) => setGuestUsername(e.target.value)}
-                                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-400"
-                                onKeyPress={(e) => e.key === 'Enter' && checkChannel()}
-                            />
-                            {channelError && (
-                                <p className="text-red-400 text-sm mt-1">{channelError}</p>
-                            )}
-                        </div>
-                        
-                        <div className="flex space-x-2">
-                            <Button
-                                onClick={checkChannel}
-                                disabled={isCheckingChannel || !guestUsername.trim()}
-                                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                            >
-                                {isCheckingChannel ? 'Проверка...' : 'Подключиться'}
-                            </Button>
-                            <Button
-                                onClick={() => setGuestModalOpen(false)}
-                                variant="outline"
-                                className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
-                            >
-                                Отмена
-                            </Button>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
-
-            <Dialog open={verificationModalOpen} onOpenChange={() => {}}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="text-center text-white">
-                            Требуется верификация
-                        </DialogTitle>
-                        <DialogDescription className="text-sm text-gray-400 text-center mt-2">
-                            Введите код верификации для завершения авторизации
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="text-center">
-                            <div className="bg-yellow-500/20 p-4 rounded-lg border border-yellow-500/50 mb-4 relative">
-                                <code className="text-2xl font-mono font-bold text-yellow-100">
-                                    {verificationCode}
-                                </code>
-                                <Button
-                                    onClick={copyVerificationCode}
-                                    size="sm"
-                                    variant="outline"
-                                    className="absolute top-2 right-2 h-8 w-8 p-0 border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/20"
-                                >
-                                    {isCodeCopied ? (
-                                        <Check className="h-4 w-4 text-green-400" />
-                                    ) : (
-                                        <Copy className="h-4 w-4" />
-                                    )}
-                                </Button>
-                            </div>
-                            <p className="text-sm text-gray-300 mb-2">
-                                Отправьте этот код в чат канала от своего имени
-                            </p>
-                            <div className="flex items-center justify-center gap-2 text-yellow-400">
-                                <Activity className="h-4 w-4" />
-                                <span className="text-sm font-medium">
-                                    Осталось времени: {verificationTimeout} сек
-                                </span>
-                            </div>
-                        </div>
-                        
-                        <div className="flex justify-end">
-                            <Button
-                                onClick={() => {
-                                    setVerificationModalOpen(false);
-                                    window.location.reload();
-                                }}
-                                variant="outline"
-                                className="border-slate-600 text-slate-300 hover:bg-slate-700"
-                            >
-                                Отмена
-                            </Button>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
             
             <CookieConsent />
         </div>
@@ -451,4 +152,3 @@ const LoginPage: React.FC = () => {
 };
 
 export default LoginPage;
-

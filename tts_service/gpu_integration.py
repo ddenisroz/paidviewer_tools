@@ -185,7 +185,7 @@ class GPUIntegrationService:
             # Подтверждаем сообщение даже при ошибке
             try:
                 self.redis_client.xack(self.config.input_stream, self.config.consumer_group, stream_id)
-            except:
+            except Exception:
                 pass
 
     async def _should_use_gpu(self, task_data: Dict[str, Any]) -> bool:
@@ -362,7 +362,7 @@ class GPUIntegrationService:
             # Подтверждаем сообщение даже при ошибке
             try:
                 self.redis_client.xack(self.config.gpu_results_stream, self.config.consumer_group, stream_id)
-            except:
+            except Exception:
                 pass
 
     async def _send_result(self, task_id: str, result_path: Optional[str], error: Optional[str], stream_id: str):

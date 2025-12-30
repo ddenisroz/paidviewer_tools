@@ -1,67 +1,63 @@
-import React, { useState, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import React, { useMemo, useState } from 'react';
+
 import { 
-    Terminal, 
-    Edit2, 
-    Trash2, 
-    Save, 
-    Settings,
-    Users,
-    ShieldCheck,
+    AlertCircle, 
+    CheckCircle2, 
+    ChevronDown, 
+    Clock, 
     Crown,
-    Clock,
-    Search,
-    Star,
+    Edit2,
     Filter,
-    ChevronDown,
     Info,
-    Play,
     Mic,
-    Radio,
-    Tag,
-    AlertCircle,
+    Play,
     Plus,
-    CheckCircle2,
+    Radio,
+    Save,
+    Search,
+    Settings,
+    ShieldCheck,
+    Star,
+    Tag,
+    Terminal,
+    Trash2,
+    Users,
     XCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { PageLoader } from '@/components/ui/loader';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { TABLE_CLASSES } from '@/constants/designSystem';
+
+
 import { useAuth } from '../context/AuthContext';
 import { useIntegrations } from '../context/IntegrationsContext';
 import {
     useCommands,
     useCreateCommand,
     useCreateCommandOverride,
-    useUpdateCommand,
     useDeleteCommand,
     useToggleCommand,
+    useUpdateCommand,
 } from '../queries/commands/commandsQueries';
-import { PageLoader } from '@/components/ui/loader';
 import PageWrapper from '../shared/components/PageWrapper';
 
-interface Command {
-    id?: number;
-    command_name: string;
-    description?: string;
-    response_text?: string;
-    platforms?: string;
-    allowed_roles?: string;
-    cooldown_seconds?: number;
-    is_enabled?: boolean;
-    command_type?: 'global' | 'override' | 'custom';
-    tags?: string[];
-}
+import type { Command as ChatCommand } from '../types';
+
+
 
 interface CreateForm {
     command_name: string;
@@ -93,15 +89,15 @@ interface PlatformOption {
 }
 
 interface TagConfig {
-    icon: React.ComponentType<unknown>;
+    icon: React.ComponentType<{ className?: string }>;
     color: string;
 }
 
 interface CommandCardProps {
-    command: Command;
+    command: ChatCommand;
     type: 'basic' | 'custom';
     onToggle: (commandName: string, data: { is_enabled: boolean }, commandId?: number) => void;
-    onEdit: (command: Command) => void;
+    onEdit: (command: ChatCommand) => void;
     onDelete?: (commandId: number) => void;
 }
 
@@ -110,17 +106,22 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
         if (!role || role.trim() === '') {
             return <Users className="h-3 w-3" />;
         }
+        // Map ChatCommand user_level to role display
+        const roleMap: Record<string, string> = {
+            'everyone': 'all',
+            'subscriber': 'vip',
+            'moderator': 'moderator',
+            'broadcaster': 'broadcaster'
+        };
+        const mappedRole = roleMap[role] || role;
+        
         const roleOptions: RoleOption[] = [
             { value: 'all', label: 'Все зрители', icon: <Users className="h-3 w-3" /> },
             { value: 'vip', label: 'VIP+', icon: <Star className="h-3 w-3" /> },
             { value: 'moderator', label: 'Модераторы+', icon: <ShieldCheck className="h-3 w-3" /> },
             { value: 'broadcaster', label: 'Владелец', icon: <Crown className="h-3 w-3" /> }
         ];
-        const normalizedRole = role.split(',').sort().join(',');
-        const option = roleOptions.find(opt => {
-            const normalizedValue = opt.value?.split(',').sort().join(',');
-            return normalizedValue === normalizedRole;
-        });
+        const option = roleOptions.find(opt => opt.value === mappedRole);
         return option ? option.icon : <Users className="h-3 w-3" />;
     };
 
@@ -128,18 +129,23 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
         if (!role || role.trim() === '') {
             return 'Все зрители';
         }
+        // Map ChatCommand user_level to role display
+        const roleMap: Record<string, string> = {
+            'everyone': 'all',
+            'subscriber': 'vip',
+            'moderator': 'moderator',
+            'broadcaster': 'broadcaster'
+        };
+        const mappedRole = roleMap[role] || role;
+        
         const roleOptions: RoleOption[] = [
             { value: 'all', label: 'Все зрители', icon: <Users className="h-3 w-3" /> },
             { value: 'vip', label: 'VIP+', icon: <Star className="h-3 w-3" /> },
             { value: 'moderator', label: 'Модераторы+', icon: <ShieldCheck className="h-3 w-3" /> },
             { value: 'broadcaster', label: 'Владелец', icon: <Crown className="h-3 w-3" /> }
         ];
-        const normalizedRole = role.split(',').sort().join(',');
-        const option = roleOptions.find(opt => {
-            const normalizedValue = opt.value?.split(',').sort().join(',');
-            return normalizedValue === normalizedRole;
-        });
-        return option ? option.label : `⚠️ ${role}`;
+        const option = roleOptions.find(opt => opt.value === mappedRole);
+        return option ? option.label : `[WARN] ${role}`;
     };
 
     const getPlatformLabel = (platforms: string | undefined): string => {
@@ -166,17 +172,17 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                     <div className="flex items-center gap-2">
                         <Terminal className="h-3 w-3 text-primary" />
                         <code className="text-sm font-bold font-mono bg-muted px-2 py-1 rounded text-foreground">
-                            !{command.command_name}
+                            !{command.name}
                         </code>
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="flex items-center gap-2 transition-all duration-300 ease-in-out">
-                            <Badge variant={command.is_enabled ? "default" : "secondary"} className="transition-all duration-300 ease-in-out">
-                                {command.is_enabled ? 'Включена' : 'Отключена'}
+                            <Badge variant={command.enabled ? "default" : "secondary"} className="transition-all duration-300 ease-in-out">
+                                {command.enabled ? 'Включена' : 'Отключена'}
                             </Badge>
                             <Switch
-                                checked={command.is_enabled}
-                                onCheckedChange={(checked) => onToggle(command.command_name, { is_enabled: checked }, command.id)}
+                                checked={command.enabled}
+                                onCheckedChange={(checked) => onToggle(command.name, { is_enabled: checked }, command.id)}
                                 className="transition-all duration-300 ease-in-out"
                             />
                         </div>
@@ -191,31 +197,31 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                     {command.description || 'Описание команды не указано'}
                 </p>
                 
-                {command.response_text && (
+                {command.response && (
                     <div className="p-2 bg-muted/30 rounded-md border-l-2 border-primary/20">
                         <p className="text-xs font-medium text-primary mb-1">Ответ:</p>
-                        <p className="text-xs text-muted-foreground line-clamp-2">"{command.response_text}"</p>
+                        <p className="text-xs text-muted-foreground line-clamp-2">"{command.response}"</p>
                     </div>
                 )}
 
                 <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-3 text-muted-foreground">
                         <div className="flex items-center gap-1">
-                            {getRoleIcon(command.allowed_roles || 'all')}
-                            <span>{getRoleLabel(command.allowed_roles || 'all')}</span>
+                            {getRoleIcon(command.user_level || 'everyone')}
+                            <span>{getRoleLabel(command.user_level || 'everyone')}</span>
                         </div>
                         <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            <span>{command.cooldown_seconds || 0}с</span>
+                            <span>{command.cooldown || 0}с</span>
                         </div>
                     </div>
                     <div className="flex items-center gap-1.5">
-                        {(command.platforms || 'twitch,vk').includes('twitch') && (
+                        {(command.platform === 'all' || command.platform === 'twitch') && (
                             <Badge variant="outline" className="text-xs px-1.5 py-0 bg-purple-500/10 text-purple-600 border-purple-500/20">
                                 Twitch
                             </Badge>
                         )}
-                        {(command.platforms || 'twitch,vk').includes('vk') && (
+                        {(command.platform === 'all' || command.platform === 'vk') && (
                             <Badge variant="outline" className="text-xs px-1.5 py-0 bg-red-500/10 text-red-600 border-red-500/20">
                                 VK
                             </Badge>
@@ -257,9 +263,9 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                             variant="destructive"
                             size="sm"
                             onClick={() => onDelete(command.id!)}
-                            className="h-8 w-8 p-0"
+                            className={TABLE_CLASSES.actionButton}
                         >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="h-4 w-4" />
                         </Button>
                     )}
                 </div>
@@ -323,9 +329,14 @@ const PlatformStatusBanner: React.FC<PlatformStatusBannerProps> = ({ integration
         );
     }
 
-    // ✅ ИСПРАВЛЕНИЕ: Убрана подсказка - она не нужна, пользователь и так видит подключенные платформы
+    // [OK] ИСПРАВЛЕНИЕ: Убрана подсказка - она не нужна, пользователь и так видит подключенные платформы
     return null;
 };
+
+interface CommandsData {
+    basic_commands: ChatCommand[];
+    custom_commands: ChatCommand[];
+}
 
 const CommandsPage: React.FC = () => {
     const navigate = useNavigate();
@@ -352,7 +363,7 @@ const CommandsPage: React.FC = () => {
     
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState<boolean>(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState<boolean>(false);
-    const [editingCommand, setEditingCommand] = useState<Command | null>(null);
+    const [editingCommand, setEditingCommand] = useState<ChatCommand | null>(null);
     
     const [createForm, setCreateForm] = useState<CreateForm>({
         command_name: '',
@@ -371,12 +382,12 @@ const CommandsPage: React.FC = () => {
         response_text: ''
     });
     
-    const basicCommands = (commandsData as unknown)?.basic_commands || [];
-    const customCommands = (commandsData as unknown)?.custom_commands || [];
+    const basicCommands = commandsData?.basic_commands || [];
+    const customCommands = commandsData?.custom_commands || [];
     
     // Все хуки должны быть вызваны до любых условных return (правило React Hooks)
     const basicTags = useMemo(() => {
-        return [...new Set(basicCommands.flatMap((cmd: Command) => {
+        return [...new Set(basicCommands.flatMap((cmd: ChatCommand) => {
             return Array.isArray(cmd.tags) ? cmd.tags : [];
         }))] as string[];
     }, [basicCommands]);
@@ -437,9 +448,9 @@ const CommandsPage: React.FC = () => {
     const availablePlatforms = platformOptions.filter(opt => opt.enabled);
     const platformsToShow = availablePlatforms.length > 0 ? availablePlatforms : platformOptions;
     
-    const getFilteredBasicCommands = (): Command[] => {
-        return basicCommands.filter((command: Command) => {
-            const matchesSearch = command.command_name.toLowerCase().includes(basicSearchTerm.toLowerCase()) ||
+    const getFilteredBasicCommands = (): ChatCommand[] => {
+        return basicCommands.filter((command: ChatCommand) => {
+            const matchesSearch = command.name.toLowerCase().includes(basicSearchTerm.toLowerCase()) ||
                                 command.description?.toLowerCase().includes(basicSearchTerm.toLowerCase());
             
             const matchesTags = selectedBasicTags.length === 0 || selectedBasicTags.some(selectedTag => 
@@ -447,19 +458,21 @@ const CommandsPage: React.FC = () => {
             );
             
             const matchesPlatform = platformFilter === 'all' || 
-                                  (command.platforms || 'twitch,vk').includes(platformFilter);
+                                  command.platform === 'all' ||
+                                  command.platform === platformFilter;
             
             return matchesSearch && matchesTags && matchesPlatform;
         });
     };
 
-    const getFilteredCustomCommands = (): Command[] => {
-        return customCommands.filter((command: Command) => {
-            const matchesSearch = command.command_name.toLowerCase().includes(customSearchTerm.toLowerCase()) ||
-                                command.response_text?.toLowerCase().includes(customSearchTerm.toLowerCase());
+    const getFilteredCustomCommands = (): ChatCommand[] => {
+        return customCommands.filter((command: ChatCommand) => {
+            const matchesSearch = command.name.toLowerCase().includes(customSearchTerm.toLowerCase()) ||
+                                command.response?.toLowerCase().includes(customSearchTerm.toLowerCase());
             
             const matchesPlatform = platformFilter === 'all' || 
-                                  (command.platforms || 'twitch,vk').includes(platformFilter);
+                                  command.platform === 'all' ||
+                                  command.platform === platformFilter;
             
             return matchesSearch && matchesPlatform;
         });
@@ -484,12 +497,12 @@ const CommandsPage: React.FC = () => {
     };
 
     const handleCreateCommand = (): void => {
-        // Преобразуем форму в формат ChatCommand
-        const commandData = {
+        // Преобразуем форму в формат Partial<ChatCommand>
+        const commandData: Partial<ChatCommand> = {
             name: createForm.command_name,
             response: createForm.response_text,
-            platform: createForm.platforms as unknown,
-            user_level: createForm.allowed_roles as unknown,
+            platform: createForm.platforms as 'twitch' | 'vk' | 'youtube' | 'all',
+            user_level: createForm.allowed_roles as 'everyone' | 'subscriber' | 'moderator' | 'broadcaster',
             cooldown: createForm.cooldown_seconds,
             enabled: createForm.is_enabled
         };
@@ -514,7 +527,7 @@ const CommandsPage: React.FC = () => {
         
         if (editingCommand.command_type === 'global') {
             createOverrideMutation.mutate({
-                command_name: editingCommand.command_name,
+                command_name: editingCommand.name,
                 is_enabled: editForm.is_enabled,
                 platforms: editForm.platforms,
                 allowed_roles: editForm.allowed_roles,
@@ -527,11 +540,11 @@ const CommandsPage: React.FC = () => {
                 },
             });
         } else {
-            // Преобразуем форму в формат ChatCommand
-            const commandData = {
+            // Преобразуем форму в формат Partial<ChatCommand>
+            const commandData: Partial<ChatCommand> = {
                 response: editForm.response_text,
-                platform: editForm.platforms as unknown,
-                user_level: editForm.allowed_roles as unknown,
+                platform: editForm.platforms === 'twitch,vk' ? 'all' : editForm.platforms as 'twitch' | 'vk' | 'youtube' | 'all',
+                user_level: editForm.allowed_roles as 'everyone' | 'subscriber' | 'moderator' | 'broadcaster',
                 cooldown: editForm.cooldown_seconds,
                 enabled: editForm.is_enabled
             };
@@ -558,16 +571,16 @@ const CommandsPage: React.FC = () => {
         deleteCommandMutation.mutate(commandId);
     };
 
-    const openEditDialog = (command: Command): void => {
+    const openEditDialog = (command: ChatCommand): void => {
         setEditingCommand(command);
-        const platforms = command.platforms || 'twitch,vk';
-        const allowed_roles = (command.allowed_roles && command.allowed_roles.trim() !== '') ? command.allowed_roles : 'all';
+        const platform = command.platform || 'all';
+        const user_level = command.user_level || 'everyone';
         setEditForm({
-            is_enabled: command.is_enabled ?? true,
-            platforms: platforms,
-            allowed_roles: allowed_roles,
-            cooldown_seconds: command.cooldown_seconds || 0,
-            response_text: command.response_text || ''
+            is_enabled: command.enabled ?? true,
+            platforms: platform === 'all' ? 'twitch,vk' : platform,
+            allowed_roles: user_level,
+            cooldown_seconds: command.cooldown || 0,
+            response_text: command.response || ''
         });
         setIsEditDialogOpen(true);
     };
@@ -745,8 +758,8 @@ const CommandsPage: React.FC = () => {
                             </div>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-all duration-200">
-                                {getFilteredBasicCommands().map((command: Command) => (
-                                    <div key={command.id || command.command_name} className="transition-all duration-200">
+                                {getFilteredBasicCommands().map((command: ChatCommand) => (
+                                    <div key={command.id || command.name} className="transition-all duration-200">
                                         <CommandCard
                                             command={command}
                                             type="basic"
@@ -960,8 +973,8 @@ const CommandsPage: React.FC = () => {
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-all duration-200">
-                                    {getFilteredCustomCommands().map((command: Command) => (
-                                        <div key={command.id || command.command_name} className="transition-all duration-200">
+                                    {getFilteredCustomCommands().map((command: ChatCommand) => (
+                                        <div key={command.id || command.name} className="transition-all duration-200">
                                             <CommandCard
                                                 command={command}
                                                 type="custom"
@@ -982,7 +995,7 @@ const CommandsPage: React.FC = () => {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
-                            !{editingCommand?.command_name}
+                            !{editingCommand?.name}
                         </DialogTitle>
                     </DialogHeader>
                     {editingCommand && (

@@ -24,7 +24,7 @@ export interface UserIntegrations {
     connected: boolean;
     user_id?: number;
   };
-  [key: string]: any;
+  [key: string]: { connected: boolean; username?: string; channel_name?: string; channel_id?: string; user_id?: number } | undefined;
 }
 
 /**
@@ -52,7 +52,7 @@ export interface User {
     vk?: string;
   };
   session_id?: string;
-  [key: string]: any;
+  [key: string]: string | number | boolean | string[] | UserIntegrations | { twitch?: string; vk?: string } | undefined;
 }
 
 /**
@@ -91,7 +91,7 @@ export interface UserSettings {
   obs_normal_color?: string;
   combine_titles?: boolean;
   combine_categories?: boolean;
-  [key: string]: any;
+  [key: string]: string | number | boolean | null | undefined;
 }
 
 /**
@@ -103,12 +103,4 @@ export interface UserSession {
   token?: string;
 }
 
-/**
- * Данные гостевого режима
- */
-export interface GuestData {
-  username: string;
-  channel?: string;
-  platform: 'twitch' | 'vk';
-  isGuest?: boolean;
-}
+

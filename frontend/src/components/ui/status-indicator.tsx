@@ -1,5 +1,6 @@
 import React from 'react';
-import { CheckCircle, AlertCircle, Loader2, Clock, LucideIcon } from 'lucide-react';
+
+import { AlertCircle, CheckCircle, Clock, Loader2, LucideIcon } from 'lucide-react';
 
 interface StatusIndicatorProps {
     status?: 'success' | 'error' | 'loading' | 'pending';

@@ -1,7 +1,7 @@
 """
 Система проверки прав доступа для различных типов пользователей
 """
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from fastapi import HTTPException, status
 from services.user_identity_service import UserIdentityService, UserType
 import logging
@@ -23,21 +23,21 @@ def require_platform_token(user: Dict[str, Any], platform: str = None) -> None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid user data"
         )
-    
+
     user_type = UserIdentityService.get_user_type(user)
     if user_type == UserType.GUEST:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Эта функция недоступна для гостей. Требуется авторизация через платформу."
         )
-    
+
     integrations = user.get("integrations", {})
     if not integrations:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Требуется авторизация через платформу для использования этой функции"
         )
-    
+
     if platform and platform not in integrations:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -70,7 +70,7 @@ def has_platform_token(user: Dict[str, Any], platform: str) -> bool:
     """Проверяет, есть ли у пользователя токен конкретной платформы."""
     if is_guest(user):
         return False
-    
+
     integrations = user.get("integrations", {})
     return platform in integrations
 

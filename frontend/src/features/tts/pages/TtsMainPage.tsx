@@ -1,40 +1,45 @@
-import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
 import { useQueryClient } from '@tanstack/react-query';
+import { AlertCircle, CheckCircle2, RefreshCw, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useTts } from '../../../context/TtsContext';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { toast } from '@/utils/toastManager';
+
 import { useAuth } from '../../../context/AuthContext';
 import { useIntegrations } from '../../../context/IntegrationsContext';
-import { getTtsWebSocketUrl } from '../../../utils/urlUtils';
-import { toast } from 'sonner';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-import { Slider } from '@/components/ui/slider';
-import { Button } from '@/components/ui/button';
-import { RefreshCw, AlertCircle, CheckCircle2, Settings } from 'lucide-react';
-import { TwitchIcon, VKIcon } from '../../../shared/components/PlatformIcons';
-import TtsFilterManager from '../components/TtsFilterManager';
-import TtsChannelPointsMode from '../components/TtsChannelPointsMode';
-import { logger } from '../../../utils/prodLogger';
-import { getQueryCache, setQueryCache } from '../../../utils/queryPersist';
-import { 
-    useTtsStatus, 
-    useTtsSettings, 
-    useTtsAudioSettings, 
-    useTtsPlatformSettings, 
-    useTtsModeSettings,
-    useToggleTts,
-    useSaveTtsSettings,
-    useSaveTtsAudioSettings,
-    useSaveTtsPlatformSettings,
-    useSaveTtsModeSettings,
-    useSetTtsListeningMode,
-    useSetTtsEngine,
-    useRegenerateTtsObsUrl
-} from '../../../queries/tts/ttsQueries';
+import { useTts } from '../../../context/TtsContext';
 import { queryKeys } from '../../../queries/queryKeys';
-import PageWrapper from '../../../shared/components/PageWrapper';
+import { 
+    useRegenerateTtsObsUrl, 
+    useSaveTtsAudioSettings, 
+    useSaveTtsModeSettings, 
+    useSaveTtsPlatformSettings, 
+    useSaveTtsSettings,
+    useSetTtsEngine,
+    useSetTtsListeningMode,
+    useToggleTts,
+    useTtsAudioSettings,
+    useTtsModeSettings,
+    useTtsPlatformSettings,
+    useTtsSettings,
+    useTtsStatus
+} from '../../../queries/tts/ttsQueries';
 import { ttsService } from '../../../services/api/services/ttsService';
-import { ApiResponse } from '@/types';
+import PageWrapper from '../../../shared/components/PageWrapper';
+import { TwitchIcon, VKIcon } from '../../../shared/components/PlatformIcons';
+import { logger } from '../../../utils/prodLogger';
+import { getQueryCache } from '../../../utils/queryPersist';
+import { getTtsWebSocketUrl } from '../../../utils/urlUtils';
+import TtsChannelPointsMode from '../components/TtsChannelPointsMode';
+import TtsFilterManager from '../components/TtsFilterManager';
+
+import type { ApiResponse } from '@/types';
+import type { AxiosError } from 'axios';
 
 interface PlatformSettings {
     enabled_platforms: ('twitch' | 'vk')[];
@@ -49,9 +54,44 @@ interface TtsSettingsState {
     version: number;
 }
 
+interface TtsStatusData {
+    enabled?: boolean;
+    engine_type?: 'cloud' | 'local' | 'gtts';
+}
+
+interface TtsSettingsData {
+    enable7TV?: boolean;
+    enableTwitch?: boolean;
+    filterReplies?: boolean;
+    filterMentions?: boolean;
+    version?: number;
+    listeningMode?: 'website' | 'obs';
+}
+
+interface AudioSettingsData {
+    websiteVolume?: number;
+}
+
+interface PlatformSettingsData {
+    enabled_platforms?: ('twitch' | 'vk')[];
+    global_enabled?: boolean;
+}
+
+interface ModeSettingsData {
+    tts_mode?: 'all_messages' | 'channel_points';
+}
+
+interface ObsTokenResponse {
+    obs_token?: string;
+}
+
+interface TtsModeResponse {
+    message?: string;
+}
+
 const TtsMainPageContent: React.FC = () => {
     const navigate = useNavigate();
-    const { ttsEnabled, isWhitelisted, initializeTts, engineStatus, isCheckingHealth } = useTts();
+    const { ttsEnabled: _ttsEnabled, isWhitelisted, initializeTts: _initializeTts, engineStatus, isCheckingHealth } = useTts();
     const isHealthy = engineStatus.loaded;
     const isChecking = isCheckingHealth;
     const { isAuthenticated, user, isGuest } = useAuth();
@@ -79,7 +119,7 @@ const TtsMainPageContent: React.FC = () => {
         version: 1,
     });
     
-    const [localTtsConfig, setLocalTtsConfig] = useState<unknown>(null);
+    const [_localTtsConfig, _setLocalTtsConfig] = useState<unknown>(null);
     const [isSavingMode, setIsSavingMode] = useState<boolean>(false);
     const [isRegeneratingUrl, setIsRegeneratingUrl] = useState<boolean>(false);
     
@@ -89,7 +129,7 @@ const TtsMainPageContent: React.FC = () => {
     const queryClient = useQueryClient();
     const isTwitchConnected = integrations.twitch?.enabled || (isGuest && user?.platform === 'twitch');
     const isVkConnected = integrations.vk?.enabled || (isGuest && user?.platform === 'vk');
-    const hasAnyIntegration = isGuest || isTwitchConnected || isVkConnected;
+    const _hasAnyIntegration = isGuest || isTwitchConnected || isVkConnected;
     const hasLocalSetup = localStorage.getItem('tts_has_local_setup') === 'true';
     const isAnyTtsEnabled = basicTtsEnabled || aiTtsEnabled;
 
@@ -123,8 +163,9 @@ const TtsMainPageContent: React.FC = () => {
             logger.log('TTS settings saved');
         },
         onError: (error: unknown) => {
+            const axiosError = error as AxiosError<{ detail?: string }>;
             logger.error('Error saving TTS settings:', error);
-            if (error.response?.status === 409) {
+            if (axiosError.response?.status === 409) {
                 toast.warning('Настройки были обновлены. Перезагружаю...');
                 setTimeout(() => queryClient.invalidateQueries({ queryKey: queryKeys.tts.settings() }), 1500);
             }
@@ -157,7 +198,7 @@ const TtsMainPageContent: React.FC = () => {
         refetchInterval: 30000,
         staleTime: 60000,
         gcTime: 5 * 60 * 1000,
-        initialData: () => getQueryCache(['tts-status'])
+        initialData: () => getQueryCache(['tts-status']) || undefined
     });
     const ttsStatusData = ttsStatusResponse?.data;
     
@@ -166,29 +207,29 @@ const TtsMainPageContent: React.FC = () => {
 
     const { data: ttsSettingsResponse } = useTtsSettings({
         enabled: !!isAuthenticated,
-        initialData: () => getQueryCache(['tts-settings'])
+        initialData: () => getQueryCache(['tts-settings']) || undefined
     });
     const ttsSettingsData = ttsSettingsResponse?.data;
 
     const { data: audioSettingsResponse } = useTtsAudioSettings({
         enabled: !!isAuthenticated,
-        initialData: () => getQueryCache(['tts-audio-settings'])
+        initialData: () => getQueryCache(['tts-audio-settings']) || undefined
     });
     const audioSettingsData = audioSettingsResponse?.data;
 
     const { data: platformSettingsResponse } = useTtsPlatformSettings({
         enabled: !!isAuthenticated,
-        initialData: () => getQueryCache(['tts-platform-settings'])
+        initialData: () => getQueryCache(['tts-platform-settings']) || undefined
     });
     const platformSettingsData = platformSettingsResponse?.data;
 
     const { data: modeSettingsResponse } = useTtsModeSettings({
         enabled: !!isAuthenticated,
-        initialData: () => getQueryCache(['tts-mode-settings'])
+        initialData: () => getQueryCache(['tts-mode-settings']) || undefined
     });
     const modeSettingsData = modeSettingsResponse?.data;
 
-    const isDataLoaded = useMemo(() => {
+    const _isDataLoaded = useMemo(() => {
         const hasStatus = ttsStatusData !== undefined || getQueryCache(['tts-status']) !== null;
         const hasSettings = ttsSettingsData !== undefined || getQueryCache(['tts-settings']) !== null;
         const hasAudio = audioSettingsData !== undefined || getQueryCache(['tts-audio-settings']) !== null;
@@ -197,8 +238,9 @@ const TtsMainPageContent: React.FC = () => {
 
     useEffect(() => {
         if (ttsStatusData) {
-            const enabled = ttsStatusData.enabled || false;
-            const engineType = (ttsStatusData as unknown).engine_type || 'gtts';
+            const statusData = ttsStatusData as TtsStatusData;
+            const enabled = statusData.enabled || false;
+            const engineType = statusData.engine_type || 'gtts';
             
             const basicEnabled = enabled && engineType === 'gtts';
             const aiEnabled = enabled && (engineType === 'cloud' || engineType === 'local');
@@ -214,10 +256,10 @@ const TtsMainPageContent: React.FC = () => {
         }
     }, [ttsStatusData]);
 
-    // ✅ ИСПРАВЛЕНИЕ: Слушаем событие tts-status-changed для синхронизации с QuickActionsBar
+    // [OK] ИСПРАВЛЕНИЕ: Слушаем событие tts-status-changed для синхронизации с QuickActionsBar
     useEffect(() => {
         const handleTtsStatusChange = (event: CustomEvent<{ enabled: boolean }>) => {
-            logger.log('🔄 TtsMainPage: Received tts-status-changed event:', event.detail);
+            logger.log('[REFRESH] TtsMainPage: Received tts-status-changed event:', event.detail);
             // Инвалидируем кэш чтобы перезагрузить данные
             queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
         };
@@ -228,37 +270,40 @@ const TtsMainPageContent: React.FC = () => {
 
     useEffect(() => {
         if (ttsSettingsData) {
+            const settingsData = ttsSettingsData as TtsSettingsData;
             setTtsSettings(prev => ({
                 ...prev,
-                enable7TV: (ttsSettingsData as unknown).enable7TV ?? prev.enable7TV,
-                enableTwitch: (ttsSettingsData as unknown).enableTwitch ?? prev.enableTwitch,
-                filterReplies: (ttsSettingsData as unknown).filterReplies ?? prev.filterReplies,
-                filterMentions: (ttsSettingsData as unknown).filterMentions ?? prev.filterMentions,
-                version: (ttsSettingsData as unknown).version ?? prev.version,
+                enable7TV: settingsData.enable7TV ?? prev.enable7TV,
+                enableTwitch: settingsData.enableTwitch ?? prev.enableTwitch,
+                filterReplies: settingsData.filterReplies ?? prev.filterReplies,
+                filterMentions: settingsData.filterMentions ?? prev.filterMentions,
+                version: settingsData.version ?? prev.version,
             }));
             
-            if ((ttsSettingsData as unknown).listeningMode) {
-                setListeningMode(prev => prev !== (ttsSettingsData as unknown).listeningMode ? (ttsSettingsData as unknown).listeningMode : prev);
+            if (settingsData.listeningMode) {
+                setListeningMode(prev => prev !== settingsData.listeningMode ? settingsData.listeningMode! : prev);
             }
         }
     }, [ttsSettingsData]);
 
     useEffect(() => {
-        if (audioSettingsData?.websiteVolume !== undefined) {
-            setLocalVolume(prev => prev !== audioSettingsData.websiteVolume ? audioSettingsData.websiteVolume : prev);
+        const audioData = audioSettingsData as AudioSettingsData | undefined;
+        if (audioData?.websiteVolume !== undefined) {
+            setLocalVolume(prev => prev !== audioData.websiteVolume ? audioData.websiteVolume! : prev);
         }
     }, [audioSettingsData]);
 
     useEffect(() => {
-        if (platformSettingsData?.enabled_platforms) {
+        const platformData = platformSettingsData as PlatformSettingsData | undefined;
+        if (platformData?.enabled_platforms) {
             setPlatformSettings(prev => {
-                const newPlatforms = platformSettingsData.enabled_platforms || [];
+                const newPlatforms = platformData.enabled_platforms || [];
                 const currentPlatforms = prev.enabled_platforms || [];
                 if (JSON.stringify(currentPlatforms) !== JSON.stringify(newPlatforms)) {
                     return {
                         ...prev,
                         enabled_platforms: newPlatforms as ('twitch' | 'vk')[],
-                        global_enabled: platformSettingsData.global_enabled ?? prev.global_enabled
+                        global_enabled: platformData.global_enabled ?? prev.global_enabled
                     };
                 }
                 return prev;
@@ -267,8 +312,9 @@ const TtsMainPageContent: React.FC = () => {
     }, [platformSettingsData]);
 
     useEffect(() => {
-        if (modeSettingsData?.tts_mode) {
-            setTtsTriggerMode(prev => prev !== modeSettingsData.tts_mode ? modeSettingsData.tts_mode : prev);
+        const modeData = modeSettingsData as ModeSettingsData | undefined;
+        if (modeData?.tts_mode) {
+            setTtsTriggerMode(prev => prev !== modeData.tts_mode ? modeData.tts_mode! : prev);
         }
     }, [modeSettingsData]);
 
@@ -276,7 +322,8 @@ const TtsMainPageContent: React.FC = () => {
         if (listeningMode === 'obs' && isAuthenticated && user?.id) {
             ttsService.generateObsUrl()
                 .then(response => {
-                    const token = (response.data as ApiResponse)?.obs_token;
+                    const obsResponse = response.data as ApiResponse<ObsTokenResponse>;
+                    const token = obsResponse?.data?.obs_token || (obsResponse as unknown as ObsTokenResponse)?.obs_token;
                     if (token) {
                         const url = getTtsWebSocketUrl(token);
                         setObsUrl(url);
@@ -300,7 +347,7 @@ const TtsMainPageContent: React.FC = () => {
         
         const newState = !isAnyTtsEnabled;
         
-        // ✅ ИСПРАВЛЕНИЕ: Оптимистичное обновление UI
+        // [OK] ИСПРАВЛЕНИЕ: Оптимистичное обновление UI
         if (newState) {
             setBasicTtsEnabled(true);
         } else {
@@ -310,7 +357,7 @@ const TtsMainPageContent: React.FC = () => {
         
         toggleTtsMutation.mutate(newState, {
             onSuccess: () => {
-                // ✅ ИСПРАВЛЕНИЕ: Инвалидируем кэш для обновления всех компонентов
+                // [OK] ИСПРАВЛЕНИЕ: Инвалидируем кэш для обновления всех компонентов
                 queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
                 window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: newState } }));
             },
@@ -332,10 +379,11 @@ const TtsMainPageContent: React.FC = () => {
         
         setIsSavingMode(true);
         saveTtsModeSettingsMutation.mutate({ tts_mode: mode }, {
-            onSuccess: (response: Record<string, unknown>) => {
+            onSuccess: (response) => {
                 setTtsTriggerMode(mode);
-                if (response.data?.message) {
-                    toast.success(response.data.message);
+                const responseData = response?.data as TtsModeResponse | undefined;
+                if (responseData?.message) {
+                    toast.success(responseData.message);
                 }
             },
             onError: (error: unknown) => {
@@ -350,7 +398,7 @@ const TtsMainPageContent: React.FC = () => {
     const handleBasicTtsToggle = (): void => {
         const newValue = !basicTtsEnabled;
         
-        // ✅ ИСПРАВЛЕНИЕ: Оптимистичное обновление UI
+        // [OK] ИСПРАВЛЕНИЕ: Оптимистичное обновление UI
         if (newValue) {
             setBasicTtsEnabled(true);
             setAiTtsEnabled(false);
@@ -360,7 +408,7 @@ const TtsMainPageContent: React.FC = () => {
         
         toggleTtsMutation.mutate(newValue, {
             onSuccess: () => {
-                // ✅ ИСПРАВЛЕНИЕ: Инвалидируем кэш для обновления всех компонентов
+                // [OK] ИСПРАВЛЕНИЕ: Инвалидируем кэш для обновления всех компонентов
                 queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
                 
                 if (newValue && aiTtsEnabled) {
@@ -391,7 +439,7 @@ const TtsMainPageContent: React.FC = () => {
         
         const newValue = !aiTtsEnabled;
         
-        // ✅ ИСПРАВЛЕНИЕ: Оптимистичное обновление UI
+        // [OK] ИСПРАВЛЕНИЕ: Оптимистичное обновление UI
         if (newValue) {
             setAiTtsEnabled(true);
             setBasicTtsEnabled(true);
@@ -402,7 +450,7 @@ const TtsMainPageContent: React.FC = () => {
         if (newValue && !isAnyTtsEnabled) {
             toggleTtsMutation.mutate(true, {
                 onSuccess: () => {
-                    // ✅ ИСПРАВЛЕНИЕ: Инвалидируем кэш для обновления всех компонентов
+                    // [OK] ИСПРАВЛЕНИЕ: Инвалидируем кэш для обновления всех компонентов
                     queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
                     setBasicTtsEnabled(true);
                     const engineType = ttsEngine === 'local' ? 'local' : 'cloud';
@@ -428,7 +476,7 @@ const TtsMainPageContent: React.FC = () => {
             const engineType = newValue ? (ttsEngine === 'local' ? 'local' : 'cloud') : 'gtts';
             switchEngineMutation.mutate(engineType, {
                 onSuccess: () => {
-                    // ✅ ИСПРАВЛЕНИЕ: Инвалидируем кэш для обновления всех компонентов
+                    // [OK] ИСПРАВЛЕНИЕ: Инвалидируем кэш для обновления всех компонентов
                     queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
                     
                     if (newValue) {
@@ -512,8 +560,9 @@ const TtsMainPageContent: React.FC = () => {
     }, [platformSettings.enabled_platforms, savePlatformSettingsMutation]);
 
     const regenerateObsUrlMutation = useRegenerateTtsObsUrl({
-        onSuccess: (response: Record<string, unknown>) => {
-            const token = response.data?.obs_token;
+        onSuccess: (response) => {
+            const responseData = response?.data as ObsTokenResponse | undefined;
+            const token = responseData?.obs_token;
             if (token) {
                 const url = getTtsWebSocketUrl(token);
                 setObsUrl(url);

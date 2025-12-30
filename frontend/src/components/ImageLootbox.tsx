@@ -1,8 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import React, { useEffect, useState } from 'react';
+
+import { Crown, Gem, Gift, Star, Zap } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Gift, Star, Zap, Crown, Gem, LucideIcon } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+
+
+import {
+    calculateTotalFrames,
+    getAnimationConfig,
+    getAnimationImageIndex,
+    getDisplayImage,
+    shouldCompleteAnimation
+} from '../utils/lootboxAnimationHelpers';
+import {
+    getLootboxButtonText,
+    getRarityButtonColor,
+    getRarityColor
+} from '../utils/rarityHelpers';
+
+interface PredeterminedResult {
+    reward_name: string;
+    quality: string;
+    image_url?: string;
+}
 
 interface ImageLootboxProps {
   images?: string[]; // Массив путей к картинкам для анимации
@@ -12,11 +34,7 @@ interface ImageLootboxProps {
   onOpen?: () => void;
   className?: string;
   size?: 'small' | 'medium' | 'large';
-  predeterminedResult?: {
-    reward_name: string;
-    quality: string;
-    image_url?: string;
-  }; // Predetermined result from backend
+  predeterminedResult?: PredeterminedResult | null; // Predetermined result from backend
 }
 
 const ImageLootbox: React.FC<ImageLootboxProps> = ({ 
@@ -31,19 +49,12 @@ const ImageLootbox: React.FC<ImageLootboxProps> = ({
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
-  const [finalResult, setFinalResult] = useState<typeof predeterminedResult | null>(null);
+  const [finalResult, setFinalResult] = useState<PredeterminedResult | null>(null);
 
   const sizeClasses: Record<string, string> = {
     small: "w-32 h-32",
     medium: "w-48 h-48", 
     large: "w-64 h-64"
-  };
-
-  const rarityColors: Record<string, string> = {
-    common: "bg-gray-500",
-    rare: "bg-blue-500", 
-    epic: "bg-purple-500",
-    legendary: "bg-yellow-500"
   };
 
   const rarityIcons: Record<string, React.ReactNode> = {
@@ -59,19 +70,15 @@ const ImageLootbox: React.FC<ImageLootboxProps> = ({
     if (isOpening && images && images.length > 0) {
       setIsAnimating(true);
       
-      // Fast image cycling to create opening effect
-      // The animation will always end at the predetermined result
-      let index = 0;
-      const cycleSpeed = 150; // ms per image
-      const totalCycles = 3; // Number of full cycles through images
-      const totalFrames = images.length * totalCycles;
+      const config = getAnimationConfig();
+      const totalFrames = calculateTotalFrames(images.length, config);
+      let currentFrame = 0;
       
       const interval = setInterval(() => {
-        // Cycle through images multiple times
-        setCurrentImageIndex(index % images.length);
-        index++;
+        setCurrentImageIndex(getAnimationImageIndex(currentFrame, images.length));
+        currentFrame++;
         
-        if (index >= totalFrames) {
+        if (shouldCompleteAnimation(currentFrame, totalFrames)) {
           clearInterval(interval);
           setIsAnimating(false);
           
@@ -83,21 +90,19 @@ const ImageLootbox: React.FC<ImageLootboxProps> = ({
             setCurrentImageIndex(images.length - 1);
           }
         }
-      }, cycleSpeed);
+      }, config.cycleSpeed);
 
       return () => clearInterval(interval);
     }
   }, [isOpening, images, predeterminedResult]);
 
   const handleOpen = () => {
-    if (onOpen) {
-      onOpen();
-    }
+    if (!onOpen) return;
+    onOpen();
   };
 
   // Display predetermined result if available, otherwise show current animation frame
-  const currentImage = finalResult?.image_url || 
-    (images && images.length > 0 ? images[currentImageIndex] : null);
+  const currentImage = getDisplayImage(finalResult, images, currentImageIndex);
 
   return (
     <Card 
@@ -133,7 +138,7 @@ const ImageLootbox: React.FC<ImageLootboxProps> = ({
                   {finalResult.reward_name}
                 </div>
                 <Badge 
-                  className={`${rarityColors[finalResult.quality.toLowerCase() as keyof typeof rarityColors] || 'bg-gray-500'} text-white`}
+                  className={`${getRarityColor(finalResult.quality)} text-white`}
                 >
                   {finalResult.quality}
                 </Badge>
@@ -151,7 +156,7 @@ const ImageLootbox: React.FC<ImageLootboxProps> = ({
               </h3>
               <div className="flex items-center gap-2 mt-1">
                 <Badge 
-                  className={`${rarityColors[finalResult?.quality.toLowerCase() as keyof typeof rarityColors || rarity] || 'bg-gray-500'} text-white text-xs flex items-center gap-1`}
+                  className={`${getRarityColor(finalResult?.quality || rarity)} text-white text-xs flex items-center gap-1`}
                 >
                   {rarityIcons[finalResult?.quality.toLowerCase() as keyof typeof rarityIcons || rarity] || <Star className="w-3 h-3" />}
                   {finalResult?.quality || rarity}
@@ -172,16 +177,11 @@ const ImageLootbox: React.FC<ImageLootboxProps> = ({
         <Button
           onClick={handleOpen}
           disabled={isAnimating}
-          className={`w-full ${
-            rarity === 'legendary' ? 'bg-yellow-600 hover:bg-yellow-700' :
-            rarity === 'epic' ? 'bg-purple-600 hover:bg-purple-700' :
-            rarity === 'rare' ? 'bg-blue-600 hover:bg-blue-700' :
-            'bg-gray-600 hover:bg-gray-700'
-          }`}
+          className={`w-full ${getRarityButtonColor(rarity)}`}
           size="sm"
         >
           <Gift className="w-4 h-4 mr-2" />
-          {isAnimating ? 'Открывается...' : finalResult ? 'Открыто!' : 'Открыть лутбокс'}
+          {getLootboxButtonText(isAnimating, !!finalResult)}
         </Button>
       </div>
     </Card>

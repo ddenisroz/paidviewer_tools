@@ -1,5 +1,6 @@
 // src/shared/components/PermissionGuard.tsx
 import React, { ReactNode } from 'react';
+
 import { useAuth } from '../../context/AuthContext';
 
 interface PermissionGuardProps {
@@ -17,7 +18,7 @@ const PermissionGuard: React.FC<PermissionGuardProps> = ({
     requireAdmin = false,
     fallback = null 
 }) => {
-    const { isAuthenticated, isGuest, user } = useAuth();
+    const { isAuthenticated, user } = useAuth();
 
     // Если требуется авторизация, но пользователь не авторизован
     if (requireAuth && !isAuthenticated) {
@@ -26,11 +27,6 @@ const PermissionGuard: React.FC<PermissionGuardProps> = ({
 
     // Если требуется админ, но пользователь не админ
     if (requireAdmin && (!user || !user.is_admin)) {
-        return <>{fallback}</>;
-    }
-
-    // Если требуется токен платформы, но пользователь гость
-    if (requirePlatformToken && isGuest) {
         return <>{fallback}</>;
     }
 

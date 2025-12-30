@@ -1,19 +1,28 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+
+import { 
+  Edit, 
+  Loader2, 
+  Music,
+  Plus,
+  Power,
+  Save,
+  Trash2
+} from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Dialog, 
   DialogContent, 
   DialogDescription, 
   DialogFooter, 
   DialogHeader, 
-  DialogTitle,
-  DialogTrigger 
+  DialogTitle
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { 
   Select,
   SelectContent,
@@ -21,35 +30,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Crown,
-  Music,
-  Save,
-  Loader2,
-  Power
-} from 'lucide-react';
-import { toast } from 'sonner';
-// ✅ НОВЫЙ ИМПОРТ: Используем централизованные queries
-import {
-  useDropsQualities,
-  useDropsRewards,
-  useCreateDropsReward,
-  useUpdateDropsReward,
-  useDeleteDropsReward,
-  useToggleDropsReward,
-} from '../../../queries/drops/dropsQueries';
-import { logger } from '../../../utils/prodLogger';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from '@/utils/toastManager';
 
 import CommonClosed from '../../../images/lootboxes/common/common_closed.png';
-import RareClosed from '../../../images/lootboxes/rare/rare_closed.png';
 import EpicClosed from '../../../images/lootboxes/epic/epic_closed.png';
 import LegendaryClosed from '../../../images/lootboxes/legendary/legendary_closed.png';
 import MythicalClosed from '../../../images/lootboxes/mythyc/mythyc_closed.png';
+import RareClosed from '../../../images/lootboxes/rare/rare_closed.png';
+import {
+  useCreateDropsReward,
+  useDeleteDropsReward,
+  useDropsQualities,
+  useDropsRewards,
+  useToggleDropsReward,
+  useUpdateDropsReward,
+} from '../../../queries/drops/dropsQueries';
+
+import type { DropsReward } from '../../../types/drops';
+// [OK] НОВЫЙ ИМПОРТ: Используем централизованные queries
 
 interface QualityConfig {
     id: number;
@@ -101,11 +100,11 @@ interface Reward {
     id: string | number;
     name: string;
     description?: string;
-    quality?: {
+    quality?: 'common' | 'rare' | 'epic' | 'legendary' | 'mythical' | {
         id?: number;
         name?: string;
     } | number;
-    weight: number;
+    weight?: number;
     reward_type?: string;
     reward_value?: string;
     image_url?: string;
@@ -129,18 +128,20 @@ interface RewardForm {
 }
 
 interface RewardsManagerProps {
-    user: any;
+    user: Record<string, unknown>;
     channelName: string;
     onRewardsCountChange?: (count: number) => void;
-    integrations?: any;
+    integrations?: {
+        twitch?: { enabled?: boolean; connected?: boolean };
+        vk?: { enabled?: boolean; connected?: boolean };
+    };
 }
 
 const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channelName, onRewardsCountChange, integrations }) => {
   const [rewardDialogOpen, setRewardDialogOpen] = useState(false);
   const [editingReward, setEditingReward] = useState<Reward | null>(null);
-  const [selectedQuality, setSelectedQuality] = useState<number | null>(null);
   
-  // ✅ OPTIMIZATION: Memoize platform availability checks
+  // [OK] OPTIMIZATION: Memoize platform availability checks
   const twitchAvailable = useMemo(() => 
     !!(integrations?.twitch?.enabled && user?.twitch_username),
     [integrations?.twitch?.enabled, user?.twitch_username]
@@ -167,16 +168,16 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
     platform: availablePlatforms.length > 0 ? availablePlatforms[0].value : 'twitch' // Выбранная платформа для новой награды
   });
   
-  // Фильтр по платформе для отображения
-  const [platformFilter, setPlatformFilter] = useState<string>('all'); // 'all', 'twitch', 'vk'
+  // [OK] НОВЫЙ КОД: Используем централизованные queries
+  const { data: qualitiesData = [] } = useDropsQualities();
 
-  // ✅ НОВЫЙ КОД: Используем централизованные queries
-  const { data: qualitiesData = [], isLoading: qualitiesLoading } = useDropsQualities();
-
-  // ✅ НОВЫЙ КОД: Используем централизованные queries для наград
-  const { data: allRewardsData = [], isLoading: rewardsLoading } = useDropsRewards(channelName);
+  // [OK] НОВЫЙ КОД: Используем централизованные queries для наград
+  const { data: allRewardsData = [] } = useDropsRewards(channelName);
   
-  // ✅ НОВЫЙ КОД: Используем централизованные mutations
+  // Фильтр по платформе для отображения
+  const [platformFilter] = useState<string>('all'); // 'all', 'twitch', 'vk'
+  
+  // [OK] НОВЫЙ КОД: Используем централизованные mutations
   const createRewardMutation = useCreateDropsReward(channelName, {
     onSuccess: () => {
       setRewardDialogOpen(false);
@@ -192,12 +193,12 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
   const deleteRewardMutation = useDeleteDropsReward(channelName);
   const toggleRewardMutation = useToggleDropsReward(channelName);
   
-  // ✅ Защита от null/undefined - всегда массив
-  const allRewards: Reward[] = (allRewardsData as any) || [];
+  // [OK] Защита от null/undefined - всегда массив
+  const allRewards: Reward[] = (Array.isArray(allRewardsData) ? allRewardsData : []) as Reward[];
   
   // Фильтруем награды по выбранной платформе (награды общие для всех платформ, но можем фильтровать по platform если нужно)
   const rewards = React.useMemo(() => {
-    // ✅ Защита от null/undefined
+    // [OK] Защита от null/undefined
     if (!allRewards) return [];
     // Награды общие для всех платформ, но можем фильтровать по platform если есть
     if (platformFilter === 'all') return allRewards;
@@ -212,10 +213,9 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
   }, [rewards, onRewardsCountChange]);
 
   const handleOpenRewardDialog = (qualityId: number | null = null) => {
-    setSelectedQuality(qualityId);
     setEditingReward(null);
     // Если qualityId не передан, берем первый из БД
-    const defaultQualityId = qualityId || (Array.isArray(qualitiesData) && qualitiesData.length > 0 ? (qualitiesData[0] as any).id : null);
+    const defaultQualityId = qualityId ?? (Array.isArray(qualitiesData) && qualitiesData.length > 0 ? (qualitiesData[0] as { id?: number })?.id ?? null : null);
     setRewardForm({
       name: '',
       description: '',
@@ -237,12 +237,11 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
     const qualityId = typeof reward.quality === 'object' 
       ? (reward.quality?.id || null)
       : (typeof reward.quality === 'number' ? reward.quality : null);
-    setSelectedQuality(qualityId);
     setRewardForm({
       name: reward.name,
       description: reward.description || '',
       quality_id: qualityId,
-      weight: [reward.weight],
+      weight: [reward.weight ?? 100],
       reward_type: reward.reward_type || 'custom',
       reward_value: reward.reward_value || '',
       image_url: reward.image_url || '',
@@ -265,20 +264,20 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
       return;
     }
 
-    const payload: any = {
+    const payload: Partial<DropsReward> = {
       name: rewardForm.name,
-      description: rewardForm.description || null,
+      description: rewardForm.description || undefined,
       quality_id: rewardForm.quality_id,
       weight: rewardForm.weight[0],
       reward_type: 'custom', // Всегда custom, так как награда - это просто сундук
       reward_value: '', // Пустое значение, так как награда - это просто показ сундука
-      image_url: (rewardForm.image_url && rewardForm.image_url.trim()) || null, // URL изображения для карточки в гача крутке (null если пусто)
+      image_url: (rewardForm.image_url && rewardForm.image_url.trim()) || undefined, // URL изображения для карточки в гача крутке (undefined если пусто)
       sound_volume: rewardForm.sound_volume[0] || 1.0, // Используем значение из формы
       is_active: rewardForm.is_active,
       platform: rewardForm.platform // Добавляем platform для новой награды (для совместимости)
-    };
+    } as Partial<DropsReward>;
 
-    // ✅ НОВЫЙ КОД: Используем централизованные mutations
+    // [OK] НОВЫЙ КОД: Используем централизованные mutations
     if (editingReward) {
       updateRewardMutation.mutate({ rewardId: Number(editingReward.id), reward: payload });
     } else {
@@ -302,9 +301,9 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
     // toast уже показывается в mutation
   };
 
-  // ✅ OPTIMIZATION: Memoize reward filtering functions
+  // [OK] OPTIMIZATION: Memoize reward filtering functions
   const getRewardsForQuality = useCallback((qualityName: string): Reward[] => {
-    // ✅ Защита от null/undefined
+    // [OK] Защита от null/undefined
     if (!rewards) return [];
     return rewards.filter(r => {
       if (typeof r.quality === 'object') {
@@ -314,14 +313,9 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
     });
   }, [rewards]);
 
-  const getTotalWeight = useCallback((qualityName: string): number => {
-    const qualityRewards = getRewardsForQuality(qualityName);
-    return qualityRewards.reduce((sum, r) => sum + r.weight, 0);
-  }, [getRewardsForQuality]);
-
   return (
     <div className="space-y-6">
-      {/* ✅ Одна общая кнопка создания награды */}
+      {/* [OK] Одна общая кнопка создания награды */}
       <div className="flex justify-end mb-6 mt-4">
         <Button
           onClick={() => handleOpenRewardDialog(null)}
@@ -337,8 +331,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
       {QUALITIES.map((qualityItem: QualityConfig) => {
         const { id, name, label, image, color: qualityColor } = qualityItem;
         const qualityRewards = getRewardsForQuality(name);
-        const totalWeight = getTotalWeight(name);
-        const qualityData = Array.isArray(qualitiesData) ? qualitiesData.find((q: any) => q.name === name) as unknown as QualityConfig | undefined : null;
+        const qualityData = Array.isArray(qualitiesData) ? (qualitiesData as unknown as QualityConfig[]).find((q) => q.name === name) : null;
         
         return (
           <Card key={id}>
@@ -368,7 +361,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
             <CardContent>
               {qualityRewards.length === 0 ? (
                 <div className="text-center py-6 border-2 border-dashed border-orange-500/30 bg-orange-500/5 rounded-lg">
-                  <p className="text-sm font-medium text-orange-400">⚠️ Награды не настроены</p>
+                  <p className="text-sm font-medium text-orange-400">[WARN] Награды не настроены</p>
                   <p className="text-xs mt-2 text-muted-foreground">Добавьте награды в этот лутбокс, чтобы зрители могли их получить</p>
                   <p className="text-xs mt-1 text-yellow-500">Без наград система Drops не будет работать</p>
                 </div>
@@ -476,7 +469,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
           </DialogHeader>
 
           <div className="space-y-4 sm:space-y-6 py-2 sm:py-4">
-            {/* ✅ УБРАЛИ выбор платформы - награды ОБЩИЕ для всех платформ */}
+            {/* [OK] УБРАЛИ выбор платформы - награды ОБЩИЕ для всех платформ */}
 
             {/* Название */}
             <div className="space-y-2">
@@ -514,15 +507,16 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
                 <SelectContent>
                   {/* Используем данные из БД если есть, иначе fallback на статические */}
                   {qualitiesData.length > 0 ? (
-                    qualitiesData.map((q: any) => {
-                      const qualityInfo = QUALITIES.find(qual => qual.name.toLowerCase() === q.name.toLowerCase());
+                    (qualitiesData as unknown as QualityConfig[]).map((q) => {
+                      const qName = typeof q.name === 'string' ? q.name : '';
+                      const qualityInfo = QUALITIES.find(qual => qual.name.toLowerCase() === qName.toLowerCase());
                       return (
                         <SelectItem key={q.id} value={q.id.toString()}>
                           <div className="flex items-center gap-2">
                             {qualityInfo && (
                               <img src={qualityInfo.image} alt={qualityInfo.label} className="w-5 h-5" />
                             )}
-                            {qualityInfo?.label || q.name}
+                            {qualityInfo?.label || qName}
                           </div>
                         </SelectItem>
                       );

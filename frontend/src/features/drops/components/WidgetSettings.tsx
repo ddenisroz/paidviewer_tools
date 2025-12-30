@@ -1,16 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+﻿import React, { useEffect, useRef, useState } from 'react';
+
+import { Copy, ExternalLink, Loader2, Monitor, Settings2 } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { Input } from '@/components/ui/input';
-import { Monitor, Copy, ExternalLink, Settings2, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { useDropsConfig, useUpdateDropsConfig, useGenerateDropsWidgetUrl } from '../../../queries/drops/dropsQueries';
+import { toast } from '@/utils/toastManager';
+
 import { useAutoSave } from '../../../hooks/useAutoSave';
+import { useDropsConfig, useGenerateDropsWidgetUrl, useUpdateDropsConfig } from '../../../queries/drops/dropsQueries';
+
+import type { DropsConfig } from '../../../types/drops';
 
 interface WidgetSettingsProps {
-    user: any;
+    user: Record<string, unknown>;
     channelName: string;
 }
 
@@ -24,8 +29,8 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
   const [widgetUrl, setWidgetUrl] = useState<string | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // ✅ НОВЫЙ КОД: Используем централизованные hooks
-  const { data: config, isLoading: configLoading } = useDropsConfig(channelName, {
+  // [OK] НОВЫЙ КОД: Используем централизованные hooks
+  const { data: config, isLoading: _configLoading } = useDropsConfig(channelName, {
     enabled: !!user && !!channelName,
   });
   
@@ -37,8 +42,9 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
   
   const generateWidgetUrlMutation = useGenerateDropsWidgetUrl({
     onSuccess: (response) => {
-      if (response.data.success) {
-        setWidgetUrl(response.data.data.url);
+      const responseData = response as { success?: boolean; data?: { url?: string } };
+      if (responseData.success && responseData.data?.url) {
+        setWidgetUrl(responseData.data.url);
       }
     },
   });
@@ -67,9 +73,9 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
     }
   }, [user, channelName]);
 
-  // ✅ Автосохранение с дебаунсом
+  // [OK] Автосохранение с дебаунсом
   const { autoSave } = useAutoSave(
-    (payload: any) => updateConfigMutation.mutate(payload),
+    (payload: Partial<DropsConfig>) => updateConfigMutation.mutate(payload),
     1000,
     () => {
       if (!user || !channelName || !config) return 'Недостаточно данных для сохранения';
@@ -77,7 +83,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
     }
   );
 
-  // ✅ Автосохранение при изменении полей
+  // [OK] Автосохранение при изменении полей
   useEffect(() => {
     if (config) {
       const payload = {
@@ -173,7 +179,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
             </div>
           </div>
 
-          {/* ✅ Убрали кнопки - автосохранение работает автоматически */}
+          {/* [OK] Убрали кнопки - автосохранение работает автоматически */}
           <p className="text-xs text-muted-foreground italic">
             Настройки сохраняются автоматически при изменении
           </p>
@@ -189,7 +195,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* ✅ Убрали инструкцию OBS */}
+          {/* [OK] Убрали инструкцию OBS */}
           {widgetUrl ? (
             <div className="space-y-2">
               <div className="flex items-center justify-between">

@@ -27,10 +27,10 @@ for i, line in enumerate(lines):
     if skip_next_empty and line.strip() == '':
         skip_next_empty = False
         continue
-    
+
     new_lines.append(line)
 
-print(f"\nWriting cleaned database.py...")
+print("\nWriting cleaned database.py...")
 with open(db_file, 'w', encoding='utf-8') as f:
     f.writelines(new_lines)
 

@@ -2,8 +2,9 @@
  * User Settings Service - инкапсуляция всех User Settings API вызовов
  */
 import { apiClient } from '../client';
-import type { AxiosResponse } from 'axios';
+
 import type { ApiResponse } from '../../../types';
+import type { AxiosResponse } from 'axios';
 
 /**
  * User Settings Service
@@ -22,7 +23,7 @@ export const userSettingsService = {
    * @param settings - Настройки для сохранения
    * @returns Promise с ответом API
    */
-  async saveUserSettings(settings: Record<string, any>): Promise<AxiosResponse<ApiResponse>> {
+  async saveUserSettings(settings: Record<string, unknown>): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.post('/api/user-settings/', settings);
   },
 };

@@ -1,7 +1,6 @@
 """
 Twitch platform implementation
 """
-import os
 import logging
 from typing import Optional, Dict, Any, List
 from .base import StreamingPlatform, PlatformConfig
@@ -11,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class TwitchPlatform(StreamingPlatform):
     """Twitch streaming platform implementation"""
-    
+
     def __init__(self):
         config = PlatformConfig(
             name='twitch',
@@ -24,10 +23,10 @@ class TwitchPlatform(StreamingPlatform):
             color='#9146FF'
         )
         super().__init__(config)
-        
+
         # Import TwitchAPI lazily to avoid circular imports
         self._twitch_api = None
-    
+
     @property
     def twitch_api(self):
         """Lazy load TwitchAPI instance"""
@@ -36,7 +35,7 @@ class TwitchPlatform(StreamingPlatform):
             from core.connection_manager import connection_manager
             self._twitch_api = TwitchAPI(connection_manager)
         return self._twitch_api
-    
+
     async def authenticate(self, code: str) -> Dict[str, Any]:
         """
         Handle Twitch OAuth authentication
@@ -51,12 +50,12 @@ class TwitchPlatform(StreamingPlatform):
             token_data = await self.twitch_api.get_user_access_token(code)
             if not token_data:
                 raise Exception("Failed to get access token from Twitch")
-            
+
             return token_data
         except Exception as e:
             logger.error(f"Twitch authentication error: {e}")
             raise
-    
+
     async def get_user_info(self, access_token: str) -> Dict[str, Any]:
         """
         Get Twitch user information
@@ -71,12 +70,12 @@ class TwitchPlatform(StreamingPlatform):
             user_info = await self.twitch_api.get_user_from_token(access_token)
             if not user_info:
                 raise Exception("Failed to get user info from Twitch")
-            
+
             return user_info
         except Exception as e:
             logger.error(f"Error getting Twitch user info: {e}")
             raise
-    
+
     async def update_stream_title(self, user_id: int, title: str) -> bool:
         """
         Update Twitch stream title
@@ -93,7 +92,7 @@ class TwitchPlatform(StreamingPlatform):
         except Exception as e:
             logger.error(f"Error updating Twitch stream title: {e}")
             return False
-    
+
     async def update_stream_category(self, user_id: int, category_id: str) -> bool:
         """
         Update Twitch stream category
@@ -110,7 +109,7 @@ class TwitchPlatform(StreamingPlatform):
         except Exception as e:
             logger.error(f"Error updating Twitch stream category: {e}")
             return False
-    
+
     async def search_categories(self, query: str) -> List[Dict[str, Any]]:
         """
         Search for Twitch categories
@@ -126,7 +125,7 @@ class TwitchPlatform(StreamingPlatform):
         except Exception as e:
             logger.error(f"Error searching Twitch categories: {e}")
             return []
-    
+
     async def get_stream_status(self, username: str) -> Optional[Dict[str, Any]]:
         """
         Get current Twitch stream status
@@ -142,7 +141,7 @@ class TwitchPlatform(StreamingPlatform):
         except Exception as e:
             logger.error(f"Error getting Twitch stream status: {e}")
             return None
-    
+
     async def get_channel_info(self, username: str) -> Optional[Dict[str, Any]]:
         """
         Get Twitch channel information
@@ -158,7 +157,7 @@ class TwitchPlatform(StreamingPlatform):
         except Exception as e:
             logger.error(f"Error getting Twitch channel info: {e}")
             return None
-    
+
     async def send_chat_message(self, user_id: int, message: str) -> bool:
         """
         Send message to Twitch chat
@@ -174,7 +173,7 @@ class TwitchPlatform(StreamingPlatform):
         # For now, return False as it's not implemented in the abstraction
         logger.warning("send_chat_message not yet implemented for Twitch platform abstraction")
         return False
-    
+
     async def create_reward(self, user_id: int, reward_data: Dict) -> Optional[str]:
         """
         Create Twitch channel points reward
@@ -190,7 +189,7 @@ class TwitchPlatform(StreamingPlatform):
         # Implementation would go here
         logger.warning("create_reward not yet implemented for Twitch platform abstraction")
         return None
-    
+
     async def update_reward(self, user_id: int, reward_id: str, reward_data: Dict) -> bool:
         """
         Update Twitch channel points reward
@@ -205,7 +204,7 @@ class TwitchPlatform(StreamingPlatform):
         """
         logger.warning("update_reward not yet implemented for Twitch platform abstraction")
         return False
-    
+
     async def delete_reward(self, user_id: int, reward_id: str) -> bool:
         """
         Delete Twitch channel points reward
@@ -219,7 +218,7 @@ class TwitchPlatform(StreamingPlatform):
         """
         logger.warning("delete_reward not yet implemented for Twitch platform abstraction")
         return False
-    
+
     async def get_user_roles(self, username: str, channel_name: str) -> List[str]:
         """
         Get user roles on a Twitch channel
@@ -233,7 +232,6 @@ class TwitchPlatform(StreamingPlatform):
         """
         # This would use the existing platform_role_checker utility
         try:
-            from utils.platform_role_checker import PlatformRoleChecker
             # This requires author_data from chat context
             # For now, return empty list as it needs chat integration
             logger.debug(f"get_user_roles called for {username} on {channel_name}")

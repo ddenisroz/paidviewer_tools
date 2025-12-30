@@ -1,21 +1,15 @@
 // src/components/ChatContextMenu.tsx
 import React, { useEffect, useRef, useState } from 'react';
-import ReactDOM from 'react-dom';
+
 import { 
-    Ban, 
-    Clock, 
-    ShieldCheck, 
-    Star, 
-    VolumeX, 
     Volume2,
-    Crown
+    VolumeX
 } from 'lucide-react';
+import ReactDOM from 'react-dom';
+
 import { logger } from '../utils/prodLogger';
 
-interface ChatMessage {
-    platform?: string;
-    [key: string]: any;
-}
+import type { ChatMessage } from '../types/chat';
 
 interface ChatContextMenuProps {
     x: number;
@@ -67,7 +61,7 @@ const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
                 adjustedY = 10;
             }
             
-            logger.log(`📐 [CONTEXT MENU] Position adjusted: original(${x}, ${y}) → final(${adjustedX}, ${adjustedY}), size: ${menuRect.width}x${menuRect.height}`);
+            logger.log(`[CONTEXT MENU] Position adjusted: original(${x}, ${y}) -> final(${adjustedX}, ${adjustedY}), size: ${menuRect.width}x${menuRect.height}`);
             setPosition({ x: adjustedX, y: adjustedY });
         }
     }, [x, y]);
@@ -100,9 +94,6 @@ const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
     };
 
     // Определяем, какие действия доступны для платформы
-    const isTwitch = message.platform === 'twitch';
-    const isVk = message.platform === 'vk';
-    
     // VK Live API ограничения - доступны только базовые функции
     // const vkAvailableActions = ['block_tts', 'unblock_tts'];
     // const twitchAvailableActions = ['block_tts', 'unblock_tts', 'timeout_10m', 'timeout_1h', 'ban', 'add_moderator', 'remove_moderator', 'add_vip', 'remove_vip'];

@@ -22,7 +22,7 @@ export function useBatchedRequests<T, R>({
   const batchQueue = useRef<{
     items: T[];
     resolvers: Array<(value: R) => void>;
-    rejecters: Array<(error: any) => void>;
+    rejecters: Array<(error: unknown) => void>;
   }>({
     items: [],
     resolvers: [],

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+
 import { cn } from '../../lib/utils';
 
 interface TypingAnimationProps extends React.HTMLAttributes<HTMLSpanElement> {
@@ -18,7 +19,6 @@ const TypingAnimation: React.FC<TypingAnimationProps> = ({
 }) => {
   const [displayedText, setDisplayedText] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isComplete, setIsComplete] = useState(false);
 
   useEffect(() => {
     if (currentIndex < text.length) {
@@ -28,8 +28,6 @@ const TypingAnimation: React.FC<TypingAnimationProps> = ({
       }, speed);
 
       return () => clearTimeout(timeout);
-    } else {
-      setIsComplete(true);
     }
   }, [currentIndex, text, speed]);
 

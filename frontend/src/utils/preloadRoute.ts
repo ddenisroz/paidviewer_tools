@@ -3,8 +3,8 @@
  * Preloads route components on hover to improve perceived performance
  */
 
-type PreloadableComponent = {
-  preload?: () => Promise<any>;
+type _PreloadableComponent = {
+  preload?: () => Promise<unknown>;
 };
 
 const preloadedRoutes = new Set<string>();
@@ -15,7 +15,7 @@ const preloadedRoutes = new Set<string>();
  * @param routeName - Unique identifier for the route (for caching)
  */
 export const preloadRoute = (
-  componentLoader: () => Promise<any>,
+  componentLoader: () => Promise<unknown>,
   routeName: string
 ): void => {
   // Only preload once per route
@@ -38,7 +38,7 @@ export const preloadRoute = (
  * Usage: <Link to="/admin" onMouseEnter={createPreloadHandler(AdminPage, 'admin')}>
  */
 export const createPreloadHandler = (
-  componentLoader: () => Promise<any>,
+  componentLoader: () => Promise<unknown>,
   routeName: string
 ) => {
   return () => preloadRoute(componentLoader, routeName);
@@ -49,7 +49,7 @@ export const createPreloadHandler = (
  * Useful for preloading related routes
  */
 export const preloadRoutes = (
-  routes: Array<{ loader: () => Promise<any>; name: string }>
+  routes: Array<{ loader: () => Promise<unknown>; name: string }>
 ): void => {
   routes.forEach(({ loader, name }) => {
     preloadRoute(loader, name);

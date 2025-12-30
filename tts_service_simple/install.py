@@ -31,7 +31,7 @@ class TTSInstaller:
         
     def run(self):
         """Запуск установки"""
-        print("🚀 TTS F5 Simple - Установщик")
+        print("[START] TTS F5 Simple - Установщик")
         print("=" * 50)
         
         try:
@@ -42,39 +42,39 @@ class TTSInstaller:
             self.create_launcher()
             self.create_readme()
             
-            print("\n✅ Установка завершена успешно!")
-            print(f"📁 Установочная папка: {self.install_dir}")
-            print("🚀 Для запуска выполните: python main.py")
-            print("📖 Документация: http://localhost:8001/docs")
+            print("\n[OK] Установка завершена успешно!")
+            print(f"[FILE] Установочная папка: {self.install_dir}")
+            print("[START] Для запуска выполните: python main.py")
+            print("[DOCS] Документация: http://localhost:8001/docs")
             
         except Exception as e:
             logger.error(f"Ошибка установки: {e}")
-            print(f"\n❌ Ошибка установки: {e}")
+            print(f"\n[ERROR] Ошибка установки: {e}")
             return False
         
         return True
     
     def check_system_requirements(self):
         """Проверка системных требований"""
-        print("🔍 Проверка системных требований...")
+        print("[DEBUG] Проверка системных требований...")
         
         # Проверяем Python версию
         if sys.version_info < (3, 8):
             raise Exception("Требуется Python 3.8 или выше")
         
-        print(f"✅ Python {sys.version.split()[0]}")
+        print(f"[OK] Python {sys.version.split()[0]}")
         
         # Проверяем платформу
         if self.is_windows:
-            print("✅ Windows")
+            print("[OK] Windows")
         else:
-            print("⚠️ Не Windows - некоторые функции могут не работать")
+            print("[WARN] Не Windows - некоторые функции могут не работать")
         
         # Проверяем доступность pip
         try:
             subprocess.run([self.python_exe, "-m", "pip", "--version"], 
                          check=True, capture_output=True)
-            print("✅ pip доступен")
+            print("[OK] pip доступен")
         except subprocess.CalledProcessError:
             raise Exception("pip не найден. Установите pip и повторите попытку")
         
@@ -85,24 +85,24 @@ class TTSInstaller:
             if gpus:
                 gpu = gpus[0]
                 vram_gb = gpu.memoryTotal / 1024**3
-                print(f"✅ GPU: {gpu.name} ({vram_gb:.1f}GB VRAM)")
+                print(f"[OK] GPU: {gpu.name} ({vram_gb:.1f}GB VRAM)")
                 
                 if vram_gb < 6:
-                    print("⚠️ Рекомендуется GPU с минимум 6GB VRAM")
+                    print("[WARN] Рекомендуется GPU с минимум 6GB VRAM")
             else:
-                print("⚠️ NVIDIA GPU не найдена - TTS может работать медленно")
+                print("[WARN] NVIDIA GPU не найдена - TTS может работать медленно")
         except ImportError:
-            print("⚠️ Не удалось проверить GPU - установите драйверы NVIDIA")
+            print("[WARN] Не удалось проверить GPU - установите драйверы NVIDIA")
         
-        print("✅ Системные требования проверены")
+        print("[OK] Системные требования проверены")
     
     def install_dependencies(self):
         """Установка зависимостей"""
-        print("\n📦 Установка зависимостей...")
+        print("\n[PACKAGE] Установка зависимостей...")
         
         # Сначала устанавливаем PyTorch с CUDA
-        print("\n🔥 Установка PyTorch с CUDA 12.4...")
-        print("⚠️  Это может занять несколько минут...")
+        print("\n[HOT] Установка PyTorch с CUDA 12.4...")
+        print("[WARN]  Это может занять несколько минут...")
         
         try:
             # Устанавливаем PyTorch с CUDA 12.4
@@ -117,7 +117,7 @@ class TTSInstaller:
             result = subprocess.run(pytorch_install, capture_output=True, text=True)
             
             if result.returncode != 0:
-                print("⚠️  Не удалось установить CUDA версию, пробуем CPU версию...")
+                print("[WARN]  Не удалось установить CUDA версию, пробуем CPU версию...")
                 # Fallback на CPU версию
                 cpu_install = [
                     self.python_exe, "-m", "pip", "install",
@@ -126,16 +126,16 @@ class TTSInstaller:
                     "torchvision==0.19.0"
                 ]
                 subprocess.run(cpu_install, check=True, capture_output=True, text=True)
-                print("✅ PyTorch (CPU версия) установлен")
+                print("[OK] PyTorch (CPU версия) установлен")
             else:
-                print("✅ PyTorch с CUDA 12.4 установлен")
+                print("[OK] PyTorch с CUDA 12.4 установлен")
                 
         except subprocess.CalledProcessError as e:
-            print(f"❌ Ошибка установки PyTorch: {e.stderr}")
+            print(f"[ERROR] Ошибка установки PyTorch: {e.stderr}")
             raise Exception("Не удалось установить PyTorch")
         
         # Теперь устанавливаем остальные зависимости
-        print("\n📦 Установка остальных зависимостей...")
+        print("\n[PACKAGE] Установка остальных зависимостей...")
         requirements_file = self.install_dir / "requirements.txt"
         if not requirements_file.exists():
             raise Exception("Файл requirements.txt не найден")
@@ -144,14 +144,14 @@ class TTSInstaller:
             subprocess.run([
                 self.python_exe, "-m", "pip", "install", "-r", str(requirements_file)
             ], check=True, capture_output=True, text=True)
-            print("✅ Все зависимости установлены")
+            print("[OK] Все зависимости установлены")
         except subprocess.CalledProcessError as e:
-            print(f"❌ Ошибка установки зависимостей: {e.stderr}")
+            print(f"[ERROR] Ошибка установки зависимостей: {e.stderr}")
             raise Exception("Не удалось установить зависимости")
     
     def create_directories(self):
         """Создание необходимых директорий"""
-        print("\n📁 Создание директорий...")
+        print("\n[FILE] Создание директорий...")
         
         directories = [
             "models",
@@ -163,11 +163,11 @@ class TTSInstaller:
         for dir_name in directories:
             dir_path = self.install_dir / dir_name
             dir_path.mkdir(exist_ok=True)
-            print(f"✅ {dir_name}/")
+            print(f"[OK] {dir_name}/")
     
     def create_config(self):
         """Создание конфигурационного файла"""
-        print("\n⚙️ Создание конфигурации...")
+        print("\n[CONFIG] Создание конфигурации...")
         
         config = {
             "version": "1.0.0",
@@ -181,16 +181,16 @@ class TTSInstaller:
         with open(config_file, 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
         
-        print("✅ Конфигурация создана")
+        print("[OK] Конфигурация создана")
     
     def create_launcher(self):
         """Создание файла запуска"""
-        print("\n🚀 Создание файла запуска...")
+        print("\n[START] Создание файла запуска...")
         
         if self.is_windows:
             # Создаем .bat файл для Windows
             launcher_content = f"""@echo off
-echo 🚀 Запуск TTS F5 Simple...
+echo [START] Запуск TTS F5 Simple...
 cd /d "{self.install_dir}"
 "{self.python_exe}" main.py
 pause
@@ -198,7 +198,7 @@ pause
             launcher_file = self.install_dir / "start_tts.bat"
             with open(launcher_file, 'w', encoding='utf-8') as f:
                 f.write(launcher_content)
-            print("✅ start_tts.bat создан")
+            print("[OK] start_tts.bat создан")
         
         # Создаем универсальный Python скрипт
         launcher_content = f"""#!/usr/bin/env python3
@@ -219,11 +219,11 @@ if __name__ == "__main__":
         launcher_file = self.install_dir / "start_tts.py"
         with open(launcher_file, 'w', encoding='utf-8') as f:
             f.write(launcher_content)
-        print("✅ start_tts.py создан")
+        print("[OK] start_tts.py создан")
     
     def create_readme(self):
         """Создание README файла"""
-        print("\n📖 Создание документации...")
+        print("\n[DOCS] Создание документации...")
         
         readme_content = """# TTS F5 Simple
 
@@ -274,7 +274,7 @@ TTS F5 Simple v1.0.0
         readme_file = self.install_dir / "README.txt"
         with open(readme_file, 'w', encoding='utf-8') as f:
             f.write(readme_content)
-        print("✅ README.txt создан")
+        print("[OK] README.txt создан")
 
 def main():
     """Главная функция установщика"""
@@ -282,10 +282,10 @@ def main():
     success = installer.run()
     
     if success:
-        print("\n🎉 Установка завершена!")
+        print("\n[SUCCESS] Установка завершена!")
         print("Для запуска выполните: python main.py")
     else:
-        print("\n❌ Установка не удалась")
+        print("\n[ERROR] Установка не удалась")
         sys.exit(1)
 
 if __name__ == "__main__":

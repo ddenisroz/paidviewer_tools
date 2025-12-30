@@ -1,4 +1,4 @@
-export type Validator = (value: any, ...args: any[]) => string | null;
+export type Validator = (value: unknown, ...args: unknown[]) => string | null;
 
 export const validators = {
   email: (value: string): string | null => {
@@ -6,7 +6,7 @@ export const validators = {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(value) ? null : 'Введите корректный email';
   },
-  required: (value: any, fieldName: string = 'Поле'): string | null => {
+  required: (value: unknown, fieldName: string = 'Поле'): string | null => {
     if (!value || value.toString().trim() === '') {
       return `${fieldName} обязательно`;
     }
@@ -42,12 +42,12 @@ export const validators = {
       return 'Введите корректный URL';
     }
   },
-  number: (value: any): string | null => {
+  number: (value: unknown): string | null => {
     if (value === '' || value === null || value === undefined) return null;
-    if (isNaN(value)) return 'Введите число';
+    if (isNaN(Number(value))) return 'Введите число';
     return null;
   },
-  positiveNumber: (value: any): string | null => {
+  positiveNumber: (value: unknown): string | null => {
     const numberError = validators.number(value);
     if (numberError) return numberError;
     if (value !== '' && Number(value) < 0) return 'Число должно быть положительным';
@@ -61,7 +61,7 @@ export const validators = {
     if (!/[0-9]/.test(value)) return 'Должна быть хотя бы одна цифра';
     return null;
   },
-  match: (value1: any, value2: any, fieldName: string = 'Поля'): string | null => {
+  match: (value1: unknown, value2: unknown, fieldName: string = 'Поля'): string | null => {
     if (value1 !== value2) {
       return `${fieldName} не совпадают`;
     }
@@ -71,7 +71,7 @@ export const validators = {
 
 export const compose =
   (...fns: Validator[]) =>
-  (value: any): string | null => {
+  (value: unknown): string | null => {
     for (const validator of fns) {
       const error = validator(value);
       if (error) return error;
@@ -79,7 +79,7 @@ export const compose =
     return null;
   };
 
-export const createFormErrors = (values: Record<string, any>, validationSchema: Record<string, Validator>): Record<string, string> => {
+export const createFormErrors = (values: Record<string, unknown>, validationSchema: Record<string, Validator>): Record<string, string> => {
   const errors: Record<string, string> = {};
   Object.keys(validationSchema).forEach((field) => {
     const validator = validationSchema[field];

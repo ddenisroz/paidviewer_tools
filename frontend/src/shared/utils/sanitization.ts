@@ -273,17 +273,17 @@ export function sanitizeNumber(
  * @param sanitizer - Sanitization function to apply (default: sanitizeInput)
  * @returns Sanitized object
  */
-export function sanitizeObject<T extends Record<string, any>>(
+export function sanitizeObject<T extends Record<string, unknown>>(
   obj: T,
   sanitizer: (value: string) => string = sanitizeInput
 ): T {
-  const sanitized: any = {};
+  const sanitized: Record<string, unknown> = {};
   
   for (const [key, value] of Object.entries(obj)) {
     if (typeof value === 'string') {
       sanitized[key] = sanitizer(value);
     } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      sanitized[key] = sanitizeObject(value, sanitizer);
+      sanitized[key] = sanitizeObject(value as Record<string, unknown>, sanitizer);
     } else {
       sanitized[key] = value;
     }
@@ -326,7 +326,7 @@ export function stripHtmlTags(input: string): string {
 export function sanitizeEmail(email: string): string {
   if (!email) return '';
   
-  let sanitized = email.trim().toLowerCase();
+  const sanitized = email.trim().toLowerCase();
   
   // Basic email validation
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;

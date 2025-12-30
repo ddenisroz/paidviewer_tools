@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+
 import { useSearchParams } from 'react-router-dom';
 import YouTube from 'react-youtube';
+
 import { logger } from '../../../utils/prodLogger';
 
 interface YouTubeVideo {
     video_id: string;
     title?: string;
-    [key: string]: any;
 }
 
 interface YouTubeMessage {
@@ -26,7 +27,7 @@ const ObsYoutubePage: React.FC = () => {
     const [isPlaying, setIsPlaying] = useState<boolean>(false);
     const [queue, setQueue] = useState<YouTubeVideo[]>([]);
     const ws = useRef<WebSocket | null>(null);
-    const playerRef = useRef<any>(null);
+    const playerRef = useRef<YouTube | null>(null);
 
     useEffect(() => {
         if (!token) {
@@ -66,8 +67,11 @@ const ObsYoutubePage: React.FC = () => {
                         break;
                     case 'youtube_volume':
                         setVolume(data.volume || 50);
-                        if (playerRef.current && playerRef.current.getInternalPlayer()) {
-                            playerRef.current.getInternalPlayer().setVolume(data.volume || 50);
+                        if (playerRef.current) {
+                            const player = playerRef.current.getInternalPlayer();
+                            if (player && typeof player.setVolume === 'function') {
+                                player.setVolume(data.volume || 50);
+                            }
                         }
                         break;
                     case 'youtube_queue_update':
@@ -132,9 +136,12 @@ const ObsYoutubePage: React.FC = () => {
         },
     };
 
-    const handleReady = (event: any): void => {
+    const handleReady = (): void => {
         if (playerRef.current) {
-            playerRef.current.getInternalPlayer().setVolume(volume);
+            const player = playerRef.current.getInternalPlayer();
+            if (player && typeof player.setVolume === 'function') {
+                player.setVolume(volume);
+            }
         }
     };
 
@@ -185,7 +192,7 @@ const ObsYoutubePage: React.FC = () => {
                         onEnd={handleVideoEnd}
                         onPlay={handlePlay}
                         onPause={handlePause}
-                        ref={playerRef}
+                        ref={playerRef as React.Ref<YouTube>}
                         style={{
                             width: '100%',
                             height: '100%'
@@ -208,7 +215,7 @@ const ObsYoutubePage: React.FC = () => {
                         marginBottom: '20px',
                         opacity: 0.3
                     }}>
-                        🎵
+                        [AUDIO]
                     </div>
                     <div style={{
                         fontSize: '24px',

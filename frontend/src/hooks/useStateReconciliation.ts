@@ -4,12 +4,15 @@
  * Fetches fresh state from backend when WebSocket reconnects
  * Invalidates stale queries and shows sync progress
  */
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+
 import { useQueryClient } from '@tanstack/react-query';
-import { getSharedWebSocket } from '../utils/sharedWebSocket';
+import { toast } from 'sonner';
+
 import { queryKeys } from '../queries/queryKeys';
 import { logger } from '../utils/prodLogger';
-import { toast } from 'sonner';
+import { getSharedWebSocket } from '../utils/sharedWebSocket';
+
 
 interface StateReconciliationOptions {
   /**
@@ -26,7 +29,7 @@ interface StateReconciliationOptions {
    * Queries to invalidate on reconnection
    * If not provided, invalidates all queries
    */
-  queriesToInvalidate?: any[][];
+  queriesToInvalidate?: unknown[][];
   
   /**
    * Callback when reconciliation starts
@@ -138,7 +141,7 @@ export const useStateReconciliation = (options: StateReconciliationOptions) => {
       }
     };
 
-    const handleStateReconciliationRequired = (message: any) => {
+    const handleStateReconciliationRequired = (message: Record<string, unknown>) => {
       if (message.type === 'state_reconciliation_required') {
         logger.info('State reconciliation requested by server');
         reconcileState();

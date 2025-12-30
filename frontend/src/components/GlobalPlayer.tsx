@@ -1,8 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Play, Pause, Volume2, VolumeX, SkipForward, X, List, ChevronUp, ChevronDown } from 'lucide-react';
+
+import { ChevronDown, ChevronUp, List, Pause, Play, SkipForward, Volume2, VolumeX, X } from 'lucide-react';
+import YouTube from 'react-youtube';
+
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import YouTube from 'react-youtube';
+import { BUTTON_SIZES, TRANSITIONS } from '@/constants/designSystem';
+import { cn } from '@/lib/utils';
+
 import { usePlayer } from '../context/PlayerContext';
 
 declare global {
@@ -23,7 +28,6 @@ const GlobalPlayer: React.FC = () => {
         queue,
         // currentTime,
         // duration,
-        playerRef,
         togglePlayPause,
         setVolume,
         toggleMute,
@@ -37,10 +41,27 @@ const GlobalPlayer: React.FC = () => {
     
     const [showQueue, setShowQueue] = useState(false);
 
+    // Типы для YouTube Player
+    interface YouTubePlayer {
+        pauseVideo: () => void;
+        playVideo: () => void;
+        setVolume: (volume: number) => void;
+        mute: () => void;
+        unMute: () => void;
+        getPlayerState: () => number;
+        getCurrentTime: () => number;
+        getDuration: () => number;
+    }
+
+    interface YouTubeEvent {
+        target: YouTubePlayer;
+        data?: number;
+    }
+
     // Обработчик готовности плеера с установкой ссылки
-    const handlePlayerReadyWithRef = (event: any) => {
+    const handlePlayerReadyWithRef = (event: YouTubeEvent) => {
         setPlayerRef(event.target);
-        handlePlayerReady(event);
+        handlePlayerReady(event as unknown as Event);
     };
 
     // Глобальный перехват ошибок YouTube API для браузерных расширений
@@ -50,7 +71,7 @@ const GlobalPlayer: React.FC = () => {
         
         // Перехватываем console.error только если еще не перехватывали
         if (!window.youtubeErrorHandlerInstalled) {
-            console.error = (...args: any[]) => {
+            console.error = (...args: unknown[]) => {
                 const message = args[0]?.toString();
                 if (message?.includes('TIMEOUT waiting for') || 
                     message?.includes('getYouTubeTitleNode') ||
@@ -77,7 +98,7 @@ const GlobalPlayer: React.FC = () => {
         setVolume(newVolume);
     };
 
-    // ✅ ВАЖНО: Вычисляем все переменные ДО условных return
+    // [OK] ВАЖНО: Вычисляем все переменные ДО условных return
     // Проверяем текущий путь, чтобы не показывать UI на странице YouTube
     const currentPath = window.location.pathname;
     const isOnYoutubePage = currentPath.includes('/dashboard/youtube');
@@ -86,7 +107,7 @@ const GlobalPlayer: React.FC = () => {
     // На YouTube странице - ничего не показываем (там свой встроенный плеер)
     const showUI = isVisible && !isTheaterMode && !isOnYoutubePage;
 
-    // ✅ ТЕПЕРЬ проверяем если нет видео, не показываем плеер
+    // [OK] ТЕПЕРЬ проверяем если нет видео, не показываем плеер
     if (!currentVideo) {
         return null;
     }
@@ -99,14 +120,14 @@ const GlobalPlayer: React.FC = () => {
                 <div className="hidden">
                     <YouTube
                         videoId={currentVideo.video_id}
-                        onReady={handlePlayerReadyWithRef}
-                        onStateChange={handlePlayerStateChange}
-                        onError={handlePlayerError}
+                        onReady={handlePlayerReadyWithRef as (event: { target: unknown; data?: number }) => void}
+                        onStateChange={handlePlayerStateChange as (event: { target: unknown; data?: number }) => void}
+                        onError={handlePlayerError as (event: { target: unknown; data?: number }) => void}
                         opts={{
                             width: '1px',
                             height: '1px',
                             playerVars: {
-                                autoplay: 1,  // ✅ Включаем автоплей
+                                autoplay: 1,  // [OK] Включаем автоплей
                                 controls: 0,
                                 disablekb: 1,
                                 enablejsapi: 1,
@@ -220,7 +241,7 @@ const GlobalPlayer: React.FC = () => {
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => setShowQueue(!showQueue)}
-                                            className="text-gray-400 hover:text-white hover:bg-gray-800 border-0 p-2 h-8 w-8 relative"
+                                            className={cn(BUTTON_SIZES.iconSm, "text-gray-400 hover:text-white hover:bg-gray-800 border-0 relative", TRANSITIONS.colors)}
                                             title={showQueue ? "Скрыть очередь" : "Показать очередь"}
                                         >
                                             {showQueue ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
@@ -235,7 +256,7 @@ const GlobalPlayer: React.FC = () => {
                                         variant="ghost"
                                         size="sm"
                                         onClick={closePlayer}
-                                        className="text-gray-400 hover:text-white hover:bg-gray-800 border-0 p-2 h-8 w-8"
+                                        className={cn(BUTTON_SIZES.iconSm, "text-gray-400 hover:text-white hover:bg-gray-800 border-0", TRANSITIONS.colors)}
                                         title="Закрыть и поставить на паузу"
                                     >
                                         <X className="w-4 h-4" />
@@ -246,7 +267,7 @@ const GlobalPlayer: React.FC = () => {
                                         variant="ghost"
                                         size="sm"
                                         onClick={togglePlayPause}
-                                        className="text-white bg-white/10 hover:bg-white/20 border-0 p-2 h-10 w-10"
+                                        className={cn(BUTTON_SIZES.icon, "text-white bg-white/10 hover:bg-white/20 border-0", TRANSITIONS.colors)}
                                     >
                                         {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
                                     </Button>
@@ -256,7 +277,7 @@ const GlobalPlayer: React.FC = () => {
                                         variant="ghost"
                                         size="sm"
                                         onClick={nextVideo}
-                                        className="text-gray-400 hover:text-white hover:bg-gray-800 border-0 p-2 h-8 w-8"
+                                        className={cn(BUTTON_SIZES.iconSm, "text-gray-400 hover:text-white hover:bg-gray-800 border-0", TRANSITIONS.colors)}
                                         title="Следующее видео"
                                     >
                                         <SkipForward className="w-4 h-4" />
@@ -269,7 +290,7 @@ const GlobalPlayer: React.FC = () => {
                                         variant="ghost"
                                         size="sm"
                                         onClick={toggleMute}
-                                        className="text-gray-400 hover:text-white hover:bg-gray-800 border-0 p-2 h-8 w-8"
+                                        className={cn(BUTTON_SIZES.iconSm, "text-gray-400 hover:text-white hover:bg-gray-800 border-0", TRANSITIONS.colors)}
                                         title={isMuted ? "Включить звук" : "Отключить звук"}
                                     >
                                         {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}

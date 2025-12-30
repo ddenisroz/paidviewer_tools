@@ -7,15 +7,161 @@ from sqlalchemy import func
 from core.database import get_db, User, UserSettings, ChatMessage, UserSession
 from auth.auth import get_current_user
 from datetime import datetime, timedelta
+from core.datetime_utils import utcnow_naive
 from typing import Optional, Dict
 from pydantic import BaseModel
+from core.config import settings
 import logging
 import asyncio
-import os
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+@router.get("/dashboard/stats")
+async def get_dashboard_stats(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Получить статистику для Dashboard админ-панели
+    
+    Returns:
+        - users: статистика пользователей (total, active_today, active_week, new_this_month)
+        - tts: статистика TTS (requests_today, requests_week, requests_month)
+        - bots: статус ботов (twitch_online, vk_online, total_connections)
+        - system: системная статистика (errors_24h, storage_used_gb, storage_total_gb)
+    """
+    try:
+        if not user.get('is_admin', False):
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        from datetime import datetime, timedelta
+        from core.datetime_utils import utcnow_naive
+        from startup.bot_registry import get_bot_registry
+        from services.memory_websocket_manager import memory_websocket_manager
+        import os
+        import shutil
+        
+        now = utcnow_naive()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_ago = now - timedelta(days=7)
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        # === USERS STATS ===
+        total_users = db.query(User).count()
+        
+        # Активные сегодня (last_seen > начало дня)
+        active_today = db.query(User).filter(
+            User.last_seen >= today_start
+        ).count()
+        
+        # Активные за неделю
+        active_week = db.query(User).filter(
+            User.last_seen >= week_ago
+        ).count()
+        
+        # Новые за месяц
+        new_this_month = db.query(User).filter(
+            User.created_at >= month_start
+        ).count()
+        
+        # === TTS STATS ===
+        # Подсчитываем сообщения в чате как прокси для TTS запросов
+        requests_today = db.query(ChatMessage).filter(
+            ChatMessage.timestamp >= today_start
+        ).count()
+        
+        requests_week = db.query(ChatMessage).filter(
+            ChatMessage.timestamp >= week_ago
+        ).count()
+        
+        requests_month = db.query(ChatMessage).filter(
+            ChatMessage.timestamp >= month_start
+        ).count()
+        
+        # === BOTS STATUS ===
+        registry = get_bot_registry()
+        twitch_bot = registry.twitch_bot
+        vk_bot = registry.vk_bot
+        
+        # Twitch bot status
+        twitch_online = False
+        twitch_connections = 0
+        if twitch_bot:
+            twitch_online = hasattr(twitch_bot, 'user_id') and twitch_bot.user_id is not None
+            twitch_connections = len(twitch_bot.connected_channels) if hasattr(twitch_bot, 'connected_channels') else 0
+        
+        # VK bot status
+        vk_online = False
+        vk_connections = 0
+        if vk_bot:
+            vk_online = vk_bot.is_running if hasattr(vk_bot, 'is_running') else False
+            vk_connections = len(vk_bot.connected_channels) if hasattr(vk_bot, 'connected_channels') else 0
+        
+        # WebSocket connections
+        ws_stats = memory_websocket_manager.get_connection_stats()
+        total_connections = ws_stats.get('active_connections', 0)
+        
+        # === SYSTEM STATS ===
+        # Ошибки за 24 часа (из SecurityLog)
+        day_ago = now - timedelta(days=1)
+        errors_24h = db.query(SecurityLog).filter(
+            SecurityLog.timestamp >= day_ago,
+            SecurityLog.action.in_(['error', 'critical', 'exception'])
+        ).count()
+        
+        # Storage usage (размер папки logs)
+        storage_used_gb = 0.0
+        storage_total_gb = 100.0  # Default 100GB
+        try:
+            logs_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', 'logs')
+            if os.path.exists(logs_path):
+                total_size = 0
+                for dirpath, dirnames, filenames in os.walk(logs_path):
+                    for filename in filenames:
+                        filepath = os.path.join(dirpath, filename)
+                        if os.path.exists(filepath):
+                            total_size += os.path.getsize(filepath)
+                storage_used_gb = round(total_size / (1024 ** 3), 2)  # Convert to GB
+            
+            # Получаем общий размер диска
+            disk_usage = shutil.disk_usage(os.path.dirname(__file__))
+            storage_total_gb = round(disk_usage.total / (1024 ** 3), 2)
+        except Exception as e:
+            logger.warning(f"Could not calculate storage usage: {e}")
+        
+        return {
+            "success": True,
+            "stats": {
+                "users": {
+                    "total": total_users,
+                    "active_today": active_today,
+                    "active_week": active_week,
+                    "new_this_month": new_this_month
+                },
+                "tts": {
+                    "requests_today": requests_today,
+                    "requests_week": requests_week,
+                    "requests_month": requests_month
+                },
+                "bots": {
+                    "twitch_online": twitch_online,
+                    "vk_online": vk_online,
+                    "total_connections": total_connections,
+                    "twitch_connections": twitch_connections,
+                    "vk_connections": vk_connections
+                },
+                "system": {
+                    "errors_24h": errors_24h,
+                    "storage_used_gb": storage_used_gb,
+                    "storage_total_gb": storage_total_gb
+                }
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting dashboard stats: {e}")
+        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
 
 @router.get("/list")
 async def get_admin_list(
@@ -100,21 +246,21 @@ def is_channel_blocked(channel_name: str, db: Session) -> tuple[bool, Optional[s
 async def get_admin_users(
     page: int = 1,
     limit: int = 50,
-    search: str = None,  # ✅ Добавлена поддержка поиска
+    search: str = None,  # [OK] Добавлена поддержка поиска
     include_guests: bool = True,  # По умолчанию включаем гостей
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список пользователей для админки (включая гостевые сессии)"""
+    """Получить список пользователей для админки"""
     try:
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        from core.database import WhitelistedChannel, GuestSession
+        from core.database import WhitelistedChannel
         
         offset = (page - 1) * limit
         
-        # ✅ ОПТИМИЗАЦИЯ: Ищем пользователей с фильтром и пагинацией
+        # [OK] ОПТИМИЗАЦИЯ: Ищем пользователей с фильтром и пагинацией
         users_query = db.query(User)
         
         # Добавляем фильтр поиска если есть
@@ -128,28 +274,7 @@ async def get_admin_users(
         
         # Загружаем обычных пользователей с пагинацией
         users = users_query.offset(offset).limit(limit).all()
-        total_users = users_query.count()  # ✅ Считаем ПОСЛЕ фильтра
-        
-        # Загружаем гостевые сессии (если включено) из таблицы GuestSession
-        guest_sessions = []
-        total_guest_sessions = 0
-        if include_guests:
-            # ✅ ОПТИМИЗАЦИЯ: Гостевые сессии ТОЖЕ с пагинацией
-            guest_query = db.query(GuestSession).filter(
-                GuestSession.is_active == True
-            )
-            
-            # Добавляем фильтр поиска для гостей
-            if search:
-                search_term = f"%{search.lower()}%"
-                guest_query = guest_query.filter(
-                    GuestSession.channel_name.ilike(search_term) |
-                    GuestSession.platform.ilike(search_term)
-                )
-            
-            # Загружаем с пагинацией
-            guest_sessions = guest_query.offset(offset).limit(limit).all()
-            total_guest_sessions = guest_query.count()  # ✅ Считаем ПОСЛЕ фильтра
+        total_users = users_query.count()  # [OK] Считаем ПОСЛЕ фильтра
         
         user_data = []
         for u in users:
@@ -230,63 +355,8 @@ async def get_admin_users(
                 'whitelisted_channels': whitelisted_channels  # Объект: {'twitch': 'channel_name', 'vk': 'channel_name'}
             })
         
-        # Добавляем гостевые сессии из GuestSession
-        for guest_session in guest_sessions:
-            # Теперь channel_name и platform хранятся прямо в таблице, не в JSON
-            monitored_channel = guest_session.channel_name
-            platform = guest_session.platform
-            
-            # Проверяем whitelist для гостевого канала
-            whitelisted_platforms = []
-            whitelisted_channels = {}
-            
-            if monitored_channel and platform:
-                whitelisted = db.query(WhitelistedChannel).filter(
-                    WhitelistedChannel.channel_name == monitored_channel.lower(),
-                    WhitelistedChannel.platform == platform
-                ).first()
-                if whitelisted:
-                    whitelisted_platforms.append(platform)
-                    whitelisted_channels[platform] = monitored_channel
-            
-            # Определяем username в зависимости от платформы
-            twitch_username = monitored_channel if platform == 'twitch' else None
-            vk_username = monitored_channel if platform == 'vk' else None
-            vk_channel_name = monitored_channel if platform == 'vk' else None
-            
-            user_data.append({
-                'id': -1,  # Специальный ID для гостей
-                'is_guest': True,
-                'session_id': guest_session.session_id,
-                'is_admin': False,
-                'is_active': True,
-                'is_blocked': False,
-                'blocked_reason': None,
-                'created_at': guest_session.created_at.isoformat() if guest_session.created_at else None,
-                'last_activity': guest_session.last_activity.isoformat() if guest_session.last_activity else None,
-                'twitch_username': twitch_username,
-                'vk_username': vk_username,
-                'vk_channel_name': vk_channel_name,
-                'integrations': {
-                    'twitch': {
-                        'connected': platform == 'twitch',
-                        'username': twitch_username,
-                        'enabled': platform == 'twitch'
-                    },
-                    'vk': {
-                        'connected': platform == 'vk',
-                        'username': vk_username,
-                        'enabled': platform == 'vk'
-                    }
-                },
-                'total_integrations': 1 if platform else 0,
-                'is_whitelisted': len(whitelisted_platforms) > 0,
-                'whitelisted_platforms': whitelisted_platforms,
-                'whitelisted_channels': whitelisted_channels
-            })
-        
-        # Общее количество (обычные пользователи + гостевые сессии)
-        total_count = total_users + total_guest_sessions
+        # Общее количество пользователей
+        total_count = total_users
         
         return {
             "success": True,
@@ -296,7 +366,6 @@ async def get_admin_users(
                 "limit": limit,
                 "total": total_count,
                 "total_users": total_users,
-                "total_guests": total_guest_sessions,
                 "pages": (total_count + limit - 1) // limit
             }
         }
@@ -321,12 +390,12 @@ async def block_user(
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        # ✅ NULL CHECK: Запрашиваем пользователя
+        # [OK] NULL CHECK: Запрашиваем пользователя
         target_user = db.query(User).filter(User.id == user_id).first()
         if not target_user:
             raise HTTPException(status_code=404, detail="User not found")
         
-        # ✅ SAFETY CHECK: Убеждаемся что user объект корректен
+        # [OK] SAFETY CHECK: Убеждаемся что user объект корректен
         if not hasattr(target_user, 'is_blocked') or not hasattr(target_user, 'blocked_reason'):
             raise HTTPException(status_code=500, detail="User object corrupted")
         
@@ -335,8 +404,12 @@ async def block_user(
         # 1. Блокируем пользователя (OAuth доступ)
         target_user.is_blocked = True
         target_user.blocked_reason = reason or "Blocked by administrator"
-        target_user.blocked_at = datetime.utcnow()
+        target_user.blocked_at = utcnow_naive()
         logger.info(f"🚫 [ADMIN BLOCK] User {user_id} blocked via OAuth")
+        
+        # [OK] Инвалидируем кеш пользователя
+        from core.user_cache_invalidation import invalidate_user_cache
+        invalidate_user_cache(user_id, f"blocked by admin: {target_user.blocked_reason}")
         
         # 2. Блокируем все каналы пользователя (гостевой доступ)
         from core.database import BlockedChannel
@@ -373,7 +446,10 @@ async def block_user(
         db.commit()
         
         # 3. Отключаем бота от всех каналов пользователя
-        from main import bot_instance, vk_live_bot_instance
+        from startup.bot_registry import get_bot_registry
+        registry = get_bot_registry()
+        bot_instance = registry.twitch_bot
+        vk_live_bot_instance = registry.vk_bot
         
         disconnected = []
         
@@ -381,7 +457,7 @@ async def block_user(
             try:
                 await bot_instance.part_channels([target_user.twitch_username])
                 disconnected.append(f"Twitch: {target_user.twitch_username}")
-                logger.info(f"🤖 [ADMIN BLOCK] Disconnected Twitch bot from {target_user.twitch_username}")
+                logger.info(f"[BOT] [ADMIN BLOCK] Disconnected Twitch bot from {target_user.twitch_username}")
             except Exception as e:
                 logger.error(f"Error disconnecting Twitch bot: {e}")
         
@@ -389,11 +465,11 @@ async def block_user(
             try:
                 await vk_live_bot_instance.disconnect_from_channel(target_user.vk_channel_name)
                 disconnected.append(f"VK: {target_user.vk_channel_name}")
-                logger.info(f"🤖 [ADMIN BLOCK] Disconnected VK bot from {target_user.vk_channel_name}")
+                logger.info(f"[BOT] [ADMIN BLOCK] Disconnected VK bot from {target_user.vk_channel_name}")
             except Exception as e:
                 logger.error(f"Error disconnecting VK bot: {e}")
         
-        logger.info(f"✅ [ADMIN BLOCK] User {user_id} fully blocked. Channels: {blocked_channels}, Bots disconnected: {disconnected}")
+        logger.info(f"[OK] [ADMIN BLOCK] User {user_id} fully blocked. Channels: {blocked_channels}, Bots disconnected: {disconnected}")
         
         return JSONResponse(content={
             "success": True,
@@ -427,12 +503,12 @@ async def unblock_user(
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        # ✅ NULL CHECK: Запрашиваем пользователя
+        # [OK] NULL CHECK: Запрашиваем пользователя
         target_user = db.query(User).filter(User.id == user_id).first()
         if not target_user:
             raise HTTPException(status_code=404, detail="User not found")
         
-        # ✅ SAFETY CHECK: Убеждаемся что user объект корректен
+        # [OK] SAFETY CHECK: Убеждаемся что user объект корректен
         if not hasattr(target_user, 'is_blocked') or not hasattr(target_user, 'blocked_reason'):
             raise HTTPException(status_code=500, detail="User object corrupted")
         
@@ -442,7 +518,11 @@ async def unblock_user(
         target_user.is_blocked = False
         target_user.blocked_reason = None
         target_user.blocked_at = None
-        logger.info(f"✅ [ADMIN UNBLOCK] User {user_id} unblocked via OAuth")
+        logger.info(f"[OK] [ADMIN UNBLOCK] User {user_id} unblocked via OAuth")
+        
+        # [OK] Инвалидируем кеш пользователя
+        from core.user_cache_invalidation import invalidate_user_cache
+        invalidate_user_cache(user_id, "unblocked by admin")
         
         # 2. Удаляем каналы из BlockedChannel (восстанавливаем гостевой доступ)
         from core.database import BlockedChannel
@@ -455,7 +535,7 @@ async def unblock_user(
             if twitch_channel:
                 db.delete(twitch_channel)
                 unblocked_channels.append(f"twitch.tv/{target_user.twitch_username}")
-                logger.info(f"✅ [ADMIN UNBLOCK] Unblocked Twitch channel: {target_user.twitch_username}")
+                logger.info(f"[OK] [ADMIN UNBLOCK] Unblocked Twitch channel: {target_user.twitch_username}")
         
         if target_user.vk_username:
             vk_channel = db.query(BlockedChannel).filter(
@@ -465,12 +545,12 @@ async def unblock_user(
             if vk_channel:
                 db.delete(vk_channel)
                 unblocked_channels.append(f"vk.com/{target_user.vk_username}")
-                logger.info(f"✅ [ADMIN UNBLOCK] Unblocked VK channel: {target_user.vk_username}")
+                logger.info(f"[OK] [ADMIN UNBLOCK] Unblocked VK channel: {target_user.vk_username}")
         
         # Сохраняем изменения в БД
         db.commit()
         
-        logger.info(f"✅ [ADMIN UNBLOCK] User {user_id} fully unblocked. Channels: {unblocked_channels}")
+        logger.info(f"[OK] [ADMIN UNBLOCK] User {user_id} fully unblocked. Channels: {unblocked_channels}")
         
         return JSONResponse(content={
             "success": True,
@@ -500,25 +580,13 @@ async def get_sessions(
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        from core.database import GuestSession
-        
         offset = (page - 1) * limit
         
-        # Загружаем авторизованные сессии
+        # Загружаем сессии
         sessions = db.query(UserSession).offset(offset).limit(limit).all()
         total_sessions = db.query(UserSession).count()
         
-        # ✅ ОПТИМИЗАЦИЯ: Загружаем гостевые сессии с пагинацией
-        guest_sessions = []
-        total_guest_sessions = 0
-        if include_guests:
-            guest_query = db.query(GuestSession).filter(
-                GuestSession.is_active == True
-            )
-            total_guest_sessions = guest_query.count()
-            guest_sessions = guest_query.offset(offset).limit(limit).all()
-        
-        # Получаем все уникальные user_id из авторизованных сессий
+        # Получаем все уникальные user_id из сессий
         user_ids = {session.user_id for session in sessions if session.user_id}
         
         # Загружаем всех пользователей одним запросом (оптимизация N+1)
@@ -529,7 +597,6 @@ async def get_sessions(
         
         sessions_data = []
         
-        # Добавляем авторизованные сессии
         for session in sessions:
             session_user = users_dict.get(session.user_id)
             sessions_data.append({
@@ -539,24 +606,8 @@ async def get_sessions(
                 'session_id': session.session_id,
                 'created_at': session.created_at.isoformat() if session.created_at else None,
                 'last_activity': session.last_activity.isoformat() if session.last_activity else None,
-                'is_active': session.is_active,
-                'is_guest': False
+                'is_active': session.is_active
             })
-        
-        # Добавляем гостевые сессии
-        for guest_session in guest_sessions:
-            sessions_data.append({
-                'id': f"guest_{guest_session.id}",
-                'user_id': -1,
-                'username': f"{guest_session.channel_name} (guest, {guest_session.platform})",
-                'session_id': guest_session.session_id,
-                'created_at': guest_session.created_at.isoformat() if guest_session.created_at else None,
-                'last_activity': guest_session.last_activity.isoformat() if guest_session.last_activity else None,
-                'is_active': guest_session.is_active,
-                'is_guest': True
-            })
-        
-        total_count = total_sessions + total_guest_sessions
         
         return {
             "success": True,
@@ -564,10 +615,8 @@ async def get_sessions(
             "pagination": {
                 "page": page,
                 "limit": limit,
-                "total": total_count,
-                "total_authenticated": total_sessions,
-                "total_guest": total_guest_sessions,
-                "pages": (total_count + limit - 1) // limit
+                "total": total_sessions,
+                "pages": (total_sessions + limit - 1) // limit
             }
         }
     except Exception as e:
@@ -603,7 +652,7 @@ async def add_to_whitelist(
         if platform not in ("twitch", "vk"):
             platform = "twitch"
         
-        # ✅ NULL CHECK: Проверяем, не добавлен ли уже
+        # [OK] NULL CHECK: Проверяем, не добавлен ли уже
         from core.database import WhitelistedChannel
         existing = db.query(WhitelistedChannel).filter(
             WhitelistedChannel.channel_name == username,
@@ -611,13 +660,13 @@ async def add_to_whitelist(
         ).first()
         
         if existing:
-            logger.warning(f"⚠️ WHITELIST: Попытка добавить уже существующий канал '{username}'")
+            logger.warning(f"[WARN] WHITELIST: Попытка добавить уже существующий канал '{username}'")
             return JSONResponse(
                 content={"success": False, "error": f"User {username} is already in whitelist"}, 
                 status_code=400
             )
         
-        # ✅ SAFETY: Добавляем в whitelist с обработкой ошибок
+        # [OK] SAFETY: Добавляем в whitelist с обработкой ошибок
         try:
             whitelist_user = WhitelistedChannel(
                 channel_name=username,
@@ -628,17 +677,17 @@ async def add_to_whitelist(
             
             db.add(whitelist_user)
             db.commit()
-            db.refresh(whitelist_user)  # ✅ Обновляем объект из БД
+            db.refresh(whitelist_user)  # [OK] Обновляем объект из БД
         except Exception as db_error:
             db.rollback()
-            logger.error(f"❌ WHITELIST: Error creating whitelist entry: {db_error}")
+            logger.error(f"[ERROR] WHITELIST: Error creating whitelist entry: {db_error}")
             raise
         
         # Инвалидируем кеш whitelist (передаем db для точной инвалидации кеша пользователей)
         from utils.whitelist_cache import invalidate_whitelist_cache
         invalidate_whitelist_cache(username, platform, db)
         
-        logger.info(f"✅ WHITELIST: Канал '{username}' добавлен в белый список")
+        logger.info(f"[OK] WHITELIST: Канал '{username}' добавлен в белый список")
         return JSONResponse(content={"success": True, "message": f"User {username} added to whitelist"})
     except Exception as e:
         logger.error(f"Error adding to whitelist: {e}")
@@ -712,7 +761,7 @@ async def remove_from_whitelist(
             from utils.whitelist_cache import invalidate_whitelist_cache
             invalidate_whitelist_cache(username, platform, db)
             
-            logger.info(f"🗑️ WHITELIST: Канал '{username}' удален из белого списка (платформа: {platform})")
+            logger.info(f"[DELETE] WHITELIST: Канал '{username}' удален из белого списка (платформа: {platform})")
             return JSONResponse(content={"success": True, "message": f"User {username} removed from whitelist (platform: {platform})"})
         else:
             # Если платформа не указана, удаляем все записи этого канала (для обратной совместимости)
@@ -735,7 +784,7 @@ async def remove_from_whitelist(
             for p in platforms:
                 invalidate_whitelist_cache(username, p, db)
             
-            logger.info(f"🗑️ WHITELIST: Канал '{username}' удален из белого списка (платформы: {', '.join(platforms)})")
+            logger.info(f"[DELETE] WHITELIST: Канал '{username}' удален из белого списка (платформы: {', '.join(platforms)})")
             return JSONResponse(content={"success": True, "message": f"User {username} removed from whitelist (platforms: {', '.join(platforms)})"})
     except Exception as e:
         logger.error(f"Error removing from whitelist: {e}")
@@ -751,7 +800,10 @@ async def get_bots_status(
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        from main import bot_instance, vk_live_bot_instance
+        from startup.bot_registry import get_bot_registry
+        registry = get_bot_registry()
+        bot_instance = registry.twitch_bot
+        vk_live_bot_instance = registry.vk_bot
         
         # Проверяем готовность Twitch бота через наличие user_id (это устанавливается при event_ready)
         twitch_is_ready = False
@@ -790,10 +842,9 @@ async def get_tts_status(
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        from constants import DEFAULT_TTS_SERVICE_URL
         import httpx
         
-        tts_service_url = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        tts_service_url = settings.tts_service_url
         
         try:
             async with httpx.AsyncClient() as client:
@@ -985,7 +1036,7 @@ async def create_support_ticket(
         db.commit()
         db.refresh(ticket)
         
-        logger.info(f"✅ Created support ticket #{ticket.id} from {user.get('username') if user else 'Anonymous'}")
+        logger.info(f"[OK] Created support ticket #{ticket.id} from {user.get('username') if user else 'Anonymous'}")
         
         return {
             "success": True,
@@ -1014,6 +1065,7 @@ async def update_ticket_status(
         
         from core.database import SupportTicket
         from datetime import datetime as dt
+        from core.datetime_utils import utcnow_naive
         
         if status.lower() not in ["open", "in_progress", "closed"]:
             raise HTTPException(status_code=400, detail="Invalid status")
@@ -1024,17 +1076,17 @@ async def update_ticket_status(
             raise HTTPException(status_code=404, detail="Тикет не найден")
         
         ticket.status = status.lower()
-        ticket.updated_at = datetime.utcnow()
+        ticket.updated_at = utcnow_naive()
         
         if status.lower() == "closed":
-            ticket.closed_at = datetime.utcnow()
+            ticket.closed_at = utcnow_naive()
         
         if admin_notes:
             ticket.admin_notes = admin_notes
         
         db.commit()
         
-        logger.info(f"✅ Updated ticket #{ticket_id} status to {status}")
+        logger.info(f"[OK] Updated ticket #{ticket_id} status to {status}")
         
         return {
             "success": True,
@@ -1083,10 +1135,10 @@ async def add_ticket_response(
         )
         
         db.add(response)
-        ticket.updated_at = datetime.utcnow()
+        ticket.updated_at = utcnow_naive()
         db.commit()
         
-        logger.info(f"✅ Added response to ticket #{ticket_id} from {user.get('username')}")
+        logger.info(f"[OK] Added response to ticket #{ticket_id} from {user.get('username')}")
         
         return {
             "success": True,
@@ -1120,7 +1172,7 @@ async def archive_support_ticket(
         ticket.is_archived = True
         db.commit()
         
-        logger.info(f"✅ Archived ticket #{ticket_id}")
+        logger.info(f"[OK] Archived ticket #{ticket_id}")
         
         return {
             "success": True,
@@ -1303,7 +1355,7 @@ async def unblock_channel(
         blocked_channel.is_active = False
         db.commit()
         
-        logger.info(f"✅ Unblocked channel: {blocked_channel.channel_name} by {user.get('username')}")
+        logger.info(f"[OK] Unblocked channel: {blocked_channel.channel_name} by {user.get('username')}")
         
         return {
             "success": True,
@@ -1332,8 +1384,8 @@ async def get_monitoring_metrics(
         blocked_users = db.query(User).filter(User.is_blocked == True).count()
         
         # Сообщения за последние 24 часа и час
-        day_ago = datetime.utcnow() - timedelta(days=1)
-        hour_ago = datetime.utcnow() - timedelta(hours=1)
+        day_ago = utcnow_naive() - timedelta(days=1)
+        hour_ago = utcnow_naive() - timedelta(hours=1)
         messages_24h = db.query(ChatMessage).filter(
             ChatMessage.timestamp >= day_ago
         ).count()
@@ -1350,11 +1402,11 @@ async def get_monitoring_metrics(
         from core.database import UserToken
         twitch_tokens = db.query(UserToken).filter(
             UserToken.platform == 'twitch',
-            UserToken.is_active == True
+            UserToken.is_active.is_(True)
         ).count()
         vk_tokens = db.query(UserToken).filter(
             UserToken.platform == 'vk',
-            UserToken.is_active == True
+            UserToken.is_active.is_(True)
         ).count()
         active_integrations = twitch_tokens + vk_tokens
         
@@ -1397,9 +1449,11 @@ async def get_monitoring_metrics(
                 },
                 "tts": {
                     "enabled_channels": tts_enabled_channels,
-                    "requests_24h": 0  # TODO: Добавить подсчет TTS запросов если есть таблица
+                    # Note: Для подсчета TTS запросов можно создать таблицу TTSRequest
+                    # или использовать существующие логи
+                    "requests_24h": 0
                 },
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": utcnow_naive().isoformat()
             }
         }
     except Exception as e:
@@ -1414,50 +1468,51 @@ async def get_analytics(
 ):
     """Получить аналитику системы"""
     try:
-        logger.info(f"📊 [ANALYTICS] Request from user {user.get('id')}")
+        logger.info(f"[STATS] [ANALYTICS] Request from user {user.get('id')}")
         
         # Проверяем что пользователь админ
         user_record = db.query(User).filter(User.id == user.get('id')).first()
         if not user_record or not user_record.is_admin:
-            logger.warning(f"❌ [ANALYTICS] User {user.get('id')} is not admin")
+            logger.warning(f"[ERROR] [ANALYTICS] User {user.get('id')} is not admin")
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        logger.info(f"✅ [ANALYTICS] User {user.get('id')} is admin")
+        logger.info(f"[OK] [ANALYTICS] User {user.get('id')} is admin")
         
         from core.database import BotCommand
         from datetime import datetime
+        from core.datetime_utils import utcnow_naive
         import psutil
         import os
         
-        logger.info(f"📊 [ANALYTICS] Imports successful")
+        logger.info(f"[STATS] [ANALYTICS] Imports successful")
         
         # Последний час
-        one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+        one_hour_ago = utcnow_naive() - timedelta(hours=1)
         
-        logger.info(f"📊 [ANALYTICS] Time calculations done")
+        logger.info(f"[STATS] [ANALYTICS] Time calculations done")
         
         # Активные пользователи
         active_users = db.query(User).filter(
             User.last_seen > one_hour_ago
         ).count()
-        logger.info(f"📊 [ANALYTICS] Active users: {active_users}")
+        logger.info(f"[STATS] [ANALYTICS] Active users: {active_users}")
         
         # Сообщения за последний час
         recent_messages = db.query(ChatMessage).filter(
             ChatMessage.timestamp > one_hour_ago
         ).count()
-        logger.info(f"📊 [ANALYTICS] Recent messages: {recent_messages}")
+        logger.info(f"[STATS] [ANALYTICS] Recent messages: {recent_messages}")
         
         # Всего сообщений
         total_messages = db.query(ChatMessage).count()
-        logger.info(f"📊 [ANALYTICS] Total messages: {total_messages}")
+        logger.info(f"[STATS] [ANALYTICS] Total messages: {total_messages}")
         
         # TTS запросы
         tts_enabled_users = db.query(User).filter(User.tts_enabled == True).count()
-        logger.info(f"📊 [ANALYTICS] TTS enabled users: {tts_enabled_users}")
+        logger.info(f"[STATS] [ANALYTICS] TTS enabled users: {tts_enabled_users}")
         
         # Получаем реальные команды
-        logger.info(f"📊 [ANALYTICS] Querying top commands...")
+        logger.info(f"[STATS] [ANALYTICS] Querying top commands...")
         top_commands_query = db.query(
             BotCommand.command_name,
             func.sum(BotCommand.usage_count).label('total_usage')
@@ -1467,19 +1522,19 @@ async def get_analytics(
             func.sum(BotCommand.usage_count).desc()
         ).limit(5).all()
         
-        logger.info(f"📊 [ANALYTICS] Top commands query result: {top_commands_query}")
+        logger.info(f"[STATS] [ANALYTICS] Top commands query result: {top_commands_query}")
         
         top_commands = [
             {"command": f"!{cmd[0]}", "count": cmd[1] or 0}
             for cmd in top_commands_query
         ]
-        logger.info(f"📊 [ANALYTICS] Top commands formatted: {top_commands}")
+        logger.info(f"[STATS] [ANALYTICS] Top commands formatted: {top_commands}")
         
         if not top_commands:
             top_commands = []
         
         # Получаем системные метрики
-        logger.info(f"📊 [ANALYTICS] Getting system metrics...")
+        logger.info(f"[STATS] [ANALYTICS] Getting system metrics...")
         try:
             cpu_usage = psutil.cpu_percent(interval=1)
             memory_info = psutil.virtual_memory()
@@ -1487,16 +1542,16 @@ async def get_analytics(
             current_process = psutil.Process(os.getpid())
             process_memory_mb = current_process.memory_info().rss / 1024 / 1024
             
-            logger.info(f"📊 [ANALYTICS] CPU: {cpu_usage}%, Memory: {memory_usage}%, Process: {process_memory_mb}MB")
+            logger.info(f"[STATS] [ANALYTICS] CPU: {cpu_usage}%, Memory: {memory_usage}%, Process: {process_memory_mb}MB")
             
         except Exception as e:
-            logger.warning(f"⚠️ [ANALYTICS] Could not get system metrics: {e}")
+            logger.warning(f"[WARN] [ANALYTICS] Could not get system metrics: {e}")
             cpu_usage = 0
             memory_usage = 0
             process_memory_mb = 0
         
         # Сборка аналитики
-        logger.info(f"📊 [ANALYTICS] Assembling analytics response...")
+        logger.info(f"[STATS] [ANALYTICS] Assembling analytics response...")
         analytics = {
             "active_users": active_users,
             "total_messages": total_messages,
@@ -1509,11 +1564,11 @@ async def get_analytics(
             "cpu_usage": round(cpu_usage, 1),
             "memory_usage": round(memory_usage, 1),
             "process_memory_mb": round(process_memory_mb, 1),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utcnow_naive().isoformat(),
             "top_commands": top_commands
         }
         
-        logger.info(f"✅ [ANALYTICS] Response assembled successfully")
+        logger.info(f"[OK] [ANALYTICS] Response assembled successfully")
         
         return {
             "success": True,
@@ -1521,12 +1576,12 @@ async def get_analytics(
         }
         
     except HTTPException:
-        logger.error(f"❌ [ANALYTICS] HTTPException raised")
+        logger.error(f"[ERROR] [ANALYTICS] HTTPException raised")
         raise
     except Exception as e:
-        logger.error(f"❌ [ANALYTICS] Error getting analytics: {e}")
+        logger.error(f"[ERROR] [ANALYTICS] Error getting analytics: {e}")
         import traceback
-        logger.error(f"❌ [ANALYTICS] Traceback: {traceback.format_exc()}")
+        logger.error(f"[ERROR] [ANALYTICS] Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Ошибка получения аналитики: {str(e)}")
 
 # === SERVICE RESTART ENDPOINTS ===
@@ -1540,10 +1595,13 @@ async def restart_bot_service(
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        logger.info(f"🔄 [ADMIN] Bot service restart requested by user {user.get('id')}")
+        logger.info(f"[REFRESH] [ADMIN] Bot service restart requested by user {user.get('id')}")
         
         # Получаем доступ к ботам из main
-        from main import bot_instance, vk_live_bot_instance
+        from startup.bot_registry import get_bot_registry
+        registry = get_bot_registry()
+        bot_instance = registry.twitch_bot
+        vk_live_bot_instance = registry.vk_bot
         
         restart_results = {
             "twitch": {"status": "not_available", "message": "Бот не активен"},
@@ -1553,7 +1611,7 @@ async def restart_bot_service(
         # Перезапуск Twitch бота
         if bot_instance:
             try:
-                logger.info("🔄 [ADMIN] Restarting Twitch bot...")
+                logger.info("[REFRESH] [ADMIN] Restarting Twitch bot...")
                 channels = list(bot_instance.connected_channels) if bot_instance.connected_channels else []
                 
                 # Отключаем текущие каналы
@@ -1587,7 +1645,7 @@ async def restart_bot_service(
                     "message": f"Переподключено к {reconnected} каналам",
                     "reconnected_channels": reconnected
                 }
-                logger.info(f"✅ [ADMIN] Twitch bot restarted, reconnected to {reconnected} channels")
+                logger.info(f"[OK] [ADMIN] Twitch bot restarted, reconnected to {reconnected} channels")
                 
             except Exception as e:
                 logger.error(f"Error restarting Twitch bot: {e}")
@@ -1599,7 +1657,7 @@ async def restart_bot_service(
         # Перезапуск VK бота
         if vk_live_bot_instance:
             try:
-                logger.info("🔄 [ADMIN] Restarting VK bot...")
+                logger.info("[REFRESH] [ADMIN] Restarting VK bot...")
                 
                 # Получаем активных пользователей с VK
                 active_vk_users = db.query(User).filter(
@@ -1628,7 +1686,7 @@ async def restart_bot_service(
                     "message": f"Переподключено к {reconnected} каналам",
                     "reconnected_channels": reconnected
                 }
-                logger.info(f"✅ [ADMIN] VK bot restarted, reconnected to {reconnected} channels")
+                logger.info(f"[OK] [ADMIN] VK bot restarted, reconnected to {reconnected} channels")
                 
             except Exception as e:
                 logger.error(f"Error restarting VK bot: {e}")
@@ -1658,14 +1716,13 @@ async def restart_tts_engine(
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        logger.info(f"🔄 [ADMIN] TTS engine restart requested by user {user.get('id')}")
+        logger.info(f"[REFRESH] [ADMIN] TTS engine restart requested by user {user.get('id')}")
         
         # TTS сервис - это отдельный микросервис, мы можем только проверить его статус
         # Реальный перезапуск должен быть выполнен через Docker или системный менеджер
         
-        from constants import DEFAULT_TTS_SERVICE_URL
-        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
         import httpx
+        TTS_SERVICE_URL = settings.tts_service_url
         
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
@@ -1722,9 +1779,8 @@ async def update_voice_settings(
             raise HTTPException(status_code=403, detail="Admin access required")
         
         from core.database import UserVoiceSettings
-        from constants import DEFAULT_TTS_SERVICE_URL
-        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
         import httpx
+        TTS_SERVICE_URL = settings.tts_service_url
         
         user_id = user['id']
         
@@ -1737,11 +1793,11 @@ async def update_voice_settings(
                     json=settings
                 )
                 if response.status_code == 200:
-                    logger.info(f"✅ Voice {voice_id} settings updated in TTS Service")
+                    logger.info(f"[OK] Voice {voice_id} settings updated in TTS Service")
                 else:
-                    logger.warning(f"⚠️ Failed to update voice {voice_id} in TTS Service: {response.status_code}")
+                    logger.warning(f"[WARN] Failed to update voice {voice_id} in TTS Service: {response.status_code}")
         except Exception as e:
-            logger.error(f"❌ Error updating voice in TTS Service: {e}")
+            logger.error(f"[ERROR] Error updating voice in TTS Service: {e}")
         
         # Создаём/обновляем персональные настройки пользователя в bot_service
         voice_settings = db.query(UserVoiceSettings).filter(
@@ -1757,7 +1813,7 @@ async def update_voice_settings(
                 voice_settings.speed_preset = settings['speed_preset']
             if 'volume' in settings:
                 voice_settings.volume = settings['volume']
-            voice_settings.updated_at = datetime.utcnow()
+            voice_settings.updated_at = utcnow_naive()
         else:
             # Создаём новые настройки
             voice_settings = UserVoiceSettings(
@@ -1773,7 +1829,7 @@ async def update_voice_settings(
         db.commit()
         db.refresh(voice_settings)
         
-        logger.info(f"✅ Voice settings updated for user {user_id}, voice {voice_id}: {settings}")
+        logger.info(f"[OK] Voice settings updated for user {user_id}, voice {voice_id}: {settings}")
         
         return {
             "status": "success",
@@ -1812,9 +1868,8 @@ async def test_voice(
         if user.get('id') != user_id:
             raise HTTPException(status_code=403, detail="User ID mismatch")
         
-        from constants import DEFAULT_TTS_SERVICE_URL
-        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
         import httpx
+        TTS_SERVICE_URL = settings.tts_service_url
         
         # Подготавливаем данные для FormData в TTS Service
         data = {
@@ -1862,9 +1917,8 @@ async def get_admin_voices(
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        from constants import DEFAULT_TTS_SERVICE_URL
         import httpx
-        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        TTS_SERVICE_URL = settings.tts_service_url
         
         # Проксируем запрос в TTS Service
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -1885,8 +1939,7 @@ async def get_admin_voices(
         raise
     except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
         # TTS сервис недоступен - возвращаем пустой список с предупреждением
-        from constants import DEFAULT_TTS_SERVICE_URL
-        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        TTS_SERVICE_URL = settings.tts_service_url
         logger.warning(f"TTS Service недоступен ({TTS_SERVICE_URL}): {e}. Возвращаю пустой список голосов.")
         return {
             "success": True,
@@ -1899,8 +1952,7 @@ async def get_admin_voices(
     except Exception as e:
         logger.error(f"Get admin voices error: {e}", exc_info=True)
         # Для других ошибок тоже возвращаем пустой список вместо 500
-        from constants import DEFAULT_TTS_SERVICE_URL
-        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        TTS_SERVICE_URL = settings.tts_service_url
         return {
             "success": True,
             "voices": [],
@@ -1918,18 +1970,43 @@ async def upload_voice_proxy(
     db: Session = Depends(get_db)
 ):
     """Загрузить голос (прокси к TTS Service с проверкой прав)"""
+    import tempfile
+    from validators.file_validators import validate_file_magic_number, ALLOWED_AUDIO_TYPES, validate_voice_file
+    
+    temp_file_path = None
     try:
         # Проверяем права доступа - только админы могут загружать голоса
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        from constants import DEFAULT_TTS_SERVICE_URL
-        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
+        # [OK] SECURITY: Валидация файла (размер, тип, имя)
+        validate_voice_file(file)
+        
         import httpx
+        TTS_SERVICE_URL = settings.tts_service_url
         
         # Читаем файл
         file_content = await file.read()
-        file.seek(0)
+        
+        # [OK] SECURITY: Сохраняем во временный файл для проверки magic numbers
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.tmp') as temp_file:
+            temp_file.write(file_content)
+            temp_file_path = temp_file.name
+        
+        # [OK] SECURITY: Проверяем magic numbers (реальный тип файла)
+        is_valid, error = validate_file_magic_number(temp_file_path, ALLOWED_AUDIO_TYPES)
+        
+        if not is_valid:
+            logger.warning(
+                f"🚫 [SECURITY] Admin voice upload rejected - invalid magic number: "
+                f"admin={user.get('id')}, filename={file.filename}, error={error}"
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid file content: {error}. File may be malicious or corrupted."
+            )
+        
+        logger.info(f"[OK] [SECURITY] Admin voice file validated: admin={user.get('id')}, filename={file.filename}")
         
         # Проксируем запрос в TTS Service
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -1962,6 +2039,13 @@ async def upload_voice_proxy(
     except Exception as e:
         logger.error(f"Upload voice error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to upload voice: {str(e)}")
+    finally:
+        # Удаляем временный файл
+        if temp_file_path and os.path.exists(temp_file_path):
+            try:
+                os.unlink(temp_file_path)
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to cleanup temp file: {cleanup_error}")
 
 @router.delete("/voices/{voice_id}")
 async def delete_voice_proxy(
@@ -1975,9 +2059,8 @@ async def delete_voice_proxy(
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        from constants import DEFAULT_TTS_SERVICE_URL
-        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
         import httpx
+        TTS_SERVICE_URL = settings.tts_service_url
         
         # Проксируем запрос в TTS Service
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -2013,9 +2096,8 @@ async def rename_voice_proxy(
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        from constants import DEFAULT_TTS_SERVICE_URL
-        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
         import httpx
+        TTS_SERVICE_URL = settings.tts_service_url
         
         # Проксируем запрос в TTS Service с query параметром
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -2053,9 +2135,8 @@ async def transcribe_voice_proxy(
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        from constants import DEFAULT_TTS_SERVICE_URL
-        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
         import httpx
+        TTS_SERVICE_URL = settings.tts_service_url
         
         # Проксируем запрос в TTS Service
         # Проверяем, есть ли такой endpoint в TTS Service
@@ -2094,9 +2175,8 @@ async def retranscribe_voice_proxy(
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        from constants import DEFAULT_TTS_SERVICE_URL
-        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
         import httpx
+        TTS_SERVICE_URL = settings.tts_service_url
         
         # Проксируем запрос в TTS Service
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -2131,9 +2211,8 @@ async def toggle_voice_proxy(
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        from constants import DEFAULT_TTS_SERVICE_URL
-        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
         import httpx
+        TTS_SERVICE_URL = settings.tts_service_url
         
         # Проксируем запрос в TTS Service
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -2167,9 +2246,8 @@ async def get_tts_stats(
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        from constants import DEFAULT_TTS_SERVICE_URL
-        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
         import httpx
+        TTS_SERVICE_URL = settings.tts_service_url
         
         # Проксируем запрос в TTS Service
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -2203,9 +2281,8 @@ async def get_tts_system_status(
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        from constants import DEFAULT_TTS_SERVICE_URL
-        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
         import httpx
+        TTS_SERVICE_URL = settings.tts_service_url
         
         # Проксируем запрос в TTS Service
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -2239,9 +2316,8 @@ async def restart_tts_system(
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        from constants import DEFAULT_TTS_SERVICE_URL
-        TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", DEFAULT_TTS_SERVICE_URL)
         import httpx
+        TTS_SERVICE_URL = settings.tts_service_url
         
         # Проксируем запрос в TTS Service
         async with httpx.AsyncClient(timeout=10.0) as client:

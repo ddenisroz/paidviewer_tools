@@ -1,14 +1,17 @@
-// src/context/AuthContext.tsx
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo, ReactNode } from 'react';
-import { toast } from 'sonner';
-import { logger } from '../utils/prodLogger';
+﻿// src/context/AuthContext.tsx
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+
+import { toast } from '@/utils/toastManager';
+
 import { useAuthStatus, useLogout } from '../queries/auth/authQueries';
 import { authService } from '../services/api/services/authService';
-import type { User, GuestData, UserIntegrations } from '../types/user';
+import { logger } from '../utils/prodLogger';
+
+import type { User, UserIntegrations } from '../types/user';
 
 // Глобальный флаг для предотвращения множественных проверок аутентификации
-const globalAuthCheckInProgress = false;
-const globalLastAuthCheckTime = 0;
+const _globalAuthCheckInProgress = false;
+const _globalLastAuthCheckTime = 0;
 
 interface AuthStatusData {
   authenticated: boolean;
@@ -19,13 +22,12 @@ interface AuthStatusData {
 interface AuthContextValue {
   user: User | null;
   isAuthenticated: boolean | null;
-  isGuest: boolean;
   isCheckingAuth: boolean;
+  isGuest: boolean;
   integrations: UserIntegrations;
   loginWithTwitch: () => void;
   loginWithVk: () => void;
   logout: () => Promise<void>;
-  setGuestMode: (guestData: GuestData) => Promise<void>;
   integrationsNeedRefresh: boolean;
   markIntegrationsRefreshed: () => void;
   triggerIntegrationsRefresh: () => void;
@@ -61,7 +63,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const [user, setUser] = useState<User | null>(getCachedUser);
     const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(getCachedUser() ? true : null);
-    const [isGuest, setIsGuest] = useState<boolean>(false);
     const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
     const [integrationsNeedRefresh, setIntegrationsNeedRefresh] = useState<boolean>(false);
 
@@ -78,7 +79,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             if (authenticated) {
                 const newUser: User = { ...userData, integrations };
                 setIsAuthenticated(true);
-                setIsGuest(userData.is_guest || false);
                 setUser(newUser);
                 try {
                     localStorage.setItem('cached_user', JSON.stringify(newUser));
@@ -87,7 +87,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 }
             } else {
                 setIsAuthenticated(false);
-                setIsGuest(false);
                 setUser(null);
                 localStorage.removeItem('cached_user');
             }
@@ -111,7 +110,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 logger.debug('Auth URL params cleaned');
                 
                 if (authSuccess || authPlatform) {
-                    logger.log(`🔄 [AUTH] OAuth success for ${authPlatform}, triggering integrations refresh`);
+                    logger.log(`[REFRESH] [AUTH] OAuth success for ${authPlatform}, triggering integrations refresh`);
                     setTimeout(() => {
                         window.dispatchEvent(new CustomEvent('auth_refresh_required'));
                     }, 200);
@@ -123,10 +122,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     useEffect(() => {
         if (isError && error) {
             logger.error('Authentication check failed:', error);
-            const axiosError = error as any;
+            const axiosError = error as { response?: { status?: number } };
             if (axiosError.response && (axiosError.response.status === 401 || axiosError.response.status === 403)) {
                 setIsAuthenticated(false);
-                setIsGuest(false);
                 setUser(null);
                 localStorage.removeItem('cached_user');
             }
@@ -164,9 +162,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 try {
                     const { apiClient } = await import('../services/api/client');
                     await apiClient.post('/api/sessions/clear-legacy');
-                    logger.debug('Legacy sessions cleared');
-                } catch (error: any) {
-                    logger.debug('Legacy sessions cleanup skipped:', error.message);
+                    // Убрали toast - это техническая операция
+                } catch {
+                    // Тихо игнорируем ошибки - это не критично
                 }
             }
         };
@@ -184,11 +182,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const loginWithVk = useCallback((): void => {
         try {
-            logger.log('🔵 [AUTH CONTEXT] loginWithVk() called');
+            logger.log('[AUTH CONTEXT] loginWithVk() called');
             authService.loginWithVk();
             logger.log('🔵 [AUTH CONTEXT] loginWithVk() executed');
         } catch (error) {
-            logger.error('❌ [AUTH CONTEXT] VK login error:', error);
+            logger.error('[ERROR] [AUTH CONTEXT] VK login error:', error);
             toast.error('Ошибка при входе через VK Live.');
         }
     }, []);
@@ -211,10 +209,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             
             try {
                 const { getSharedWebSocket } = await import('../utils/sharedWebSocket');
-                const wsManager = getSharedWebSocket(userId);
-                if (wsManager) {
-                    wsManager.cleanup();
-                    logger.info('[AUTH] WebSocket cleaned up on logout');
+                if (userId !== undefined) {
+                    const wsManager = getSharedWebSocket(userId);
+                    if (wsManager) {
+                        wsManager.cleanup();
+                        logger.info('[AUTH] WebSocket cleaned up on logout');
+                    }
                 }
             } catch (error) {
                 logger.error('[AUTH] Failed to cleanup WebSocket:', error);
@@ -234,39 +234,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setIntegrationsNeedRefresh(true);
     }, []);
 
-    const setGuestMode = useCallback(async (guestData: GuestData): Promise<void> => {
-        try {
-            setIsAuthenticated(true);
-            setIsGuest(true);
-            setUser({
-                id: -1,
-                username: guestData.username,
-                is_admin: false,
-                is_guest: true,
-                platform: guestData.platform,
-                integrations: {}
-            });
-        } catch (error) {
-            logger.error('Failed to set guest mode:', error);
-            throw error;
-        }
-    }, []);
+    const isGuest = user?.is_guest === true || user?.id === -1;
 
     const value = useMemo<AuthContextValue>(() => ({
         user,
         isAuthenticated,
-        isGuest,
         isCheckingAuth,
+        isGuest,
         integrations: user?.integrations || {},
         loginWithTwitch,
         loginWithVk,
         logout,
-        setGuestMode,
         integrationsNeedRefresh,
         markIntegrationsRefreshed,
         triggerIntegrationsRefresh,
         refreshAuthStatus: checkAuthStatus
-    }), [user, isAuthenticated, isGuest, isCheckingAuth, integrationsNeedRefresh, loginWithTwitch, loginWithVk, logout, setGuestMode, markIntegrationsRefreshed, triggerIntegrationsRefresh, checkAuthStatus]);
+    }), [user, isAuthenticated, isCheckingAuth, isGuest, integrationsNeedRefresh, loginWithTwitch, loginWithVk, logout, markIntegrationsRefreshed, triggerIntegrationsRefresh, checkAuthStatus]);
 
     return (
         <AuthContext.Provider value={value}>

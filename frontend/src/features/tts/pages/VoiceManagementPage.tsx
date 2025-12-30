@@ -1,39 +1,43 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useEffect, useState } from 'react';
+
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertCircle, Edit, Globe, Lock, Settings, TestTube2, Trash2, Upload, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Trash2, Settings, TestTube2, Globe, User, Edit, Lock, AlertCircle } from 'lucide-react';
+import { PageLoader } from '@/components/ui/loader';
 import { Slider } from "@/components/ui/slider";
-import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
+
 import { useToast } from '../../../components/ui/toast';
-import { useButtonPosition } from '../../../hooks/useButtonPosition';
+import { TTS_SERVICE_URL } from '../../../constants';
 import { useAuth } from '../../../context/AuthContext';
 import { useIntegrations } from '../../../context/IntegrationsContext';
 import { useTts } from '../../../context/TtsContext';
-import TtsErrorCard from '../components/TtsErrorCard';
-import { 
-    getUserVoices, 
-    uploadUserVoice, 
-    deleteUserVoice, 
-    updateUserVoiceSettings, 
-    retranscribeUserVoice,
-    testVoice,
-    renameUserVoice,
-    getGlobalVoices
-} from '../../../services/unified-api';
+import { useButtonPosition } from '../../../hooks/useButtonPosition';
+import { useLoadingState } from '../../../hooks/useLoadingState';
 import { useWhitelistStatus } from '../../../queries/tts/ttsQueries';
 import { ttsService } from '../../../services/api/services/ttsService';
-import { Badge } from '@/components/ui/badge';
-import { PageLoader } from '@/components/ui/loader';
-import { useLoadingState } from '../../../hooks/useLoadingState';
-import { TTS_SERVICE_URL } from '../../../constants';
+import { 
+    deleteUserVoice, 
+    getGlobalVoices, 
+    getUserVoices, 
+    renameUserVoice, 
+    retranscribeUserVoice,
+    testVoice,
+    updateUserVoiceSettings,
+    uploadUserVoice
+} from '../../../services/unified-api';
 import PageWrapper from '../../../shared/components/PageWrapper';
 import { logger } from '../../../utils/prodLogger';
+import TtsErrorCard from '../components/TtsErrorCard';
+
 import type { TtsVoice } from '../../../types/tts';
 
 interface WhitelistStatus {
@@ -43,17 +47,38 @@ interface WhitelistStatus {
     message?: string;
 }
 
+interface VoiceApiResponse {
+    data?: TtsVoice[];
+}
+
+interface EnabledVoicesResponse {
+    enabled_voice_ids?: number[];
+}
+
+interface TranscribeResponse {
+    data?: { reference_text?: string };
+    reference_text?: string;
+}
+
+interface MutationError {
+    message?: string;
+}
+
+interface TestVoiceResponse {
+    audio_url?: string;
+}
+
 const VoiceManagementPageContent: React.FC = () => {
     const navigate = useNavigate();
     const { addToast } = useToast();
-    const { getButtonPosition } = useButtonPosition();
+    const { getButtonPosition: _getButtonPosition } = useButtonPosition();
     const { user, isGuest, isAuthenticated } = useAuth();
     const { integrations } = useIntegrations();
     const [loading, setLoading] = useState<boolean>(true);
     
     const isTwitchConnected = integrations.twitch?.enabled || (isGuest && user?.platform === 'twitch');
     const isVkConnected = integrations.vk?.enabled || (isGuest && user?.platform === 'vk');
-    const hasAnyIntegration = isTwitchConnected || isVkConnected || isGuest;
+    const _hasAnyIntegration = isTwitchConnected || isVkConnected || isGuest;
     const [uploadDialogOpen, setUploadDialogOpen] = useState<boolean>(false);
     const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
     const [renameDialogOpen, setRenameDialogOpen] = useState<boolean>(false);
@@ -65,25 +90,25 @@ const VoiceManagementPageContent: React.FC = () => {
     const [isUploading, setIsUploading] = useState<boolean>(false);
     const [isTranscribing, setIsTranscribing] = useState<boolean>(false);
     const [isTestingVoice, setIsTestingVoice] = useState<boolean>(false);
-    const [voiceVolumes, setVoiceVolumes] = useState<Record<string, number>>({});
+    const [voiceVolumes, _setVoiceVolumes] = useState<Record<string, number>>({});
     const fileInputRef = React.useRef<HTMLInputElement | null>(null);
     const voiceVolumeSaveTimeout = React.useRef<Record<string, NodeJS.Timeout>>({});
     
-    const { initializeTts, engineStatus, isCheckingHealth, checkTtsHealth } = useTts();
+    const { initializeTts: _initializeTts, engineStatus, isCheckingHealth, checkTtsHealth: _checkTtsHealth } = useTts();
     const isHealthy = engineStatus.loaded;
     const isChecking = isCheckingHealth;
     const lastCheck: Date | null = null;
     const queryClient = useQueryClient();
-    let audioContext: AudioContext | null = null;
-    let audioSource: AudioBufferSourceNode | null = null;
+    let _audioContext: AudioContext | null = null;
+    let _audioSource: AudioBufferSourceNode | null = null;
     
     const showLoader = useLoadingState(isChecking);
 
-    const loadVoiceVolume = async (voiceName: string): Promise<number> => {
+    const _loadVoiceVolume = async (_voiceName: string): Promise<number> => {
         return 50.0;
     };
 
-    const saveVoiceVolume = async (voiceName: string, volumeLevel: number): Promise<void> => {
+    const _saveVoiceVolume = async (_voiceName: string, _volumeLevel: number): Promise<void> => {
         // No-op: volume is managed via UserVoiceSettings in admin panel
     };
 
@@ -94,13 +119,14 @@ const VoiceManagementPageContent: React.FC = () => {
         refetchOnWindowFocus: false,
     });
 
-    const whitelistStatus = whitelistStatusData as WhitelistStatus | undefined;
+    const whitelistStatus = whitelistStatusData?.data as WhitelistStatus | undefined;
 
     const { data: globalVoicesData = [], isLoading: globalVoicesLoading, isError: globalVoicesError, error: globalVoicesErrorData } = useQuery<TtsVoice[]>({
         queryKey: ['global-voices'],
         queryFn: async () => {
             const response = await getGlobalVoices();
-            const data = (response as any)?.data || response || [];
+            const voiceResponse = (response as unknown) as VoiceApiResponse;
+            const data = voiceResponse?.data || response || [];
             return Array.isArray(data) ? data : [];
         },
         enabled: !!whitelistStatus?.can_manage_voices,
@@ -121,7 +147,8 @@ const VoiceManagementPageContent: React.FC = () => {
         queryFn: async () => {
             if (!userId) return [];
             const response = await getUserVoices(userId);
-            const data = (response as any)?.data || response || [];
+            const voiceResponse = (response as unknown) as VoiceApiResponse;
+            const data = voiceResponse?.data || response || [];
             return Array.isArray(data) ? data : [];
         },
         enabled: !!userId,
@@ -151,8 +178,9 @@ const VoiceManagementPageContent: React.FC = () => {
             }
             queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
         },
-        onError: (error: any) => {
-            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось загрузить голос.' });
+        onError: (error: unknown) => {
+            const mutationError = error as MutationError;
+            addToast({ type: 'error', title: 'Ошибка', message: mutationError.message || 'Не удалось загрузить голос.' });
         },
         onSettled: () => {
             setIsUploading(false);
@@ -160,15 +188,16 @@ const VoiceManagementPageContent: React.FC = () => {
     });
 
     const deleteVoiceMutation = useMutation({
-        mutationFn: async ({ voiceId, userId, voiceName }: { voiceId: number; userId: number; voiceName: string }) => {
+        mutationFn: async ({ voiceId, userId, voiceName: _voiceName }: { voiceId: number; userId: number; voiceName: string }) => {
             return await deleteUserVoice(String(voiceId), userId);
         },
-        onSuccess: (data: any, variables: { voiceId: number; userId: number; voiceName: string }) => {
+        onSuccess: (_data: unknown, variables: { voiceId: number; userId: number; voiceName: string }) => {
             addToast({ type: 'success', title: 'Успех', message: `Голос "${variables.voiceName}" удалён.` });
             queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
         },
-        onError: (error: any) => {
-            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось удалить голос.' });
+        onError: (error: unknown) => {
+            const mutationError = error as MutationError;
+            addToast({ type: 'error', title: 'Ошибка', message: mutationError.message || 'Не удалось удалить голос.' });
         }
     });
 
@@ -182,13 +211,14 @@ const VoiceManagementPageContent: React.FC = () => {
             setEditDialogOpen(false);
             queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
         },
-        onError: (error: any) => {
-            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось переименовать голос.' });
+        onError: (error: unknown) => {
+            const mutationError = error as MutationError;
+            addToast({ type: 'error', title: 'Ошибка', message: mutationError.message || 'Не удалось переименовать голос.' });
         }
     });
 
     const updateVoiceSettingsMutation = useMutation({
-        mutationFn: async ({ voiceId, userId, settings }: { voiceId: number; userId: number; settings: Record<string, any> }) => {
+        mutationFn: async ({ voiceId, userId, settings }: { voiceId: number; userId: number; settings: Record<string, unknown> }) => {
             return await updateUserVoiceSettings(voiceId, userId, settings);
         },
         onSuccess: () => {
@@ -196,8 +226,9 @@ const VoiceManagementPageContent: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
             queryClient.invalidateQueries({ queryKey: ['global-voices'] });
         },
-        onError: (error: any) => {
-            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось обновить настройки.' });
+        onError: (error: unknown) => {
+            const mutationError = error as MutationError;
+            addToast({ type: 'error', title: 'Ошибка', message: mutationError.message || 'Не удалось обновить настройки.' });
             queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
             queryClient.invalidateQueries({ queryKey: ['global-voices'] });
         }
@@ -208,30 +239,33 @@ const VoiceManagementPageContent: React.FC = () => {
             setIsTranscribing(true);
             return await retranscribeUserVoice(voiceId, userId);
         },
-        onSuccess: (response: any) => {
-            const newReferenceText = response?.data?.reference_text || response?.reference_text;
+        onSuccess: (response: unknown) => {
+            const transcribeResponse = response as TranscribeResponse;
+            const newReferenceText = transcribeResponse?.data?.reference_text || transcribeResponse?.reference_text;
             if (newReferenceText && currentVoice) {
                 setCurrentVoice({...currentVoice, reference_text: newReferenceText});
                 addToast({ type: 'success', title: 'Успех', message: 'Референсный текст обновлён!' });
             }
             queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
         },
-        onError: (error: any) => {
-            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось перетранскрибировать голос.' });
+        onError: (error: unknown) => {
+            const mutationError = error as MutationError;
+            addToast({ type: 'error', title: 'Ошибка', message: mutationError.message || 'Не удалось перетранскрибировать голос.' });
         },
         onSettled: () => {
             setIsTranscribing(false);
         }
     });
 
-    const { data: enabledVoicesData, isLoading: enabledVoicesLoading } = useQuery<number[]>({
+    const { data: enabledVoicesData, isLoading: _enabledVoicesLoading } = useQuery<number[]>({
         queryKey: ['enabled-voices', userId],
         queryFn: async () => {
             if (!userId) return [];
             try {
                 const response = await ttsService.getEnabledVoices(userId);
-                return (response.data as any).enabled_voice_ids || [];
-            } catch (error: any) {
+                const enabledResponse = response.data as EnabledVoicesResponse;
+                return enabledResponse.enabled_voice_ids || [];
+            } catch (error: unknown) {
                 logger.error('Error loading enabled voices:', error);
                 return [];
             }
@@ -249,7 +283,7 @@ const VoiceManagementPageContent: React.FC = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['enabled-voices', userId] });
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             logger.error('Error updating enabled voices:', error);
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось обновить включенные голоса' });
         }
@@ -273,12 +307,12 @@ const VoiceManagementPageContent: React.FC = () => {
     }, [whitelistStatus, user]);
 
     useEffect(() => {
-        if (!whitelistStatusData?.can_manage_voices) {
+        if (!whitelistStatus?.can_manage_voices) {
             setLoading(false);
             return;
         }
         setLoading(globalVoicesLoading || userVoicesLoading);
-    }, [globalVoicesLoading, userVoicesLoading, whitelistStatusData]);
+    }, [globalVoicesLoading, userVoicesLoading, whitelistStatus]);
 
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>): void => {
         event.stopPropagation();
@@ -309,7 +343,7 @@ const VoiceManagementPageContent: React.FC = () => {
         setVoiceName(nameWithoutExt);
     };
 
-    const handleUpload = async (event: React.MouseEvent<HTMLButtonElement>): Promise<void> => {
+    const handleUpload = async (_event: React.MouseEvent<HTMLButtonElement>): Promise<void> => {
         if (!uploadFile || !voiceName.trim()) {
             addToast({ type: 'error', title: 'Ошибка', message: 'Выберите файл и введите имя голоса.' });
             return;
@@ -453,17 +487,22 @@ const VoiceManagementPageContent: React.FC = () => {
         );
     };
 
-    const playAudio = (buffer: ArrayBuffer): void => {
-        if (audioSource) {
-            audioSource.stop();
+    const _playAudio = (buffer: ArrayBuffer): void => {
+        if (_audioSource) {
+            _audioSource.stop();
         }
-        audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        audioSource = audioContext.createBufferSource();
-        audioContext.decodeAudioData(buffer, (decodedBuffer) => {
-            if (audioSource) {
-                audioSource.buffer = decodedBuffer;
-                audioSource.connect(audioContext!.destination);
-                audioSource.start(0);
+        const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!AudioContextClass) {
+            addToast({ type: 'error', title: 'Ошибка', message: 'AudioContext не поддерживается в вашем браузере.' });
+            return;
+        }
+        _audioContext = new AudioContextClass();
+        _audioSource = _audioContext.createBufferSource();
+        _audioContext.decodeAudioData(buffer, (decodedBuffer) => {
+            if (_audioSource) {
+                _audioSource.buffer = decodedBuffer;
+                _audioSource.connect(_audioContext!.destination);
+                _audioSource.start(0);
             }
         }, (error) => {
             logger.error('Error decoding audio data', error);
@@ -488,7 +527,8 @@ const VoiceManagementPageContent: React.FC = () => {
                 testText
             );
             
-            const audioUrl = (response.data as any).audio_url;
+            const testResponse = response.data as TestVoiceResponse;
+            const audioUrl = testResponse.audio_url;
             if (audioUrl) {
                 try {
                     let fullAudioUrl = audioUrl;
@@ -504,7 +544,7 @@ const VoiceManagementPageContent: React.FC = () => {
                     
                     audio.oncanplaythrough = () => {
                         logger.log('Test audio ready to play with volume:', audio.volume);
-                        audio.play().catch((e: any) => {
+                        audio.play().catch((e: unknown) => {
                             logger.error("Test audio play failed:", e);
                             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось воспроизвести аудио.' });
                         });
@@ -514,27 +554,28 @@ const VoiceManagementPageContent: React.FC = () => {
                         logger.log('Test audio playback ended');
                     };
                     
-                    audio.onerror = (e: any) => {
+                    audio.onerror = (e: unknown) => {
                         logger.error("Error loading test audio:", fullAudioUrl, e);
                         addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось загрузить аудио файл.' });
                     };
                     
                     audio.load();
-                } catch (error: any) {
+                } catch (error: unknown) {
                     logger.error("Error creating audio:", error);
                     addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось создать аудио объект.' });
                 }
             } else {
                 addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось получить аудио для воспроизведения.' });
             }
-        } catch (error: any) {
-            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось протестировать голос.' });
+        } catch (error: unknown) {
+            const mutationError = error as MutationError;
+            addToast({ type: 'error', title: 'Ошибка', message: mutationError.message || 'Не удалось протестировать голос.' });
         } finally {
             setIsTestingVoice(false);
         }
     };
 
-    const handleUpdateSettings = async (): Promise<void> => {
+    const _handleUpdateSettings = async (): Promise<void> => {
         if (!currentVoice || !user) return;
         try {
             await updateUserVoiceSettings(currentVoice.id, user.id, {
@@ -544,12 +585,13 @@ const VoiceManagementPageContent: React.FC = () => {
             setEditDialogOpen(false);
             queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
             queryClient.invalidateQueries({ queryKey: ['global-voices'] });
-        } catch (error: any) {
-            addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось обновить настройки.' });
+        } catch (error: unknown) {
+            const mutationError = error as MutationError;
+            addToast({ type: 'error', title: 'Ошибка', message: mutationError.message || 'Не удалось обновить настройки.' });
         }
     };
 
-    const handleSliderChange = (value: number[], field: string): void => {
+    const _handleSliderChange = (value: number[], field: string): void => {
         if (currentVoice) {
             setCurrentVoice(prev => prev ? ({ ...prev, [field]: value[0] }) : null);
         }
@@ -686,7 +728,7 @@ const VoiceManagementPageContent: React.FC = () => {
                             Обратитесь к администратору для получения доступа.
                         </p>
                         <p className="text-orange-200/60 text-xs mt-2">
-                            💡 Вам доступна только базовая озвучка (gTTS) через основные настройки TTS.
+                            [INFO] Вам доступна только базовая озвучка (gTTS) через основные настройки TTS.
                         </p>
                     </div>
                 </div>
@@ -701,10 +743,10 @@ const VoiceManagementPageContent: React.FC = () => {
                             Канал, к которому вы подключились, не находится в whitelist. F5-TTS (AI озвучка) недоступен.
                         </p>
                         <p className="text-blue-200/60 text-xs mt-2">
-                            💡 Вам доступна только базовая озвучка (gTTS) через основные настройки TTS.
+                            [INFO] Вам доступна только базовая озвучка (gTTS) через основные настройки TTS.
                         </p>
                         <p className="text-blue-200/60 text-xs mt-1">
-                            💡 Для получения доступа к F5-TTS обратитесь к администратору для добавления канала в whitelist.
+                            [INFO] Для получения доступа к F5-TTS обратитесь к администратору для добавления канала в whitelist.
                         </p>
                     </div>
                 </div>

@@ -1,21 +1,86 @@
 // src/pages/SettingsPage.tsx
 import React, { useState } from 'react';
+
+import { AlertCircle, ArrowUpCircle, ChevronDown, Gift, Inbox, Settings, Shield, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
+
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
-import { Inbox, Settings, Gift, AlertCircle, Trash2 } from 'lucide-react';
-import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
-import { useIntegrations } from '../context/IntegrationsContext';
-import { useDonationAlerts } from '../context/DonationAlertsContext';
-import { useAuth } from '../context/AuthContext';
-import { useAudioPriority } from '../context/AudioPriorityContext';
-import InboxPage from './InboxPage';
-import PageWrapper from '../shared/components/PageWrapper';
+import { Switch } from '@/components/ui/switch';
+
+import { BotManagementCard } from '../components/BotManagementCard';
 import DeleteAccountModal from '../components/DeleteAccountModal';
+import { API_BASE_URL } from '../constants';
+import { useAudioPriority } from '../context/AudioPriorityContext';
+import { useAuth } from '../context/AuthContext';
+import { useDonationAlerts } from '../context/DonationAlertsContext';
+import { useIntegrations } from '../context/IntegrationsContext';
+import PageWrapper from '../shared/components/PageWrapper';
+import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
+
+import InboxPage from './InboxPage';
+
+
 
 type TabType = 'settings' | 'tickets';
+
+interface PlatformIntegrationCardProps {
+    platform: 'twitch' | 'vk';
+    enabled: boolean;
+    onToggle: (enabled: boolean) => void;
+    onConnect: () => void;
+}
+
+const PlatformIntegrationCard: React.FC<PlatformIntegrationCardProps> = ({
+    platform,
+    enabled,
+    onToggle,
+    onConnect
+}) => {
+    const platformName = platform === 'twitch' ? 'Twitch' : 'VK Live';
+    const PlatformIcon = platform === 'twitch' ? TwitchIcon : VKIcon;
+    const platformColor = platform === 'twitch' ? '#9146FF' : '#ef4444';
+
+    return (
+        <Card className="flex flex-col gap-3 p-4">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <PlatformIcon width="20" height="20" />
+                    <Label className="text-base font-medium">
+                        {platformName}
+                    </Label>
+                </div>
+                
+                {enabled ? (
+                    <Switch
+                        checked={enabled}
+                        onCheckedChange={onToggle}
+                        style={{ backgroundColor: platformColor }}
+                    />
+                ) : (
+                    <Button variant="outline" size="sm" onClick={onConnect}>
+                        Подключить
+                    </Button>
+                )}
+            </div>
+            
+            {/* Индикатор подключения */}
+            {enabled && (
+                <div className="flex items-center gap-1.5 text-xs px-2 py-1.5 rounded bg-green-500/10 text-green-400">
+                    <Shield className="w-3 h-3" />
+                    <span>Подключено</span>
+                </div>
+            )}
+        </Card>
+    );
+};
 
 const SettingsPage: React.FC = () => {
     const navigate = useNavigate();
@@ -27,6 +92,11 @@ const SettingsPage: React.FC = () => {
     const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
 
     const hasMainIntegration = integrations.twitch?.enabled || integrations.vk?.enabled;
+
+    const handlePlatformConnect = (platform: 'twitch' | 'vk'): void => {
+        const authUrl = `${API_BASE_URL}/auth/${platform}/login`;
+        window.location.href = authUrl;
+    };
 
     const handleDonationAlertsConnect = async (): Promise<void> => {
         if (!hasMainIntegration) {
@@ -101,38 +171,28 @@ const SettingsPage: React.FC = () => {
             {/* Содержимое табов */}
             {activeTab === 'settings' && (
             <>
+            {/* Bot Management (Admin Only) */}
+            {user?.is_admin && (
+                <BotManagementCard />
+            )}
+
             {/* Интеграции */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Twitch Integration */}
-                <Card className="flex flex-col items-center justify-between gap-3 p-4">
-                    <div className="flex items-center gap-2">
-                        <TwitchIcon width="20" height="20" />
-                        <Label htmlFor="twitch-integration" className="text-base font-medium">
-                            Twitch
-                        </Label>
-                    </div>
-                    <Switch
-                        id="twitch-integration"
-                        checked={integrations.twitch?.enabled || false}
-                        onCheckedChange={(checked: boolean) => updateTwitchIntegration(checked, null)}
-                    />
-                </Card>
+                <PlatformIntegrationCard
+                    platform="twitch"
+                    enabled={integrations.twitch?.enabled || false}
+                    onToggle={(checked) => updateTwitchIntegration(checked, null)}
+                    onConnect={() => handlePlatformConnect('twitch')}
+                />
 
                 {/* VK Integration */}
-                <Card className="flex flex-col items-center justify-between gap-3 p-4">
-                    <div className="flex items-center gap-2">
-                        <VKIcon width="20" height="20" />
-                        <Label htmlFor="vk-integration" className="text-base font-medium">
-                            VK Live
-                        </Label>
-                    </div>
-                    <Switch
-                        id="vk-integration"
-                        checked={integrations.vk?.enabled || false}
-                        onCheckedChange={(checked: boolean) => updateVkIntegration(checked, null)}
-                        style={integrations.vk?.enabled ? { backgroundColor: '#ef4444' } : {}}
-                    />
-                </Card>
+                <PlatformIntegrationCard
+                    platform="vk"
+                    enabled={integrations.vk?.enabled || false}
+                    onToggle={(checked) => updateVkIntegration(checked, null)}
+                    onConnect={() => handlePlatformConnect('vk')}
+                />
 
                 {/* DonationAlerts Integration */}
                 <Card className="flex flex-col items-center justify-between gap-3 p-4">
@@ -240,20 +300,9 @@ const SettingsPage: React.FC = () => {
 
                 {/* Danger Zone - Delete Account */}
                 <Card className="flex flex-col gap-3 p-4 border-red-500/30 bg-red-500/10">
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                            <Trash2 className="h-5 w-5 text-red-500 flex-shrink-0" />
-                            <span className="text-sm font-semibold text-red-500">Опасная зона</span>
-                        </div>
-                        <Button
-                            variant="destructive"
-                            onClick={() => setShowDeleteModal(true)}
-                            className="bg-red-600 hover:bg-red-700 flex-shrink-0"
-                            size="sm"
-                        >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Удалить
-                        </Button>
+                    <div className="flex items-center gap-2">
+                        <Trash2 className="h-5 w-5 text-red-500 flex-shrink-0" />
+                        <span className="text-sm font-semibold text-red-500">Опасная зона</span>
                     </div>
                     <div className="flex items-start gap-2">
                         <AlertCircle className="h-4 w-4 text-red-400/80 flex-shrink-0 mt-0.5" />
@@ -261,6 +310,15 @@ const SettingsPage: React.FC = () => {
                             Необратимые действия. Удаление аккаунта приведет к полной потере всех данных.
                         </p>
                     </div>
+                    <Button
+                        variant="destructive"
+                        onClick={() => setShowDeleteModal(true)}
+                        className="w-full bg-red-600 hover:bg-red-700"
+                        size="sm"
+                    >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Удалить аккаунт
+                    </Button>
                 </Card>
             </div>
 
@@ -281,4 +339,3 @@ const SettingsPage: React.FC = () => {
 };
 
 export default SettingsPage;
-

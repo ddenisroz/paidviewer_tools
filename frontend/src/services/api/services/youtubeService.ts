@@ -2,8 +2,10 @@
  * YouTube Service - инкапсуляция всех YouTube API вызовов
  */
 import { apiClient } from '../client';
+
+import type { ApiResponse } from '../../../types/api';
+import type { YoutubeObsUrlResponse, YoutubeQueue, YoutubeSettings, YoutubeVideo } from '../../../types/youtube';
 import type { AxiosResponse } from 'axios';
-import type { ApiResponse, YouTubeQueueItem, YouTubeSettings } from '../../../types';
 
 /**
  * YouTube Service
@@ -13,7 +15,7 @@ export const youtubeService = {
    * Получить очередь YouTube
    * @returns Promise с ответом API
    */
-  async getQueue(): Promise<AxiosResponse<ApiResponse<YouTubeQueueItem[]>>> {
+  async getQueue(): Promise<AxiosResponse<YoutubeQueue>> {
     return apiClient.get('/api/youtube/queue');
   },
 
@@ -22,7 +24,7 @@ export const youtubeService = {
    * @param data - Данные видео
    * @returns Promise с ответом API
    */
-  async addToQueue(data: { video_url?: string; url?: string; is_paid?: boolean; points_cost?: number }): Promise<AxiosResponse<ApiResponse<YouTubeQueueItem>>> {
+  async addToQueue(data: { video_url?: string; url?: string; is_paid?: boolean; points_cost?: number }): Promise<AxiosResponse<ApiResponse<{ queue_item: YoutubeVideo }>>> {
     // Backend endpoint: POST /api/youtube/queue/add
     return apiClient.post('/api/youtube/queue/add', {
       video_url: data.video_url || data.url,
@@ -54,7 +56,7 @@ export const youtubeService = {
    * Перейти к следующему видео
    * @returns Promise с ответом API
    */
-  async nextVideo(): Promise<AxiosResponse<ApiResponse>> {
+  async nextVideo(): Promise<AxiosResponse<ApiResponse<{ current_video: YoutubeVideo | null }>>> {
     // Backend endpoint: POST /api/youtube/player/next
     return apiClient.post('/api/youtube/player/next');
   },
@@ -73,7 +75,7 @@ export const youtubeService = {
    * Получить настройки YouTube
    * @returns Promise с ответом API
    */
-  async getSettings(): Promise<AxiosResponse<ApiResponse<YouTubeSettings>>> {
+  async getSettings(): Promise<AxiosResponse<YoutubeSettings>> {
     return apiClient.get('/api/tts/youtube-settings');
   },
 
@@ -82,7 +84,7 @@ export const youtubeService = {
    * @param settings - Настройки YouTube
    * @returns Promise с ответом API
    */
-  async saveSettings(settings: Partial<YouTubeSettings>): Promise<AxiosResponse<ApiResponse<YouTubeSettings>>> {
+  async saveSettings(settings: Partial<YoutubeSettings>): Promise<AxiosResponse<YoutubeSettings>> {
     return apiClient.post('/api/tts/youtube-settings', settings);
   },
 
@@ -90,7 +92,7 @@ export const youtubeService = {
    * Получить OBS URL для YouTube
    * @returns Promise с ответом API
    */
-  async getObsUrl(): Promise<AxiosResponse<ApiResponse>> {
+  async getObsUrl(): Promise<AxiosResponse<YoutubeObsUrlResponse>> {
     return apiClient.get('/api/tts/obs-url');
   },
 
@@ -98,7 +100,7 @@ export const youtubeService = {
    * Сгенерировать OBS URL для YouTube
    * @returns Promise с ответом API
    */
-  async generateObsUrl(): Promise<AxiosResponse<ApiResponse>> {
+  async generateObsUrl(): Promise<AxiosResponse<{ youtube_obs_url: string }>> {
     return apiClient.post('/api/youtube/generate-obs-url');
   },
 
@@ -106,7 +108,7 @@ export const youtubeService = {
    * Регенерировать OBS URL для YouTube
    * @returns Promise с ответом API
    */
-  async regenerateObsUrl(): Promise<AxiosResponse<ApiResponse>> {
+  async regenerateObsUrl(): Promise<AxiosResponse<{ youtube_obs_url: string }>> {
     return apiClient.post('/api/youtube/regenerate-obs-url');
   },
 };

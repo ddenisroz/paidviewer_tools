@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
+
 import { useAuth } from '../context/AuthContext';
-import cacheManager, { CACHE_CONFIG } from '../utils/cacheManager';
-import useSharedWebSocket from './useSharedWebSocket';
+import cacheManager, { CACHE_CONFIG, CacheConfigValue } from '../utils/cacheManager';
 import Logger from '../utils/prodLogger';
+
+import useSharedWebSocket from './useSharedWebSocket';
 
 const logger = new Logger('CACHE_SYNC');
 
@@ -52,7 +54,7 @@ export const useCacheWebSocketSync = (): null => {
   const { user, isAuthenticated } = authContext || {};
   const userId = user?.id;
 
-  const handleWebSocketMessage = (data: any) => {
+  const handleWebSocketMessage = (data: Record<string, unknown>) => {
     // Проверка authContext внутри обработчика
     if (!authContext) {
       return;
@@ -60,22 +62,22 @@ export const useCacheWebSocketSync = (): null => {
     
     try {
       if (data.type === 'cache_invalidate') {
-        logger.info(`[CACHE] Received invalidation for: ${data.cache_key}`);
+        logger.info(`[CACHE] Received invalidation for: ${String(data.cache_key)}`);
         const cacheType = Object.values(CACHE_CONFIG).find((config) => config.key === data.cache_key);
         if (cacheType) {
-          cacheManager.invalidate(cacheType as any);
-          logger.debug(`[CACHE] CacheManager invalidated: ${data.cache_key}`);
+          cacheManager.invalidate(cacheType as CacheConfigValue);
+          logger.debug(`[CACHE] CacheManager invalidated: ${String(data.cache_key)}`);
         } else {
-          logger.debug(`[CACHE] No CacheManager config for: ${data.cache_key}`);
+          logger.debug(`[CACHE] No CacheManager config for: ${String(data.cache_key)}`);
         }
-        const queryKeys = getQueryKeysForCacheKey(data.cache_key);
+        const queryKeys = getQueryKeysForCacheKey(String(data.cache_key));
         if (queryKeys.length > 0) {
           queryKeys.forEach((queryKey) => {
             queryClient.invalidateQueries({ queryKey });
             logger.debug(`[CACHE] React Query invalidated: ${JSON.stringify(queryKey)}`);
           });
         } else {
-          logger.warn(`[CACHE] No React Query keys mapped for: ${data.cache_key}`);
+          logger.warn(`[CACHE] No React Query keys mapped for: ${String(data.cache_key)}`);
         }
       }
     } catch (error) {

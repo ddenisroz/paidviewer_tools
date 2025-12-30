@@ -2,7 +2,8 @@
  * OptimizedImage Component
  * Provides lazy loading and optimized image rendering
  */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+
 import { cn } from '@/lib/utils';
 
 interface OptimizedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {

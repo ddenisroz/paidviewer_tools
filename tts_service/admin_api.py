@@ -154,7 +154,7 @@ async def upload_voice(
             temp_file.write(contents)
             temp_input_path = temp_file.name
         
-        logger.info(f"📥 Voice file uploaded to temp: {temp_input_path}")
+        logger.info(f"[RECEIVE] Voice file uploaded to temp: {temp_input_path}")
         
         # Конвертируем в WAV с требованиями F5-TTS (48kHz, Mono, 16-bit)
         temp_converted_path = tempfile.mktemp(suffix='.wav')
@@ -169,7 +169,7 @@ async def upload_voice(
             if not success:
                 raise Exception("Audio conversion failed")
             
-            logger.info(f"✅ Audio converted to WAV: {temp_converted_path}")
+            logger.info(f"[OK] Audio converted to WAV: {temp_converted_path}")
         finally:
             await converter.stop_workers()
         
@@ -179,11 +179,11 @@ async def upload_voice(
             from tts_service.tts_engine import tts_engine_manager
             if tts_engine_manager.transcriber:
                 reference_text = tts_engine_manager.transcribe(temp_converted_path)
-                logger.info(f"✅ Audio transcribed: '{reference_text[:50]}...'")
+                logger.info(f"[OK] Audio transcribed: '{reference_text[:50]}...'")
             else:
-                logger.warning("⚠️ Transcriber not available, skipping transcription")
+                logger.warning("[WARN] Transcriber not available, skipping transcription")
         except Exception as e:
-            logger.warning(f"⚠️ Transcription failed: {e}, continuing without reference text")
+            logger.warning(f"[WARN] Transcription failed: {e}, continuing without reference text")
         
         # Сохраняем в финальную директорию
         voices_dir = Path("audio/voices/global")
@@ -197,7 +197,7 @@ async def upload_voice(
         import shutil
         shutil.copy2(temp_converted_path, final_voice_path)
         
-        logger.info(f"✅ Voice saved: {final_voice_path}")
+        logger.info(f"[OK] Voice saved: {final_voice_path}")
         
         # Создаём запись в БД
         # Используем значения из конфига для дефолтных настроек
@@ -217,7 +217,7 @@ async def upload_voice(
         db.commit()
         db.refresh(new_voice)
         
-        logger.info(f"✅ Global voice '{voice_name}' uploaded successfully by admin user {current_user.get('user_id')} (Voice ID: {new_voice.id})")
+        logger.info(f"[OK] Global voice '{voice_name}' uploaded successfully by admin user {current_user.get('user_id')} (Voice ID: {new_voice.id})")
         
         return {
             "status": "success",
@@ -250,13 +250,13 @@ async def upload_voice(
         if temp_input_path and os.path.exists(temp_input_path):
             try:
                 os.unlink(temp_input_path)
-            except:
+            except OSError:
                 pass
         
         if temp_converted_path and os.path.exists(temp_converted_path):
             try:
                 os.unlink(temp_converted_path)
-            except:
+            except OSError:
                 pass
 
 @admin_router.post("/voices/{voice_id}/retranscribe")
@@ -272,7 +272,7 @@ async def retranscribe_voice(voice_id: int, db: Session = Depends(get_db)):
         if not voice.file_path or not os.path.exists(voice.file_path):
             raise HTTPException(status_code=404, detail="Аудиофайл не найден")
         
-        logger.info(f"🔄 Starting retranscription for voice {voice_id} ({voice.name})")
+        logger.info(f"[REFRESH] Starting retranscription for voice {voice_id} ({voice.name})")
         
         # Транскрибируем аудио
         reference_text = ""
@@ -280,11 +280,11 @@ async def retranscribe_voice(voice_id: int, db: Session = Depends(get_db)):
             from tts_service.tts_engine import tts_engine_manager
             if tts_engine_manager.transcriber:
                 reference_text = tts_engine_manager.transcribe(voice.file_path)
-                logger.info(f"✅ Retranscribed: '{reference_text[:50]}...'")
+                logger.info(f"[OK] Retranscribed: '{reference_text[:50]}...'")
             else:
                 raise Exception("Transcriber not available")
         except Exception as e:
-            logger.error(f"❌ Transcription failed: {e}")
+            logger.error(f"[ERROR] Transcription failed: {e}")
             raise HTTPException(status_code=500, detail=f"Ошибка транскрибации: {str(e)}")
         
         # Обновляем reference_text в БД
@@ -292,7 +292,7 @@ async def retranscribe_voice(voice_id: int, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(voice)
         
-        logger.info(f"✅ Voice {voice_id} retranscribed successfully")
+        logger.info(f"[OK] Voice {voice_id} retranscribed successfully")
         
         return {
             "status": "success",
@@ -332,7 +332,7 @@ async def test_voice(
         if voice.owner_id and user_id and voice.owner_id != user_id:
             raise HTTPException(status_code=403, detail="Access denied")
         
-        logger.info(f"🎤 Testing voice '{voice_name}' with text: '{test_text[:50]}...'")
+        logger.info(f"[TTS] Testing voice '{voice_name}' with text: '{test_text[:50]}...'")
         
         # Используем переданные параметры или значения по умолчанию из голоса
         cfg = cfg_strength if cfg_strength is not None else voice.cfg_strength
@@ -363,7 +363,7 @@ async def test_voice(
         
         # Если есть audio_url, используем его напрямую
         if audio_url:
-            logger.info(f"✅ Test synthesis completed: {audio_url}")
+            logger.info(f"[OK] Test synthesis completed: {audio_url}")
             return {
                 "status": "success",
                 "audio_url": audio_url,
@@ -388,7 +388,7 @@ async def test_voice(
                     # Если файл находится вне audio, пытаемся найти его имя
                     audio_url = f"/audio/{audio_path_obj.name}"
                     
-                logger.info(f"✅ Test synthesis completed: {audio_url}")
+                logger.info(f"[OK] Test synthesis completed: {audio_url}")
                 return {
                     "status": "success",
                     "audio_url": audio_url,
@@ -465,7 +465,7 @@ async def update_voice_settings(
         db.commit()
         db.refresh(voice)
         
-        logger.info(f"✅ Voice {voice_id} settings updated")
+        logger.info(f"[OK] Voice {voice_id} settings updated")
         
         return {
             "status": "success",
@@ -591,7 +591,7 @@ async def update_voice_settings(
         db.commit()
         db.refresh(voice)
         
-        logger.info(f"✅ Admin updated voice {voice_id} settings")
+        logger.info(f"[OK] Admin updated voice {voice_id} settings")
         
         return {
             "success": True,
@@ -627,15 +627,15 @@ async def delete_voice(
         if voice.file_path and os.path.exists(voice.file_path):
             try:
                 os.remove(voice.file_path)
-                logger.info(f"✅ Deleted voice file: {voice.file_path}")
+                logger.info(f"[OK] Deleted voice file: {voice.file_path}")
             except Exception as e:
-                logger.warning(f"⚠️ Failed to delete voice file: {e}")
+                logger.warning(f"[WARN] Failed to delete voice file: {e}")
         
         # Delete from database
         db.delete(voice)
         db.commit()
         
-        logger.info(f"✅ Admin deleted voice {voice_id}")
+        logger.info(f"[OK] Admin deleted voice {voice_id}")
         
         return {
             "success": True,
@@ -675,7 +675,7 @@ async def rename_voice_endpoint(
         voice.name = new_name
         db.commit()
         
-        logger.info(f"✅ Admin renamed voice {voice_id} from '{old_name}' to '{new_name}'")
+        logger.info(f"[OK] Admin renamed voice {voice_id} from '{old_name}' to '{new_name}'")
         
         return {
             "success": True,

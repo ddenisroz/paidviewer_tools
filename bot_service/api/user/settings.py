@@ -1,9 +1,8 @@
 # bot_service/api/user/settings.py
 """User-specific settings endpoints"""
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from core.database import get_db, User, UserSettings, TTSUserSettings, AudioSettings
+from core.database import get_db, UserSettings, TTSUserSettings, AudioSettings
 from auth.auth import get_current_user
 from core.permissions import require_permission, Permission, require_ownership_or_admin
 from typing import Optional
@@ -56,12 +55,12 @@ async def get_my_settings(
     """
     try:
         user_id = current_user.get('id')
-        
+
         # Get user settings
         settings = db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
         tts_settings = db.query(TTSUserSettings).filter(TTSUserSettings.user_id == user_id).first()
         audio_settings = db.query(AudioSettings).filter(AudioSettings.user_id == user_id).first()
-        
+
         return {
             "success": True,
             "settings": {
@@ -106,13 +105,13 @@ async def update_my_settings(
     """
     try:
         user_id = current_user.get('id')
-        
+
         # Get or create settings
         settings = db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
         if not settings:
             settings = UserSettings(user_id=user_id)
             db.add(settings)
-        
+
         # Update fields if provided
         if request.chat_enabled is not None:
             settings.chat_enabled = request.chat_enabled
@@ -132,11 +131,11 @@ async def update_my_settings(
             settings.obs_background_color = request.obs_background_color
         if request.obs_text_color is not None:
             settings.obs_text_color = request.obs_text_color
-        
+
         db.commit()
-        
+
         logger.info(f"User {user_id} updated their settings")
-        
+
         return {
             "success": True,
             "message": "Settings updated successfully"
@@ -161,42 +160,42 @@ async def update_my_tts_settings(
     """
     try:
         user_id = current_user.get('id')
-        
+
         # Get or create TTS settings
         tts_settings = db.query(TTSUserSettings).filter(TTSUserSettings.user_id == user_id).first()
         if not tts_settings:
             tts_settings = TTSUserSettings(user_id=user_id)
             db.add(tts_settings)
-        
+
         # Update fields if provided
         if request.engine is not None:
             valid_engines = ['gtts', 'f5tts']
             if request.engine not in valid_engines:
                 raise HTTPException(status_code=400, detail=f"Invalid engine. Must be one of: {valid_engines}")
             tts_settings.engine = request.engine
-        
+
         if request.voice is not None:
             tts_settings.voice = request.voice
-        
+
         if request.listening_mode is not None:
             valid_modes = ['website', 'obs']
             if request.listening_mode not in valid_modes:
                 raise HTTPException(status_code=400, detail=f"Invalid listening mode. Must be one of: {valid_modes}")
             tts_settings.listening_mode = request.listening_mode
-        
+
         if request.enabled_platforms is not None:
             tts_settings.enabled_platforms = request.enabled_platforms
-        
+
         if request.tts_mode is not None:
             valid_modes = ['all_messages', 'channel_points']
             if request.tts_mode not in valid_modes:
                 raise HTTPException(status_code=400, detail=f"Invalid TTS mode. Must be one of: {valid_modes}")
             tts_settings.tts_mode = request.tts_mode
-        
+
         db.commit()
-        
+
         logger.info(f"User {user_id} updated their TTS settings")
-        
+
         return {
             "success": True,
             "message": "TTS settings updated successfully"
@@ -223,28 +222,28 @@ async def update_my_audio_settings(
     """
     try:
         user_id = current_user.get('id')
-        
+
         # Get or create audio settings
         audio_settings = db.query(AudioSettings).filter(AudioSettings.user_id == user_id).first()
         if not audio_settings:
             audio_settings = AudioSettings(user_id=user_id)
             db.add(audio_settings)
-        
+
         # Update fields if provided
         if request.website_volume is not None:
             if not 0 <= request.website_volume <= 100:
                 raise HTTPException(status_code=400, detail="Volume must be between 0 and 100")
             audio_settings.website_volume = request.website_volume
-        
+
         if request.obs_volume is not None:
             if not 0 <= request.obs_volume <= 100:
                 raise HTTPException(status_code=400, detail="Volume must be between 0 and 100")
             audio_settings.obs_volume = request.obs_volume
-        
+
         db.commit()
-        
+
         logger.info(f"User {user_id} updated their audio settings")
-        
+
         return {
             "success": True,
             "message": "Audio settings updated successfully"
@@ -274,7 +273,7 @@ async def get_user_settings(
         settings = db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
         tts_settings = db.query(TTSUserSettings).filter(TTSUserSettings.user_id == user_id).first()
         audio_settings = db.query(AudioSettings).filter(AudioSettings.user_id == user_id).first()
-        
+
         return {
             "success": True,
             "settings": {

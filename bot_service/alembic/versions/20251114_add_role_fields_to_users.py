@@ -21,17 +21,17 @@ def upgrade():
     # Add application role field
     op.add_column('users', sa.Column('role', sa.String(), nullable=False, server_default='user'))
     op.create_index(op.f('ix_users_role'), 'users', ['role'], unique=False)
-    
+
     # Add Twitch platform role fields
     op.add_column('users', sa.Column('twitch_is_broadcaster', sa.Boolean(), nullable=False, server_default='false'))
     op.add_column('users', sa.Column('twitch_is_moderator', sa.Boolean(), nullable=False, server_default='false'))
     op.add_column('users', sa.Column('twitch_is_vip', sa.Boolean(), nullable=False, server_default='false'))
     op.add_column('users', sa.Column('twitch_is_subscriber', sa.Boolean(), nullable=False, server_default='false'))
-    
+
     # Add VK platform role fields
     op.add_column('users', sa.Column('vk_is_owner', sa.Boolean(), nullable=False, server_default='false'))
     op.add_column('users', sa.Column('vk_is_moderator', sa.Boolean(), nullable=False, server_default='false'))
-    
+
     # Migrate existing is_admin users to admin role
     op.execute("UPDATE users SET role = 'admin' WHERE is_admin = true")
 
@@ -41,13 +41,13 @@ def downgrade():
     # Remove VK platform role fields
     op.drop_column('users', 'vk_is_moderator')
     op.drop_column('users', 'vk_is_owner')
-    
+
     # Remove Twitch platform role fields
     op.drop_column('users', 'twitch_is_subscriber')
     op.drop_column('users', 'twitch_is_vip')
     op.drop_column('users', 'twitch_is_moderator')
     op.drop_column('users', 'twitch_is_broadcaster')
-    
+
     # Remove application role field
     op.drop_index(op.f('ix_users_role'), table_name='users')
     op.drop_column('users', 'role')

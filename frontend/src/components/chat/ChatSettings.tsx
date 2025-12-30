@@ -1,11 +1,13 @@
-// src/components/chat/ChatSettings.tsx
+﻿// src/components/chat/ChatSettings.tsx
 import React from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+
+import { Copy, MessageCircle, Settings } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Settings, MessageCircle, Copy } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/utils/toastManager';
 
 interface ObsSettings {
     width: number;

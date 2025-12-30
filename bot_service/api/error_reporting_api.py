@@ -2,7 +2,6 @@
 API для отчетов об ошибках от frontend
 """
 import logging
-from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
@@ -43,13 +42,14 @@ async def report_frontend_error(
     """
     user_id = current_user.get("id") if current_user else None
     user_name = current_user.get("username") if current_user else "anonymous"
-    
+
     # Логируем ошибку с полным контекстом
+    # NOTE: 'message' is a reserved field in LogRecord, use 'error_message' instead
     logger.error(
         f"Frontend error: {error.type} - {error.message}",
         extra={
             "error_type": error.type,
-            "message": error.message,
+            "error_message": error.message,
             "url": error.url,
             "route": error.route,
             "feature": error.feature,
@@ -62,7 +62,7 @@ async def report_frontend_error(
             "component_stack": error.componentStack,
         },
     )
-    
+
     return {
         "success": True,
         "message": "Error report received",
@@ -76,10 +76,15 @@ async def get_error_stats(
 ):
     """
     Получить статистику ошибок (для админов)
+    
+    Note: Для полной реализации требуется создать таблицу ErrorLog в базе данных.
+    Сейчас ошибки логируются в файл logs/bot_service.log через structlog.
     """
-    # TODO: Реализовать когда будет таблица ErrorLog
+    # Ошибки логируются через structlog в logs/bot_service.log
+    # Для статистики можно парсить лог-файл или создать таблицу ErrorLog
     return {
         "total_errors": 0,
         "errors_by_type": {},
         "recent_errors": [],
+        "message": "Error logging is active. Errors are stored in logs/bot_service.log"
     }

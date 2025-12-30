@@ -1,5 +1,6 @@
 import * as React from "react"
-import { useState, useRef } from "react"
+import { useRef, useState } from "react"
+
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 
@@ -35,8 +36,7 @@ interface DialogContentProps extends React.ComponentPropsWithoutRef<typeof Dialo
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DialogContentProps
->(({ className, children, closeOnOverlayClick = true, closeOnEscape = true, ...props }, ref) => {
-  const [isVisible, setIsVisible] = useState(false);
+>(({ className, children, closeOnOverlayClick = true, closeOnEscape = true, ...props }, _ref) => {
   const [isAnimating, setIsAnimating] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -57,13 +57,11 @@ const DialogContent = React.forwardRef<
         setOpen(prevOpen => {
           if (prevOpen !== isOpen) {
             if (isOpen) {
-              setIsVisible(true);
               setIsAnimating(true);
               setTimeout(() => setIsAnimating(false), 50);
             } else {
               setIsAnimating(true);
               setTimeout(() => {
-                setIsVisible(false);
                 setIsAnimating(false);
               }, 200);
             }

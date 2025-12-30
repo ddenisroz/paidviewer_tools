@@ -1,20 +1,25 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertCircle, Edit, Globe, Loader2, Mic, RefreshCw, Settings, TestTube2, Trash2, Upload, User as UserIcon, Users, Volume2, X } from 'lucide-react';
 import ReactDOM from 'react-dom';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { PageLoader } from '@/components/ui/loader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Upload, Trash2, Edit, Users, Globe, Settings, TestTube2, Mic, Loader2, RefreshCw, Volume2, X, User as UserIcon, AlertCircle } from 'lucide-react';
 import { Slider } from "@/components/ui/slider";
-import { getAdminVoices, uploadVoice, deleteVoice, updateVoiceSettings, transcribeVoice, retranscribeVoice, testVoice, getUsers, renameVoice } from '../../../services/unified-api';
-import { useAuth } from '../../../context/AuthContext';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
+
 import { TTS_SERVICE_URL } from '../../../constants';
+import { useAuth } from '../../../context/AuthContext';
+import { deleteVoice, getAdminVoices, getUsers, renameVoice, retranscribeVoice, testVoice, transcribeVoice, updateVoiceSettings, uploadVoice } from '../../../services/unified-api';
 import { logger } from '../../../utils/prodLogger';
+
 import type { TtsVoice } from '../../../types/tts';
 
 interface VoiceManagementUser {
@@ -63,6 +68,7 @@ const VoiceManagement: React.FC = () => {
     
     // Состояние для фильтрации
     const [selectedUserFilter, setSelectedUserFilter] = useState<string>('all');
+    const [searchQuery, setSearchQuery] = useState<string>('');
     
     // Состояние для загрузки
     const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -80,23 +86,27 @@ const VoiceManagement: React.FC = () => {
     const { user } = useAuth();
     const audioContext: AudioContext | null = null;
     const audioSource: AudioBufferSourceNode | null = null;
+    // Note: audioContext and audioSource are declared but not used in this component
+    // They are kept for potential future audio processing features
+    void audioContext;
+    void audioSource;
 
     // React Query: загружаем голоса для админа
     const { data: voicesData = [], isLoading: voicesLoading, error: voicesError } = useQuery<TtsVoice[]>({
         queryKey: ['admin-voices'],
         queryFn: async (): Promise<TtsVoice[]> => {
-            logger.log('🔍 [ADMIN] Fetching voices...');
+            logger.log('[DEBUG] [ADMIN] Fetching voices...');
             const response = await getAdminVoices();
-            logger.log('🔍 [ADMIN] Raw response:', response);
+            logger.log('[DEBUG] [ADMIN] Raw response:', response);
             
             const apiResponse = response as ApiResponse;
             const data = apiResponse?.data || response;
-            logger.log('🔍 [ADMIN] Extracted data:', data);
+            logger.log('[DEBUG] [ADMIN] Extracted data:', data);
             
             const dataWithWarning = data as { warning?: string };
             if (dataWithWarning?.warning) {
                 setTtsServiceWarning(dataWithWarning.warning);
-                logger.warn('⚠️ [ADMIN] TTS Service warning:', dataWithWarning.warning);
+                logger.warn('[WARN] [ADMIN] TTS Service warning:', dataWithWarning.warning);
             } else {
                 setTtsServiceWarning(null);
             }
@@ -104,45 +114,45 @@ const VoiceManagement: React.FC = () => {
             let voicesArray: TtsVoice[] = [];
             if (Array.isArray(data)) {
                 voicesArray = data as TtsVoice[];
-                logger.log('✅ [ADMIN] Data is array, using directly');
+                logger.log('[OK] [ADMIN] Data is array, using directly');
             } else {
                 const dataObj = data as { status?: string; success?: boolean; voices?: TtsVoice[] | VoicesResponse; data?: TtsVoice[]; global_voices?: TtsVoice[]; user_voices?: TtsVoice[] };
                 
                 if (dataObj?.status === 'success' && Array.isArray(dataObj.voices)) {
                     voicesArray = dataObj.voices;
-                    logger.log('✅ [ADMIN] Found voices in data.voices (status: success)');
+                    logger.log('[OK] [ADMIN] Found voices in data.voices (status: success)');
                 } else if (Array.isArray(dataObj?.voices)) {
                     voicesArray = dataObj.voices;
-                    logger.log('✅ [ADMIN] Found voices array in data.voices');
+                    logger.log('[OK] [ADMIN] Found voices array in data.voices');
                 } else if (dataObj?.success && typeof dataObj.voices === 'object' && dataObj.voices !== null) {
-                    // ✅ ИСПРАВЛЕНИЕ: Обрабатываем случай когда voices - это объект с global_voices и user_voices
+                    // [OK] ИСПРАВЛЕНИЕ: Обрабатываем случай когда voices - это объект с global_voices и user_voices
                     const voicesObj = dataObj.voices as VoicesResponse;
                     voicesArray = [
                         ...(voicesObj.global_voices || []),
                         ...(voicesObj.user_voices || [])
                     ];
-                    logger.log('✅ [ADMIN] Found voices object with global/user voices:', voicesArray.length);
+                    logger.log('[OK] [ADMIN] Found voices object with global/user voices:', voicesArray.length);
                 } else if (dataObj?.success && Array.isArray(dataObj.voices)) {
                     voicesArray = dataObj.voices;
-                    logger.log('✅ [ADMIN] Found voices in success response');
+                    logger.log('[OK] [ADMIN] Found voices in success response');
                 } else if (Array.isArray(dataObj?.data)) {
                     voicesArray = dataObj.data;
-                    logger.log('✅ [ADMIN] Found voices in data.data');
+                    logger.log('[OK] [ADMIN] Found voices in data.data');
                 } else if (Array.isArray(dataObj?.global_voices) || Array.isArray(dataObj?.user_voices)) {
                     voicesArray = [
                         ...(dataObj.global_voices || []),
                         ...(dataObj.user_voices || [])
                     ];
-                    logger.log('✅ [ADMIN] Combined global and user voices:', voicesArray.length);
+                    logger.log('[OK] [ADMIN] Combined global and user voices:', voicesArray.length);
                 } else {
-                    logger.warn('⚠️ [ADMIN] Could not extract voices array from response:', data);
+                    logger.warn('[WARN] [ADMIN] Could not extract voices array from response:', data);
                     voicesArray = [];
                 }
             }
             
-            logger.log('✅ [ADMIN] Loaded voices:', voicesArray.length, 'voices');
+            logger.log('[OK] [ADMIN] Loaded voices:', voicesArray.length, 'voices');
             if (voicesArray.length > 0) {
-                logger.log('✅ [ADMIN] First voice sample:', voicesArray[0]);
+                logger.log('[OK] [ADMIN] First voice sample:', voicesArray[0]);
             }
             return voicesArray;
         },
@@ -154,7 +164,7 @@ const VoiceManagement: React.FC = () => {
     // Handle errors from the query
     useEffect(() => {
         if (voicesError) {
-            logger.error('❌ [ADMIN] Error loading voices:', voicesError);
+            logger.error('[ERROR] [ADMIN] Error loading voices:', voicesError);
             const error = voicesError as { message?: string; code?: string; response?: { status?: number; data?: { detail?: string } } };
             
             if (error.message?.includes('connection') || error.message?.includes('timeout') || error.code === 'ECONNREFUSED') {
@@ -505,8 +515,8 @@ const VoiceManagement: React.FC = () => {
             ));
             
             addToast({ type: 'success', title: 'Успех', message: 'Транскрипция завершена успешно!' });
-        } catch (error) {
-            logger.error('Error transcribing voice:', error);
+        } catch {
+            logger.error('Error transcribing voice');
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось выполнить транскрипцию аудио.' });
         } finally {
             setIsTranscribing(false);
@@ -566,6 +576,14 @@ const VoiceManagement: React.FC = () => {
                             Всего: {voices.length}
                         </Badge>
                     </div>
+                    <div className="flex gap-4">
+                        <Input
+                            placeholder="Поиск по имени голоса..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="max-w-xs"
+                        />
+                    </div>
                  </CardHeader>
                  <CardContent>
                     {ttsServiceWarning && (
@@ -573,7 +591,7 @@ const VoiceManagement: React.FC = () => {
                             <div className="flex items-start gap-3">
                                 <AlertCircle className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
                                 <div className="flex-1">
-                                    <p className="text-yellow-300 font-semibold mb-1">⚠️ TTS Сервис недоступен</p>
+                                    <p className="text-yellow-300 font-semibold mb-1">[WARN] TTS Сервис недоступен</p>
                                     <p className="text-yellow-400/80 text-sm">{ttsServiceWarning}</p>
                                     <p className="text-yellow-400/60 text-xs mt-2">
                                         Убедитесь, что TTS сервис запущен и доступен по адресу указанному в переменной окружения TTS_SERVICE_URL.
@@ -592,10 +610,7 @@ const VoiceManagement: React.FC = () => {
                     )}
                     <div className="space-y-8">
                          {loading ? (
-                             <div className="flex items-center justify-center py-12">
-                                 <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
-                                 <span className="ml-3 text-gray-400">Загрузка голосов...</span>
-                             </div>
+                             <PageLoader message="Загрузка голосов..." />
                          ) : (
                              <>
                                  <div>
@@ -626,7 +641,8 @@ const VoiceManagement: React.FC = () => {
                                      {(() => {
                                          const userVoices = voices.filter(v => 
                                              v.voice_type === 'user' && 
-                                             (selectedUserFilter === 'all' || v.owner_id === parseInt(selectedUserFilter))
+                                             (selectedUserFilter === 'all' || v.owner_id === parseInt(selectedUserFilter)) &&
+                                             (searchQuery === '' || v.name.toLowerCase().includes(searchQuery.toLowerCase()))
                                          );
                                          return userVoices.length === 0 ? (
                                              <div className="text-center py-12 bg-gray-800/30 rounded-lg border border-gray-700 border-dashed">
@@ -707,7 +723,10 @@ const VoiceManagement: React.FC = () => {
                                          </p>
                                      </div>
                                      {(() => {
-                                         const globalVoices = voices.filter(v => v.voice_type === 'global');
+                                         const globalVoices = voices.filter(v => 
+                                             v.voice_type === 'global' &&
+                                             (searchQuery === '' || v.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                                         );
                                          return globalVoices.length === 0 ? (
                                              <div className="text-center py-12 bg-gray-800/30 rounded-lg border border-gray-700 border-dashed">
                                                  <Globe className="h-16 w-16 text-gray-600 mx-auto mb-4" />
@@ -893,7 +912,12 @@ const VoiceManagement: React.FC = () => {
                                     disabled={isUploading || !uploadFile || !voiceName.trim() || (ownerId === 'user' && !selectedUserId)}
                                     className="w-36 bg-green-600 hover:bg-green-700"
                                 >
-                                    {isUploading ? 'Загрузка...' : 'Загрузить'}
+                                    {isUploading ? (
+                                        <span className="flex items-center gap-2">
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            Загрузка...
+                                        </span>
+                                    ) : 'Загрузить'}
                                 </Button>
                             </div>
                         </div>
@@ -993,7 +1017,7 @@ const VoiceManagement: React.FC = () => {
                                                 className="mt-2"
                                             />
                                             <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded mt-1">
-                                                💡 <strong>Стабильность:</strong> Влияет на стабильность и консистентность речи. 
+                                                [INFO] <strong>Стабильность:</strong> Влияет на стабильность и консистентность речи. 
                                                 Рекомендуемое значение 2.5. Слишком высокое значение может сделать речь роботизированной.
                                             </div>
                                         </div>
@@ -1034,7 +1058,7 @@ const VoiceManagement: React.FC = () => {
                                                 <span>Очень быстрый</span>
                                             </div>
                                             <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded mt-1">
-                                                💡 <strong>Скорость:</strong> Подберите подходящий пресет. Сильно быстрый может обрывать конец фразы. 
+                                                [INFO] <strong>Скорость:</strong> Подберите подходящий пресет. Сильно быстрый может обрывать конец фразы. 
                                                 Слишком медленный может тормозить речь. Начните с "Нормальный" и корректируйте по результату.
                                             </div>
                                         </div>

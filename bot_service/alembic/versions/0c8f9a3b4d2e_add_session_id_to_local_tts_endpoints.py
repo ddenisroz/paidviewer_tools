@@ -19,12 +19,12 @@ depends_on = None
 def upgrade():
     # Делаем user_id nullable и добавляем session_id
     with op.batch_alter_table('local_tts_endpoints', schema=None) as batch_op:
-        batch_op.alter_column('user_id', 
-                              existing_type=sa.INTEGER(), 
+        batch_op.alter_column('user_id',
+                              existing_type=sa.INTEGER(),
                               nullable=True)
         batch_op.add_column(sa.Column('session_id', sa.String(), nullable=True))
         batch_op.create_index('ix_local_tts_endpoints_session_id', ['session_id'])
-        
+
         # Добавляем constraint: должен быть заполнен либо user_id, либо session_id
         batch_op.create_check_constraint(
             'check_user_or_session_local_tts',

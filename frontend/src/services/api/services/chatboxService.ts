@@ -2,8 +2,9 @@
  * Chatbox Service - инкапсуляция всех Chatbox API вызовов
  */
 import { apiClient } from '../client';
-import type { AxiosResponse } from 'axios';
+
 import type { ApiResponse } from '../../../types';
+import type { AxiosResponse } from 'axios';
 
 /**
  * Chatbox Service
@@ -23,7 +24,7 @@ export const chatboxService = {
    * @param regenerateToken - Регенерировать токен виджета
    * @returns Promise с ответом API
    */
-  async saveSettings(settings: Record<string, any>, regenerateToken: boolean = false): Promise<AxiosResponse<ApiResponse>> {
+  async saveSettings(settings: Record<string, unknown>, regenerateToken: boolean = false): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.post('/api/chatbox/settings', settings, {
       params: { regenerate_token: regenerateToken },
     });
@@ -43,7 +44,7 @@ export const chatboxService = {
    * @param config - Конфигурация виджета
    * @returns Promise с ответом API
    */
-  async saveWidgetConfig(config: Record<string, any>): Promise<AxiosResponse<ApiResponse>> {
+  async saveWidgetConfig(config: Record<string, unknown>): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.post('/api/widgets/chat/config', config);
   },
 };

@@ -1,23 +1,26 @@
 /**
  * Points Queries - централизованные React Query queries для Points
  */
-import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
-import { queryKeys } from '../queryKeys';
-import { pointsService } from '../../services/api/services/pointsService';
+import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
+
+import { pointsService } from '../../services/api/services/pointsService';
 import { logger } from '../../utils/prodLogger';
-import type { AxiosError } from 'axios';
+import { queryKeys } from '../queryKeys';
+
 import type { ApiResponse } from '../../types';
+import type { AxiosError, AxiosRequestConfig } from 'axios';
 
 /**
  * Получить награды платформы
  */
-export const usePlatformRewards = (platform: string, options?: Omit<UseQueryOptions<any, AxiosError>, 'queryKey' | 'queryFn'>) => {
-  return useQuery({
+export const usePlatformRewards = (platform: string, options?: Omit<UseQueryOptions<ApiResponse, AxiosError>, 'queryKey' | 'queryFn'>) => {
+  return useQuery<ApiResponse, AxiosError>({
     queryKey: queryKeys.points.platformRewards(platform),
     queryFn: async () => {
       try {
-        return await pointsService.getPlatformRewards(platform);
+        const response = await pointsService.getPlatformRewards(platform);
+        return response.data;
       } catch (error) {
         const axiosError = error as AxiosError;
         // Логируем только если это не 403 (ожидаемая ошибка для не-партнёров)
@@ -26,7 +29,7 @@ export const usePlatformRewards = (platform: string, options?: Omit<UseQueryOpti
             url: axiosError.config?.url,
             method: axiosError.config?.method,
             status: axiosError.response?.status,
-            retries: axiosError.config?.['axios-retry']?.retryCount || 0
+            retries: (axiosError.config as AxiosRequestConfig & { 'axios-retry'?: { retryCount?: number } })?.['axios-retry']?.retryCount || 0
           });
         }
         throw error;
@@ -50,11 +53,14 @@ export const usePlatformRewards = (platform: string, options?: Omit<UseQueryOpti
 /**
  * Создать награду платформы
  */
-export const useCreatePlatformReward = (platform: string, options?: UseMutationOptions<any, AxiosError, Record<string, any>, unknown>) => {
+export const useCreatePlatformReward = (platform: string, options?: UseMutationOptions<ApiResponse, AxiosError, Record<string, unknown>, unknown>) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (reward: Record<string, any>) => pointsService.createPlatformReward(platform, reward),
+  return useMutation<ApiResponse, AxiosError, Record<string, unknown>>({
+    mutationFn: async (reward: Record<string, unknown>) => {
+      const response = await pointsService.createPlatformReward(platform, reward);
+      return response.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.points.platformRewards(platform) });
       if (!options?.onSuccess) {
@@ -64,7 +70,8 @@ export const useCreatePlatformReward = (platform: string, options?: UseMutationO
     onError: (error: AxiosError) => {
       logger.error('Error creating platform reward:', error);
       if (!options?.onError) {
-        const errorMessage = (error.response?.data as any)?.detail || (error.response?.data as any)?.message || 'Ошибка создания награды';
+        const errorData = error.response?.data as Record<string, unknown> | undefined;
+        const errorMessage = (errorData?.detail || errorData?.message || 'Ошибка создания награды') as string;
         toast.error(errorMessage);
       }
     },
@@ -75,11 +82,14 @@ export const useCreatePlatformReward = (platform: string, options?: UseMutationO
 /**
  * Обновить награду платформы
  */
-export const useUpdatePlatformReward = (platform: string, options?: UseMutationOptions<any, AxiosError, { rewardId: string; reward: Record<string, any> }, unknown>) => {
+export const useUpdatePlatformReward = (platform: string, options?: UseMutationOptions<ApiResponse, AxiosError, { rewardId: string; reward: Record<string, unknown> }, unknown>) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: ({ rewardId, reward }: { rewardId: string; reward: Record<string, any> }) => pointsService.updatePlatformReward(platform, rewardId, reward),
+  return useMutation<ApiResponse, AxiosError, { rewardId: string; reward: Record<string, unknown> }>({
+    mutationFn: async ({ rewardId, reward }: { rewardId: string; reward: Record<string, unknown> }) => {
+      const response = await pointsService.updatePlatformReward(platform, rewardId, reward);
+      return response.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.points.platformRewards(platform) });
       if (!options?.onSuccess) {
@@ -89,7 +99,8 @@ export const useUpdatePlatformReward = (platform: string, options?: UseMutationO
     onError: (error: AxiosError) => {
       logger.error('Error updating platform reward:', error);
       if (!options?.onError) {
-        const errorMessage = (error.response?.data as any)?.detail || (error.response?.data as any)?.message || 'Ошибка обновления награды';
+        const errorData = error.response?.data as Record<string, unknown> | undefined;
+        const errorMessage = (errorData?.detail || errorData?.message || 'Ошибка обновления награды') as string;
         toast.error(errorMessage);
       }
     },
@@ -100,11 +111,14 @@ export const useUpdatePlatformReward = (platform: string, options?: UseMutationO
 /**
  * Удалить награду платформы
  */
-export const useDeletePlatformReward = (platform: string, options?: UseMutationOptions<any, AxiosError, string, unknown>) => {
+export const useDeletePlatformReward = (platform: string, options?: UseMutationOptions<ApiResponse, AxiosError, string, unknown>) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (rewardId: string) => pointsService.deletePlatformReward(platform, rewardId),
+  return useMutation<ApiResponse, AxiosError, string>({
+    mutationFn: async (rewardId: string) => {
+      const response = await pointsService.deletePlatformReward(platform, rewardId);
+      return response.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.points.platformRewards(platform) });
       if (!options?.onSuccess) {
@@ -124,12 +138,15 @@ export const useDeletePlatformReward = (platform: string, options?: UseMutationO
 /**
  * Переключить статус награды платформы
  */
-export const useTogglePlatformReward = (platform: string, options?: UseMutationOptions<any, AxiosError, { rewardId: string; isEnabled: boolean }, unknown>) => {
+export const useTogglePlatformReward = (platform: string, options?: UseMutationOptions<ApiResponse, AxiosError, { rewardId: string; isEnabled: boolean }, unknown>) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: ({ rewardId, isEnabled }: { rewardId: string; isEnabled: boolean }) => pointsService.togglePlatformReward(platform, rewardId, isEnabled),
-    onSuccess: (response, variables) => {
+  return useMutation<ApiResponse, AxiosError, { rewardId: string; isEnabled: boolean }>({
+    mutationFn: async ({ rewardId, isEnabled }: { rewardId: string; isEnabled: boolean }) => {
+      const response = await pointsService.togglePlatformReward(platform, rewardId, isEnabled);
+      return response.data;
+    },
+    onSuccess: (_response, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.points.platformRewards(platform) });
       if (!options?.onSuccess) {
         toast.success(variables.isEnabled ? 'Награда включена' : 'Награда отключена');

@@ -9,10 +9,9 @@ between admin and user functions. It supports both application-level roles
 
 import logging
 from enum import Enum
-from typing import Optional, List, Callable
+from typing import List, Callable
 from functools import wraps
-from fastapi import HTTPException, Depends, status
-from sqlalchemy.orm import Session
+from fastapi import HTTPException, status
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ class Permission(Enum):
     VIEW_ALL_SETTINGS = "view_all_settings"    # View settings of all users
     MANAGE_SYSTEM = "manage_system"            # System configuration, logs
     BLOCK_USERS = "block_users"                # Block/unblock users
-    
+
     # User permissions
     MANAGE_OWN_SETTINGS = "manage_own_settings"  # Update own settings
     MANAGE_OWN_VOICES = "manage_own_voices"      # Upload/delete personal voices
@@ -41,7 +40,7 @@ class Permission(Enum):
     MANAGE_COMMANDS = "manage_commands"          # Create/edit custom commands
     MANAGE_REWARDS = "manage_rewards"            # Create/edit channel rewards
     MANAGE_DROPS = "manage_drops"                # Configure drops system
-    
+
     # Guest permissions
     VIEW_CHAT = "view_chat"                    # View chat messages
     VIEW_PUBLIC_DATA = "view_public_data"      # View public stream info
@@ -55,7 +54,7 @@ class PlatformRole(Enum):
     VIP = "vip"                  # VIP user
     SUBSCRIBER = "subscriber"    # Subscriber
     VIEWER = "viewer"            # Regular viewer
-    
+
     # VK roles (mapped to similar hierarchy)
     OWNER = "owner"              # Channel owner (same as broadcaster)
     # MODERATOR already defined above
@@ -122,7 +121,7 @@ def has_permission(user_role: AppRole, required_permission: Permission) -> bool:
     if user_role not in ROLE_HIERARCHY:
         logger.warning(f"Unknown role: {user_role}")
         return False
-    
+
     return required_permission in ROLE_HIERARCHY[user_role]
 
 
@@ -138,7 +137,7 @@ def get_platform_roles(user, platform: str = "twitch") -> List[PlatformRole]:
         List of platform roles the user has
     """
     roles = [PlatformRole.VIEWER]  # Everyone is at least a viewer
-    
+
     if platform == "twitch":
         if getattr(user, 'twitch_is_broadcaster', False):
             roles.append(PlatformRole.BROADCASTER)
@@ -148,13 +147,13 @@ def get_platform_roles(user, platform: str = "twitch") -> List[PlatformRole]:
             roles.append(PlatformRole.VIP)
         if getattr(user, 'twitch_is_subscriber', False):
             roles.append(PlatformRole.SUBSCRIBER)
-    
+
     elif platform == "vk":
         if getattr(user, 'vk_is_owner', False):
             roles.append(PlatformRole.OWNER)
         if getattr(user, 'vk_is_moderator', False):
             roles.append(PlatformRole.MODERATOR)
-    
+
     return roles
 
 
@@ -172,12 +171,12 @@ def has_platform_role(user, required_role: PlatformRole, platform: str = "twitch
     """
     user_roles = get_platform_roles(user, platform)
     required_level = PLATFORM_ROLE_HIERARCHY.get(required_role, 0)
-    
+
     for role in user_roles:
         user_level = PLATFORM_ROLE_HIERARCHY.get(role, 0)
         if user_level >= required_level:
             return True
-    
+
     return False
 
 
@@ -202,34 +201,35 @@ def require_permission(required_permission: Permission):
                     if hasattr(arg, 'role'):
                         current_user = arg
                         break
-            
+
             if not current_user:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Authentication required"
                 )
-            
+
             # Get user's role
-            user_role_str = getattr(current_user, 'role', 'user')
+            user_role_str = current_user.get('role', 'user') if isinstance(current_user, dict) else getattr(current_user, 'role', 'user')
+            user_id = current_user.get('id', 'unknown') if isinstance(current_user, dict) else getattr(current_user, 'id', 'unknown')
             try:
                 user_role = AppRole(user_role_str)
             except ValueError:
-                logger.warning(f"Invalid role for user {current_user.id}: {user_role_str}")
+                logger.warning(f"Invalid role for user {user_id}: {user_role_str}")
                 user_role = AppRole.USER
-            
+
             # Check permission
             if not has_permission(user_role, required_permission):
                 logger.warning(
-                    f"Permission denied: User {current_user.id} (role: {user_role.value}) "
+                    f"Permission denied: User {user_id} (role: {user_role.value}) "
                     f"attempted to access {required_permission.value}"
                 )
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"Permission denied: {required_permission.value} required"
                 )
-            
+
             return await func(*args, **kwargs)
-        
+
         return wrapper
     return decorator
 
@@ -255,34 +255,35 @@ def require_role(required_role: AppRole):
                     if hasattr(arg, 'role'):
                         current_user = arg
                         break
-            
+
             if not current_user:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Authentication required"
                 )
-            
+
             # Get user's role
-            user_role_str = getattr(current_user, 'role', 'user')
+            user_role_str = current_user.get('role', 'user') if isinstance(current_user, dict) else getattr(current_user, 'role', 'user')
+            user_id = current_user.get('id', 'unknown') if isinstance(current_user, dict) else getattr(current_user, 'id', 'unknown')
             try:
                 user_role = AppRole(user_role_str)
             except ValueError:
-                logger.warning(f"Invalid role for user {current_user.id}: {user_role_str}")
+                logger.warning(f"Invalid role for user {user_id}: {user_role_str}")
                 user_role = AppRole.USER
-            
+
             # Check role
             if user_role != required_role:
                 logger.warning(
-                    f"Role check failed: User {current_user.id} (role: {user_role.value}) "
+                    f"Role check failed: User {user_id} (role: {user_role.value}) "
                     f"attempted to access {required_role.value}-only endpoint"
                 )
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"Access denied: {required_role.value} role required"
                 )
-            
+
             return await func(*args, **kwargs)
-        
+
         return wrapper
     return decorator
 
@@ -306,26 +307,27 @@ def require_platform_role(required_role: PlatformRole, platform: str = "twitch")
                     if hasattr(arg, 'role'):
                         user = arg
                         break
-            
+
             if not user:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Authentication required"
                 )
-            
+
             # Check platform role
             if not has_platform_role(user, required_role, platform):
+                user_id = user.get('id', 'unknown') if isinstance(user, dict) else getattr(user, 'id', 'unknown')
                 logger.warning(
-                    f"Platform role check failed: User {user.id} attempted to access "
+                    f"Platform role check failed: User {user_id} attempted to access "
                     f"{required_role.value}-only operation on {platform}"
                 )
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"Access denied: {required_role.value} role required on {platform}"
                 )
-            
+
             return await func(*args, **kwargs)
-        
+
         return wrapper
     return decorator
 
@@ -349,9 +351,10 @@ def check_resource_ownership(user, resource_user_id: int) -> bool:
             return True
     except ValueError:
         pass
-    
+
     # Check ownership
-    return user.id == resource_user_id
+    user_id = user.get('id') if isinstance(user, dict) else getattr(user, 'id', None)
+    return user_id == resource_user_id
 
 
 def require_ownership_or_admin(resource_user_id_param: str = "user_id"):
@@ -374,7 +377,7 @@ def require_ownership_or_admin(resource_user_id_param: str = "user_id"):
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Authentication required"
                 )
-            
+
             # Extract resource_user_id
             resource_user_id = kwargs.get(resource_user_id_param)
             if resource_user_id is None:
@@ -382,19 +385,20 @@ def require_ownership_or_admin(resource_user_id_param: str = "user_id"):
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Missing parameter: {resource_user_id_param}"
                 )
-            
+
             # Check ownership or admin
             if not check_resource_ownership(current_user, resource_user_id):
+                user_id = current_user.get('id', 'unknown') if isinstance(current_user, dict) else getattr(current_user, 'id', 'unknown')
                 logger.warning(
-                    f"Ownership check failed: User {current_user.id} attempted to access "
+                    f"Ownership check failed: User {user_id} attempted to access "
                     f"resource owned by user {resource_user_id}"
                 )
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Access denied: You can only access your own resources"
                 )
-            
+
             return await func(*args, **kwargs)
-        
+
         return wrapper
     return decorator

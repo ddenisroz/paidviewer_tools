@@ -1,11 +1,14 @@
 /**
  * Username Input Component with validation
  */
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+
+import { AlertCircle, CheckCircle2, Loader2, XCircle } from 'lucide-react';
+
+import { cancelUsernameCheck, debouncedUsernameCheck, validateUsernameFormat } from '../../utils/usernameValidation';
+
 import { Input } from './input';
 import { Label } from './label';
-import { CheckCircle2, XCircle, Loader2, AlertCircle } from 'lucide-react';
-import { validateUsernameFormat, debouncedUsernameCheck, cancelUsernameCheck } from '../../utils/usernameValidation';
 
 interface UsernameInputProps {
   value: string;

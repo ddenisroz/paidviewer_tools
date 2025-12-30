@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class VKPlatform(StreamingPlatform):
     """VK Live streaming platform implementation"""
-    
+
     def __init__(self):
         config = PlatformConfig(
             name='vk',
@@ -23,10 +23,10 @@ class VKPlatform(StreamingPlatform):
             color='#0077FF'
         )
         super().__init__(config)
-        
+
         # Import VKLiveAPI lazily to avoid circular imports
         self._vk_api = None
-    
+
     @property
     def vk_api(self):
         """Lazy load VKLiveAPI instance"""
@@ -34,7 +34,7 @@ class VKPlatform(StreamingPlatform):
             from api.vk_api import VKLiveAPI
             self._vk_api = VKLiveAPI()
         return self._vk_api
-    
+
     async def authenticate(self, code: str) -> Dict[str, Any]:
         """
         Handle VK Live OAuth authentication
@@ -49,7 +49,7 @@ class VKPlatform(StreamingPlatform):
         # This method is here for interface compliance
         # The actual OAuth flow uses the existing vk_auth.py implementation
         raise NotImplementedError("VK authentication is handled by auth/vk_auth.py")
-    
+
     async def get_user_info(self, access_token: str) -> Dict[str, Any]:
         """
         Get VK Live user information
@@ -64,12 +64,12 @@ class VKPlatform(StreamingPlatform):
             user_info = await self.vk_api._get_current_user_info(access_token)
             if not user_info:
                 raise Exception("Failed to get user info from VK Live")
-            
+
             return user_info
         except Exception as e:
             logger.error(f"Error getting VK user info: {e}")
             raise
-    
+
     async def update_stream_title(self, user_id: int, title: str) -> bool:
         """
         Update VK Live stream title
@@ -86,7 +86,7 @@ class VKPlatform(StreamingPlatform):
         except Exception as e:
             logger.error(f"Error updating VK stream title: {e}")
             return False
-    
+
     async def update_stream_category(self, user_id: int, category_id: str) -> bool:
         """
         Update VK Live stream category
@@ -103,7 +103,7 @@ class VKPlatform(StreamingPlatform):
         except Exception as e:
             logger.error(f"Error updating VK stream category: {e}")
             return False
-    
+
     async def search_categories(self, query: str) -> List[Dict[str, Any]]:
         """
         Search for VK Live categories
@@ -123,7 +123,7 @@ class VKPlatform(StreamingPlatform):
         except Exception as e:
             logger.error(f"Error searching VK categories: {e}")
             return []
-    
+
     async def search_categories_for_user(self, query: str, user_id: int) -> List[Dict[str, Any]]:
         """
         Search for VK Live categories for a specific user
@@ -141,7 +141,7 @@ class VKPlatform(StreamingPlatform):
         except Exception as e:
             logger.error(f"Error searching VK categories: {e}")
             return []
-    
+
     async def get_stream_status(self, username: str) -> Optional[Dict[str, Any]]:
         """
         Get current VK Live stream status
@@ -156,7 +156,7 @@ class VKPlatform(StreamingPlatform):
         # This needs to be adapted for VK's authentication model
         logger.warning("get_stream_status called with username, but VK requires user_id")
         return None
-    
+
     async def get_stream_status_for_user(self, user_id: int) -> Optional[Dict[str, Any]]:
         """
         Get current VK Live stream status for a specific user
@@ -173,7 +173,7 @@ class VKPlatform(StreamingPlatform):
         except Exception as e:
             logger.error(f"Error getting VK stream status: {e}")
             return None
-    
+
     async def get_channel_info(self, username: str) -> Optional[Dict[str, Any]]:
         """
         Get VK Live channel information
@@ -187,7 +187,7 @@ class VKPlatform(StreamingPlatform):
         # VK API requires user_id, not username
         logger.warning("get_channel_info called with username, but VK requires user_id")
         return None
-    
+
     async def send_chat_message(self, user_id: int, message: str) -> bool:
         """
         Send message to VK Live chat
@@ -203,7 +203,7 @@ class VKPlatform(StreamingPlatform):
         # For now, return False as it's not implemented in the abstraction
         logger.warning("send_chat_message not yet implemented for VK platform abstraction")
         return False
-    
+
     async def create_reward(self, user_id: int, reward_data: Dict) -> Optional[str]:
         """
         Create VK Live channel points reward
@@ -220,7 +220,7 @@ class VKPlatform(StreamingPlatform):
         except Exception as e:
             logger.error(f"Error creating VK reward: {e}")
             return None
-    
+
     async def update_reward(self, user_id: int, reward_id: str, reward_data: Dict) -> bool:
         """
         Update VK Live channel points reward
@@ -238,7 +238,7 @@ class VKPlatform(StreamingPlatform):
         except Exception as e:
             logger.error(f"Error updating VK reward: {e}")
             return False
-    
+
     async def delete_reward(self, user_id: int, reward_id: str) -> bool:
         """
         Delete VK Live channel points reward
@@ -255,7 +255,7 @@ class VKPlatform(StreamingPlatform):
         except Exception as e:
             logger.error(f"Error deleting VK reward: {e}")
             return False
-    
+
     async def get_user_roles(self, username: str, channel_name: str) -> List[str]:
         """
         Get user roles on a VK Live channel
@@ -269,7 +269,6 @@ class VKPlatform(StreamingPlatform):
         """
         # This would use the existing platform_role_checker utility
         try:
-            from utils.platform_role_checker import PlatformRoleChecker
             # This requires author_data from chat context
             # For now, return empty list as it needs chat integration
             logger.debug(f"get_user_roles called for {username} on {channel_name}")

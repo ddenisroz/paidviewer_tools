@@ -17,11 +17,11 @@ def main():
         updated_count = db.query(ChatBoxSettings).filter(
             ChatBoxSettings.show_badges == False
         ).update({"show_badges": True})
-        
+
         db.commit()
-        print(f"✅ Updated show_badges to True for {updated_count} ChatBoxSettings records")
+        print(f"[OK] Updated show_badges to True for {updated_count} ChatBoxSettings records")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         db.rollback()
     finally:
         db.close()

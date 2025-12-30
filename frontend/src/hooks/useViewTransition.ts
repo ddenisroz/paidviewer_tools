@@ -5,8 +5,9 @@ import { NavigateOptions, To, useNavigate } from 'react-router-dom';
 export function useViewTransition(): (to: To, options?: NavigateOptions) => void {
   const navigate = useNavigate();
   const transitionNavigate = (to: To, options: NavigateOptions = {}) => {
-    if ('startViewTransition' in document && typeof (document as any).startViewTransition === 'function') {
-      (document as any).startViewTransition(() => {
+    const doc = document as Document & { startViewTransition?: (callback: () => void) => void };
+    if ('startViewTransition' in document && typeof doc.startViewTransition === 'function') {
+      doc.startViewTransition(() => {
         navigate(to, options);
       });
     } else {

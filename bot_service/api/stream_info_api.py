@@ -1,8 +1,7 @@
 # bot_service/api/stream_info_api.py
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from auth.auth import get_current_user, get_current_user_optional
-from core.session_manager import session_manager
 from platforms.registry import platform_registry
 from pydantic import BaseModel
 from typing import Optional
@@ -30,14 +29,22 @@ class StreamUpdateRequest(BaseModel):
 
 @router.get("/twitch/stream")
 async def get_twitch_stream(user: dict = Depends(get_current_user)):
-    """Получить информацию о Twitch стриме"""
+    """
+    Получить информацию о Twitch стриме
+    
+    Note: Этот endpoint возвращает базовую информацию.
+    Для полной реализации нужно использовать Twitch API для получения
+    актуальной информации о стриме (is_live, viewers, etc.)
+    """
     try:
-        # TODO: Реализовать получение информации о Twitch стриме
+        # Базовая информация - в будущем можно интегрировать с Twitch API
+        # для получения реального статуса стрима
         return JSONResponse(content={
             "is_live": False,
             "title": "",
             "category": None,
-            "viewers": 0
+            "viewers": 0,
+            "message": "Basic stream info. Use /api/twitch/stream-info for detailed information."
         })
     except Exception as e:
         logger.error(f"Error getting Twitch stream info: {e}")
@@ -50,15 +57,15 @@ async def get_twitch_stream_info(user: dict = Depends(get_current_user)):
         user_id = user.get("id")
         if user_id is None:
             raise HTTPException(status_code=401, detail="User not authenticated")
-        
+
         # Пользователь с ID 0 - это гость, но у него могут быть токены
         logger.info(f"Getting Twitch stream info for user_id: {user_id}")
-        
+
         from api.twitch_api import TwitchAPI
         from core.connection_manager import get_connection_manager
         connection_manager = get_connection_manager()
         twitch_api = TwitchAPI(connection_manager)
-        
+
         # Получаем информацию о канале пользователя через TokenManager
         from core.token_manager import token_manager
         session_id = user.get("session_id")
@@ -68,7 +75,7 @@ async def get_twitch_stream_info(user: dict = Depends(get_current_user)):
             session_id=session_id,
             require_session_check=True  # Проверяем linked_platforms для безопасности
         )
-        
+
         if not tokens:
             logger.warning(f"No Twitch tokens found for user {user_id}")
             return JSONResponse(content={
@@ -80,15 +87,15 @@ async def get_twitch_stream_info(user: dict = Depends(get_current_user)):
                 "started_at": None,
                 "language": "ru"
             })
-        
+
         platform_user_id = tokens["platform_user_id"]
         logger.info(f"Twitch token found for user {user_id}, platform_user_id: {platform_user_id}")
         logger.info(f"Getting channel info for platform_user_id: {platform_user_id}")
-        
+
         # Получаем информацию о канале
         channel_info = await twitch_api.get_channel_info_by_id(platform_user_id)
         logger.info(f"Channel info result: {channel_info}")
-        
+
         if not channel_info:
             logger.warning(f"No channel info found for platform_user_id: {platform_user_id}")
             return JSONResponse(content={
@@ -100,15 +107,15 @@ async def get_twitch_stream_info(user: dict = Depends(get_current_user)):
                 "started_at": None,
                 "language": "ru"
             })
-        
+
         # Получаем информацию о стриме
         stream_info = await twitch_api.get_stream_info_by_id(platform_user_id)
         logger.info(f"Stream info result: {stream_info}")
-        
+
         is_live = stream_info is not None
         channel_name = channel_info.get("broadcaster_name", "").lower() if channel_info else ""
-        
-        # ✅ Отслеживание трансляций: создаем или обновляем сессию
+
+        # [OK] Отслеживание трансляций: создаем или обновляем сессию
         if is_live and channel_name:
             from core.database import get_db
             from services.stream_session_service import StreamSessionService
@@ -143,7 +150,7 @@ async def get_twitch_stream_info(user: dict = Depends(get_current_user)):
                 logger.error(f"Error ending stream session: {e}")
             finally:
                 db.close()
-        
+
         result = {
             "is_live": is_live,
             "title": channel_info.get("title", ""),
@@ -153,7 +160,7 @@ async def get_twitch_stream_info(user: dict = Depends(get_current_user)):
             "started_at": stream_info.get("started_at") if stream_info else None,
             "language": channel_info.get("broadcaster_language", "ru")
         }
-        
+
         logger.info(f"Returning Twitch stream info: {result}")
         return JSONResponse(content=result)
     except Exception as e:
@@ -176,17 +183,17 @@ async def get_vk_stream_info(user: dict = Depends(get_current_user)):
         session_id = user.get("session_id")
         if user_id is None:
             raise HTTPException(status_code=401, detail="User not authenticated")
-        
+
         # Пользователь с ID 0 - это гость, но у него могут быть токены
         logger.info(f"Getting VK stream info for user_id: {user_id}")
-        
+
         from api.vk_api import vk_api
-        
+
         # Получаем информацию о стриме VK (с проверкой безопасности)
         stream_info = await vk_api.get_stream_info(str(user_id), session_id)
-        
+
         is_live = stream_info.get("online", False)
-        
+
         # Получаем channel_name из User
         from core.database import get_db, User
         db = next(get_db())
@@ -195,8 +202,8 @@ async def get_vk_stream_info(user: dict = Depends(get_current_user)):
             channel_name = None
             if user_record:
                 channel_name = (user_record.vk_channel_name or user_record.vk_username or "").lower()
-            
-            # ✅ Отслеживание трансляций: создаем или обновляем сессию
+
+            # [OK] Отслеживание трансляций: создаем или обновляем сессию
             if is_live and channel_name:
                 from services.stream_session_service import StreamSessionService
                 stream_session_service = StreamSessionService(db)
@@ -221,7 +228,7 @@ async def get_vk_stream_info(user: dict = Depends(get_current_user)):
             logger.error(f"Error managing stream session: {e}")
         finally:
             db.close()
-        
+
         return JSONResponse(content={
             "is_live": is_live,
             "title": stream_info.get("title", ""),
@@ -249,72 +256,72 @@ async def update_stream(
     user: dict = Depends(get_current_user)
 ):
     """Обновить информацию о стриме (title или category)"""
-    logger.info(f"🎬 [STREAM UPDATE] ===== START =====")
+    logger.info("🎬 [STREAM UPDATE] ===== START =====")
     logger.info(f"🎬 [STREAM UPDATE] User: {user}")
     logger.info(f"🎬 [STREAM UPDATE] Request raw: {request}")
-    
+
     try:
         user_id = user.get("id")
         session_id = user.get("session_id")
         results = []
-        
+
         logger.info(f"🎬 [STREAM UPDATE] Received request from user {user_id}")
         logger.info(f"🎬 [STREAM UPDATE] Request data: {request.dict()}")
-        
+
         # Детальное логирование VK данных
         if request.vk:
-            logger.info(f"🔍 [DEBUG] request.vk exists")
-            logger.info(f"🔍 [DEBUG] request.vk dict: {request.vk.dict()}")
-            logger.info(f"🔍 [DEBUG] request.vk.category_id: {request.vk.category_id}")
-            logger.info(f"🔍 [DEBUG] request.vk.category: {request.vk.category}")
+            logger.info("[DEBUG] [DEBUG] request.vk exists")
+            logger.info(f"[DEBUG] [DEBUG] request.vk dict: {request.vk.dict()}")
+            logger.info(f"[DEBUG] [DEBUG] request.vk.category_id: {request.vk.category_id}")
+            logger.info(f"[DEBUG] [DEBUG] request.vk.category: {request.vk.category}")
             if request.vk.category:
-                logger.info(f"🔍 [DEBUG] request.vk.category dict: {request.vk.category.dict()}")
-        
+                logger.info(f"[DEBUG] [DEBUG] request.vk.category dict: {request.vk.category.dict()}")
+
         # Обновляем Twitch если данные переданы
         if request.twitch:
             from api.twitch_api import TwitchAPI
             from core.connection_manager import get_connection_manager
             connection_manager = get_connection_manager()
             twitch_api = TwitchAPI(connection_manager)
-            
+
             if request.twitch.title is not None:
                 logger.info(f"🎬 [TWITCH] Updating title to: {request.twitch.title}")
                 success = await twitch_api.update_stream_title(user_id, request.twitch.title)
                 if not success:
-                    logger.error(f"❌ [TWITCH] Title update failed for user {user_id}")
+                    logger.error(f"[ERROR] [TWITCH] Title update failed for user {user_id}")
                     raise HTTPException(status_code=401, detail="Twitch token expired. Please re-authenticate.")
-                logger.info(f"✅ [TWITCH] Title updated successfully")
+                logger.info("[OK] [TWITCH] Title updated successfully")
                 results.append("Twitch title updated")
-            
+
             if request.twitch.category_id:
                 logger.info(f"🎬 [TWITCH] Updating category to: {request.twitch.category_id}")
                 success = await twitch_api.update_stream_category(user_id, request.twitch.category_id)
                 if not success:
-                    logger.error(f"❌ [TWITCH] Category update failed for user {user_id}")
+                    logger.error(f"[ERROR] [TWITCH] Category update failed for user {user_id}")
                     raise HTTPException(status_code=401, detail="Twitch token expired. Please re-authenticate.")
-                logger.info(f"✅ [TWITCH] Category updated successfully")
+                logger.info("[OK] [TWITCH] Category updated successfully")
                 results.append("Twitch category updated")
-        
+
         # Обновляем VK если данные переданы
         if request.vk:
             from api.vk_api import vk_api
             logger.info(f"🎬 [VK] request.vk данные: title={request.vk.title}, category_id={request.vk.category_id}")
-            
+
             if request.vk.title is not None:
                 logger.info(f"🎬 [VK] Updating title to: {request.vk.title}")
                 success = await vk_api.update_stream_title(str(user_id), request.vk.title, session_id)
                 if not success:
-                    logger.error(f"❌ [VK] Title update failed for user {user_id}")
+                    logger.error(f"[ERROR] [VK] Title update failed for user {user_id}")
                     raise HTTPException(status_code=400, detail="Failed to update VK stream title")
-                logger.info(f"✅ [VK] Title updated successfully")
+                logger.info("[OK] [VK] Title updated successfully")
                 results.append("VK title updated")
-            
+
             if request.vk.category_id or request.vk.category:
                 # Детальное логирование для отладки
-                logger.info(f"🔍 [VK] request.vk.category_id = {request.vk.category_id}")
-                logger.info(f"🔍 [VK] request.vk.category = {request.vk.category}")
-                logger.info(f"🔍 [VK] type(request.vk.category) = {type(request.vk.category)}")
-                
+                logger.info(f"[DEBUG] [VK] request.vk.category_id = {request.vk.category_id}")
+                logger.info(f"[DEBUG] [VK] request.vk.category = {request.vk.category}")
+                logger.info(f"[DEBUG] [VK] type(request.vk.category) = {type(request.vk.category)}")
+
                 # Используем полный объект категории если доступен, иначе только ID
                 category_data = None
                 if request.vk.category:
@@ -330,28 +337,28 @@ async def update_stream(
                     # Только ID - используем старый метод (может не работать!)
                     category_data = request.vk.category_id
                     logger.warning(f"🎬 [VK] Updating category with ID only (may fail): {category_data}")
-                
+
                 success = await vk_api.update_stream_category(str(user_id), category_data, session_id)
                 if not success:
-                    logger.error(f"❌ [VK] Category update failed for user {user_id}")
+                    logger.error(f"[ERROR] [VK] Category update failed for user {user_id}")
                     raise HTTPException(status_code=400, detail="Failed to update VK stream category")
-                logger.info(f"✅ [VK] Category updated successfully")
+                logger.info("[OK] [VK] Category updated successfully")
                 results.append("VK category updated")
-        
+
         if not results:
-            logger.warning(f"⚠️ [STREAM UPDATE] No changes to update for user {user_id}")
+            logger.warning(f"[WARN] [STREAM UPDATE] No changes to update for user {user_id}")
             return JSONResponse(content={"success": True, "message": "No changes to update"})
-        
-        logger.info(f"✅ [STREAM UPDATE] Completed for user {user_id}: {', '.join(results)}")
+
+        logger.info(f"[OK] [STREAM UPDATE] Completed for user {user_id}: {', '.join(results)}")
         return JSONResponse(content={"success": True, "message": ", ".join(results)})
-            
+
     except HTTPException as he:
-        logger.error(f"❌ [STREAM UPDATE] HTTPException: {he.status_code} - {he.detail}")
+        logger.error(f"[ERROR] [STREAM UPDATE] HTTPException: {he.status_code} - {he.detail}")
         return JSONResponse(content={"success": False, "error": he.detail}, status_code=he.status_code)
     except Exception as e:
-        logger.error(f"❌ [STREAM UPDATE] Unexpected error: {type(e).__name__}: {str(e)}")
+        logger.error(f"[ERROR] [STREAM UPDATE] Unexpected error: {type(e).__name__}: {str(e)}")
         import traceback
-        logger.error(f"❌ [STREAM UPDATE] Traceback: {traceback.format_exc()}")
+        logger.error(f"[ERROR] [STREAM UPDATE] Traceback: {traceback.format_exc()}")
         return JSONResponse(content={"success": False, "error": f"Internal server error: {str(e)}"}, status_code=500)
 
 @router.get("/twitch/categories")
@@ -366,14 +373,14 @@ async def search_twitch_categories(
         if not platform:
             logger.error("Twitch platform not registered")
             return JSONResponse(content={"categories": []}, status_code=500)
-        
+
         categories = await platform.search_categories(search)
-        
+
         if categories is None:
             return JSONResponse(content={"categories": []})
-        
+
         return JSONResponse(content={"categories": categories})
-        
+
     except Exception as e:
         logger.error(f"Error searching Twitch categories: {e}")
         return JSONResponse(content={"categories": []}, status_code=500)
@@ -403,7 +410,7 @@ async def search_platform_categories(
                 content={"error": f"Unknown platform: {platform_name}"},
                 status_code=400
             )
-        
+
         # Get platform instance
         platform = platform_registry.get(platform_name)
         if not platform:
@@ -412,7 +419,7 @@ async def search_platform_categories(
                 content={"error": f"Platform {platform_name} not available"},
                 status_code=500
             )
-        
+
         # Check if platform supports categories
         if not platform.config.supports_categories:
             logger.warning(f"Platform {platform_name} does not support categories")
@@ -420,12 +427,12 @@ async def search_platform_categories(
                 content={"categories": []},
                 status_code=200
             )
-        
+
         # Search categories
         categories = await platform.search_categories(search)
-        
+
         return JSONResponse(content={"categories": categories or []})
-        
+
     except Exception as e:
         logger.error(f"Error searching {platform_name} categories: {e}")
         return JSONResponse(
@@ -451,7 +458,7 @@ async def update_platform_stream(
     """
     try:
         user_id = user.get("id")
-        
+
         # Validate platform
         if not platform_registry.is_valid_platform(platform_name):
             logger.warning(f"Unknown platform requested: {platform_name}")
@@ -459,7 +466,7 @@ async def update_platform_stream(
                 status_code=400,
                 detail=f"Unknown platform: {platform_name}"
             )
-        
+
         # Get platform instance
         platform = platform_registry.get(platform_name)
         if not platform:
@@ -468,9 +475,9 @@ async def update_platform_stream(
                 status_code=500,
                 detail=f"Platform {platform_name} not available"
             )
-        
+
         results = []
-        
+
         # Update title if provided
         if title is not None:
             logger.info(f"Updating {platform_name} title for user {user_id}: {title}")
@@ -481,7 +488,7 @@ async def update_platform_stream(
                     detail=f"Failed to update {platform_name} stream title"
                 )
             results.append(f"{platform_name} title updated")
-        
+
         # Update category if provided
         if category_id is not None:
             logger.info(f"Updating {platform_name} category for user {user_id}: {category_id}")
@@ -492,18 +499,18 @@ async def update_platform_stream(
                     detail=f"Failed to update {platform_name} stream category"
                 )
             results.append(f"{platform_name} category updated")
-        
+
         if not results:
             return JSONResponse(content={
                 "success": True,
                 "message": "No changes to update"
             })
-        
+
         return JSONResponse(content={
             "success": True,
             "message": ", ".join(results)
         })
-        
+
     except HTTPException:
         raise
     except Exception as e:

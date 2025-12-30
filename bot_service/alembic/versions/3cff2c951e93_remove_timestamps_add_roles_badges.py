@@ -24,7 +24,7 @@ def upgrade() -> None:
         # Добавляем новые поля
         batch_op.add_column(sa.Column('show_roles', sa.Boolean(), nullable=False, server_default='1'))
         batch_op.add_column(sa.Column('show_badges', sa.Boolean(), nullable=False, server_default='1'))
-        
+
         # Удаляем старые поля (show_timestamps, timestamp_color)
         # SQLite требует batch mode для drop column
         batch_op.drop_column('show_timestamps')
@@ -37,7 +37,7 @@ def downgrade() -> None:
         # Возвращаем удалённые поля
         batch_op.add_column(sa.Column('show_timestamps', sa.Boolean(), nullable=False, server_default='1'))
         batch_op.add_column(sa.Column('timestamp_color', sa.String(), nullable=True, server_default='#808080'))
-        
+
         # Удаляем добавленные поля
         batch_op.drop_column('show_roles')
         batch_op.drop_column('show_badges')

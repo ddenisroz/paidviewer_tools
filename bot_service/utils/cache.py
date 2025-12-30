@@ -31,7 +31,7 @@ def get_cached(key: str, func: Callable, *args, ttl: Optional[float] = None, **k
         Результат выполнения функции
     """
     ttl = ttl or CACHE_TTL
-    
+
     # Проверяем кеш
     if key in _cache:
         value, timestamp = _cache[key]
@@ -42,12 +42,12 @@ def get_cached(key: str, func: Callable, *args, ttl: Optional[float] = None, **k
             # Удаляем устаревший кеш
             del _cache[key]
             logger.debug(f"Cache EXPIRED: {key}")
-    
+
     # Выполняем функцию и кешируем результат
     logger.debug(f"Cache MISS: {key}")
     value = func(*args, **kwargs)
     _cache[key] = (value, time.time())
-    
+
     return value
 
 
@@ -91,13 +91,13 @@ def get_cache_stats() -> dict:
     now = time.time()
     active_entries = 0
     expired_entries = 0
-    
+
     for key, (value, timestamp) in _cache.items():
         if now - timestamp < CACHE_TTL:
             active_entries += 1
         else:
             expired_entries += 1
-    
+
     return {
         "total_entries": len(_cache),
         "active_entries": active_entries,

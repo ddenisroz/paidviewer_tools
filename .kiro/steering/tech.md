@@ -1,137 +1,104 @@
-# Technology Stack
+# Tech Stack
 
-## Backend (bot_service)
+## Backend (bot_service/)
+- Python 3.12
+- FastAPI with uvicorn
+- SQLAlchemy 2.0 + Alembic migrations
+- PostgreSQL (prod) / SQLite (dev)
+- pydantic-settings for configuration
+- JWT + OAuth2 authentication
+- Fernet encryption for tokens
+- slowapi for rate limiting
 
-- **Framework**: FastAPI 0.121.2
-- **Language**: Python 3.10+
-- **Database**: SQLite (dev) / PostgreSQL (prod) with SQLAlchemy 2.0.44
-- **Migrations**: Alembic 1.17.1
-- **Authentication**: JWT + OAuth2 (Twitch, VK Live)
-- **Security**: Fernet encryption, slowapi rate limiting, pydantic validation
-- **WebSocket**: FastAPI WebSocket with connection manager
-- **Async**: aiohttp, httpx for non-blocking operations
-- **Logging**: structlog with rotation
-- **Testing**: pytest, pytest-asyncio, pytest-cov
+## Frontend (frontend/)
+- React 19 + TypeScript
+- Vite build system
+- Tailwind CSS + shadcn/ui components
+- React Query (@tanstack/react-query)
+- React Router v7
+- Zod for validation
+- react-hook-form for forms
 
-## Frontend
-
-- **Framework**: React 19.1.1
-- **Build Tool**: Vite 7.1.2
-- **Language**: TypeScript migration in progress (allowJs: true, strict: false)
-- **Routing**: react-router-dom 7.8.2
-- **State Management**: React Context API, @tanstack/react-query 5.90.6
-- **Forms**: react-hook-form 7.66.0 with @hookform/resolvers
-- **Validation**: Zod 4.1.12
-- **UI Components**: shadcn/ui with Radix UI primitives
-- **Styling**: Tailwind CSS 3.4.17 with 8px grid system
-- **Icons**: lucide-react 0.544.0
-- **Notifications**: sonner 2.0.7
-- **Testing**: @testing-library/react, jest
-
-## TTS Service
-
-- **Framework**: FastAPI
-- **TTS Engines**: Google Cloud TTS, F5-TTS 1.1.9
-- **ML/AI**: PyTorch 2.6.0+cu124, transformers 4.57.1, faster-whisper 1.2.1
-- **Audio**: librosa 0.11.0, soundfile 0.13.1, pydub 0.25.1
-- **GPU**: CUDA 12.4 support
-
-## Infrastructure
-
-- **Containerization**: Docker + Docker Compose
-- **Reverse Proxy**: nginx
-- **Tunneling**: Cloudflare Tunnel support
-- **Environment**: pydantic-settings 2.11.0 for centralized config
+## TTS Services
+- tts_service/: Advanced F5-TTS (multi-user, GPU)
+- tts_service_simple/: Personal F5-TTS (single user, GPU)
+- Google Cloud TTS (cloud fallback)
 
 ## Common Commands
 
+### Development Setup
+```bash
+# Activate venv (REQUIRED before any Python commands)
+.venv\Scripts\activate  # Windows
+source .venv/bin/activate  # Linux/Mac
+```
+
 ### Development
-
 ```bash
-# Frontend
-npm run dev:frontend          # Start dev server (localhost:5173)
-cd frontend && npm run build  # Build for production
-
-# Backend
-npm run dev:bot              # Start bot service (localhost:8000)
-cd bot_service && python main.py
-
-# TTS Service
-npm run dev:tts              # Start TTS service (localhost:8001)
-cd tts_service && python main.py
-
-# Database migrations
-cd bot_service
-alembic revision --autogenerate -m "description"
-alembic upgrade head
-alembic downgrade -1
+npm run dev:frontend    # Frontend at localhost:5173
+npm run dev:bot         # Backend at localhost:8000 (venv must be active)
+npm run dev:tts         # TTS service at localhost:8001 (venv must be active)
 ```
 
-### Production (Docker)
-
+### Frontend
 ```bash
-npm start                    # Start all services
-npm stop                     # Stop all services
-npm restart                  # Restart all services
-npm run logs                 # View all logs
-npm run logs:bot             # View bot service logs
-npm run logs:frontend        # View frontend logs
-npm run status               # Check service status
-```
-
-### Code Quality
-
-```bash
-# Design system checks
-npm run check:design         # Check design system compliance
-npm run migrate:design:apply # Auto-fix design issues
-
-# Python linting
-cd bot_service
-ruff check .
-ruff format .
-
-# Frontend linting
 cd frontend
-npm run lint
-
-# Testing
-cd bot_service
-pytest                       # Run all tests
-pytest --cov                 # With coverage
-pytest -v tests/specific_test.py  # Specific test
-
-# Run all tests (from root)
-python run_all_tests.py
+npm run dev             # Start dev server
+npm run build           # Production build
+npm run lint            # ESLint check
+npm run lint:fix        # Fix lint issues
+npm run type-check      # TypeScript check
+npm run test            # Run tests (vitest)
+npm run test:coverage   # Tests with coverage
 ```
 
-### Setup & Migration
-
+### Backend (venv must be active)
 ```bash
-# Initial setup
-./migrate.sh                 # Linux/Mac
-migrate.ps1                  # Windows
-
-# Generate security keys
-openssl rand -hex 32         # SECRET_KEY, JWT_SECRET_KEY
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"  # ENCRYPTION_KEY
+cd bot_service
+python main.py          # Start server
+pytest                  # Run all tests
+pytest --cov            # Tests with coverage
+alembic upgrade head    # Apply migrations
+alembic revision -m "description"  # Create migration
 ```
 
-## Key Libraries & Frameworks
+### Docker
+```bash
+npm run start           # docker-compose up -d
+npm run stop            # docker-compose down
+npm run logs            # View logs
+npm run restart         # Restart services
+```
 
-- **API Client**: axios 1.11.0
-- **Virtual Scrolling**: @tanstack/react-virtual 3.13.12
-- **Debouncing**: use-debounce 10.0.6
-- **YouTube Player**: react-youtube 10.1.0
-- **Monitoring**: prometheus-client 0.23.1, sentry-sdk 2.44.0
-- **Rate Limiting**: slowapi 0.1.9, limits 5.6.0
-- **Caching**: cachetools 6.2.0
+## Key Dependencies
+- Backend: fastapi, sqlalchemy, twitchio, aiohttp, pydantic, python-jose (JWT), cryptography (Fernet), sentry-sdk
+- Frontend: react, @tanstack/react-query, axios, zod, lucide-react, sonner, @radix-ui (primitives), dompurify
 
-## Configuration Management
+## Code Conventions
 
-All configuration via environment variables:
-- `bot_service/.env` - Backend config (OAuth, database, security)
-- `tts_service/.env` - TTS engine config
-- `frontend/.env` - API endpoints, feature flags
+### Backend
+- Use `core/config.py` settings instead of `os.getenv()` directly
+- All datetime operations use `datetime.now(timezone.utc)` (not `datetime.utcnow()`)
+- Use `db_session()` context manager for database operations
+- Specific exception handling (no bare `except:` blocks)
+- Type hints required for all functions
+- Pydantic models for request/response validation
 
-Use `core/config.py` (pydantic-settings) for centralized backend config - never use `os.getenv()` directly.
+### Frontend
+- TypeScript strict mode (работаем над полным покрытием)
+- React Query для всех API запросов (queries/)
+- Zod schemas для валидации форм
+- shadcn/ui компоненты из components/ui/
+- Toast уведомления через sonner
+- Error boundaries для graceful error handling
+
+### API Conventions
+- REST endpoints под `/api/` prefix
+- Admin endpoints в `/api/admin/`
+- WebSocket endpoints в `/ws/`
+- Rate limits: 60/min default, 5/15min login, 30/min TTS
+
+### Database
+- SQLAlchemy 2.0 async style
+- Alembic для всех миграций (никаких ручных изменений схемы)
+- Индексы для часто используемых полей (twitch_username, vk_user_id, user_id)

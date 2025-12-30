@@ -303,14 +303,14 @@ class TTSPrometheusMetrics:
                     try:
                         temperature = pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
                         self.gpu_temperature.labels(device_id=device_id).set(temperature)
-                    except:
+                    except Exception:
                         pass
                     
                     # Потребление энергии
                     try:
                         power_usage = pynvml.nvmlDeviceGetPowerUsage(handle) / 1000.0  # В ваттах
                         self.gpu_power_usage.labels(device_id=device_id).set(power_usage)
-                    except:
+                    except Exception:
                         pass
                         
                 except ImportError:

@@ -18,7 +18,9 @@ export const logger = {
     if (isDevelopment) console.debug(...args);
   },
   table: (...args: unknown[]) => {
-    if (isDevelopment && (console as any).table) (console as any).table(...args);
+    if (isDevelopment && typeof (console as Console & { table?: (...args: unknown[]) => void }).table === 'function') {
+      (console as Console & { table: (...args: unknown[]) => void }).table(...args);
+    }
   },
   group: (...args: unknown[]) => {
     if (isDevelopment) console.group(...args);
@@ -46,7 +48,7 @@ export const reportError = (error: unknown, context: Record<string, unknown> = {
 export const perfLog = (label: string, startTime: number) => {
   if (isDevelopment) {
     const duration = performance.now() - startTime;
-    console.log(`⏱️ [PERF] ${label}: ${duration.toFixed(2)}ms`);
+    console.log(`[PERF] [PERF] ${label}: ${duration.toFixed(2)}ms`);
   }
 };
 
@@ -74,17 +76,17 @@ class Logger {
         break;
     }
   }
-  debug(...args: unknown[]) { this._log('DEBUG', '🔍', ...args); }
-  info(...args: unknown[]) { this._log('INFO', 'ℹ️', ...args); }
-  warn(...args: unknown[]) { this._log('WARN', '⚠️', ...args); }
-  error(...args: unknown[]) { this._log('ERROR', '❌', ...args); }
-  success(...args: unknown[]) { this._log('INFO', '✅', ...args); }
-  api(method: string, endpoint: string, data?: unknown) { this._log('DEBUG', '📡', `${method} ${endpoint}`, data); }
+  debug(...args: unknown[]) { this._log('DEBUG', '[DEBUG]', ...args); }
+  info(...args: unknown[]) { this._log('INFO', '[INFO]', ...args); }
+  warn(...args: unknown[]) { this._log('WARN', '[WARN]', ...args); }
+  error(...args: unknown[]) { this._log('ERROR', '[ERROR]', ...args); }
+  success(...args: unknown[]) { this._log('INFO', '[OK]', ...args); }
+  api(method: string, endpoint: string, data?: unknown) { this._log('DEBUG', '[API]', `${method} ${endpoint}`, data); }
   apiResponse(status: number, endpoint: string, data?: unknown) {
-    const emoji = status < 400 ? '✅' : '❌';
+    const emoji = status < 400 ? '[OK]' : '[ERROR]';
     this._log('DEBUG', emoji, `[${status}] ${endpoint}`, data);
   }
-  ws(event: string, data?: unknown) { this._log('DEBUG', '🔌', `WS: ${event}`, data); }
+  ws(event: string, data?: unknown) { this._log('DEBUG', '[CONNECT]', `WS: ${event}`, data); }
   log(...args: unknown[]) { this.info(...args); }
 }
 
@@ -101,9 +103,9 @@ export const apiLogger = new Logger('API');
 export const wsLogger = new Logger('WEBSOCKET');
 
 if (isDevelopment) {
-  console.log('🔓 Development mode: Full logging enabled');
+  console.log('[DECRYPT] Development mode: Full logging enabled');
 } else {
-  console.log('🔒 Production mode: Limited logging (errors only)');
+  console.log('[SECURITY] Production mode: Limited logging (errors only)');
 }
 
 

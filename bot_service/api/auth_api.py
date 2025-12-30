@@ -2,7 +2,6 @@
 """Authentication API endpoints"""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import Optional
 import logging
 
 from core.database import get_db, User
@@ -34,7 +33,7 @@ async def check_username_availability(
     try:
         # Нормализуем никнейм
         username_normalized = username.strip().lower()
-        
+
         # Проверяем зарезервированные имена
         reserved_names = ['admin', 'root', 'system', 'bot', 'moderator', 'mod', 'guest']
         if username_normalized in reserved_names:
@@ -43,24 +42,24 @@ async def check_username_availability(
                 "username": username,
                 "reason": "reserved"
             }
-        
+
         # Проверяем существование в базе
         existing_user = db.query(User).filter(
             User.username.ilike(username)  # Case-insensitive поиск
         ).first()
-        
+
         if existing_user:
             return {
                 "available": False,
                 "username": username,
                 "reason": "taken"
             }
-        
+
         return {
             "available": True,
             "username": username
         }
-        
+
     except Exception as e:
         logger.error(f"Error checking username availability: {e}")
         raise HTTPException(status_code=500, detail="Error checking username availability")

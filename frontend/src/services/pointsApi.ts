@@ -13,8 +13,8 @@ async function handleJsonResponse<T>(response: Response, fallbackMessage: string
   }
   let errorMessage = fallbackMessage;
   try {
-    const errorData = await response.json();
-    errorMessage = (errorData as any)?.detail || (errorData as any)?.message || fallbackMessage;
+    const errorData = await response.json() as { detail?: string; message?: string };
+    errorMessage = errorData?.detail || errorData?.message || fallbackMessage;
   } catch {
     try {
       const text = await response.text();
@@ -30,7 +30,7 @@ async function handleJsonResponse<T>(response: Response, fallbackMessage: string
 }
 
 class PointsAPI {
-  async getRewards<T = any>(platform: Platform): Promise<T> {
+  async getRewards<T = unknown>(platform: Platform): Promise<T> {
     const response = await fetch(`${API_BASE_URL}/api/points/rewards/${platform}`, {
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -38,7 +38,7 @@ class PointsAPI {
     return handleJsonResponse<T>(response, `Failed to load ${platform} rewards`);
   }
 
-  async createReward<T = any>(platform: Platform, rewardData: Record<string, any>): Promise<T> {
+  async createReward<T = unknown>(platform: Platform, rewardData: Record<string, unknown>): Promise<T> {
     const response = await fetch(`${API_BASE_URL}/api/points/rewards/${platform}/create`, {
       method: 'POST',
       credentials: 'include',
@@ -48,7 +48,7 @@ class PointsAPI {
     return handleJsonResponse<T>(response, 'Failed to create reward');
   }
 
-  async updateReward<T = any>(platform: Platform, rewardId: string, rewardData: Record<string, any>): Promise<T> {
+  async updateReward<T = unknown>(platform: Platform, rewardId: string, rewardData: Record<string, unknown>): Promise<T> {
     const response = await fetch(`${API_BASE_URL}/api/points/rewards/${platform}/${rewardId}`, {
       method: 'PATCH',
       credentials: 'include',
@@ -58,7 +58,7 @@ class PointsAPI {
     return handleJsonResponse<T>(response, 'Failed to update reward');
   }
 
-  async deleteReward<T = any>(platform: Platform, rewardId: string): Promise<T> {
+  async deleteReward<T = unknown>(platform: Platform, rewardId: string): Promise<T> {
     const response = await fetch(`${API_BASE_URL}/api/points/rewards/${platform}/${rewardId}`, {
       method: 'DELETE',
       credentials: 'include',
@@ -66,7 +66,7 @@ class PointsAPI {
     return handleJsonResponse<T>(response, 'Failed to delete reward');
   }
 
-  async toggleReward<T = any>(platform: Platform, rewardId: string, isEnabled: boolean): Promise<T> {
+  async toggleReward<T = unknown>(platform: Platform, rewardId: string, isEnabled: boolean): Promise<T> {
     const response = await fetch(`${API_BASE_URL}/api/points/rewards/${platform}/${rewardId}/toggle`, {
       method: 'PATCH',
       credentials: 'include',
@@ -76,7 +76,7 @@ class PointsAPI {
     return handleJsonResponse<T>(response, 'Failed to toggle reward');
   }
 
-  async getVKDemands<T = any>(): Promise<T> {
+  async getVKDemands<T = unknown>(): Promise<T> {
     const response = await fetch(`${API_BASE_URL}/api/points/rewards/vk/demands`, {
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -84,7 +84,7 @@ class PointsAPI {
     return handleJsonResponse<T>(response, 'Failed to load VK demands');
   }
 
-  async processVKDemands<T = any>(action: 'accept' | 'reject', demandIds: string[]): Promise<T> {
+  async processVKDemands<T = unknown>(action: 'accept' | 'reject', demandIds: string[]): Promise<T> {
     const response = await fetch(`${API_BASE_URL}/api/points/rewards/vk/demands/process`, {
       method: 'POST',
       credentials: 'include',

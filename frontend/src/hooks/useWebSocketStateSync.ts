@@ -6,10 +6,12 @@
  */
 
 import { useEffect, useState } from 'react';
+
 import { useQueryClient } from '@tanstack/react-query';
-import getSharedWebSocket from '../utils/sharedWebSocket';
+
 import { useAuth } from '../context/AuthContext';
 import Logger from '../utils/prodLogger';
+import getSharedWebSocket from '../utils/sharedWebSocket';
 
 const logger = new Logger('WS_STATE_SYNC');
 
@@ -25,7 +27,7 @@ export const useWebSocketStateSync = () => {
     const ws = getSharedWebSocket(user.id);
 
     // Handle state reconciliation messages
-    const handleStateReconciliation = async (message: any) => {
+    const handleStateReconciliation = async (message: Record<string, unknown>) => {
       if (message.type === 'state_reconciliation_required') {
         logger.info('State reconciliation triggered - invalidating all queries');
         setSyncStatus('syncing');

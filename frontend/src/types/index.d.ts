@@ -4,6 +4,7 @@
  */
 
 export * from './api';
+export * from './admin';
 export * from './user';
 export * from './tts';
 export * from './stream';

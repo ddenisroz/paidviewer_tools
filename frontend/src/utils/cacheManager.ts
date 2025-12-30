@@ -18,11 +18,11 @@ export const CACHE_CONFIG = {
   TWITCH_BADGES: { key: 'cache_twitch_badges', ttl: 24 * 60 * 60 * 1000, version: 1 },
 } as const;
 
-type CacheConfigValue = (typeof CACHE_CONFIG)[keyof typeof CACHE_CONFIG];
+export type CacheConfigValue = (typeof CACHE_CONFIG)[keyof typeof CACHE_CONFIG];
 
 class CacheManager {
-  private listeners: Map<string, Array<(data?: any) => void>>;
-  private pendingUpdates: Map<string, Promise<any>>;
+  private listeners: Map<string, Array<(data?: unknown) => void>>;
+  private pendingUpdates: Map<string, Promise<unknown>>;
 
   constructor() {
     this.listeners = new Map();
@@ -30,7 +30,7 @@ class CacheManager {
     this.setupStorageListener();
   }
 
-  get<T = any>(cacheType: CacheConfigValue, options: { ignoreExpired?: boolean } = {}): T | null {
+  get<T = unknown>(cacheType: CacheConfigValue, options: { ignoreExpired?: boolean } = {}): T | null {
     try {
       const cached = localStorage.getItem(cacheType.key);
       if (!cached) {
@@ -58,7 +58,7 @@ class CacheManager {
     }
   }
 
-  set<T = any>(cacheType: CacheConfigValue, data: T, options: { userId?: number | null } = {}): void {
+  set<T = unknown>(cacheType: CacheConfigValue, data: T, options: { userId?: number | null } = {}): void {
     try {
       const cacheEntry = {
         data,
@@ -69,9 +69,10 @@ class CacheManager {
       localStorage.setItem(cacheType.key, JSON.stringify(cacheEntry));
       logger.debug(`[CACHE] Set: ${cacheType.key}`);
       this.notifyOtherTabs('cache_updated', { key: cacheType.key, data });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('[CACHE] Write error:', error);
-      if (error?.name === 'QuotaExceededError') {
+      const storageError = error as { name?: string };
+      if (storageError?.name === 'QuotaExceededError') {
         logger.warn('[CACHE] Storage quota exceeded, clearing old caches...');
         this.clearOldest();
       }
@@ -119,7 +120,7 @@ class CacheManager {
     }
   }
 
-  async getOrFetch<T = any>(
+  async getOrFetch<T = unknown>(
     cacheType: CacheConfigValue,
     fetchFn: () => Promise<T>,
     options: { ignoreExpired?: boolean; userId?: number | null } = {}
@@ -155,9 +156,9 @@ class CacheManager {
     return promise;
   }
 
-  async optimisticUpdate<T = any>(
+  async optimisticUpdate<T = unknown>(
     cacheType: CacheConfigValue,
-    updateFn: (newData: T) => Promise<any>,
+    updateFn: (newData: T) => Promise<unknown>,
     newData: T,
     options: { userId?: number | null } = {}
   ): Promise<boolean> {
@@ -181,7 +182,7 @@ class CacheManager {
     }
   }
 
-  subscribe(cacheKey: string, callback: (data?: any) => void): () => void {
+  subscribe(cacheKey: string, callback: (data?: unknown) => void): () => void {
     if (!this.listeners.has(cacheKey)) {
       this.listeners.set(cacheKey, []);
     }
@@ -200,10 +201,10 @@ class CacheManager {
     window.addEventListener('storage', (event: StorageEvent) => {
       if (event.key === 'cache_event') {
         try {
-          const { type, payload } = JSON.parse(event.newValue || '{}') as { type: string; payload: any };
+          const { type, payload } = JSON.parse(event.newValue || '{}') as { type: string; payload: { key?: string; data?: unknown } };
           if (type === 'cache_invalidated') {
             logger.debug(`[CACHE] Multi-tab invalidation: ${payload.key}`);
-            const listeners = this.listeners.get(payload.key) || [];
+            const listeners = this.listeners.get(payload.key as string) || [];
             listeners.forEach((callback) => callback());
           } else if (type === 'cache_invalidated_all') {
             logger.debug('[CACHE] Multi-tab invalidation: ALL');
@@ -212,7 +213,7 @@ class CacheManager {
             });
           } else if (type === 'cache_updated') {
             logger.debug(`[CACHE] Multi-tab update: ${payload.key}`);
-            const listeners = this.listeners.get(payload.key) || [];
+            const listeners = this.listeners.get(payload.key as string) || [];
             listeners.forEach((callback) => callback(payload.data));
           }
         } catch (error) {
@@ -222,7 +223,7 @@ class CacheManager {
     });
   }
 
-  private notifyOtherTabs(type: string, payload: any): void {
+  private notifyOtherTabs(type: string, payload: unknown): void {
     try {
       localStorage.setItem('cache_event', JSON.stringify({ type, payload, timestamp: Date.now() }));
       localStorage.removeItem('cache_event');
@@ -259,7 +260,13 @@ class CacheManager {
     invalid: number;
     caches: Array<{ key: string; age: number; ttl: number; expired: boolean; validVersion: boolean; size: number }>;
   } {
-    const stats = { total: 0, valid: 0, expired: 0, invalid: 0, caches: [] as any[] };
+    const stats: {
+      total: number;
+      valid: number;
+      expired: number;
+      invalid: number;
+      caches: Array<{ key: string; age: number; ttl: number; expired: boolean; validVersion: boolean; size: number }>;
+    } = { total: 0, valid: 0, expired: 0, invalid: 0, caches: [] };
     Object.values(CACHE_CONFIG).forEach((config) => {
       const cached = localStorage.getItem(config.key);
       if (cached) {

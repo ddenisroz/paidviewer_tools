@@ -7,8 +7,7 @@ import logging
 import secrets
 import base64
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any
-from functools import wraps
+from typing import Optional
 
 # Современные библиотеки безопасности
 from cryptography.fernet import Fernet
@@ -20,7 +19,7 @@ from fastapi import HTTPException, Request, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
 
-from core.config_modern import modern_config
+from core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -28,12 +27,12 @@ logger = logging.getLogger(__name__)
 def _get_encryption_key() -> bytes:
     """Получить ключ шифрования для OAuth токенов из конфигурации"""
     # Используем TOKEN_ENCRYPTION_KEY из .env файла
-    encryption_key = getattr(modern_config, 'token_encryption_key', None)
-    if not encryption_key:
-        # Fallback на JWT ключ если TOKEN_ENCRYPTION_KEY не задан
-        key = modern_config.jwt_secret_key.encode()[:32]
+    encryption_key = settings.token_encryption_key
+    if not encryption_key or encryption_key.startswith('your-'):
+        # Fallback на SECRET_KEY если TOKEN_ENCRYPTION_KEY не задан
+        key = settings.secret_key.encode()[:32]
         encryption_key = base64.urlsafe_b64encode(key.ljust(32, b'0')[:32]).decode()
-    
+
     return encryption_key.encode()
 
 _fernet = Fernet(_get_encryption_key())
@@ -46,13 +45,13 @@ security = HTTPBearer()
 
 class ModernSecurityManager:
     """Современный менеджер безопасности с профессиональными библиотеками"""
-    
+
     def __init__(self):
-        self.secret_key = modern_config.jwt_secret_key
-        self.algorithm = modern_config.jwt_algorithm
-        self.access_token_expire_minutes = modern_config.jwt_access_token_expire_minutes
-        
-        logger.info("🔐 Modern Security Manager initialized with professional libraries")
+        self.secret_key = settings.secret_key
+        self.algorithm = settings.algorithm
+        self.access_token_expire_minutes = 30  # Default 30 minutes
+
+        logger.info("[AUTH] Modern Security Manager initialized with professional libraries")
 
     def encrypt_oauth_token(self, token: str) -> str:
         """
@@ -75,15 +74,15 @@ class ModernSecurityManager:
         """
         if not encrypted_token:
             return encrypted_token
-            
+
         try:
             # Пытаемся расшифровать токен
             encrypted_data = base64.urlsafe_b64decode(encrypted_token.encode())
             decrypted_token = _fernet.decrypt(encrypted_data)
             return decrypted_token.decode()
-        except Exception as e:
+        except Exception:
             # Если не получилось расшифровать - возможно токен не зашифрован (старый формат)
-            logger.debug(f"Token appears to be unencrypted (legacy format), returning as-is")
+            logger.debug("Token appears to be unencrypted (legacy format), returning as-is")
             return encrypted_token
 
     def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -95,7 +94,7 @@ class ModernSecurityManager:
             expire = datetime.now(timezone.utc) + expires_delta
         else:
             expire = datetime.now(timezone.utc) + timedelta(minutes=self.access_token_expire_minutes)
-        
+
         to_encode.update({"exp": expire})
         encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
         return encoded_jwt
@@ -144,7 +143,7 @@ def rate_limit(requests_per_minute: str):
 
 def login_rate_limit():
     """Декоратор для rate limiting логина"""
-    return limiter.limit(f"{modern_config.rate_limit_login_attempts}/{modern_config.rate_limit_login_window_minutes}minutes")
+    return limiter.limit(settings.rate_limit_login)
 
 # Функции для FastAPI
 def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> int:
@@ -180,4 +179,4 @@ def rate_limit_handler(request: Request, exc: RateLimitExceeded):
         content={"detail": f"Rate limit exceeded: {exc.detail}"}
     )
 
-logger.info("🔐 Modern Security Manager initialized with OAuth encryption and JWT")
+logger.info("[AUTH] Modern Security Manager initialized with OAuth encryption and JWT")

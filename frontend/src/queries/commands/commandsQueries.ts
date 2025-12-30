@@ -1,17 +1,26 @@
 /**
  * Commands Queries - централизованные React Query queries для Commands
  */
-import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
-import { queryKeys } from '../queryKeys';
-import { commandsService } from '../../services/api/services/commandsService';
+import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
+
+import { commandsService } from '../../services/api/services/commandsService';
 import { logger } from '../../utils/prodLogger';
+import { queryKeys } from '../queryKeys';
+import { unwrapResponse } from '../queryUtils';
+
+
+import type { ApiResponse, Command as ChatCommand } from '../../types';
 import type { AxiosError } from 'axios';
-import type { ApiResponse, Command } from '../../types';
 
 interface CommandsData {
-  basic_commands: Command[];
-  custom_commands: Command[];
+  basic_commands: ChatCommand[];
+  custom_commands: ChatCommand[];
+}
+
+interface CommandsApiResponse {
+  basic_commands: ChatCommand[];
+  custom_commands: ChatCommand[];
 }
 
 /**
@@ -21,11 +30,12 @@ export const useCommands = (options?: Omit<UseQueryOptions<CommandsData, AxiosEr
   return useQuery<CommandsData, AxiosError>({
     queryKey: queryKeys.commands.list(),
     queryFn: async () => {
-      const response = await commandsService.getCommands();
+      const response = await unwrapResponse(commandsService.getCommands());
+      const data = response as unknown as CommandsApiResponse;
       // Возвращаем данные в том же формате, что ожидают компоненты
       return {
-        basic_commands: ((response.data as any)?.basic_commands || []) as Command[],
-        custom_commands: ((response.data as any)?.custom_commands || []) as Command[],
+        basic_commands: (data?.basic_commands || []) as ChatCommand[],
+        custom_commands: (data?.custom_commands || []) as ChatCommand[],
       };
     },
     staleTime: 30 * 1000, // 30 секунд
@@ -40,145 +50,117 @@ export const useCommands = (options?: Omit<UseQueryOptions<CommandsData, AxiosEr
 /**
  * Создать команду
  */
-export const useCreateCommand = (options?: UseMutationOptions<any, AxiosError, Partial<Command>, unknown>) => {
+export const useCreateCommand = (options?: Omit<UseMutationOptions<ApiResponse<ChatCommand>, AxiosError, Partial<ChatCommand>, unknown>, 'mutationFn'>) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (command: Partial<Command>) => commandsService.createCommand(command),
-    onSuccess: (response, command, context) => {
+  return useMutation<ApiResponse<ChatCommand>, AxiosError, Partial<ChatCommand>, unknown>({
+    mutationFn: (command: Partial<ChatCommand>) => unwrapResponse(commandsService.createCommand(command)),
+    onSuccess: (_response, _command, _context) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.commands.list() });
-      // Вызываем onSuccess из options если он есть
-      if (options?.onSuccess) {
-        (options.onSuccess as any)(response, command, context);
-      } else {
+      if (!options?.onSuccess) {
         toast.success('Команда создана');
       }
     },
-    onError: (error: AxiosError, command, context) => {
+    onError: (error: AxiosError, _command, _context) => {
       logger.error('Error creating command:', error);
-      const errorMessage = (error.response?.data as any)?.detail || (error.response?.data as any)?.message || 'Ошибка создания команды';
-      // Вызываем onError из options если он есть
-      if (options?.onError) {
-        (options.onError as any)(error, command, context);
-      } else {
+      if (!options?.onError) {
+        const errorMessage = (error.response?.data as Record<string, unknown>)?.detail as string || (error.response?.data as Record<string, unknown>)?.message as string || 'Ошибка создания команды';
         toast.error(errorMessage);
       }
     },
-    ...(options || {}),
+    ...options,
   });
 };
 
 /**
  * Создать override для команды
  */
-export const useCreateCommandOverride = (options?: UseMutationOptions<any, AxiosError, Record<string, any>, unknown>) => {
+export const useCreateCommandOverride = (options?: Omit<UseMutationOptions<ApiResponse, AxiosError, Record<string, unknown>, unknown>, 'mutationFn'>) => {
   const queryClient = useQueryClient();
-  
 
-  return useMutation({
-    mutationFn: (override: Record<string, any>) => commandsService.createOverride(override),
-    onSuccess: (response, override, context) => {
+  return useMutation<ApiResponse, AxiosError, Record<string, unknown>, unknown>({
+    mutationFn: (override: Record<string, unknown>) => unwrapResponse(commandsService.createOverride(override)),
+    onSuccess: (_response, _override, _context) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.commands.list() });
-      // Вызываем onSuccess из options если он есть (позволяет переопределить поведение)
-      if (options?.onSuccess) {
-        (options.onSuccess as any)(response, override, context);
-      } else {
+      if (!options?.onSuccess) {
         toast.success('Персональная настройка создана');
       }
     },
-    onError: (error: AxiosError, override, context) => {
+    onError: (error: AxiosError, _override, _context) => {
       logger.error('Error creating command override:', error);
-      const errorMessage = (error.response?.data as any)?.detail || (error.response?.data as any)?.message || 'Ошибка создания персональной настройки';
-      
-      // Специальная обработка ошибки "уже существует"
-      if (error.response?.status === 400 && errorMessage.includes('уже существует')) {
-        toast.error('Персональная настройка уже существует. Перезагрузите список команд.');
-        queryClient.invalidateQueries({ queryKey: queryKeys.commands.list() });
-      }
-      
-      // Вызываем onError из options если он есть
-      if (options?.onError) {
-        (options.onError as any)(error, override, context);
-      } else if (!errorMessage.includes('уже существует')) {
-        // Показываем toast только если это не ошибка "уже существует" (она обработана выше)
-        toast.error(errorMessage);
+      if (!options?.onError) {
+        const errorMessage = (error.response?.data as Record<string, unknown>)?.detail as string || (error.response?.data as Record<string, unknown>)?.message as string || 'Ошибка создания персональной настройки';
+        
+        // Специальная обработка ошибки "уже существует"
+        if (error.response?.status === 400 && errorMessage.includes('уже существует')) {
+          toast.error('Персональная настройка уже существует. Перезагрузите список команд.');
+          queryClient.invalidateQueries({ queryKey: queryKeys.commands.list() });
+        } else {
+          toast.error(errorMessage);
+        }
       }
     },
-    ...(options || {}),
+    ...options,
   });
 };
 
 /**
  * Обновить команду
  */
-export const useUpdateCommand = (options?: UseMutationOptions<any, AxiosError, { commandId: number; command: Partial<Command> }, unknown>) => {
+export const useUpdateCommand = (options?: Omit<UseMutationOptions<ApiResponse<ChatCommand>, AxiosError, { commandId: number; command: Partial<ChatCommand> }, unknown>, 'mutationFn'>) => {
   const queryClient = useQueryClient();
-  
 
-  return useMutation({
-    mutationFn: ({ commandId, command }: { commandId: number; command: Partial<Command> }) => commandsService.updateCommand(commandId, command),
-    onSuccess: (response, variables, context) => {
+  return useMutation<ApiResponse<ChatCommand>, AxiosError, { commandId: number; command: Partial<ChatCommand> }, unknown>({
+    mutationFn: ({ commandId, command }: { commandId: number; command: Partial<ChatCommand> }) => unwrapResponse(commandsService.updateCommand(commandId, command)),
+    onSuccess: (_response, _variables, _context) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.commands.list() });
-      if (options?.onSuccess) {
-        (options.onSuccess as any)(response, variables, context);
-      } else {
+      if (!options?.onSuccess) {
         toast.success('Команда обновлена');
       }
     },
-    onError: (error: AxiosError, variables, context) => {
+    onError: (error: AxiosError, _variables, _context) => {
       logger.error('Error updating command:', error);
-      if (options?.onError) {
-        (options.onError as any)(error, variables, context);
-      } else {
+      if (!options?.onError) {
         toast.error('Ошибка обновления команды');
       }
     },
-    ...(options || {}),
+    ...options,
   });
 };
 
 /**
  * Удалить команду
  */
-export const useDeleteCommand = (options?: UseMutationOptions<any, AxiosError, number, unknown>) => {
+export const useDeleteCommand = (options?: Omit<UseMutationOptions<ApiResponse, AxiosError, number, unknown>, 'mutationFn'>) => {
   const queryClient = useQueryClient();
-  
 
-  return useMutation({
-    mutationFn: (commandId: number) => commandsService.deleteCommand(commandId),
-    onSuccess: (response, commandId, context) => {
+  return useMutation<ApiResponse, AxiosError, number, unknown>({
+    mutationFn: (commandId: number) => unwrapResponse(commandsService.deleteCommand(commandId)),
+    onSuccess: (_response, _commandId, _context) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.commands.list() });
-      if (options?.onSuccess) {
-        (options.onSuccess as any)(response, commandId, context);
-      } else {
+      if (!options?.onSuccess) {
         toast.success('Команда удалена');
       }
     },
-    onError: (error: AxiosError, commandId, context) => {
+    onError: (error: AxiosError, _commandId, _context) => {
       logger.error('Error deleting command:', error);
-      if (options?.onError) {
-        (options.onError as any)(error, commandId, context);
-      } else {
+      if (!options?.onError) {
         toast.error('Ошибка удаления команды');
       }
     },
-    ...(options || {}),
+    ...options,
   });
 };
 
 /**
  * Переключить команду
  */
-export const useToggleCommand = (options?: UseMutationOptions<any, AxiosError, { commandName: string; data: Record<string, any> }, { previousCommands?: CommandsData }>) => {
+export const useToggleCommand = (options?: Omit<UseMutationOptions<ApiResponse, AxiosError, { commandName: string; data: Record<string, unknown> }, { previousCommands?: CommandsData }>, 'mutationFn'>) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: ({ commandName, data }: { commandName: string; data: Record<string, any> }) => commandsService.toggleCommand(commandName, data),
+  return useMutation<ApiResponse, AxiosError, { commandName: string; data: Record<string, unknown> }, { previousCommands?: CommandsData }>({
+    mutationFn: ({ commandName, data }: { commandName: string; data: Record<string, unknown> }) => unwrapResponse(commandsService.toggleCommand(commandName, data)),
     onMutate: async (variables) => {
-      // Вызываем onMutate из options если есть
-      const customContext = options?.onMutate ? await (options.onMutate as any)(variables) : undefined;
-      
-      // Оптимистичное обновление
       const { commandName, data } = variables;
       await queryClient.cancelQueries({ queryKey: queryKeys.commands.list() });
       const previousCommands = queryClient.getQueryData<CommandsData>(queryKeys.commands.list());
@@ -195,26 +177,17 @@ export const useToggleCommand = (options?: UseMutationOptions<any, AxiosError, {
         };
       });
       
-      return { previousCommands, ...(customContext || {}) };
+      return { previousCommands };
     },
     onError: (err: AxiosError, variables, context: { previousCommands?: CommandsData } | undefined) => {
-      // Откатываем при ошибке
       if (context?.previousCommands) {
         queryClient.setQueryData(queryKeys.commands.list(), context.previousCommands);
       }
-      // Вызываем onError из options если есть
-      if (options?.onError) {
-        (options.onError as any)(err, variables, context);
-      }
     },
-    onSettled: (data, error, variables, context) => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.commands.list() });
-      // Вызываем onSettled из options если есть
-      if (options?.onSettled) {
-        (options.onSettled as any)(data, error, variables, context);
-      }
     },
-    ...(options || {}),
+    ...options,
   });
 };
 

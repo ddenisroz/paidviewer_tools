@@ -1,46 +1,51 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+﻿import React, { useEffect, useState } from 'react';
+
 import { useQueryClient } from '@tanstack/react-query';
+import axios, { type AxiosError } from 'axios';
 import { 
-    Server, 
+    AlertCircle, 
+    AlertTriangle, 
     CheckCircle, 
-    XCircle, 
-    Loader2, 
     Copy, 
+    Cpu, 
     ExternalLink, 
-    AlertTriangle,
-    Cpu,
     HardDrive,
-    Zap,
-    RefreshCw,
+    Loader2,
     Mic,
-    Upload,
-    Trash2,
     Plus,
+    RefreshCw,
+    Server,
     Settings,
-    AlertCircle
+    Trash2,
+    Upload,
+    XCircle,
+    Zap
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '../../../components/ui/card';
+import { useNavigate } from 'react-router-dom';
+
+import { TABLE_CLASSES } from '@/constants/designSystem';
+import { toast } from '@/utils/toastManager';
+
+import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../../../components/ui/dialog';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
-import { Textarea } from '../../../components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
-import { Badge } from '../../../components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '../../../components/ui/dialog';
-import { toast } from 'sonner';
+import { Textarea } from '../../../components/ui/textarea';
+import { useAuth } from '../../../context/AuthContext';
+import { useIntegrations } from '../../../context/IntegrationsContext';
 import { 
   useLocalTtsConfig, 
   useSaveLocalTtsConfig, 
   useTestLocalTtsConnection, 
   useToggleLocalTts 
 } from '../../../queries/tts/ttsQueries';
-import axios from 'axios';
-import { logger } from '../../../utils/prodLogger';
-import { useAuth } from '../../../context/AuthContext';
-import { useIntegrations } from '../../../context/IntegrationsContext';
 import PageWrapper from '../../../shared/components/PageWrapper';
-import type { LocalTtsConfig } from '../../../types/tts';
+import { logger } from '../../../utils/prodLogger';
+
+import type { ApiResponse } from '../../../types/api';
 
 interface LocalTtsConfigState {
     endpoint_url: string;
@@ -114,13 +119,13 @@ const LocalTTSSettingsPage: React.FC = () => {
     const [loadingVoices, setLoadingVoices] = useState<boolean>(false);
     const [isCreateVoiceDialogOpen, setIsCreateVoiceDialogOpen] = useState<boolean>(false);
     const [newVoice, setNewVoice] = useState<NewVoice>({ name: '', language: 'ru', description: '' });
-    const [selectedVoice, setSelectedVoice] = useState<Voice | null>(null);
+    const [_selectedVoice, _setSelectedVoice] = useState<Voice | null>(null);
     const [uploadingFile, setUploadingFile] = useState<boolean>(false);
     const [currentTab, setCurrentTab] = useState<'connection' | 'voices'>('connection');
-    const [isWhitelisted, setIsWhitelisted] = useState<boolean>(true);
-    const [whitelistChecked, setWhitelistChecked] = useState<boolean>(true);
+    const [_isWhitelisted, _setIsWhitelisted] = useState<boolean>(true);
+    const [_whitelistChecked, _setWhitelistChecked] = useState<boolean>(true);
 
-    const queryClient = useQueryClient();
+    const _queryClient = useQueryClient();
 
     const { data: configData, isLoading: configLoading, error: configError } = useLocalTtsConfig({
     });
@@ -147,22 +152,24 @@ const LocalTTSSettingsPage: React.FC = () => {
     }, [configLoading]);
 
     const testConnectionMutation = useTestLocalTtsConnection({
-        onSuccess: (response: any) => {
-            if (response.data.success) {
+        onSuccess: (response) => {
+            const data = (response as ApiResponse<{ success?: boolean; health_data?: HealthData; status_data?: StatusData; error?: string }>).data || {};
+            if (data.success) {
                 setTestResult({ success: true, message: 'Соединение успешно!' });
-                setHealthData(response.data.health_data);
-                setStatusData(response.data.status_data);
+                setHealthData(data.health_data || null);
+                setStatusData(data.status_data || null);
             } else {
                 setTestResult({ 
                     success: false, 
-                    message: response.data.error || 'Не удалось подключиться' 
+                    message: data.error || 'Не удалось подключиться' 
                 });
             }
         },
-        onError: (error: any) => {
+        onError: (error) => {
+            const axiosError = error as AxiosError<{ detail?: string }>;
             setTestResult({ 
                 success: false, 
-                message: error.response?.data?.detail || 'Ошибка подключения к серверу' 
+                message: axiosError.response?.data?.detail || 'Ошибка подключения к серверу' 
             });
         },
         onMutate: () => {
@@ -188,7 +195,7 @@ const LocalTTSSettingsPage: React.FC = () => {
         onSuccess: () => {
             // Toast уже показан в hook
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             logger.error('Error saving config:', error);
         },
         onMutate: () => {
@@ -208,16 +215,17 @@ const LocalTTSSettingsPage: React.FC = () => {
     };
 
     const toggleServiceMutation = useToggleLocalTts({
-        onSuccess: (response: any) => {
-            if (response.data.success) {
-                setConfig(prev => ({ ...prev, use_local: response.data.use_local }));
+        onSuccess: (response) => {
+            const data = (response as ApiResponse<{ success?: boolean; use_local?: boolean; message?: string }>).data || {};
+            if (data.success) {
+                setConfig(prev => ({ ...prev, use_local: data.use_local || false }));
             } else {
-                toast.error(response.data.message);
+                toast.error(data.message || 'Ошибка переключения');
             }
         },
-        onError: (error: any) => {
+        onError: (error) => {
             logger.error('Error toggling service:', error);
-            toast.error('❌ Ошибка переключения сервиса');
+            toast.error('[ERROR] Ошибка переключения сервиса');
         },
     });
 
@@ -227,7 +235,7 @@ const LocalTTSSettingsPage: React.FC = () => {
 
     const copyToClipboard = (text: string): void => {
         navigator.clipboard.writeText(text);
-        toast.success('📋 Скопировано в буфер обмена');
+        toast.success('[LIST] Скопировано в буфер обмена');
     };
 
     const loadVoices = async (): Promise<void> => {
@@ -237,7 +245,7 @@ const LocalTTSSettingsPage: React.FC = () => {
             setLoadingVoices(true);
             const response = await axios.get(`${config.endpoint_url}/api/voices/list`);
             setVoices((response.data.voices || []) as Voice[]);
-        } catch (error: any) {
+        } catch (error: unknown) {
             logger.error('Error loading voices:', error);
             toast.error('Ошибка загрузки голосов');
         } finally {
@@ -257,18 +265,19 @@ const LocalTTSSettingsPage: React.FC = () => {
             formData.append('language', newVoice.language);
             formData.append('description', newVoice.description);
 
-            const response = await axios.post(
+            const _response = await axios.post(
                 `${config.endpoint_url}/api/voices/create`,
                 formData
             );
 
-            toast.success('✅ Голос создан! Загрузите референсные аудио.');
+            toast.success('[OK] Голос создан! Загрузите референсные аудио.');
             setIsCreateVoiceDialogOpen(false);
             setNewVoice({ name: '', language: 'ru', description: '' });
             loadVoices();
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const axiosError = error as AxiosError<{ detail?: string }>;
             logger.error('Error creating voice:', error);
-            toast.error(error.response?.data?.detail || 'Ошибка создания голоса');
+            toast.error(axiosError.response?.data?.detail || 'Ошибка создания голоса');
         }
     };
 
@@ -276,7 +285,7 @@ const LocalTTSSettingsPage: React.FC = () => {
     const [currentSampleVoiceId, setCurrentSampleVoiceId] = useState<number | null>(null);
     const [sampleText, setSampleText] = useState<string>('');
     const [sampleFile, setSampleFile] = useState<File | null>(null);
-    const [isTranscribing, setIsTranscribing] = useState<boolean>(false);
+    const [_isTranscribing, _setIsTranscribing] = useState<boolean>(false);
 
     const uploadSample = async (voiceId: number, file: File, text: string): Promise<void> => {
         try {
@@ -294,17 +303,18 @@ const LocalTTSSettingsPage: React.FC = () => {
 
             toast.success(
                 response.data.transcription 
-                    ? '✅ Сэмпл загружен и транскрибирован'
-                    : '✅ Сэмпл загружен'
+                    ? '[OK] Сэмпл загружен и транскрибирован'
+                    : '[OK] Сэмпл загружен'
             );
             
             loadVoices();
             setSampleDialogOpen(false);
             setSampleText('');
             setSampleFile(null);
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const axiosError = error as AxiosError<{ detail?: string }>;
             logger.error('Error uploading sample:', error);
-            toast.error(error.response?.data?.detail || 'Ошибка загрузки сэмпла');
+            toast.error(axiosError.response?.data?.detail || 'Ошибка загрузки сэмпла');
         } finally {
             setUploadingFile(false);
         }
@@ -330,9 +340,9 @@ const LocalTTSSettingsPage: React.FC = () => {
 
         try {
             await axios.delete(`${config.endpoint_url}/api/voices/${voiceId}`);
-            toast.success('🗑️ Голос удалён');
+            toast.success('[DELETE] Голос удалён');
             loadVoices();
-        } catch (error: any) {
+        } catch (error: unknown) {
             logger.error('Error deleting voice:', error);
             toast.error('Ошибка удаления голоса');
         }
@@ -811,7 +821,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                                             variant="ghost"
                                                             size="sm"
                                                             onClick={() => deleteVoice(voice.id)}
-                                                            className="h-8 w-8 p-0"
+                                                            className={TABLE_CLASSES.actionButton}
                                                         >
                                                             <Trash2 className="w-4 h-4 text-red-400" />
                                                         </Button>
@@ -853,7 +863,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                     <Card className="bg-blue-500/10 border-blue-500/30">
                         <CardHeader>
                             <CardTitle className="text-blue-400 text-sm">
-                                💡 Рекомендации по записи
+                                [INFO] Рекомендации по записи
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2 text-sm">
@@ -888,7 +898,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                 rows={3}
                             />
                             <p className="text-xs text-muted-foreground mt-1">
-                                💡 Если оставить пустым, текст будет извлечён автоматически через Whisper
+                                [INFO] Если оставить пустым, текст будет извлечён автоматически через Whisper
                             </p>
                         </div>
 

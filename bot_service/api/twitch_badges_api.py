@@ -17,25 +17,25 @@ async def get_global_badges(client_id: str, access_token: str) -> Dict:
     Получить глобальные badges Twitch
     """
     global GLOBAL_BADGES_CACHE
-    
+
     if GLOBAL_BADGES_CACHE:
         return GLOBAL_BADGES_CACHE
-    
+
     url = "https://api.twitch.tv/helix/chat/badges/global"
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Client-Id": client_id
     }
-    
+
     try:
         # Timeout: 10 секунд на соединение, 30 секунд на чтение
         timeout = aiohttp.ClientTimeout(total=30, connect=10)
-        
+
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.get(url, headers=headers) as response:
                 if response.status == 200:
                     data = await response.json()
-                    
+
                     # Преобразуем в удобный формат: {badge_id: {version: url}}
                     badges_dict = {}
                     for badge_set in data.get('data', []):
@@ -47,15 +47,15 @@ async def get_global_badges(client_id: str, access_token: str) -> Dict:
                                 'image_url_2x': version['image_url_2x'],
                                 'image_url_4x': version['image_url_4x'],
                             }
-                    
+
                     GLOBAL_BADGES_CACHE = badges_dict
-                    logger.info(f"✅ Loaded {len(badges_dict)} global badge sets")
+                    logger.info(f"[OK] Loaded {len(badges_dict)} global badge sets")
                     return badges_dict
                 else:
-                    logger.error(f"❌ Failed to fetch global badges: {response.status}")
+                    logger.error(f"[ERROR] Failed to fetch global badges: {response.status}")
                     return {}
     except Exception as e:
-        logger.error(f"❌ Error fetching global badges: {e}")
+        logger.error(f"[ERROR] Error fetching global badges: {e}")
         return {}
 
 
@@ -65,22 +65,22 @@ async def get_channel_badges(broadcaster_id: str, client_id: str, access_token: 
     """
     if broadcaster_id in CHANNEL_BADGES_CACHE:
         return CHANNEL_BADGES_CACHE[broadcaster_id]
-    
+
     url = f"https://api.twitch.tv/helix/chat/badges?broadcaster_id={broadcaster_id}"
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Client-Id": client_id
     }
-    
+
     try:
         # Timeout: 10 секунд на соединение, 30 секунд на чтение
         timeout = aiohttp.ClientTimeout(total=30, connect=10)
-        
+
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.get(url, headers=headers) as response:
                 if response.status == 200:
                     data = await response.json()
-                    
+
                     # Преобразуем в удобный формат
                     badges_dict = {}
                     for badge_set in data.get('data', []):
@@ -92,29 +92,29 @@ async def get_channel_badges(broadcaster_id: str, client_id: str, access_token: 
                                 'image_url_2x': version['image_url_2x'],
                                 'image_url_4x': version['image_url_4x'],
                             }
-                    
+
                     CHANNEL_BADGES_CACHE[broadcaster_id] = badges_dict
-                    logger.info(f"✅ Loaded {len(badges_dict)} badge sets for channel {broadcaster_id}")
+                    logger.info(f"[OK] Loaded {len(badges_dict)} badge sets for channel {broadcaster_id}")
                     return badges_dict
                 elif response.status == 400:
                     # 400 Bad Request - обычно означает что канал не найден или неверный broadcaster_id
                     error_text = await response.text()
-                    logger.warning(f"⚠️ Channel badges not available for broadcaster {broadcaster_id}: {response.status} - {error_text}")
+                    logger.warning(f"[WARN] Channel badges not available for broadcaster {broadcaster_id}: {response.status} - {error_text}")
                     # Кэшируем пустой результат, чтобы не запрашивать снова
                     CHANNEL_BADGES_CACHE[broadcaster_id] = {}
                     return {}
                 elif response.status == 404:
                     # 404 Not Found - канал не найден
-                    logger.warning(f"⚠️ Channel {broadcaster_id} not found")
+                    logger.warning(f"[WARN] Channel {broadcaster_id} not found")
                     CHANNEL_BADGES_CACHE[broadcaster_id] = {}
                     return {}
                 else:
                     error_text = await response.text()
-                    logger.error(f"❌ Failed to fetch channel badges: {response.status} - {error_text}")
+                    logger.error(f"[ERROR] Failed to fetch channel badges: {response.status} - {error_text}")
                     # Не кэшируем ошибки, чтобы можно было повторить попытку
                     return {}
     except Exception as e:
-        logger.error(f"❌ Error fetching channel badges: {e}", exc_info=True)
+        logger.error(f"[ERROR] Error fetching channel badges: {e}", exc_info=True)
         return {}
 
 
@@ -135,10 +135,10 @@ def get_badge_url(badge_id: str, version: str, global_badges: Dict, channel_badg
     # Сначала ищем в badges канала (приоритет)
     if badge_id in channel_badges and version in channel_badges[badge_id]:
         return channel_badges[badge_id][version].get(f'image_url_{size}')
-    
+
     # Затем в глобальных badges
     if badge_id in global_badges and version in global_badges[badge_id]:
         return global_badges[badge_id][version].get(f'image_url_{size}')
-    
+
     return None
 

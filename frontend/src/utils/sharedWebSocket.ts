@@ -1,8 +1,9 @@
-import Logger from './prodLogger';
 import { WS_BASE_URL } from '../constants';
 import { WEBSOCKET_CONSTANTS } from '../constants/websocket';
 
-type MessageHandler = (message: any) => void;
+import Logger from './prodLogger';
+
+type MessageHandler = (message: Record<string, unknown>) => void;
 type ConnectionStatusHandler = (status: 'connected' | 'disconnected' | 'reconnecting' | 'failed') => void;
 
 class SharedWebSocketManager {
@@ -54,7 +55,7 @@ class SharedWebSocketManager {
     this.userId = userId;
     this.channel = new BroadcastChannel(`ws_chat_${userId}`);
     this.channel.onmessage = (event) => {
-      this._handleChannelMessage(event.data as any);
+      this._handleChannelMessage(event.data as Record<string, unknown>);
     };
     this._electLeader();
     this.leaderCheckInterval = setInterval(() => {
@@ -77,7 +78,7 @@ class SharedWebSocketManager {
   private _becomeLeader(): void {
     if (this.isLeader) return;
     this.isLeader = true;
-    this.logger.info(`[${this.tabId}] 👑 Became LEADER - opening WebSocket`);
+    this.logger.info(`[${this.tabId}] [LEADER] Became LEADER - opening WebSocket`);
     this._connectWebSocket();
     
     // Leader heartbeat to other tabs (every 2 seconds)
@@ -129,7 +130,7 @@ class SharedWebSocketManager {
     }
   }
 
-  private _handleChannelMessage(data: any): void {
+  private _handleChannelMessage(data: Record<string, unknown>): void {
     switch (data.type) {
       case 'leader_ping':
         if (this.isLeader) {
@@ -145,7 +146,7 @@ class SharedWebSocketManager {
         break;
       case 'leader_heartbeat':
         if (data.tabId !== this.tabId) {
-          this.lastLeaderHeartbeat = data.timestamp;
+          this.lastLeaderHeartbeat = data.timestamp as number;
         }
         break;
       case 'leader_elected':
@@ -163,7 +164,7 @@ class SharedWebSocketManager {
         break;
       case 'ws_message':
         if (!this.isLeader) {
-          this._notifyHandlers(data.message);
+          this._notifyHandlers(data.message as Record<string, unknown>);
         }
         break;
       case 'ws_connected':
@@ -173,7 +174,7 @@ class SharedWebSocketManager {
         break;
       case 'connection_status':
         if (data.tabId !== this.tabId) {
-          this._updateConnectionStatus(data.status);
+          this._updateConnectionStatus(data.status as 'connected' | 'disconnected' | 'reconnecting' | 'failed');
         }
         break;
       case 'ws_connection_failed':
@@ -202,13 +203,13 @@ class SharedWebSocketManager {
       const wsBaseUrl = WS_BASE_URL || `${protocol}//${window.location.hostname}:8000`;
       const wsUrl = `${wsBaseUrl}/ws/chat/${this.userId}`;
       
-      this.logger.info(`[${this.tabId}] 🔌 Connecting WebSocket: ${wsUrl}`);
+      this.logger.info(`[${this.tabId}] [CONNECT] Connecting WebSocket: ${wsUrl}`);
       this._updateConnectionStatus('reconnecting');
       
       this.ws = new WebSocket(wsUrl);
       
       this.ws.onopen = () => {
-        this.logger.info(`[${this.tabId}] ✅ WebSocket connected`);
+        this.logger.info(`[${this.tabId}] [OK] WebSocket connected`);
         this.reconnectAttempts = 0;
         this.lastWsHeartbeat = Date.now();
         this._updateConnectionStatus('connected');
@@ -219,7 +220,7 @@ class SharedWebSocketManager {
         // Notify other tabs
         this.channel?.postMessage({ type: 'ws_connected', tabId: this.tabId });
         
-        // Trigger state reconciliation
+        // Trigger state reconciliation (БЕЗ toast уведомления)
         this._reconcileState();
       };
       
@@ -248,7 +249,7 @@ class SharedWebSocketManager {
       };
       
       this.ws.onerror = (error) => {
-        this.logger.error(`[${this.tabId}] ❌ WebSocket error:`, error);
+        this.logger.error(`[${this.tabId}] [ERROR] WebSocket error:`, error);
       };
       
       this.ws.onclose = () => {
@@ -326,7 +327,7 @@ class SharedWebSocketManager {
     });
   }
 
-  private _notifyHandlers(message: any): void {
+  private _notifyHandlers(message: Record<string, unknown>): void {
     this.messageHandlers.forEach((handler) => {
       try {
         handler(message);
@@ -377,7 +378,7 @@ class SharedWebSocketManager {
     this.logger.info(`[${this.tabId}] State reconciliation triggered`);
   }
 
-  send(data: any): void {
+  send(data: Record<string, unknown>): void {
     if (!this.isLeader) {
       this.logger.warn(`[${this.tabId}] Not a leader, cannot send message`);
       return;

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+
+import { ChevronRight, Coins, Command, Headphones, Home, LucideIcon, Menu, MessageSquare, Mic, Monitor, Settings, Shield, Sparkles, X, Youtube } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Mic, Youtube, Coins, Headphones, Settings, Shield, MessageSquare, Command, Sparkles, Monitor, Menu, X, ChevronRight, LucideIcon } from 'lucide-react';
+
 import { useAuth } from '../../context/AuthContext';
-import { useAdminList } from '../../queries/admin/adminQueries';
-import { logger } from '../../utils/prodLogger';
 import { createPreloadHandler } from '../../utils/preloadRoute';
 
 interface NavSubItem {
@@ -83,7 +83,7 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
     const isParentActive = hasSubmenu 
         ? item.submenu!.some(sub => {
             // Точное совпадение или путь начинается с sub.to + '/'
-            return location.pathname === sub.to || location.pathname.startsWith(sub.to + '/');
+            return location.pathname === sub.to || location.pathname.startsWith(`${sub.to  }/`);
         })
         : location.pathname === item.to;
 
@@ -215,13 +215,6 @@ const Sidebar: React.FC = () => {
     const { user, isAuthenticated, isGuest } = useAuth();
     const [isAdmin, setIsAdmin] = useState(false);
     
-    // Загружаем список админов только для админов
-    const { data: adminListData } = useAdminList({
-        enabled: !!user?.is_admin,
-    });
-    
-    const adminUsers = adminListData?.data || [];
-    
     // Проверяем, является ли пользователь админом
     useEffect(() => {
         if (isAuthenticated && user) {
@@ -245,7 +238,7 @@ const Sidebar: React.FC = () => {
         // Проверяем, находимся ли мы на странице из какого-либо submenu
         const isInAnySubmenu = navItems.some(item => 
             item.submenu?.some(sub => 
-                location.pathname === sub.to || location.pathname.startsWith(sub.to + '/')
+                location.pathname === sub.to || location.pathname.startsWith(`${sub.to  }/`)
             )
         );
         
@@ -319,7 +312,7 @@ const Sidebar: React.FC = () => {
                     <div className="p-4 border-t">
                         <div className="flex flex-col items-center justify-center gap-4 text-center">
                             <div className="text-4xl mb-2">
-                                😔
+                                [SAD]
                             </div>
                             <h3 className="text-lg font-bold text-foreground">
                                 Интеграции отключены

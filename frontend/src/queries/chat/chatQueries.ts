@@ -1,21 +1,25 @@
 /**
  * Chat Queries - централизованные React Query queries для Chat
  */
-import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
-import { queryKeys } from '../queryKeys';
-import { chatService } from '../../services/api/services/chatService';
+import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
+
+import { chatService } from '../../services/api/services/chatService';
 import { logger } from '../../utils/prodLogger';
-import type { AxiosError } from 'axios';
+import { queryKeys } from '../queryKeys';
+import { unwrapResponse } from '../queryUtils';
+
+
 import type { ApiResponse } from '../../types';
+import type { AxiosError } from 'axios';
 
 /**
  * Получить историю чата
  */
-export const useChatHistory = (params: Record<string, any> = {}, options?: Omit<UseQueryOptions<any, AxiosError>, 'queryKey' | 'queryFn'>) => {
+export const useChatHistory = (params: Record<string, unknown> = {}, options?: Omit<UseQueryOptions<ApiResponse, AxiosError>, 'queryKey' | 'queryFn'>) => {
   return useQuery({
     queryKey: queryKeys.chat.history(),
-    queryFn: () => chatService.getChatHistory(params),
+    queryFn: () => unwrapResponse(chatService.getChatHistory(params)),
     staleTime: 30 * 1000, // 30 секунд
     gcTime: 5 * 60 * 1000, // 5 минут
     refetchOnMount: false,
@@ -28,10 +32,10 @@ export const useChatHistory = (params: Record<string, any> = {}, options?: Omit<
 /**
  * Получить статус бота
  */
-export const useBotStatus = (options?: Omit<UseQueryOptions<any, AxiosError>, 'queryKey' | 'queryFn'>) => {
+export const useBotStatus = (options?: Omit<UseQueryOptions<ApiResponse, AxiosError>, 'queryKey' | 'queryFn'>) => {
   return useQuery({
     queryKey: queryKeys.chat.botStatus(),
-    queryFn: () => chatService.getBotStatus(),
+    queryFn: () => unwrapResponse(chatService.getBotStatus()),
     staleTime: 10 * 1000, // 10 секунд
     gcTime: 2 * 60 * 1000, // 2 минуты
     refetchInterval: 30 * 1000, // 30 секунд
@@ -45,11 +49,11 @@ export const useBotStatus = (options?: Omit<UseQueryOptions<any, AxiosError>, 'q
 /**
  * Подключить бота
  */
-export const useConnectBot = (options?: UseMutationOptions<any, AxiosError, void>) => {
+export const useConnectBot = (options?: UseMutationOptions<ApiResponse, AxiosError, void>) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: () => chatService.connectBot(),
+    mutationFn: () => unwrapResponse(chatService.connectBot()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.chat.botStatus() });
       if (!options?.onSuccess) {
@@ -59,7 +63,7 @@ export const useConnectBot = (options?: UseMutationOptions<any, AxiosError, void
     onError: (error: AxiosError) => {
       logger.error('Error connecting bot:', error);
       if (!options?.onError) {
-        const errorMessage = (error.response?.data as any)?.detail || (error.response?.data as any)?.message || 'Не удалось подключить бота';
+        const errorMessage = (error.response?.data as Record<string, unknown>)?.detail as string || (error.response?.data as Record<string, unknown>)?.message as string || 'Не удалось подключить бота';
         toast.error(errorMessage);
       }
     },
@@ -70,11 +74,11 @@ export const useConnectBot = (options?: UseMutationOptions<any, AxiosError, void
 /**
  * Отключить бота
  */
-export const useDisconnectBot = (options?: UseMutationOptions<any, AxiosError, void>) => {
+export const useDisconnectBot = (options?: UseMutationOptions<ApiResponse, AxiosError, void>) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: () => chatService.disconnectBot(),
+    mutationFn: () => unwrapResponse(chatService.disconnectBot()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.chat.botStatus() });
       if (!options?.onSuccess) {
@@ -84,7 +88,7 @@ export const useDisconnectBot = (options?: UseMutationOptions<any, AxiosError, v
     onError: (error: AxiosError) => {
       logger.error('Error disconnecting bot:', error);
       if (!options?.onError) {
-        const errorMessage = (error.response?.data as any)?.detail || (error.response?.data as any)?.message || 'Не удалось отключить бота';
+        const errorMessage = (error.response?.data as Record<string, unknown>)?.detail as string || (error.response?.data as Record<string, unknown>)?.message as string || 'Не удалось отключить бота';
         toast.error(errorMessage);
       }
     },

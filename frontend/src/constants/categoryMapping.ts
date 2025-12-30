@@ -585,17 +585,17 @@ export function getSimilarCategories(
 export const CATEGORY_MAPPING = categoryMapping;
 
 export const CATEGORY_ICONS: Record<string, string> = {
-  'just-chatting': '💬',
-  music: '🎵',
-  gaming: '🎮',
-  art: '🎨',
-  sports: '⚽',
-  'science-tech': '🔬',
-  asmr: '🎧',
-  cooking: '👨‍🍳',
-  travel: '✈️',
-  education: '📚',
-  other: '📺',
+  'just-chatting': '[CHAT]',
+  music: '[AUDIO]',
+  gaming: '[GAME]',
+  art: '[ART]',
+  sports: '[SPORTS]',
+  'science-tech': '[TECH]',
+  asmr: '[LISTEN]',
+  cooking: '[COOK]',
+  travel: '[TRAVEL]',
+  education: '[EDU]',
+  other: '[OTHER]',
 };
 
 

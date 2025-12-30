@@ -20,10 +20,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Добавляем режим работы TTS (all_messages или channel_points)
-    op.add_column('tts_user_settings', 
+    op.add_column('tts_user_settings',
         sa.Column('tts_mode', sa.String(), nullable=False, server_default='all_messages')
     )
-    
+
     # Добавляем JSON для хранения ID наград TTS для каждой платформы
     # Формат: {"twitch": "reward_id", "vk": "reward_id"}
     op.add_column('tts_user_settings',

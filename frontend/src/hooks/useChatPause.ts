@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
+
 import { useLocation } from 'react-router-dom';
+
 import { useChat } from '../context/ChatContext';
 
 const useChatPause = (): void => {

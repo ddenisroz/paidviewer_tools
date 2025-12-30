@@ -2,14 +2,9 @@
 """Основной класс VK Live бота"""
 import asyncio
 import logging
-import time
-import os
-import json
 from typing import List, Dict, Any, Optional
 from core.connection_manager import ConnectionManager
-from core.database import BotCommand, get_db
 from utils.vk_live_websocket import VKLiveWebSocketClient
-from constants import DEFAULT_BACKEND_URL
 
 logger = logging.getLogger('bot_service')
 
@@ -21,7 +16,7 @@ class VKLiveBotCore:
     
     Это НЕ токен стримера! Аналогично Twitch Bot Token.
     """
-    
+
     def __init__(self, user_access_token: str, connection_manager: ConnectionManager):
         """
         Args:
@@ -32,14 +27,14 @@ class VKLiveBotCore:
         self.connection_manager = connection_manager
         self.connected_channels: List[str] = []
         self.is_running = False
-        
+
         self.ws_client: Optional[VKLiveWebSocketClient] = None
         self.ws_task: Optional[asyncio.Task] = None
-        
+
         # Инициализируем TTS API для обработки сообщений
         from features.tts.tts_api import TTSAPI
         self.tts_api = TTSAPI()
-        
+
         # Универсальная система команд
         from bots.universal_command_handler import UniversalCommandHandler
         self.universal_command_handler = UniversalCommandHandler()
@@ -49,9 +44,9 @@ class VKLiveBotCore:
         if self.is_running:
             logger.warning("VK Live bot is already running")
             return
-            
+
         self.is_running = True
-        logger.info("🚀 VK LIVE BOT STARTED - Ready to listen to chat")
+        logger.info("[START] VK LIVE BOT STARTED - Ready to listen to chat")
         logger.info("VK LIVE BOT: Started and ready to connect to channels")
 
     async def stop_bot(self):
@@ -59,7 +54,7 @@ class VKLiveBotCore:
         if not self.is_running:
             logger.warning("VK Live bot is not running")
             return
-            
+
         self.is_running = False
         logger.info("🛑 VK LIVE BOT STOPPED")
 
@@ -73,9 +68,9 @@ class VKLiveBotCore:
             # Используем HTTP polling вместо WebSocket!
             from utils.vk_live_http_polling import VKLiveHTTPPolling
             from core.database import User, UserToken, get_db
-            
-            logger.info(f"🔌 Connecting VK Live HTTP polling to channel: {channel_id}")
-            
+
+            logger.info(f"[CONNECT] Connecting VK Live HTTP polling to channel: {channel_id}")
+
             # Получаем OAuth токен пользователя из базы данных
             db = next(get_db())
             try:
@@ -83,56 +78,56 @@ class VKLiveBotCore:
                 from sqlalchemy import func
                 user = db.query(User).filter(func.lower(User.vk_channel_name) == channel_id.lower()).first()
                 if not user:
-                    logger.error(f"❌ User not found for VK channel: {channel_id}")
+                    logger.error(f"[ERROR] User not found for VK channel: {channel_id}")
                     return False
-                
+
                 # Получаем OAuth токен пользователя
                 user_token = db.query(UserToken).filter(
                     UserToken.user_id == user.id,
                     UserToken.platform == 'vk'
                 ).first()
-                
+
                 if not user_token or not user_token.access_token:
-                    logger.error(f"❌ No VK OAuth token found for channel: {channel_id}")
+                    logger.error(f"[ERROR] No VK OAuth token found for channel: {channel_id}")
                     return False
-                
+
                 # Расшифровываем токен
                 from core.token_encryption import decrypt_token, is_token_encrypted
-                
+
                 oauth_token = user_token.access_token
                 if is_token_encrypted(oauth_token):
                     oauth_token = decrypt_token(oauth_token)
-                
-                logger.info(f"✅ Found VK OAuth token for channel: {channel_id}")
-                
+
+                logger.info(f"[OK] Found VK OAuth token for channel: {channel_id}")
+
             finally:
                 db.close()
-            
+
             # Создаем HTTP polling клиент с OAuth токеном пользователя
             self.http_polling = VKLiveHTTPPolling(
                 access_token=oauth_token,  # Используем OAuth токен пользователя!
                 channel_url=channel_id
             )
-            
+
             # Запускаем polling с обработчиком сообщений
             await self.http_polling.start(self._handle_message)
-            
+
             self.connected_channels.append(channel_id)
-            logger.info(f"✅ VK Live HTTP polling started for channel: {channel_id}")
-            
+            logger.info(f"[OK] VK Live HTTP polling started for channel: {channel_id}")
+
             return True
-            
+
         except Exception as e:
-            logger.error(f"❌ Failed to connect to channel {channel_id}: {e}")
+            logger.error(f"[ERROR] Failed to connect to channel {channel_id}: {e}")
             import traceback
             logger.error(traceback.format_exc())
             return False
-    
+
     async def _get_websocket_channel_name(self, channel_url: str) -> str:
         """Получить реальное имя WebSocket канала из VK API"""
         try:
             import aiohttp
-            
+
             url = "https://apidev.live.vkvideo.ru/v1/channel"
             headers = {
                 "Authorization": f"Bearer {self.user_access_token}",
@@ -141,40 +136,40 @@ class VKLiveBotCore:
             params = {
                 "channel_url": channel_url
             }
-            
+
             # SSL context с отключенной верификацией для dev API
             import ssl
             ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
-            
+
             async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
                 async with session.get(url, headers=headers, params=params) as response:
                     if response.status == 200:
                         data = await response.json()
                         ws_channels = data.get("data", {}).get("channel", {}).get("web_socket_channels", {})
-                        
+
                         # Логируем ВСЕ доступные каналы
-                        logger.info(f"📋 Available WebSocket channels: {ws_channels}")
-                        
+                        logger.info(f"[LIST] Available WebSocket channels: {ws_channels}")
+
                         # Пробуем разные варианты каналов в порядке приоритета:
                         # 1. chat - ПОСТОЯННЫЙ публичный чат канала (работает всегда)
                         # 2. limited_chat - приватный чат ТЕКУЩЕГО стрима (только во время стрима)
                         # 3. private_chat - личный чат
-                        
+
                         for channel_type in ["chat", "limited_chat", "private_chat"]:
                             chat_channel = ws_channels.get(channel_type)
                             if chat_channel:
-                                logger.info(f"✅ Selected WebSocket channel ({channel_type}): {chat_channel}")
+                                logger.info(f"[OK] Selected WebSocket channel ({channel_type}): {chat_channel}")
                                 return chat_channel
-                        
-                        logger.error(f"❌ No chat channel found in response for {channel_url}")
+
+                        logger.error(f"[ERROR] No chat channel found in response for {channel_url}")
                         return None
                     else:
                         error_text = await response.text()
-                        logger.error(f"❌ Failed to get channel info: {response.status} - {error_text}")
+                        logger.error(f"[ERROR] Failed to get channel info: {response.status} - {error_text}")
                         return None
-                        
+
         except Exception as e:
             logger.error(f"Error getting WebSocket channel name: {e}")
             import traceback
@@ -194,12 +189,12 @@ class VKLiveBotCore:
                 self.http_polling = None
 
             self.connected_channels.remove(channel_id)
-            logger.info(f"✅ Disconnected from VK Live channel: {channel_id}")
-            
+            logger.info(f"[OK] Disconnected from VK Live channel: {channel_id}")
+
             return True
-            
+
         except Exception as e:
-            logger.error(f"❌ Failed to disconnect from channel {channel_id}: {e}")
+            logger.error(f"[ERROR] Failed to disconnect from channel {channel_id}: {e}")
             return False
 
     async def _read_messages(self):
@@ -215,7 +210,7 @@ class VKLiveBotCore:
         except Exception as e:
             logger.error(f"Error reading messages: {e}")
             # Fallback: если WebSocket не работает, пробуем polling
-            logger.info("🔄 Falling back to VK Live polling mode")
+            logger.info("[REFRESH] Falling back to VK Live polling mode")
             await self._poll_vk_live_messages()
 
     async def _handle_message(self, message: Dict[str, Any]):
@@ -230,19 +225,19 @@ class VKLiveBotCore:
             platform = message.get("platform", "vk")
             is_owner = author.get("is_owner", False) or author.get("is_broadcaster", False)
             is_moderator = author.get("is_moderator", False)
-            
+
             # Определяем роль для VK Live
             role = None
             if is_owner:
                 role = 'broadcaster'
             elif is_moderator:
                 role = 'moderator'
-            
+
             logger.info(f"📩 [VK MSG] {channel_id} | {user} (owner={is_owner}, mod={is_moderator}, role={role}): {text[:50]}")
-            
+
             # 1. Отправляем сообщение в WebSocket для отображения в chatbox
             from utils.websocket_helper import broadcast_chat_message
-            logger.info(f"🔄 [VK MSG] About to broadcast message...")
+            logger.info("[REFRESH] [VK MSG] About to broadcast message...")
             await broadcast_chat_message(
                 username=user,
                 content=text,
@@ -251,35 +246,35 @@ class VKLiveBotCore:
                 role=role,
                 badges=None  # VK Live не предоставляет badges через API
             )
-            logger.info(f"✅ [VK MSG] Broadcast completed, processing command checks...")
-            
-            # 1.5. ✅ НОВОЕ: Увеличиваем счетчик сообщений для стриков (только если стрик включен)
+            logger.info("[OK] [VK MSG] Broadcast completed, processing command checks...")
+
+            # 1.5. [OK] НОВОЕ: Увеличиваем счетчик сообщений для стриков (только если стрик включен)
             try:
                 from features.drops.drops_service import DropsService
                 from core.database import get_db, User
                 from sqlalchemy import func
-                
+
                 db = get_db().__next__()
                 try:
                     channel_owner = db.query(User).filter(
                         func.lower(User.vk_channel_name) == channel_id.lower()
                     ).first()
-                    
+
                     if channel_owner:
                         drops_service = DropsService(db)
-                        # ✅ Проверяем включен ли стрик для VK
+                        # [OK] Проверяем включен ли стрик для VK
                         config = drops_service.get_config(
                             user_id=channel_owner.id,
                             session_id=None,
                             channel_name=channel_id.lower(),
                             platform=None  # Общий конфиг
                         )
-                        
+
                         # Проверяем включен ли стрик для VK
                         streak_enabled = False
                         if config:
                             streak_enabled = getattr(config, 'streak_enabled_vk', False)
-                        
+
                         # Увеличиваем счетчик только если стрик включен
                         if streak_enabled:
                             drops_service.increment_viewer_message_count(
@@ -289,8 +284,8 @@ class VKLiveBotCore:
                                 viewer_id=user_id,
                                 viewer_name=user
                             )
-                            
-                            # ✅ Обрабатываем стрик Drops (проверяем награды)
+
+                            # [OK] Обрабатываем стрик Drops (проверяем награды)
                             try:
                                 result = drops_service.process_streak_drops(
                                     user_id=channel_owner.id,
@@ -299,10 +294,10 @@ class VKLiveBotCore:
                                     viewer_id=user_id,
                                     viewer_name=user
                                 )
-                                
+
                                 if result:
-                                    logger.info(f"🎁 [DROPS VK] {result['viewer_name']} получил {result['reward']} ({result['quality']})")
-                                    
+                                    logger.info(f"[REWARD] [DROPS VK] {result['viewer_name']} получил {result['reward']} ({result['quality']})")
+
                                     # Отправляем событие в WebSocket для OBS виджета
                                     from utils.websocket_helper import broadcast_drops_event
                                     await broadcast_drops_event(result)
@@ -312,10 +307,10 @@ class VKLiveBotCore:
                     db.close()
             except Exception as streak_err:
                 logger.debug(f"Could not increment streak message count for VK: {streak_err}")
-            
+
             # 2. Проверка гостевого кода (если это 6 цифр)
             if text.strip().isdigit() and len(text.strip()) == 6:
-                logger.info(f"🔍 [GUEST_VK] Detected 6-digit code: {text.strip()}")
+                logger.info(f"[DEBUG] [GUEST_VK] Detected 6-digit code: {text.strip()}")
                 from api.guest_api import confirm_guest_code
                 confirm_guest_code(
                     channel_name=channel_id,
@@ -324,10 +319,10 @@ class VKLiveBotCore:
                     is_owner=is_owner
                 )
                 return  # Не обрабатываем TTS для кодов
-            
+
             # 3. Обрабатываем команды через универсальную систему
             if text.startswith('!'):
-                logger.info(f"🎮 [VK CMD] Detected command: {text[:50]}")
+                logger.info(f"[GAME] [VK CMD] Detected command: {text[:50]}")
                 # Преобразуем формат сообщения для universal_command_handler
                 command_message = {
                     'message': text,
@@ -336,15 +331,15 @@ class VKLiveBotCore:
                     'is_moderator': message.get("author", {}).get("is_moderator", False),
                     'is_owner': message.get("author", {}).get("is_owner", False)
                 }
-                logger.info(f"🎮 [VK CMD] Calling handler for channel: {channel_id}, message: {command_message}")
+                logger.info(f"[GAME] [VK CMD] Calling handler for channel: {channel_id}, message: {command_message}")
                 await self.universal_command_handler.handle_vk_command(channel_id, command_message, self)
-                logger.info(f"🎮 [VK CMD] Handler completed for: {text[:50]}")
+                logger.info(f"[GAME] [VK CMD] Handler completed for: {text[:50]}")
                 return  # Не обрабатываем TTS для команд
-            
+
             # 4. Извлекаем reward_id из сообщения
             reward_id = None
             reward_title = None
-            
+
             # VK Live не передает reward_id напрямую, но ChatBot отправляет сообщения о наградах
             # Паттерн: "получает награду: [название награды] за [стоимость]"
             if user.lower() == 'chatbot':
@@ -353,8 +348,8 @@ class VKLiveBotCore:
                 match = re.search(reward_pattern, text)
                 if match:
                     reward_title = match.group(1).strip()
-                    logger.info(f"🎁 [VK MSG] Detected reward from ChatBot: '{reward_title}'")
-                    
+                    logger.info(f"[REWARD] [VK MSG] Detected reward from ChatBot: '{reward_title}'")
+
                     # Ищем reward_id TTS награды из настроек пользователя
                     from core.database import SessionLocal, User, TTSUserSettings
                     db = SessionLocal()
@@ -363,24 +358,24 @@ class VKLiveBotCore:
                         channel_owner = db.query(User).filter(
                             func.lower(User.vk_channel_name) == channel_id.lower()
                         ).first()
-                        
+
                         if channel_owner:
                             tts_settings = db.query(TTSUserSettings).filter(
                                 TTSUserSettings.user_id == channel_owner.id
                             ).first()
-                            
+
                             # Если название награды содержит "TTS" - считаем что это TTS награда
                             if tts_settings and tts_settings.tts_reward_ids and 'tts' in reward_title.lower():
                                 stored_reward_id = tts_settings.tts_reward_ids.get('vk')
                                 if stored_reward_id:
                                     reward_id = stored_reward_id
-                                    logger.info(f"✅ [VK MSG] Matched TTS reward_id: {reward_id}")
+                                    logger.info(f"[OK] [VK MSG] Matched TTS reward_id: {reward_id}")
                     finally:
                         db.close()
-            
+
             # 5. Обработка TTS для обычных сообщений
             await self._handle_vk_tts(message, channel_id, user, text, reward_id, reward_title)
-                
+
         except Exception as e:
             logger.error(f"Error handling VK Live message: {e}")
             import traceback
@@ -389,7 +384,7 @@ class VKLiveBotCore:
     async def _handle_vk_tts(self, message: Dict[str, Any], channel_id: str, username: str, text: str, reward_id: str = None, reward_title: str = None):
         """Обработка TTS для VK сообщений"""
         from utils.websocket_helper import handle_tts_for_message
-        
+
         # Если это сообщение с наградой от ChatBot - извлекаем чистый текст
         cleaned_text = text
         if username.lower() == 'chatbot' and reward_title:
@@ -398,7 +393,7 @@ class VKLiveBotCore:
             reward_pattern = r'^получает награду:\s*[^\n]+?\s*за\s*\d+\s*\n*'
             cleaned_text = re.sub(reward_pattern, '', text, flags=re.MULTILINE).strip()
             logger.info(f"🧹 [VK TTS] Cleaned text from reward message: '{cleaned_text[:50]}...'")
-        
+
         await handle_tts_for_message(
             text=cleaned_text,
             username=username.lower(),
@@ -409,7 +404,7 @@ class VKLiveBotCore:
             skip_if_command=False,  # Команды уже отфильтрованы в _handle_message
             reward_id=reward_id  # Передаем reward_id если есть
         )
-    
+
     def get_connected_channels(self) -> List[str]:
         """Получить список подключенных каналов"""
         return self.connected_channels.copy()
@@ -430,9 +425,9 @@ class VKLiveBotCore:
     async def _poll_vk_live_messages(self):
         """Fallback метод для получения сообщений через polling"""
         try:
-            logger.info("🔄 Starting VK Live polling mode")
+            logger.info("[REFRESH] Starting VK Live polling mode")
             import aiohttp
-            
+
             while self.is_running:
                 try:
                     # Получаем сообщения через VK API
@@ -441,37 +436,37 @@ class VKLiveBotCore:
                         endpoints = [
                             f"https://api.live.vkvideo.ru/v1/streams/{channel_id}/chat/messages" for channel_id in self.connected_channels
                         ]
-                        
+
                         for endpoint in endpoints:
                             try:
                                 headers = {
                                     "Authorization": f"Bearer {self.user_access_token}",
                                     "Content-Type": "application/json"
                                 }
-                                
+
                                 async with session.get(endpoint, headers=headers) as response:
                                     if response.status == 200:
                                         data = await response.json()
                                         messages = data.get("data", {}).get("messages", [])
-                                        
+
                                         for message in messages:
                                             await self._handle_message(message)
-                                        
+
                                         logger.info(f"📩 Polled {len(messages)} messages from VK Live")
                                         break
                                     else:
                                         logger.debug(f"Polling endpoint {endpoint} returned {response.status}")
-                                        
+
                             except Exception as e:
                                 logger.debug(f"Error polling {endpoint}: {e}")
                                 continue
-                        
+
                         # Ждем перед следующим запросом
                         await asyncio.sleep(5)
-                        
+
                 except Exception as e:
                     logger.error(f"Error in VK Live polling: {e}")
                     await asyncio.sleep(10)
-                    
+
         except Exception as e:
             logger.error(f"Fatal error in VK Live polling: {e}")

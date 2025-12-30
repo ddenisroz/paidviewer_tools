@@ -1,10 +1,11 @@
 /**
  * Auth Service - инкапсуляция всех Auth API вызовов
  */
-import { apiClient } from '../client';
 import { API_BASE_URL } from '../../../constants';
-import type { AxiosResponse } from 'axios';
+import { apiClient } from '../client';
+
 import type { ApiResponse, User } from '../../../types';
+import type { AxiosResponse } from 'axios';
 
 /**
  * Auth Service
@@ -35,14 +36,14 @@ export const authService = {
   },
 
   /**
-   * Войти через Twitch (редирект)
+   * Войти через Twitch (редирект на полную OAuth авторизацию)
    */
   loginWithTwitch(): void {
     window.location.href = `${API_BASE_URL}/auth/twitch/login`;
   },
 
   /**
-   * Войти через VK (редирект)
+   * Войти через VK (редирект на полную OAuth авторизацию)
    */
   loginWithVk(): void {
     window.location.href = `${API_BASE_URL}/auth/vk/login`;

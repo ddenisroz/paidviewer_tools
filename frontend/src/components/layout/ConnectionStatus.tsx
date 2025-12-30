@@ -5,11 +5,13 @@
  */
 
 import React from 'react';
+
+import { AlertCircle, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+
 import { useWebSocketStateSync } from '../../hooks/useWebSocketStateSync';
-import { Wifi, WifiOff, RefreshCw, AlertCircle } from 'lucide-react';
 
 export const ConnectionStatus: React.FC = () => {
-  const { syncStatus, connectionStatus, isSyncing, isConnected, isReconnecting, isFailed } = useWebSocketStateSync();
+  const { syncStatus, isConnected, isReconnecting, isFailed } = useWebSocketStateSync();
 
   // Don't show anything when connected and not syncing
   if (isConnected && syncStatus === 'idle') {
@@ -38,7 +40,7 @@ export const ConnectionStatus: React.FC = () => {
       )}
 
       {/* Syncing State */}
-      {isSyncing && (
+      {syncStatus === 'syncing' && (
         <div className="flex items-center gap-2 bg-blue-500/90 text-white px-4 py-2 rounded-lg shadow-lg backdrop-blur-sm">
           <RefreshCw className="w-4 h-4 animate-spin" />
           <span className="text-sm font-medium">Syncing state...</span>

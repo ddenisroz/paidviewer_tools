@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import Optional
 
-from core.database import get_db, TTSBlockedUser, User
+from core.database import get_db, TTSBlockedUser
 from auth.auth import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ def is_user_blocked_from_tts(channel_name: str, platform: str, username: str) ->
     """
     try:
         from core.database import SessionLocal
-        
+
         db = SessionLocal()
         try:
             blocked = db.query(TTSBlockedUser).filter(
@@ -36,7 +36,7 @@ def is_user_blocked_from_tts(channel_name: str, platform: str, username: str) ->
                 TTSBlockedUser.platform == platform.lower(),
                 TTSBlockedUser.username == username.lower()
             ).first()
-            
+
             return blocked is not None
         finally:
             db.close()
@@ -80,9 +80,9 @@ async def toggle_mute_user(
         username = request.username.lower().strip('@')
         platform = request.platform.lower()
         channel_name = request.channel_name.lower()
-        
+
         logger.info(f"рџ”‡ [MODERATION] Toggle mute request: user={username}, platform={platform}, channel={channel_name}")
-        
+
         # РџСЂРѕРІРµСЂСЏРµРј, Р·Р°РіР»СѓС€С‘РЅ Р»Рё РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РІ РґР°РЅРЅС‹Р№ РјРѕРјРµРЅС‚
         existing_block = db.query(TTSBlockedUser).filter(
             TTSBlockedUser.user_id == user_id,
@@ -90,35 +90,35 @@ async def toggle_mute_user(
             TTSBlockedUser.platform == platform,
             TTSBlockedUser.channel_name == channel_name
         ).first()
-        
+
         platform_mute_applied = False
-        
+
         if existing_block:
             # Р РђР—РњРЈРўРРўР¬
             logger.info(f"рџ”Љ [MODERATION] Unmuting user {username} on {platform}")
-            
+
             db.delete(existing_block)
             db.commit()
-            
+
             # Р”Р»СЏ Twitch - СЃРЅРёРјР°РµРј timeout РЅР° РїР»Р°С‚С„РѕСЂРјРµ
             if platform == 'twitch':
                 try:
                     from api.twitch_api import TwitchAPI
                     from core.connection_manager import get_connection_manager
-                    
+
                     connection_manager = get_connection_manager()
                     twitch_api = TwitchAPI(connection_manager)
-                    
+
                     success = await twitch_api.untimeout_user(user_id, channel_name, username, db=db)
                     platform_mute_applied = success
-                    
+
                     if success:
                         logger.info(f"вњ… [TWITCH] Timeout removed for {username} in {channel_name}")
                     else:
                         logger.warning(f"вљ пёЏ [TWITCH] Failed to remove timeout for {username}")
                 except Exception as e:
                     logger.error(f"вќЊ [TWITCH] Error removing timeout: {e}")
-            
+
             return MuteStatusResponse(
                 success=True,
                 action="unmuted",
@@ -127,11 +127,11 @@ async def toggle_mute_user(
                 platform_mute_applied=platform_mute_applied,
                 message=f"РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ {username} СЂР°Р·РіР»СѓС€РµРЅ"
             )
-        
+
         else:
             # Р—РђРњРЈРўРРўР¬
             logger.info(f"рџ”‡ [MODERATION] Muting user {username} on {platform}")
-            
+
             new_block = TTSBlockedUser(
                 user_id=user_id,
                 username=username,
@@ -140,40 +140,40 @@ async def toggle_mute_user(
                 blocked_by=user_id,
                 reason=request.reason
             )
-            
+
             db.add(new_block)
             db.commit()
-            
+
             # Р”Р»СЏ Twitch - РїСЂРёРјРµРЅСЏРµРј timeout РЅР° РїР»Р°С‚С„РѕСЂРјРµ
             if platform == 'twitch':
                 try:
                     from api.twitch_api import TwitchAPI
                     from core.connection_manager import get_connection_manager
-                    
+
                     connection_manager = get_connection_manager()
                     twitch_api = TwitchAPI(connection_manager)
-                    
+
                     success = await twitch_api.timeout_user(
-                        user_id, 
-                        channel_name, 
-                        username, 
+                        user_id,
+                        channel_name,
+                        username,
                         request.duration_seconds,
                         request.reason,
                         db=db
                     )
                     platform_mute_applied = success
-                    
+
                     if success:
                         logger.info(f"вњ… [TWITCH] Timeout applied for {username} ({request.duration_seconds}s)")
                     else:
                         logger.warning(f"вљ пёЏ [TWITCH] Failed to apply timeout for {username}")
                 except Exception as e:
                     logger.error(f"вќЊ [TWITCH] Error applying timeout: {e}")
-            
+
             # VK Live РЅРµ РїРѕРґРґРµСЂР¶РёРІР°РµС‚ timeout С‡РµСЂРµР· API
             elif platform == 'vk':
-                logger.info(f"в„№пёЏ [VK LIVE] Platform timeout not available, only internal TTS mute applied")
-            
+                logger.info("в„№пёЏ [VK LIVE] Platform timeout not available, only internal TTS mute applied")
+
             return MuteStatusResponse(
                 success=True,
                 action="muted",
@@ -182,7 +182,7 @@ async def toggle_mute_user(
                 platform_mute_applied=platform_mute_applied,
                 message=f"РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ {username} Р·Р°РіР»СѓС€РµРЅ"
             )
-        
+
     except Exception as e:
         logger.error(f"вќЊ [MODERATION] Error toggling mute: {e}")
         raise HTTPException(status_code=500, detail=f"РћС€РёР±РєР° РёР·РјРµРЅРµРЅРёСЏ СЃС‚Р°С‚СѓСЃР° РјСѓС‚Р°: {str(e)}")
@@ -197,14 +197,14 @@ async def get_muted_users(
     """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє Р·Р°РіР»СѓС€С'РЅРЅС‹С… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№"""
     try:
         user_id = current_user.get('id')
-        
+
         query = db.query(TTSBlockedUser).filter(TTSBlockedUser.user_id == user_id)
-        
+
         if platform:
             query = query.filter(TTSBlockedUser.platform == platform.lower())
-        
+
         blocked_users = query.all()
-        
+
         return {
             "success": True,
             "blocked_users": [
@@ -219,7 +219,7 @@ async def get_muted_users(
                 for user in blocked_users
             ]
         }
-        
+
     except Exception as e:
         logger.error(f"Error getting muted users: {e}")
         raise HTTPException(status_code=500, detail=str(e))

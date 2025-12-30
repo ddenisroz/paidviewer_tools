@@ -2,8 +2,9 @@
  * Points Service - инкапсуляция всех Points API вызовов
  */
 import { apiClient } from '../client';
-import type { AxiosResponse } from 'axios';
+
 import type { ApiResponse } from '../../../types';
+import type { AxiosResponse } from 'axios';
 
 /**
  * Points Service
@@ -26,7 +27,7 @@ export const pointsService = {
    * @param reward - Данные награды
    * @returns Promise с ответом API
    */
-  async createPlatformReward(platform: string, reward: Record<string, any>): Promise<AxiosResponse<ApiResponse>> {
+  async createPlatformReward(platform: string, reward: Record<string, unknown>): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.post('/api/points/platform/rewards/create', reward, {
       params: { platform },
     });
@@ -39,7 +40,7 @@ export const pointsService = {
    * @param reward - Данные награды
    * @returns Promise с ответом API
    */
-  async updatePlatformReward(platform: string, rewardId: string, reward: Record<string, any>): Promise<AxiosResponse<ApiResponse>> {
+  async updatePlatformReward(platform: string, rewardId: string, reward: Record<string, unknown>): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.put(`/api/points/platform/rewards/${rewardId}`, reward, {
       params: { platform },
     });

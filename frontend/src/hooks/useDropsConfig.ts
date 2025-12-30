@@ -1,10 +1,14 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { dropsService } from '../services/api/services/dropsService';
-import { queryKeys } from '../queries/queryKeys';
+import { useState } from 'react';
+
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+
+import { queryKeys } from '../queries/queryKeys';
+import { dropsService } from '../services/api/services/dropsService';
 import { logger } from '../utils/prodLogger';
-import { useEffect, useState, useMemo } from 'react';
+
 import type { DropsConfig } from '../types';
+import type { ApiResponse } from '../types/api';
 
 /**
  * Хук для работы с конфигурацией drops
@@ -20,7 +24,8 @@ export const useDropsConfig = (channelName: string | null | undefined) => {
     queryFn: async () => {
       if (!channelName) return null;
       const response = await dropsService.getConfig(channelName);
-      return (response.data as any)?.success ? (response.data as any)?.data : null;
+      const apiResponse = response.data as ApiResponse<DropsConfig>;
+      return apiResponse?.success && apiResponse?.data ? apiResponse.data : null;
     },
     enabled: !!channelName,
     staleTime: 30000,
@@ -48,13 +53,14 @@ export const useDropsConfig = (channelName: string | null | undefined) => {
       logger.error('Error saving drops config:', err);
     },
     onSuccess: (response, payload: Partial<DropsConfig>) => {
-      // ✅ ОБНОВЛЕНИЕ КЭША: Обновляем кэш данными с сервера для надежности
-      if ((response.data as any)?.success && (response.data as any)?.data) {
-        queryClient.setQueryData(['drops-config', channelName], (response.data as any).data);
+      // [OK] ОБНОВЛЕНИЕ КЭША: Обновляем кэш данными с сервера для надежности
+      const apiResponse = response.data as ApiResponse<DropsConfig>;
+      if (apiResponse?.success && apiResponse?.data) {
+        queryClient.setQueryData(['drops-config', channelName], apiResponse.data);
       }
       
-      // ✅ СИНХРОНИЗАЦИЯ: Отправляем события для синхронизации с другими компонентами
-      // ✅ ИСПРАВЛЕНИЕ: Добавляем source для предотвращения циклических обновлений
+      // [OK] СИНХРОНИЗАЦИЯ: Отправляем события для синхронизации с другими компонентами
+      // [OK] ИСПРАВЛЕНИЕ: Добавляем source для предотвращения циклических обновлений
       if (payload.donation_enabled !== undefined) {
         window.dispatchEvent(new CustomEvent('drops-config-changed', {
           detail: { 
@@ -85,7 +91,7 @@ export const useDropsConfig = (channelName: string | null | undefined) => {
         }));
       }
     },
-    // ✅ УБРАНО: onSettled с invalidateQueries - не нужен, так как данные уже обновлены в onSuccess
+    // [OK] УБРАНО: onSettled с invalidateQueries - не нужен, так как данные уже обновлены в onSuccess
     // Это предотвращает race condition и некорректное отображение статуса
   });
 

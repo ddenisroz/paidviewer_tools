@@ -2,8 +2,9 @@
  * Drops Service - инкапсуляция всех Drops API вызовов
  */
 import { apiClient } from '../client';
+
+import type { ApiResponse, DropsConfig, DropsHistory, DropsReward, DropsStreak } from '../../../types';
 import type { AxiosResponse } from 'axios';
-import type { ApiResponse, DropsConfig, DropsReward, DropsHistory, DropsStreak } from '../../../types';
 
 /**
  * Drops Service
@@ -105,7 +106,7 @@ export const dropsService = {
    * @param params - Параметры запроса (limit, offset, etc.)
    * @returns Promise с ответом API
    */
-  async getHistory(channelName: string, params: Record<string, any> = {}): Promise<AxiosResponse<ApiResponse<DropsHistory[]>>> {
+  async getHistory(channelName: string, params: Record<string, unknown> = {}): Promise<AxiosResponse<ApiResponse<DropsHistory[]>>> {
     return apiClient.get(`/api/drops/history/${channelName}`, { params });
   },
 
@@ -135,7 +136,7 @@ export const dropsService = {
    * @param params - Параметры запроса (limit, offset, search)
    * @returns Promise с ответом API
    */
-  async getStreaks(channelName: string, params: Record<string, any> = {}): Promise<AxiosResponse<ApiResponse<DropsStreak[]>>> {
+  async getStreaks(channelName: string, params: Record<string, unknown> = {}): Promise<AxiosResponse<ApiResponse<DropsStreak[]>>> {
     return apiClient.get(`/api/drops/streaks/${channelName}`, { params });
   },
 
@@ -154,7 +155,7 @@ export const dropsService = {
    * @param params - Параметры запроса (platform, widget_token)
    * @returns Promise с ответом API
    */
-  async getConfigWithToken(channelName: string, params: Record<string, any> = {}): Promise<AxiosResponse<ApiResponse<DropsConfig>>> {
+  async getConfigWithToken(channelName: string, params: Record<string, unknown> = {}): Promise<AxiosResponse<ApiResponse<DropsConfig>>> {
     return apiClient.get(`/api/drops/config/${channelName}`, { params });
   },
 
@@ -176,7 +177,7 @@ export const dropsService = {
    * @param params - Параметры запроса (platform, quality, widget_token)
    * @returns Promise с ответом API
    */
-  async getRewardsForWidget(channelName: string, params: Record<string, any> = {}): Promise<AxiosResponse<ApiResponse<DropsReward[]>>> {
+  async getRewardsForWidget(channelName: string, params: Record<string, unknown> = {}): Promise<AxiosResponse<ApiResponse<DropsReward[]>>> {
     return apiClient.get(`/api/drops/rewards/${channelName}`, { params });
   },
 };

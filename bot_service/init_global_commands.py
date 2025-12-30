@@ -9,12 +9,12 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from core.database import get_db, BotCommand
-from datetime import datetime
+from core.datetime_utils import utcnow_naive
 
 def init_global_commands():
     """Инициализировать глобальные базовые команды"""
     db = next(get_db())
-    
+
     try:
         # Глобальные базовые команды (доступны всем)
         # Категории: "Медиа и интерактивность", "TTS ИИ озвучка", "Управление трансляцией", "Общее"
@@ -125,10 +125,10 @@ def init_global_commands():
                 "cooldown_seconds": 60
             }
         ]
-        
+
         commands_created = 0
         commands_updated = 0
-        
+
         for cmd_data in global_commands:
             # Проверяем, есть ли уже такая глобальная команда
             existing = db.query(BotCommand).filter(
@@ -136,16 +136,16 @@ def init_global_commands():
                 BotCommand.command_type == 'global',
                 BotCommand.command_name == cmd_data["command_name"]
             ).first()
-            
+
             if existing:
                 # Обновляем описание и другие параметры
                 existing.description = cmd_data["description"]
                 existing.tags = cmd_data["tags"]
                 existing.allowed_roles = cmd_data["allowed_roles"]
                 existing.cooldown_seconds = cmd_data["cooldown_seconds"]
-                existing.updated_at = datetime.utcnow()
+                existing.updated_at = utcnow_naive()
                 commands_updated += 1
-                print(f"  🔄 Updated: !{cmd_data['command_name']}")
+                print(f"  [REFRESH] Updated: !{cmd_data['command_name']}")
             else:
                 # Создаем новую глобальную команду
                 command = BotCommand(
@@ -160,22 +160,22 @@ def init_global_commands():
                     allowed_roles=cmd_data["allowed_roles"],
                     cooldown_seconds=cmd_data["cooldown_seconds"],
                     tags=cmd_data["tags"],
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow()
+                    created_at=utcnow_naive(),
+                    updated_at=utcnow_naive()
                 )
-                
+
                 db.add(command)
                 commands_created += 1
-                print(f"  ✅ Created: !{cmd_data['command_name']}")
-        
+                print(f"  [OK] Created: !{cmd_data['command_name']}")
+
         db.commit()
-        print(f"\n✅ ИТОГО:")
+        print("\n[OK] ИТОГО:")
         print(f"   - Создано: {commands_created} команд")
         print(f"   - Обновлено: {commands_updated} команд")
         print(f"   - Всего глобальных команд: {commands_created + commands_updated}")
-        
+
     except Exception as e:
-        print(f"❌ Ошибка при создании глобальных команд: {e}")
+        print(f"[ERROR] Ошибка при создании глобальных команд: {e}")
         db.rollback()
         import traceback
         traceback.print_exc()
@@ -184,7 +184,7 @@ def init_global_commands():
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("🌐 ИНИЦИАЛИЗАЦИЯ ГЛОБАЛЬНЫХ КОМАНД")
+    print("[WEB] ИНИЦИАЛИЗАЦИЯ ГЛОБАЛЬНЫХ КОМАНД")
     print("=" * 60)
     print()
     init_global_commands()

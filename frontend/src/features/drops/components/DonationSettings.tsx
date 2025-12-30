@@ -1,24 +1,30 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+
+import { AlertTriangle, Loader2, Package, Sparkles } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Slider } from '@/components/ui/slider';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Sparkles, Loader2, AlertTriangle, Package } from 'lucide-react';
-import { toast } from 'sonner';
-import { logger } from '../../../utils/prodLogger';
-import { useIntegrations } from '../../../context/IntegrationsContext';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { toast } from '@/utils/toastManager';
+
+import { DROPS_CONSTANTS } from '../../../constants/drops';
 import { useDonationAlerts } from '../../../context/DonationAlertsContext';
+import { useIntegrations } from '../../../context/IntegrationsContext';
+import { useAutoSave } from '../../../hooks/useAutoSave';
+import { useDropsConfig } from '../../../hooks/useDropsConfig';
+import MythycClosed from '../../../images/lootboxes/mythyc/mythyc_closed.png';
+
 import DonationGrid from './DonationGrid';
 import DonationHistory from './DonationHistory';
-import MythycClosed from '../../../images/lootboxes/mythyc/mythyc_closed.png';
-import { useDropsConfig } from '../../../hooks/useDropsConfig';
-import { useAutoSave } from '../../../hooks/useAutoSave';
-import { DROPS_CONSTANTS } from '../../../constants/drops';
+
+
+import type { DropsConfig } from '../../../types/drops';
 
 interface DonationSettingsProps {
-    user: any;
+    user: Record<string, unknown>;
     channelName: string;
     hasRewards?: boolean;
 }
@@ -74,28 +80,32 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
   
   const initialFormData = useMemo(() => {
     if (!config) return null;
+    
+    // Type assertion after null check
+    const typedConfig = config as DropsConfig;
+    
     // Проверяем интеграцию DonationAlerts при загрузке (используем актуальное значение)
     const currentDonationalertsConnected = integrations?.donationalerts?.enabled || daConnected || false;
-    const donationEnabledFromServer = config.donation_enabled ?? false;
+    const donationEnabledFromServer = typedConfig.donation_enabled ?? false;
     // Если интеграция не подключена, принудительно ставим false
     const donationEnabled = currentDonationalertsConnected ? donationEnabledFromServer : false;
     
-    // ✅ МИФИЧЕСКИЙ DROPS ДОСТУПЕН ТОЛЬКО С DONATIONALERTS
+    // [OK] МИФИЧЕСКИЙ DROPS ДОСТУПЕН ТОЛЬКО С DONATIONALERTS
     // Мифический drops работает на основе донатов, поэтому требует подключения DonationAlerts
-    const mythicalEnabledFromServer = config.mythical_enabled ?? false;
+    const mythicalEnabledFromServer = typedConfig.mythical_enabled ?? false;
     const mythicalEnabled = currentDonationalertsConnected ? mythicalEnabledFromServer : false;
     
     return {
       donation_enabled: donationEnabled,
-      donation_amount_common: [config.donation_amount_common ?? DROPS_CONSTANTS.DONATION.DEFAULT_COMMON],
-      donation_amount_rare: [config.donation_amount_rare ?? DROPS_CONSTANTS.DONATION.DEFAULT_RARE],
-      donation_amount_epic: [config.donation_amount_epic ?? DROPS_CONSTANTS.DONATION.DEFAULT_EPIC],
-      donation_amount_legendary: [config.donation_amount_legendary ?? DROPS_CONSTANTS.DONATION.DEFAULT_LEGENDARY],
+      donation_amount_common: [typedConfig.donation_amount_common ?? DROPS_CONSTANTS.DONATION.DEFAULT_COMMON],
+      donation_amount_rare: [typedConfig.donation_amount_rare ?? DROPS_CONSTANTS.DONATION.DEFAULT_RARE],
+      donation_amount_epic: [typedConfig.donation_amount_epic ?? DROPS_CONSTANTS.DONATION.DEFAULT_EPIC],
+      donation_amount_legendary: [typedConfig.donation_amount_legendary ?? DROPS_CONSTANTS.DONATION.DEFAULT_LEGENDARY],
       mythical_enabled: mythicalEnabled,
-      mythical_min_interval_hours: [config.mythical_min_interval_hours ?? DROPS_CONSTANTS.MYTHICAL.DEFAULT_MIN_INTERVAL_HOURS],
-      mythical_max_interval_hours: [config.mythical_max_interval_hours ?? DROPS_CONSTANTS.MYTHICAL.DEFAULT_MAX_INTERVAL_HOURS],
-      mythical_window_duration_minutes: [config.mythical_window_duration_minutes ?? DROPS_CONSTANTS.MYTHICAL.DEFAULT_WINDOW_DURATION_MINUTES],
-      mythical_donation_amount: [config.mythical_donation_amount ?? DROPS_CONSTANTS.MYTHICAL.DEFAULT_DONATION_AMOUNT]
+      mythical_min_interval_hours: [typedConfig.mythical_min_interval_hours ?? DROPS_CONSTANTS.MYTHICAL.DEFAULT_MIN_INTERVAL_HOURS],
+      mythical_max_interval_hours: [typedConfig.mythical_max_interval_hours ?? DROPS_CONSTANTS.MYTHICAL.DEFAULT_MAX_INTERVAL_HOURS],
+      mythical_window_duration_minutes: [typedConfig.mythical_window_duration_minutes ?? DROPS_CONSTANTS.MYTHICAL.DEFAULT_WINDOW_DURATION_MINUTES],
+      mythical_donation_amount: [typedConfig.mythical_donation_amount ?? DROPS_CONSTANTS.MYTHICAL.DEFAULT_DONATION_AMOUNT]
     };
   }, [config, integrations, daConnected]);
   
@@ -106,14 +116,14 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
     }
   }, [initialFormData, isInitialLoad]);
 
-  // ✅ ИСПРАВЛЕНИЕ: Используем функциональное обновление и удаляем formData из зависимостей
+  // [OK] ИСПРАВЛЕНИЕ: Используем функциональное обновление и удаляем formData из зависимостей
   // чтобы избежать бесконечного цикла. Проверяем текущие значения через ref или функциональное обновление.
   useEffect(() => {
     if (!donationalertsConnected) {
       // Отключаем donation и mythical drops если DonationAlerts отключен
-      // ✅ Используем функциональное обновление для чтения актуальных значений без добавления в зависимости
+      // [OK] Используем функциональное обновление для чтения актуальных значений без добавления в зависимости
       setFormData(prev => {
-        // ✅ Проверяем текущие значения и обновляем только если они true
+        // [OK] Проверяем текущие значения и обновляем только если они true
         if (prev.donation_enabled || prev.mythical_enabled) {
           return {
             ...prev,
@@ -124,12 +134,12 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
         return prev; // Не изменяем состояние если значения уже false
       });
     }
-  }, [donationalertsConnected]); // ✅ Убираем formData из зависимостей для предотвращения бесконечного цикла
+  }, [donationalertsConnected]); // [OK] Убираем formData из зависимостей для предотвращения бесконечного цикла
 
   const mythicalEnabledDisplay = formData.mythical_enabled;
   const donationEnabledDisplay = donationalertsConnected ? formData.donation_enabled : false;
 
-  const validateMythical = (payload: any): string | null => {
+  const validateMythical = (payload: Partial<DropsConfig>): string | null => {
     if (payload.mythical_enabled) {
       const minInterval = payload.mythical_min_interval_hours ?? formData.mythical_min_interval_hours[0];
       const maxInterval = payload.mythical_max_interval_hours ?? formData.mythical_max_interval_hours[0];
@@ -141,12 +151,12 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
   };
 
   const { autoSave } = useAutoSave(
-    (payload: any) => saveMutation.mutate(payload),
+    (payload: Partial<DropsConfig>) => saveMutation.mutate(payload),
     1000,
     validateMythical
   );
   
-  const createPayload = (): any => ({
+  const createPayload = (): Partial<DropsConfig> => ({
     donation_enabled: formData.donation_enabled,
     donation_amount_common: formData.donation_amount_common[0],
     donation_amount_rare: formData.donation_amount_rare[0],
@@ -292,7 +302,10 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
           </div>
         </CardHeader>
         <CardContent>
-          <DonationGrid formData={formData as any} setFormData={setFormData as any} />
+          <DonationGrid 
+            formData={formData as unknown as { donation_amount_common: number[]; donation_amount_rare: number[]; donation_amount_epic: number[]; donation_amount_legendary: number[]; [key: string]: number[] }} 
+            setFormData={setFormData as unknown as React.Dispatch<React.SetStateAction<{ donation_amount_common: number[]; donation_amount_rare: number[]; donation_amount_epic: number[]; donation_amount_legendary: number[]; [key: string]: number[] }>>} 
+          />
         </CardContent>
       </Card>
 
@@ -491,7 +504,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
       {/* История донатов */}
       <DonationHistory user={user} platform={platform} channelName={channelName} />
 
-      {/* ✅ Убрали кнопку "Сохранить" - автосохранение работает автоматически */}
+      {/* [OK] Убрали кнопку "Сохранить" - автосохранение работает автоматически */}
     </div>
   );
 };

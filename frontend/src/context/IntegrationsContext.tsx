@@ -1,10 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
-import { useAuth } from './AuthContext';
-import { saveReturnUrl } from '../utils/oauthRedirect';
-import { logger } from '../utils/prodLogger';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+
 import { integrationsService } from '../services/api/services/integrationsService';
 import { ttsService } from '../services/api/services/ttsService';
-import type { UserIntegrations } from '../types/user';
+import { saveReturnUrl } from '../utils/oauthRedirect';
+import { logger } from '../utils/prodLogger';
+
+import { useAuth } from './AuthContext';
 
 interface IntegrationStatus {
     enabled: boolean;
@@ -47,15 +48,15 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
             return {
                 twitch: { 
                     enabled: !!user.integrations.twitch?.connected,
-                    username: (user.integrations.twitch as any)?.username || null
+                    username: (user.integrations.twitch as { username?: string })?.username || null
                 },
                 vk: { 
                     enabled: !!user.integrations.vk?.connected,
-                    username: (user.integrations.vk as any)?.username || null
+                    username: (user.integrations.vk as { username?: string })?.username || null
                 },
                 donationalerts: {
                     enabled: !!user.integrations.donationalerts?.connected,
-                    username: (user.integrations.donationalerts as any)?.username || null
+                    username: (user.integrations.donationalerts as { username?: string })?.username || null
                 },
             };
         }
@@ -87,15 +88,15 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
             const newIntegrations: IntegrationsState = {
                 twitch: { 
                     enabled: !!user.integrations.twitch?.connected,
-                    username: (user.integrations.twitch as any)?.username || null
+                    username: (user.integrations.twitch as { username?: string })?.username || null
                 },
                 vk: { 
                     enabled: !!user.integrations.vk?.connected,
-                    username: (user.integrations.vk as any)?.username || null
+                    username: (user.integrations.vk as { username?: string })?.username || null
                 },
                 donationalerts: {
                     enabled: !!user.integrations.donationalerts?.connected,
-                    username: (user.integrations.donationalerts as any)?.username || null
+                    username: (user.integrations.donationalerts as { username?: string })?.username || null
                 },
             };
             
@@ -127,7 +128,7 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
 
     useEffect(() => {
         const handleAuthRefresh = (): void => {
-            logger.log('🔄 [INTEGRATIONS] Received auth_refresh_required, refreshing integrations...');
+            logger.log('[REFRESH] [INTEGRATIONS] Received auth_refresh_required, refreshing integrations...');
             setTimeout(() => {
                 refreshAuthStatus(true);
                 fetchIntegrations();
@@ -153,7 +154,7 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
                 
                 try {
                     const ttsSettingsResponse = await ttsService.getPlatformSettings();
-                    const currentPlatforms = (ttsSettingsResponse.data as any).enabled_platforms || [];
+                    const currentPlatforms = (ttsSettingsResponse.data as { enabled_platforms?: string[] }).enabled_platforms || [];
                     const updatedPlatforms = currentPlatforms.filter((p: string) => p !== 'twitch');
                     await ttsService.savePlatformSettings({
                         enabled_platforms: updatedPlatforms
@@ -163,7 +164,7 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
                         detail: { enabledPlatforms: updatedPlatforms }
                     }));
                     
-                    logger.log('🔄 Automatically removed twitch from TTS enabled_platforms');
+                    logger.log('[REFRESH] Automatically removed twitch from TTS enabled_platforms');
                 } catch (ttsError) {
                     logger.error('Error updating TTS settings after disconnect:', ttsError);
                 }
@@ -180,7 +181,7 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
 
     const updateVkIntegration = useCallback(async (enabled: boolean, onClose: (() => void) | null = null): Promise<void> => {
         if (enabled) {
-            logger.log('🔵 [INTEGRATIONS] VK integration enable requested');
+            logger.log('[INTEGRATIONS] VK integration enable requested');
             if (onClose) onClose();
             saveReturnUrl();
             integrationsService.connectVk();
@@ -191,7 +192,7 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
                 
                 try {
                     const ttsSettingsResponse = await ttsService.getPlatformSettings();
-                    const currentPlatforms = (ttsSettingsResponse.data as any).enabled_platforms || [];
+                    const currentPlatforms = (ttsSettingsResponse.data as { enabled_platforms?: string[] }).enabled_platforms || [];
                     const updatedPlatforms = currentPlatforms.filter((p: string) => p !== 'vk');
                     await ttsService.savePlatformSettings({
                         enabled_platforms: updatedPlatforms
@@ -201,7 +202,7 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
                         detail: { enabledPlatforms: updatedPlatforms }
                     }));
                     
-                    logger.log('🔄 Automatically removed vk from TTS enabled_platforms');
+                    logger.log('[REFRESH] Automatically removed vk from TTS enabled_platforms');
                 } catch (ttsError) {
                     logger.error('Error updating TTS settings after disconnect:', ttsError);
                 }

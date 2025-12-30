@@ -2,9 +2,8 @@
 """Прокси-эндпоинты для внешних ресурсов (7TV эмодзи и т.д.)"""
 import logging
 import httpx
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -32,13 +31,13 @@ async def proxy_7tv(path: str):
         # Проверяем что путь начинается с разрешенного домена
         if not any(path.startswith(domain) for domain in ALLOWED_DOMAINS):
             raise HTTPException(status_code=403, detail="Domain not allowed")
-        
+
         # Формируем полный URL
         url = f"https://{path}"
-        
-        logger.debug(f"🔄 [PROXY] Proxying 7TV request: {url}")
-        
-        # ✅ ОПТИМИЗАЦИЯ: Используем асинхронный httpx вместо синхронного requests
+
+        logger.debug(f"[REFRESH] [PROXY] Proxying 7TV request: {url}")
+
+        # [OK] ОПТИМИЗАЦИЯ: Используем асинхронный httpx вместо синхронного requests
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
                 url,
@@ -47,16 +46,16 @@ async def proxy_7tv(path: str):
                 },
                 follow_redirects=True
             )
-        
+
         response.raise_for_status()
-        
+
         # Определяем Content-Type
         content_type = response.headers.get("Content-Type", "image/webp")
-        
-        # ✅ ОПТИМИЗАЦИЯ: Возвращаем данные из памяти (httpx уже загрузил ответ)
+
+        # [OK] ОПТИМИЗАЦИЯ: Возвращаем данные из памяти (httpx уже загрузил ответ)
         async def generate_content():
             yield response.content
-        
+
         # Возвращаем проксированный ответ с кэшированием
         return StreamingResponse(
             generate_content(),
@@ -68,14 +67,14 @@ async def proxy_7tv(path: str):
                 "Access-Control-Allow-Headers": "*"
             }
         )
-        
+
     except httpx.TimeoutException:
         logger.error(f"⏱️ [PROXY] Timeout proxying 7TV request: {path}")
         raise HTTPException(status_code=504, detail="Request timeout")
     except httpx.RequestError as e:
-        logger.error(f"❌ [PROXY] Error proxying 7TV request: {path}, error: {e}")
+        logger.error(f"[ERROR] [PROXY] Error proxying 7TV request: {path}, error: {e}")
         raise HTTPException(status_code=502, detail=f"Proxy error: {str(e)}")
     except Exception as e:
-        logger.error(f"❌ [PROXY] Unexpected error proxying 7TV request: {path}, error: {e}")
+        logger.error(f"[ERROR] [PROXY] Unexpected error proxying 7TV request: {path}, error: {e}")
         raise HTTPException(status_code=500, detail="Internal proxy error")
 

@@ -1,18 +1,21 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
+
 import { useQueryClient } from '@tanstack/react-query';
+import { Loader2, Trash2 } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Card, CardContent } from '@/components/ui/card';
-import { toast } from 'sonner';
-import { TwitchIcon, VKIcon } from '../../../shared/components/PlatformIcons';
+import { toast } from '@/utils/toastManager';
+
 import { useAuth } from '../../../context/AuthContext';
 import { useIntegrations } from '../../../context/IntegrationsContext';
-import { Loader2, Trash2 } from 'lucide-react';
-import { logger } from '../../../utils/prodLogger';
-import { useTtsModeSettings, useCreateTtsReward, useDeleteTtsReward } from '../../../queries/tts/ttsQueries';
 import { queryKeys } from '../../../queries/queryKeys';
+import { useCreateTtsReward, useDeleteTtsReward, useTtsModeSettings } from '../../../queries/tts/ttsQueries';
+import { TwitchIcon, VKIcon } from '../../../shared/components/PlatformIcons';
+import { logger } from '../../../utils/prodLogger';
 
 interface TtsChannelPointsModeProps {
     ttsMode: string;
@@ -52,14 +55,14 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
     cooldown: 0
   });
 
-  // ✅ НОВЫЙ КОД: Используем централизованный hook для режима TTS
+  // [OK] НОВЫЙ КОД: Используем централизованный hook для режима TTS
   const { data: modeSettingsResponse, isLoading: isLoadingRewards, refetch: refetchModeSettings } = useTtsModeSettings({
     enabled: !!user,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
     staleTime: 0, // Всегда считаем данные устаревшими для немедленного обновления
   });
-  const modeSettingsData = modeSettingsResponse?.data;
+  const modeSettingsData = (modeSettingsResponse as { data?: { tts_reward_ids?: Record<string, string> } })?.data;
 
   const ttsRewardIds = modeSettingsData?.tts_reward_ids || {};
 
@@ -74,18 +77,20 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
     setShowCreateDialog(true);
   };
 
-  // ✅ НОВЫЙ КОД: Используем централизованный hook для создания награды
+  // [OK] НОВЫЙ КОД: Используем централизованный hook для создания награды
   const createTtsRewardMutation = useCreateTtsReward({
     onSuccess: (response) => {
       // Оптимистичное обновление - сразу обновляем кэш с новым reward_id
-      const rewardId = response.data?.reward_id;
+      const responseData = response as { data?: { reward_id?: string } };
+      const rewardId = responseData.data?.reward_id;
       if (rewardId && modeSettingsData && selectedPlatform) {
-        queryClient.setQueryData(queryKeys.tts.modeSettings(), (oldData: any) => {
+        queryClient.setQueryData(queryKeys.tts.modeSettings(), (oldData: Record<string, unknown> | undefined) => {
           if (!oldData) return oldData;
+          const oldRewardIds = (oldData.tts_reward_ids || {}) as Record<string, unknown>;
           return {
             ...oldData,
             tts_reward_ids: {
-              ...(oldData.tts_reward_ids || {}),
+              ...oldRewardIds,
               [selectedPlatform]: rewardId
             }
           };
@@ -126,7 +131,7 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
     });
   };
 
-  // ✅ НОВЫЙ КОД: Используем централизованный hook для удаления награды
+  // [OK] НОВЫЙ КОД: Используем централизованный hook для удаления награды
   const deleteTtsRewardMutation = useDeleteTtsReward({
     onSuccess: () => {
       // Принудительно обновляем данные с сервера
@@ -151,13 +156,13 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
 
     // Оптимистичное обновление - сразу удаляем reward_id из кэша
     if (modeSettingsData) {
-      queryClient.setQueryData(queryKeys.tts.modeSettings(), (oldData: any) => {
+      queryClient.setQueryData(queryKeys.tts.modeSettings(), (oldData: Record<string, unknown> | undefined) => {
         if (!oldData) return oldData;
-        const newRewardIds = { ...(oldData.tts_reward_ids || {}) };
-        delete newRewardIds[platform];
+        const oldRewardIds = { ...((oldData.tts_reward_ids || {}) as Record<string, unknown>) };
+        delete oldRewardIds[platform];
         return {
           ...oldData,
-          tts_reward_ids: newRewardIds
+          tts_reward_ids: oldRewardIds
         };
       });
     }

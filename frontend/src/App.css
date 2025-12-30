@@ -263,6 +263,21 @@ body {
 }
 
 /* === Toast уведомления (Sonner) === */
+/* Контейнер для всех toast - правильное позиционирование */
+[data-sonner-toaster] {
+  position: fixed !important;
+  z-index: 9999 !important;
+  pointer-events: none !important;
+}
+
+[data-sonner-toaster][data-x-position="right"] {
+  right: 16px !important;
+}
+
+[data-sonner-toaster][data-y-position="top"] {
+  top: 120px !important; /* Увеличено для header (64px) + отступ (56px) */
+}
+
 /* Стандартизированные стили для всех toast */
 [data-sonner-toast] {
   --tw-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
@@ -270,6 +285,8 @@ body {
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
   border-radius: calc(var(--radius) + 2px);
   font-family: inherit;
+  pointer-events: auto !important;
+  margin-bottom: 8px !important;
 }
 
 .toast-base {
@@ -459,7 +476,7 @@ body {
 @keyframes fade-in {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -477,7 +494,7 @@ body {
 }
 
 .animate-fade-in {
-  animation: fade-in 0.5s ease-out;
+  animation: fade-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 .animate-progress-shimmer {

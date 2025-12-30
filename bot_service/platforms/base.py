@@ -21,10 +21,10 @@ class PlatformConfig:
 
 class StreamingPlatform(ABC):
     """Abstract base class for streaming platforms"""
-    
+
     def __init__(self, config: PlatformConfig):
         self.config = config
-    
+
     @abstractmethod
     async def authenticate(self, code: str) -> Dict[str, Any]:
         """
@@ -37,7 +37,7 @@ class StreamingPlatform(ABC):
             Dict containing access_token, refresh_token, expires_in, etc.
         """
         pass
-    
+
     @abstractmethod
     async def get_user_info(self, access_token: str) -> Dict[str, Any]:
         """
@@ -50,7 +50,7 @@ class StreamingPlatform(ABC):
             Dict containing user_id, username, avatar_url, etc.
         """
         pass
-    
+
     @abstractmethod
     async def update_stream_title(self, user_id: int, title: str) -> bool:
         """
@@ -64,7 +64,7 @@ class StreamingPlatform(ABC):
             True if successful, False otherwise
         """
         pass
-    
+
     @abstractmethod
     async def update_stream_category(self, user_id: int, category_id: str) -> bool:
         """
@@ -78,7 +78,7 @@ class StreamingPlatform(ABC):
             True if successful, False otherwise
         """
         pass
-    
+
     @abstractmethod
     async def search_categories(self, query: str) -> List[Dict[str, Any]]:
         """
@@ -91,7 +91,7 @@ class StreamingPlatform(ABC):
             List of category dicts with id, name, box_art_url, etc.
         """
         pass
-    
+
     @abstractmethod
     async def get_stream_status(self, username: str) -> Optional[Dict[str, Any]]:
         """
@@ -104,7 +104,7 @@ class StreamingPlatform(ABC):
             Dict with stream info if online, None if offline
         """
         pass
-    
+
     @abstractmethod
     async def get_channel_info(self, username: str) -> Optional[Dict[str, Any]]:
         """
@@ -117,7 +117,7 @@ class StreamingPlatform(ABC):
             Dict with channel info (title, category, etc.)
         """
         pass
-    
+
     @abstractmethod
     async def send_chat_message(self, user_id: int, message: str) -> bool:
         """
@@ -131,9 +131,9 @@ class StreamingPlatform(ABC):
             True if successful, False otherwise
         """
         pass
-    
+
     # Optional methods (not all platforms support all features)
-    
+
     async def create_reward(self, user_id: int, reward_data: Dict) -> Optional[str]:
         """
         Create channel points reward (if supported)
@@ -146,7 +146,7 @@ class StreamingPlatform(ABC):
             Reward ID if successful, None otherwise
         """
         return None
-    
+
     async def update_reward(self, user_id: int, reward_id: str, reward_data: Dict) -> bool:
         """
         Update channel points reward (if supported)
@@ -160,7 +160,7 @@ class StreamingPlatform(ABC):
             True if successful, False otherwise
         """
         return False
-    
+
     async def delete_reward(self, user_id: int, reward_id: str) -> bool:
         """
         Delete channel points reward (if supported)
@@ -173,7 +173,7 @@ class StreamingPlatform(ABC):
             True if successful, False otherwise
         """
         return False
-    
+
     async def get_user_roles(self, username: str, channel_name: str) -> List[str]:
         """
         Get user roles on a channel (broadcaster, moderator, vip, subscriber, etc.)

@@ -1,6 +1,6 @@
 # bot_service/utils/validators.py
 """
-🔒 Валидаторы для входных данных
+[SECURITY] Валидаторы для входных данных
 Обеспечивают безопасность и корректность данных во всей системе
 """
 
@@ -17,16 +17,16 @@ class ValidationError(Exception):
 
 class InputValidator:
     """Валидатор пользовательских входных данных"""
-    
+
     # Регулярные выражения
     USERNAME_PATTERN = re.compile(r'^[a-zA-Z0-9_-]{2,30}$')
     EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
     CHANNEL_NAME_PATTERN = re.compile(r'^[a-zA-Z0-9_-]{2,50}$')
     COMMAND_NAME_PATTERN = re.compile(r'^[a-zA-Z0-9_-]{2,20}$')
-    
+
     # Опасные символы для XSS
     XSS_DANGEROUS_CHARS = ['<', '>', '&', '"', "'", '\\', '/', ';', '|', '`', '\n', '\r', '\t']
-    
+
     # Опасные SQL паттерны
     SQL_INJECTION_PATTERNS = [
         r"('\s*(or|and)\s*')",
@@ -36,7 +36,7 @@ class InputValidator:
         r"(exec\s*\()",
         r"(script>)",
     ]
-    
+
     @staticmethod
     def sanitize_text(text: str, max_length: int = 500, allow_multiline: bool = False) -> str:
         """
@@ -55,26 +55,26 @@ class InputValidator:
         """
         if not text:
             raise ValidationError("Text cannot be empty")
-        
+
         text = text.strip()
-        
+
         if len(text) > max_length:
             raise ValidationError(f"Text too long: {len(text)} > {max_length}")
-        
+
         # Удаляем опасные символы
         for char in InputValidator.XSS_DANGEROUS_CHARS:
             if not allow_multiline and char in ['\n', '\r', '\t']:
                 text = text.replace(char, ' ')
             elif char != '\n' and char != '\r' and char != '\t':
                 text = text.replace(char, '')
-        
+
         # Проверяем на SQL инъекции
         for pattern in InputValidator.SQL_INJECTION_PATTERNS:
             if re.search(pattern, text, re.IGNORECASE):
                 raise ValidationError("Potentially dangerous SQL pattern detected")
-        
+
         return text.strip()
-    
+
     @staticmethod
     def validate_username(username: str) -> bool:
         """
@@ -91,12 +91,12 @@ class InputValidator:
         """
         if not username:
             raise ValidationError("Username cannot be empty")
-        
+
         if not InputValidator.USERNAME_PATTERN.match(username):
             raise ValidationError("Invalid username format. Use only letters, numbers, _ and -")
-        
+
         return True
-    
+
     @staticmethod
     def validate_email(email: str) -> bool:
         """
@@ -113,12 +113,12 @@ class InputValidator:
         """
         if not email:
             raise ValidationError("Email cannot be empty")
-        
+
         if not InputValidator.EMAIL_PATTERN.match(email):
             raise ValidationError("Invalid email format")
-        
+
         return True
-    
+
     @staticmethod
     def validate_channel_name(channel_name: str) -> bool:
         """
@@ -135,12 +135,12 @@ class InputValidator:
         """
         if not channel_name:
             raise ValidationError("Channel name cannot be empty")
-        
+
         if not InputValidator.CHANNEL_NAME_PATTERN.match(channel_name):
             raise ValidationError("Invalid channel name format")
-        
+
         return True
-    
+
     @staticmethod
     def validate_command_name(command_name: str) -> bool:
         """
@@ -157,17 +157,17 @@ class InputValidator:
         """
         if not command_name:
             raise ValidationError("Command name cannot be empty")
-        
+
         if not InputValidator.COMMAND_NAME_PATTERN.match(command_name):
             raise ValidationError("Invalid command name format. Use only letters, numbers, _ and -")
-        
+
         # Проверка зарезервированных слов
         reserved_words = ['admin', 'mod', 'owner', 'system', 'bot', 'api']
         if command_name.lower() in reserved_words:
             raise ValidationError(f"'{command_name}' is a reserved word")
-        
+
         return True
-    
+
     @staticmethod
     def validate_url(url: str, allowed_domains: Optional[List[str]] = None) -> bool:
         """
@@ -185,41 +185,41 @@ class InputValidator:
         """
         if not url:
             raise ValidationError("URL cannot be empty")
-        
+
         try:
             parsed = urlparse(url)
-            
+
             # Проверяем схему
             if parsed.scheme not in ['http', 'https']:
                 raise ValidationError("URL must use http or https scheme")
-            
+
             # Проверяем наличие домена
             if not parsed.netloc:
                 raise ValidationError("URL must have a valid domain")
-            
+
             # Проверяем разрешенные домены
             if allowed_domains:
                 domain = parsed.netloc.lower()
                 # Удаляем www. если есть
                 if domain.startswith('www.'):
                     domain = domain[4:]
-                
+
                 allowed = False
                 for allowed_domain in allowed_domains:
                     if domain == allowed_domain or domain.endswith(f'.{allowed_domain}'):
                         allowed = True
                         break
-                
+
                 if not allowed:
                     raise ValidationError(f"Domain not allowed. Allowed: {', '.join(allowed_domains)}")
-            
+
             return True
-            
+
         except Exception as e:
             if isinstance(e, ValidationError):
                 raise
             raise ValidationError(f"Invalid URL: {str(e)}")
-    
+
     @staticmethod
     def validate_youtube_url(url: str) -> Dict[str, Any]:
         """
@@ -235,13 +235,13 @@ class InputValidator:
             ValidationError: Если URL не валиден
         """
         youtube_domains = ['youtube.com', 'youtu.be', 'm.youtube.com']
-        
+
         try:
             InputValidator.validate_url(url, youtube_domains)
             parsed = urlparse(url)
-            
+
             video_id = None
-            
+
             # Парсим video ID из разных форматов
             if 'youtu.be' in parsed.netloc:
                 # https://youtu.be/VIDEO_ID
@@ -251,29 +251,29 @@ class InputValidator:
                 from urllib.parse import parse_qs
                 query_params = parse_qs(parsed.query)
                 video_id = query_params.get('v', [None])[0]
-            
+
             if not video_id:
                 raise ValidationError("Could not extract video ID from YouTube URL")
-            
+
             # Валидация video ID (обычно 11 символов)
             if not re.match(r'^[a-zA-Z0-9_-]{11}$', video_id):
                 raise ValidationError("Invalid YouTube video ID format")
-            
+
             return {
                 'valid': True,
                 'video_id': video_id,
                 'url': url,
                 'platform': 'youtube'
             }
-            
+
         except Exception as e:
             if isinstance(e, ValidationError):
                 raise
             raise ValidationError(f"Invalid YouTube URL: {str(e)}")
-    
+
     @staticmethod
-    def validate_number_range(value: Any, min_value: Optional[float] = None, 
-                             max_value: Optional[float] = None, 
+    def validate_number_range(value: Any, min_value: Optional[float] = None,
+                             max_value: Optional[float] = None,
                              field_name: str = "Value") -> float:
         """
         Валидация числового значения в диапазоне
@@ -294,15 +294,15 @@ class InputValidator:
             num = float(value)
         except (TypeError, ValueError):
             raise ValidationError(f"{field_name} must be a number")
-        
+
         if min_value is not None and num < min_value:
             raise ValidationError(f"{field_name} must be >= {min_value}")
-        
+
         if max_value is not None and num > max_value:
             raise ValidationError(f"{field_name} must be <= {max_value}")
-        
+
         return num
-    
+
     @staticmethod
     def validate_integer(value: Any, field_name: str = "Value") -> int:
         """
@@ -326,7 +326,7 @@ class InputValidator:
 
 class FileValidator:
     """Валидатор для загружаемых файлов"""
-    
+
     # Разрешенные MIME типы для аудио
     ALLOWED_AUDIO_MIME_TYPES = [
         'audio/wav',
@@ -337,13 +337,13 @@ class FileValidator:
         'audio/ogg',
         'audio/flac'
     ]
-    
+
     # Разрешенные расширения файлов
     ALLOWED_AUDIO_EXTENSIONS = ['.wav', '.mp3', '.ogg', '.flac']
-    
+
     # Максимальный размер файла (в байтах)
     MAX_AUDIO_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
-    
+
     @staticmethod
     def validate_audio_file(filename: str, content_type: str, file_size: int) -> bool:
         """
@@ -365,25 +365,25 @@ class FileValidator:
             raise ValidationError(
                 f"File too large: {file_size} bytes. Max: {FileValidator.MAX_AUDIO_FILE_SIZE} bytes"
             )
-        
+
         # Проверка расширения
         file_ext = None
         for ext in FileValidator.ALLOWED_AUDIO_EXTENSIONS:
             if filename.lower().endswith(ext):
                 file_ext = ext
                 break
-        
+
         if not file_ext:
             raise ValidationError(
                 f"Invalid file extension. Allowed: {', '.join(FileValidator.ALLOWED_AUDIO_EXTENSIONS)}"
             )
-        
+
         # Проверка MIME типа
         if content_type not in FileValidator.ALLOWED_AUDIO_MIME_TYPES:
             raise ValidationError(
                 f"Invalid MIME type: {content_type}. Allowed: {', '.join(FileValidator.ALLOWED_AUDIO_MIME_TYPES)}"
             )
-        
+
         return True
 
 

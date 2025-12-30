@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { TTS_SERVICE_URL, WS_BASE_URL } from '../../../constants';
+
 import { useParams } from 'react-router-dom';
+
+import { TTS_SERVICE_URL, WS_BASE_URL } from '../../../constants';
 
 const ObsTtsPage: React.FC = () => {
     const { token } = useParams<{ token: string }>();

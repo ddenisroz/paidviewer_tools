@@ -50,13 +50,13 @@ class BackgroundTaskManager:
                 
                 if cleanup_stats['files_deleted'] > 0:
                     mb_freed = cleanup_stats['bytes_freed'] / (1024 * 1024)
-                    logger.info(f"🧹 TTS Service cleanup: {cleanup_stats['files_deleted']} files deleted, {mb_freed:.1f} MB freed")
+                    logger.info(f"[CLEANUP] TTS Service cleanup: {cleanup_stats['files_deleted']} files deleted, {mb_freed:.1f} MB freed")
                 
                 # Ждем 6 часов до следующей очистки
                 await asyncio.sleep(21600)
                 
             except Exception as e:
-                logger.error(f"❌ Error in TTS Service file cleanup: {e}")
+                logger.error(f"[ERROR] Error in TTS Service file cleanup: {e}")
                 await asyncio.sleep(3600)  # Ждем 1 час при ошибке
 
     async def cleanup_temp_file_delayed(self, file_path: Path, delay_seconds: int = 300):

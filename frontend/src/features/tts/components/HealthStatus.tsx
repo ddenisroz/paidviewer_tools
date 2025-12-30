@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Button } from '../ui/button';
+
 import { RefreshCw } from 'lucide-react';
-import { useInterval } from '../../hooks/useInterval';
+
+import { Button } from '@/components/ui/button';
+import { useInterval } from '@/hooks/useInterval';
 
 interface HealthStatusProps {
     isHealthy: boolean;
@@ -62,7 +64,7 @@ const HealthStatus: React.FC<HealthStatusProps> = ({ isHealthy, isChecking, chec
                             Ваш канал не в белом списке (whitelist). Доступна только базовая озвучка (gTTS).
                         </p>
                         <p className="text-xs text-gray-400 mt-2">
-                            💡 Для использования F5-TTS настройте локальный TTS (tts_service_simple) или обратитесь к администратору для whitelist.
+                            [INFO] Для использования F5-TTS настройте локальный TTS (tts_service_simple) или обратитесь к администратору для whitelist.
                         </p>
                     </div>
                 </div>

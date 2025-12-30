@@ -2,8 +2,9 @@
  * Stream Service - инкапсуляция всех Stream API вызовов
  */
 import { apiClient } from '../client';
-import type { AxiosResponse } from 'axios';
+
 import type { ApiResponse } from '../../../types';
+import type { AxiosResponse } from 'axios';
 
 /**
  * Stream Service
@@ -14,7 +15,7 @@ export const streamService = {
    * @param params - Параметры запроса (force и т.д.)
    * @returns Promise с ответом API
    */
-  async getTwitchStreamInfo(params: Record<string, any> = {}): Promise<AxiosResponse<ApiResponse>> {
+  async getTwitchStreamInfo(params: Record<string, unknown> = {}): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.get('/api/twitch/stream-info', { params });
   },
 
@@ -23,7 +24,7 @@ export const streamService = {
    * @param params - Параметры запроса (force и т.д.)
    * @returns Promise с ответом API
    */
-  async getVkStreamInfo(params: Record<string, any> = {}): Promise<AxiosResponse<ApiResponse>> {
+  async getVkStreamInfo(params: Record<string, unknown> = {}): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.get('/api/vk/stream-info', { params });
   },
 
@@ -98,7 +99,7 @@ export const streamService = {
    * @param payload - Данные для обновления (twitch, vk)
    * @returns Promise с ответом API
    */
-  async updateStream(payload: Record<string, any>): Promise<AxiosResponse<ApiResponse>> {
+  async updateStream(payload: Record<string, unknown>): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.post('/api/stream/update', payload);
   },
 };

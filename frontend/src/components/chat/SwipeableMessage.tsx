@@ -1,18 +1,13 @@
-import React, { useRef, useState, ReactNode } from 'react';
+import React, { ReactNode, useRef, useState } from 'react';
+
 import { VolumeX } from 'lucide-react';
 
-interface Message {
-    id: string | number;
-    timestamp?: string | number;
-    author?: string;
-    username?: string;
-    message?: string;
-}
+import type { ChatMessage } from '../../types/chat';
 
 interface SwipeableMessageProps {
     children: ReactNode;
-    onSwipeAction: (action: string, message: Message) => void;
-    message: Message;
+    onSwipeAction: (action: string, message: ChatMessage) => void;
+    message: ChatMessage;
 }
 
 const SwipeableMessage = React.memo<SwipeableMessageProps>(({ children, onSwipeAction, message }) => {

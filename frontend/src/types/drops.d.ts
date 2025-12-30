@@ -29,7 +29,7 @@ export interface DropsConfig {
   widget_spinning_duration_ms?: number;
   widget_opening_duration_ms?: number;
   widget_result_duration_ms?: number;
-  [key: string]: any;
+  [key: string]: string | number | boolean | undefined;
 }
 
 /**
@@ -125,7 +125,7 @@ export interface DonationFormData {
   donation_amount_rare: number;
   donation_amount_epic: number;
   donation_amount_legendary: number;
-  [key: string]: any;
+  [key: string]: number | boolean;
 }
 
 /**
@@ -140,5 +140,59 @@ export interface StreakFormData {
   streak_days_legendary: number;
   streak_messages_required: number;
   streak_reset_on_skip: boolean;
-  [key: string]: any;
+  [key: string]: number | boolean;
+}
+
+/**
+ * Форма данных для сетки донатов (с массивами для слайдеров)
+ */
+export interface DonationGridFormData {
+  donation_amount_common: number[];
+  donation_amount_rare: number[];
+  donation_amount_epic: number[];
+  donation_amount_legendary: number[];
+  [key: string]: number[];
+}
+
+/**
+ * Форма данных для настроек донатов (расширенная)
+ */
+export interface DonationSettingsFormData {
+  donation_enabled: boolean;
+  donation_amount_common: number[];
+  donation_amount_rare: number[];
+  donation_amount_epic: number[];
+  donation_amount_legendary: number[];
+  mythical_enabled: boolean;
+  mythical_min_interval_hours: number[];
+  mythical_max_interval_hours: number[];
+  mythical_window_duration_minutes: number[];
+  mythical_donation_amount: number[];
+  [key: string]: number[] | boolean;
+}
+
+/**
+ * Форма данных для календаря стриков (с массивами для слайдеров)
+ */
+export interface StreakCalendarFormData {
+  streak_days_common: number[];
+  streak_days_rare: number[];
+  streak_days_epic: number[];
+  streak_days_legendary: number[];
+  [key: string]: number[];
+}
+
+/**
+ * Форма данных для настроек стриков (расширенная)
+ */
+export interface StreakSettingsFormData {
+  streak_enabled_twitch: boolean;
+  streak_enabled_vk: boolean;
+  streak_days_common: number[];
+  streak_days_rare: number[];
+  streak_days_epic: number[];
+  streak_days_legendary: number[];
+  streak_messages_required: number[];
+  streak_reset_on_skip: boolean;
+  [key: string]: number[] | boolean;
 }

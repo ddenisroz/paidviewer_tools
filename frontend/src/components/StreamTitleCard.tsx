@@ -1,31 +1,33 @@
-// src/components/StreamTitleCard.tsx
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+﻿// src/components/StreamTitleCard.tsx
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+
+import { Edit3, Link, Loader, Save, Unlink } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Edit3, CheckCircle, XCircle, Save, Loader, Link, Unlink } from 'lucide-react';
-import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
+import { Switch } from '@/components/ui/switch';
+import { toast } from '@/utils/toastManager';
+
 import { useData } from '../context/DataContext';
 import { useIntegrations } from '../context/IntegrationsContext';
 import { useUserSettings } from '../context/UserSettingsContext';
-import { useAuth } from '../context/AuthContext';
-import { toast } from 'sonner';
-import { logger } from '../utils/prodLogger';
 import { useTimeout } from '../hooks/useTimeout';
+import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
+import { logger } from '../utils/prodLogger';
 
 interface StreamTitleCardProps {
     onLinkStateChange?: (isLinked: boolean) => void;
 }
 
 const StreamTitleCard: React.FC<StreamTitleCardProps> = ({ onLinkStateChange }) => {
-    const { user, isAuthenticated } = useAuth();
-    const { integrations, isLoading: integrationsLoading } = useIntegrations();
+    const { integrations } = useIntegrations();
     const { initialData, currentData, setCurrentData, saveChanges, status } = useData();
     const { getCombineSettings, updateSetting } = useUserSettings();
     const { combine_titles: combineTitles, combine_categories: combineCategories } = getCombineSettings();
-    // 🚀 ANTI-FLASH: Используем useMemo для вычисления isLinked напрямую из combineTitles
+    
+    // ANTI-FLASH: Используем useMemo для вычисления isLinked напрямую из combineTitles
     // Это гарантирует, что значение всегда синхронизировано и нет видимого переключения
     const isLinked = useMemo(() => combineTitles || false, [combineTitles]);
     const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -46,7 +48,7 @@ const StreamTitleCard: React.FC<StreamTitleCardProps> = ({ onLinkStateChange }) 
                 minHeight: '320px'
             };
         } else if (bothEnabled && isLinked) {
-            // В объединенном режиме - проверяем, объединены ли ОБЕ карточки
+            // В объединенном режиме проверяем, объединены ли ОБЕ карточки
             // Если объединена только одна (название ИЛИ категория) - оставляем полную высоту
             // Если объединены обе - уменьшаем высоту
             const bothCardsLinked = combineTitles && combineCategories;
@@ -65,7 +67,7 @@ const StreamTitleCard: React.FC<StreamTitleCardProps> = ({ onLinkStateChange }) 
 
     // Component state processed
 
-    // 🚀 ANTI-FLASH: Уведомляем родительский компонент об изменении isLinked
+    // ANTI-FLASH: Уведомляем родительский компонент об изменении isLinked
     // isLinked теперь вычисляется напрямую из combineTitles через useMemo, поэтому нет видимого переключения
     useEffect(() => {
         if (onLinkStateChange) {
@@ -81,7 +83,7 @@ const StreamTitleCard: React.FC<StreamTitleCardProps> = ({ onLinkStateChange }) 
             // При включении объединения - синхронизируем название Twitch на VK Live
             if (value && bothEnabled) {
                 const twitchTitle = currentData.twitch?.title || '';
-                setCurrentData((prev: any) => ({
+                setCurrentData(prev => ({
                     ...prev,
                     vk: { ...prev.vk, title: twitchTitle }
                 }));
@@ -107,15 +109,15 @@ const StreamTitleCard: React.FC<StreamTitleCardProps> = ({ onLinkStateChange }) 
         }
         
         if (isLinked && bothEnabled) {
-            setCurrentData((prev: any) => ({
+            setCurrentData(prev => ({
                 ...prev,
                 twitch: { ...prev.twitch, title: trimmedValue },
                 vk: { ...prev.vk, title: trimmedValue },
             }));
         } else {
-            setCurrentData((prev: any) => ({
+            setCurrentData(prev => ({
                 ...prev,
-                [platform]: { ...prev[platform], title: trimmedValue },
+                [platform as 'twitch' | 'vk']: { ...prev[platform as 'twitch' | 'vk'], title: trimmedValue },
             }));
         }
     };
@@ -130,14 +132,14 @@ const StreamTitleCard: React.FC<StreamTitleCardProps> = ({ onLinkStateChange }) 
             (vkEnabled && (initialData.vk?.title || '') !== (currentData.vk?.title || ''));
         
         if (!stillChanged) {
-            logger.log('⏰ [AUTO-RESET] Skipping reset - changes were already saved');
+            logger.log('[AUTO-RESET] Skipping reset - changes were already saved');
             return;
         }
         
-        logger.log('⏰ [AUTO-RESET] 10 seconds passed - resetting to initial data');
+        logger.log('[AUTO-RESET] 10 seconds passed - resetting to initial data');
         
         // Сбрасываем к исходным данным
-        setCurrentData((prev: any) => ({
+        setCurrentData(prev => ({
             ...prev,
             twitch: { ...prev.twitch, title: initialData.twitch?.title || '' },
             vk: { ...prev.vk, title: initialData.vk?.title || '' }
@@ -148,11 +150,11 @@ const StreamTitleCard: React.FC<StreamTitleCardProps> = ({ onLinkStateChange }) 
         setResetTimerDelay(null); // Останавливаем таймер
     }, resetTimerDelay);
 
-    // 🚀 FIX: Запускаем таймер автосброса только после того, как пользователь убрал фокус с инпута
+    // FIX: Запускаем таймер автосброса только после того, как пользователь убрал фокус с инпута
     const handleInputBlur = () => {
         // Если есть несохранённые изменения - запускаем таймер
         if (isChanged && status.saveTitle !== 'loading' && status.saveTitle !== 'success') {
-            logger.log('⏰ [AUTO-RESET] Input blurred - starting 10s timer to reset unsaved changes');
+            logger.log('[AUTO-RESET] Input blurred - starting 10s timer to reset unsaved changes');
             setResetTimerDelay(10000); // 10 секунд
         }
     };
@@ -160,7 +162,7 @@ const StreamTitleCard: React.FC<StreamTitleCardProps> = ({ onLinkStateChange }) 
     // Очищаем таймер при получении фокуса (пользователь снова начал редактировать)
     const handleInputFocus = () => {
         setResetTimerDelay(null);
-        logger.log('⏰ [AUTO-RESET] Input focused - clearing timer');
+        logger.log('[AUTO-RESET] Input focused - clearing timer');
     };
 
     const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -174,10 +176,10 @@ const StreamTitleCard: React.FC<StreamTitleCardProps> = ({ onLinkStateChange }) 
         if (autoSaveTimerRef.current) {
             clearTimeout(autoSaveTimerRef.current);
             autoSaveTimerRef.current = null;
-            logger.log('⏰ [AUTO-RESET] Timer cleared - user saved manually');
+            logger.log('[AUTO-RESET] Timer cleared - user saved manually');
         }
         
-        const payload: any = {};
+        const payload: { twitch?: { title: string }; vk?: { title: string } } = {};
         
         logger.log('StreamTitleCard handleSave:', {
             mode,
@@ -230,7 +232,6 @@ const StreamTitleCard: React.FC<StreamTitleCardProps> = ({ onLinkStateChange }) 
             // В объединенном режиме проверяем, изменился ли заголовок хотя бы на одной платформе
             const currentTitle = currentData.twitch?.title || '';
             const initialTwitchTitle = initialData.twitch?.title || '';
-            const initialVkTitle = initialData.vk?.title || '';
             // Если объединены, то они должны быть одинаковыми, поэтому проверяем только один
             return currentTitle !== initialTwitchTitle;
         } else {
@@ -252,7 +253,7 @@ const StreamTitleCard: React.FC<StreamTitleCardProps> = ({ onLinkStateChange }) 
         };
     }, []);
 
-    // 🚀 ANTI-FLASH: Показываем skeleton пока данные не загружены
+    // ANTI-FLASH: Показываем skeleton пока данные не загружены
     const isDataLoaded = currentData && (currentData.twitch || currentData.vk);
 
     return (
@@ -274,46 +275,28 @@ const StreamTitleCard: React.FC<StreamTitleCardProps> = ({ onLinkStateChange }) 
                     </div>
                 ) : (
                 <>
-                {/* Toggle объединения полей */}
-                {bothEnabled && (
-                    <div className="flex items-center justify-between p-2 bg-background/10 rounded-lg mb-2">
-                        <Label htmlFor="link-titles" className="flex items-center gap-2 cursor-pointer text-sm">
-                            {isLinked ? <Link className="h-4 w-4 text-green-500" /> : <Unlink className="h-4 w-4" />}
-                            Объединить поля
-                        </Label>
-                        <Switch 
-                            id="link-titles" 
-                            checked={isLinked} 
-                            onCheckedChange={handleToggleChange} 
-                            disabled={!bothEnabled} 
-                        />
-                    </div>
-                )}
+                    {/* Toggle объединения полей */}
+                    {bothEnabled && (
+                        <div className="flex items-center justify-between p-2 bg-background/10 rounded-lg mb-2">
+                            <Label htmlFor="link-titles" className="flex items-center gap-2 cursor-pointer text-sm">
+                                {isLinked ? <Link className="h-4 w-4 text-green-500" /> : <Unlink className="h-4 w-4" />}
+                                Объединить поля
+                            </Label>
+                            <Switch 
+                                id="link-titles" 
+                                checked={isLinked} 
+                                onCheckedChange={handleToggleChange} 
+                                disabled={!bothEnabled} 
+                            />
+                        </div>
+                    )}
 
-                {/* Поля ввода */}
-                <div className="flex-1 flex items-center">
-                {isLinked && bothEnabled ? (
-                    <div className="space-y-2 w-full mx-auto max-w-2xl">
-                        <Label className="flex items-center gap-2 text-sm">
-                            <TwitchIcon /><VKIcon /> Общее название
-                        </Label>
-                        <Input 
-                            value={currentData.twitch?.title || ''} 
-                            onChange={(e) => handleTitleChange('twitch', e.target.value)} 
-                            onKeyPress={handleKeyPress}
-                            onBlur={handleInputBlur}
-                            onFocus={handleInputFocus}
-                            placeholder="Введите общее название для обеих платформ..."
-                            className="h-10"
-                        />
-                    </div>
-                ) : (
-                    <div className="space-y-2 w-full mx-auto max-w-2xl">
-                        {/* Поле Twitch */}
-                        <div className={`space-y-2 ${!twitchEnabled ? 'opacity-50' : ''}`}>
+                    {/* Поля ввода */}
+                    <div className="flex-1 flex items-center">
+                    {isLinked && bothEnabled ? (
+                        <div className="space-y-2 w-full mx-auto max-w-2xl">
                             <Label className="flex items-center gap-2 text-sm">
-                                <TwitchIcon /> Twitch
-                                {!twitchEnabled && <span className="text-xs text-muted-foreground">(отключено)</span>}
+                                <TwitchIcon /><VKIcon /> Общее название
                             </Label>
                             <Input 
                                 value={currentData.twitch?.title || ''} 
@@ -321,33 +304,51 @@ const StreamTitleCard: React.FC<StreamTitleCardProps> = ({ onLinkStateChange }) 
                                 onKeyPress={handleKeyPress}
                                 onBlur={handleInputBlur}
                                 onFocus={handleInputFocus}
-                                placeholder={twitchEnabled ? "Название стрима на Twitch..." : "Интеграция отключена"}
-                                className={`h-10 ${!twitchEnabled ? 'bg-muted cursor-not-allowed blur-sm' : ''}`}
-                                disabled={!twitchEnabled}
+                                placeholder="Введите общее название для обеих платформ..."
+                                className="h-10"
                             />
                         </div>
+                    ) : (
+                        <div className="space-y-2 w-full mx-auto max-w-2xl">
+                            {/* Поле Twitch */}
+                            <div className={`space-y-2 ${!twitchEnabled ? 'opacity-50' : ''}`}>
+                                <Label className="flex items-center gap-2 text-sm">
+                                    <TwitchIcon /> Twitch
+                                    {!twitchEnabled && <span className="text-xs text-muted-foreground">(отключено)</span>}
+                                </Label>
+                                <Input 
+                                    value={currentData.twitch?.title || ''} 
+                                    onChange={(e) => handleTitleChange('twitch', e.target.value)} 
+                                    onKeyPress={handleKeyPress}
+                                    onBlur={handleInputBlur}
+                                    onFocus={handleInputFocus}
+                                    placeholder={twitchEnabled ? "Название стрима на Twitch..." : "Интеграция отключена"}
+                                    className={`h-10 ${!twitchEnabled ? 'bg-muted cursor-not-allowed blur-sm' : ''}`}
+                                    disabled={!twitchEnabled}
+                                />
+                            </div>
 
-                        {/* Поле VK Live */}
-                        <div className={`space-y-2 ${!vkEnabled ? 'opacity-50' : ''}`}>
-                            <Label className="flex items-center gap-2 text-sm">
-                                <VKIcon /> VK Live
-                                {!vkEnabled && <span className="text-xs text-muted-foreground">(отключено)</span>}
-                            </Label>
-                            <Input 
-                                value={currentData.vk?.title || ''} 
-                                onChange={(e) => handleTitleChange('vk', e.target.value)} 
-                                onKeyPress={handleKeyPress}
-                                onBlur={handleInputBlur}
-                                onFocus={handleInputFocus}
-                                placeholder={vkEnabled ? "Название стрима на VK Live..." : "Интеграция отключена"}
-                                className={`h-10 ${!vkEnabled ? 'bg-muted cursor-not-allowed blur-sm' : ''}`}
-                                disabled={!vkEnabled}
-                            />
+                            {/* Поле VK Live */}
+                            <div className={`space-y-2 ${!vkEnabled ? 'opacity-50' : ''}`}>
+                                <Label className="flex items-center gap-2 text-sm">
+                                    <VKIcon /> VK Live
+                                    {!vkEnabled && <span className="text-xs text-muted-foreground">(отключено)</span>}
+                                </Label>
+                                <Input 
+                                    value={currentData.vk?.title || ''} 
+                                    onChange={(e) => handleTitleChange('vk', e.target.value)} 
+                                    onKeyPress={handleKeyPress}
+                                    onBlur={handleInputBlur}
+                                    onFocus={handleInputFocus}
+                                    placeholder={vkEnabled ? "Название стрима на VK Live..." : "Интеграция отключена"}
+                                    className={`h-10 ${!vkEnabled ? 'bg-muted cursor-not-allowed blur-sm' : ''}`}
+                                    disabled={!vkEnabled}
+                                />
+                            </div>
                         </div>
+                    )}
                     </div>
-                )}
-                </div>
-                </>
+                    </>
                 )}
             </CardContent>
             

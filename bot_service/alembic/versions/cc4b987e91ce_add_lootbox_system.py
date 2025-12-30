@@ -20,7 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Создаем таблицы для системы лутбоксов
-    
+
     # LootboxType
     op.create_table('lootbox_types',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -31,7 +31,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_lootbox_types_id'), 'lootbox_types', ['id'], unique=False)
-    
+
     # LootboxQuality
     op.create_table('lootbox_qualities',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -42,7 +42,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_lootbox_qualities_id'), 'lootbox_qualities', ['id'], unique=False)
-    
+
     # LootboxConfig
     op.create_table('lootbox_configs',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -74,7 +74,7 @@ def upgrade() -> None:
     op.create_index(op.f('ix_lootbox_configs_id'), 'lootbox_configs', ['id'], unique=False)
     op.create_index(op.f('ix_lootbox_configs_user_id'), 'lootbox_configs', ['user_id'], unique=False)
     op.create_index(op.f('ix_lootbox_configs_channel_name'), 'lootbox_configs', ['channel_name'], unique=False)
-    
+
     # LootboxReward
     op.create_table('lootbox_rewards',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -99,7 +99,7 @@ def upgrade() -> None:
     op.create_index(op.f('ix_lootbox_rewards_id'), 'lootbox_rewards', ['id'], unique=False)
     op.create_index(op.f('ix_lootbox_rewards_user_id'), 'lootbox_rewards', ['user_id'], unique=False)
     op.create_index(op.f('ix_lootbox_rewards_channel_name'), 'lootbox_rewards', ['channel_name'], unique=False)
-    
+
     # UserStreak
     op.create_table('user_streaks',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -122,7 +122,7 @@ def upgrade() -> None:
     op.create_index(op.f('ix_user_streaks_user_id'), 'user_streaks', ['user_id'], unique=False)
     op.create_index(op.f('ix_user_streaks_channel_name'), 'user_streaks', ['channel_name'], unique=False)
     op.create_index(op.f('ix_user_streaks_viewer_id'), 'user_streaks', ['viewer_id'], unique=False)
-    
+
     # LootboxHistory
     op.create_table('lootbox_history',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -153,7 +153,7 @@ def upgrade() -> None:
     op.create_index(op.f('ix_lootbox_history_channel_name'), 'lootbox_history', ['channel_name'], unique=False)
     op.create_index(op.f('ix_lootbox_history_viewer_id'), 'lootbox_history', ['viewer_id'], unique=False)
     op.create_index(op.f('ix_lootbox_history_created_at'), 'lootbox_history', ['created_at'], unique=False)
-    
+
     # MythicalLootboxSession
     op.create_table('mythical_lootbox_sessions',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -183,32 +183,32 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_mythical_lootbox_sessions_user_id'), table_name='mythical_lootbox_sessions')
     op.drop_index(op.f('ix_mythical_lootbox_sessions_id'), table_name='mythical_lootbox_sessions')
     op.drop_table('mythical_lootbox_sessions')
-    
+
     op.drop_index(op.f('ix_lootbox_history_created_at'), table_name='lootbox_history')
     op.drop_index(op.f('ix_lootbox_history_viewer_id'), table_name='lootbox_history')
     op.drop_index(op.f('ix_lootbox_history_channel_name'), table_name='lootbox_history')
     op.drop_index(op.f('ix_lootbox_history_user_id'), table_name='lootbox_history')
     op.drop_index(op.f('ix_lootbox_history_id'), table_name='lootbox_history')
     op.drop_table('lootbox_history')
-    
+
     op.drop_index(op.f('ix_user_streaks_viewer_id'), table_name='user_streaks')
     op.drop_index(op.f('ix_user_streaks_channel_name'), table_name='user_streaks')
     op.drop_index(op.f('ix_user_streaks_user_id'), table_name='user_streaks')
     op.drop_index(op.f('ix_user_streaks_id'), table_name='user_streaks')
     op.drop_table('user_streaks')
-    
+
     op.drop_index(op.f('ix_lootbox_rewards_channel_name'), table_name='lootbox_rewards')
     op.drop_index(op.f('ix_lootbox_rewards_user_id'), table_name='lootbox_rewards')
     op.drop_index(op.f('ix_lootbox_rewards_id'), table_name='lootbox_rewards')
     op.drop_table('lootbox_rewards')
-    
+
     op.drop_index(op.f('ix_lootbox_configs_channel_name'), table_name='lootbox_configs')
     op.drop_index(op.f('ix_lootbox_configs_user_id'), table_name='lootbox_configs')
     op.drop_index(op.f('ix_lootbox_configs_id'), table_name='lootbox_configs')
     op.drop_table('lootbox_configs')
-    
+
     op.drop_index(op.f('ix_lootbox_qualities_id'), table_name='lootbox_qualities')
     op.drop_table('lootbox_qualities')
-    
+
     op.drop_index(op.f('ix_lootbox_types_id'), table_name='lootbox_types')
     op.drop_table('lootbox_types')

@@ -1,24 +1,27 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+
+import { useQueryClient } from '@tanstack/react-query';
+import { History, RefreshCw, Search } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { History, Search, RefreshCw } from 'lucide-react';
+
+
 import { useDropsHistory } from '../../../queries/drops/dropsQueries';
-import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../../queries/queryKeys';
-import type { DropsHistory } from '../../../types';
 
 interface DropsHistoryProps {
-    user: any;
+    user: Record<string, unknown>;
     channelName: string;
 }
 
 interface HistoryEntry {
     id: string | number;
     viewer_name: string;
-    reward_name: string;
-    drops_type: string;
+    reward_name?: string;
+    drops_type?: string;
     quality?: {
         name?: string;
         color?: string;
@@ -26,17 +29,17 @@ interface HistoryEntry {
     streak_days?: number;
     donation_amount?: number;
     messages_count?: number;
-    created_at: string;
+    created_at?: string;
 }
 
 const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelName }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [offset, setOffset] = useState(0);
-  const [allHistory, setAllHistory] = useState<DropsHistory[]>([]);
+  const [allHistory, setAllHistory] = useState<HistoryEntry[]>([]);
   const limit = 50;
   const queryClient = useQueryClient();
 
-  // ✅ НОВЫЙ КОД: Используем централизованный hook для загрузки истории
+  // [OK] НОВЫЙ КОД: Используем централизованный hook для загрузки истории
   const { data: historyData, isLoading: loading, refetch } = useDropsHistory(
     channelName,
     { limit, offset },
@@ -72,16 +75,16 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
     refetch();
   }, [channelName, queryClient, refetch]);
 
-  // ✅ OPTIMIZATION: Memoize filtered history to avoid recalculation on every render
+  // [OK] OPTIMIZATION: Memoize filtered history to avoid recalculation on every render
   const filteredHistory = useMemo(() => 
     history.filter(entry => 
       entry.viewer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      entry.reward_name.toLowerCase().includes(searchQuery.toLowerCase())
+      (entry.reward_name?.toLowerCase() ?? '').includes(searchQuery.toLowerCase())
     ),
     [history, searchQuery]
   );
 
-  // ✅ OPTIMIZATION: Memoize utility functions
+  // [OK] OPTIMIZATION: Memoize utility functions
   const getQualityColor = useCallback((quality?: { name?: string }): string => {
     switch (quality?.name?.toLowerCase()) {
       case 'common':
@@ -100,7 +103,8 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
     }
   }, []);
 
-  const formatDate = useCallback((dateString: string): string => {
+  const formatDate = useCallback((dateString: string | undefined): string => {
+    if (!dateString) return 'Не указано';
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('ru-RU', {
       year: 'numeric',
@@ -111,7 +115,8 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
     }).format(date);
   }, []);
 
-  const getDropsTypeLabel = useCallback((type: string): string => {
+  const getDropsTypeLabel = useCallback((type: string | undefined): string => {
+    if (!type) return 'Неизвестно';
     switch (type) {
       case 'streak':
         return 'Стрик';
@@ -198,7 +203,7 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground truncate">
-                      {entry.reward_name}
+                      {entry.reward_name ?? 'Неизвестная награда'}
                     </p>
                     <div className="flex items-center gap-4 mt-2">
                       {entry.streak_days && (

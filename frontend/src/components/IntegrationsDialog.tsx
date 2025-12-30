@@ -1,15 +1,17 @@
-// src/components/IntegrationsDialog.tsx
-import React, { useEffect } from 'react';
+﻿// src/components/IntegrationsDialog.tsx
+import React from 'react';
+
+import { AlertCircle, Gift, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Switch } from "@/components/ui/switch";
+
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { useIntegrations } from '../context/IntegrationsContext';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { toast } from '@/utils/toastManager';
+
 import { useDonationAlerts } from '../context/DonationAlertsContext';
-import { useAuth } from '../context/AuthContext';
+import { useIntegrations } from '../context/IntegrationsContext';
 import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
-import { Gift, AlertCircle, X } from 'lucide-react';
-import { toast } from 'sonner';
 import { logger } from '../utils/prodLogger';
 
 interface IntegrationsDialogProps {
@@ -21,7 +23,6 @@ const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenCha
     const navigate = useNavigate();
     const { integrations, isLoading, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
     const { isConnected: daConnected, isLoading: daLoading, error: daError, connect: daConnect, disconnect: daDisconnect } = useDonationAlerts();
-    const { loginWithTwitch, loginWithVk } = useAuth();
     // Проверяем, есть ли хотя бы одна основная интеграция
     const hasMainIntegration = integrations.twitch?.enabled || integrations.vk?.enabled;
 

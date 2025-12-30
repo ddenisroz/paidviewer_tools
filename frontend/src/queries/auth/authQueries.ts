@@ -1,13 +1,15 @@
 /**
  * Auth Queries - централизованные React Query queries для Auth
  */
-import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
-import { queryKeys } from '../queryKeys';
-import { authService } from '../../services/api/services/authService';
+import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
+
+import { authService } from '../../services/api/services/authService';
 import { logger } from '../../utils/prodLogger';
-import type { AxiosError } from 'axios';
+import { queryKeys } from '../queryKeys';
+
 import type { ApiResponse } from '../../types';
+import type { AxiosError } from 'axios';
 
 /**
  * Получить статус аутентификации
@@ -47,15 +49,11 @@ export const useLogout = (options?: UseMutationOptions<void, AxiosError, void>) 
       queryClient.clear();
       // Очищаем localStorage
       localStorage.removeItem('cached_user');
-      if (!options?.onSuccess) {
-        toast.success('Вы вышли из системы');
-      }
+      toast.success('Вы вышли из системы');
     },
     onError: (error) => {
       logger.error('Error logging out:', error);
-      if (!options?.onError) {
-        toast.error('Ошибка выхода из системы');
-      }
+      toast.error('Ошибка выхода из системы');
     },
     ...options,
   });
@@ -71,20 +69,16 @@ export const useDeleteAccount = (options?: UseMutationOptions<void, AxiosError, 
     mutationFn: () => authService.deleteAccount().then(() => undefined),
     onSuccess: () => {
       queryClient.clear(); // Очищаем весь кэш при удалении аккаунта
-      if (!options?.onSuccess) {
-        toast.success('Аккаунт успешно удалён');
-        // Перенаправляем на страницу логина через 2 секунды
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 2000);
-      }
+      toast.success('Аккаунт успешно удалён');
+      // Перенаправляем на страницу логина через 2 секунды
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 2000);
     },
     onError: (error) => {
       logger.error('Error deleting account:', error);
-      if (!options?.onError) {
-        const message = (error as AxiosError)?.response?.data as any;
-        toast.error(message?.detail || 'Ошибка удаления аккаунта');
-      }
+      const errorData = error?.response?.data as Record<string, unknown> | undefined;
+      toast.error((errorData?.detail as string) || 'Ошибка удаления аккаунта');
     },
     ...options,
   });

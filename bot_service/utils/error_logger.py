@@ -3,9 +3,9 @@ Enhanced error logging with sensitive data redaction
 """
 import logging
 import re
-import json
 from typing import Any, Dict, Optional
-from datetime import datetime
+
+from core.datetime_utils import utcnow_naive
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ class SensitiveDataFilter(logging.Filter):
     """
     Фильтр для удаления чувствительных данных из логов
     """
-    
+
     # Паттерны для поиска чувствительных данных
     SENSITIVE_PATTERNS = [
         # Токены и ключи
@@ -30,21 +30,21 @@ class SensitiveDataFilter(logging.Filter):
         # IP адреса (частично)
         (r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.)\d{1,3}', r'\1***'),
     ]
-    
+
     def filter(self, record: logging.LogRecord) -> bool:
         """Фильтрует чувствительные данные из сообщения лога"""
         if hasattr(record, 'msg'):
             record.msg = self.redact_sensitive_data(str(record.msg))
-        
+
         # Фильтруем args если есть
         if hasattr(record, 'args') and record.args:
             if isinstance(record.args, dict):
                 record.args = {k: self.redact_sensitive_data(str(v)) for k, v in record.args.items()}
             elif isinstance(record.args, (list, tuple)):
                 record.args = tuple(self.redact_sensitive_data(str(arg)) for arg in record.args)
-        
+
         return True
-    
+
     def redact_sensitive_data(self, text: str) -> str:
         """Заменяет чувствительные данные на ***REDACTED***"""
         for pattern, replacement in self.SENSITIVE_PATTERNS:
@@ -56,14 +56,14 @@ class StructuredErrorLogger:
     """
     Структурированное логирование ошибок с контекстом
     """
-    
+
     def __init__(self, logger_name: str = "bot_service.errors"):
         self.logger = logging.getLogger(logger_name)
-        
+
         # Добавляем фильтр для удаления чувствительных данных
         sensitive_filter = SensitiveDataFilter()
         self.logger.addFilter(sensitive_filter)
-    
+
     def log_error(
         self,
         error: Exception,
@@ -83,24 +83,24 @@ class StructuredErrorLogger:
             severity: Уровень серьезности (ERROR, CRITICAL, WARNING)
         """
         error_data = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utcnow_naive().isoformat(),
             "error_type": type(error).__name__,
             "error_message": str(error),
             "user_id": user_id,
             "endpoint": endpoint,
             "context": context or {},
         }
-        
+
         # Логируем в зависимости от severity
         log_level = getattr(logging, severity.upper(), logging.ERROR)
-        
+
         self.logger.log(
             log_level,
             f"Error occurred: {error_data['error_type']}",
             extra=error_data,
             exc_info=True,
         )
-    
+
     def log_validation_error(
         self,
         errors: list,
@@ -111,18 +111,18 @@ class StructuredErrorLogger:
         Логирует ошибки валидации
         """
         error_data = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utcnow_naive().isoformat(),
             "error_type": "ValidationError",
             "endpoint": endpoint,
             "user_id": user_id,
             "validation_errors": errors,
         }
-        
+
         self.logger.warning(
             f"Validation error in {endpoint}",
             extra=error_data,
         )
-    
+
     def log_api_error(
         self,
         status_code: int,
@@ -136,7 +136,7 @@ class StructuredErrorLogger:
         Логирует ошибки API
         """
         error_data = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utcnow_naive().isoformat(),
             "error_type": "APIError",
             "status_code": status_code,
             "endpoint": endpoint,
@@ -145,7 +145,7 @@ class StructuredErrorLogger:
             "user_id": user_id,
             "response_time_ms": response_time,
         }
-        
+
         # Определяем уровень логирования по статус коду
         if status_code >= 500:
             log_level = logging.ERROR
@@ -153,13 +153,13 @@ class StructuredErrorLogger:
             log_level = logging.WARNING
         else:
             log_level = logging.INFO
-        
+
         self.logger.log(
             log_level,
             f"API {status_code} {method} {endpoint}",
             extra=error_data,
         )
-    
+
     def log_database_error(
         self,
         error: Exception,
@@ -171,20 +171,20 @@ class StructuredErrorLogger:
         Логирует ошибки базы данных
         """
         error_data = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utcnow_naive().isoformat(),
             "error_type": "DatabaseError",
             "operation": operation,
             "table": table,
             "error_message": str(error),
             "user_id": user_id,
         }
-        
+
         self.logger.error(
             f"Database error during {operation}",
             extra=error_data,
             exc_info=True,
         )
-    
+
     def log_external_api_error(
         self,
         service: str,
@@ -197,7 +197,7 @@ class StructuredErrorLogger:
         Логирует ошибки внешних API (Twitch, VK, etc.)
         """
         error_data = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utcnow_naive().isoformat(),
             "error_type": "ExternalAPIError",
             "service": service,
             "endpoint": endpoint,
@@ -205,7 +205,7 @@ class StructuredErrorLogger:
             "error_message": error_message,
             "user_id": user_id,
         }
-        
+
         self.logger.error(
             f"External API error: {service} - {error_message}",
             extra=error_data,
@@ -249,7 +249,7 @@ def redact_sensitive_data(data: Any) -> Any:
         Очищенные данные
     """
     sensitive_filter = SensitiveDataFilter()
-    
+
     if isinstance(data, dict):
         return {k: redact_sensitive_data(v) for k, v in data.items()}
     elif isinstance(data, (list, tuple)):

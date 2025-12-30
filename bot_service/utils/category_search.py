@@ -121,7 +121,7 @@ CATEGORY_ALIASES = {
     'roblox': ['Roblox'],
     'vrchat': ['VRChat'],
     'beatsaber': ['Beat Saber'],
-    
+
     # === Русские названия популярных игр ===
     'дота': ['Dota 2'],
     'кс': ['Counter-Strike', 'Counter-Strike 2', 'CS:GO'],
@@ -240,7 +240,7 @@ CATEGORY_ALIASES = {
     'лост': ['Lost Ark'],
     'нью': ['New World'],
     'рунескейп': ['Old School RuneScape', 'RuneScape'],
-    
+
     # === Переводы категорий (RU → EN) с маппингом Twitch ↔ VK ===
     'общение': ['Just Chatting', 'Говорим и смотрим', 'Разговоры', 'Talk Shows & Podcasts'],
     'разговоры': ['Just Chatting', 'Говорим и смотрим', 'Talk Shows & Podcasts'],
@@ -277,7 +277,7 @@ CATEGORY_ALIASES = {
     'асмр': ['ASMR', 'АСМР'],
     'красота': ['Beauty'],
     'подкаст': ['Podcasts', 'Talk Shows & Podcasts', 'Говорим и смотрим'],
-    
+
     # === Переводы категорий (EN → RU) с маппингом Twitch ↔ VK ===
     'chatting': ['Just Chatting', 'Говорим и смотрим', 'Talk Shows & Podcasts'],
     'just': ['Just Chatting', 'Говорим и смотрим'],
@@ -335,11 +335,11 @@ def expand_query_with_aliases(query: str) -> List[str]:
         ["общение", "Just Chatting", "Говорим и смотрим"]
     """
     queries = [query]  # Всегда включаем исходный запрос
-    
+
     normalized_query = query.lower().strip()
     if normalized_query in CATEGORY_ALIASES:
         queries.extend(CATEGORY_ALIASES[normalized_query])
-    
+
     return queries
 
 
@@ -357,24 +357,24 @@ def calculate_relevance(category_name: str, query: str) -> float:
     """
     cat_lower = category_name.lower()
     query_lower = query.lower()
-    
+
     # Точное совпадение - максимальный приоритет
     if cat_lower == query_lower:
         return 0
-    
+
     # Совпадение с начала строки
     if cat_lower.startswith(query_lower):
         return 1
-    
+
     # Разбиваем название категории и запрос на слова
     cat_words = [w for w in re.split(r'[\s:,\-–—()]+', cat_lower) if len(w) > 0]
     query_words = [w for w in re.split(r'[\s:,\-–—()]+', query_lower) if len(w) > 0]
-    
+
     # Проверяем, все ли слова запроса присутствуют в категории
     all_words_match = True
     exact_word_matches = 0
     partial_word_matches = 0
-    
+
     for query_word in query_words:
         found_match = False
         for cat_word in cat_words:
@@ -391,7 +391,7 @@ def calculate_relevance(category_name: str, query: str) -> float:
                 break
         if not found_match:
             all_words_match = False
-    
+
     # Если все слова запроса найдены как точные совпадения - высокий приоритет
     if exact_word_matches == len(query_words):
         # Проверяем, идут ли слова подряд (например, "counter strike" в "Counter-Strike")
@@ -399,11 +399,11 @@ def calculate_relevance(category_name: str, query: str) -> float:
         if re.search(query_pattern, category_name, re.IGNORECASE):
             return 1.5  # Все слова подряд - очень высокий приоритет
         return 2  # Все слова есть, но не обязательно подряд
-    
+
     # Если все слова запроса найдены (хотя бы частично)
     if all_words_match:
         return 3 + (len(query_words) - exact_word_matches) * 0.5
-    
+
     # Проверяем каждое слово запроса отдельно
     best_word_match = 100
     for query_word in query_words:
@@ -420,14 +420,14 @@ def calculate_relevance(category_name: str, query: str) -> float:
             # Слово содержит запрос
             elif query_word in cat_word:
                 best_word_match = min(best_word_match, 10 + i * 0.5)
-    
+
     if best_word_match < 100:
         return best_word_match
-    
+
     # Содержит подстроку (для цельного поиска)
     if query_lower in cat_lower:
         return 15
-    
+
     # Нечеткое совпадение (содержит большинство символов запроса)
     match_count = 0
     last_index = -1
@@ -436,7 +436,7 @@ def calculate_relevance(category_name: str, query: str) -> float:
         if index > last_index:
             match_count += 1
             last_index = index
-    
+
     fuzzy_score = match_count / len(query_lower) if len(query_lower) > 0 else 0
     if fuzzy_score > 0.8:
         return 20  # 80%+ символов совпадают
@@ -444,7 +444,7 @@ def calculate_relevance(category_name: str, query: str) -> float:
         return 25  # 60%+ символов совпадают
     if fuzzy_score > 0.4:
         return 30  # 40%+ символов совпадают
-    
+
     # Не релевантно
     return 100
 
@@ -462,12 +462,12 @@ def sort_categories_by_relevance(categories: List[Dict[str, Any]], query: str) -
     """
     if not query or not query.strip():
         return categories
-    
+
     def sort_key(cat):
         relevance = calculate_relevance(cat.get('name', ''), query)
         name = cat.get('name', '')
         return (relevance, name)  # Сортируем по relevance, потом по имени
-    
+
     return sorted(categories, key=sort_key)
 
 
@@ -490,9 +490,9 @@ def find_best_category_match(categories: List[Dict[str, Any]], query: str) -> Op
     """
     if not categories:
         return None
-    
+
     sorted_cats = sort_categories_by_relevance(categories, query)
-    
+
     # Возвращаем первую категорию (самую релевантную)
     # Но только если она достаточно релевантна (score < 50)
     if sorted_cats:
@@ -500,6 +500,6 @@ def find_best_category_match(categories: List[Dict[str, Any]], query: str) -> Op
         relevance = calculate_relevance(best_match.get('name', ''), query)
         if relevance < 50:  # Порог релевантности
             return best_match
-    
+
     return None
 

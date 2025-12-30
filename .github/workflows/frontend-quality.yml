@@ -1,0 +1,230 @@
+name: Frontend Quality Checks
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'frontend/**/*.ts'
+      - 'frontend/**/*.tsx'
+      - 'frontend/**/*.js'
+      - 'frontend/**/*.jsx'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - 'frontend/eslint.config.js'
+      - 'frontend/tsconfig.json'
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'frontend/**/*.ts'
+      - 'frontend/**/*.tsx'
+      - 'frontend/**/*.js'
+      - 'frontend/**/*.jsx'
+
+jobs:
+  lint:
+    name: ESLint Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Run ESLint
+      run: |
+        cd frontend
+        npm run lint
+    
+    - name: Comment PR on failure
+      if: failure() && github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `## ❌ ESLint Check Failed
+            
+            Your changes contain linting errors.
+            
+            ### 🔧 To fix:
+            \`\`\`bash
+            cd frontend
+            npm run lint:fix
+            \`\`\`
+            
+            ### 📋 Check errors locally:
+            \`\`\`bash
+            cd frontend
+            npm run lint
+            \`\`\`
+            
+            Please fix the linting errors before merging.`
+          })
+
+  format:
+    name: Prettier Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Run Prettier
+      run: |
+        cd frontend
+        npm run format:check
+    
+    - name: Comment PR on failure
+      if: failure() && github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `## ❌ Prettier Check Failed
+            
+            Your changes are not properly formatted.
+            
+            ### 🔧 To fix automatically:
+            \`\`\`bash
+            cd frontend
+            npm run format
+            \`\`\`
+            
+            Please format your code before merging.`
+          })
+
+  typecheck:
+    name: TypeScript Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Run TypeScript
+      run: |
+        cd frontend
+        npm run type-check
+    
+    - name: Comment PR on failure
+      if: failure() && github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `## ❌ TypeScript Check Failed
+            
+            Your changes contain type errors.
+            
+            ### 🔧 To check errors locally:
+            \`\`\`bash
+            cd frontend
+            npm run type-check
+            \`\`\`
+            
+            ### 📚 Resources:
+            - [TypeScript Handbook](https://www.typescriptlang.org/docs/handbook/intro.html)
+            - Check the design document: \`.kiro/specs/frontend-typescript-linting/design.md\`
+            
+            Please fix the type errors before merging.`
+          })
+
+  import-cycles:
+    name: Check Import Cycles
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Check for circular dependencies
+      run: |
+        cd frontend
+        npm run lint -- --quiet --rule 'import/no-cycle: error'
+    
+    - name: Comment PR on failure
+      if: failure() && github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `## ❌ Circular Dependencies Detected
+            
+            Your changes introduce circular import dependencies.
+            
+            ### 🔧 To check locally:
+            \`\`\`bash
+            cd frontend
+            npm run lint
+            \`\`\`
+            
+            Circular dependencies can cause:
+            - Runtime errors
+            - Bundling issues
+            - Difficult-to-debug problems
+            
+            Please refactor to remove circular dependencies before merging.`
+          })
+
+  all-checks:
+    name: All Quality Checks
+    runs-on: ubuntu-latest
+    needs: [lint, format, typecheck, import-cycles]
+    
+    steps:
+    - name: All checks passed
+      run: echo "✅ All frontend quality checks passed!"

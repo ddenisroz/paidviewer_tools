@@ -9,26 +9,27 @@ declare global {
 type WidgetType = 'chat' | 'lootbox' | string;
 
 class WidgetConfigManager {
-  private configs: Map<string, any>;
-  private defaultConfigs: Map<string, any>;
+  private configs: Map<string, unknown>;
+  private defaultConfigs: Map<string, unknown>;
 
   constructor() {
     this.configs = new Map();
     this.defaultConfigs = new Map();
   }
 
-  async loadConfig(widgetType: WidgetType, configId: string = 'default', userId: string | number | null = null): Promise<any> {
+  async loadConfig(widgetType: WidgetType, configId: string = 'default', userId: string | number | null = null): Promise<Record<string, unknown>> {
     try {
       const cacheKey = `${widgetType}_${configId}_${userId || 'default'}`;
-      if (this.configs.has(cacheKey)) {
-        return this.configs.get(cacheKey);
+      const cachedConfig = this.configs.get(cacheKey);
+      if (cachedConfig !== undefined) {
+        return cachedConfig as Record<string, unknown>;
       }
       let url = `/api/widgets/${widgetType}/config/${configId}`;
       if (userId) url += `?user_id=${userId}`;
       const response = await fetch(url);
       if (response.ok) {
-        const data = await response.json();
-        const config = (data as any).config || data;
+        const data = await response.json() as { config?: Record<string, unknown> } | Record<string, unknown>;
+        const config = ('config' in data ? (data.config || {}) : data) as Record<string, unknown>;
         this.configs.set(cacheKey, config);
         return config;
       }
@@ -38,7 +39,7 @@ class WidgetConfigManager {
     return this.getDefaultConfig(widgetType);
   }
 
-  async saveConfig(widgetType: WidgetType, config: any, configId: string | null = null, userId: string | number | null = null): Promise<any> {
+  async saveConfig(widgetType: WidgetType, config: Record<string, unknown>, configId: string | null = null, userId: string | number | null = null): Promise<Record<string, unknown>> {
     try {
       const response = await fetch(`/api/widgets/${widgetType}/config`, {
         method: 'POST',
@@ -46,22 +47,23 @@ class WidgetConfigManager {
         body: JSON.stringify({ id: configId, widget_type: widgetType, config }),
       });
       if (response.ok) {
-        const result = await response.json();
-        const cacheKey = `${widgetType}_${(result as any).id}_${userId || 'default'}`;
+        const result = await response.json() as { id?: string } & Record<string, unknown>;
+        const cacheKey = `${widgetType}_${result.id || 'default'}_${userId || 'default'}`;
         this.configs.set(cacheKey, config);
         return result;
       }
+      throw new Error('Failed to save config');
     } catch (error) {
       logger.error('Error saving config:', error);
       throw error;
     }
   }
 
-  getDefaultConfig(widgetType: WidgetType): any {
+  getDefaultConfig(widgetType: WidgetType): Record<string, unknown> {
     if (this.defaultConfigs.has(widgetType)) {
-      return this.defaultConfigs.get(widgetType);
+      return this.defaultConfigs.get(widgetType) as Record<string, unknown>;
     }
-    let defaultConfig: any;
+    let defaultConfig: Record<string, unknown>;
     switch (widgetType) {
       case 'chat':
         defaultConfig = {
@@ -110,11 +112,11 @@ class WidgetConfigManager {
     return defaultConfig;
   }
 
-  applyConfig(config: Record<string, any>, prefix: string = ''): void {
+  applyConfig(config: Record<string, unknown>, prefix: string = ''): void {
     const root = document.documentElement;
     Object.entries(config).forEach(([key, value]) => {
       if (typeof value === 'object' && value !== null) {
-        Object.entries(value as Record<string, any>).forEach(([subKey, subValue]) => {
+        Object.entries(value as Record<string, unknown>).forEach(([subKey, subValue]) => {
           const cssVar = `--${prefix}${key}-${subKey}`;
           root.style.setProperty(cssVar, String(subValue));
         });
@@ -125,7 +127,7 @@ class WidgetConfigManager {
     });
   }
 
-  exportConfig(config: any, filename: string = 'widget-config.json'): void {
+  exportConfig(config: Record<string, unknown>, filename: string = 'widget-config.json'): void {
     const configJson = JSON.stringify(config, null, 2);
     const blob = new Blob([configJson], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -136,7 +138,7 @@ class WidgetConfigManager {
     URL.revokeObjectURL(url);
   }
 
-  importConfig(file: File): Promise<any> {
+  importConfig(file: File): Promise<Record<string, unknown>> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {

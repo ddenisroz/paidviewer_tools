@@ -1,15 +1,14 @@
-/**
- * useWebSocketSync - Hook for synchronizing state via WebSocket
- * 
- * Listens for WebSocket messages and updates React Query cache accordingly
- * Handles concurrent updates and prevents race conditions
- */
-import { useEffect, useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
+
 import { useQueryClient } from '@tanstack/react-query';
-import { getSharedWebSocket } from '../utils/sharedWebSocket';
+import { toast } from 'sonner';
+
 import { queryKeys } from '../queries/queryKeys';
 import { logger } from '../utils/prodLogger';
-import { toast } from 'sonner';
+import { getSharedWebSocket } from '../utils/sharedWebSocket';
+
+
+import type { ApiResponse } from '../types/api';
 
 interface WebSocketSyncOptions {
   /**
@@ -25,7 +24,7 @@ interface WebSocketSyncOptions {
   /**
    * Custom message handlers for specific event types
    */
-  customHandlers?: Record<string, (data: any) => void>;
+  customHandlers?: Record<string, (data: Record<string, unknown>) => void>;
 }
 
 export const useWebSocketSync = (options: WebSocketSyncOptions) => {
@@ -33,18 +32,25 @@ export const useWebSocketSync = (options: WebSocketSyncOptions) => {
   const queryClient = useQueryClient();
 
   const handleWebSocketMessage = useCallback(
-    (message: any) => {
-      const { type, data } = message;
+    (message: Record<string, unknown>) => {
+      const wsMessage = message as { type?: string; data?: Record<string, unknown>; platform?: string };
+      const { type, data } = wsMessage;
+
+      if (!type) return;
 
       logger.debug('WebSocket message received:', { type, data });
 
       switch (type) {
         // Settings updates
         case 'settings_updated':
-          queryClient.setQueryData(queryKeys.userSettings.settings(), (old: any) => ({
-            ...old,
-            ...data.settings,
-          }));
+          if (!data) break;
+          queryClient.setQueryData(queryKeys.userSettings.settings(), (old: ApiResponse | undefined) => {
+            const settingsData = data.settings as Record<string, unknown>;
+            return {
+              ...old,
+              ...settingsData,
+            };
+          });
           if (showNotifications) {
             toast.info('Настройки обновлены');
           }
@@ -52,13 +58,17 @@ export const useWebSocketSync = (options: WebSocketSyncOptions) => {
 
         // TTS settings updates
         case 'tts_settings_updated':
-          queryClient.setQueryData(queryKeys.tts.settings(), (old: any) => ({
-            ...old,
-            data: {
-              ...(old?.data || {}),
-              ...data.settings,
-            },
-          }));
+          if (!data) break;
+          queryClient.setQueryData(queryKeys.tts.settings(), (old: ApiResponse | undefined) => {
+            const settingsData = data.settings as Record<string, unknown>;
+            return {
+              ...old,
+              data: {
+                ...(old?.data as Record<string, unknown> || {}),
+                ...settingsData,
+              },
+            };
+          });
           if (showNotifications) {
             toast.info('Настройки TTS обновлены');
           }
@@ -66,33 +76,43 @@ export const useWebSocketSync = (options: WebSocketSyncOptions) => {
 
         // TTS status updates
         case 'tts_status_changed':
-          queryClient.setQueryData(queryKeys.tts.status(null), (old: any) => ({
-            ...old,
-            data: {
-              ...(old?.data || {}),
-              enabled: data.enabled,
-            },
-          }));
+          if (!data) break;
+          queryClient.setQueryData(queryKeys.tts.status(null), (old: ApiResponse | undefined) => {
+            return {
+              ...old,
+              data: {
+                ...(old?.data as Record<string, unknown> || {}),
+                enabled: data.enabled,
+              },
+            };
+          });
           break;
 
         // Stream info updates
         case 'stream_info_updated':
+          if (!data) break;
           if (data.platform === 'twitch') {
-            queryClient.setQueryData(queryKeys.stream.twitchInfo(), (old: any) => ({
-              ...old,
-              data: {
-                ...(old?.data || {}),
-                ...data.stream_info,
-              },
-            }));
+            queryClient.setQueryData(queryKeys.stream.twitchInfo(), (old: ApiResponse | undefined) => {
+              const streamInfo = data.stream_info as Record<string, unknown>;
+              return {
+                ...old,
+                data: {
+                  ...(old?.data as Record<string, unknown> || {}),
+                  ...streamInfo,
+                },
+              };
+            });
           } else if (data.platform === 'vk') {
-            queryClient.setQueryData(queryKeys.stream.vkInfo(), (old: any) => ({
-              ...old,
-              data: {
-                ...(old?.data || {}),
-                ...data.stream_info,
-              },
-            }));
+            queryClient.setQueryData(queryKeys.stream.vkInfo(), (old: ApiResponse | undefined) => {
+              const streamInfo = data.stream_info as Record<string, unknown>;
+              return {
+                ...old,
+                data: {
+                  ...(old?.data as Record<string, unknown> || {}),
+                  ...streamInfo,
+                },
+              };
+            });
           }
           if (showNotifications) {
             toast.info('Информация о стриме обновлена');
@@ -128,7 +148,7 @@ export const useWebSocketSync = (options: WebSocketSyncOptions) => {
 
         // Custom handlers
         default:
-          if (customHandlers[type]) {
+          if (customHandlers[type] && data) {
             customHandlers[type](data);
           } else {
             logger.debug('Unhandled WebSocket message type:', type);
@@ -152,7 +172,7 @@ export const useWebSocketSync = (options: WebSocketSyncOptions) => {
   return {
     // Expose WebSocket instance for sending messages
     send: useCallback(
-      (data: any) => {
+      (data: Record<string, unknown>) => {
         const ws = getSharedWebSocket(userId);
         ws.send(data);
       },
@@ -166,7 +186,7 @@ export const useWebSocketSync = (options: WebSocketSyncOptions) => {
  */
 export const useBroadcastSettingChange = (userId: string | number) => {
   const broadcastChange = useCallback(
-    (settingType: string, settingData: any) => {
+    (settingType: string, settingData: Record<string, unknown>) => {
       const ws = getSharedWebSocket(userId);
       ws.send({
         type: 'setting_changed',

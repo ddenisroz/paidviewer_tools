@@ -1,4 +1,4 @@
-import { logger } from '../utils/prodLogger';
+import { logger } from "./prodLogger";
 
 const RETURN_URL_KEY = 'oauth_return_url';
 const RETURN_URL_TIMESTAMP = 'oauth_return_timestamp';
@@ -13,14 +13,14 @@ export function saveReturnUrl(): void {
       currentPath === '/' ||
       currentPath.startsWith('/dashboard?')
     ) {
-      logger.log('🔄 [OAuth] Skipping save - already on main page or has query params');
+      logger.log('[REFRESH] [OAuth] Skipping save - already on main page or has query params');
       return;
     }
     localStorage.setItem(RETURN_URL_KEY, currentPath);
     localStorage.setItem(RETURN_URL_TIMESTAMP, Date.now().toString());
-    logger.log('💾 [OAuth] Saved return URL:', currentPath);
+    logger.log('[DB] [OAuth] Saved return URL:', currentPath);
   } catch (error) {
-    logger.error('❌ [OAuth] Failed to save return URL:', error);
+    logger.error('[ERROR] [OAuth] Failed to save return URL:', error);
   }
 }
 
@@ -32,14 +32,14 @@ export function getAndClearReturnUrl(): string | null {
     localStorage.removeItem(RETURN_URL_TIMESTAMP);
 
     if (!returnUrl) {
-      logger.log('ℹ️ [OAuth] No saved return URL');
+      logger.log('[INFO] [OAuth] No saved return URL');
       return null;
     }
 
     if (timestamp) {
       const age = Date.now() - parseInt(timestamp, 10);
       if (age > MAX_AGE_MS) {
-        logger.log('⏰ [OAuth] Return URL expired, ignoring');
+        logger.log('[TIMEOUT] [OAuth] Return URL expired, ignoring');
         return null;
       }
     }
@@ -50,14 +50,14 @@ export function getAndClearReturnUrl(): string | null {
       returnUrl.startsWith('/dashboard?') ||
       returnUrl.startsWith('/login')
     ) {
-      logger.log('🔄 [OAuth] Return URL is main page or login, ignoring');
+      logger.log('[REFRESH] [OAuth] Return URL is main page or login, ignoring');
       return null;
     }
 
-    logger.log('✅ [OAuth] Retrieved return URL:', returnUrl);
+    logger.log('[OK] [OAuth] Retrieved return URL:', returnUrl);
     return returnUrl;
   } catch (error) {
-    logger.error('❌ [OAuth] Failed to get return URL:', error);
+    logger.error('[ERROR] [OAuth] Failed to get return URL:', error);
     return null;
   }
 }
@@ -66,9 +66,9 @@ export function clearReturnUrl(): void {
   try {
     localStorage.removeItem(RETURN_URL_KEY);
     localStorage.removeItem(RETURN_URL_TIMESTAMP);
-    logger.log('🗑️ [OAuth] Cleared return URL');
+    logger.log('[DELETE] [OAuth] Cleared return URL');
   } catch (error) {
-    logger.error('❌ [OAuth] Failed to clear return URL:', error);
+    logger.error('[ERROR] [OAuth] Failed to clear return URL:', error);
   }
 }
 

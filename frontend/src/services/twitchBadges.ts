@@ -24,16 +24,16 @@ class TwitchBadgesService {
         const age = Date.now() - timestamp;
         if (age < 24 * 60 * 60 * 1000) {
           this.globalBadges = badges;
-          logger.log('✅ [BADGES] Loaded from cache:', Object.keys(this.globalBadges).length, 'sets');
+          logger.log('[OK] [BADGES] Loaded from cache:', Object.keys(this.globalBadges).length, 'sets');
           if (age > 60 * 60 * 1000) {
-            logger.log('🔄 [BADGES] Refreshing cache in background...');
+            logger.log('[REFRESH] [BADGES] Refreshing cache in background...');
             this.refreshBadgesInBackground();
           }
           return this.globalBadges;
         }
       }
     } catch (error) {
-      logger.warn('⚠️ [BADGES] Cache read error:', error);
+      logger.warn('[WARN] [BADGES] Cache read error:', error);
     }
     if (this.loading) {
       await new Promise<void>((resolve) => {
@@ -53,7 +53,7 @@ class TwitchBadgesService {
       // Проверяем, что ответ - это JSON, а не HTML
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        logger.warn('⚠️ [BADGES] Backend not available (got HTML instead of JSON). Using empty badges.');
+        logger.warn('[WARN] [BADGES] Backend not available (got HTML instead of JSON). Using empty badges.');
         this.globalBadges = {};
         this.loading = false;
         return this.globalBadges;
@@ -63,22 +63,22 @@ class TwitchBadgesService {
         const data = await response.json();
         if (data.success) {
           this.globalBadges = data.badges as BadgesDict;
-          logger.log('✅ [BADGES] Loaded global badges:', Object.keys(this.globalBadges).length, 'sets');
+          logger.log('[OK] [BADGES] Loaded global badges:', Object.keys(this.globalBadges).length, 'sets');
           try {
             localStorage.setItem('twitch_badges_cache', JSON.stringify({ badges: this.globalBadges, timestamp: Date.now() }));
-            logger.log('💾 [BADGES] Saved to cache');
+            logger.log('[DB] [BADGES] Saved to cache');
           } catch (e) {
-            logger.warn('⚠️ [BADGES] Cache save error:', e);
+            logger.warn('[WARN] [BADGES] Cache save error:', e);
           }
         } else {
           this.globalBadges = {};
         }
       } else {
-        logger.warn('⚠️ [BADGES] Failed to load badges:', response.status);
+        logger.warn('[WARN] [BADGES] Failed to load badges:', response.status);
         this.globalBadges = {};
       }
     } catch (error) {
-      logger.warn('⚠️ [BADGES] Backend not available:', error instanceof Error ? error.message : 'Unknown error');
+      logger.warn('[WARN] [BADGES] Backend not available:', error instanceof Error ? error.message : 'Unknown error');
       this.globalBadges = {};
     } finally {
       this.loading = false;
@@ -91,7 +91,7 @@ class TwitchBadgesService {
       .then((response) => {
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
-          logger.debug('⚠️ [BADGES] Background refresh skipped (backend not available)');
+          logger.debug('[WARN] [BADGES] Background refresh skipped (backend not available)');
           return null;
         }
         return response.json();
@@ -100,10 +100,10 @@ class TwitchBadgesService {
         if (data && data.success) {
           this.globalBadges = data.badges as BadgesDict;
           localStorage.setItem('twitch_badges_cache', JSON.stringify({ badges: this.globalBadges, timestamp: Date.now() }));
-          logger.log('🔄 [BADGES] Cache refreshed');
+          logger.log('[REFRESH] [BADGES] Cache refreshed');
         }
       })
-      .catch((error) => logger.debug('⚠️ [BADGES] Background refresh failed:', error instanceof Error ? error.message : 'Unknown error'));
+      .catch((error) => logger.debug('[WARN] [BADGES] Background refresh failed:', error instanceof Error ? error.message : 'Unknown error'));
   }
 
   async loadChannelBadges(broadcasterId: string): Promise<BadgesDict> {
@@ -116,7 +116,7 @@ class TwitchBadgesService {
       // Проверяем, что ответ - это JSON, а не HTML
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        logger.warn(`⚠️ [BADGES] Backend not available for channel ${broadcasterId}. Using empty badges.`);
+        logger.warn(`[WARN] [BADGES] Backend not available for channel ${broadcasterId}. Using empty badges.`);
         this.channelBadges[broadcasterId] = {};
         return this.channelBadges[broadcasterId];
       }
@@ -125,7 +125,7 @@ class TwitchBadgesService {
         const data = await response.json();
         if (data.success) {
           this.channelBadges[broadcasterId] = data.badges as BadgesDict;
-          logger.log(`✅ [BADGES] Loaded channel badges for ${broadcasterId}:`, Object.keys(this.channelBadges[broadcasterId]).length);
+          logger.log(`[OK] [BADGES] Loaded channel badges for ${broadcasterId}:`, Object.keys(this.channelBadges[broadcasterId]).length);
         } else {
           this.channelBadges[broadcasterId] = {};
         }
@@ -133,7 +133,7 @@ class TwitchBadgesService {
         this.channelBadges[broadcasterId] = {};
       }
     } catch (error) {
-      logger.warn(`⚠️ [BADGES] Backend not available for channel ${broadcasterId}:`, error instanceof Error ? error.message : 'Unknown error');
+      logger.warn(`[WARN] [BADGES] Backend not available for channel ${broadcasterId}:`, error instanceof Error ? error.message : 'Unknown error');
       this.channelBadges[broadcasterId] = {};
     }
     return this.channelBadges[broadcasterId];
@@ -143,13 +143,13 @@ class TwitchBadgesService {
     if (broadcasterId && this.channelBadges[broadcasterId]) {
       const channelBadge = this.channelBadges[broadcasterId][badgeId]?.[version];
       if (channelBadge) {
-        return (channelBadge as any)[`image_url_${size}`] || null;
+        return (channelBadge as Record<string, string>)[`image_url_${size}`] || null;
       }
     }
     if (this.globalBadges) {
       const globalBadge = this.globalBadges[badgeId]?.[version];
       if (globalBadge) {
-        return (globalBadge as any)[`image_url_${size}`] || null;
+        return (globalBadge as Record<string, string>)[`image_url_${size}`] || null;
       }
     }
     return null;
@@ -171,9 +171,9 @@ class TwitchBadgesService {
     this.channelBadges = {};
     try {
       localStorage.removeItem('twitch_badges_cache');
-      logger.log('🗑️ [BADGES] Cache cleared (memory + localStorage)');
+      logger.log('[DELETE] [BADGES] Cache cleared (memory + localStorage)');
     } catch (e) {
-      logger.warn('⚠️ [BADGES] localStorage clear error:', e);
+      logger.warn('[WARN] [BADGES] localStorage clear error:', e);
     }
   }
 }

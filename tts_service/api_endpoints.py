@@ -185,8 +185,8 @@ class TTSAPIEndpoints:
             cfg_strength = getattr(request, 'cfg_strength', None)
             speed_preset = getattr(request, 'speed_preset', None)
             
-            logger.info(f"📥 Request params: cfg_strength={cfg_strength}, speed_preset={speed_preset}")
-            logger.info(f"📊 Voice defaults: cfg_strength={voice.cfg_strength}, speed_preset={voice.speed_preset}")
+            logger.info(f"[RECEIVE] Request params: cfg_strength={cfg_strength}, speed_preset={speed_preset}")
+            logger.info(f"[STATS] Voice defaults: cfg_strength={voice.cfg_strength}, speed_preset={voice.speed_preset}")
             
             synthesis_params = {
                 "cfg_strength": cfg_strength if cfg_strength is not None else voice.cfg_strength,
@@ -194,7 +194,7 @@ class TTSAPIEndpoints:
                 "volume_level": getattr(request, 'volume_level', 50.0)  # Громкость по умолчанию 50%
             }
             
-            logger.info(f"🎛️ Final synthesis params: {synthesis_params}")
+            logger.info(f"[SETTINGS] Final synthesis params: {synthesis_params}")
             
             # Выполняем синтез с применением громкости
             success = await tts_engine_manager.synthesize(
@@ -592,16 +592,16 @@ async def synthesize_channel(request: dict):
         if not all([channel_name, text, author]):
             raise HTTPException(status_code=400, detail="Missing required parameters")
         
-        logger.info(f"🎙️ [CHANNEL TTS] {channel_name} | {author}: {text[:50]}...")
+        logger.info(f"[MIC] [CHANNEL TTS] {channel_name} | {author}: {text[:50]}...")
         
-        # ✅ Извлекаем голос из tts_settings, если указан
+        # [OK] Извлекаем голос из tts_settings, если указан
         voice = tts_settings.get("voice", "female_1") if tts_settings else "female_1"
-        logger.info(f"🎤 [CHANNEL TTS] Using voice: {voice} (from tts_settings)")
+        logger.info(f"[TTS] [CHANNEL TTS] Using voice: {voice} (from tts_settings)")
         
         # Используем tts_engine_manager для синтеза
         result = await tts_engine_manager.synthesize_speech_async(
             text=text,
-            voice=voice,  # ✅ Используем голос из tts_settings
+            voice=voice,  # [OK] Используем голос из tts_settings
             user_id=user_id,
             channel_name=channel_name,
             author=author,
@@ -612,7 +612,7 @@ async def synthesize_channel(request: dict):
         )
         
         if result.get("success"):
-            logger.info(f"✅ [CHANNEL TTS] Синтез успешен для {channel_name}")
+            logger.info(f"[OK] [CHANNEL TTS] Синтез успешен для {channel_name}")
             
             return {
                 "success": True,
@@ -622,13 +622,13 @@ async def synthesize_channel(request: dict):
                 "tts_type": result.get("tts_type", "f5")
             }
         else:
-            logger.error(f"❌ [CHANNEL TTS] Синтез не удался: {result.get('error')}")
+            logger.error(f"[ERROR] [CHANNEL TTS] Синтез не удался: {result.get('error')}")
             raise HTTPException(status_code=500, detail=result.get("error", "Synthesis failed"))
             
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ [CHANNEL TTS] Ошибка: {e}")
+        logger.error(f"[ERROR] [CHANNEL TTS] Ошибка: {e}")
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 # Глобальный экземпляр класса (для совместимости)
@@ -753,7 +753,7 @@ async def upload_user_voice_endpoint(
             shutil.copyfileobj(file.file, temp_file)
             temp_input_path = temp_file.name
         
-        logger.info(f"📥 User voice uploaded to temp: {temp_input_path}")
+        logger.info(f"[RECEIVE] User voice uploaded to temp: {temp_input_path}")
         
         # Конвертируем в WAV с требованиями F5-TTS
         temp_converted_path = tempfile.mktemp(suffix='.wav')
@@ -767,7 +767,7 @@ async def upload_user_voice_endpoint(
             if not success:
                 raise Exception("Audio conversion failed")
             
-            logger.info(f"✅ Audio converted to WAV: {temp_converted_path}")
+            logger.info(f"[OK] Audio converted to WAV: {temp_converted_path}")
         finally:
             await converter.stop_workers()
         
@@ -776,14 +776,14 @@ async def upload_user_voice_endpoint(
         try:
             if tts_engine_manager.transcriber:
                 reference_text = tts_engine_manager.transcribe(temp_converted_path)
-                logger.info(f"✅ Audio transcribed: '{reference_text[:50]}...'")
+                logger.info(f"[OK] Audio transcribed: '{reference_text[:50]}...'")
             else:
-                logger.warning("⚠️ Transcriber not available, skipping transcription")
+                logger.warning("[WARN] Transcriber not available, skipping transcription")
         except Exception as e:
-            logger.warning(f"⚠️ Transcription failed: {e}, continuing without reference text")
+            logger.warning(f"[WARN] Transcription failed: {e}, continuing without reference text")
         
         # Сохраняем в финальную директорию
-        # ✅ Используем абсолютный путь из config для надежности
+        # [OK] Используем абсолютный путь из config для надежности
         from tts_service.config import config
         voices_dir = config.user_voices_path / str(user_id)
         voices_dir.mkdir(parents=True, exist_ok=True)
@@ -795,7 +795,7 @@ async def upload_user_voice_endpoint(
         # Копируем конвертированный файл
         shutil.copy2(temp_converted_path, final_voice_path)
         
-        logger.info(f"✅ User voice saved: {final_voice_path}")
+        logger.info(f"[OK] User voice saved: {final_voice_path}")
         
         # Используем значения из конфига для дефолтных настроек
         from tts_service.config import config
@@ -815,7 +815,7 @@ async def upload_user_voice_endpoint(
         db.commit()
         db.refresh(new_voice)
         
-        logger.info(f"✅ User voice '{voice_name}' uploaded for user {user_id} (ID: {new_voice.id})")
+        logger.info(f"[OK] User voice '{voice_name}' uploaded for user {user_id} (ID: {new_voice.id})")
         
         return {
             "status": "success",
@@ -848,13 +848,13 @@ async def upload_user_voice_endpoint(
         if temp_input_path and os.path.exists(temp_input_path):
             try:
                 os.unlink(temp_input_path)
-            except:
+            except OSError:
                 pass
         
         if temp_converted_path and os.path.exists(temp_converted_path):
             try:
                 os.unlink(temp_converted_path)
-            except:
+            except OSError:
                 pass
 
 @tts_api.delete("/user/voices/{voice_id}")
@@ -942,18 +942,18 @@ async def transcribe_user_voice_endpoint(voice_id: int, user_id: int, db: Sessio
         if not voice.file_path or not os.path.exists(voice.file_path):
             raise HTTPException(status_code=404, detail="Audio file not found")
         
-        logger.info(f"🔄 Transcribing user voice {voice_id} ({voice.name})")
+        logger.info(f"[REFRESH] Transcribing user voice {voice_id} ({voice.name})")
         
         # Транскрибируем аудио
         reference_text = ""
         try:
             if tts_engine_manager.transcriber:
                 reference_text = tts_engine_manager.transcribe(voice.file_path)
-                logger.info(f"✅ Transcribed: '{reference_text[:50]}...'")
+                logger.info(f"[OK] Transcribed: '{reference_text[:50]}...'")
             else:
                 raise Exception("Transcriber not available")
         except Exception as e:
-            logger.error(f"❌ Transcription failed: {e}")
+            logger.error(f"[ERROR] Transcription failed: {e}")
             raise HTTPException(status_code=500, detail=f"Ошибка транскрибации: {str(e)}")
         
         # Обновляем reference_text в БД
@@ -989,18 +989,18 @@ async def retranscribe_user_voice_endpoint(voice_id: int, user_id: int, db: Sess
         if not voice.file_path or not os.path.exists(voice.file_path):
             raise HTTPException(status_code=404, detail="Audio file not found")
         
-        logger.info(f"🔄 Retranscribing user voice {voice_id} ({voice.name})")
+        logger.info(f"[REFRESH] Retranscribing user voice {voice_id} ({voice.name})")
         
         # Транскрибируем аудио заново
         reference_text = ""
         try:
             if tts_engine_manager.transcriber:
                 reference_text = tts_engine_manager.transcribe(voice.file_path)
-                logger.info(f"✅ Retranscribed: '{reference_text[:50]}...'")
+                logger.info(f"[OK] Retranscribed: '{reference_text[:50]}...'")
             else:
                 raise Exception("Transcriber not available")
         except Exception as e:
-            logger.error(f"❌ Transcription failed: {e}")
+            logger.error(f"[ERROR] Transcription failed: {e}")
             raise HTTPException(status_code=500, detail=f"Ошибка транскрибации: {str(e)}")
         
         # Обновляем reference_text в БД
@@ -1050,7 +1050,7 @@ async def update_user_voice_settings_endpoint(
         db.commit()
         db.refresh(voice)
         
-        logger.info(f"✅ User voice {voice_id} settings updated")
+        logger.info(f"[OK] User voice {voice_id} settings updated")
         
         return {
             "status": "success",
@@ -1071,8 +1071,8 @@ async def get_global_voices(db: Session = Depends(get_db)):
     """Get all global voices (admin-uploaded voices available to all users)"""
     try:
         voices = db.query(VoiceModel).filter(
-            VoiceModel.is_global == True,
-            VoiceModel.is_active == True
+            VoiceModel.is_global.is_(True),
+            VoiceModel.is_active.is_(True)
         ).all()
         
         return [
@@ -1151,7 +1151,7 @@ async def update_user_voice_settings(
         db.commit()
         db.refresh(voice)
         
-        logger.info(f"✅ Updated custom voice {voice_id} settings")
+        logger.info(f"[OK] Updated custom voice {voice_id} settings")
         
         return {
             "success": True,
@@ -1193,15 +1193,15 @@ async def delete_user_voice(
         if voice.file_path and os.path.exists(voice.file_path):
             try:
                 os.remove(voice.file_path)
-                logger.info(f"✅ Deleted voice file: {voice.file_path}")
+                logger.info(f"[OK] Deleted voice file: {voice.file_path}")
             except Exception as e:
-                logger.warning(f"⚠️ Failed to delete voice file: {e}")
+                logger.warning(f"[WARN] Failed to delete voice file: {e}")
         
         # Delete from database
         db.delete(voice)
         db.commit()
         
-        logger.info(f"✅ User {user_id} deleted custom voice {voice_id}")
+        logger.info(f"[OK] User {user_id} deleted custom voice {voice_id}")
         
         return {
             "success": True,

@@ -22,9 +22,9 @@ async def get_cache_stats(user: dict = Depends(get_current_user)):
         dict: Статистика кеша (количество записей, TTL)
     """
     from core.token_validation_cache import token_validation_cache
-    
+
     stats = token_validation_cache.get_stats()
-    
+
     return {
         "success": True,
         "cache": {
@@ -49,13 +49,13 @@ async def clear_cache(user: dict = Depends(get_current_user)):
             "success": False,
             "error": "Admin access required"
         }
-    
+
     from core.token_validation_cache import token_validation_cache
-    
+
     token_validation_cache.clear()
-    
-    logger.info(f"🗑️ Cache cleared by admin user {user.get('id')}")
-    
+
+    logger.info(f"[DELETE] Cache cleared by admin user {user.get('id')}")
+
     return {
         "success": True,
         "message": "Cache cleared successfully"
@@ -74,13 +74,13 @@ async def cleanup_expired_cache(user: dict = Depends(get_current_user)):
             "success": False,
             "error": "Admin access required"
         }
-    
+
     from core.token_validation_cache import token_validation_cache
-    
+
     token_validation_cache.cleanup_expired()
-    
+
     logger.info(f"🧹 Cache cleanup triggered by admin user {user.get('id')}")
-    
+
     return {
         "success": True,
         "message": "Expired entries cleaned up"

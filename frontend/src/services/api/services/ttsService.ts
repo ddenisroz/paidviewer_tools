@@ -2,10 +2,11 @@
  * TTS Service - инкапсуляция всех TTS API вызовов
  * Использует единый API клиент
  */
-import { apiClient, ttsApiClient } from '../client';
 import { logger } from '../../../utils/prodLogger';
+import { apiClient, ttsApiClient } from '../client';
+
+import type { ApiResponse, BlockedUser, FilteredWord, LocalTtsConfig, TtsSettings, TtsStatus, TtsVoice } from '../../../types';
 import type { AxiosResponse } from 'axios';
-import type { ApiResponse, TtsStatus, TtsSettings, TtsVoice, FilteredWord, BlockedUser, LocalTtsConfig } from '../../../types';
 
 /**
  * TTS Service
@@ -67,7 +68,7 @@ export const ttsService = {
    * @param settings - Аудио настройки
    * @returns Promise с ответом API
    */
-  async saveAudioSettings(settings: Record<string, any>): Promise<AxiosResponse<ApiResponse>> {
+  async saveAudioSettings(settings: Record<string, unknown>): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.post('/api/tts/audio-settings', settings);
   },
 
@@ -84,7 +85,7 @@ export const ttsService = {
    * @param settings - Настройки платформы
    * @returns Promise с ответом API
    */
-  async savePlatformSettings(settings: Record<string, any>): Promise<AxiosResponse<ApiResponse>> {
+  async savePlatformSettings(settings: Record<string, unknown>): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.post('/api/tts/platform-settings', settings);
   },
 
@@ -101,7 +102,7 @@ export const ttsService = {
    * @param settings - Настройки режима
    * @returns Promise с ответом API
    */
-  async saveModeSettings(settings: Record<string, any>): Promise<AxiosResponse<ApiResponse>> {
+  async saveModeSettings(settings: Record<string, unknown>): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.post('/api/tts/mode-settings', settings);
   },
 
@@ -161,7 +162,7 @@ export const ttsService = {
         status: 500,
         statusText: 'Internal Server Error',
         headers: {},
-        config: {} as any,
+        config: {} as unknown,
       } as AxiosResponse<ApiResponse>;
     }
   },
@@ -171,7 +172,7 @@ export const ttsService = {
    * @returns Promise с ответом API
    */
   async getGlobalVoices(): Promise<AxiosResponse<ApiResponse<TtsVoice[]>>> {
-    return ttsApiClient.get('/api/tts/voices/global');
+    return apiClient.get('/api/voices/global');
   },
 
   /**
@@ -371,30 +372,30 @@ export const ttsService = {
   },
 
   /**
-   * Включить гостевой TTS
+   * Включить TTS для гостя
    * @param data - Данные для включения
    * @returns Promise с ответом API
    */
   async enableGuest(data: { channel_name: string; platform: 'twitch' | 'vk' }): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.post('/api/tts/guest/enable', data);
+    return apiClient.post('/api/guest/tts/enable', data);
   },
 
   /**
-   * Выключить гостевой TTS
+   * Выключить TTS для гостя
    * @param data - Данные для выключения
    * @returns Promise с ответом API
    */
   async disableGuest(data: { channel_name: string; platform: 'twitch' | 'vk' }): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.post('/api/tts/guest/disable', data);
+    return apiClient.post('/api/guest/tts/disable', data);
   },
 
   /**
-   * Отключить гостевой TTS
+   * Отключить гостя от канала
    * @param data - Данные для отключения
    * @returns Promise с ответом API
    */
   async disconnectGuest(data: { channel_name: string; platform: 'twitch' | 'vk' }): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.post('/api/tts/disconnect-guest', data);
+    return apiClient.post('/api/guest/disconnect', data);
   },
 };
 

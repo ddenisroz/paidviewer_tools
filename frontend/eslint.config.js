@@ -3,10 +3,11 @@ import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
+import importPlugin from 'eslint-plugin-import'
 
 export default [
   {
-    ignores: ['dist', 'node_modules', 'build', 'src/tests/**/*', '*.config.js', 'scripts/**/*'],
+    ignores: ['dist', 'node_modules', 'build', 'src/tests/**/*', '*.config.js', '*.config.ts', '*.cjs', 'scripts/**/*'],
   },
   js.configs.recommended,
   reactHooks.configs['recommended-latest'],
@@ -14,6 +15,7 @@ export default [
   ...tseslint.configs.recommended,
   {
     files: ['**/*.{ts,tsx}'],
+    ignores: ['**/__tests__/**/*', '**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.spec.tsx'],
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: {
@@ -24,15 +26,95 @@ export default [
       },
       globals: globals.browser,
     },
+    plugins: {
+      'import': importPlugin,
+    },
+    settings: {
+      'import/resolver': {
+        typescript: {
+          alwaysTryTypes: true,
+          project: './tsconfig.json',
+        },
+        node: true,
+      },
+      'import/parsers': {
+        '@typescript-eslint/parser': ['.ts', '.tsx'],
+      },
+    },
     rules: {
-      // TypeScript правила - мягкие для постепенного улучшения
-      '@typescript-eslint/no-unused-vars': 'warn',
-      '@typescript-eslint/no-explicit-any': 'warn',
+      // TypeScript правила - строгие для качества
+      '@typescript-eslint/no-unused-vars': ['error', { 
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+      }],
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'warn',
       
-      // React правила - мягкие
+      // React правила
+      'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
       'react-refresh/only-export-components': 'warn',
+      
+      // Code quality правила
+      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      'no-debugger': 'error',
+      'no-alert': 'warn',
+      'no-var': 'error',
+      'prefer-const': 'error',
+      'prefer-template': 'warn',
+      'no-duplicate-imports': 'off', // Отключаем в пользу import/no-duplicates
+      
+      // Complexity правила
+      'max-lines-per-function': ['warn', { max: 150, skipBlankLines: true, skipComments: true }],
+      'max-depth': ['warn', 4],
+      'complexity': ['warn', 15],
+      
+      // Import правила - организация и качество импортов
+      'import/no-duplicates': 'error',
+      'import/no-cycle': ['error', { maxDepth: 10, ignoreExternal: true }],
+      'import/no-self-import': 'error',
+      'import/no-useless-path-segments': ['error', { noUselessIndex: true }],
+      'import/first': 'error',
+      'import/newline-after-import': 'warn',
+      'import/no-absolute-path': 'error',
+      'import/order': ['warn', {
+        groups: [
+          'builtin',   // Node.js встроенные модули
+          'external',  // npm пакеты
+          'internal',  // Внутренние алиасы (@/)
+          'parent',    // ../
+          'sibling',   // ./
+          'index',     // ./index
+          'type',      // import type
+        ],
+        'newlines-between': 'always',
+        alphabetize: {
+          order: 'asc',
+          caseInsensitive: true,
+        },
+        pathGroups: [
+          {
+            pattern: '@/**',
+            group: 'internal',
+            position: 'before',
+          },
+          {
+            pattern: 'react',
+            group: 'external',
+            position: 'before',
+          },
+        ],
+        pathGroupsExcludedImportTypes: ['react', 'type'],
+      }],
+      
+      // Сортировка импортов внутри группы
+      'sort-imports': ['warn', {
+        ignoreCase: true,
+        ignoreDeclarationSort: true, // Используем import/order для сортировки деклараций
+        ignoreMemberSort: false,
+        memberSyntaxSortOrder: ['none', 'all', 'multiple', 'single'],
+      }],
     },
   },
 ]

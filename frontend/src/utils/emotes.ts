@@ -1,5 +1,6 @@
-import { logger } from '../utils/prodLogger';
 import { API_BASE_URL } from '../constants';
+
+import { logger } from "./prodLogger";
 
 const SEVENTV_GQL_ENDPOINT = 'https://api.7tv.app/v4/gql';
 const REQUEST_TIMEOUT = 5000;
@@ -9,6 +10,39 @@ interface EmoteData {
   name: string;
   url: string;
   animated: boolean;
+}
+
+interface EmoteFile {
+  name: string;
+  format: string;
+}
+
+interface EmoteHost {
+  url: string;
+  files: EmoteFile[];
+}
+
+interface EmoteDataField {
+  animated: boolean;
+  host: EmoteHost;
+}
+
+interface Emote {
+  id: string;
+  name: string;
+  data: EmoteDataField;
+}
+
+interface Connection {
+  platform: string;
+  username: string;
+  emote_set_id: string;
+}
+
+interface User {
+  id: string;
+  username: string;
+  connections: Connection[];
 }
 
 type EmoteMap = Map<string, EmoteData>;
@@ -45,7 +79,7 @@ export async function getChannelEmotes(channelName: string): Promise<EmoteMap> {
       return emotesCache.get(channelName)!;
     }
 
-    logger.debug(`🔍 [7TV] Searching for Twitch user: ${channelName}`);
+    logger.debug(`[DEBUG] [7TV] Searching for Twitch user: ${channelName}`);
 
     const searchQuery = `
       query SearchUser($username: String!) {
@@ -71,30 +105,30 @@ export async function getChannelEmotes(channelName: string): Promise<EmoteMap> {
 
     if (!response.ok) {
       if (response.status === 404) {
-        logger.debug(`ℹ️ [7TV] Channel "${channelName}" not found on 7TV`);
+        logger.debug(`[INFO] [7TV] Channel "${channelName}" not found on 7TV`);
       } else {
-        logger.debug(`⚠️ [7TV] API returned status ${response.status}`);
+        logger.debug(`[WARN] [7TV] API returned status ${response.status}`);
       }
       return new Map();
     }
 
-    const result = await response.json();
+    const result = await response.json() as { data?: { users?: { items?: User[] } } };
     const users = result?.data?.users?.items ?? [];
 
     if (users.length === 0) {
-      logger.debug(`ℹ️ [7TV] No 7TV user found for "${channelName}"`);
+      logger.debug(`[INFO] [7TV] No 7TV user found for "${channelName}"`);
       return new Map();
     }
 
     const user = users[0];
-    const twitchConn = user.connections?.find((c: any) => c.platform === 'TWITCH');
+    const twitchConn = user.connections?.find((c) => c.platform === 'TWITCH');
 
     if (!twitchConn?.emote_set_id) {
-      logger.debug(`ℹ️ [7TV] User "${channelName}" has no emote set`);
+      logger.debug(`[INFO] [7TV] User "${channelName}" has no emote set`);
       return new Map();
     }
 
-    logger.debug(`✅ [7TV] Found emote set: ${twitchConn.emote_set_id}`);
+    logger.debug(`[OK] [7TV] Found emote set: ${twitchConn.emote_set_id}`);
 
     const emoteSetQuery = `
       query EmoteSet($id: String!) {
@@ -124,37 +158,39 @@ export async function getChannelEmotes(channelName: string): Promise<EmoteMap> {
     });
 
     if (!emoteSetResponse.ok) {
-      logger.debug('⚠️ [7TV] Failed to fetch emote set');
+      logger.debug('[WARN] [7TV] Failed to fetch emote set');
       return new Map();
     }
 
-    const emoteSetResult = await emoteSetResponse.json();
+    const emoteSetResult = await emoteSetResponse.json() as { data?: { emoteSet?: { emotes?: Emote[] } } };
     const emotes = emoteSetResult?.data?.emoteSet?.emotes ?? [];
 
-    logger.debug(`✅ [7TV] Loaded ${emotes.length} channel emotes for ${channelName}`);
+    logger.debug(`[OK] [7TV] Loaded ${emotes.length} channel emotes for ${channelName}`);
 
     const emotesMap: EmoteMap = new Map();
-    emotes.forEach((emote: any) => {
+    emotes.forEach((emote) => {
       const host = emote.data?.host;
       if (host?.url) {
-        const file = host.files?.find((f: any) => f.name === '4x.webp') ?? host.files?.[0];
-        const url = `https:${host.url}/${file?.name ?? '4x.webp'}`;
+        // Используем статичную версию (1x.webp) вместо анимированной
+        const file = host.files?.find((f) => f.name === '1x.webp') ?? host.files?.[0];
+        const url = `https:${host.url}/${file?.name ?? '1x.webp'}`;
         emotesMap.set(emote.name, {
           id: emote.id,
           name: emote.name,
           url: proxy7tvUrl(url) ?? url,
-          animated: Boolean(emote.data?.animated),
+          animated: false, // Всегда используем статичную версию
         });
       }
     });
 
     emotesCache.set(channelName, emotesMap);
     return emotesMap;
-  } catch (error: any) {
-    if (error?.name === 'AbortError') {
-      logger.debug('⚠️ [7TV] Request timeout (5s exceeded)');
+  } catch (error: unknown) {
+    const err = error as Error;
+    if (err?.name === 'AbortError') {
+      logger.debug('[WARN] [7TV] Request timeout (5s exceeded)');
     } else {
-      logger.debug('⚠️ [7TV] Error fetching channel emotes:', error?.message || error);
+      logger.debug('[WARN] [7TV] Error fetching channel emotes:', err?.message || error);
     }
     return new Map();
   }
@@ -166,7 +202,7 @@ export async function getGlobalEmotes(): Promise<EmoteMap> {
       return emotesCache.get('global')!;
     }
 
-    logger.debug('🔍 [7TV] Fetching global emotes');
+    logger.debug('[DEBUG] [7TV] Fetching global emotes');
 
     const query = `
       query GlobalEmotes {
@@ -196,37 +232,39 @@ export async function getGlobalEmotes(): Promise<EmoteMap> {
     });
 
     if (!response.ok) {
-      logger.debug(`⚠️ [7TV] Global emotes API returned status ${response.status}`);
+      logger.debug(`[WARN] [7TV] Global emotes API returned status ${response.status}`);
       return new Map();
     }
 
-    const result = await response.json();
+    const result = await response.json() as { data?: { emoteSet?: { emotes?: Emote[] } } };
     const emotes = result?.data?.emoteSet?.emotes ?? [];
 
-    logger.debug(`✅ [7TV] Loaded ${emotes.length} global emotes`);
+    logger.debug(`[OK] [7TV] Loaded ${emotes.length} global emotes`);
 
     const emotesMap: EmoteMap = new Map();
-    emotes.forEach((emote: any) => {
+    emotes.forEach((emote) => {
       const host = emote.data?.host;
       if (host?.url) {
-        const file = host.files?.find((f: any) => f.name === '4x.webp') ?? host.files?.[0];
-        const url = `https:${host.url}/${file?.name ?? '4x.webp'}`;
+        // Используем статичную версию (1x.webp) вместо анимированной
+        const file = host.files?.find((f) => f.name === '1x.webp') ?? host.files?.[0];
+        const url = `https:${host.url}/${file?.name ?? '1x.webp'}`;
         emotesMap.set(emote.name, {
           id: emote.id,
           name: emote.name,
           url,
-          animated: Boolean(emote.data?.animated),
+          animated: false, // Всегда используем статичную версию
         });
       }
     });
 
     emotesCache.set('global', emotesMap);
     return emotesMap;
-  } catch (error: any) {
-    if (error?.name === 'AbortError') {
-      logger.debug('⚠️ [7TV] Global emotes request timeout');
+  } catch (error: unknown) {
+    const err = error as Error;
+    if (err?.name === 'AbortError') {
+      logger.debug('[WARN] [7TV] Global emotes request timeout');
     } else {
-      logger.debug('⚠️ [7TV] Error fetching global emotes:', error?.message || error);
+      logger.debug('[WARN] [7TV] Error fetching global emotes:', err?.message || error);
     }
     return new Map();
   }

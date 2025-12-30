@@ -86,7 +86,7 @@ class TTSConfig:
         max_vram_gb = float(os.getenv('GPU_MAX_VRAM_GB', '0'))
         if max_vram_gb > 0:
             vram_gb = min(vram_gb, max_vram_gb)
-            logger.info(f"📊 Ограничение VRAM: {max_vram_gb} GB (используется: {vram_gb:.1f} GB)")
+            logger.info(f"[STATS] Ограничение VRAM: {max_vram_gb} GB (используется: {vram_gb:.1f} GB)")
         
         # Проверяем приоритет из .env
         priority = os.getenv('GPU_PRIORITY', 'performance').lower()
@@ -105,7 +105,7 @@ class TTSConfig:
             else:
                 max_workers = 1
                 batch_size = 1
-                logger.warning("⚠️ Мало VRAM для режима quality! Рекомендуется минимум 6GB")
+                logger.warning("[WARN] Мало VRAM для режима quality! Рекомендуется минимум 6GB")
         else:
             # Приоритет производительности (по умолчанию)
             if vram_gb >= 12:
@@ -120,7 +120,7 @@ class TTSConfig:
             else:
                 max_workers = 1
                 batch_size = 1
-                logger.warning("⚠️ Мало VRAM! Рекомендуется минимум 6GB")
+                logger.warning("[WARN] Мало VRAM! Рекомендуется минимум 6GB")
         
         # Находим свободный порт
         port = self._find_free_port()
@@ -285,7 +285,7 @@ processing_stats = {
 @app.on_event("startup")
 async def startup_event():
     """Инициализация при запуске"""
-    logger.info("🚀 Запуск TTS F5 Simple...")
+    logger.info("[START] Запуск TTS F5 Simple...")
     
     # Инициализируем TTS движок
     await initialize_tts_engine()
@@ -294,7 +294,7 @@ async def startup_event():
     asyncio.create_task(process_tts_queue())
     asyncio.create_task(monitor_system())
     
-    logger.info("✅ TTS F5 Simple готов к работе!")
+    logger.info("[OK] TTS F5 Simple готов к работе!")
 
 async def initialize_tts_engine():
     """Инициализирует TTS движок"""
@@ -311,10 +311,10 @@ async def initialize_tts_engine():
             "voices": ["female_1", "male_1", "female_2", "male_2"]
         }
         
-        logger.info("✅ TTS движок инициализирован")
+        logger.info("[OK] TTS движок инициализирован")
         
     except Exception as e:
-        logger.error(f"❌ Ошибка инициализации TTS движка: {e}")
+        logger.error(f"[ERROR] Ошибка инициализации TTS движка: {e}")
         tts_engine = {"status": "error", "error": str(e)}
 
 async def process_tts_queue():
@@ -350,11 +350,11 @@ async def process_tts_request(request_data: Dict[str, Any]):
             processing_stats["average_processing_time"] + processing_time
         ) / 2
         
-        logger.info(f"✅ TTS запрос обработан за {processing_time:.2f}с")
+        logger.info(f"[OK] TTS запрос обработан за {processing_time:.2f}с")
         
     except Exception as e:
         processing_stats["failed_requests"] += 1
-        logger.error(f"❌ Ошибка обработки TTS запроса: {e}")
+        logger.error(f"[ERROR] Ошибка обработки TTS запроса: {e}")
 
 async def monitor_system():
     """Мониторинг системы"""
@@ -368,7 +368,7 @@ async def monitor_system():
             if gpus:
                 gpu = gpus[0]
                 if gpu.memoryUsed / gpu.memoryTotal > 0.9:
-                    logger.warning("⚠️ Высокое использование GPU памяти!")
+                    logger.warning("[WARN] Высокое использование GPU памяти!")
             
             # Ждем 30 секунд
             await asyncio.sleep(30)
@@ -457,11 +457,11 @@ async def synthesize_channel_tts(request: ChannelTTSRequest, background_tasks: B
         if not tts_engine or tts_engine.get("status") != "ready":
             raise HTTPException(status_code=503, detail="TTS движок не готов")
         
-        logger.info(f"🎙️ [CHANNEL TTS] {request.channel_name} | {request.author}: {request.text[:50]}...")
+        logger.info(f"[MIC] [CHANNEL TTS] {request.channel_name} | {request.author}: {request.text[:50]}...")
         
         # 1. Проверка блокировки пользователя
         if request.blocked_users and request.author.lower() in [u.lower() for u in request.blocked_users]:
-            logger.warning(f"⚠️ User {request.author} is blocked, skipping TTS")
+            logger.warning(f"[WARN] User {request.author} is blocked, skipping TTS")
             return ChannelTTSResponse(
                 success=False,
                 error=f"User {request.author} is blocked"
@@ -474,7 +474,7 @@ async def synthesize_channel_tts(request: ChannelTTSRequest, background_tasks: B
                 if word.lower() in filtered_text.lower():
                     import re
                     filtered_text = re.sub(re.escape(word), "***", filtered_text, flags=re.IGNORECASE)
-                    logger.info(f"🔇 Filtered word '{word}' in message")
+                    logger.info(f"[MUTE] Filtered word '{word}' in message")
         
         # 3. Применяем настройки TTS
         tts_settings = request.tts_settings or TTSSettingsData()
@@ -482,18 +482,18 @@ async def synthesize_channel_tts(request: ChannelTTSRequest, background_tasks: B
         max_length = tts_settings.maxLength or 200
         if len(filtered_text) > max_length:
             filtered_text = filtered_text[:max_length]
-            logger.info(f"✂️ Trimmed message to {max_length} chars")
+            logger.info(f"[CUT] Trimmed message to {max_length} chars")
         
         # Пропускаем команды если нужно
         if tts_settings.skipCommands and filtered_text.strip().startswith("!"):
-            logger.info(f"⏭️ Skipping command: {filtered_text}")
+            logger.info(f"[SKIP] Skipping command: {filtered_text}")
             return ChannelTTSResponse(
                 success=False,
                 error="Command messages are skipped"
             )
         
         # 4. Синтезируем речь
-        logger.info(f"🎤 Synthesizing: '{filtered_text[:50]}...' with volume={request.volume_level}%")
+        logger.info(f"[TTS] Synthesizing: '{filtered_text[:50]}...' with volume={request.volume_level}%")
         
         # Добавляем запрос в очередь
         request_data = {
@@ -525,7 +525,7 @@ async def synthesize_channel_tts(request: ChannelTTSRequest, background_tasks: B
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error in synthesize_channel: {e}")
+        logger.error(f"[ERROR] Error in synthesize_channel: {e}")
         import traceback
         logger.error(traceback.format_exc())
         return ChannelTTSResponse(
@@ -700,7 +700,7 @@ def convert_audio_to_wav_48khz(input_path: str, output_path: str) -> bool:
         import librosa
         import numpy as np
         
-        logger.info(f"🔄 Converting audio: {input_path} -> {output_path}")
+        logger.info(f"[REFRESH] Converting audio: {input_path} -> {output_path}")
         
         # Загружаем аудио с ресемплингом до 48kHz и конвертацией в моно
         audio, sr = librosa.load(input_path, sr=48000, mono=True)
@@ -714,11 +714,11 @@ def convert_audio_to_wav_48khz(input_path: str, output_path: str) -> bool:
         # Сохраняем как WAV 16-bit PCM
         sf.write(output_path, audio, 48000, subtype='PCM_16')
         
-        logger.info(f"✅ Audio converted successfully to WAV 48kHz Mono 16-bit")
+        logger.info(f"[OK] Audio converted successfully to WAV 48kHz Mono 16-bit")
         return True
         
     except Exception as e:
-        logger.error(f"❌ Audio conversion failed: {e}")
+        logger.error(f"[ERROR] Audio conversion failed: {e}")
         return False
 
 def transcribe_audio(audio_path: str) -> str:
@@ -738,7 +738,7 @@ def transcribe_audio(audio_path: str) -> str:
             model = WhisperModel("base", device="auto", compute_type="auto")
             segments, info = model.transcribe(audio_path, language="ru")
             text = " ".join([segment.text for segment in segments])
-            logger.info(f"✅ Transcribed with faster-whisper: '{text[:50]}...'")
+            logger.info(f"[OK] Transcribed with faster-whisper: '{text[:50]}...'")
             return text.strip()
         except ImportError:
             logger.warning("faster-whisper not available, trying whisper")
@@ -749,14 +749,14 @@ def transcribe_audio(audio_path: str) -> str:
             model = whisper.load_model("base")
             result = model.transcribe(audio_path, language="ru")
             text = result.get("text", "").strip()
-            logger.info(f"✅ Transcribed with whisper: '{text[:50]}...'")
+            logger.info(f"[OK] Transcribed with whisper: '{text[:50]}...'")
             return text
         except ImportError:
             logger.warning("whisper not available, skipping transcription")
             return ""
             
     except Exception as e:
-        logger.error(f"❌ Transcription failed: {e}")
+        logger.error(f"[ERROR] Transcription failed: {e}")
         return ""
 
 @app.post("/api/voices/{voice_id}/upload")
@@ -796,7 +796,7 @@ async def upload_voice_sample(
             content = await file.read()
             await out_file.write(content)
         
-        logger.info(f"📥 Sample uploaded to temp: {temp_input_path}")
+        logger.info(f"[RECEIVE] Sample uploaded to temp: {temp_input_path}")
         
         # Конвертируем в WAV 48kHz Mono 16-bit
         timestamp = int(datetime.now().timestamp())
@@ -808,12 +808,12 @@ async def upload_voice_sample(
         
         # Автоматическая транскрибация (если не передан текст)
         if not sample_text:
-            logger.info("🎤 Starting automatic transcription...")
+            logger.info("[TTS] Starting automatic transcription...")
             sample_text = transcribe_audio(temp_converted_path)
             if sample_text:
-                logger.info(f"✅ Auto-transcribed: '{sample_text[:50]}...'")
+                logger.info(f"[OK] Auto-transcribed: '{sample_text[:50]}...'")
             else:
-                logger.warning("⚠️ Transcription failed, continuing without text")
+                logger.warning("[WARN] Transcription failed, continuing without text")
         
         # Сохраняем конвертированный WAV файл
         sample_filename = f"sample_{timestamp}.wav"  # ВСЕГДА .wav
@@ -822,7 +822,7 @@ async def upload_voice_sample(
         import shutil
         shutil.copy2(temp_converted_path, final_sample_path)
         
-        logger.info(f"✅ Sample saved: {final_sample_path}")
+        logger.info(f"[OK] Sample saved: {final_sample_path}")
         
         # Сохраняем метаданные сэмпла
         sample_metadata = {
@@ -858,7 +858,7 @@ async def upload_voice_sample(
             with open(metadata_file, 'w', encoding='utf-8') as f:
                 json.dump(metadata, f, indent=2, ensure_ascii=False)
         
-        logger.info(f"✅ Uploaded and converted sample for voice {voice_id}: {sample_filename}")
+        logger.info(f"[OK] Uploaded and converted sample for voice {voice_id}: {sample_filename}")
         
         return {
             "success": True,
@@ -879,7 +879,7 @@ async def upload_voice_sample(
         if final_sample_path and Path(final_sample_path).exists():
             try:
                 os.remove(final_sample_path)
-            except:
+            except OSError:
                 pass
         
         raise HTTPException(status_code=500, detail=str(e))
@@ -889,13 +889,13 @@ async def upload_voice_sample(
         if temp_input_path and os.path.exists(temp_input_path):
             try:
                 os.remove(temp_input_path)
-            except:
+            except OSError:
                 pass
         
         if temp_converted_path and os.path.exists(temp_converted_path):
             try:
                 os.remove(temp_converted_path)
-            except:
+            except OSError:
                 pass
 
 @app.get("/api/voices/{voice_id}/samples")
@@ -970,7 +970,7 @@ async def retranscribe_voice_sample(voice_id: str, filename: str):
         if not sample_path.exists():
             raise HTTPException(status_code=404, detail="Сэмпл не найден")
         
-        logger.info(f"🔄 Retranscribing sample: {filename}")
+        logger.info(f"[REFRESH] Retranscribing sample: {filename}")
         
         # Транскрибируем аудио
         transcribed_text = transcribe_audio(str(sample_path))
@@ -999,7 +999,7 @@ async def retranscribe_voice_sample(voice_id: str, filename: str):
             with open(samples_meta_file, 'w', encoding='utf-8') as f:
                 json.dump(samples_meta, f, indent=2, ensure_ascii=False)
         
-        logger.info(f"✅ Sample retranscribed: '{transcribed_text[:50]}...'")
+        logger.info(f"[OK] Sample retranscribed: '{transcribed_text[:50]}...'")
         
         return {
             "success": True,
@@ -1047,7 +1047,7 @@ async def update_sample_text(voice_id: str, filename: str, text: str = Form(...)
             with open(samples_meta_file, 'w', encoding='utf-8') as f:
                 json.dump(samples_meta, f, indent=2, ensure_ascii=False)
         
-        logger.info(f"✅ Sample text updated: {filename}")
+        logger.info(f"[OK] Sample text updated: {filename}")
         
         return {
             "success": True,
@@ -1118,7 +1118,7 @@ async def delete_voice(voice_id: str):
 
 def main():
     """Главная функция"""
-    print("🚀 TTS F5 Simple - Упрощенный микросервис")
+    print("[START] TTS F5 Simple - Упрощенный микросервис")
     print("=" * 50)
     print(f"Версия: {config.get('version')}")
     print(f"Порт: {config.get('port')}")

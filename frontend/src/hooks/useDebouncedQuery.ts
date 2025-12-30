@@ -2,9 +2,10 @@
  * useDebouncedQuery Hook
  * Debounces query execution to reduce unnecessary API calls
  */
-import { useQuery, UseQueryOptions, QueryKey } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+
+import { QueryKey, useQuery, UseQueryOptions } from '@tanstack/react-query';
 import { useDebounce } from 'use-debounce';
-import { useState, useEffect } from 'react';
 
 interface UseDebouncedQueryOptions<TData, TError> extends Omit<UseQueryOptions<TData, TError>, 'queryKey' | 'queryFn'> {
   queryKey: QueryKey;

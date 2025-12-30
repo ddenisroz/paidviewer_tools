@@ -30,10 +30,10 @@ def upgrade():
     """
     conn = op.get_bind()
     inspector = sa.inspect(conn)
-    
+
     # Проверяем какие таблицы существуют
     tables = inspector.get_table_names()
-    
+
     # === USERS TABLE ===
     if 'users' in tables:
         # Индекс на twitch_username (уже unique, но добавим для JOIN оптимизации)
@@ -41,25 +41,25 @@ def upgrade():
             op.create_index('idx_users_twitch_username', 'users', ['twitch_username'])
         except:
             pass  # Может уже существовать
-        
+
         # Индекс на vk_username
         try:
             op.create_index('idx_users_vk_username', 'users', ['vk_username'])
         except:
             pass
-        
+
         # Индекс на created_at для сортировки
         try:
             op.create_index('idx_users_created_at', 'users', ['created_at'])
         except:
             pass
-        
+
         # Индекс на is_active для фильтрации
         try:
             op.create_index('idx_users_is_active', 'users', ['is_active'])
         except:
             pass
-    
+
     # === USER_TOKENS TABLE ===
     if 'user_tokens' in tables:
         # Композитный индекс user_id + platform (частый запрос)
@@ -67,19 +67,19 @@ def upgrade():
             op.create_index('idx_user_tokens_user_platform', 'user_tokens', ['user_id', 'platform'])
         except:
             pass
-        
+
         # Индекс на platform_user_id для поиска по внешнему ID
         try:
             op.create_index('idx_user_tokens_platform_user_id', 'user_tokens', ['platform_user_id'])
         except:
             pass
-        
+
         # Индекс на is_active для фильтрации активных токенов
         try:
             op.create_index('idx_user_tokens_is_active', 'user_tokens', ['is_active'])
         except:
             pass
-    
+
     # === USER_SESSIONS TABLE ===
     if 'user_sessions' in tables:
         # Композитный индекс user_id + is_active
@@ -87,13 +87,13 @@ def upgrade():
             op.create_index('idx_user_sessions_user_active', 'user_sessions', ['user_id', 'is_active'])
         except:
             pass
-        
+
         # Индекс на session_id (частый поиск)
         try:
             op.create_index('idx_user_sessions_session_id', 'user_sessions', ['session_id'])
         except:
             pass
-    
+
     # === BOT_COMMANDS TABLE ===
     if 'bot_commands' in tables:
         # Композитный индекс user_id + is_enabled
@@ -101,13 +101,13 @@ def upgrade():
             op.create_index('idx_bot_commands_user_enabled', 'bot_commands', ['user_id', 'is_enabled'])
         except:
             pass
-        
+
         # Индекс на command_name для поиска команд
         try:
             op.create_index('idx_bot_commands_command_name', 'bot_commands', ['command_name'])
         except:
             pass
-    
+
     # === CHAT_MESSAGES TABLE ===
     if 'chat_messages' in tables:
         # Композитный индекс user_id + platform
@@ -115,19 +115,19 @@ def upgrade():
             op.create_index('idx_chat_messages_user_platform', 'chat_messages', ['user_id', 'platform'])
         except:
             pass
-        
+
         # Индекс на created_at для сортировки по времени
         try:
             op.create_index('idx_chat_messages_created_at', 'chat_messages', ['created_at'])
         except:
             pass
-        
+
         # Индекс на channel_name для фильтрации по каналу
         try:
             op.create_index('idx_chat_messages_channel', 'chat_messages', ['channel_name'])
         except:
             pass
-    
+
     # === FILTERED_WORDS TABLE ===
     if 'filtered_words' in tables:
         # Композитный индекс user_id + word
@@ -135,7 +135,7 @@ def upgrade():
             op.create_index('idx_filtered_words_user_word', 'filtered_words', ['user_id', 'word'])
         except:
             pass
-    
+
     # === STREAM_DATA TABLE (если существует) ===
     if 'stream_data' in tables:
         # Композитный индекс user_id + platform
@@ -143,7 +143,7 @@ def upgrade():
             op.create_index('idx_stream_data_user_platform', 'stream_data', ['user_id', 'platform'])
         except:
             pass
-        
+
         # Индекс на is_live для поиска активных стримов
         try:
             op.create_index('idx_stream_data_is_live', 'stream_data', ['is_live'])
@@ -156,7 +156,7 @@ def downgrade():
     conn = op.get_bind()
     inspector = sa.inspect(conn)
     tables = inspector.get_table_names()
-    
+
     # Удаляем все созданные индексы
     if 'users' in tables:
         try:
@@ -175,7 +175,7 @@ def downgrade():
             op.drop_index('idx_users_is_active', 'users')
         except:
             pass
-    
+
     if 'user_tokens' in tables:
         try:
             op.drop_index('idx_user_tokens_user_platform', 'user_tokens')
@@ -189,7 +189,7 @@ def downgrade():
             op.drop_index('idx_user_tokens_is_active', 'user_tokens')
         except:
             pass
-    
+
     if 'user_sessions' in tables:
         try:
             op.drop_index('idx_user_sessions_user_active', 'user_sessions')
@@ -199,7 +199,7 @@ def downgrade():
             op.drop_index('idx_user_sessions_session_id', 'user_sessions')
         except:
             pass
-    
+
     if 'bot_commands' in tables:
         try:
             op.drop_index('idx_bot_commands_user_enabled', 'bot_commands')
@@ -209,7 +209,7 @@ def downgrade():
             op.drop_index('idx_bot_commands_command_name', 'bot_commands')
         except:
             pass
-    
+
     if 'chat_messages' in tables:
         try:
             op.drop_index('idx_chat_messages_user_platform', 'chat_messages')
@@ -223,13 +223,13 @@ def downgrade():
             op.drop_index('idx_chat_messages_channel', 'chat_messages')
         except:
             pass
-    
+
     if 'filtered_words' in tables:
         try:
             op.drop_index('idx_filtered_words_user_word', 'filtered_words')
         except:
             pass
-    
+
     if 'stream_data' in tables:
         try:
             op.drop_index('idx_stream_data_user_platform', 'stream_data')

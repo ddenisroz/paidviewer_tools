@@ -612,7 +612,7 @@ class RussianTTS:
             if seed is not None:
                 infer_params["seed"] = seed
 
-            logger.info(f"🎛️ Финальные параметры синтеза:")
+            logger.info(f"[SETTINGS] Финальные параметры синтеза:")
             logger.info(f"  - cross_fade={cross_fade_duration}, speed={speed}, silence={silence_duration_ms}ms")
             logger.info(f"  - target_rms={target_rms}, sway={sway_sampling_coef}, cfg={cfg_strength}, nfe={nfe_step}")
 
@@ -775,7 +775,7 @@ class RussianTTS:
                 return False
             
             # Логируем параметры для диагностики
-            logger.info(f"🔧 Synthesize called with kwargs: {kwargs}")
+            logger.info(f"[FIX] Synthesize called with kwargs: {kwargs}")
             
             # Выполняем стандартный синтез
             result_path = self.synthesize_speech(
@@ -796,7 +796,7 @@ class RussianTTS:
                 # Удаляем временный файл
                 try:
                     os.remove(result_path)
-                except:
+                except OSError:
                     pass
             
             # Применяем громкость к выходному файлу

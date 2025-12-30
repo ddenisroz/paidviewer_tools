@@ -1,20 +1,25 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
+
+import { AlertCircle, Maximize, Minimize, Monitor, Pause, Play, RefreshCw, Settings, SkipForward, Trash2, Volume2, VolumeX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Pause, SkipForward, Volume2, VolumeX, Maximize, Minimize, Monitor, Trash2, RefreshCw, Settings, AlertCircle } from 'lucide-react';
+import YouTube from 'react-youtube';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
-import { toast } from 'sonner';
-import YouTube from 'react-youtube';
-import { usePlayer } from '../../context/PlayerContext';
-import { useChat } from '../../context/ChatContext';
+import { BUTTON_SIZES } from '@/constants/designSystem';
+import { toast } from '@/utils/toastManager';
+
 import { useAuth } from '../../context/AuthContext';
+import { useChat } from '../../context/ChatContext';
+import { usePlayer } from '../../context/PlayerContext';
 import { youtubeService } from '../../services/api/services/youtubeService';
-import { logger } from '../../utils/prodLogger';
 import PageWrapper from '../../shared/components/PageWrapper';
-import type { YoutubeVideo } from '../../types/youtube';
+import { logger } from '../../utils/prodLogger';
+
+import type { YouTubePlayer, YoutubeSettings, YoutubeVideo } from '../../types/youtube';
 
 type PlaybackMode = 'browser' | 'obs';
 
@@ -46,17 +51,17 @@ const YoutubeIntegrationPage: React.FC = () => {
     const { lastJsonMessage } = useChat();
     
     // Handler for the embedded player on this page
-    const handlePagePlayerReady = (event: any): void => {
-        setPlayerRef(event.target);
+    const handlePagePlayerReady = (event: { target: YouTubePlayer }): void => {
+        setPlayerRef(event.target as YouTubePlayer);
         handlePlayerReady(event);
-        logger.debug('📺 [YouTube Page] Player ready');
+        logger.debug('[YouTube Page] Player ready');
     };
 
     const loadYoutubeSettings = useCallback(async (): Promise<void> => {
         try {
             const response = await youtubeService.getSettings();
-            setPlaybackMode((response.data as any).playback_mode || 'browser');
-            setVolume((response.data as any).volume_level || 100);
+            setPlaybackMode(response.data.playback_mode || 'browser');
+            setVolume(response.data.volume_level || 100);
         } catch (error) {
             logger.error('Error loading YouTube settings:', error);
         }
@@ -66,7 +71,7 @@ const YoutubeIntegrationPage: React.FC = () => {
         try {
             await youtubeService.saveSettings({
                 volume_level: newVolume
-            } as any);
+            } as Partial<YoutubeSettings>);
             toast.success('Настройки YouTube сохранены');
         } catch (error) {
             logger.error('Error saving YouTube settings:', error);
@@ -77,7 +82,7 @@ const YoutubeIntegrationPage: React.FC = () => {
     const generateYoutubeObsUrl = async (): Promise<string | null> => {
         try {
             const response = await youtubeService.generateObsUrl();
-            const url = (response.data as any).youtube_obs_url;
+            const url = response.data.youtube_obs_url;
             setYoutubeObsUrl(url);
             
             toast.success('OBS URL сгенерирован!', {
@@ -103,7 +108,7 @@ const YoutubeIntegrationPage: React.FC = () => {
     const regenerateYoutubeObsUrl = async (): Promise<string | null> => {
         try {
             const response = await youtubeService.regenerateObsUrl();
-            const url = (response.data as any).youtube_obs_url;
+            const url = response.data.youtube_obs_url;
             setYoutubeObsUrl(url);
             
             toast.success('OBS URL перегенерирован!', {
@@ -122,9 +127,9 @@ const YoutubeIntegrationPage: React.FC = () => {
     const loadExistingObsUrl = useCallback(async (): Promise<void> => {
         try {
             const response = await youtubeService.getObsUrl();
-            if ((response.data as any).obs_token) {
+            if (response.data.obs_token) {
                 const frontendUrl = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173';
-                const url = `${frontendUrl}/youtube-obs/${(response.data as any).obs_token}`;
+                const url = `${frontendUrl}/youtube-obs/${response.data.obs_token}`;
                 setYoutubeObsUrl(url);
             }
         } catch (error) {
@@ -135,7 +140,7 @@ const YoutubeIntegrationPage: React.FC = () => {
     useEffect(() => {
         loadYoutubeSettings();
         loadExistingObsUrl();
-    }, [loadYoutubeSettings, loadExistingObsUrl]);
+    }, []); // [OK] Пустой массив зависимостей - загружаем только один раз при монтировании
 
     useEffect(() => {
         const handleEscKey = (event: KeyboardEvent): void => {
@@ -149,8 +154,8 @@ const YoutubeIntegrationPage: React.FC = () => {
     }, [isTheaterMode, setIsTheaterMode]);
 
     useEffect(() => {
-        if (lastJsonMessage && (lastJsonMessage as any).type === 'youtube_queue_update') {
-            logger.log('📺 [YouTube] Queue updated via WebSocket');
+        if (lastJsonMessage && (lastJsonMessage as { type?: string }).type === 'youtube_queue_update') {
+            logger.log('[YouTube] Queue updated via WebSocket');
         }
     }, [lastJsonMessage]);
 
@@ -160,10 +165,11 @@ const YoutubeIntegrationPage: React.FC = () => {
             toast.success("Очередь очищена.");
             setIsClearDialogOpen(false);
             loadQueue();
-        } catch (error: any) {
-            if (error.response?.status === 429) {
+        } catch (error: unknown) {
+            const axiosError = error as { response?: { status?: number }; code?: string; message?: string };
+            if (axiosError.response?.status === 429) {
                 toast.error("Слишком много запросов. Попробуйте через несколько секунд.");
-            } else if (error.code === 'ERR_NETWORK' || error.message?.includes('CORS')) {
+            } else if (axiosError.code === 'ERR_NETWORK' || axiosError.message?.includes('CORS')) {
                 toast.error("Ошибка сети. Проверьте подключение к серверу.");
             } else {
                 toast.error("Не удалось очистить очередь.");
@@ -228,7 +234,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                         <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
                                             {currentVideo ? (
                                                 <YouTube
-                                                    videoId={currentVideo.video_id || currentVideo.id}
+                                                    videoId={currentVideo.video_id}
                                                     onReady={handlePagePlayerReady}
                                                     onStateChange={handlePlayerStateChange}
                                                     onError={handlePlayerError}
@@ -252,7 +258,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                             widget_referrer: window.location.origin
                                                         }
                                                     }}
-                                                    key={`page-player-${currentVideo.video_id || currentVideo.id}-${Date.now()}`}
+                                                    key={`page-player-${currentVideo.video_id}-${Date.now()}`}
                                                     className="w-full h-full"
                                                 />
                                             ) : (
@@ -264,7 +270,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                     ) : (
                                         <div className="relative bg-gray-800 rounded-lg overflow-hidden border-2 border-purple-500 aspect-video">
                                             <div className="w-full h-full flex flex-col items-center justify-center text-center p-3">
-                                                <div className="text-3xl mb-1">📹</div>
+                                                <div className="text-3xl mb-1">[VIDEO]</div>
                                                 <h3 className="text-sm font-medium text-purple-300 mb-1">Режим OBS Studio</h3>
                                                 <p className="text-gray-300 text-xs">
                                                     Видео воспроизводятся в OBS Studio
@@ -282,14 +288,14 @@ const YoutubeIntegrationPage: React.FC = () => {
                                 <div className="flex-1 space-y-3">
                                     <div className="bg-muted/30 rounded-lg p-3">
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" size="sm" onClick={togglePlayPause} disabled={!currentVideo} className="h-10 w-10 p-0" title={isPlaying ? "Пауза" : "Воспроизвести"}>
+                                            <Button variant="ghost" size="sm" onClick={togglePlayPause} disabled={!currentVideo} className={BUTTON_SIZES.icon} title={isPlaying ? "Пауза" : "Воспроизвести"}>
                                                 {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
                                             </Button>
-                                            <Button variant="ghost" size="sm" onClick={nextVideo} disabled={!currentVideo} className="h-10 w-10 p-0" title="Пропустить">
+                                            <Button variant="ghost" size="sm" onClick={nextVideo} disabled={!currentVideo} className={BUTTON_SIZES.icon} title="Пропустить">
                                                 <SkipForward className="h-5 w-5" />
                                             </Button>
                                             <div className="h-6 w-px bg-border mx-2" />
-                                            <Button variant="ghost" size="sm" onClick={toggleMute} className="h-10 w-10 p-0" title={isMuted ? "Включить звук" : "Выключить звук"}>
+                                            <Button variant="ghost" size="sm" onClick={toggleMute} className={BUTTON_SIZES.icon} title={isMuted ? "Включить звук" : "Выключить звук"}>
                                                 {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                                             </Button>
                                             <div className="flex-1 flex items-center gap-2 mx-2">
@@ -408,7 +414,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                         <img src={currentVideo.thumbnail} alt={currentVideo.title} className="w-20 h-12 object-cover rounded"/>
                                         <div className="flex-1 min-w-0">
                                             <h4 className="font-medium text-sm line-clamp-2">{currentVideo.title}</h4>
-                                            <p className="text-xs text-muted-foreground">от {(currentVideo as any).requester_name || (currentVideo as any).user_id || 'Unknown'}</p>
+                                            <p className="text-xs text-muted-foreground">от {currentVideo.requester_name || currentVideo.user_id || 'Unknown'}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -425,7 +431,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                 <img src={video.thumbnail} alt={video.title} className="w-20 h-12 object-cover rounded"/>
                                                 <div className="flex-1 min-w-0">
                                                     <h4 className="font-medium text-sm line-clamp-2">{video.title}</h4>
-                                                    <p className="text-xs text-muted-foreground">заказал: {(video as any).requester_name || (video as any).user_id || 'Unknown'}</p>
+                                                    <p className="text-xs text-muted-foreground">заказал: {video.requester_name || video.user_id || 'Unknown'}</p>
                                                 </div>
                                             </div>
                                         );
@@ -433,7 +439,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                 </div>
                             ) : (
                                 <div className="text-center py-8 text-muted-foreground p-4">
-                                    <div className="text-4xl mb-4">🎵</div>
+                                    <div className="text-4xl mb-4">[AUDIO]</div>
                                     <p className="font-medium text-base mb-2">Очередь пуста</p>
                                     <p className="text-sm text-muted-foreground">
                                         Очередь пуста. Зрители могут добавлять видео командой !sr
@@ -465,7 +471,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                             <div className="aspect-video bg-black rounded-lg overflow-hidden">
                                 {currentVideo ? (
                                     <YouTube
-                                        videoId={currentVideo.video_id || currentVideo.id}
+                                        videoId={currentVideo.video_id}
                                         onReady={handlePagePlayerReady}
                                         onStateChange={handlePlayerStateChange}
                                         onError={handlePlayerError}
@@ -489,7 +495,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                 widget_referrer: window.location.origin
                                             }
                                         }}
-                                        key={`theater-player-${currentVideo.video_id || currentVideo.id}-${Date.now()}`}
+                                        key={`theater-player-${currentVideo.video_id}-${Date.now()}`}
                                         className="w-full h-full"
                                     />
                                 ) : (
@@ -513,7 +519,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                 <img src={currentVideo.thumbnail} alt={currentVideo.title} className="w-20 h-12 object-cover rounded"/>
                                                 <div className="flex-1 min-w-0">
                                                     <h4 className="font-medium text-sm line-clamp-2">{currentVideo.title}</h4>
-                                                    <p className="text-xs text-muted-foreground">от {(currentVideo as any).requester_name || (currentVideo as any).user_id || 'Unknown'}</p>
+                                                    <p className="text-xs text-muted-foreground">от {currentVideo.requester_name || currentVideo.user_id || 'Unknown'}</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -530,7 +536,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                         <img src={video.thumbnail} alt={video.title} className="w-20 h-12 object-cover rounded"/>
                                                         <div className="flex-1 min-w-0">
                                                             <h4 className="font-medium text-sm line-clamp-2">{video.title}</h4>
-                                                            <p className="text-xs text-muted-foreground">заказал: {(video as any).requester_name || (video as any).user_id || 'Unknown'}</p>
+                                                            <p className="text-xs text-muted-foreground">заказал: {video.requester_name || video.user_id || 'Unknown'}</p>
                                                         </div>
                                                     </div>
                                                 );
@@ -538,7 +544,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                         </div>
                                     ) : (
                                         <div className="text-center py-8 text-muted-foreground p-4">
-                                            <div className="text-4xl mb-4">🎵</div>
+                                            <div className="text-4xl mb-4">[AUDIO]</div>
                                             <p className="font-medium text-base mb-2">Очередь пуста</p>
                                             <p className="text-sm text-muted-foreground">
                                                 Очередь пуста. Зрители могут добавлять видео командой !sr

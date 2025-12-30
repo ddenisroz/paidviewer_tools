@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+
 import { logger } from '../utils/prodLogger';
 
 type AudioSource = 'youtube' | 'tts' | null;
@@ -34,7 +35,7 @@ export const AudioPriorityProvider: React.FC<AudioPriorityProviderProps> = ({ ch
             if (source === 'tts' && prev.activeSource === 'youtube') {
                 // Check user preference for audio priority
                 if (prev.ttsPreference === 'none') {
-                    logger.debug('🎵 [AudioPriority] TTS requesting focus, but preference is "none" - no action');
+                    logger.debug('[AUDIO] [AudioPriority] TTS requesting focus, but preference is "none" - no action');
                     return {
                         ...prev,
                         activeSource: 'tts'
@@ -42,7 +43,7 @@ export const AudioPriorityProvider: React.FC<AudioPriorityProviderProps> = ({ ch
                 }
                 
                 if (prev.ttsPreference === 'pause') {
-                    logger.debug('🎵 [AudioPriority] TTS requesting focus, pausing YouTube (preference: pause)');
+                    logger.debug('[AUDIO] [AudioPriority] TTS requesting focus, pausing YouTube (preference: pause)');
                     
                     // Dispatch event to pause YouTube
                     window.dispatchEvent(new CustomEvent('audio_priority_change', {
@@ -57,7 +58,7 @@ export const AudioPriorityProvider: React.FC<AudioPriorityProviderProps> = ({ ch
                 }
                 
                 if (prev.ttsPreference === 'duck') {
-                    logger.debug('🎵 [AudioPriority] TTS requesting focus, ducking YouTube volume (preference: duck)');
+                    logger.debug('[AUDIO] [AudioPriority] TTS requesting focus, ducking YouTube volume (preference: duck)');
                     
                     // Dispatch event to duck YouTube volume
                     window.dispatchEvent(new CustomEvent('audio_priority_change', {
@@ -74,7 +75,7 @@ export const AudioPriorityProvider: React.FC<AudioPriorityProviderProps> = ({ ch
             
             // If YouTube requests focus and TTS is not playing
             if (source === 'youtube' && prev.activeSource !== 'tts') {
-                logger.debug('🎵 [AudioPriority] YouTube requesting focus');
+                logger.debug('[AUDIO] [AudioPriority] YouTube requesting focus');
                 return {
                     ...prev,
                     activeSource: 'youtube',
@@ -84,7 +85,7 @@ export const AudioPriorityProvider: React.FC<AudioPriorityProviderProps> = ({ ch
             
             // If TTS requests focus and nothing is playing
             if (source === 'tts' && prev.activeSource === null) {
-                logger.debug('🎵 [AudioPriority] TTS requesting focus (no conflict)');
+                logger.debug('[AUDIO] [AudioPriority] TTS requesting focus (no conflict)');
                 return {
                     ...prev,
                     activeSource: 'tts'
@@ -99,11 +100,11 @@ export const AudioPriorityProvider: React.FC<AudioPriorityProviderProps> = ({ ch
         setState(prev => {
             // Only release if the source matches the active source
             if (prev.activeSource === source) {
-                logger.debug(`🎵 [AudioPriority] ${source} releasing focus`);
+                logger.debug(`[AUDIO] [AudioPriority] ${source} releasing focus`);
                 
                 // If TTS is releasing and YouTube was paused, resume it
                 if (source === 'tts' && prev.isPaused) {
-                    logger.debug('🎵 [AudioPriority] TTS finished, resuming YouTube');
+                    logger.debug('[AUDIO] [AudioPriority] TTS finished, resuming YouTube');
                     
                     // Dispatch event to resume YouTube
                     window.dispatchEvent(new CustomEvent('audio_priority_change', {
@@ -119,7 +120,7 @@ export const AudioPriorityProvider: React.FC<AudioPriorityProviderProps> = ({ ch
                 
                 // If TTS is releasing and YouTube was ducked, restore volume
                 if (source === 'tts' && prev.ttsPreference === 'duck') {
-                    logger.debug('🎵 [AudioPriority] TTS finished, restoring YouTube volume');
+                    logger.debug('[AUDIO] [AudioPriority] TTS finished, restoring YouTube volume');
                     
                     // Dispatch event to restore YouTube volume
                     window.dispatchEvent(new CustomEvent('audio_priority_change', {
@@ -152,7 +153,7 @@ export const AudioPriorityProvider: React.FC<AudioPriorityProviderProps> = ({ ch
         
         // Save preference to localStorage
         localStorage.setItem('audio_priority_preference', preference);
-        logger.debug(`🎵 [AudioPriority] TTS preference set to: ${preference}`);
+        logger.debug(`[AUDIO] [AudioPriority] TTS preference set to: ${preference}`);
     }, []);
 
     // Load preference from localStorage on mount

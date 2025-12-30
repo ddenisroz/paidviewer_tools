@@ -20,7 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Create guest_sessions table and migrate existing guest sessions from user_sessions"""
-    
+
     # Создаем таблицу guest_sessions
     op.create_table(
         'guest_sessions',
@@ -34,7 +34,7 @@ def upgrade() -> None:
         sa.Column('is_active', sa.Boolean(), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
-    
+
     # Создаем индексы
     op.create_index('ix_guest_sessions_id', 'guest_sessions', ['id'])
     op.create_index('ix_guest_sessions_session_id', 'guest_sessions', ['session_id'], unique=True)
@@ -43,7 +43,7 @@ def upgrade() -> None:
     op.create_index('ix_guest_sessions_last_activity', 'guest_sessions', ['last_activity'])
     op.create_index('ix_guest_sessions_is_active', 'guest_sessions', ['is_active'])
     op.create_index('idx_guest_channel_platform', 'guest_sessions', ['channel_name', 'platform'])
-    
+
     # Мигрируем существующие гостевые сессии из user_sessions (user_id = -1)
     # ВАЖНО: Этот код будет выполнен только при upgrade, не при downgrade
     op.execute("""
@@ -59,18 +59,18 @@ def upgrade() -> None:
         FROM user_sessions us
         WHERE us.user_id = -1
     """)
-    
+
     # Удаляем гостевые сессии из user_sessions
     op.execute("DELETE FROM user_sessions WHERE user_id = -1")
 
 
 def downgrade() -> None:
     """Remove guest_sessions table and restore guest sessions to user_sessions"""
-    
+
     # Восстанавливаем гостевые сессии обратно в user_sessions
     # ВАЖНО: Нужно создать фиктивного пользователя с id=-1 для FK constraint
     # Или временно отключить FK constraint
-    
+
     # Мигрируем данные обратно
     op.execute("""
         INSERT INTO user_sessions (user_id, session_id, device_info, created_at, last_activity, is_active)
@@ -87,7 +87,7 @@ def downgrade() -> None:
             gs.is_active
         FROM guest_sessions gs
     """)
-    
+
     # Удаляем таблицу guest_sessions
     op.drop_index('idx_guest_channel_platform', table_name='guest_sessions')
     op.drop_index('ix_guest_sessions_is_active', table_name='guest_sessions')

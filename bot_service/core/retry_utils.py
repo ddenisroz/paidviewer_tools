@@ -38,36 +38,36 @@ async def retry_async(
         Результат функции или None при неудаче
     """
     last_error = None
-    
+
     for attempt in range(1, max_attempts + 1):
         try:
             if asyncio.iscoroutinefunction(func):
                 return await func(**kwargs)
             else:
                 return func(**kwargs)
-                
+
         except retry_on as e:
             last_error = e
-            
+
             if attempt >= max_attempts:
-                logger.error(f"❌ Retry failed after {max_attempts} attempts: {e}")
+                logger.error(f"[ERROR] Retry failed after {max_attempts} attempts: {e}")
                 if on_failure:
                     on_failure(e)
                 return None
-            
+
             # Экспоненциальный backoff
             delay = min(initial_delay * (backoff_factor ** (attempt - 1)), max_delay)
-            logger.warning(f"⚠️ Attempt {attempt}/{max_attempts} failed: {e}. Retrying in {delay:.1f}s...")
+            logger.warning(f"[WARN] Attempt {attempt}/{max_attempts} failed: {e}. Retrying in {delay:.1f}s...")
             await asyncio.sleep(delay)
-            
+
         except Exception as e:
             # Неожиданное исключение - не ретраим
-            logger.error(f"❌ Unexpected error (not retrying): {e}")
+            logger.error(f"[ERROR] Unexpected error (not retrying): {e}")
             if on_failure:
                 on_failure(e)
             return None
-    
-    logger.error(f"❌ All {max_attempts} attempts failed")
+
+    logger.error(f"[ERROR] All {max_attempts} attempts failed")
     if on_failure and last_error:
         on_failure(last_error)
     return None
@@ -100,34 +100,34 @@ def retry_sync(
         Результат функции или None при неудаче
     """
     last_error = None
-    
+
     for attempt in range(1, max_attempts + 1):
         try:
             return func(**kwargs)
-                
+
         except retry_on as e:
             last_error = e
-            
+
             if attempt >= max_attempts:
-                logger.error(f"❌ Retry failed after {max_attempts} attempts: {e}")
+                logger.error(f"[ERROR] Retry failed after {max_attempts} attempts: {e}")
                 if on_failure:
                     on_failure(e)
                 return None
-            
+
             # Экспоненциальный backoff
             delay = min(initial_delay * (backoff_factor ** (attempt - 1)), max_delay)
-            logger.warning(f"⚠️ Attempt {attempt}/{max_attempts} failed: {e}. Retrying in {delay:.1f}s...")
+            logger.warning(f"[WARN] Attempt {attempt}/{max_attempts} failed: {e}. Retrying in {delay:.1f}s...")
             import time
             time.sleep(delay)
-            
+
         except Exception as e:
             # Неожиданное исключение - не ретраим
-            logger.error(f"❌ Unexpected error (not retrying): {e}")
+            logger.error(f"[ERROR] Unexpected error (not retrying): {e}")
             if on_failure:
                 on_failure(e)
             return None
-    
-    logger.error(f"❌ All {max_attempts} attempts failed")
+
+    logger.error(f"[ERROR] All {max_attempts} attempts failed")
     if on_failure and last_error:
         on_failure(last_error)
     return None

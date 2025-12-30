@@ -1,18 +1,26 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useEffect, useState } from 'react';
+
+import { AlertCircle, CheckCircle, Clock, Eye, MessageCircle, Plus, Send, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, Clock, CheckCircle, AlertCircle, Reply, Send, Eye, Plus, Settings } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+
+import { cn } from '@/lib/utils';
+import { toast } from '@/utils/toastManager';
+
 import { Badge } from '../components/ui/badge';
-import { Textarea } from '../components/ui/textarea';
+import { Button } from '../components/ui/button';
+import { Card, CardContent } from '../components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
-import { toast } from 'sonner';
-import { logger } from '../utils/prodLogger';
-import { supportService } from '../services/api/services/supportService';
+import { PageLoader } from '../components/ui/loader';
+import { Textarea } from '../components/ui/textarea';
+import { BUTTON_SIZES } from '../constants/designSystem';
 import { useAuth } from '../context/AuthContext';
+import { supportService } from '../services/api/services/supportService';
 import PageWrapper from '../shared/components/PageWrapper';
+import { logger } from '../utils/prodLogger';
+
+import type { ApiResponse } from '../types/api';
 
 interface Ticket {
   id: number;
@@ -87,10 +95,12 @@ const InboxPage: React.FC = () => {
     try {
       setLoading(true);
       const response = await supportService.getMyTickets();
-      setTickets((response.data as any).tickets || []);
-    } catch (error: any) {
+      const result = response.data as ApiResponse<{ tickets?: Ticket[] }>;
+      setTickets(result.data?.tickets || []);
+    } catch (error: unknown) {
+      const err = error as { status?: number };
       logger.error('Error loading tickets:', error);
-      const errorMsg = error.status === 503 
+      const errorMsg = err.status === 503 
         ? 'Сервис на обслуживании. Попробуйте позже.'
         : 'Не удалось загрузить тикеты. Проверьте интернет-соединение.';
       toast.error(errorMsg);
@@ -102,7 +112,8 @@ const InboxPage: React.FC = () => {
   const loadTicketResponses = async (ticketId: number): Promise<void> => {
     try {
       const response = await supportService.getTicketResponses(ticketId);
-      setResponses((response.data as any).responses || []);
+      const result = response.data as ApiResponse<{ responses?: TicketResponse[] }>;
+      setResponses(result.data?.responses || []);
     } catch (error) {
       logger.error('Error loading responses:', error);
       toast.error('Ошибка при загрузке ответов');
@@ -180,7 +191,8 @@ const InboxPage: React.FC = () => {
       formDataToSend.append('message', createFormData.message);
 
       const response = await supportService.createTicket(formDataToSend);
-      toast.success(`Тикет #${(response.data as any).ticket_id} успешно создан!`);
+      const result = response.data as ApiResponse<{ ticket_id?: number }>;
+      toast.success(`Тикет #${result.data?.ticket_id} успешно создан!`);
       await loadTickets();
     } catch (error) {
       setTickets(prev => prev.filter(t => t.id !== optimisticTicket.id));
@@ -288,17 +300,14 @@ const InboxPage: React.FC = () => {
 
       <div className="space-y-4">
         {loading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-muted-foreground">Загрузка тикетов...</p>
-          </div>
+          <PageLoader message="Загрузка тикетов..." />
         ) : tickets.length === 0 ? (
           <Card className="border-dashed border-2">
             <CardContent className="p-12 text-center">
               <MessageCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
               <h3 className="text-xl font-semibold mb-2">Нет тикетов поддержки</h3>
               <p className="text-muted-foreground mb-6">
-                Все хорошо! 🎉 У вас пока нет обращений в службу поддержки.
+                Все хорошо! [SUCCESS] У вас пока нет обращений в службу поддержки.
               </p>
               <Button onClick={() => setIsCreateDialogOpen(true)} size="lg">
                 <Plus className="h-4 w-4 mr-2" />
@@ -440,7 +449,7 @@ const InboxPage: React.FC = () => {
 
               {selectedTicket.status === 'closed' && (
                 <div className="text-center py-4 text-muted-foreground">
-                  <CheckCircle className="h-8 w-8 mx-auto mb-2" />
+                  <CheckCircle className={cn(BUTTON_SIZES.iconSm, "mx-auto mb-2")} />
                   <p>Этот тикет закрыт. Создайте новый тикет для дополнительных вопросов.</p>
                 </div>
               )}

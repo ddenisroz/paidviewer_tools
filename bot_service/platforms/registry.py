@@ -3,23 +3,23 @@ Platform registry for managing all streaming platforms
 """
 from typing import Dict, Optional, List
 import logging
-from .base import StreamingPlatform, PlatformConfig
+from .base import StreamingPlatform
 
 logger = logging.getLogger(__name__)
 
 
 class PlatformRegistry:
     """Central registry for all streaming platforms"""
-    
+
     def __init__(self):
         self._platforms: Dict[str, StreamingPlatform] = {}
         self._initialized = False
-    
+
     def _register_platforms(self):
         """Register all available platforms"""
         if self._initialized:
             return
-            
+
         try:
             # Import and register Twitch
             from .twitch import TwitchPlatform
@@ -27,7 +27,7 @@ class PlatformRegistry:
             logger.info("Registered Twitch platform")
         except Exception as e:
             logger.error(f"Failed to register Twitch platform: {e}")
-        
+
         try:
             # Import and register VK
             from .vk import VKPlatform
@@ -35,10 +35,10 @@ class PlatformRegistry:
             logger.info("Registered VK platform")
         except Exception as e:
             logger.error(f"Failed to register VK platform: {e}")
-        
+
         self._initialized = True
         logger.info(f"Platform registry initialized with {len(self._platforms)} platforms")
-    
+
     def register(self, platform: StreamingPlatform):
         """
         Register a new platform
@@ -48,7 +48,7 @@ class PlatformRegistry:
         """
         self._platforms[platform.config.name] = platform
         logger.debug(f"Registered platform: {platform.config.display_name}")
-    
+
     def get(self, name: str) -> Optional[StreamingPlatform]:
         """
         Get platform by name
@@ -62,9 +62,9 @@ class PlatformRegistry:
         # Lazy initialization
         if not self._initialized:
             self._register_platforms()
-        
+
         return self._platforms.get(name)
-    
+
     def get_all(self) -> Dict[str, StreamingPlatform]:
         """
         Get all registered platforms
@@ -75,9 +75,9 @@ class PlatformRegistry:
         # Lazy initialization
         if not self._initialized:
             self._register_platforms()
-        
+
         return self._platforms.copy()
-    
+
     def get_configs(self) -> List[Dict]:
         """
         Get all platform configurations for frontend
@@ -88,7 +88,7 @@ class PlatformRegistry:
         # Lazy initialization
         if not self._initialized:
             self._register_platforms()
-        
+
         configs = []
         for platform in self._platforms.values():
             config = platform.config
@@ -103,7 +103,7 @@ class PlatformRegistry:
                 'color': config.color
             })
         return configs
-    
+
     def is_valid_platform(self, name: str) -> bool:
         """
         Check if a platform name is valid
@@ -117,7 +117,7 @@ class PlatformRegistry:
         # Lazy initialization
         if not self._initialized:
             self._register_platforms()
-        
+
         return name in self._platforms
 
 

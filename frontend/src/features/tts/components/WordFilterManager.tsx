@@ -1,13 +1,19 @@
-import React, { useState, useCallback } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import React, { useCallback, useState } from 'react';
+
+import { AlertCircle, ChevronDown, Plus, Trash2 } from 'lucide-react';
+
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, AlertCircle, ChevronDown } from 'lucide-react';
+
+
 import { useIntegrations } from '../../../context/IntegrationsContext';
-import { useFilteredWords, useAddFilteredWord, useDeleteFilteredWord } from '../../../queries/tts/ttsQueries';
+import { useAddFilteredWord, useDeleteFilteredWord, useFilteredWords } from '../../../queries/tts/ttsQueries';
+
+import type { AxiosError } from 'axios';
 
 interface FilteredWord {
     id: number;
@@ -37,7 +43,7 @@ const WordFilterManager: React.FC = React.memo(() => {
         onSuccess: () => {
             setNewWord('');
         },
-        onError: (error: any) => {
+        onError: (error: AxiosError) => {
             // Ошибка уже обработана в hook, но не показываем toast если TTS сервис недоступен
             if (error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED') {
                 // Не показываем ошибку если TTS сервис недоступен
@@ -46,7 +52,7 @@ const WordFilterManager: React.FC = React.memo(() => {
     });
 
     const deleteWordMutation = useDeleteFilteredWord({
-        onError: (error: any) => {
+        onError: (error: AxiosError) => {
             // Ошибка уже обработана в hook, но не показываем toast если TTS сервис недоступен
             if (error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED') {
                 // Не показываем ошибку если TTS сервис недоступен
@@ -54,7 +60,12 @@ const WordFilterManager: React.FC = React.memo(() => {
         },
     });
 
-    const words: FilteredWord[] = Array.isArray(wordsData) ? wordsData : (wordsData as any)?.data?.filtered_words || (wordsData as any)?.data?.words || [];
+    const wordsRaw = Array.isArray(wordsData) 
+        ? wordsData 
+        : ((wordsData as { data?: { filtered_words?: unknown; words?: unknown } } | undefined)?.data?.filtered_words 
+           ?? (wordsData as { data?: { filtered_words?: unknown; words?: unknown } } | undefined)?.data?.words 
+           ?? []);
+    const words: FilteredWord[] = (Array.isArray(wordsRaw) ? wordsRaw : []) as FilteredWord[];
     const isAdding = addWordMutation.isPending;
 
     // Получаем доступные платформы из интеграций
@@ -67,10 +78,10 @@ const WordFilterManager: React.FC = React.memo(() => {
 
     // Получаем иконку для платформы
     const getPlatformIcon = (platform: string): string => {
-        if (platform === 'twitch') return '🟣';
-        if (platform === 'vk') return '🔵';
-        if (platform === 'all') return '🌐';
-        return '❓';
+        if (platform === 'twitch') return '[TW]';
+        if (platform === 'vk') return '[VK]';
+        if (platform === 'all') return '[WEB]';
+        return '[?]';
     };
 
     // Добавление слова
@@ -100,11 +111,11 @@ const WordFilterManager: React.FC = React.memo(() => {
     };
 
     // Получение лейбла для платформы
-    const getPlatformLabel = (platform: string): string => {
+    const _getPlatformLabel = (platform: string): string => {
         switch (platform) {
-            case 'twitch': return '🟣 Twitch';
-            case 'vk': return '🔵 VK Live';
-            case 'all': return '🌐 Все платформы';
+            case 'twitch': return '[TW] Twitch';
+            case 'vk': return '[VK] VK Live';
+            case 'all': return '[WEB] Все платформы';
             default: return platform;
         }
     };
@@ -174,12 +185,12 @@ const WordFilterManager: React.FC = React.memo(() => {
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">🌐 Все</SelectItem>
+                                    <SelectItem value="all">[WEB] Все</SelectItem>
                                     {availablePlatforms.includes('twitch') && (
-                                        <SelectItem value="twitch">🟣 Twitch</SelectItem>
+                                        <SelectItem value="twitch">[TW] Twitch</SelectItem>
                                     )}
                                     {availablePlatforms.includes('vk') && (
-                                        <SelectItem value="vk">🔵 VK Live</SelectItem>
+                                        <SelectItem value="vk">[VK] VK Live</SelectItem>
                                     )}
                                 </SelectContent>
                             </Select>

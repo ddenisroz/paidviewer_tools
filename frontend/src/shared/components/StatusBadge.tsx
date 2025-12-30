@@ -1,14 +1,16 @@
 // src/shared/components/StatusBadge.tsx
 import React from 'react';
-import { Badge } from '@/components/ui/badge';
+
 import { 
-    CheckCircle, 
-    XCircle, 
     AlertCircle, 
+    CheckCircle, 
     Clock, 
-    Loader2,
-    LucideIcon
+    Loader2, 
+    LucideIcon,
+    XCircle
 } from 'lucide-react';
+
+import { Badge } from '@/components/ui/badge';
 
 interface StatusBadgeProps {
     status?: string;
@@ -26,7 +28,7 @@ interface StatusConfig {
 
 const StatusBadge: React.FC<StatusBadgeProps> = ({ 
     status, 
-    variant = 'default',
+    variant: _variant = 'default',
     showIcon = true,
     className = '' 
 }) => {

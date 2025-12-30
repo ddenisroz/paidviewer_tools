@@ -4,6 +4,124 @@
 
 ---
 
+## Dec 18, 2025 - Full Project Audit & Healing
+
+### Комплексный аудит проекта
+**Статус:** ✅ Завершено (87%)
+
+Выполнен полный аудит проекта: UI/UX, функционал, кнопки, консистентность дизайна, админ панель.
+
+#### Исправления
+
+**TtsPlayerContext.tsx:**
+- Добавлен retry limit (MAX_RETRIES = 3) для предотвращения зацикливания аудио
+- Сброс счетчика при успешном воспроизведении
+
+**AdminPage.tsx:**
+- Полностью переписан с lazy loading компонентов
+- Единые стили из designSystem
+- Горизонтальный скролл для табов
+- Suspense с skeleton loader
+
+**UserManagementPage.tsx:**
+- Увеличены кнопки действий с h-7 w-7 до h-8 w-8 (32x32px)
+- Реализована smart pagination (первая, последняя, окружение текущей)
+- Добавлен тип `UsersApiResponse`
+- Исправлены типы в mutations и error handlers
+
+**SystemLogsPage.tsx:**
+- Добавлен тип `ApiResponse`
+
+**StorageManagementPage.tsx:**
+- Добавлен тип `ApiResponse`
+- Исправлены типы ошибок в catch блоках
+
+**ChatHeader.tsx:**
+- Удалена неиспользуемая функция `getButtonStyle`
+
+**ChatCard.tsx:**
+- Создан подкомпонент ChatEmptyState
+- Стандартизированы размеры кнопок (40x40px)
+- Добавлены Tooltips
+- Убраны анимации прыжка
+
+**tts_api.py:**
+- Убраны лишние whitelist проверки для Google TTS
+- Оптимизированы логи
+
+**App.tsx (Toast):**
+- Позиция: top-right
+- Duration: 3 секунды
+- Offset: 80px
+
+#### Новые файлы
+
+- `frontend/src/constants/designSystem.ts` - единые константы дизайн-системы
+- `frontend/src/components/chat/ChatEmptyState.tsx` - компонент пустого состояния чата
+- `PROJECT_HEALING_PLAN.md` - план лечения проекта
+- `AUDIT_REPORT.md` - детальный отчет аудита
+
+#### Документация
+
+- Обновлен `docs/CURRENT_STATUS.md` - добавлена секция об аудите
+- Обновлен `docs/architecture/DESIGN_SYSTEM.md` - добавлены константы
+
+#### Дополнительные улучшения (Dec 18, вечер)
+
+**SystemLogsPage.tsx:**
+- Добавлен экспорт логов в CSV с кнопкой Download
+- UTF-8 BOM для корректного отображения кириллицы в Excel
+
+**VoiceManagement.tsx:**
+- Добавлен прогресс-индикатор при загрузке голоса (Loader2 + анимация)
+
+**UserManagementPage.tsx:**
+- Debounce для поиска уже был реализован (500ms)
+
+**Dashboard Batch API (оптимизация производительности):**
+- Создан `bot_service/api/dashboard_api.py` - endpoint `GET /api/dashboard/init`
+- Объединяет 4-6 запросов в один: user, integrations, tts settings, chat history
+- Создан `frontend/src/hooks/useDashboardInit.ts` - React Query хук для использования
+
+**Документация:** [PROJECT_HEALING_PLAN.md](../PROJECT_HEALING_PLAN.md), [AUDIT_REPORT.md](../AUDIT_REPORT.md)
+
+---
+
+## Dec 15, 2025 - Auth Type System
+
+### Система типов авторизации
+**Статус:** Готово
+
+Реализована система выбора типа авторизации (full/basic) при входе через Twitch или VK Live.
+
+#### Новые возможности
+- **Full авторизация** - все функции включая управление стримом и channel points
+- **Basic авторизация** - базовые функции (TTS, YouTube, Drops) без управления стримом
+- **Двухшаговый логин** - выбор платформы, затем выбор типа авторизации
+- **Апгрейд авторизации** - возможность перейти с basic на full
+
+#### Backend изменения
+- Добавлены константы `AuthType`, `OAUTH_SCOPES_FULL`, `OAUTH_SCOPES_BASIC` в `constants.py`
+- Добавлено поле `auth_type` в модель `UserToken`
+- Создан API `/api/auth/type` для работы с типами авторизации
+- Обновлен `oauth_handler.py` для поддержки auth_type
+- Создана миграция `20251215_add_auth_type_to_user_tokens.py`
+
+#### Frontend изменения
+- Обновлен `LoginPage.tsx` - двухшаговый процесс логина
+- Создан `BasicAuthBanner.tsx` - баннер для заблокированных функций
+- Создан хук `useAuthType.ts` - работа с типами авторизации
+
+#### Исправления
+- Исправлен `advanced_rate_limiter.py` - использование `parse()` для библиотеки limits
+
+#### Тесты
+- Добавлены тесты в `tests/test_auth_type.py`
+
+**Документация:** [AUTH_TYPE_SYSTEM.md](AUTH_TYPE_SYSTEM.md)
+
+---
+
 ## Nov 9, 2025 - Code Refactoring & Quality Improvements
 
 ### Рефакторинг кода

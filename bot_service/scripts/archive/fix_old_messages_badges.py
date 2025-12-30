@@ -5,7 +5,6 @@
 import sys
 import os
 import json
-from datetime import datetime
 
 # Добавляем корневую директорию в путь
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -31,14 +30,14 @@ def fix_broadcaster_badges():
     try:
         # Получаем всех пользователей
         users = db.query(User).all()
-        
+
         total_updated = 0
-        
+
         for user in users:
             # Twitch канал
             if user.twitch_username:
                 logger.info(f"Processing Twitch channel: {user.twitch_username}")
-                
+
                 # Находим сообщения от владельца канала без badges
                 messages = db.query(ChatMessage).filter(
                     ChatMessage.user_id == user.id,
@@ -47,22 +46,22 @@ def fix_broadcaster_badges():
                     func.lower(ChatMessage.author_username) == user.twitch_username.lower(),
                     ChatMessage.badges == None  # Только сообщения без badges
                 ).all()
-                
+
                 logger.info(f"  Found {len(messages)} broadcaster messages without badges")
-                
+
                 for msg in messages:
                     # Добавляем broadcaster badge и role
                     msg.badges = json.dumps(['broadcaster/1'])
                     msg.role = 'broadcaster'
                     total_updated += 1
-                
+
                 db.commit()
-                logger.info(f"  ✅ Updated {len(messages)} messages for {user.twitch_username}")
-            
+                logger.info(f"  [OK] Updated {len(messages)} messages for {user.twitch_username}")
+
             # VK канал
             if user.vk_username:
                 logger.info(f"Processing VK channel: {user.vk_username}")
-                
+
                 # Находим сообщения от владельца канала без role
                 messages = db.query(ChatMessage).filter(
                     ChatMessage.user_id == user.id,
@@ -71,40 +70,40 @@ def fix_broadcaster_badges():
                     func.lower(ChatMessage.author_username) == user.vk_username.lower(),
                     ChatMessage.role == None  # Только сообщения без role
                 ).all()
-                
+
                 logger.info(f"  Found {len(messages)} owner messages without role")
-                
+
                 for msg in messages:
                     # Для VK нет badges, но есть role
                     msg.role = 'owner'
                     total_updated += 1
-                
+
                 db.commit()
-                logger.info(f"  ✅ Updated {len(messages)} messages for {user.vk_username}")
-        
-        logger.info(f"\n🎉 TOTAL UPDATED: {total_updated} messages")
-        
+                logger.info(f"  [OK] Updated {len(messages)} messages for {user.vk_username}")
+
+        logger.info(f"\n[SUCCESS] TOTAL UPDATED: {total_updated} messages")
+
         # Статистика
         total_messages = db.query(ChatMessage).count()
         messages_with_badges = db.query(ChatMessage).filter(ChatMessage.badges != None).count()
         messages_with_role = db.query(ChatMessage).filter(ChatMessage.role != None).count()
-        
-        logger.info(f"\n📊 STATISTICS:")
+
+        logger.info("\n[STATS] STATISTICS:")
         logger.info(f"  Total messages: {total_messages}")
         logger.info(f"  Messages with badges: {messages_with_badges}")
         logger.info(f"  Messages with role: {messages_with_role}")
         logger.info(f"  Messages without badges: {total_messages - messages_with_badges}")
-        
+
     except Exception as e:
-        logger.error(f"❌ Error: {e}", exc_info=True)
+        logger.error(f"[ERROR] Error: {e}", exc_info=True)
         db.rollback()
     finally:
         db.close()
 
 if __name__ == "__main__":
-    logger.info("🚀 Starting badges fix script...")
+    logger.info("[START] Starting badges fix script...")
     logger.info("=" * 60)
     fix_broadcaster_badges()
     logger.info("=" * 60)
-    logger.info("✅ Script completed!")
+    logger.info("[OK] Script completed!")
 

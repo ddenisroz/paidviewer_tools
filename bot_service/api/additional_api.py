@@ -6,6 +6,7 @@ from core.database import get_db, User, UserToken, ChatMessage, UserSession
 from auth.auth import get_current_user, get_current_user_optional
 import logging
 from datetime import datetime, timedelta
+from core.datetime_utils import utcnow_naive
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +88,7 @@ async def get_integrations(user: dict = Depends(get_current_user)):
                         }
                     else:
                         # Токен недействителен - НЕ добавляем в интеграции, НО НЕ удаляем (может быть временная проблема)
-                        logger.warning(f"⚠️ Invalid token for {token.platform} user {user_id}, skipping integration (keeping token for retry)")
+                        logger.warning(f"[WARN] Invalid token for {token.platform} user {user_id}, skipping integration (keeping token for retry)")
                         # Не удаляем токен - возможно это временная проблема с API платформы
             
             return JSONResponse(content={"integrations": integrations})
@@ -112,7 +113,7 @@ async def disconnect_integration(platform: str, user: dict = Depends(get_current
     if not user_id:
         raise HTTPException(status_code=400, detail="User ID not found")
     
-    logger.info(f"🔌 [DISCONNECT] User {user_id} disconnecting {platform} integration...")
+    logger.info(f"[CONNECT] [DISCONNECT] User {user_id} disconnecting {platform} integration...")
     
     # Получаем информацию о пользователе
     db = SessionLocal()
@@ -129,14 +130,15 @@ async def disconnect_integration(platform: str, user: dict = Depends(get_current
             if channel_name:
                 # Отключаем Twitch бота
                 try:
-                    from main import bot_instance
+                    from startup.bot_registry import get_bot_registry
+                    bot_instance = get_bot_registry().twitch_bot
                     if bot_instance:
                         # Бот покидает канал
                         await bot_instance.part_channels([channel_name])
-                        logger.info(f"✅ Twitch bot left channel: {channel_name}")
+                        logger.info(f"[OK] Twitch bot left channel: {channel_name}")
                         # Отключаем TTS
                         connection_manager.disable_tts_for_channel(channel_name.lower())
-                        logger.info(f"✅ TTS disabled for {channel_name}")
+                        logger.info(f"[OK] TTS disabled for {channel_name}")
                 except Exception as e:
                     logger.error(f"Error disconnecting Twitch bot: {e}")
                     raise HTTPException(status_code=500, detail=f"Failed to disconnect Twitch bot: {str(e)}")
@@ -147,14 +149,14 @@ async def disconnect_integration(platform: str, user: dict = Depends(get_current
                 # Отключаем VK бота
                 try:
                     import main
-                    logger.info(f"🔍 VK bot instance status: {main.vk_live_bot_instance is not None}")
+                    logger.info(f"[DEBUG] VK bot instance status: {main.vk_live_bot_instance is not None}")
                     if main.vk_live_bot_instance:
                         # Отключаем от канала
                         await main.vk_live_bot_instance.disconnect_from_channel(channel_name)
                         connection_manager.disable_tts_for_channel(channel_name.lower())
-                        logger.info(f"✅ Disconnected VK bot from {channel_name}")
+                        logger.info(f"[OK] Disconnected VK bot from {channel_name}")
                     else:
-                        logger.warning(f"⚠️ VK bot instance not found, only disabling TTS")
+                        logger.warning(f"[WARN] VK bot instance not found, only disabling TTS")
                         connection_manager.disable_tts_for_channel(channel_name.lower())
                 except Exception as e:
                     logger.error(f"Error disconnecting VK bot: {e}")
@@ -171,9 +173,9 @@ async def disconnect_integration(platform: str, user: dict = Depends(get_current
         if token:
             db.delete(token)
             db.commit()
-            logger.info(f"✅ Deleted {platform} token for user {user_id}")
+            logger.info(f"[OK] Deleted {platform} token for user {user_id}")
         
-        logger.info(f"✅ Integration {platform} disconnected for user {user_id} (token deleted)")
+        logger.info(f"[OK] Integration {platform} disconnected for user {user_id} (token deleted)")
         return JSONResponse(content={"success": True, "message": f"{platform} bot disconnected (tokens saved for quick reconnect)"})
         
     finally:
@@ -210,10 +212,11 @@ async def remove_integration(platform: str, user: dict = Depends(get_current_use
                 channel_name = db_user.twitch_username
                 if channel_name:
                     try:
-                        from main import bot_instance
+                        from startup.bot_registry import get_bot_registry
+                        bot_instance = get_bot_registry().twitch_bot
                         if bot_instance:
                             await bot_instance.part_channels([channel_name])
-                            logger.info(f"✅ Twitch bot left channel: {channel_name}")
+                            logger.info(f"[OK] Twitch bot left channel: {channel_name}")
                     except Exception as e:
                         logger.error(f"Error disconnecting Twitch bot: {e}")
                     connection_manager.disable_tts_for_channel(channel_name.lower())
@@ -226,7 +229,7 @@ async def remove_integration(platform: str, user: dict = Depends(get_current_use
                         if main.vk_live_bot_instance:
                             await main.vk_live_bot_instance.disconnect_from_channel(channel_name)
                         else:
-                            logger.warning(f"⚠️ VK bot instance not found for removal")
+                            logger.warning(f"[WARN] VK bot instance not found for removal")
                     except Exception as e:
                         logger.error(f"Error disconnecting VK bot: {e}")
                         import traceback
@@ -241,7 +244,7 @@ async def remove_integration(platform: str, user: dict = Depends(get_current_use
         if not success:
             raise HTTPException(status_code=500, detail=f"Failed to remove {platform} integration")
         
-        logger.info(f"✅ Integration {platform} REMOVED for user {user_id} (tokens deleted)")
+        logger.info(f"[OK] Integration {platform} REMOVED for user {user_id} (tokens deleted)")
         return JSONResponse(content={"success": True, "message": f"{platform} integration fully removed. Re-authorization required."})
         
     except Exception as e:
@@ -295,7 +298,7 @@ async def get_chat_history(
         query = db.query(ChatMessage).filter(
             ChatMessage.user_id == user_id,
             func.lower(ChatMessage.channel_name) == channel.lower(),  # Case-insensitive поиск
-            ChatMessage.is_deleted == False
+            ChatMessage.is_deleted.is_(False)
         )
         
         logger.info(f"📜 [CHAT HISTORY] Using case-insensitive search for channel: {channel}")
@@ -309,8 +312,8 @@ async def get_chat_history(
             logger.info(f"📜 [CHAT HISTORY] Found {len(messages)} messages in database")
         except Exception as db_error:
             # Fallback если нет колонки author_username (старая БД)
-            logger.warning(f"⚠️ Database schema mismatch: {db_error}")
-            logger.info("ℹ️ Falling back to basic query without author_username")
+            logger.warning(f"[WARN] Database schema mismatch: {db_error}")
+            logger.info("[INFO] Falling back to basic query without author_username")
             
             # Переделаем запрос без author_username
             try:
@@ -343,7 +346,7 @@ async def get_chat_history(
                         'author_username': None  # Fallback
                     })())
             except Exception as fallback_error:
-                logger.error(f"❌ Fallback query also failed: {fallback_error}")
+                logger.error(f"[ERROR] Fallback query also failed: {fallback_error}")
                 return JSONResponse(content={
                     "success": False,
                     "error": "Database schema mismatch. Please reinitialize database."
@@ -378,7 +381,7 @@ async def get_chat_history(
         if messages_data and len(messages_data) > 0:
             logger.info(f"🎖️ [CHAT HISTORY API] Sample message: author={messages_data[0]['author']}, role={messages_data[0]['role']}, badges={messages_data[0]['badges']}")
         
-        logger.info(f"✅ [CHAT HISTORY] Returning {len(messages_data)} messages for {platform}:{channel}")
+        logger.info(f"[OK] [CHAT HISTORY] Returning {len(messages_data)} messages for {platform}:{channel}")
         
         return JSONResponse(content={
             "success": True,
@@ -387,7 +390,7 @@ async def get_chat_history(
         })
         
     except Exception as e:
-        logger.error(f"❌ [CHAT HISTORY] Error: {e}", exc_info=True)
+        logger.error(f"[ERROR] [CHAT HISTORY] Error: {e}", exc_info=True)
         return JSONResponse(content={
             "success": False,
             "messages": [],
@@ -403,7 +406,7 @@ async def permanently_delete_user(
     """
     [ADMIN ONLY] Окончательное удаление пользователя из базы данных
     
-    ⚠️ ВНИМАНИЕ: Это действие НЕОБРАТИМО!
+    [WARN] ВНИМАНИЕ: Это действие НЕОБРАТИМО!
     
     Удаляет пользователя ФИЗИЧЕСКИ из БД (hard delete).
     Используйте только для:
@@ -430,8 +433,8 @@ async def permanently_delete_user(
         db.delete(target_user)
         db.commit()
         
-        logger.info(f"🗑️ [ADMIN DELETE] User {user_id} ({username}) permanently deleted by admin {current_user.get('id')}")
-        logger.info(f"📊 [ADMIN DELETE] User status: is_blocked={is_blocked}, reason={blocked_reason}")
+        logger.info(f"[DELETE] [ADMIN DELETE] User {user_id} ({username}) permanently deleted by admin {current_user.get('id')}")
+        logger.info(f"[STATS] [ADMIN DELETE] User status: is_blocked={is_blocked}, reason={blocked_reason}")
         
         return JSONResponse(content={
             "success": True,
@@ -447,7 +450,7 @@ async def permanently_delete_user(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ [ADMIN DELETE] Error permanently deleting user: {e}", exc_info=True)
+        logger.error(f"[ERROR] [ADMIN DELETE] Error permanently deleting user: {e}", exc_info=True)
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error deleting user: {str(e)}")
 
@@ -478,7 +481,7 @@ async def delete_user_account(
         if not user_id:
             raise HTTPException(status_code=400, detail="User ID not found")
         
-        logger.info(f"🗑️ [DELETE ACCOUNT] User {user_id} requested account deletion")
+        logger.info(f"[DELETE] [DELETE ACCOUNT] User {user_id} requested account deletion")
         
         # Получаем пользователя
         from core.database import User, UserToken, UserSession, UserSettings, ChatMessage, ChatBoxSettings, WhitelistedChannel, AdminUser, TTSUserSettings
@@ -493,7 +496,7 @@ async def delete_user_account(
         
         if db_user.twitch_username:
             connection_manager.disable_tts_for_channel(db_user.twitch_username.lower())
-            logger.info(f"🗑️ Disconnected Twitch bot from {db_user.twitch_username}")
+            logger.info(f"[DELETE] Disconnected Twitch bot from {db_user.twitch_username}")
         
         if db_user.vk_channel_name or db_user.vk_username:
             channel_name = db_user.vk_channel_name or db_user.vk_username
@@ -502,7 +505,7 @@ async def delete_user_account(
                 if main.vk_live_bot_instance:
                     await main.vk_live_bot_instance.disconnect_from_channel(channel_name)
                 connection_manager.disable_tts_for_channel(channel_name.lower())
-                logger.info(f"🗑️ Disconnected VK bot from {channel_name}")
+                logger.info(f"[DELETE] Disconnected VK bot from {channel_name}")
             except Exception as e:
                 logger.error(f"Error disconnecting VK bot: {e}")
         
@@ -543,12 +546,13 @@ async def delete_user_account(
             ])
         ).delete()
         
-        # 9. ⚠️ SOFT DELETE: Помечаем пользователя как удалённого (НЕ удаляем физически!)
+        # 9. [WARN] SOFT DELETE: Помечаем пользователя как удалённого (НЕ удаляем физически!)
         # Это позволяет сохранить историю и предотвратить конфликты при повторной регистрации
         from datetime import datetime
+        from core.datetime_utils import utcnow_naive
         db_user.is_blocked = True
         db_user.blocked_reason = "account_deleted"
-        db_user.blocked_at = datetime.utcnow()
+        db_user.blocked_at = utcnow_naive()
         
         # Анонимизируем данные для GDPR compliance
         db_user.twitch_username = f"deleted_user_{user_id}"
@@ -558,9 +562,13 @@ async def delete_user_account(
         # Коммитим все изменения
         db.commit()
         
-        logger.info(f"✅ [DELETE ACCOUNT] Successfully soft-deleted user {user_id}")
-        logger.info(f"📊 [DELETE ACCOUNT] Deleted counts: {deleted_counts}")
-        logger.info(f"🔒 [DELETE ACCOUNT] User marked as blocked with reason: account_deleted")
+        # [OK] Инвалидируем кеш пользователя
+        from core.user_cache_invalidation import invalidate_user_cache
+        invalidate_user_cache(user_id, "account deleted")
+        
+        logger.info(f"[OK] [DELETE ACCOUNT] Successfully soft-deleted user {user_id}")
+        logger.info(f"[STATS] [DELETE ACCOUNT] Deleted counts: {deleted_counts}")
+        logger.info(f"[SECURITY] [DELETE ACCOUNT] User marked as blocked with reason: account_deleted")
         
         # Очищаем cookie сессии
         response = JSONResponse(content={
@@ -575,6 +583,6 @@ async def delete_user_account(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ [DELETE ACCOUNT] Error deleting account: {e}", exc_info=True)
+        logger.error(f"[ERROR] [DELETE ACCOUNT] Error deleting account: {e}", exc_info=True)
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error deleting account: {str(e)}")

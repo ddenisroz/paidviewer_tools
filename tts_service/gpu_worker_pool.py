@@ -263,13 +263,13 @@ class GPUWorkerPool:
                 # Температура
                 try:
                     temperature = pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
-                except:
+                except Exception:
                     temperature = None
                 
                 # Потребление энергии
                 try:
                     power_usage = pynvml.nvmlDeviceGetPowerUsage(handle) / 1000.0  # В ваттах
-                except:
+                except Exception:
                     power_usage = None
                     
             except ImportError:
@@ -437,7 +437,7 @@ class GPUWorkerPool:
             # Подтверждаем сообщение даже при ошибке, чтобы избежать зацикливания
             try:
                 self.redis_client.xack(self.stream_name, self.consumer_group, stream_id)
-            except:
+            except Exception:
                 pass
 
     async def _synthesize_speech(self, task: SynthesisTask) -> Optional[str]:

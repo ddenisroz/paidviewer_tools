@@ -1,17 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+﻿import React, { useEffect, useState } from 'react';
+
+import { Calendar, Search, TrendingUp, Trophy } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, Trophy, TrendingUp, Calendar } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { toast } from '@/utils/toastManager';
+
 import { useDropsConfig } from '../../../queries/drops/dropsQueries';
 import { dropsService } from '../../../services/api/services/dropsService';
-import { toast } from 'sonner';
 import { logger } from '../../../utils/prodLogger';
+
 import type { Streak } from '../../../types';
 
 interface StreakTrackerProps {
-    user: any;
+    user: Record<string, unknown>;
     channelName: string;
 }
 
@@ -52,7 +56,7 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
 
     try {
       setLoading(true);
-      // 🚀 FIX: Загружаем общую статистику стриков (без фильтрации по platform)
+      // [START] FIX: Загружаем общую статистику стриков (без фильтрации по platform)
       const response = await dropsService.getStreaks(channelName, {
         limit, 
         offset: currentOffset 
@@ -90,7 +94,8 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
     streak.viewer_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return 'Не указано';
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('ru-RU', {
       year: 'numeric',
@@ -110,11 +115,11 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
   };
 
   const getStreakBadge = (days: number): { text: string; emoji: string } => {
-    if (days >= 60) return { text: 'Легенда', emoji: '👑' };
-    if (days >= 30) return { text: 'Эпик', emoji: '💎' };
-    if (days >= 14) return { text: 'Мастер', emoji: '🏆' };
-    if (days >= 7) return { text: 'Активный', emoji: '⭐' };
-    return { text: 'Новичок', emoji: '🌱' };
+    if (days >= 60) return { text: 'Легенда', emoji: '[CROWN]' };
+    if (days >= 30) return { text: 'Эпик', emoji: '[POINTS]' };
+    if (days >= 14) return { text: 'Мастер', emoji: '[TROPHY]' };
+    if (days >= 7) return { text: 'Активный', emoji: '[STAR]' };
+    return { text: 'Новичок', emoji: '[SPROUT]' };
   };
 
 

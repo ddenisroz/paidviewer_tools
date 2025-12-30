@@ -16,7 +16,7 @@ health_router = APIRouter(tags=["health"])
 @health_router.get("/health")
 async def health_check():
     """Базовая проверка здоровья"""
-    # ✅ Проверяем готовность движка
+    # [OK] Проверяем готовность движка
     try:
         tts_engine_loaded = tts_engine_manager.is_ready()
     except Exception as e:

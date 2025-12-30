@@ -1,24 +1,36 @@
 /**
  * Stream Queries - централизованные React Query queries для Stream
  */
-import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
-import { queryKeys } from '../queryKeys';
-import { streamService } from '../../services/api/services/streamService';
+import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
+
+import { streamService } from '../../services/api/services/streamService';
 import { logger } from '../../utils/prodLogger';
-import type { AxiosError } from 'axios';
+import { queryKeys } from '../queryKeys';
+import { unwrapResponse } from '../queryUtils';
+
+
 import type { ApiResponse } from '../../types';
+import type { AxiosError } from 'axios';
+
+// Stream info data type
+interface StreamInfoData {
+  title?: string;
+  game_id?: string;
+  category_id?: string;
+  [key: string]: unknown;
+}
 
 /**
  * Получить информацию о стриме Twitch
  */
-export const useTwitchStreamInfo = (options?: Omit<UseQueryOptions<any, AxiosError>, 'queryKey' | 'queryFn'> & { params?: Record<string, any> }) => {
-  return useQuery({
+export const useTwitchStreamInfo = (options?: Omit<UseQueryOptions<ApiResponse<StreamInfoData>, AxiosError>, 'queryKey' | 'queryFn'> & { params?: Record<string, unknown> }) => {
+  return useQuery<ApiResponse<StreamInfoData>, AxiosError>({
     queryKey: queryKeys.stream.twitchInfo(),
-    queryFn: () => streamService.getTwitchStreamInfo(options?.params || {}),
-    staleTime: 60 * 1000, // 1 минута
-    gcTime: 5 * 60 * 1000, // 5 минут
-    refetchInterval: 60 * 1000, // 1 минута
+    queryFn: () => unwrapResponse(streamService.getTwitchStreamInfo(options?.params || {})) as Promise<ApiResponse<StreamInfoData>>,
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchInterval: 60 * 1000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     retry: 1,
@@ -29,13 +41,13 @@ export const useTwitchStreamInfo = (options?: Omit<UseQueryOptions<any, AxiosErr
 /**
  * Получить информацию о стриме VK
  */
-export const useVkStreamInfo = (options?: Omit<UseQueryOptions<any, AxiosError>, 'queryKey' | 'queryFn'> & { params?: Record<string, any> }) => {
-  return useQuery({
+export const useVkStreamInfo = (options?: Omit<UseQueryOptions<ApiResponse<StreamInfoData>, AxiosError>, 'queryKey' | 'queryFn'> & { params?: Record<string, unknown> }) => {
+  return useQuery<ApiResponse<StreamInfoData>, AxiosError>({
     queryKey: queryKeys.stream.vkInfo(),
-    queryFn: () => streamService.getVkStreamInfo(options?.params || {}),
-    staleTime: 60 * 1000, // 1 минута
-    gcTime: 5 * 60 * 1000, // 5 минут
-    refetchInterval: 60 * 1000, // 1 минута
+    queryFn: () => unwrapResponse(streamService.getVkStreamInfo(options?.params || {})) as Promise<ApiResponse<StreamInfoData>>,
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchInterval: 60 * 1000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     retry: 1,
@@ -46,51 +58,37 @@ export const useVkStreamInfo = (options?: Omit<UseQueryOptions<any, AxiosError>,
 /**
  * Обновить название стрима Twitch
  */
-export const useUpdateTwitchStreamTitle = (options?: UseMutationOptions<any, AxiosError, string, unknown>) => {
+export const useUpdateTwitchStreamTitle = (options?: UseMutationOptions<ApiResponse<StreamInfoData>, AxiosError, string, { previousStreamInfo?: ApiResponse<StreamInfoData> }>) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (title: string) => streamService.updateTwitchStreamTitle(title),
+  return useMutation<ApiResponse<StreamInfoData>, AxiosError, string, { previousStreamInfo?: ApiResponse<StreamInfoData> }>({
+    mutationFn: (title: string) => unwrapResponse(streamService.updateTwitchStreamTitle(title)) as Promise<ApiResponse<StreamInfoData>>,
     onMutate: async (newTitle: string) => {
-      // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: queryKeys.stream.twitchInfo() });
+      const previousStreamInfo = queryClient.getQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.twitchInfo());
       
-      // Snapshot previous value
-      const previousStreamInfo = queryClient.getQueryData(queryKeys.stream.twitchInfo());
-      
-      // Optimistically update
-      queryClient.setQueryData(queryKeys.stream.twitchInfo(), (old: any) => {
-        if (!old) return old;
+      queryClient.setQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.twitchInfo(), (old) => {
+        if (!old?.data) return old;
         return {
           ...old,
-          data: {
-            ...old.data,
-            title: newTitle
-          }
+          data: { ...old.data, title: newTitle }
         };
       });
       
-      // Return context for rollback
       return { previousStreamInfo };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.stream.twitchInfo() });
-      if (!options?.onSuccess) {
-        toast.success('Название стрима обновлено');
-      }
+      toast.success('Название стрима обновлено');
     },
-    onError: (error: AxiosError, newTitle, context: { previousStreamInfo?: any } | undefined) => {
-      // Rollback on error
+    onError: (error, _newTitle, context) => {
       if (context?.previousStreamInfo) {
         queryClient.setQueryData(queryKeys.stream.twitchInfo(), context.previousStreamInfo);
       }
       logger.error('Error updating Twitch stream title:', error);
-      if (!options?.onError) {
-        toast.error('Ошибка обновления названия стрима');
-      }
+      toast.error('Ошибка обновления названия стрима');
     },
     onSettled: () => {
-      // Refetch to ensure consistency
       queryClient.invalidateQueries({ queryKey: queryKeys.stream.twitchInfo() });
     },
     ...options,
@@ -100,51 +98,37 @@ export const useUpdateTwitchStreamTitle = (options?: UseMutationOptions<any, Axi
 /**
  * Обновить категорию стрима Twitch
  */
-export const useUpdateTwitchStreamCategory = (options?: UseMutationOptions<any, AxiosError, string, unknown>) => {
+export const useUpdateTwitchStreamCategory = (options?: UseMutationOptions<ApiResponse<StreamInfoData>, AxiosError, string, { previousStreamInfo?: ApiResponse<StreamInfoData> }>) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (categoryId: string) => streamService.updateTwitchStreamCategory(categoryId),
+  return useMutation<ApiResponse<StreamInfoData>, AxiosError, string, { previousStreamInfo?: ApiResponse<StreamInfoData> }>({
+    mutationFn: (categoryId: string) => unwrapResponse(streamService.updateTwitchStreamCategory(categoryId)) as Promise<ApiResponse<StreamInfoData>>,
     onMutate: async (newCategoryId: string) => {
-      // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: queryKeys.stream.twitchInfo() });
+      const previousStreamInfo = queryClient.getQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.twitchInfo());
       
-      // Snapshot previous value
-      const previousStreamInfo = queryClient.getQueryData(queryKeys.stream.twitchInfo());
-      
-      // Optimistically update
-      queryClient.setQueryData(queryKeys.stream.twitchInfo(), (old: any) => {
-        if (!old) return old;
+      queryClient.setQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.twitchInfo(), (old) => {
+        if (!old?.data) return old;
         return {
           ...old,
-          data: {
-            ...old.data,
-            game_id: newCategoryId
-          }
+          data: { ...old.data, game_id: newCategoryId }
         };
       });
       
-      // Return context for rollback
       return { previousStreamInfo };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.stream.twitchInfo() });
-      if (!options?.onSuccess) {
-        toast.success('Категория стрима обновлена');
-      }
+      toast.success('Категория стрима обновлена');
     },
-    onError: (error: AxiosError, newCategoryId, context: { previousStreamInfo?: any } | undefined) => {
-      // Rollback on error
+    onError: (error, _newCategoryId, context) => {
       if (context?.previousStreamInfo) {
         queryClient.setQueryData(queryKeys.stream.twitchInfo(), context.previousStreamInfo);
       }
       logger.error('Error updating Twitch stream category:', error);
-      if (!options?.onError) {
-        toast.error('Ошибка обновления категории стрима');
-      }
+      toast.error('Ошибка обновления категории стрима');
     },
     onSettled: () => {
-      // Refetch to ensure consistency
       queryClient.invalidateQueries({ queryKey: queryKeys.stream.twitchInfo() });
     },
     ...options,
@@ -154,51 +138,37 @@ export const useUpdateTwitchStreamCategory = (options?: UseMutationOptions<any, 
 /**
  * Обновить название стрима VK
  */
-export const useUpdateVkStreamTitle = (options?: UseMutationOptions<any, AxiosError, string, unknown>) => {
+export const useUpdateVkStreamTitle = (options?: UseMutationOptions<ApiResponse<StreamInfoData>, AxiosError, string, { previousStreamInfo?: ApiResponse<StreamInfoData> }>) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (title: string) => streamService.updateVkStreamTitle(title),
+  return useMutation<ApiResponse<StreamInfoData>, AxiosError, string, { previousStreamInfo?: ApiResponse<StreamInfoData> }>({
+    mutationFn: (title: string) => unwrapResponse(streamService.updateVkStreamTitle(title)) as Promise<ApiResponse<StreamInfoData>>,
     onMutate: async (newTitle: string) => {
-      // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: queryKeys.stream.vkInfo() });
+      const previousStreamInfo = queryClient.getQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.vkInfo());
       
-      // Snapshot previous value
-      const previousStreamInfo = queryClient.getQueryData(queryKeys.stream.vkInfo());
-      
-      // Optimistically update
-      queryClient.setQueryData(queryKeys.stream.vkInfo(), (old: any) => {
-        if (!old) return old;
+      queryClient.setQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.vkInfo(), (old) => {
+        if (!old?.data) return old;
         return {
           ...old,
-          data: {
-            ...old.data,
-            title: newTitle
-          }
+          data: { ...old.data, title: newTitle }
         };
       });
       
-      // Return context for rollback
       return { previousStreamInfo };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.stream.vkInfo() });
-      if (!options?.onSuccess) {
-        toast.success('Название стрима обновлено');
-      }
+      toast.success('Название стрима обновлено');
     },
-    onError: (error: AxiosError, newTitle, context: { previousStreamInfo?: any } | undefined) => {
-      // Rollback on error
+    onError: (error, _newTitle, context) => {
       if (context?.previousStreamInfo) {
         queryClient.setQueryData(queryKeys.stream.vkInfo(), context.previousStreamInfo);
       }
       logger.error('Error updating VK stream title:', error);
-      if (!options?.onError) {
-        toast.error('Ошибка обновления названия стрима');
-      }
+      toast.error('Ошибка обновления названия стрима');
     },
     onSettled: () => {
-      // Refetch to ensure consistency
       queryClient.invalidateQueries({ queryKey: queryKeys.stream.vkInfo() });
     },
     ...options,
@@ -208,51 +178,37 @@ export const useUpdateVkStreamTitle = (options?: UseMutationOptions<any, AxiosEr
 /**
  * Обновить категорию стрима VK
  */
-export const useUpdateVkStreamCategory = (options?: UseMutationOptions<any, AxiosError, string, unknown>) => {
+export const useUpdateVkStreamCategory = (options?: UseMutationOptions<ApiResponse<StreamInfoData>, AxiosError, string, { previousStreamInfo?: ApiResponse<StreamInfoData> }>) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (categoryId: string) => streamService.updateVkStreamCategory(categoryId),
+  return useMutation<ApiResponse<StreamInfoData>, AxiosError, string, { previousStreamInfo?: ApiResponse<StreamInfoData> }>({
+    mutationFn: (categoryId: string) => unwrapResponse(streamService.updateVkStreamCategory(categoryId)) as Promise<ApiResponse<StreamInfoData>>,
     onMutate: async (newCategoryId: string) => {
-      // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: queryKeys.stream.vkInfo() });
+      const previousStreamInfo = queryClient.getQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.vkInfo());
       
-      // Snapshot previous value
-      const previousStreamInfo = queryClient.getQueryData(queryKeys.stream.vkInfo());
-      
-      // Optimistically update
-      queryClient.setQueryData(queryKeys.stream.vkInfo(), (old: any) => {
-        if (!old) return old;
+      queryClient.setQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.vkInfo(), (old) => {
+        if (!old?.data) return old;
         return {
           ...old,
-          data: {
-            ...old.data,
-            category_id: newCategoryId
-          }
+          data: { ...old.data, category_id: newCategoryId }
         };
       });
       
-      // Return context for rollback
       return { previousStreamInfo };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.stream.vkInfo() });
-      if (!options?.onSuccess) {
-        toast.success('Категория стрима обновлена');
-      }
+      toast.success('Категория стрима обновлена');
     },
-    onError: (error: AxiosError, newCategoryId, context: { previousStreamInfo?: any } | undefined) => {
-      // Rollback on error
+    onError: (error, _newCategoryId, context) => {
       if (context?.previousStreamInfo) {
         queryClient.setQueryData(queryKeys.stream.vkInfo(), context.previousStreamInfo);
       }
       logger.error('Error updating VK stream category:', error);
-      if (!options?.onError) {
-        toast.error('Ошибка обновления категории стрима');
-      }
+      toast.error('Ошибка обновления категории стрима');
     },
     onSettled: () => {
-      // Refetch to ensure consistency
       queryClient.invalidateQueries({ queryKey: queryKeys.stream.vkInfo() });
     },
     ...options,
@@ -262,13 +218,13 @@ export const useUpdateVkStreamCategory = (options?: UseMutationOptions<any, Axio
 /**
  * Получить категории Twitch
  */
-export const useTwitchCategories = (search: string = '', options?: Omit<UseQueryOptions<any, AxiosError>, 'queryKey' | 'queryFn'>) => {
-  return useQuery({
+export const useTwitchCategories = (search: string = '', options?: Omit<UseQueryOptions<ApiResponse, AxiosError>, 'queryKey' | 'queryFn'>) => {
+  return useQuery<ApiResponse, AxiosError>({
     queryKey: queryKeys.stream.twitchCategories(search),
-    queryFn: () => streamService.getTwitchCategories(search),
-    enabled: !!search, // Загружаем только при наличии поискового запроса
-    staleTime: 5 * 60 * 1000, // 5 минут - категории редко меняются
-    gcTime: 30 * 60 * 1000, // 30 минут
+    queryFn: () => unwrapResponse(streamService.getTwitchCategories(search)),
+    enabled: !!search,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     ...options,
   });
 };
@@ -276,13 +232,13 @@ export const useTwitchCategories = (search: string = '', options?: Omit<UseQuery
 /**
  * Получить категории VK
  */
-export const useVkCategories = (search: string = '', options?: Omit<UseQueryOptions<any, AxiosError>, 'queryKey' | 'queryFn'>) => {
-  return useQuery({
+export const useVkCategories = (search: string = '', options?: Omit<UseQueryOptions<ApiResponse, AxiosError>, 'queryKey' | 'queryFn'>) => {
+  return useQuery<ApiResponse, AxiosError>({
     queryKey: queryKeys.stream.vkCategories(search),
-    queryFn: () => streamService.getVkCategories(search),
-    enabled: !!search, // Загружаем только при наличии поискового запроса
-    staleTime: 5 * 60 * 1000, // 5 минут - категории редко меняются
-    gcTime: 30 * 60 * 1000, // 30 минут
+    queryFn: () => unwrapResponse(streamService.getVkCategories(search)),
+    enabled: !!search,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     ...options,
   });
 };
@@ -290,13 +246,13 @@ export const useVkCategories = (search: string = '', options?: Omit<UseQueryOpti
 /**
  * Получить историю стримов
  */
-export const useStreamHistory = (options?: Omit<UseQueryOptions<any, AxiosError>, 'queryKey' | 'queryFn'>) => {
-  return useQuery({
+export const useStreamHistory = (options?: Omit<UseQueryOptions<ApiResponse, AxiosError>, 'queryKey' | 'queryFn'>) => {
+  return useQuery<ApiResponse, AxiosError>({
     queryKey: queryKeys.stream.history(),
-    queryFn: () => streamService.getStreamHistory(),
-    staleTime: 30 * 1000, // 30 секунд
-    gcTime: 5 * 60 * 1000, // 5 минут
-    refetchInterval: 30 * 1000, // 30 секунд
+    queryFn: () => unwrapResponse(streamService.getStreamHistory()),
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchInterval: 30 * 1000,
     ...options,
   });
 };
@@ -304,60 +260,56 @@ export const useStreamHistory = (options?: Omit<UseQueryOptions<any, AxiosError>
 /**
  * Обновить данные стрима (название и категория)
  */
-export const useUpdateStream = (options?: UseMutationOptions<any, AxiosError, Record<string, any>, unknown>) => {
+export const useUpdateStream = (options?: UseMutationOptions<ApiResponse<StreamInfoData>, AxiosError, Record<string, unknown>, { previousTwitchInfo?: ApiResponse<StreamInfoData>; previousVkInfo?: ApiResponse<StreamInfoData> }>) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (payload: Record<string, any>) => streamService.updateStream(payload),
-    onMutate: async (newData: Record<string, any>) => {
-      // Cancel outgoing refetches
+  return useMutation<ApiResponse<StreamInfoData>, AxiosError, Record<string, unknown>, { previousTwitchInfo?: ApiResponse<StreamInfoData>; previousVkInfo?: ApiResponse<StreamInfoData> }>({
+    mutationFn: (payload: Record<string, unknown>) => unwrapResponse(streamService.updateStream(payload)) as Promise<ApiResponse<StreamInfoData>>,
+    onMutate: async (newData: Record<string, unknown>) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.stream.all });
       
-      // Snapshot previous values
-      const previousTwitchInfo = queryClient.getQueryData(queryKeys.stream.twitchInfo());
-      const previousVkInfo = queryClient.getQueryData(queryKeys.stream.vkInfo());
+      const previousTwitchInfo = queryClient.getQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.twitchInfo());
+      const previousVkInfo = queryClient.getQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.vkInfo());
       
-      // Optimistically update based on platform
       if (newData.platform === 'twitch' || newData.platform === 'both') {
-        queryClient.setQueryData(queryKeys.stream.twitchInfo(), (old: any) => {
-          if (!old) return old;
+        queryClient.setQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.twitchInfo(), (old) => {
+          if (!old?.data) return old;
+          const updates: Partial<StreamInfoData> = {};
+          if (newData.title) updates.title = newData.title as string;
+          if (newData.game_id) updates.game_id = newData.game_id as string;
           return {
             ...old,
             data: {
               ...old.data,
-              ...(newData.title && { title: newData.title }),
-              ...(newData.game_id && { game_id: newData.game_id })
+              ...updates
             }
           };
         });
       }
       
       if (newData.platform === 'vk' || newData.platform === 'both') {
-        queryClient.setQueryData(queryKeys.stream.vkInfo(), (old: any) => {
-          if (!old) return old;
+        queryClient.setQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.vkInfo(), (old) => {
+          if (!old?.data) return old;
+          const updates: Partial<StreamInfoData> = {};
+          if (newData.title) updates.title = newData.title as string;
+          if (newData.category_id) updates.category_id = newData.category_id as string;
           return {
             ...old,
             data: {
               ...old.data,
-              ...(newData.title && { title: newData.title }),
-              ...(newData.category_id && { category_id: newData.category_id })
+              ...updates
             }
           };
         });
       }
       
-      // Return context for rollback
       return { previousTwitchInfo, previousVkInfo };
     },
     onSuccess: () => {
-      // Инвалидируем все stream queries
       queryClient.invalidateQueries({ queryKey: queryKeys.stream.all });
-      if (!options?.onSuccess) {
-        toast.success('Изменения сохранены');
-      }
+      toast.success('Изменения сохранены');
     },
-    onError: (error: AxiosError, newData, context: { previousTwitchInfo?: any; previousVkInfo?: any } | undefined) => {
-      // Rollback on error
+    onError: (error, _newData, context) => {
       if (context?.previousTwitchInfo) {
         queryClient.setQueryData(queryKeys.stream.twitchInfo(), context.previousTwitchInfo);
       }
@@ -365,16 +317,13 @@ export const useUpdateStream = (options?: UseMutationOptions<any, AxiosError, Re
         queryClient.setQueryData(queryKeys.stream.vkInfo(), context.previousVkInfo);
       }
       logger.error('Error updating stream:', error);
-      if (!options?.onError) {
-        const errorMessage = (error.response?.data as any)?.detail || (error.response?.data as any)?.message || 'Не удалось сохранить изменения';
-        toast.error(errorMessage);
-      }
+      const errorData = error.response?.data as Record<string, unknown> | undefined;
+      const errorMessage = (errorData?.detail || errorData?.message || 'Не удалось сохранить изменения') as string;
+      toast.error(errorMessage);
     },
     onSettled: () => {
-      // Refetch to ensure consistency
       queryClient.invalidateQueries({ queryKey: queryKeys.stream.all });
     },
     ...options,
   });
 };
-

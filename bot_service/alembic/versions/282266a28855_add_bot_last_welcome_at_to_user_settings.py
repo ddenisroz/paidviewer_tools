@@ -20,7 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Добавляем поле bot_last_welcome_at в таблицу user_settings
-    op.add_column('user_settings', 
+    op.add_column('user_settings',
         sa.Column('bot_last_welcome_at', sa.DateTime(), nullable=True)
     )
 

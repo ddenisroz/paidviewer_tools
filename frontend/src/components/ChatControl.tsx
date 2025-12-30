@@ -1,9 +1,11 @@
 import React from 'react';
+
+import { Pause, Play, Wifi, WifiOff } from 'lucide-react';
+
+import { useChat } from '../context/ChatContext';
+
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
-import { Play, Pause, Square, Wifi, WifiOff } from 'lucide-react';
-import { useChat } from '../context/ChatContext';
-import { useAuth } from '../context/AuthContext';
 
 const ChatControl: React.FC = () => {
     const { 
@@ -11,12 +13,11 @@ const ChatControl: React.FC = () => {
         connectBotToChannels: connectChat,
         disconnectBotFromChannels: disconnectChat
     } = useChat();
-    const { isAuthenticated } = useAuth();
     
     // Pause/resume functionality not implemented in current context
     const isChatPaused = false;
-    const pauseChat = () => console.log('Pause not implemented');
-    const resumeChat = () => console.log('Resume not implemented');
+    const pauseChat = () => { /* Pause not implemented */ };
+    const resumeChat = () => { /* Resume not implemented */ };
 
     // Убираем требование авторизации для чата
     // if (!isAuthenticated) {

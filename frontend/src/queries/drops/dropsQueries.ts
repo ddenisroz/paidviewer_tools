@@ -1,13 +1,17 @@
 /**
  * Drops Queries - централизованные React Query queries для Drops
  */
-import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
-import { queryKeys } from '../queryKeys';
-import { dropsService } from '../../services/api/services/dropsService';
+import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
+
+import { dropsService } from '../../services/api/services/dropsService';
 import { logger } from '../../utils/prodLogger';
+import { queryKeys } from '../queryKeys';
+import { unwrapResponse } from '../queryUtils';
+
+
+import type { ApiResponse, DropsConfig, DropsHistory, DropsReward } from '../../types';
 import type { AxiosError } from 'axios';
-import type { ApiResponse, DropsConfig, DropsReward, DropsHistory } from '../../types';
 
 /**
  * Получить конфигурацию Drops
@@ -17,9 +21,8 @@ export const useDropsConfig = (channelName: string | null | undefined, options?:
     queryKey: queryKeys.drops.config(channelName),
     queryFn: async () => {
       if (!channelName) return null;
-      const response = await dropsService.getConfig(channelName);
-      // Возвращаем данные в формате, который ожидают компоненты
-      return ((response.data as any)?.success ? (response.data as any)?.data : null) as DropsConfig | null;
+      const response = await unwrapResponse(dropsService.getConfig(channelName));
+      return (response?.success ? response?.data : null) as DropsConfig | null;
     },
     enabled: !!channelName,
     staleTime: 30 * 1000, // 30 секунд
@@ -31,20 +34,15 @@ export const useDropsConfig = (channelName: string | null | undefined, options?:
 /**
  * Обновить конфигурацию Drops
  */
-export const useUpdateDropsConfig = (channelName: string, options?: UseMutationOptions<any, AxiosError, Partial<DropsConfig>, { previousConfig?: DropsConfig }>) => {
+export const useUpdateDropsConfig = (channelName: string, options?: UseMutationOptions<ApiResponse, AxiosError, Partial<DropsConfig>, { previousConfig?: DropsConfig }>) => {
   const queryClient = useQueryClient();
-  
 
   return useMutation({
-    mutationFn: (config: Partial<DropsConfig>) => dropsService.updateConfig(channelName, config),
+    mutationFn: (config: Partial<DropsConfig>) => unwrapResponse(dropsService.updateConfig(channelName, config)),
     onMutate: async (config: Partial<DropsConfig>) => {
-      // Отменяем исходящие запросы
       await queryClient.cancelQueries({ queryKey: queryKeys.drops.config(channelName) });
-      
-      // Сохраняем предыдущее значение
       const previousConfig = queryClient.getQueryData<DropsConfig>(queryKeys.drops.config(channelName));
       
-      // Оптимистичное обновление
       queryClient.setQueryData(queryKeys.drops.config(channelName), (old: DropsConfig | undefined) => ({
         ...old,
         ...config,
@@ -53,26 +51,18 @@ export const useUpdateDropsConfig = (channelName: string, options?: UseMutationO
       return { previousConfig };
     },
     onError: (err: AxiosError, config: Partial<DropsConfig>, context: { previousConfig?: DropsConfig } | undefined) => {
-      // Откатываем при ошибке
       if (context?.previousConfig) {
         queryClient.setQueryData(queryKeys.drops.config(channelName), context.previousConfig);
       }
-      // Вызываем onError из options если он есть
-      if (options?.onError) {
-        (options.onError as any)(err, config, context);
-      } else {
-        toast.error('Ошибка сохранения настроек Drops');
-        logger.error('Error updating drops config:', err);
-      }
+      toast.error('Ошибка сохранения настроек Drops');
+      logger.error('Error updating drops config:', err);
     },
-    onSuccess: (response, config: Partial<DropsConfig>, context) => {
-      // Обновляем кэш данными с сервера
-      if ((response.data as any)?.success && (response.data as any)?.data) {
-        queryClient.setQueryData(queryKeys.drops.config(channelName), (response.data as any).data);
+    onSuccess: (_response, config: Partial<DropsConfig>, _context) => {
+      if (_response?.success && _response?.data) {
+        queryClient.setQueryData(queryKeys.drops.config(channelName), _response.data);
       }
       
-      // ✅ СИНХРОНИЗАЦИЯ: Отправляем события для синхронизации с другими компонентами
-      // Добавляем source для предотвращения циклических обновлений
+      // [OK] СИНХРОНИЗАЦИЯ: Отправляем события для синхронизации с другими компонентами
       if (config.donation_enabled !== undefined) {
         window.dispatchEvent(new CustomEvent('drops-config-changed', {
           detail: { 
@@ -102,15 +92,8 @@ export const useUpdateDropsConfig = (channelName: string, options?: UseMutationO
           }
         }));
       }
-      
-      // Вызываем onSuccess из options если он есть
-      if (options?.onSuccess) {
-        (options.onSuccess as any)(response, config, context);
-      }
     },
-    // ✅ УБРАНО: onSettled с invalidateQueries - не нужен, так как данные уже обновлены в onSuccess
-    // Это предотвращает race condition и некорректное отображение статуса
-    ...(options || {}),
+    ...options,
   });
 };
 
@@ -121,9 +104,8 @@ export const useDropsQualities = (options?: Omit<UseQueryOptions<string[], Axios
   return useQuery<string[], AxiosError>({
     queryKey: queryKeys.drops.qualities(),
     queryFn: async () => {
-      const response = await dropsService.getQualities();
-      // Возвращаем данные в формате, который ожидают компоненты
-      return ((response.data as any)?.success ? (response.data as any)?.data : []) as string[];
+      const response = await unwrapResponse(dropsService.getQualities());
+      return (response?.success ? response?.data : []) as string[];
     },
     staleTime: 10 * 60 * 1000, // 10 минут - качества редко меняются
     gcTime: 30 * 60 * 1000, // 30 минут
@@ -139,10 +121,9 @@ export const useDropsRewards = (channelName: string | null | undefined, options?
     queryKey: queryKeys.drops.rewards(channelName),
     queryFn: async () => {
       if (!channelName) return [];
-      const response = await dropsService.getRewards(channelName);
-      // Возвращаем данные в формате, который ожидают компоненты
-      if (!(response.data as any)?.success) return [];
-      return ((response.data as any)?.data || []) as DropsReward[];
+      const response = await unwrapResponse(dropsService.getRewards(channelName));
+      if (!response?.success) return [];
+      return (response?.data || []) as DropsReward[];
     },
     enabled: !!channelName,
     staleTime: 30 * 1000, // 30 секунд
@@ -154,21 +135,15 @@ export const useDropsRewards = (channelName: string | null | undefined, options?
 /**
  * Создать награду Drops
  */
-export const useCreateDropsReward = (channelName: string, options?: UseMutationOptions<any, AxiosError, Partial<DropsReward>, unknown>) => {
+export const useCreateDropsReward = (channelName: string, options?: UseMutationOptions<ApiResponse, AxiosError, Partial<DropsReward>, { previousRewards?: DropsReward[] }>) => {
   const queryClient = useQueryClient();
-  
 
   return useMutation({
-    mutationFn: (reward: Partial<DropsReward>) => dropsService.createReward(channelName, reward),
+    mutationFn: (reward: Partial<DropsReward>) => unwrapResponse(dropsService.createReward(channelName, reward)),
     onMutate: async (reward: Partial<DropsReward>) => {
-      // Вызываем onMutate из options если есть
-      const customContext = options?.onMutate ? await (options.onMutate as any)(reward) : undefined;
-      
-      // Оптимистичное обновление
       await queryClient.cancelQueries({ queryKey: queryKeys.drops.rewards(channelName) });
       const previousRewards = queryClient.getQueryData<DropsReward[]>(queryKeys.drops.rewards(channelName));
       
-      // Добавляем временную награду в список
       const tempReward: DropsReward = {
         id: `temp-${Date.now()}`,
         name: reward.name || '',
@@ -181,49 +156,32 @@ export const useCreateDropsReward = (channelName: string, options?: UseMutationO
         return [...old, tempReward];
       });
       
-      return { previousRewards, ...(customContext || {}) };
+      return { previousRewards };
     },
-    onError: (err: AxiosError, reward: Partial<DropsReward>, context: { previousRewards?: DropsReward[] } | undefined) => {
-      // Откатываем при ошибке
+    onError: (err: AxiosError, _reward: Partial<DropsReward>, context: { previousRewards?: DropsReward[] } | undefined) => {
       if (context?.previousRewards) {
         queryClient.setQueryData(queryKeys.drops.rewards(channelName), context.previousRewards);
       }
-      // Вызываем onError из options если он есть
-      if (options?.onError) {
-        (options.onError as any)(err, reward, context);
-      } else {
-        logger.error('Error creating reward:', err);
-        toast.error('Ошибка создания награды');
-      }
+      logger.error('Error creating reward:', err);
+      toast.error('Ошибка создания награды');
     },
-    onSuccess: (response, reward: Partial<DropsReward>, context) => {
-      // Инвалидируем для получения актуальных данных с сервера
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.drops.rewards(channelName) });
-      // Вызываем onSuccess из options если он есть
-      if (options?.onSuccess) {
-        (options.onSuccess as any)(response, reward, context);
-      } else {
-        toast.success('Награда создана');
-      }
+      toast.success('Награда создана');
     },
-    ...(options || {}),
+    ...options,
   });
 };
 
 /**
  * Обновить награду Drops
  */
-export const useUpdateDropsReward = (channelName: string, options?: UseMutationOptions<any, AxiosError, { rewardId: number; reward: Partial<DropsReward> }, unknown>) => {
+export const useUpdateDropsReward = (channelName: string, options?: UseMutationOptions<ApiResponse, AxiosError, { rewardId: number; reward: Partial<DropsReward> }, { previousRewards?: DropsReward[] }>) => {
   const queryClient = useQueryClient();
-  
 
   return useMutation({
-    mutationFn: ({ rewardId, reward }: { rewardId: number; reward: Partial<DropsReward> }) => dropsService.updateReward(channelName, rewardId, reward),
+    mutationFn: ({ rewardId, reward }: { rewardId: number; reward: Partial<DropsReward> }) => unwrapResponse(dropsService.updateReward(channelName, rewardId, reward)),
     onMutate: async (variables) => {
-      // Вызываем onMutate из options если есть
-      const customContext = options?.onMutate ? await (options.onMutate as any)(variables) : undefined;
-      
-      // Оптимистичное обновление
       const { rewardId, reward } = variables;
       await queryClient.cancelQueries({ queryKey: queryKeys.drops.rewards(channelName) });
       const previousRewards = queryClient.getQueryData<DropsReward[]>(queryKeys.drops.rewards(channelName));
@@ -233,49 +191,32 @@ export const useUpdateDropsReward = (channelName: string, options?: UseMutationO
         return old.map(r => r.id === rewardId ? { ...r, ...reward } : r) as DropsReward[];
       });
       
-      return { previousRewards, ...(customContext || {}) };
+      return { previousRewards };
     },
-    onError: (err: AxiosError, variables: { rewardId: number; reward: Partial<DropsReward> }, context: { previousRewards?: DropsReward[] } | undefined) => {
-      // Откатываем при ошибке
+    onError: (err: AxiosError, _variables: { rewardId: number; reward: Partial<DropsReward> }, context: { previousRewards?: DropsReward[] } | undefined) => {
       if (context?.previousRewards) {
         queryClient.setQueryData(queryKeys.drops.rewards(channelName), context.previousRewards);
       }
-      // Вызываем onError из options если он есть
-      if (options?.onError) {
-        (options.onError as any)(err, variables, context);
-      } else {
-        logger.error('Error updating reward:', err);
-        toast.error('Ошибка обновления награды');
-      }
+      logger.error('Error updating reward:', err);
+      toast.error('Ошибка обновления награды');
     },
-    onSuccess: (response, variables: { rewardId: number; reward: Partial<DropsReward> }, context) => {
-      // Инвалидируем для получения актуальных данных с сервера
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.drops.rewards(channelName) });
-      // Вызываем onSuccess из options если он есть
-      if (options?.onSuccess) {
-        (options.onSuccess as any)(response, variables, context);
-      } else {
-        toast.success('Награда обновлена');
-      }
+      toast.success('Награда обновлена');
     },
-    ...(options || {}),
+    ...options,
   });
 };
 
 /**
  * Удалить награду Drops
  */
-export const useDeleteDropsReward = (channelName: string, options?: UseMutationOptions<any, AxiosError, number, unknown>) => {
+export const useDeleteDropsReward = (channelName: string, options?: UseMutationOptions<ApiResponse, AxiosError, number, { previousRewards?: DropsReward[] }>) => {
   const queryClient = useQueryClient();
-  
 
   return useMutation({
-    mutationFn: (rewardId: number) => dropsService.deleteReward(channelName, rewardId),
+    mutationFn: (rewardId: number) => unwrapResponse(dropsService.deleteReward(channelName, rewardId)),
     onMutate: async (rewardId: number) => {
-      // Вызываем onMutate из options если есть
-      const customContext = options?.onMutate ? await (options.onMutate as any)(rewardId) : undefined;
-      
-      // Оптимистичное обновление
       await queryClient.cancelQueries({ queryKey: queryKeys.drops.rewards(channelName) });
       const previousRewards = queryClient.getQueryData<DropsReward[]>(queryKeys.drops.rewards(channelName));
       
@@ -284,49 +225,32 @@ export const useDeleteDropsReward = (channelName: string, options?: UseMutationO
         return old.filter(r => r.id !== rewardId);
       });
       
-      return { previousRewards, ...(customContext || {}) };
+      return { previousRewards };
     },
-    onError: (err: AxiosError, rewardId: number, context: { previousRewards?: DropsReward[] } | undefined) => {
-      // Откатываем при ошибке
+    onError: (err: AxiosError, _rewardId: number, context: { previousRewards?: DropsReward[] } | undefined) => {
       if (context?.previousRewards) {
         queryClient.setQueryData(queryKeys.drops.rewards(channelName), context.previousRewards);
       }
-      // Вызываем onError из options если он есть
-      if (options?.onError) {
-        (options.onError as any)(err, rewardId, context);
-      } else {
-        logger.error('Error deleting reward:', err);
-        toast.error('Ошибка удаления награды');
-      }
+      logger.error('Error deleting reward:', err);
+      toast.error('Ошибка удаления награды');
     },
-    onSuccess: (response, rewardId: number, context) => {
-      // Инвалидируем для синхронизации
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.drops.rewards(channelName) });
-      // Вызываем onSuccess из options если он есть
-      if (options?.onSuccess) {
-        (options.onSuccess as any)(response, rewardId, context);
-      } else {
-        toast.success('Награда удалена');
-      }
+      toast.success('Награда удалена');
     },
-    ...(options || {}),
+    ...options,
   });
 };
 
 /**
  * Переключить активность награды Drops
  */
-export const useToggleDropsReward = (channelName: string, options?: UseMutationOptions<any, AxiosError, { rewardId: number; isActive: boolean }, unknown>) => {
+export const useToggleDropsReward = (channelName: string, options?: UseMutationOptions<ApiResponse, AxiosError, { rewardId: number; isActive: boolean }, { previousRewards?: DropsReward[] }>) => {
   const queryClient = useQueryClient();
-  
 
   return useMutation({
-    mutationFn: ({ rewardId, isActive }: { rewardId: number; isActive: boolean }) => dropsService.toggleReward(channelName, rewardId, isActive),
+    mutationFn: ({ rewardId, isActive }: { rewardId: number; isActive: boolean }) => unwrapResponse(dropsService.toggleReward(channelName, rewardId, isActive)),
     onMutate: async (variables) => {
-      // Вызываем onMutate из options если есть
-      const customContext = options?.onMutate ? await (options.onMutate as any)(variables) : undefined;
-      
-      // Оптимистичное обновление
       const { rewardId, isActive } = variables;
       await queryClient.cancelQueries({ queryKey: queryKeys.drops.rewards(channelName) });
       const previousRewards = queryClient.getQueryData<DropsReward[]>(queryKeys.drops.rewards(channelName));
@@ -338,47 +262,35 @@ export const useToggleDropsReward = (channelName: string, options?: UseMutationO
         ) as DropsReward[];
       });
       
-      return { previousRewards, ...(customContext || {}) };
+      return { previousRewards };
     },
-    onError: (err: AxiosError, variables: { rewardId: number; isActive: boolean }, context: { previousRewards?: DropsReward[] } | undefined) => {
-      // Откатываем при ошибке
+    onError: (err: AxiosError, _variables: { rewardId: number; isActive: boolean }, context: { previousRewards?: DropsReward[] } | undefined) => {
       if (context?.previousRewards) {
         queryClient.setQueryData(queryKeys.drops.rewards(channelName), context.previousRewards);
       }
-      // Вызываем onError из options если он есть
-      if (options?.onError) {
-        (options.onError as any)(err, variables, context);
-      } else {
-        toast.error('Ошибка переключения награды');
-        logger.error('Error toggling reward:', err);
-      }
+      toast.error('Ошибка переключения награды');
+      logger.error('Error toggling reward:', err);
     },
-    onSuccess: (response, variables: { rewardId: number; isActive: boolean }, context) => {
-      // Инвалидируем для синхронизации
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.drops.rewards(channelName) });
-      // Вызываем onSuccess из options если он есть
-      if (options?.onSuccess) {
-        (options.onSuccess as any)(response, variables, context);
-      } else {
-        toast.success((response.data as any)?.message || 'Статус награды изменен');
-      }
+      toast.success(response?.message || 'Статус награды изменен');
     },
-    ...(options || {}),
+    ...options,
   });
 };
 
 /**
  * Получить историю Drops
  */
-export const useDropsHistory = (channelName: string | null | undefined, params: Record<string, any> = {}, options?: Omit<UseQueryOptions<{ data: DropsHistory[]; hasMore: boolean }, AxiosError>, 'queryKey' | 'queryFn'>) => {
+export const useDropsHistory = (channelName: string | null | undefined, params: Record<string, unknown> = {}, options?: Omit<UseQueryOptions<{ data: DropsHistory[]; hasMore: boolean }, AxiosError>, 'queryKey' | 'queryFn'>) => {
   return useQuery<{ data: DropsHistory[]; hasMore: boolean }, AxiosError>({
     queryKey: [...queryKeys.drops.history(channelName), params],
     queryFn: async () => {
       if (!channelName) return { data: [], hasMore: false };
-      const response = await dropsService.getHistory(channelName, params);
+      const response = await unwrapResponse(dropsService.getHistory(channelName, params));
       return {
-        data: ((response.data as any)?.success ? (response.data as any)?.data : []) as DropsHistory[],
-        hasMore: ((response.data as any)?.data || []).length === (params.limit || 50),
+        data: (response?.success ? response?.data : []) as DropsHistory[],
+        hasMore: ((response?.data as DropsHistory[]) || []).length === (params.limit || 50),
       };
     },
     enabled: !!channelName,
@@ -391,27 +303,19 @@ export const useDropsHistory = (channelName: string | null | undefined, params: 
 /**
  * Сгенерировать или получить URL виджета для OBS
  */
-export const useGenerateDropsWidgetUrl = (options?: UseMutationOptions<any, AxiosError, boolean, unknown>) => {
-  
-  
+export const useGenerateDropsWidgetUrl = (options?: UseMutationOptions<ApiResponse, AxiosError, boolean, unknown>) => {
   return useMutation({
-    mutationFn: (regenerate: boolean = false) => dropsService.generateWidgetUrl(regenerate),
-    onSuccess: (response, regenerate: boolean, context) => {
-      if (options?.onSuccess) {
-        (options.onSuccess as any)(response, regenerate, context);
-      } else if (regenerate) {
+    mutationFn: (regenerate: boolean = false) => unwrapResponse(dropsService.generateWidgetUrl(regenerate)),
+    onSuccess: (_response, _regenerate: boolean, _context) => {
+      if (_regenerate) {
         toast.success('Токен виджета перегенерирован');
       }
     },
-    onError: (error: AxiosError, regenerate: boolean, context) => {
+    onError: (error: AxiosError, _regenerate: boolean, _context) => {
       logger.error('Error generating widget URL:', error);
-      if (options?.onError) {
-        (options.onError as any)(error, regenerate, context);
-      } else {
-        toast.error('Ошибка генерации URL виджета');
-      }
+      toast.error('Ошибка генерации URL виджета');
     },
-    ...(options || {}),
+    ...options,
   });
 };
 

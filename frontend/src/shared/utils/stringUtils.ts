@@ -1,7 +1,7 @@
 export const truncateString = (str: string, maxLength: number = 50): string => {
   if (!str || typeof str !== 'string') return '';
   if (str.length <= maxLength) return str;
-  return str.substring(0, maxLength) + '...';
+  return `${str.substring(0, maxLength)  }...`;
 };
 
 export const capitalize = (str: string): string => {

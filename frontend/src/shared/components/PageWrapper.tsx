@@ -13,7 +13,7 @@ interface PageWrapperProps {
  * Обеспечивает единообразное позиционирование заголовков и контента
  */
 export const PageWrapper: React.FC<PageWrapperProps> = ({ 
-    title, 
+    title: _title, 
     description, 
     actions, 
     children, 

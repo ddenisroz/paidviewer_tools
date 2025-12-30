@@ -1,15 +1,17 @@
 import { Outlet } from 'react-router-dom';
-import Sidebar from './layout/Sidebar';
-import Header from './layout/Header';
+
+import { DataProvider } from '../context/DataContext';
+import { DonationAlertsProvider } from '../context/DonationAlertsContext';
+import { PlayerProvider, usePlayer } from '../context/PlayerContext';
+import { TtsProvider } from '../context/TtsContext';
+import { composeProviders } from '../shared/utils/composeProviders';
+
 import CookieConsent from './CookieConsent';
 import GlobalPlayer from './GlobalPlayer';
 import GlobalTtsPlayer from './GlobalTtsPlayer';
-import { composeProviders } from '../shared/utils/composeProviders';
-import { TtsProvider } from '../context/TtsContext';
-import { DataProvider } from '../context/DataContext';
-import { PlayerProvider, usePlayer } from '../context/PlayerContext';
-import { DonationAlertsProvider } from '../context/DonationAlertsContext';
-// 📦 Layout-specific провайдеры
+import Header from './layout/Header';
+import Sidebar from './layout/Sidebar';
+// [PACKAGE] Layout-specific провайдеры
 // Эти контексты нужны только внутри dashboard layout
 // AudioPriorityProvider и TtsPlayerProvider теперь в main.tsx (нужны для ChatProvider)
 const LayoutProviders = composeProviders(

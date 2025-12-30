@@ -1,17 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+﻿import React, { useEffect, useState } from 'react';
+
+import { Edit, Gift, Plus, Trash2, Trophy } from 'lucide-react';
+
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { PageLoader } from '@/components/ui/loader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Gift, Plus, Edit, Trash2, Trophy } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from '@/utils/toastManager';
+
 import { lootboxService } from '../../../services/api/services/lootboxService';
 import { logger } from '../../../utils/prodLogger';
-import { toast } from 'sonner';
 
 interface Lootbox {
     id: number;
@@ -132,7 +136,7 @@ const LootboxManagement: React.FC = () => {
 
     const handleCreateLootbox = async (): Promise<void> => {
         try {
-            await lootboxService.createLootbox(lootboxForm);
+            await lootboxService.createLootbox(lootboxForm as unknown as Record<string, unknown>);
             toast.success('Лутбокс создан!');
             setIsDialogOpen(false);
             setLootboxForm({ name: '', description: '', type: 'free', price: 0 });
@@ -145,7 +149,7 @@ const LootboxManagement: React.FC = () => {
 
     const handleCreateReward = async (): Promise<void> => {
         try {
-            await lootboxService.createReward(rewardForm);
+            await lootboxService.createReward(rewardForm as unknown as Record<string, unknown>);
             toast.success('Награда создана!');
             setIsDialogOpen(false);
             setRewardForm({ 
@@ -165,7 +169,7 @@ const LootboxManagement: React.FC = () => {
 
     const handleCreateAchievement = async (): Promise<void> => {
         try {
-            await lootboxService.createAchievement(achievementForm);
+            await lootboxService.createAchievement(achievementForm as unknown as Record<string, unknown>);
             toast.success('Достижение создано!');
             setIsDialogOpen(false);
             setAchievementForm({ 
@@ -421,11 +425,7 @@ const LootboxManagement: React.FC = () => {
     };
 
     if (isLoading) {
-        return (
-            <div className="flex items-center justify-center p-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
-        );
+        return <PageLoader message="Загрузка лутбоксов..." />;
     }
 
     return (

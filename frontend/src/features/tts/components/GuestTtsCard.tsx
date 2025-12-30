@@ -1,16 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+﻿import React, { useEffect, useRef, useState } from 'react';
+
+import { AlertCircle, Check, Loader, Mic, X } from 'lucide-react';
+
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Mic, Check, X, AlertCircle, Loader } from 'lucide-react';
-import { toast } from 'sonner';
-import { adminService } from '../services/api/services/adminService';
-import { ttsService } from '../services/api/services/ttsService';
-import { chatService } from '../services/api/services/chatService';
-import { logger } from '../utils/prodLogger';
+import { adminService, chatService, ttsService } from '@/services/api/services';
+import { logger } from '@/utils/prodLogger';
+import { toast } from '@/utils/toastManager';
 
 interface Voice {
     name: string;
@@ -74,8 +74,9 @@ const GuestTtsCard: React.FC = () => {
             const response = await adminService.getWhitelist();
             const data = response.data.data || response.data;
             if (response.data.success) {
+                const whitelistData = data as { whitelist_users?: string[] };
                 setAllowedChannels({
-                    twitch: data.whitelist_users || [],
+                    twitch: whitelistData.whitelist_users || [],
                     vk: []
                 });
             }
@@ -95,7 +96,7 @@ const GuestTtsCard: React.FC = () => {
             // Используем универсальный endpoint с channel_name
             const response = await ttsService.getStatus(channel);
             const data = response.data.data || response.data;
-            const enabled = (data as any).enabled || false;
+            const enabled = (data as TtsStatus)?.enabled || false;
             setTtsStatus({ enabled, ready: true, loaded: true });
             setTtsEnabled(enabled);
         } catch (error) {
@@ -143,14 +144,14 @@ const GuestTtsCard: React.FC = () => {
     const checkVerificationStatus = async () => {
         try {
             const response = await chatService.getGuestStatus(channel);
-            const data = response.data.data || response.data;
-            if (data.verified) {
+            const data = response.data.data as { verified?: boolean; connected?: boolean } | undefined;
+            if (data?.verified) {
                 setIsVerified(true);
                 setVerificationRequired(false);
                 toast.success('Верификация успешна! Добро пожаловать!');
                 await loadTtsStatus();
                 await loadVoices();
-            } else if (data.connected === false) {
+            } else if (data?.connected === false) {
                 // Бот отключился из-за неудачной верификации
                 setVerificationRequired(false);
                 setIsConnected(false);
@@ -178,19 +179,19 @@ const GuestTtsCard: React.FC = () => {
             });
 
             // GuestTtsCard: API response:', response.data);
-            const data = response.data.data || response.data;
+            const data = response.data.data as { verification_required?: boolean; verification_code?: string; timeout?: number; message?: string } | undefined;
 
-            if (data.verification_required) {
+            if (data?.verification_required) {
                 // GuestTtsCard: Verification required, setting up verification UI');
                 setIsConnected(true); // Бот подключен, но требует верификации
                 setVerificationRequired(true);
-                setVerificationCode(data.verification_code);
-                setVerificationTimeout(data.timeout);
+                setVerificationCode(data.verification_code || '');
+                setVerificationTimeout(data.timeout || 0);
                 toast.warning(`Бот подключен! Отправьте код "${data.verification_code}" в чат канала ${channel} для верификации`);
                 
                 // Запускаем таймер верификации
                 startVerificationTimer();
-            } else if (data.message) {
+            } else if (data?.message) {
                 setIsConnected(true);
                 setIsVerified(true);
                 toast.success(`Подключен к каналу ${channel}`);
@@ -198,8 +199,9 @@ const GuestTtsCard: React.FC = () => {
                 await loadTtsStatus();
                 await loadVoices();
             }
-        } catch (error: any) {
-            const errorMessage = error.response?.data?.detail || 'Ошибка подключения';
+        } catch (error: unknown) {
+            const axiosError = error as { response?: { data?: { detail?: string } } };
+            const errorMessage = axiosError.response?.data?.detail || 'Ошибка подключения';
             toast.error(errorMessage);
         } finally {
             setIsConnecting(false);

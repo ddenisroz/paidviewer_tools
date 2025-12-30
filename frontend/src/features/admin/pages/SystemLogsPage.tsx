@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+﻿import React, { useEffect, useState } from 'react';
+
 import {
-  History, Filter, RefreshCw, BarChart3, AlertCircle,
-  CheckCircle, XCircle, Clock, User, Target, Loader
+  AlertCircle, BarChart3, CheckCircle, Clock, Download,
+  Filter, Loader, RefreshCw, Target, User, XCircle
 } from 'lucide-react';
-import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { toast } from '@/utils/toastManager';
+
 import { adminService } from '../../../services/api/services/adminService';
 import { logger } from '../../../utils/prodLogger';
 
@@ -18,9 +21,9 @@ interface AdminLog {
   target_user_name?: string;
   timestamp?: string;
   status: 'success' | 'failed' | 'warning';
-  old_value?: any;
-  new_value?: any;
-  details?: any;
+  old_value?: Record<string, unknown>;
+  new_value?: Record<string, unknown>;
+  details?: Record<string, unknown>;
   error_message?: string;
   user_agent?: string;
   target_resource?: string;
@@ -42,6 +45,22 @@ interface Pagination {
   offset: number;
   pages: number;
   total: number;
+}
+
+interface LogsApiResponse {
+  success?: boolean;
+  data?: AdminLog[];
+  pagination?: Pagination;
+}
+
+interface StatsApiResponse {
+  success?: boolean;
+  data?: LogStats;
+}
+
+interface ActionsApiResponse {
+  success?: boolean;
+  data?: string[];
 }
 
 interface LogItemProps {
@@ -177,9 +196,12 @@ const SystemLogsPage: React.FC = () => {
         ...(actionType && { action_type: actionType }),
         ...(status && { status: status })
       });
-      if ((response.data as any)?.success) {
-        setLogs((response.data as any).data);
-        setPagination((response.data as any).pagination);
+      const apiData = response.data as LogsApiResponse;
+      if (apiData?.success) {
+        setLogs(apiData.data || []);
+        if (apiData.pagination) {
+          setPagination(apiData.pagination);
+        }
       }
     } catch (error) {
       logger.error('Error loading logs:', error);
@@ -192,8 +214,9 @@ const SystemLogsPage: React.FC = () => {
   const loadStats = async (): Promise<void> => {
     try {
       const response = await adminService.getLogsStats(daysRange);
-      if ((response.data as any)?.success) {
-        setStats((response.data as any).data);
+      const apiData = response.data as StatsApiResponse;
+      if (apiData?.success) {
+        setStats(apiData.data || null);
       }
     } catch (error) {
       logger.error('Error loading stats:', error);
@@ -203,8 +226,9 @@ const SystemLogsPage: React.FC = () => {
   const loadAvailableActions = async (): Promise<void> => {
     try {
       const response = await adminService.getLogsActions();
-      if ((response.data as any)?.success) {
-        setAvailableActions((response.data as any).data);
+      const apiData = response.data as ActionsApiResponse;
+      if (apiData?.success) {
+        setAvailableActions(apiData.data || []);
       }
     } catch (error) {
       logger.error('Error loading actions:', error);
@@ -264,7 +288,7 @@ const SystemLogsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">📋 История действий</h1>
+        <h1 className="text-3xl font-bold">[LIST] История действий</h1>
         <p className="text-slate-400 mt-2">Логирование всех действий администраторов системы</p>
       </div>
 
@@ -358,10 +382,44 @@ const SystemLogsPage: React.FC = () => {
               </select>
             </div>
 
-            <div className="flex items-end">
-              <Button onClick={() => loadLogs(selectedActionType, selectedStatus)} disabled={loading} className="w-full">
+            <div className="flex items-end gap-2">
+              <Button onClick={() => loadLogs(selectedActionType, selectedStatus)} disabled={loading}>
                 <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 Обновить
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  if (logs.length === 0) {
+                    toast.error('Нет данных для экспорта');
+                    return;
+                  }
+                  const headers = ['ID', 'Тип', 'Описание', 'Админ', 'Цель', 'Статус', 'Дата'];
+                  const csvContent = [
+                    headers.join(','),
+                    ...logs.map(log => [
+                      log.id,
+                      `"${(log.action_type || '').replace(/"/g, '""')}"`,
+                      `"${(log.description || '').replace(/"/g, '""')}"`,
+                      `"${(log.admin_name || '').replace(/"/g, '""')}"`,
+                      `"${(log.target_user_name || '').replace(/"/g, '""')}"`,
+                      log.status,
+                      log.timestamp || ''
+                    ].join(','))
+                  ].join('\n');
+                  const blob = new Blob([`\ufeff${  csvContent}`], { type: 'text/csv;charset=utf-8;' });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = `admin_logs_${new Date().toISOString().split('T')[0]}.csv`;
+                  link.click();
+                  URL.revokeObjectURL(url);
+                  toast.success('Логи экспортированы в CSV');
+                }}
+                disabled={logs.length === 0}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                CSV
               </Button>
             </div>
           </div>

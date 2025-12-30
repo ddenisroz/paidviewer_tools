@@ -1,38 +1,31 @@
 // src/components/ChatBoxSettingsModal.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+
+import { Check, Copy, RefreshCw, X } from 'lucide-react';
 import ReactDOM from 'react-dom';
-import { X, Copy, Check, RefreshCw, Loader2 } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
+import { toast } from '@/utils/toastManager';
+
 import { chatboxService } from '../services/api/services/chatboxService';
-import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
-import { toast } from 'sonner';
-import { twitchBadgesService } from '../services/twitchBadges';
+import { 
+    extractSettingsFromResponse, 
+    loadGoogleFont, 
+    normalizeChatBoxSettings 
+} from '../utils/chatboxHelpers';
 import { logger } from '../utils/prodLogger';
 
-interface ChatBoxSettings {
-    font_family: string;
-    font_size: number;
-    text_stroke_width: number;
-    background_opacity: number;
-    max_messages: number;
-    message_spacing: number;
-    animation_type: string;
-    message_fade_seconds: number;
-    chat_direction: string;
-    chat_width: number;
-    show_platform_icons: boolean;
-    show_badges: boolean;
-    show_7tv_emotes: boolean;
-    show_links: boolean;
-    widget_url: string;
-    version: number;
-    background_color?: string;
-    text_stroke_color?: string;
-    border_radius?: number;
-}
+import AnimationSettings from './chatbox/AnimationSettings';
+import ColorSettings from './chatbox/ColorSettings';
+import FontSettings from './chatbox/FontSettings';
+import PlatformSettings from './chatbox/PlatformSettings';
+import PreviewPanel from './chatbox/PreviewPanel';
+
+import type { ApiResponse } from '../types/api';
+import type { ChatBoxSettings } from '../types/chatbox';
+import type { AxiosResponse } from 'axios';
 
 interface ChatBoxSettingsModalProps {
     isOpen: boolean;
@@ -50,96 +43,67 @@ interface PreviewMessage {
     badges: string[];
 }
 
+const DEFAULT_SETTINGS: ChatBoxSettings = {
+    font_family: 'Inter',
+    font_size: 16,
+    text_stroke_width: 0,
+    text_stroke_color: '#000000',
+    background_opacity: 0.5,
+    background_color: '#000000',
+    max_messages: 20,
+    message_spacing: 4,
+    animation_type: 'fade',
+    animation_duration: 300,
+    message_fade_seconds: 60,
+    chat_direction: 'vertical',
+    chat_width: 100,
+    border_radius: 8,
+    show_platform_icons: true,
+    show_badges: true,
+    show_7tv_emotes: true,
+    show_links: true,
+    widget_url: '',
+    version: 1
+};
+
+const PREVIEW_MESSAGES: PreviewMessage[] = [
+    { id: 1, platform: 'twitch', author: 'Streamer', message: 'Привет всем! 👋', time: '12:00', role: 'Broadcaster', badges: ['broadcaster/1'] },
+    { id: 2, platform: 'vk', author: 'Viewer1', message: 'Привет! Как дела?', time: '12:01', role: 'Viewer', badges: [] },
+    { id: 3, platform: 'twitch', author: 'Moderator', message: 'Всем привет!', time: '12:02', role: 'Moderator', badges: ['moderator/1'] }
+];
+
 const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onClose, onSave }) => {
-    // ✅ Устанавливаем начальные значения по умолчанию для предотвращения визуальных скачков
-    const [settings, setSettings] = useState<ChatBoxSettings>({
-        font_family: 'Inter',
-        font_size: 16,
-        text_stroke_width: 0,
-        text_stroke_color: '#000000',
-        background_opacity: 0.5,
-        background_color: '#000000',
-        max_messages: 20,
-        message_spacing: 4,
-        animation_type: 'fade',
-        animation_duration: 300,
-        message_fade_seconds: 60,
-        chat_direction: 'vertical',
-        chat_width: 100,
-        border_radius: 8,
-        show_platform_icons: true,
-        show_badges: true,
-        // v0.03 - новые настройки для 7TV эмодзи и ссылок
-        show_7tv_emotes: true,
-        show_links: true,
-        widget_url: '',
-        version: 1  // ✅ Версия для защиты от race conditions
-    });
-    const [loading, setLoading] = useState(false); // ✅ Начальное состояние false - не показываем loading при первом рендере
+    const [settings, setSettings] = useState<ChatBoxSettings>(DEFAULT_SETTINGS);
+    const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [copied, setCopied] = useState(false);
     
-    // Загрузка настроек при открытии
     useEffect(() => {
         if (isOpen) {
-            // ✅ Загружаем данные только когда окно открыто
             loadSettings();
-            // Блокируем скролл body
             document.body.style.overflow = 'hidden';
         } else {
-            // Восстанавливаем скролл body
             document.body.style.overflow = '';
-            // ✅ Сбрасываем состояние при закрытии, чтобы при следующем открытии заново загружались данные
-            setSettings({
-                font_family: 'Inter',
-                font_size: 16,
-                text_stroke_width: 0,
-                text_stroke_color: '#000000',
-                background_opacity: 0.5,
-                background_color: '#000000',
-                max_messages: 20,
-                message_spacing: 4,
-                animation_type: 'fade',
-                animation_duration: 300,
-                message_fade_seconds: 60,
-                chat_direction: 'vertical',
-                chat_width: 100,
-                border_radius: 8,
-                show_platform_icons: true,
-                show_badges: true,
-                show_7tv_emotes: true,
-                show_links: true,
-                widget_url: '',
-                version: 1  // ✅ Версия для защиты от race conditions
-            });
+            setSettings(DEFAULT_SETTINGS);
             setLoading(false);
         }
         
-        // Cleanup при размонтировании
         return () => {
             document.body.style.overflow = '';
         };
     }, [isOpen]);
     
-    // Загружаем выбранный шрифт из Google Fonts
     useEffect(() => {
-        if (settings?.font_family && !document.getElementById(`font-${settings.font_family}`)) {
-            const link = document.createElement('link');
-            link.id = `font-${settings.font_family}`;
-            link.rel = 'stylesheet';
-            link.href = `https://fonts.googleapis.com/css2?family=${settings.font_family.replace(' ', '+')}:wght@400;600;700&display=swap`;
-            document.head.appendChild(link);
+        if (settings?.font_family) {
+            loadGoogleFont(settings.font_family);
         }
     }, [settings?.font_family]);
     
-    // Обработчик клавиши Escape для закрытия модального окна
     useEffect(() => {
         if (!isOpen) return undefined;
         
         const handleEscape = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                onClose();
-            }
+            if (e.key === 'Escape') onClose();
         };
         
         document.addEventListener('keydown', handleEscape);
@@ -149,33 +113,9 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
     const loadSettings = async () => {
         try {
             setLoading(true);
-            const response = await chatboxService.getSettings();
-            const data = (response.data as any)?.data || response.data;
-            
-            // ✅ Нормализуем данные - убеждаемся что числа это числа
-            const normalizedSettings: ChatBoxSettings = {
-                font_family: data.font_family || 'Inter',
-                font_size: parseInt(String(data.font_size)) || 16,
-                text_stroke_width: parseInt(String(data.text_stroke_width)) || 0,
-                text_stroke_color: data.text_stroke_color || '#000000',
-                background_opacity: parseFloat(String(data.background_opacity)) ?? 0.5,
-                background_color: data.background_color || '#000000',
-                max_messages: parseInt(String(data.max_messages)) || 20,
-                message_spacing: parseInt(String(data.message_spacing)) || 4,
-                animation_type: data.animation_type || 'fade',
-                animation_duration: parseInt(String(data.animation_duration)) || 300,
-                message_fade_seconds: parseInt(String(data.message_fade_seconds)) || 60,
-                chat_width: parseInt(String(data.chat_width)) || 100,
-                chat_direction: data.chat_direction || 'vertical',
-                border_radius: parseInt(String(data.border_radius)) || 8,
-                show_platform_icons: data.show_platform_icons ?? true,
-                show_badges: data.show_badges ?? true,
-                show_7tv_emotes: data.show_7tv_emotes ?? true,
-                show_links: data.show_links ?? true,
-                widget_url: data.widget_url || '',
-                version: data.version || 1
-            };
-            
+            const response = await chatboxService.getSettings() as AxiosResponse<ApiResponse<ChatBoxSettings>>;
+            const data = extractSettingsFromResponse(response);
+            const normalizedSettings = normalizeChatBoxSettings(data);
             setSettings(normalizedSettings);
         } catch (error) {
             logger.error('Ошибка загрузки настроек ChatBox:', error);
@@ -187,88 +127,40 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
     const handleSave = async (regenerateToken = false) => {
         try {
             setSaving(true);
+            const response = await chatboxService.saveSettings(
+                { ...settings, version: settings.version || 1 }, 
+                regenerateToken
+            ) as AxiosResponse<ApiResponse<ChatBoxSettings>>;
+            const updatedSettings = extractSettingsFromResponse(response);
             
-            // ✅ Отправляем версию с запросом
-            const requestData = {
-                ...settings,
-                version: settings.version || 1
-            };
-            
-            const response = await chatboxService.saveSettings(requestData, regenerateToken);
-            const savedData = response.data.data || response.data;
-            
-            // ✅ Нормализуем данные после сохранения
-            const normalizedSettings: ChatBoxSettings = {
-                font_family: savedData.font_family || settings.font_family,
-                font_size: parseInt(String(savedData.font_size)) || 16,
-                text_stroke_width: parseInt(String(savedData.text_stroke_width)) || 0,
-                text_stroke_color: savedData.text_stroke_color || '#000000',
-                background_opacity: parseFloat(String(savedData.background_opacity)) ?? 0.5,
-                background_color: savedData.background_color || '#000000',
-                max_messages: parseInt(String(savedData.max_messages)) || 20,
-                message_fade_seconds: parseInt(String(savedData.message_fade_seconds)) || 60,
-                message_spacing: parseInt(String(savedData.message_spacing)) || 4,
-                animation_type: savedData.animation_type || 'fade',
-                animation_duration: parseInt(String(savedData.animation_duration)) || 300,
-                chat_width: parseInt(String(savedData.chat_width)) || 100,
-                chat_direction: savedData.chat_direction || 'vertical',
-                border_radius: parseInt(String(savedData.border_radius)) || 8,
-                show_platform_icons: savedData.show_platform_icons ?? true,
-                show_badges: savedData.show_badges ?? true,
-                show_7tv_emotes: savedData.show_7tv_emotes ?? true,
-                show_links: savedData.show_links ?? true,
-                widget_url: savedData.widget_url || '',
-                version: savedData.version || 1  // ✅ Обновляем версию
-            };
-            
-            setSettings(normalizedSettings);
-            onSave?.(normalizedSettings);
-            
-            if (regenerateToken) {
-                toast.success('Токен перегенерирован! Обновите ссылку в OBS.');
-            } else {
-                toast.success('Настройки ChatBox сохранены!');
-            }
-        } catch (error: any) {
-            // ✅ Обработка 409 Conflict - данные были обновлены
-            if (error.response?.status === 409) {
-                logger.warn('Version conflict detected', error.response.data);
-                toast.warning('Данные обновлены. Перезагружаю...');
-                // Перезагружаем модальное окно или обновляем версию
-                setTimeout(() => {
-                    window.location.reload();  // Простой способ пересинхронизировать
-                }, 1500);
-            } else {
-                logger.error('Ошибка сохранения настроек:', error);
-                toast.error('Не удалось сохранить настройки');
-            }
+            setSettings(prev => ({ ...prev, ...updatedSettings }));
+            toast.success('Настройки сохранены');
+            if (onSave) onSave(updatedSettings);
+        } catch (error) {
+            logger.error('Ошибка сохранения настроек:', error);
+            toast.error('Ошибка сохранения настроек');
         } finally {
             setSaving(false);
         }
     };
     
-    const copyToClipboard = () => {
-        if (settings?.widget_url) {
-            navigator.clipboard.writeText(settings.widget_url);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-            toast.success('Ссылка скопирована в буфер обмена!');
-        }
+    const handleChange = (key: keyof ChatBoxSettings, value: string | number | boolean) => {
+        setSettings(prev => ({ ...prev, [key]: value }));
     };
     
-    const handleChange = React.useCallback((field: keyof ChatBoxSettings, value: any) => {
-        setSettings(prev => ({ ...prev, [field]: value }));
-    }, []);
+    const copyToClipboard = () => {
+        navigator.clipboard.writeText(settings.widget_url);
+        setCopied(true);
+        toast.success('URL скопирован');
+        setTimeout(() => setCopied(false), 2000);
+    };
     
     if (!isOpen) return null;
     
-    // ✅ Показываем loading экран только во время загрузки данных
     if (loading) {
         const loadingContent = (
             <>
-                {/* Backdrop */}
                 <div className="fixed inset-0 bg-black/80 z-[9999]" />
-                {/* Loading Content */}
                 <div className="fixed inset-0 z-[10000] flex items-center justify-center">
                     <div className="bg-gray-900 p-8 rounded-lg shadow-2xl">
                         <div className="text-white">Загрузка...</div>
@@ -279,651 +171,123 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
         return ReactDOM.createPortal(loadingContent, document.body);
     }
     
-    // Google Fonts для выбора (разнообразные стили)
-    const GOOGLE_FONTS = [
-        'Inter',              // Современный геометрический
-        'Roboto',             // Нейтральный гротеск
-        'Montserrat',         // Круглый геометрический
-        'Oswald',             // Узкий и высокий
-        'Ubuntu',             // Гуманистический
-        'Comic Neue',         // Комичный стиль
-        'Pacifico',           // Рукописный скрипт
-        'Russo One',          // Жирный заголовочный
-        'Exo 2',              // Футуристичный (кириллица)
-        'Play',               // Современный геометрический (кириллица)
-        'Rubik',              // Округлый современный (кириллица)
-        'Marck Script',       // Рукописный элегантный (кириллица)
-        'Ruslan Display',     // Декоративный русский
-        'Lobster',            // Декоративный ретро
-        'Caveat',             // Небрежный рукописный
-        'Bebas Neue',         // Конденсированный заголовочный
-        'Permanent Marker',   // Маркер
-        'JetBrains Mono',     // Моноширинный для кода
-        'Fira Code',          // Моноширинный с лигатурами
-        'Comfortaa'           // Круглый дружелюбный
-    ];
-    
-    // Пример сообщений для preview - useMemo для предотвращения пересоздания
-    const previewMessages: PreviewMessage[] = React.useMemo(() => [
-        { 
-            id: 1, 
-            platform: 'twitch', 
-            author: 'Yourchy', 
-            message: 'Привет, это тестовое сообщение!', 
-            time: '12:34',
-            role: 'broadcaster',
-            badges: ['broadcaster/1', 'premium/1']
-        },
-        { 
-            id: 2, 
-            platform: 'vk', 
-            author: 'Your4y', 
-            message: 'Еще одно сообщение для примера', 
-            time: '12:35',
-            role: 'moderator',
-            badges: [] // VK Live не использует Twitch badges
-        },
-        { 
-            id: 3, 
-            platform: 'twitch', 
-            author: 'TestUser', 
-            message: 'Как дела? Проверка preview', 
-            time: '12:36',
-            role: 'subscriber',
-            badges: ['subscriber/12', 'sub-gifter/1']
-        }
-    ], []);
-    
     const modalContent = (
         <>
-            {/* Backdrop - затемнение заднего фона */}
-            <div 
-                className="fixed inset-0 bg-black/80 z-[9999]"
-                onClick={onClose}
-            />
+            <div className="fixed inset-0 bg-black/80 z-[9999]" onClick={onClose} />
             
-            {/* Modal Content */}
             <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pointer-events-none">
                 <div 
                     className="bg-gray-900 rounded-lg max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto border border-gray-700"
                     onClick={(e) => e.stopPropagation()}
                 >
-                {/* Header */}
-                <div className="border-b border-gray-700 p-4 flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-white">Настройки ChatBox для OBS</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
-                
-                {/* Content: 2 columns */}
-                <div className="flex-1 overflow-y-auto p-6">
-                    <div className="grid grid-cols-2 gap-6 h-full">
-                        {/* Left: Settings */}
-                        <div className="space-y-6">
-                            {/* OBS Link */}
-                            <div className="space-y-2">
-                                <Label className="text-white font-semibold">Ссылка для OBS</Label>
-                                <div className="flex gap-2">
-                                    <Input
-                                        value={settings.widget_url || ''}
-                                        readOnly
-                                        className="bg-gray-800 text-white border-gray-600 font-mono text-xs flex-1"
-                                    />
-                                    <Button
-                                        onClick={copyToClipboard}
-                                        variant="outline"
-                                        size="sm"
-                                        className="border-gray-600 hover:bg-gray-700"
-                                    >
-                                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                                    </Button>
-                                    <Button
-                                        onClick={() => handleSave(true)}
-                                        variant="outline"
-                                        size="sm"
-                                        className="border-gray-600 hover:bg-gray-700"
-                                        title="Обновить токен"
-                                    >
-                                        <RefreshCw className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                                <p className="text-xs text-gray-400">
-                                    Добавьте эту ссылку в OBS (Browser Source)
-                                </p>
-                            </div>
-                            
-                            {/* Font Family */}
-                            <div className="space-y-2">
-                                <Label className="text-white">Шрифт</Label>
-                                <select
-                                    value={settings.font_family || 'Inter'}
-                                    onChange={(e) => handleChange('font_family', e.target.value)}
-                                    className="w-full bg-gray-800 text-white border-gray-600 rounded-lg p-2"
-                                >
-                                    {GOOGLE_FONTS.map(font => (
-                                        <option key={font} value={font}>{font}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            
-                            {/* Font Size */}
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <Label className="text-white">Размер шрифта</Label>
-                                    <span className="text-sm text-gray-400">{settings.font_size}px</span>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="8"
-                                    max="32"
-                                    value={settings.font_size || 16}
-                                    onChange={(e) => handleChange('font_size', parseInt(e.target.value) || 16)}
-                                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                    style={{
-                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${(((settings.font_size || 16) - 8) / 24) * 100}%, #374151 ${(((settings.font_size || 16) - 8) / 24) * 100}%, #374151 100%)`
-                                    }}
-                                />
-                            </div>
-                            
-                            {/* Animation Type */}
-                            <div className="space-y-2">
-                                <Label className="text-white">Анимация сообщений</Label>
-                                <select
-                                    value={settings.animation_type || 'fade'}
-                                    onChange={(e) => handleChange('animation_type', e.target.value)}
-                                    className="w-full bg-gray-800 text-white border-gray-600 rounded-lg p-2"
-                                >
-                                    <option value="fade">Появление</option>
-                                    <option value="slide-right">← Слева</option>
-                                    <option value="slide-left">Справа →</option>
-                                    <option value="scale">Увеличение</option>
-                                    <option value="bounce">Подпрыгивание</option>
-                                </select>
-                            </div>
-                            
-                            {/* Message Fade Duration */}
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <Label className="text-white">Исчезание сообщений</Label>
-                                    <span className="text-sm text-gray-400">
-                                        {settings.message_fade_seconds === 60 ? 'Никогда' : `${settings.message_fade_seconds}с`}
-                                    </span>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="10"
-                                    max="60"
-                                    step="10"
-                                    value={settings.message_fade_seconds || 60}
-                                    onChange={(e) => handleChange('message_fade_seconds', parseInt(e.target.value) || 60)}
-                                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                    style={{
-                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${(((settings.message_fade_seconds || 60) - 10) / 50) * 100}%, #374151 ${(((settings.message_fade_seconds || 60) - 10) / 50) * 100}%, #374151 100%)`
-                                    }}
-                                />
-                            </div>
-                            
-                            {/* Text Stroke */}
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <Label className="text-white">Обводка букв (читаемость)</Label>
-                                    <span className="text-sm text-gray-400">
-                                        {settings.text_stroke_width === 0 ? 'Выкл' : `${settings.text_stroke_width}px`}
-                                    </span>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="3"
-                                    step="0.5"
-                                    value={settings.text_stroke_width ?? 0}
-                                    onChange={(e) => handleChange('text_stroke_width', parseFloat(e.target.value) || 0)}
-                                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                    style={{
-                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${(((settings.text_stroke_width ?? 0)) / 3) * 100}%, #374151 ${(((settings.text_stroke_width ?? 0)) / 3) * 100}%, #374151 100%)`
-                                    }}
-                                />
-                            </div>
-                            
-                            {/* Background Opacity */}
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <Label className="text-white">Непрозрачность фона</Label>
-                                    <span className="text-sm text-gray-400">{Math.round(settings.background_opacity * 100)}%</span>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="100"
-                                    step="1"
-                                    value={Math.round(settings.background_opacity * 100)}
-                                    onChange={(e) => handleChange('background_opacity', parseFloat(e.target.value) / 100)}
-                                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                    style={{
-                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${Math.round(settings.background_opacity * 100)}%, #374151 ${Math.round(settings.background_opacity * 100)}%, #374151 100%)`
-                                    }}
-                                />
-                            </div>
-                            
-                            {/* Max Messages */}
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <Label className="text-white">Количество сообщений</Label>
-                                    <span className="text-sm text-gray-400">{settings.max_messages}</span>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="1"
-                                    max="50"
-                                    value={settings.max_messages || 20}
-                                    onChange={(e) => handleChange('max_messages', parseInt(e.target.value) || 20)}
-                                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                    style={{
-                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${(((settings.max_messages || 20) - 1) / 49) * 100}%, #374151 ${(((settings.max_messages || 20) - 1) / 49) * 100}%, #374151 100%)`
-                                    }}
-                                />
-                            </div>
-                            
-                            {/* Chat Direction */}
-                            <div className="space-y-2">
-                                <Label className="text-white">Направление чата</Label>
-                                <div className="flex gap-2">
-                                    <Button
-                                        onClick={() => handleChange('chat_direction', 'vertical')}
-                                        variant={settings.chat_direction === 'vertical' ? 'default' : 'outline'}
-                                        size="sm"
-                                        className="flex-1"
-                                    >
-                                        ↓ Вертикальный
-                                    </Button>
-                                    <Button
-                                        onClick={() => handleChange('chat_direction', 'horizontal')}
-                                        variant={settings.chat_direction === 'horizontal' ? 'default' : 'outline'}
-                                        size="sm"
-                                        className="flex-1"
-                                    >
-                                        → Горизонтальный
-                                    </Button>
-                                </div>
-                            </div>
-                            
-                            {/* Chat Width */}
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <Label className="text-white">Ширина чата</Label>
-                                    <span className="text-sm text-gray-400">{settings.chat_width ?? 100}%</span>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="20"
-                                    max="100"
-                                    step="5"
-                                    value={settings.chat_width ?? 100}
-                                    onChange={(e) => handleChange('chat_width', parseInt(e.target.value) || 100)}
-                                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                    style={{
-                                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${(((settings.chat_width ?? 100) - 20) / 80) * 100}%, #374151 ${(((settings.chat_width ?? 100) - 20) / 80) * 100}%, #374151 100%)`
-                                    }}
-                                />
-                            </div>
-                                </div>
-                                
-                        {/* Right: Live Preview + Additional Settings */}
-                        <div className="space-y-4">
-                            {/* Preview */}
-                        <div className="space-y-2">
-                            <Label className="text-white font-semibold">Предпросмотр</Label>
-                            <div 
-                                className="rounded-lg p-4 h-[400px] chatbox-preview-scroll"
-                                style={{
-                                    backgroundColor: (() => {
-                                        const hex = settings?.background_color || '#000000';
-                                        const opacity = settings?.background_opacity ?? 0.8;
-                                        // Конвертируем hex в rgba
-                                        const r = parseInt(hex.slice(1, 3), 16);
-                                        const g = parseInt(hex.slice(3, 5), 16);
-                                        const b = parseInt(hex.slice(5, 7), 16);
-                                        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-                                    })(),
-                                    width: `${settings?.chat_width ?? 100}%`,
-                                    overflowY: settings?.chat_direction === 'horizontal' ? 'hidden' : 'auto',
-                                    overflowX: settings?.chat_direction === 'horizontal' ? 'auto' : 'hidden',
-                                    scrollbarWidth: 'thin',
-                                    scrollbarColor: '#4B5563 #1F2937'
-                                } as React.CSSProperties}
-                            >
-                                <div 
-                                    className={settings?.chat_direction === 'horizontal' ? 'flex' : ''}
-                                    style={{
-                                        flexDirection: settings?.chat_direction === 'horizontal' ? 'row' : 'column',
-                                        gap: settings?.chat_direction === 'horizontal' ? '16px' : `${settings?.message_spacing || 4}px`,
-                                        alignItems: settings?.chat_direction === 'horizontal' ? 'center' : 'stretch'
-                                    } as React.CSSProperties}
-                                >
-                                    {previewMessages.slice(0, Math.min(3, settings?.max_messages || 20)).map((msg, index, array) => {
-                                        // Анимация применяется ТОЛЬКО к последнему сообщению в предпросмотре
-                                        const isLastMessage = index === array.length - 1;
-                                        const animationClass = isLastMessage ? (
-                                            settings?.animation_type === 'fade' ? 'animate-fadeIn' :
-                                            settings?.animation_type === 'slide-right' ? 'animate-slideRight' :
-                                            settings?.animation_type === 'slide-left' ? 'animate-slideLeft' :
-                                            settings?.animation_type === 'scale' ? 'animate-scale' :
-                                            settings?.animation_type === 'bounce' ? 'animate-bounce' :
-                                            'animate-fadeIn'
-                                        ) : '';
-                                        
-                                        return (
-                                        <div 
-                                            key={msg.id} 
-                                            className={animationClass}
-                                            style={{
-                                                whiteSpace: settings?.chat_direction === 'horizontal' ? 'nowrap' : 'normal',
-                                                wordBreak: settings?.chat_direction === 'horizontal' ? 'normal' : 'break-word',
-                                                fontSize: `${settings?.font_size}px`,
-                                                fontFamily: `'${settings?.font_family || 'Inter'}', system-ui, sans-serif`,
-                                                lineHeight: '1.5',
-                                                flexShrink: 0,
-                                                minWidth: settings?.chat_direction === 'horizontal' ? 'fit-content' : 'auto',
-                                                maxWidth: settings?.chat_direction === 'horizontal' ? '400px' : 'auto',
-                                                padding: settings?.chat_direction === 'horizontal' ? '12px 16px' : '0',
-                                                backgroundColor: settings?.chat_direction === 'horizontal' ? 'rgba(0, 0, 0, 0.3)' : 'transparent',
-                                                borderRadius: settings?.chat_direction === 'horizontal' ? `${settings?.border_radius || 8}px` : '0'
-                                            } as React.CSSProperties}
+                    <div className="border-b border-gray-700 p-4 flex items-center justify-between">
+                        <h2 className="text-xl font-bold text-white">Настройки ChatBox для OBS</h2>
+                        <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-6">
+                        <div className="grid grid-cols-2 gap-6 h-full">
+                            <div className="space-y-6">
+                                {/* OBS Link */}
+                                <div className="space-y-2">
+                                    <Label className="text-white font-semibold">Ссылка для OBS</Label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            value={settings.widget_url || ''}
+                                            readOnly
+                                            className="bg-gray-800 text-white border-gray-600 font-mono text-xs flex-1"
+                                        />
+                                        <Button
+                                            onClick={copyToClipboard}
+                                            variant="outline"
+                                            size="sm"
+                                            className="border-gray-600 hover:bg-gray-700"
                                         >
-                                            {/* Platform Icon */}
-                                            {settings?.show_platform_icons && (
-                                                msg.platform === 'twitch' ? (
-                                                    <TwitchIcon 
-                                                        style={{ 
-                                                            color: '#9147FF',
-                                                            width: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
-                                                            height: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
-                                                            display: 'inline-block',
-                                                            verticalAlign: 'text-bottom',
-                                                            marginRight: '4px'
-                                                        }} 
-                                                    />
-                                                ) : (
-                                                    <VKIcon 
-                                                        style={{ 
-                                                            color: '#EF4444',
-                                                            // VK иконка на 15% меньше из-за другого viewBox (20x20 vs 24x24)
-                                                            width: `${Math.round(Math.max(12, Math.min(24, settings?.font_size || 16)) * 0.85)}px`,
-                                                            height: `${Math.round(Math.max(12, Math.min(24, settings?.font_size || 16)) * 0.85)}px`,
-                                                            display: 'inline-block',
-                                                            verticalAlign: 'text-bottom',
-                                                            marginRight: '4px'
-                                                        }} 
-                                                    />
-                                                )
-                                            )}
-                                            
-                                            {/* Badges (значки Twitch) */}
-                                            {settings?.show_badges && msg.badges && msg.badges.length > 0 && (
-                                                <>
-                                                    {msg.badges.map((badge, idx) => {
-                                                        const [badgeId, version] = badge.split('/');
-                                                        const badgeUrl = twitchBadgesService.getBadgeUrl(badgeId, version, '1x');
-                                                        
-                                                        // Пропускаем badge если URL не найден
-                                                        if (!badgeUrl) return null;
-                                                        
-                                                        const badgeSize = Math.max(14, Math.min(28, (settings?.font_size || 16) * 1.1));
-                                                        
-                                                        return (
-                                                            <img 
-                                                                key={idx} 
-                                                                src={badgeUrl}
-                                                                alt={badgeId}
-                                                                title={badge}
-                                                                style={{ 
-                                                                    width: `${badgeSize}px`, 
-                                                                    height: `${badgeSize}px`,
-                                                                    display: 'inline-block',
-                                                                    verticalAlign: 'text-bottom',
-                                                                    marginRight: '2px'
-                                                                }}
-                                                                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                                                                    // Скрываем если значок не загрузился
-                                                                    (e.target as HTMLImageElement).style.display = 'none';
-                                                                }}
-                                                            />
-                                                        );
-                                                    })}
-                                                </>
-                                            )}
-                                            
-                                            {/* Message Content */}
-                                            <span 
-                                                style={{
-                                                    overflowWrap: 'break-word',
-                                                    wordWrap: 'break-word',
-                                                    ...((settings?.text_stroke_width ?? 0) > 0 ? {
-                                                        textShadow: `
-                                                            -${settings.text_stroke_width ?? 0}px -${settings.text_stroke_width ?? 0}px 0 ${settings?.text_stroke_color || '#000000'},
-                                                            ${settings.text_stroke_width ?? 0}px -${settings.text_stroke_width ?? 0}px 0 ${settings?.text_stroke_color || '#000000'},
-                                                            -${settings.text_stroke_width ?? 0}px ${settings.text_stroke_width ?? 0}px 0 ${settings?.text_stroke_color || '#000000'},
-                                                            ${settings.text_stroke_width ?? 0}px ${settings.text_stroke_width ?? 0}px 0 ${settings?.text_stroke_color || '#000000'}
-                                                        `
-                                                    } : {})
-                                                }}
-                                            >
-                                                <span className="font-semibold" style={{ 
-                                                    color: msg.platform === 'twitch' ? '#9146FF' : '#FF0000'
-                                                }}>
-                                                    {msg.author}
-                                                </span>
-                                                {': '}
-                                                <span style={{ color: '#FFFFFF' }}>
-                                                    {msg.message}
-                                                </span>
-                                            </span>
-                                        </div>
-                                        );
-                                    })}
+                                            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                                        </Button>
+                                        <Button
+                                            onClick={() => handleSave(true)}
+                                            variant="outline"
+                                            size="sm"
+                                            className="border-gray-600 hover:bg-gray-700"
+                                            title="Обновить токен"
+                                        >
+                                            <RefreshCw className="w-4 h-4" />
+                                        </Button>
+                                    </div>
                                 </div>
+                                
+                                <FontSettings
+                                    fontFamily={settings.font_family}
+                                    fontSize={settings.font_size}
+                                    textStrokeWidth={settings.text_stroke_width}
+                                    onFontFamilyChange={(value) => handleChange('font_family', value)}
+                                    onFontSizeChange={(value) => handleChange('font_size', value)}
+                                    onTextStrokeWidthChange={(value) => handleChange('text_stroke_width', value)}
+                                />
+                                
+                                <ColorSettings
+                                    backgroundColor={settings.background_color || '#000000'}
+                                    backgroundOpacity={settings.background_opacity}
+                                    textStrokeColor={settings.text_stroke_color || '#000000'}
+                                    borderRadius={settings.border_radius || 8}
+                                    onBackgroundColorChange={(value) => handleChange('background_color', value)}
+                                    onBackgroundOpacityChange={(value) => handleChange('background_opacity', value)}
+                                    onTextStrokeColorChange={(value) => handleChange('text_stroke_color', value)}
+                                    onBorderRadiusChange={(value) => handleChange('border_radius', value)}
+                                />
+                                
+                                <AnimationSettings
+                                    animationType={settings.animation_type}
+                                    animationDuration={settings.animation_duration}
+                                    messageFadeSeconds={settings.message_fade_seconds}
+                                    onAnimationTypeChange={(value) => handleChange('animation_type', value)}
+                                    onAnimationDurationChange={(value) => handleChange('animation_duration', value)}
+                                    onMessageFadeSecondsChange={(value) => handleChange('message_fade_seconds', value)}
+                                />
+                                
+                                <PlatformSettings
+                                    showPlatformIcons={settings.show_platform_icons}
+                                    showBadges={settings.show_badges}
+                                    show7tvEmotes={settings.show_7tv_emotes}
+                                    showLinks={settings.show_links}
+                                    maxMessages={settings.max_messages}
+                                    messageSpacing={settings.message_spacing}
+                                    chatDirection={settings.chat_direction}
+                                    chatWidth={settings.chat_width}
+                                    onShowPlatformIconsChange={(value) => handleChange('show_platform_icons', value)}
+                                    onShowBadgesChange={(value) => handleChange('show_badges', value)}
+                                    onShow7tvEmotesChange={(value) => handleChange('show_7tv_emotes', value)}
+                                    onShowLinksChange={(value) => handleChange('show_links', value)}
+                                    onMaxMessagesChange={(value) => handleChange('max_messages', value)}
+                                    onMessageSpacingChange={(value) => handleChange('message_spacing', value)}
+                                    onChatDirectionChange={(value) => handleChange('chat_direction', value)}
+                                    onChatWidthChange={(value) => handleChange('chat_width', value)}
+                                />
                             </div>
-                            <p className="text-xs text-gray-500 text-center">
-                                Изменения применяются в реальном времени
-                            </p>
-                        </div>
-
-                            {/* Additional Settings - Moved to right column */}
-                            <div className="space-y-3 pt-2 border-t border-gray-700">
-                                <div className="text-xs text-gray-400 mb-3 font-semibold">📝 Дополнительные настройки</div>
-                                
-                                <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
-                                    <Label className="text-white cursor-pointer">Показывать иконки платформ</Label>
-                                    <Switch
-                                        checked={settings.show_platform_icons ?? true}
-                                        onCheckedChange={(checked) => handleChange('show_platform_icons', checked)}
-                                    />
-                                </div>
-                                
-                                <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
-                                    <Label className="text-white cursor-pointer">Показывать значки</Label>
-                                    <Switch
-                                        checked={settings.show_badges ?? true}
-                                        onCheckedChange={(checked) => handleChange('show_badges', checked)}
-                                    />
-                                </div>
-                                
-                                {/* v0.03 - новые настройки для 7TV эмодзи и ссылок */}
-                                <div className="border-t border-gray-700/50 pt-3 mt-3">
-                                    <div className="text-xs text-gray-400 mb-3 font-semibold">📝 Контент и элементы</div>
-                                    
-                                    <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
-                                        <Label className="text-white cursor-pointer">Показывать 7TV смайлики</Label>
-                                        <Switch
-                                            checked={settings.show_7tv_emotes ?? true}
-                                            onCheckedChange={(checked) => handleChange('show_7tv_emotes', checked)}
-                                        />
-                                    </div>
-                                    
-                                    <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
-                                        <Label className="text-white cursor-pointer">Показывать ссылки из чата</Label>
-                                        <Switch
-                                            checked={settings.show_links ?? true}
-                                            onCheckedChange={(checked) => handleChange('show_links', checked)}
-                                        />
-                                    </div>
-                                </div>
+                            
+                            <div>
+                                <PreviewPanel settings={settings} previewMessages={PREVIEW_MESSAGES} />
                             </div>
                         </div>
                     </div>
-                </div>
-                
-                {/* Footer */}
-                <div className="border-t border-gray-700 p-4 flex justify-end items-center">
-                    <div className="flex gap-3">
-                        <Button
-                            onClick={onClose}
-                            variant="outline"
-                            className="border-gray-600 hover:bg-gray-700"
-                        >
+                    
+                    <div className="border-t border-gray-700 p-4 flex justify-end gap-2">
+                        <Button variant="outline" onClick={onClose} className="border-gray-600">
                             Отмена
                         </Button>
-                        <Button
-                            onClick={() => handleSave(false)}
-                            disabled={saving}
-                            className="bg-purple-600 hover:bg-purple-700 min-w-32"
-                        >
-                            {saving ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Сохранение...
-                                </>
-                            ) : (
-                                'Сохранить'
-                            )}
+                        <Button onClick={() => handleSave(false)} disabled={saving}>
+                            {saving ? 'Сохранение...' : 'Сохранить'}
                         </Button>
                     </div>
                 </div>
-                
-                <style>{`
-                    /* КРУТЫЕ АНИМАЦИИ ДЛЯ ПРЕВЬЮ */
-                    
-                    @keyframes fadeIn {
-                        0% {
-                            opacity: 0;
-                            transform: translateY(10px);
-                        }
-                        100% {
-                            opacity: 1;
-                            transform: translateY(0);
-                        }
-                    }
-                    
-                    @keyframes slideRight {
-                        0% {
-                            opacity: 0;
-                            transform: translateX(-40px) scale(0.95);
-                        }
-                        60% {
-                            transform: translateX(5px) scale(1.02);
-                        }
-                        100% {
-                            opacity: 1;
-                            transform: translateX(0) scale(1);
-                        }
-                    }
-                    
-                    @keyframes slideLeft {
-                        0% {
-                            opacity: 0;
-                            transform: translateX(40px) scale(0.95);
-                        }
-                        60% {
-                            transform: translateX(-5px) scale(1.02);
-                        }
-                        100% {
-                            opacity: 1;
-                            transform: translateX(0) scale(1);
-                        }
-                    }
-                    
-                    @keyframes scale {
-                        0% {
-                            opacity: 0;
-                            transform: scale(0.7) rotate(-3deg);
-                        }
-                        50% {
-                            transform: scale(1.05) rotate(1deg);
-                        }
-                        100% {
-                            opacity: 1;
-                            transform: scale(1) rotate(0deg);
-                        }
-                    }
-                    
-                    @keyframes bounce {
-                        0% {
-                            opacity: 0;
-                            transform: translateY(30px) scale(0.8);
-                        }
-                        40% {
-                            opacity: 1;
-                            transform: translateY(-10px) scale(1.05);
-                        }
-                        60% {
-                            transform: translateY(5px) scale(0.98);
-                        }
-                        80% {
-                            transform: translateY(-3px) scale(1.01);
-                        }
-                        100% {
-                            transform: translateY(0) scale(1);
-                        }
-                    }
-                    
-                    .animate-fadeIn {
-                        animation: fadeIn 0.4s ease-out;
-                    }
-                    
-                    .animate-slideRight {
-                        animation: slideRight 0.4s ease-out;
-                    }
-                    
-                    .animate-slideLeft {
-                        animation: slideLeft 0.4s ease-out;
-                    }
-                    
-                    .animate-scale {
-                        animation: scale 0.4s ease-out;
-                    }
-                    
-                    .animate-bounce {
-                        animation: bounce 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-                    }
-                    
-                    input[type="range"]::-webkit-slider-thumb {
-                        appearance: none;
-                        width: 16px;
-                        height: 16px;
-                        border-radius: 50%;
-                        background: #8b5cf6;
-                        cursor: pointer;
-                    }
-                    
-                    input[type="range"]::-moz-range-thumb {
-                        width: 16px;
-                        height: 16px;
-                        border-radius: 50%;
-                        background: #8b5cf6;
-                        cursor: pointer;
-                        border: none;
-                    }
-                `}</style>
-                </div> {/* Закрываем bg-gray-900 div */}
-            </div> {/* Закрываем wrapper div */}
+            </div>
         </>
     );
     
-    // Используем Portal для рендеринга модального окна в корне DOM
     return ReactDOM.createPortal(modalContent, document.body);
 };
 
 export default ChatBoxSettingsModal;
-
-

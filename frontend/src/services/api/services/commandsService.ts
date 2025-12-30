@@ -2,8 +2,9 @@
  * Commands Service - инкапсуляция всех Commands API вызовов
  */
 import { apiClient } from '../client';
-import type { AxiosResponse } from 'axios';
+
 import type { ApiResponse, Command } from '../../../types';
+import type { AxiosResponse } from 'axios';
 
 /**
  * Commands Service
@@ -31,7 +32,7 @@ export const commandsService = {
    * @param override - Данные override
    * @returns Promise с ответом API
    */
-  async createOverride(override: Record<string, any>): Promise<AxiosResponse<ApiResponse>> {
+  async createOverride(override: Record<string, unknown>): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.post('/api/commands/override', override);
   },
 
@@ -60,7 +61,7 @@ export const commandsService = {
    * @param data - Данные для обновления (должен содержать command_id)
    * @returns Promise с ответом API
    */
-  async toggleCommand(commandName: string, data: Record<string, any>): Promise<AxiosResponse<ApiResponse>> {
+  async toggleCommand(commandName: string, data: Record<string, unknown>): Promise<AxiosResponse<ApiResponse>> {
     // Backend требует command_id, а не command_name
     if (!data.command_id) {
       throw new Error('command_id is required for toggle operation');

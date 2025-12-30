@@ -1,10 +1,15 @@
-import React, { createContext, useContext, useReducer, useEffect, useRef, useCallback, ReactNode } from 'react';
+﻿import React, { createContext, ReactNode, useCallback, useContext, useEffect, useReducer, useRef } from 'react';
+
+import { toast } from '@/utils/toastManager';
+
+import { useInterval } from '../hooks/useInterval';
+import { useSkipYoutubeVideo, useYoutubeQueue } from '../queries/youtube/youtubeQueries';
 import { logger } from '../utils/prodLogger';
+
 import { useAuth } from './AuthContext';
 import { useChat } from './ChatContext';
-import { useInterval } from '../hooks/useInterval';
-import { useYoutubeQueue, useSkipYoutubeVideo } from '../queries/youtube/youtubeQueries';
-import type { YoutubeVideo } from '../types/youtube';
+
+import type { YoutubeQueue, YoutubeVideo } from '../types/youtube';
 
 interface YouTubePlayer {
     pauseVideo: () => void;
@@ -136,9 +141,9 @@ interface PlayerContextValue extends PlayerState {
     setVolume: (volume: number) => void;
     toggleMute: () => void;
     setPlayerRef: (ref: YouTubePlayer | null) => void;
-    handlePlayerReady: (event: any) => void;
-    handlePlayerStateChange: (event: any) => void;
-    handlePlayerError: (event: any) => void;
+    handlePlayerReady: (event: unknown) => void;
+    handlePlayerStateChange: (event: unknown) => void;
+    handlePlayerError: (event: unknown) => void;
     closePlayer: () => void;
     updateTime: () => void;
     setIsTheaterMode: (value: boolean) => void;
@@ -156,7 +161,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     const { isAuthenticated } = useAuth();
     const { lastJsonMessage } = useChat();
     
-    const { data: queueData, isLoading: isLoadingQueue, refetch: refetchQueue, error: queueError } = useYoutubeQueue({
+    const { data: queueData, isLoading: isLoadingQueue, refetch: refetchQueue, error: _queueError } = useYoutubeQueue({
         enabled: !!isAuthenticated,
         refetchInterval: 15000,
         refetchOnMount: false,
@@ -166,12 +171,14 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     // React Query v5: onSuccess/onError moved to useEffect
     useEffect(() => {
         if (queueData) {
-            const queueResponse = queueData?.data || queueData;
+            // queueData is already typed as YoutubeQueue from the service
+            const response = queueData as { data?: YoutubeQueue } | YoutubeQueue;
+            const queue = 'data' in response && response.data ? response.data : (response as YoutubeQueue);
             dispatch({ 
                 type: 'LOAD_QUEUE', 
                 payload: {
-                    queue: queueResponse.queue || [],
-                    current_video: queueResponse.current_video || null
+                    queue: queue.queue || [],
+                    current_video: queue.current_video || null
                 }
             });
             dispatch({ type: 'SET_LOADING', payload: false });
@@ -179,9 +186,10 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     }, [queueData]);
     
     useEffect(() => {
-        if (queueError) {
-            logger.error('Error loading queue:', queueError);
-            if ((queueError as any).response?.status === 429 || (queueError as any).code === 'ERR_NETWORK') {
+        if (_queueError) {
+            logger.error('Error loading queue:', _queueError);
+            const error = _queueError as { response?: { status?: number }; code?: string };
+            if (error.response?.status === 429 || error.code === 'ERR_NETWORK') {
                 return;
             }
             dispatch({ 
@@ -190,7 +198,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
             });
             dispatch({ type: 'SET_LOADING', payload: false });
         }
-    }, [queueError]);
+    }, [_queueError]);
 
     useEffect(() => {
         dispatch({ type: 'SET_LOADING', payload: isLoadingQueue });
@@ -206,19 +214,20 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     }, [isAuthenticated, refetchQueue]);
 
     const skipVideoMutation = useSkipYoutubeVideo({
-        onSuccess: (response: any) => {
-            const data = response?.data || response;
+        onSuccess: (response) => {
+            // Response is typed from youtubeService
+            const data = response as { success: boolean; data?: { current_video?: YoutubeVideo } };
             if (data.success) {
                 dispatch({ 
                     type: 'NEXT_VIDEO', 
-                    payload: { current_video: data.current_video }
+                    payload: { current_video: data.data?.current_video || null }
                 });
                 setTimeout(() => refetchQueue(), 500);
             } else {
                 dispatch({ type: 'CLOSE_PLAYER' });
             }
         },
-        onError: (error: any) => {
+        onError: (error) => {
             logger.error('Error skipping to next video:', error);
             dispatch({ 
                 type: 'SET_ERROR', 
@@ -309,15 +318,17 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         }
     }, [state.playerRef]);
 
-    const handlePlayerReady = (event: any): void => {
-        const player = event.target;
+    const handlePlayerReady = (event: unknown): void => {
+        const playerEvent = event as { target: YouTubePlayer };
+        const player = playerEvent.target;
         setPlayerRef(player);
-        logger.debug('✅ [YOUTUBE] Player ready - autoplay handled by iframe params');
+        logger.debug('[OK] [YOUTUBE] Player ready - autoplay handled by iframe params');
     };
 
-    const handlePlayerStateChange = (event: any): void => {
-        const playerState = event.data;
-        const player = event.target;
+    const handlePlayerStateChange = (event: unknown): void => {
+        const playerEvent = event as { data: number; target: YouTubePlayer };
+        const playerState = playerEvent.data;
+        const player = playerEvent.target;
         
         if (playerState === 1) {
             dispatch({ type: 'SET_PLAYING', payload: true });
@@ -327,7 +338,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
             dispatch({ type: 'SET_PLAYING', payload: false });
             logger.debug('⏸️ [YOUTUBE] Paused');
         } else if (playerState === 0) {
-            logger.debug('⏭️ [YOUTUBE] Video ended, switching to next');
+            logger.debug('[SKIP] [YOUTUBE] Video ended, switching to next');
             nextVideo();
         } else if (playerState === 5) {
             try {
@@ -335,14 +346,24 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
                     player.playVideo();
                     logger.debug('▶️ [YOUTUBE] Auto-play triggered (video cued)');
                 }
-            } catch (error: any) {
-                logger.debug('Auto-play skipped:', error.message);
+            } catch (error: unknown) {
+                const err = error as { message?: string };
+                logger.debug('Auto-play skipped:', err.message);
             }
         }
     };
 
-    const handlePlayerError = (event: any): void => {
-        logger.error('YouTube player error:', event);
+    const handlePlayerError = (event: unknown): void => {
+        const errorEvent = event as { data: number };
+        const errorCode = errorEvent.data;
+        
+        logger.error('YouTube player error:', errorCode);
+        
+        // Error codes: 2 (invalid ID), 5 (HTML5 error), 100 (not found), 101/150 (not embeddable)
+        if ([2, 100, 101, 150].includes(errorCode)) {
+            toast.error('Видео недоступно, переход к следующему');
+            nextVideo(); // Автоматически пропускаем проблемное видео
+        }
     };
 
     const closePlayer = (): void => {
@@ -367,8 +388,8 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     }, [isAuthenticated, loadQueue]);
 
     useEffect(() => {
-        if (lastJsonMessage && (lastJsonMessage as any).type === 'youtube_queue_update') {
-            logger.debug('📺 [YouTube] Queue updated via WebSocket, reloading...');
+        if (lastJsonMessage && (lastJsonMessage as { type?: string }).type === 'youtube_queue_update') {
+            logger.debug('[YouTube] Queue updated via WebSocket, reloading...');
             loadQueue(true);
         }
     }, [lastJsonMessage, loadQueue]);
@@ -418,7 +439,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     useEffect(() => {
         const handleAudioPriorityChange = (event: CustomEvent): void => {
             const { action, reason } = event.detail;
-            logger.debug(`🎵 [YouTube] Audio priority change: ${action} (${reason})`);
+            logger.debug(`[AUDIO] [YouTube] Audio priority change: ${action} (${reason})`);
             
             if (action === 'pause_youtube' && state.playerRef && state.isPlaying) {
                 logger.debug('⏸️ [YouTube] Pausing for TTS');
@@ -432,13 +453,13 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
                 // Save current volume and reduce to 20%
                 originalVolumeRef.current = state.volume;
                 const duckedVolume = Math.floor(state.volume * 0.2);
-                logger.debug(`🔉 [YouTube] Ducking volume from ${state.volume} to ${duckedVolume}`);
+                logger.debug(`[YouTube] Ducking volume from ${state.volume} to ${duckedVolume}`);
                 state.playerRef.setVolume(duckedVolume);
                 dispatch({ type: 'SET_VOLUME', payload: duckedVolume });
             } else if (action === 'unduck_youtube' && state.playerRef) {
                 // Restore original volume
                 const restoredVolume = originalVolumeRef.current;
-                logger.debug(`🔊 [YouTube] Restoring volume to ${restoredVolume}`);
+                logger.debug(`[VOLUME] [YouTube] Restoring volume to ${restoredVolume}`);
                 state.playerRef.setVolume(restoredVolume);
                 dispatch({ type: 'SET_VOLUME', payload: restoredVolume });
             }

@@ -121,16 +121,16 @@ function replaceConsoleLogs(filePath) {
 }
 
 // Запускаем обход и замену
-console.log('🔄 Starting console.log replacement...\n');
+console.log('[START] Starting console.log replacement...\n');
 
 walkDir(srcDir, (filePath) => {
   const replacements = replaceConsoleLogs(filePath);
   if (replacements > 0) {
     const relativePath = path.relative(srcDir, filePath);
-    console.log(`✅ ${relativePath}: ${replacements} replacements`);
+    console.log(`[OK] ${relativePath}: ${replacements} replacements`);
     totalReplacements += replacements;
     filesModified++;
   }
 });
 
-console.log(`\n✨ Complete! Total: ${totalReplacements} replacements in ${filesModified} files`);
+console.log(`\n[DONE] Complete! Total: ${totalReplacements} replacements in ${filesModified} files`);

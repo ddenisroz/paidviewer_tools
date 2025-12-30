@@ -94,7 +94,7 @@ def add_time(
     """
     if dt is None:
         dt = utcnow()
-    
+
     delta = timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
     return dt + delta
 
@@ -158,10 +158,10 @@ def get_date_key(dt: Optional[datetime] = None, format: str = "daily") -> str:
     """
     if dt is None:
         dt = utcnow()
-    
+
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
-    
+
     if format == "daily":
         return dt.strftime("%Y-%m-%d")
     elif format == "weekly":

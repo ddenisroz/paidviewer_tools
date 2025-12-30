@@ -6,7 +6,7 @@
  *   <Composed>{children}</Composed>
  */
 
-import React, { ReactNode, ComponentType } from 'react';
+import React, { ComponentType, ReactNode } from 'react';
 
 interface ProviderProps {
   children: ReactNode;

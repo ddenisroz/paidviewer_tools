@@ -2,8 +2,9 @@
  * Lootbox Service - инкапсуляция всех Lootbox API вызовов
  */
 import { apiClient } from '../client';
-import type { AxiosResponse } from 'axios';
+
 import type { ApiResponse } from '../../../types';
+import type { AxiosResponse } from 'axios';
 
 /**
  * Lootbox Service
@@ -33,7 +34,7 @@ export const lootboxService = {
    * @param params - Параметры запроса (limit)
    * @returns Promise с ответом API
    */
-  async getRecentOpenings(channelName: string, params: Record<string, any> = {}): Promise<AxiosResponse<ApiResponse>> {
+  async getRecentOpenings(channelName: string, params: Record<string, unknown> = {}): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.get(`/lootbox/recent/${channelName}`, { params });
   },
 
@@ -67,7 +68,7 @@ export const lootboxService = {
    * @param data - Данные лутбокса
    * @returns Promise с ответом API
    */
-  async createLootbox(data: Record<string, any>): Promise<AxiosResponse<ApiResponse>> {
+  async createLootbox(data: Record<string, unknown>): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.post('/lootbox/admin/lootbox', data);
   },
 
@@ -76,7 +77,7 @@ export const lootboxService = {
    * @param data - Данные награды
    * @returns Promise с ответом API
    */
-  async createReward(data: Record<string, any>): Promise<AxiosResponse<ApiResponse>> {
+  async createReward(data: Record<string, unknown>): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.post('/lootbox/admin/lootbox/reward', data);
   },
 
@@ -85,7 +86,7 @@ export const lootboxService = {
    * @param data - Данные достижения
    * @returns Promise с ответом API
    */
-  async createAchievement(data: Record<string, any>): Promise<AxiosResponse<ApiResponse>> {
+  async createAchievement(data: Record<string, unknown>): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.post('/lootbox/admin/achievement', data);
   },
 };

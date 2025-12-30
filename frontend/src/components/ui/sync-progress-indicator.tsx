@@ -4,8 +4,11 @@
  * Displays a progress bar or spinner when syncing state with backend
  */
 import React from 'react';
-import { Loader2, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
+
+import { AlertCircle, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
+
 import { cn } from '../../lib/utils';
+
 import { Progress } from './progress';
 
 interface SyncProgressIndicatorProps {

@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react';
+
 import { useNavigate } from 'react-router-dom';
+
 import { useAuth } from '../context/AuthContext';
 import { logger } from '../utils/prodLogger';
 
@@ -27,7 +29,7 @@ const AuthCallbackPage: React.FC = () => {
                 await refreshAuthStatus(true);
                 navigate('/dashboard', { replace: true });
             } catch (error) {
-                logger.error("❌ Ошибка при обновлении статуса аутентификации:", error);
+                logger.error("[ERROR] Ошибка при обновлении статуса аутентификации:", error);
                 navigate('/login', { replace: true });
             }
         };

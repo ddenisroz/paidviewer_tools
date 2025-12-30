@@ -49,6 +49,16 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
+# Test databases
+test*.db
+*_test.db
+
+# Lint results
+lint-results.json
+
+# HTTP Archive files
+*.har
+
 # Translations
 *.mo
 *.pot

@@ -1,7 +1,10 @@
 import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+
+import { Twitch, Users, Wifi, WifiOff } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
-import { Twitch, MessageCircle, Users, Wifi, WifiOff } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+
 import { VKIcon } from '../shared/components/PlatformIcons';
 
 interface StreamStatusProps {

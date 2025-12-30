@@ -7,4 +7,4 @@ export * from './platformUtils';
 export * from './sanitization';
 export * from './validationUtils';
 export * from './errorMessages';
-export { default as composeProviders } from './composeProviders';
+export { composeProviders } from './composeProviders';

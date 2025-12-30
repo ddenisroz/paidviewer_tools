@@ -1,21 +1,21 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, ChevronDown, Settings } from 'lucide-react';
-import { toast } from 'sonner';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+
+import { ChevronDown, LogOut, Settings } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
 import { useAuth } from '../../context/AuthContext';
 import { useIntegrations } from '../../context/IntegrationsContext';
-import { Button } from '../ui/button';
-import { TwitchIcon, VKIcon } from '../../shared/components/PlatformIcons';
 import { authService } from '../../services/api/services/authService';
 import { integrationsService } from '../../services/api/services/integrationsService';
+import { TwitchIcon, VKIcon } from '../../shared/components/PlatformIcons';
 import { saveReturnUrl } from '../../utils/oauthRedirect';
 import { logger } from '../../utils/prodLogger';
+import { Button } from '../ui/button';
 
 const Header: React.FC = () => {
     const { user, logout, isGuest, isAuthenticated, refreshAuthStatus } = useAuth();
     const { integrations, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
-    const navigate = useNavigate();
-    const location = useLocation();
+    const _navigate = useNavigate();
     const [integrationsOpen, setIntegrationsOpen] = useState(false);
     
     // Маппинг путей к заголовкам страниц
@@ -35,10 +35,7 @@ const Header: React.FC = () => {
     }), []);
     
     const pageTitle = useMemo(() => {
-        // Ищем заголовок для текущего пути
-        // Проверяем сначала точные совпадения, потом подпути
-        // Убираем query параметры и trailing slash для корректного сравнения
-        const currentPath = location.pathname.replace(/\/$/, '') || '/';
+        const currentPath = window.location.pathname.replace(/\/$/, '') || '/';
         
         // Сначала проверяем точное совпадение
         if (pageTitles[currentPath as keyof typeof pageTitles] !== undefined) {
@@ -54,13 +51,13 @@ const Header: React.FC = () => {
             if (!title) continue;
             
             // Если текущий путь начинается с базового пути + '/' (подстраница)
-            if (currentPath.startsWith(path + '/')) {
+            if (currentPath.startsWith(`${path  }/`)) {
                 return title;
             }
         }
         
         return '';
-    }, [location.pathname, pageTitles]);
+    }, [pageTitles]);
 
     // Закрытие меню при клике вне его
     useEffect(() => {
@@ -80,7 +77,7 @@ const Header: React.FC = () => {
             if (platform === 'twitch') {
                 const newEnabled = !integrations?.twitch?.enabled;
                 if (newEnabled) {
-                    // 💾 Сохраняем текущую страницу перед редиректом
+                    // [DB] Сохраняем текущую страницу перед редиректом
                     saveReturnUrl();
                     // Подключение - перенаправляем на OAuth
                     authService.loginWithTwitch();
@@ -90,7 +87,7 @@ const Header: React.FC = () => {
             } else if (platform === 'vk') {
                 const newEnabled = !integrations?.vk?.enabled;
                 if (newEnabled) {
-                    // 💾 Сохраняем текущую страницу перед редиректом
+                    // [DB] Сохраняем текущую страницу перед редиректом
                     saveReturnUrl();
                     // Прямой редирект на VK OAuth
                     authService.loginWithVk();
@@ -106,9 +103,10 @@ const Header: React.FC = () => {
                     // Подключаем DonationAlerts - используем тот же подход, что и в DonationAlertsContext
                     try {
                         const response = await integrationsService.connectDonationAlerts();
-                        const data = response.data.data || response.data;
+                        const responseData = response.data as { data?: { success?: boolean; auth_url?: string }; success?: boolean; auth_url?: string };
+                        const data = responseData.data || responseData;
                             if (data.success && data.auth_url) {
-                                // 💾 Сохраняем текущую страницу перед редиректом
+                                // [DB] Сохраняем текущую страницу перед редиректом
                                 saveReturnUrl();
                                 // Перенаправляем на страницу авторизации DonationAlerts
                                 window.location.href = data.auth_url;
@@ -116,9 +114,10 @@ const Header: React.FC = () => {
                                 logger.error('URL авторизации DonationAlerts не получен:', data);
                                 alert('Ошибка: URL авторизации DonationAlerts не получен');
                             }
-                    } catch (error: any) {
+                    } catch (error) {
                         logger.error('Ошибка подключения DonationAlerts:', error);
-                        alert(`Ошибка подключения DonationAlerts: ${error.message || 'Неизвестная ошибка'}`);
+                        const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
+                        alert(`Ошибка подключения DonationAlerts: ${errorMessage}`);
                     }
                 }
             }
@@ -151,7 +150,7 @@ const Header: React.FC = () => {
                 <div className="relative integrations-menu">
             <Button 
                         variant="outline"
-                        className="flex items-center gap-2 h-10 px-4 bg-slate-800/50 border-slate-600 hover:bg-slate-700/50 hover:border-slate-500 text-slate-200 hover:text-white transition-all duration-200"
+                        className="flex items-center gap-2 h-10 px-4 bg-slate-800/50 border-slate-600 hover:bg-slate-700/50 hover:border-slate-500 text-slate-200 hover:text-white transition-colors duration-200 active:scale-100 active:transform-none"
                         onClick={() => setIntegrationsOpen(!integrationsOpen)}
                     >
                         <Settings className="h-4 w-4" />

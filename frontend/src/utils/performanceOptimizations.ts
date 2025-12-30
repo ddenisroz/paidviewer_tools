@@ -5,7 +5,7 @@
  * following the requirements from task 7.2
  */
 
-import React, { useCallback, useMemo, useRef, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 /**
  * Debounce hook for expensive operations
@@ -15,7 +15,7 @@ import React, { useCallback, useMemo, useRef, useEffect, useState } from 'react'
  * @param delay - Delay in milliseconds
  * @returns Debounced function
  */
-export function useDebounce<T extends (...args: any[]) => any>(
+export function useDebounce<T extends (...args: unknown[]) => unknown>(
   callback: T,
   delay: number
 ): (...args: Parameters<T>) => void {
@@ -43,7 +43,7 @@ export function useDebounce<T extends (...args: any[]) => any>(
  * @param delay - Minimum delay between calls in milliseconds
  * @returns Throttled function
  */
-export function useThrottle<T extends (...args: any[]) => any>(
+export function useThrottle<T extends (...args: unknown[]) => unknown>(
   callback: T,
   delay: number
 ): (...args: Parameters<T>) => void {
@@ -96,7 +96,7 @@ export function useMemoizedValue<T>(
  * @param deps - Dependencies array
  * @returns Stable callback reference
  */
-export function useStableCallback<T extends (...args: any[]) => any>(
+export function useStableCallback<T extends (...args: unknown[]) => unknown>(
   callback: T,
   deps: React.DependencyList
 ): T {
@@ -173,7 +173,7 @@ export function usePerformanceMonitor(
  * @param delay - Delay before applying updates (default: 0 = next tick)
  * @returns Function to trigger batch update
  */
-export function useBatchedUpdates<T extends Record<string, any>>(
+export function useBatchedUpdates<T extends Record<string, unknown>>(
   delay: number = 0
 ): [(updates: Partial<T>) => void, Partial<T>] {
   const [pendingUpdates, setPendingUpdates] = useState<Partial<T>>({});
@@ -219,19 +219,22 @@ export function useDeepMemo<T>(value: T): T {
 /**
  * Deep equality check for objects and arrays
  */
-function deepEqual(a: any, b: any): boolean {
+function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
   if (typeof a !== 'object' || typeof b !== 'object') return false;
 
-  const keysA = Object.keys(a);
-  const keysB = Object.keys(b);
+  const objA = a as Record<string, unknown>;
+  const objB = b as Record<string, unknown>;
+  
+  const keysA = Object.keys(objA);
+  const keysB = Object.keys(objB);
 
   if (keysA.length !== keysB.length) return false;
 
   for (const key of keysA) {
     if (!keysB.includes(key)) return false;
-    if (!deepEqual(a[key], b[key])) return false;
+    if (!deepEqual(objA[key], objB[key])) return false;
   }
 
   return true;

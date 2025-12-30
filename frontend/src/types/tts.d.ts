@@ -11,6 +11,8 @@ export interface TtsStatus {
   platform?: 'twitch' | 'vk' | 'youtube';
   is_playing?: boolean;
   current_voice?: string;
+  engine_type?: 'gtts' | 'local' | 'cloud';
+  has_local_setup?: boolean;
 }
 
 /**
@@ -63,7 +65,7 @@ export interface TtsVoice {
   speed_preset?: 'very_slow' | 'slow' | 'normal' | 'fast' | 'very_fast';
   reference_text?: string;
   samples_count?: number;
-  [key: string]: any;
+  [key: string]: string | number | boolean | undefined;
 }
 
 /**
@@ -99,5 +101,80 @@ export interface LocalTtsConfig {
   endpoint_url?: string;
   api_key?: string;
   test_connection?: boolean;
+  configured?: boolean;
+  healthy?: boolean;
+  data?: {
+    configured?: boolean;
+    healthy?: boolean;
+  };
 }
 
+/**
+ * Режим TTS (все сообщения или за баллы канала)
+ */
+export type TtsTriggerMode = 'all_messages' | 'channel_points';
+
+/**
+ * Настройки режима TTS
+ */
+export interface TtsModeSettings {
+  tts_mode?: TtsTriggerMode;
+  tts_reward_ids?: TtsRewardIds;
+}
+
+/**
+ * ID наград TTS по платформам
+ */
+export interface TtsRewardIds {
+  twitch?: string;
+  vk?: string;
+  [platform: string]: string | undefined;
+}
+
+/**
+ * Ответ с настройками режима TTS
+ */
+export interface TtsModeSettingsResponse {
+  success: boolean;
+  data?: TtsModeSettings;
+}
+
+/**
+ * Данные для создания TTS награды
+ */
+export interface CreateTtsRewardData {
+  platform: string;
+  title: string;
+  cost: number;
+  cooldown: number;
+}
+
+/**
+ * Ответ при создании TTS награды
+ */
+export interface CreateTtsRewardResponse {
+  success: boolean;
+  data?: {
+    reward_id?: string;
+    message?: string;
+  };
+}
+
+/**
+ * Ответ при удалении TTS награды
+ */
+export interface DeleteTtsRewardResponse {
+  success: boolean;
+  message?: string;
+}
+
+
+/**
+ * Статус whitelist пользователя
+ */
+export interface WhitelistStatus {
+  is_whitelisted: boolean;
+  data?: {
+    is_whitelisted?: boolean;
+  };
+}

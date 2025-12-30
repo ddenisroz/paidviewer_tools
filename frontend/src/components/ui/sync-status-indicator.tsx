@@ -7,7 +7,9 @@
  * - Data is out of sync (error)
  */
 import React from 'react';
-import { CheckCircle2, AlertCircle, Loader2, WifiOff } from 'lucide-react';
+
+import { AlertCircle, CheckCircle2, Loader2, WifiOff } from 'lucide-react';
+
 import { cn } from '../../lib/utils';
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error' | 'offline';
@@ -119,7 +121,7 @@ export const SyncStatusBadge: React.FC<SyncStatusIndicatorProps> = ({
 export const useSyncStatus = (autoHideDelay = 2000) => {
   const [status, setStatus] = React.useState<SyncStatus>('idle');
   const [message, setMessage] = React.useState<string | undefined>();
-  const timeoutRef = React.useRef<ReturnType<typeof setTimeout>>();
+  const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const updateStatus = React.useCallback(
     (newStatus: SyncStatus, newMessage?: string) => {

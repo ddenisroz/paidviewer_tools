@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { Mic, MicOff, Volume2, Monitor } from 'lucide-react';
-import { useAuth } from '../../../context/AuthContext';
+import React, { useEffect, useState } from 'react';
+
+import { Mic, MicOff, Monitor, Volume2 } from 'lucide-react';
+
+// useAuth available but not currently needed
+// import { useAuth } from '../../../context/AuthContext';
+import { useSaveTtsPlatformSettings, useTtsPlatformSettings } from '../../../queries/tts/ttsQueries';
 import { TwitchIcon, VKIcon } from '../../../shared/components/PlatformIcons';
 import { logger } from '../../../utils/prodLogger';
-import { useTtsPlatformSettings, useSaveTtsPlatformSettings } from '../../../queries/tts/ttsQueries';
 
 interface TtsPlatformSettings {
   enabled_platforms: string[];
@@ -11,9 +14,8 @@ interface TtsPlatformSettings {
 }
 
 const TtsPlatformSelector: React.FC = () => {
-  const { user } = useAuth();
-  // ✅ НОВЫЙ КОД: Используем централизованные hooks для настроек платформы TTS
-  const { data: platformSettingsResponse, isLoading: loading, isInitialLoading: initialLoading } = useTtsPlatformSettings({
+  // [OK] НОВЫЙ КОД: Используем централизованные hooks для настроек платформы TTS
+  const { data: platformSettingsResponse, isLoading: _loading } = useTtsPlatformSettings({
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
@@ -24,7 +26,7 @@ const TtsPlatformSelector: React.FC = () => {
     global_enabled: false
   });
 
-  // ✅ НОВЫЙ КОД: Синхронизируем состояние с данными из React Query
+  // [OK] НОВЫЙ КОД: Синхронизируем состояние с данными из React Query
   useEffect(() => {
     if (platformSettingsData) {
       const data = platformSettingsData as { enabled_platforms?: string[]; global_enabled?: boolean };
@@ -32,7 +34,7 @@ const TtsPlatformSelector: React.FC = () => {
         enabled_platforms: Array.isArray(data.enabled_platforms) ? data.enabled_platforms : ['twitch', 'vk'],
         global_enabled: data.global_enabled !== false
       });
-      logger.log('🔄 [TTS SELECTOR] State updated from React Query:', {
+      logger.log('[REFRESH] [TTS SELECTOR] State updated from React Query:', {
         enabled_platforms: data.enabled_platforms,
         twitch_enabled: Array.isArray(data.enabled_platforms) && data.enabled_platforms.includes('twitch'),
         vk_enabled: Array.isArray(data.enabled_platforms) && data.enabled_platforms.includes('vk')
@@ -40,7 +42,7 @@ const TtsPlatformSelector: React.FC = () => {
     }
   }, [platformSettingsData]);
 
-  // ✅ НОВЫЙ КОД: Используем централизованный mutation для сохранения настроек
+  // [OK] НОВЫЙ КОД: Используем централизованный mutation для сохранения настроек
   const savePlatformSettingsMutation = useSaveTtsPlatformSettings({
     onSuccess: (response, variables) => {
       const vars = variables as { enabled_platforms: string[] };
@@ -50,11 +52,11 @@ const TtsPlatformSelector: React.FC = () => {
       };
       setSettings(newSettings);
       
-      // 🔄 Отправляем событие для синхронизации с нижними кнопками
+      // [REFRESH] Отправляем событие для синхронизации с нижними кнопками
       window.dispatchEvent(new CustomEvent('tts-settings-changed', {
         detail: { enabledPlatforms: vars.enabled_platforms }
       }));
-      logger.log('🔄 [TTS SELECTOR] Dispatched settings update:', vars.enabled_platforms);
+      logger.log('[REFRESH] [TTS SELECTOR] Dispatched settings update:', vars.enabled_platforms);
       // toast уже показан в hook
     },
     onError: (error) => {
@@ -103,12 +105,12 @@ const TtsPlatformSelector: React.FC = () => {
   };
 
   useEffect(() => {
-    // 🔄 Слушаем изменения TTS настроек из нижних кнопок
+    // [REFRESH] Слушаем изменения TTS настроек из нижних кнопок
     const handleTtsSettingsChanged = (event: CustomEvent<{ enabledPlatforms: string[] }>) => {
       const { enabledPlatforms } = event.detail;
-      logger.log('🔄 [TTS SELECTOR] Received settings update from shortcuts:', enabledPlatforms);
+      logger.log('[REFRESH] [TTS SELECTOR] Received settings update from shortcuts:', enabledPlatforms);
       setSettings(prev => {
-        logger.log('🔄 [TTS SELECTOR] Updating state from', prev.enabled_platforms, 'to', enabledPlatforms);
+        logger.log('[REFRESH] [TTS SELECTOR] Updating state from', prev.enabled_platforms, 'to', enabledPlatforms);
         return {
           ...prev,
           enabled_platforms: enabledPlatforms
@@ -123,7 +125,7 @@ const TtsPlatformSelector: React.FC = () => {
     };
   }, []);
 
-  // ⚡ Не показываем скелетон - сразу рендерим с дефолтными значениями
+  // Не показываем скелетон - сразу рендерим с дефолтными значениями
 
   const platforms = [
     {

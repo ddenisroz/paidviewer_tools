@@ -42,7 +42,7 @@ if [ ${#MISSING_ENV[@]} -gt 0 ]; then
     fi
     
     echo ""
-    echo "⚠️  Please edit the .env files with your configuration before continuing."
+    echo "[WARN] Please edit the .env files with your configuration before continuing."
     echo "   Run this script again after editing."
     exit 1
 fi
@@ -59,7 +59,7 @@ if grep -q "your-secret-key-here" bot_service/.env; then
     if command -v openssl &> /dev/null; then
         SECRET_KEY=$(openssl rand -hex 32)
     else
-        echo "❌ openssl not found. Please install openssl or manually generate SECRET_KEY"
+        echo "[ERROR] openssl not found. Please install openssl or manually generate SECRET_KEY"
         exit 1
     fi
     
@@ -69,7 +69,7 @@ if grep -q "your-secret-key-here" bot_service/.env; then
     elif command -v python &> /dev/null; then
         ENCRYPTION_KEY=$(python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
     else
-        echo "❌ Python not found. Please install Python or manually generate TOKEN_ENCRYPTION_KEY"
+        echo "[ERROR] Python not found. Please install Python or manually generate TOKEN_ENCRYPTION_KEY"
         exit 1
     fi
     
@@ -125,7 +125,7 @@ echo ""
 # Run database migrations
 echo "Running database migrations..."
 cd bot_service
-alembic upgrade head || echo "⚠️  Database migration failed. This is normal for first-time setup."
+alembic upgrade head || echo "[WARN] Database migration failed. This is normal for first-time setup."
 cd ..
 echo "✓ Database ready"
 echo ""

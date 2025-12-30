@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react';
-import { authService } from '../services/api/services/authService';
+
 import { useNavigate } from 'react-router-dom';
+
+import { authService } from '../services/api/services/authService';
 import { logger } from '../utils/prodLogger';
+
+import type { ApiResponse } from '../types/api';
+
+interface DonationAlertsResponse {
+  user_id?: string | number;
+}
 
 const DonationAlertsCallback: React.FC = () => {
   const [status, setStatus] = useState<string>('Обработка авторизации...');
@@ -30,20 +38,21 @@ const DonationAlertsCallback: React.FC = () => {
         setStatus('Обмен кода на токен...');
 
         const response = await authService.handleDonationAlertsCallback(code, state || '');
-        const result = (response.data as any);
+        const result = response.data as ApiResponse<DonationAlertsResponse>;
         
         setStatus('Успешно подключено к DonationAlerts!');
         
         window.dispatchEvent(new CustomEvent('donationalerts_connected', { 
-          detail: { success: true, user_id: result.user_id } 
+          detail: { success: true, user_id: result.data?.user_id } 
         }));
         
         window.dispatchEvent(new CustomEvent('auth_refresh_required'));
         
         setTimeout(() => navigate('/settings'), 2000);
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as Error;
         logger.error('DonationAlerts callback error:', error);
-        setStatus(`Ошибка: ${error.message || 'Неизвестная ошибка'}`);
+        setStatus(`Ошибка: ${err.message || 'Неизвестная ошибка'}`);
         setTimeout(() => navigate('/settings'), 3000);
       }
     };

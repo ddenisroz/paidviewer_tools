@@ -1,9 +1,10 @@
-import { AxiosError } from 'axios';
+import axios, { AxiosError } from 'axios';
 import { toast } from 'sonner';
+
 import { logger } from './prodLogger';
 
 /**
- * Типы ошибок API
+ * Типы ошибок API (клиентская классификация)
  */
 export enum ApiErrorType {
   NETWORK_ERROR = 'NETWORK_ERROR',
@@ -17,13 +18,55 @@ export enum ApiErrorType {
 }
 
 /**
+ * Коды ошибок от backend (core/exceptions.py)
+ */
+export type BackendErrorCode =
+  | 'INTERNAL_ERROR'
+  | 'AUTHENTICATION_ERROR'
+  | 'AUTHORIZATION_ERROR'
+  | 'TOKEN_EXPIRED'
+  | 'INVALID_TOKEN'
+  | 'SESSION_EXPIRED'
+  | 'NOT_FOUND'
+  | 'ALREADY_EXISTS'
+  | 'VALIDATION_ERROR'
+  | 'INVALID_INPUT'
+  | 'PLATFORM_ERROR'
+  | 'PLATFORM_CONNECTION_ERROR'
+  | 'PLATFORM_API_ERROR'
+  | 'BOT_ERROR'
+  | 'BOT_NOT_CONNECTED'
+  | 'BOT_ALREADY_CONNECTED'
+  | 'TTS_ERROR'
+  | 'TTS_SERVICE_UNAVAILABLE'
+  | 'TTS_VOICE_NOT_FOUND'
+  | 'DATABASE_ERROR'
+  | 'DATABASE_CONNECTION_ERROR'
+  | 'RATE_LIMIT_EXCEEDED'
+  | 'EXTERNAL_SERVICE_ERROR';
+
+/**
+ * Структура ответа ошибки от backend
+ */
+interface BackendErrorResponse {
+  error_code?: BackendErrorCode;
+  message?: string;
+  details?: Record<string, unknown>;
+  timestamp?: string;
+  // Legacy format
+  error?: string;
+  detail?: string;
+}
+
+/**
  * Структура ошибки API
  */
 export interface ApiError {
   type: ApiErrorType;
+  errorCode?: BackendErrorCode;
   message: string;
   statusCode?: number;
-  details?: any;
+  details?: unknown;
   originalError: AxiosError;
 }
 
@@ -71,15 +114,57 @@ function getErrorType(error: AxiosError): ApiErrorType {
 }
 
 /**
+ * Получает error_code из ответа backend
+ */
+function getBackendErrorCode(error: AxiosError): BackendErrorCode | undefined {
+  const data = error.response?.data as BackendErrorResponse | undefined;
+  return data?.error_code;
+}
+
+/**
  * Получает пользовательское сообщение об ошибке
  */
 function getUserMessage(error: AxiosError, type: ApiErrorType): string {
-  // Пытаемся получить сообщение от сервера
-  const serverMessage = (error.response?.data as any)?.detail || 
-                       (error.response?.data as any)?.message;
-
+  const data = error.response?.data as BackendErrorResponse | undefined;
+  
+  // Пытаемся получить сообщение от сервера (новый формат)
+  if (data?.message && typeof data.message === 'string') {
+    return data.message;
+  }
+  
+  // Legacy format
+  const serverMessage = data?.error || data?.detail;
   if (serverMessage && typeof serverMessage === 'string') {
     return serverMessage;
+  }
+
+  // Сообщения по error_code от backend
+  const errorCode = data?.error_code;
+  if (errorCode) {
+    switch (errorCode) {
+      case 'TOKEN_EXPIRED':
+      case 'SESSION_EXPIRED':
+        return 'Сессия истекла. Пожалуйста, войдите снова.';
+      case 'INVALID_TOKEN':
+        return 'Недействительный токен авторизации.';
+      case 'BOT_NOT_CONNECTED':
+        return 'Бот не подключен к каналу.';
+      case 'BOT_ALREADY_CONNECTED':
+        return 'Бот уже подключен к каналу.';
+      case 'TTS_SERVICE_UNAVAILABLE':
+        return 'TTS сервис временно недоступен.';
+      case 'TTS_VOICE_NOT_FOUND':
+        return 'Выбранный голос не найден.';
+      case 'PLATFORM_CONNECTION_ERROR':
+        return 'Ошибка подключения к платформе.';
+      case 'RATE_LIMIT_EXCEEDED':
+        const retryAfter = data?.details?.retry_after;
+        return retryAfter 
+          ? `Превышен лимит запросов. Повторите через ${retryAfter} сек.`
+          : 'Превышен лимит запросов. Попробуйте позже.';
+      case 'ALREADY_EXISTS':
+        return 'Такой ресурс уже существует.';
+    }
   }
 
   // Дефолтные сообщения по типу ошибки
@@ -125,8 +210,10 @@ export function handleApiError(
   const message = customMessage || getUserMessage(error, errorType);
   const statusCode = error.response?.status;
 
+  const errorCode = getBackendErrorCode(error);
   const apiError: ApiError = {
     type: errorType,
+    errorCode,
     message,
     statusCode,
     details: error.response?.data,
@@ -163,10 +250,11 @@ export function handleApiError(
 
       case ApiErrorType.VALIDATION_ERROR:
         // Для ошибок валидации показываем детали
-        const validationErrors = (error.response?.data as any)?.errors;
+        const responseData = error.response?.data as BackendErrorResponse | undefined;
+        const validationErrors = responseData?.details?.errors as Array<{ field: string; message: string }> | undefined;
         if (validationErrors && Array.isArray(validationErrors)) {
           const errorList = validationErrors
-            .map((e: any) => `${e.field}: ${e.message}`)
+            .map((e) => `${e.field}: ${e.message}`)
             .join('\n');
           toast.error(message, {
             description: errorList,
@@ -233,9 +321,9 @@ export class RetryHandler {
    */
   async execute<T>(
     fn: () => Promise<T>,
-    shouldRetry: (error: any) => boolean = () => true
+    shouldRetry: (error: unknown) => boolean = () => true
   ): Promise<T> {
-    let lastError: any;
+    let lastError: unknown;
     
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       try {
@@ -295,14 +383,14 @@ export function useRetryHandler(maxRetries = 2) {
   ): Promise<T> => {
     try {
       return await retryHandler.execute(fn, (error) => {
-        if (error.isAxiosError) {
-          return shouldRetryRequest(error as AxiosError);
+        if (axios.isAxiosError(error)) {
+          return shouldRetryRequest(error);
         }
         return false;
       });
     } catch (error) {
-      if (error.isAxiosError) {
-        handleApiError(error as AxiosError, options);
+      if (axios.isAxiosError(error)) {
+        handleApiError(error, options);
       }
       throw error;
     }
@@ -321,7 +409,7 @@ export async function apiCall<T>(
   try {
     return await fn();
   } catch (error) {
-    if (error.isAxiosError) {
+    if (error && typeof error === 'object' && 'isAxiosError' in error && error.isAxiosError) {
       handleApiError(error as AxiosError, options);
     }
     throw error;

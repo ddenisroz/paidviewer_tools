@@ -1,9 +1,10 @@
 # bot_service/api/donationalerts_api.py
 """API для DonationAlerts"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from core.database import get_db, User
+from core.database import get_db
 from auth.auth import get_current_user, get_current_user_optional
+from core.config import settings
 import logging
 
 logger = logging.getLogger(__name__)
@@ -18,33 +19,33 @@ async def get_donationalerts_status(
     """Получить статус DonationAlerts"""
     try:
         from core.database import UserToken
-        
+
         # Поддерживаем гостей и авторизованных пользователей
         user_id = user.get('id') if user and user.get('id') and user.get('id') > 0 else None
         session_id = user.get('session_id') if user and user.get('id') == -1 else None
         is_guest = (user and user.get('id') == -1)
-        
+
         if not user_id and not session_id:
             return {
                 "success": True,
                 "connected": False,
                 "user_info": None
             }
-        
+
         # Проверяем наличие токена DonationAlerts
         if is_guest:
             token = db.query(UserToken).filter(
                 UserToken.session_id == session_id,
                 UserToken.platform == "donationalerts",
-                UserToken.is_active == True
+                UserToken.is_active.is_(True)
             ).first()
         else:
             token = db.query(UserToken).filter(
                 UserToken.user_id == user_id,
                 UserToken.platform == "donationalerts",
-                UserToken.is_active == True
+                UserToken.is_active.is_(True)
             ).first()
-        
+
         if token:
             return {
                 "success": True,
@@ -71,25 +72,22 @@ async def connect_donationalerts(
     """Подключить DonationAlerts"""
     try:
         import os
-        
+
         # Проверяем что пользователь авторизован (гость или авторизованный пользователь)
         if not user:
             logger.error("User not authenticated")
             return {"success": False, "error": "Not authenticated"}
-        
-        # Получаем настройки из .env
-        client_id = os.getenv("DONATIONALERTS_CLIENT_ID")
-        redirect_uri = os.getenv("DONATIONALERTS_REDIRECT_URI")
-        
+
+        # Получаем настройки
+        client_id = settings.donationalerts_client_id
+        redirect_uri = settings.donationalerts_redirect_uri
+
         # Проверяем настройки
         if not client_id:
             logger.error("DONATIONALERTS_CLIENT_ID not set in environment variables")
             return {"success": False, "error": "DonationAlerts integration is not configured"}
-        
-        if not redirect_uri:
-            redirect_uri = "http://localhost:8000/auth/donationalerts/callback"
             logger.warning("DONATIONALERTS_REDIRECT_URI not set, using default value")
-        
+
         # Формируем URL авторизации
         from urllib.parse import urlencode
         params = {
@@ -99,10 +97,10 @@ async def connect_donationalerts(
             "scope": "oauth-user-show oauth-donation-subscribe oauth-donation-index"
         }
         auth_url = f"https://www.donationalerts.com/oauth/authorize?{urlencode(params)}"
-        
+
         user_identifier = f"guest {user.get('session_id')}" if user.get('id') == -1 else f"user {user.get('id')}"
         logger.info(f"DonationAlerts auth URL generated for {user_identifier}: {auth_url}")
-        
+
         return {
             "success": True,
             "message": "DonationAlerts connection initiated",
@@ -117,18 +115,18 @@ async def disconnect_donationalerts(
     user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    
+
     try:
         from core.database import UserToken
-        
+
         # Поддерживаем гостей и авторизованных пользователей
         user_id = user.get('id') if user and user.get('id') and user.get('id') > 0 else None
         session_id = user.get('session_id') if user and user.get('id') == -1 else None
         is_guest = (user and user.get('id') == -1)
-        
+
         if not user_id and not session_id:
             return {"success": False, "error": "Not authenticated"}
-        
+
         # Удаляем токен DonationAlerts
         if is_guest:
             deleted = db.query(UserToken).filter(
@@ -140,11 +138,11 @@ async def disconnect_donationalerts(
                 UserToken.user_id == user_id,
                 UserToken.platform == "donationalerts"
             ).delete()
-        
+
         db.commit()
-        
+
         user_identifier = f"guest {session_id}" if is_guest else f"user {user_id}"
-        logger.info(f"✅ Disconnected DonationAlerts for {user_identifier}")
+        logger.info(f"[OK] Disconnected DonationAlerts for {user_identifier}")
         return {
             "success": True,
             "message": "DonationAlerts disconnected successfully"
@@ -164,19 +162,19 @@ async def get_donations_history(
     """Получить историю донатов пользователя"""
     try:
         from core.database import DonationAlert
-        
+
         user_id = user.get('id')
-        
+
         # Получаем сумму страниц
         total = db.query(DonationAlert).filter(
             DonationAlert.user_id == user_id
         ).count()
-        
+
         # Получаем донаты с пагинацией
         donations = db.query(DonationAlert).filter(
             DonationAlert.user_id == user_id
         ).order_by(DonationAlert.processed_at.desc()).offset(offset).limit(limit).all()
-        
+
         return {
             "success": True,
             "donations": [
@@ -214,42 +212,42 @@ async def get_donations_stats(
         from sqlalchemy import func
         from datetime import timedelta
         from datetime import datetime as dt
-        
+
         user_id = user.get('id')
-        
+
         # За всё время
         total_donations = db.query(DonationAlert).filter(
             DonationAlert.user_id == user_id
         ).count()
-        
+
         total_amount = db.query(func.sum(DonationAlert.amount)).filter(
             DonationAlert.user_id == user_id
         ).scalar() or 0.0
-        
+
         # За последний месяц
         one_month_ago = dt.utcnow() - timedelta(days=30)
         month_donations = db.query(DonationAlert).filter(
             DonationAlert.user_id == user_id,
             DonationAlert.processed_at > one_month_ago
         ).count()
-        
+
         month_amount = db.query(func.sum(DonationAlert.amount)).filter(
             DonationAlert.user_id == user_id,
             DonationAlert.processed_at > one_month_ago
         ).scalar() or 0.0
-        
+
         # За последнюю неделю
         one_week_ago = dt.utcnow() - timedelta(days=7)
         week_donations = db.query(DonationAlert).filter(
             DonationAlert.user_id == user_id,
             DonationAlert.processed_at > one_week_ago
         ).count()
-        
+
         week_amount = db.query(func.sum(DonationAlert.amount)).filter(
             DonationAlert.user_id == user_id,
             DonationAlert.processed_at > one_week_ago
         ).scalar() or 0.0
-        
+
         return {
             "success": True,
             "stats": {

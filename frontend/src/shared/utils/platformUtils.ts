@@ -1,5 +1,7 @@
 import { logger } from '../../utils/prodLogger';
 
+import type { AxiosError } from 'axios';
+
 export const PLATFORMS = {
   TWITCH: 'twitch',
   VK: 'vk',
@@ -8,6 +10,34 @@ export const PLATFORMS = {
 } as const;
 
 export type Platform = typeof PLATFORMS[keyof typeof PLATFORMS];
+
+interface UserSettings {
+  twitch_token_valid?: boolean;
+  twitch_token?: string;
+  twitch_username?: string;
+  vk_token_valid?: boolean;
+  vk_token?: string;
+  vk_channel_name?: string;
+}
+
+interface PlatformConfig {
+  enabled?: boolean;
+  token?: string;
+  username?: string;
+  channelName?: string;
+}
+
+interface PlatformData {
+  platform?: string;
+  channel_name?: string;
+  channel_id?: string;
+  [key: string]: unknown;
+}
+
+interface CommandData {
+  platforms: string | string[];
+  [key: string]: unknown;
+}
 
 export const PLATFORM_NAMES: Record<Platform, string> = {
   [PLATFORMS.TWITCH]: 'Twitch',
@@ -24,14 +54,14 @@ export const PLATFORM_COLORS: Record<Platform, string> = {
 };
 
 export const PLATFORM_ICONS: Record<Platform, string> = {
-  [PLATFORMS.TWITCH]: '🎮',
-  [PLATFORMS.VK]: '🌐',
-  [PLATFORMS.YOUTUBE]: '📺',
-  [PLATFORMS.DONATION_ALERTS]: '💝',
+  [PLATFORMS.TWITCH]: '[GAME]',
+  [PLATFORMS.VK]: '[WEB]',
+  [PLATFORMS.YOUTUBE]: '[YT]',
+  [PLATFORMS.DONATION_ALERTS]: '[DA]',
 };
 
-export const isValidPlatform = (platform: any): platform is Platform => {
-  return Object.values(PLATFORMS).includes(platform);
+export const isValidPlatform = (platform: unknown): platform is Platform => {
+  return typeof platform === 'string' && Object.values(PLATFORMS).includes(platform as Platform);
 };
 
 export const getPlatformName = (platform: Platform | string): string => {
@@ -43,7 +73,7 @@ export const getPlatformColor = (platform: Platform | string): string => {
 };
 
 export const getPlatformIcon = (platform: Platform | string): string => {
-  return PLATFORM_ICONS[platform as Platform] || '🔌';
+  return PLATFORM_ICONS[platform as Platform] || '[CONNECT]';
 };
 
 export const getPlatformProfileUrl = (platform: Platform | string, username?: string | null): string | null => {
@@ -75,58 +105,65 @@ export const getPlatformStreamUrl = (platform: Platform | string, username?: str
   }
 };
 
-export const getPlatformSettings = (userSettings: any): Record<string, any> => {
-  if (!userSettings) return {};
+export const getPlatformSettings = (userSettings: unknown): Record<string, PlatformConfig> => {
+  const settings = userSettings as UserSettings | null;
+  if (!settings) return {};
   return {
     [PLATFORMS.TWITCH]: {
-      enabled: userSettings.twitch_token_valid === true,
-      token: userSettings.twitch_token,
-      username: userSettings.twitch_username,
+      enabled: settings.twitch_token_valid === true,
+      token: settings.twitch_token,
+      username: settings.twitch_username,
     },
     [PLATFORMS.VK]: {
-      enabled: userSettings.vk_token_valid === true,
-      token: userSettings.vk_token,
-      channelName: userSettings.vk_channel_name,
+      enabled: settings.vk_token_valid === true,
+      token: settings.vk_token,
+      channelName: settings.vk_channel_name,
     },
   };
 };
 
-export const isPlatformAuthorized = (userSettings: any, platform: Platform | string): boolean => {
+export const isPlatformAuthorized = (userSettings: unknown, platform: Platform | string): boolean => {
   const settings = getPlatformSettings(userSettings);
   return !!settings[platform as Platform]?.enabled;
 };
 
-export const getAuthorizedPlatforms = (userSettings: any): string[] => {
+export const getAuthorizedPlatforms = (userSettings: unknown): string[] => {
   const settings = getPlatformSettings(userSettings);
   return Object.entries(settings)
-    .filter(([, config]) => (config as any).enabled)
+    .filter(([, config]) => config.enabled)
     .map(([platform]) => platform);
 };
 
-export const normalizePlatformData = (platform: Platform | string, data: any): any => {
-  const normalized: any = { platform, ...data };
+export const normalizePlatformData = (platform: Platform | string, data: unknown): PlatformData => {
+  const normalized: PlatformData = { platform, ...(data as Record<string, unknown>) };
   switch (platform) {
     case PLATFORMS.TWITCH:
-      normalized.channel_name = normalized.channel_name?.toLowerCase();
+      if (normalized.channel_name) {
+        normalized.channel_name = normalized.channel_name.toLowerCase();
+      }
       break;
     case PLATFORMS.VK:
-      normalized.channel_id = normalized.channel_id?.toString();
+      if (normalized.channel_id) {
+        normalized.channel_id = normalized.channel_id.toString();
+      }
       break;
   }
   return normalized;
 };
 
-export const formatPlatformError = (platform: Platform | string, error: any): string => {
+export const formatPlatformError = (platform: Platform | string, error: unknown): string => {
   logger.error(`Platform error [${platform}]:`, error);
   const platformName = getPlatformName(platform);
-  if (error?.response?.status === 401) {
+  const axiosError = error as AxiosError<{ detail?: string }>;
+  
+  if (axiosError.response?.status === 401) {
     return `${platformName} authorization expired. Please login again.`;
   }
-  if (error?.response?.status === 403) {
+  if (axiosError.response?.status === 403) {
     return `Access denied on ${platformName}. Check permissions.`;
   }
-  if (error?.response?.data?.detail) {
-    return error.response.data.detail;
+  if (axiosError.response?.data?.detail) {
+    return axiosError.response.data.detail;
   }
   return `Error connecting to ${platformName}`;
 };
@@ -138,14 +175,16 @@ export const getCommandPlatforms = (commandPlatforms: string | string[]): string
   return Array.isArray(commandPlatforms) ? commandPlatforms : [PLATFORMS.TWITCH];
 };
 
-export const isCommandAvailableOnPlatform = (command: any, platform: Platform | string): boolean => {
-  const platforms = getCommandPlatforms(command.platforms);
+export const isCommandAvailableOnPlatform = (command: unknown, platform: Platform | string): boolean => {
+  const cmd = command as CommandData;
+  const platforms = getCommandPlatforms(cmd.platforms);
   return platforms.includes(platform as string) || platforms.includes('all');
 };
 
-export const groupByPlatform = (items: any[], platformKey: string = 'platform'): Record<string, any[]> => {
-  return items.reduce((acc: Record<string, any[]>, item: any) => {
-    const platform = item[platformKey];
+export const groupByPlatform = (items: unknown[], platformKey: string = 'platform'): Record<string, unknown[]> => {
+  return items.reduce((acc: Record<string, unknown[]>, item: unknown) => {
+    const itemData = item as Record<string, unknown>;
+    const platform = itemData[platformKey] as string;
     if (!acc[platform]) {
       acc[platform] = [];
     }
@@ -155,12 +194,12 @@ export const groupByPlatform = (items: any[], platformKey: string = 'platform'):
 };
 
 export const applyToAllPlatforms = async (
-  userSettings: any,
-  operation: (platform: string) => Promise<any>,
+  userSettings: unknown,
+  operation: (platform: string) => Promise<unknown>,
   onProgress: ((platform: string, index: number, total: number) => void) | null = null
-): Promise<Record<string, any>> => {
+): Promise<Record<string, unknown>> => {
   const platforms = getAuthorizedPlatforms(userSettings);
-  const results: Record<string, any> = {};
+  const results: Record<string, unknown> = {};
   for (let i = 0; i < platforms.length; i++) {
     const platform = platforms[i];
     try {

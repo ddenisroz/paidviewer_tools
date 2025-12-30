@@ -1,9 +1,9 @@
 """API для системных логов и истории действий администраторов"""
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_
-from typing import Optional, List
-from datetime import datetime, timedelta
+from typing import Optional
+from datetime import timedelta
 
 from core.database import get_db, SystemLog, User
 from core.datetime_utils import utcnow_naive
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/admin", tags=["system-logs"])
 
 class SystemLogService:
     """Сервис для работы с системными логами"""
-    
+
     @staticmethod
     def log_action(
         db: Session,
@@ -77,37 +77,37 @@ async def get_system_logs(
         # Проверяем права доступа - только админы
         if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Admin access required")
-        
+
         # Строим фильтры
         filters = []
-        
+
         # Временной диапазон
         cutoff_date = utcnow_naive() - timedelta(days=days)
         filters.append(SystemLog.timestamp >= cutoff_date)
-        
+
         if action_type:
             filters.append(SystemLog.action_type == action_type)
-        
+
         if admin_id:
             filters.append(SystemLog.admin_id == admin_id)
-        
+
         if target_user_id:
             filters.append(SystemLog.target_user_id == target_user_id)
-        
+
         if status:
             filters.append(SystemLog.status == status)
-        
+
         # Получаем логи
         logs = db.query(SystemLog).filter(and_(*filters)) if filters else db.query(SystemLog)
         total_count = logs.count()
         logs = logs.order_by(desc(SystemLog.timestamp)).limit(limit).offset(offset).all()
-        
+
         # Форматируем результаты
         formatted_logs = []
         for log in logs:
             admin_user = db.query(User).filter(User.id == log.admin_id).first()
             target_user = db.query(User).filter(User.id == log.target_user_id).first() if log.target_user_id else None
-            
+
             formatted_logs.append({
                 "id": log.id,
                 "admin_id": log.admin_id,
@@ -124,7 +124,7 @@ async def get_system_logs(
                 "error_message": log.error_message,
                 "timestamp": log.timestamp.isoformat() if log.timestamp else None
             })
-        
+
         return {
             "success": True,
             "data": formatted_logs,
@@ -136,7 +136,7 @@ async def get_system_logs(
             },
             "timestamp": utcnow_naive().isoformat()
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -155,9 +155,9 @@ async def get_logs_statistics(
         # Проверяем права доступа - только админы
         if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Admin access required")
-        
+
         cutoff_date = utcnow_naive() - timedelta(days=days)
-        
+
         # Считаем логи по типам действий
         from sqlalchemy import func, case
         action_stats = db.query(
@@ -166,13 +166,13 @@ async def get_logs_statistics(
             func.sum(case((SystemLog.status == 'success', 1), else_=0)).label('success_count'),
             func.sum(case((SystemLog.status == 'failed', 1), else_=0)).label('failed_count')
         ).filter(SystemLog.timestamp >= cutoff_date).group_by(SystemLog.action_type).all()
-        
+
         # Считаем логи по админам
         admin_stats = db.query(
             SystemLog.admin_id,
             func.count(SystemLog.id).label('count')
         ).filter(SystemLog.timestamp >= cutoff_date).group_by(SystemLog.admin_id).order_by(desc(func.count(SystemLog.id))).limit(10).all()
-        
+
         # Форматируем результаты
         action_data = []
         for action_type, count, success, failed in action_stats:
@@ -183,7 +183,7 @@ async def get_logs_statistics(
                 "failed": failed,
                 "success_rate": round((success / count * 100), 2) if count > 0 else 0
             })
-        
+
         admin_data = []
         for admin_id, count in admin_stats:
             admin_user = db.query(User).filter(User.id == admin_id).first()
@@ -192,7 +192,7 @@ async def get_logs_statistics(
                 "admin_name": admin_user.twitch_username or admin_user.vk_username or f"User {admin_id}" if admin_user else f"Unknown {admin_id}",
                 "action_count": count
             })
-        
+
         return {
             "success": True,
             "data": {
@@ -203,7 +203,7 @@ async def get_logs_statistics(
             },
             "timestamp": utcnow_naive().isoformat()
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -221,18 +221,18 @@ async def get_available_actions(
         # Проверяем права доступа - только админы
         if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Admin access required")
-        
-        from sqlalchemy import func, distinct
-        
+
+        from sqlalchemy import distinct
+
         # Получаем все уникальные типы действий
         action_types = db.query(distinct(SystemLog.action_type)).all()
-        
+
         return {
             "success": True,
             "data": [action[0] for action in action_types if action[0]],
             "timestamp": utcnow_naive().isoformat()
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:

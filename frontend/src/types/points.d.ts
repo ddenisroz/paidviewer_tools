@@ -62,7 +62,7 @@ export interface RewardDemand {
     nick?: string;
     name?: string;
   };
-  message?: string | any;
+  message?: string | { text?: string; content?: string };
   message_parts?: Array<string | {
     text?: { content: string };
     mention?: { nick: string };

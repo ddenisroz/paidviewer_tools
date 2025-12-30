@@ -3,6 +3,7 @@
 import logging
 import json
 from datetime import datetime
+from core.datetime_utils import utcnow_naive
 from typing import List
 from twitchio.ext import commands
 from core.connection_manager import ConnectionManager
@@ -52,12 +53,13 @@ class Bot(TwitchBotCore):
                     break
             
             if not channel:
-                logger.warning(f"⚠️ [BOT] Channel {channel_name} not found in connected_channels")
+                logger.warning(f"[WARN] [BOT] Channel {channel_name} not found in connected_channels")
                 return
             
             # Проверяем в БД, не отправляли ли приветствие недавно
             from core.database import SessionLocal, UserSettings
             from datetime import datetime, timedelta
+            from core.datetime_utils import utcnow_naive
             
             db = SessionLocal()
             try:
@@ -66,7 +68,7 @@ class Bot(TwitchBotCore):
                 ).first()
                 
                 if settings and settings.bot_last_welcome_at:
-                    time_diff = datetime.utcnow() - settings.bot_last_welcome_at
+                    time_diff = utcnow_naive() - settings.bot_last_welcome_at
                     if time_diff < timedelta(minutes=5):
                         logger.debug(f"🔇 [BOT] Welcome message sent {int(time_diff.total_seconds())}s ago, skipping")
                         return
@@ -78,19 +80,19 @@ class Bot(TwitchBotCore):
                 
                 # Обновляем время в БД
                 if settings:
-                    settings.bot_last_welcome_at = datetime.utcnow()
+                    settings.bot_last_welcome_at = utcnow_naive()
                     db.commit()
                 
-                logger.info(f"✅ [BOT] Welcome message sent to {channel.name} with fake IP: {fake_ip}")
+                logger.info(f"[OK] [BOT] Welcome message sent to {channel.name} with fake IP: {fake_ip}")
                 
             except Exception as e:
-                logger.error(f"❌ [BOT] Failed to send welcome message: {e}")
+                logger.error(f"[ERROR] [BOT] Failed to send welcome message: {e}")
                 await self._handle_ban_error(channel_name, e)
             finally:
                 db.close()
                 
         except Exception as e:
-            logger.error(f"❌ [BOT] Error in send_welcome_message: {e}")
+            logger.error(f"[ERROR] [BOT] Error in send_welcome_message: {e}")
     
     async def event_join(self, channel, user):
         """Вызывается когда кто-то присоединяется к каналу (включая самого бота)"""
@@ -100,7 +102,7 @@ class Bot(TwitchBotCore):
         # Welcome message теперь отправляется только при OAuth подключении
         # См. send_welcome_message() - вызывается из oauth_handler после авторизации
         if user.name.lower() == self.nick.lower():
-            logger.info(f"✅ [BOT] Joined channel {channel.name} (welcome message via OAuth only)")
+            logger.info(f"[OK] [BOT] Joined channel {channel.name} (welcome message via OAuth only)")
     
     async def _handle_ban_error(self, channel_name: str, error: Exception):
         """Обработка ошибок, связанных с баном бота"""
@@ -117,7 +119,7 @@ class Bot(TwitchBotCore):
     async def _disconnect_and_cleanup(self, channel_name: str, reason: str = "ban"):
         """Отключиться от канала и удалить токены"""
         try:
-            logger.warning(f"🔌 [DISCONNECT] Disconnecting from {channel_name} due to: {reason}")
+            logger.warning(f"[CONNECT] [DISCONNECT] Disconnecting from {channel_name} due to: {reason}")
             
             # Получаем user_id из БД по имени канала
             from core.database import SessionLocal, User
@@ -128,34 +130,34 @@ class Bot(TwitchBotCore):
                 ).first()
                 
                 if user:
-                    logger.info(f"🗑️ [CLEANUP] Found user {user.id} for channel {channel_name}")
+                    logger.info(f"[DELETE] [CLEANUP] Found user {user.id} for channel {channel_name}")
                     
                     # Удаляем токены
                     from core.session_manager import session_manager
                     session_manager.remove_platform_token(user.id, 'twitch')
-                    logger.info(f"✅ [CLEANUP] Twitch tokens removed for user {user.id}")
+                    logger.info(f"[OK] [CLEANUP] Twitch tokens removed for user {user.id}")
                     
                     # Отключаем TTS
                     self.connection_manager.disable_tts_for_channel(channel_name.lower())
-                    logger.info(f"✅ [CLEANUP] TTS disabled for {channel_name}")
+                    logger.info(f"[OK] [CLEANUP] TTS disabled for {channel_name}")
                     
                     # Завершаем сессии с причиной бана
                     session_manager.terminate_user_sessions(user.id, f"bot_{reason}", db)
-                    logger.info(f"✅ [CLEANUP] Sessions terminated for user {user.id}")
+                    logger.info(f"[OK] [CLEANUP] Sessions terminated for user {user.id}")
                 else:
-                    logger.warning(f"⚠️ [CLEANUP] User not found for channel {channel_name}")
+                    logger.warning(f"[WARN] [CLEANUP] User not found for channel {channel_name}")
             finally:
                 db.close()
             
             # Покидаем канал
             try:
                 await self.part_channels([channel_name])
-                logger.info(f"✅ [DISCONNECT] Bot left channel: {channel_name}")
+                logger.info(f"[OK] [DISCONNECT] Bot left channel: {channel_name}")
             except Exception as e:
-                logger.error(f"❌ [DISCONNECT] Error leaving channel {channel_name}: {e}")
+                logger.error(f"[ERROR] [DISCONNECT] Error leaving channel {channel_name}: {e}")
                 
         except Exception as e:
-            logger.error(f"❌ [CLEANUP] Error during disconnect and cleanup for {channel_name}: {e}")
+            logger.error(f"[ERROR] [CLEANUP] Error during disconnect and cleanup for {channel_name}: {e}")
             import traceback
             logger.error(traceback.format_exc())
 
@@ -192,7 +194,7 @@ class Bot(TwitchBotCore):
         
         # Проверка гостевого кода (если это 6 цифр)
         if message.content.strip().isdigit() and len(message.content.strip()) == 6:
-            logger.info(f"🔍 [GUEST] Detected 6-digit code: {message.content.strip()}")
+            logger.info(f"[DEBUG] [GUEST] Detected 6-digit code: {message.content.strip()}")
             from api.guest_api import confirm_guest_code
             confirm_guest_code(
                 channel_name=message.channel.name.lower(),
@@ -240,7 +242,7 @@ class Bot(TwitchBotCore):
         if hasattr(message, 'tags') and message.tags:
             reward_id = message.tags.get('custom-reward-id')
             if reward_id:
-                logger.info(f"🎁 [TWITCH MSG] Message from Channel Points reward: {reward_id}")
+                logger.info(f"[REWARD] [TWITCH MSG] Message from Channel Points reward: {reward_id}")
         
         await handle_tts_for_message(
             text=message.content,
@@ -277,7 +279,7 @@ class Bot(TwitchBotCore):
             )
             
             if result:
-                logger.info(f"🎁 [DROPS] {result['viewer_name']} получил {result['reward']} ({result['quality']})")
+                logger.info(f"[REWARD] [DROPS] {result['viewer_name']} получил {result['reward']} ({result['quality']})")
                 
                 # Отправляем событие в WebSocket для OBS виджета
                 from utils.websocket_helper import broadcast_drops_event

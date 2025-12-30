@@ -1,19 +1,22 @@
-// src/components/chat/ChatControls.tsx
+﻿// src/components/chat/ChatControls.tsx
 import React from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+
+import { 
+    Copy, 
+    MessageCircle,
+    MessageSquare,
+    Settings,
+    Twitch
+} from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { 
-    MessageSquare, 
-    Settings,
-    Twitch,
-    MessageCircle,
-    Copy
-} from 'lucide-react';
-import { VKIcon } from '../PlatformIcons';
-import { toast } from 'sonner';
+import { Switch } from '@/components/ui/switch';
+import { toast } from '@/utils/toastManager';
+
+import { VKIcon } from '../../shared/components/PlatformIcons';
 
 interface Integration {
     enabled?: boolean;

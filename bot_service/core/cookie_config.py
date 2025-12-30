@@ -3,9 +3,9 @@
 Production-ready cookie configuration
 Автоматически настраивает security флаги на основе ENVIRONMENT
 """
-import os
 import logging
 from typing import Optional
+from core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -31,21 +31,20 @@ def get_cookie_settings(
     Returns:
         dict: Настройки для response.set_cookie()
     """
-    environment = os.getenv("ENVIRONMENT", "development").lower()
-    is_production = environment == "production"
-    
+    is_production = settings.environment.lower() == "production"
+
     settings = {
         "key": key,
         "value": value,
         "httponly": httponly,
-        "secure": is_production,  # ✅ True только в production
+        "secure": is_production,  # True только в production
         "samesite": samesite,
         "path": path
     }
-    
+
     if max_age is not None:
         settings["max_age"] = max_age
-    
+
     # Логируем для отладки (только в dev)
     if not is_production:
         logger.debug(
@@ -54,13 +53,13 @@ def get_cookie_settings(
             f"httponly={httponly}, "
             f"samesite={samesite}"
         )
-    
+
     return settings
 
 
 def is_production() -> bool:
     """Проверка что приложение запущено в production"""
-    return os.getenv("ENVIRONMENT", "development").lower() == "production"
+    return settings.environment.lower() == "production"
 
 
 def is_development() -> bool:
@@ -70,7 +69,8 @@ def is_development() -> bool:
 
 # Константы для session cookies
 # Бесконечная сессия (10 лет) - сессия живет до явного логаута или логина с другого устройства
-SESSION_MAX_AGE_SECONDS = int(os.getenv("SESSION_MAX_AGE_SECONDS", "315360000"))  # 10 лет (315360000 секунд)
+TEN_YEARS_IN_SECONDS = 10 * 365 * 24 * 60 * 60  # 315360000 секунд
+SESSION_MAX_AGE_SECONDS = TEN_YEARS_IN_SECONDS
 
 def get_session_cookie_settings(session_id: str) -> dict:
     """
@@ -93,9 +93,8 @@ def get_session_cookie_settings(session_id: str) -> dict:
 
 
 # При импорте модуля показываем текущий режим
-_environment = os.getenv("ENVIRONMENT", "development")
-if _environment.lower() == "production":
-    logger.info("🔒 Running in PRODUCTION mode: cookies.secure=True")
+if settings.is_production:
+    logger.info("[SECURITY] Running in PRODUCTION mode: cookies.secure=True")
 else:
-    logger.info(f"🔓 Running in {_environment.upper()} mode: cookies.secure=False")
+    logger.info(f"[DEV] Running in {settings.environment.upper()} mode: cookies.secure=False")
 

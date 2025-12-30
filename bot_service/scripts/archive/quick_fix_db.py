@@ -17,15 +17,15 @@ if user:
         if channel_name and not settings.channel_name:
             settings.channel_name = channel_name.lower()
             db.commit()
-            print(f"✅ Updated UserSettings.channel_name = {settings.channel_name}")
+            print(f"[OK] Updated UserSettings.channel_name = {settings.channel_name}")
         elif settings.channel_name:
-            print(f"✅ UserSettings.channel_name already set: {settings.channel_name}")
+            print(f"[OK] UserSettings.channel_name already set: {settings.channel_name}")
         else:
-            print(f"❌ No username found for user {user.id}")
+            print(f"[ERROR] No username found for user {user.id}")
     else:
-        print(f"❌ No UserSettings for user {user.id}")
+        print(f"[ERROR] No UserSettings for user {user.id}")
 else:
-    print("❌ User not found")
+    print("[ERROR] User not found")
 
 db.close()
 

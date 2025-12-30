@@ -22,13 +22,13 @@ async def get_user_enabled_voices(
         # Получаем все записи enabled для пользователя
         enabled_records = db.query(UserVoiceEnabled).filter(
             UserVoiceEnabled.user_id == user_id,
-            UserVoiceEnabled.is_enabled == True
+            UserVoiceEnabled.is_enabled.is_(True)
         ).all()
         
         # Если нет записей, возвращаем все доступные голоса как включенные по умолчанию
         if not enabled_records:
             all_voices = db.query(VoiceModel).filter(
-                VoiceModel.is_active == True
+                VoiceModel.is_active.is_(True)
             ).all()
             
             enabled_voice_ids = [v.id for v in all_voices]
@@ -57,7 +57,7 @@ async def update_user_enabled_voices(
     try:
         # Получаем все доступные голоса
         all_voices = db.query(VoiceModel).filter(
-            VoiceModel.is_active == True
+            VoiceModel.is_active.is_(True)
         ).all()
         
         all_voice_ids = {v.id for v in all_voices}
@@ -89,7 +89,7 @@ async def update_user_enabled_voices(
         
         db.commit()
         
-        logger.info(f"✅ Updated enabled voices for user {user_id}: {len(voice_ids)} enabled out of {len(all_voice_ids)} total")
+        logger.info(f"[OK] Updated enabled voices for user {user_id}: {len(voice_ids)} enabled out of {len(all_voice_ids)} total")
         
         return {
             "success": True,
@@ -116,7 +116,7 @@ async def toggle_voice_enabled(
         # Проверяем что голос существует
         voice = db.query(VoiceModel).filter(
             VoiceModel.id == voice_id,
-            VoiceModel.is_active == True
+            VoiceModel.is_active.is_(True)
         ).first()
         
         if not voice:
@@ -143,7 +143,7 @@ async def toggle_voice_enabled(
         db.commit()
         
         status_text = "enabled" if is_enabled else "disabled"
-        logger.info(f"✅ Voice {voice_id} {status_text} for user {user_id}")
+        logger.info(f"[OK] Voice {voice_id} {status_text} for user {user_id}")
         
         return {
             "success": True,

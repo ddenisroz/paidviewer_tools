@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+
 import { useParams } from 'react-router-dom';
-import { logger } from '../../utils/prodLogger';
-import { dropsService } from '../../services/api/services/dropsService';
+
 import CommonOpened from '../../images/lootboxes/common/common_opened.png';
-import RareOpened from '../../images/lootboxes/rare/rare_opened_.png';
 import EpicOpened from '../../images/lootboxes/epic/epic_opened.png';
 import LegendaryOpened from '../../images/lootboxes/legendary/legendary_opened.png';
 import MythycOpened from '../../images/lootboxes/mythyc/mythyc_opened.png';
+import RareOpened from '../../images/lootboxes/rare/rare_opened_.png';
+import { dropsService } from '../../services/api/services/dropsService';
+import { logger } from '../../utils/prodLogger';
 
 const QUALITY_IMAGES: Record<string, string> = {
   'common': CommonOpened,
@@ -26,7 +28,6 @@ interface Reward {
     name: string;
   };
   is_active?: boolean;
-  [key: string]: any;
 }
 
 interface RewardData {
@@ -45,7 +46,6 @@ interface RewardData {
 interface MythicalSession {
   donation_amount: number;
   time_remaining_seconds: number;
-  [key: string]: any;
 }
 
 interface WebSocketMessage {
@@ -60,6 +60,24 @@ interface WidgetConfig {
   spinning_duration: number;
   opening_duration: number;
   result_duration: number;
+}
+
+interface UserTokenResponse {
+  user_id?: number;
+  channel_name?: string;
+  platform?: string;
+}
+
+interface WidgetConfigData {
+  widget_spinning_duration_ms?: number;
+  widget_opening_duration_ms?: number;
+  widget_result_duration_ms?: number;
+}
+
+interface DropsApiResponse<T = unknown> {
+  success: boolean;
+  data?: T;
+  error?: string;
 }
 
 const DropsWidget: React.FC = () => {
@@ -92,18 +110,20 @@ const DropsWidget: React.FC = () => {
       if (token) {
         dropsService.getUserFromToken(token)
           .then(res => {
-            const data = (res.data as any);
-            if (data.channel_name && data.platform) {
-              setChannelName(data.channel_name);
-              setPlatform(data.platform);
-              return dropsService.getConfigWithToken(data.channel_name, {
-                platform: data.platform,
+            const data = res.data as DropsApiResponse<UserTokenResponse>;
+            if (data.data?.channel_name && data.data?.platform) {
+              setChannelName(data.data.channel_name);
+              setPlatform(data.data.platform);
+              return dropsService.getConfigWithToken(data.data.channel_name, {
+                platform: data.data.platform,
                 widget_token: token
               });
             }
+            return undefined;
           })
           .then(res => {
-            const configData = (res?.data as any);
+            if (!res) return;
+            const configData = res.data as DropsApiResponse<WidgetConfigData>;
             if (configData?.success && configData.data) {
               widgetConfig.current = {
                 spinning_duration: configData.data.widget_spinning_duration_ms || 1500,
@@ -135,10 +155,11 @@ const DropsWidget: React.FC = () => {
     const fetchUserId = async (): Promise<void> => {
       try {
         const response = await dropsService.getUserFromToken(token);
-        const data = (response.data as any);
-        const userId = data.user_id;
-        setChannelName(data.channel_name);
-        setPlatform(data.platform);
+        const apiData = response.data as DropsApiResponse<UserTokenResponse>;
+        const data = apiData.data || apiData as unknown as UserTokenResponse;
+        const userId = (data as UserTokenResponse & { user_id?: number }).user_id;
+        setChannelName(data.channel_name || null);
+        setPlatform(data.platform || null);
         
         if (userId && data.channel_name && data.platform) {
           try {
@@ -146,7 +167,7 @@ const DropsWidget: React.FC = () => {
               platform: data.platform,
               widget_token: token
             });
-            const configData = (configResponse.data as any);
+            const configData = configResponse.data as DropsApiResponse<WidgetConfigData>;
             if (configData.success && configData.data) {
               widgetConfig.current = {
                 spinning_duration: configData.data.widget_spinning_duration_ms || 1500,
@@ -159,7 +180,7 @@ const DropsWidget: React.FC = () => {
           }
         }
         
-        loadMythicalSession(data.channel_name);
+        loadMythicalSession(data.channel_name || null);
         
         const wsUrl = `${wsBaseUrl}/ws/chat/${userId}`;
         const websocket = new WebSocket(wsUrl);
@@ -235,7 +256,7 @@ const DropsWidget: React.FC = () => {
     
     try {
       const response = await dropsService.getMythicalSession(channel, token);
-      const data = (response.data as any);
+      const data = response.data as DropsApiResponse<MythicalSession>;
       if (data.success && data.data) {
         setMythicalSession(data.data);
         startMythicalTimer(data.data.time_remaining_seconds);
@@ -286,10 +307,9 @@ const DropsWidget: React.FC = () => {
         quality,
         widget_token: token
       });
-      const data = (response.data as any);
-      if (data.success && data.data) {
-        return data.data.filter((r: Reward) => r.is_active);
-      }
+      const data = response.data as unknown as { success?: boolean; data?: Reward[] } | Reward[];
+      const rewards = Array.isArray(data) ? data : (data.success && data.data ? data.data : []);
+      return rewards.filter((r: Reward) => r.is_active);
     } catch (error) {
       logger.error('Error loading rewards:', error);
     }
@@ -332,7 +352,7 @@ const DropsWidget: React.FC = () => {
       
       const targetPosition = targetIndex;
       let currentPos = startPosition;
-      const totalCards = duplicatedRewards.length;
+      const _totalCards = duplicatedRewards.length;
       const finalPosition = targetPosition + rewards.length;
       const duration = widgetConfig.current.spinning_duration;
       const startTime = Date.now();
@@ -538,7 +558,7 @@ const DropsWidget: React.FC = () => {
 
   const quality = currentReward.quality?.toLowerCase() || currentReward.quality || 'common';
   const chestImage = getQualityImage(quality);
-  const visibleCards = 5;
+  const _visibleCards = 5;
   const cardWidth = 200;
 
   return (
@@ -556,7 +576,7 @@ const DropsWidget: React.FC = () => {
           <div className="relative w-full h-64 overflow-hidden">
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-52 h-64 border-4 border-yellow-400 rounded-lg shadow-lg shadow-yellow-400/50 z-30 pointer-events-none">
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-yellow-400 font-bold text-lg">
-                🎁
+                [REWARD]
               </div>
             </div>
 
@@ -594,7 +614,7 @@ const DropsWidget: React.FC = () => {
                       />
                     ) : (
                       <div className="w-full h-40 bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center">
-                        <span className="text-white/40 text-2xl">🎁</span>
+                        <span className="text-white/40 text-2xl">[REWARD]</span>
                       </div>
                     )}
                     <div className="p-3 text-center">

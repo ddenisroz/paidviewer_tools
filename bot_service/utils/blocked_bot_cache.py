@@ -22,11 +22,11 @@ def get_blocked_bots_set_cached(db: Session) -> Set[str]:
     Returns:
         Set[str]: Множество имен заблокированных ботов в нижнем регистре
     """
-    def _load_blocked_bots():
+    def _load_blocked_bots(db_session: Session):
         """Внутренняя функция для загрузки ботов из БД"""
-        bots = db.query(BlockedBot.bot_name).all()
+        bots = db_session.query(BlockedBot.bot_name).all()
         return {bot.bot_name.lower() for bot in bots}
-    
+
     cache_key = "blocked_bots:set"
     return get_cached(cache_key, _load_blocked_bots, db, ttl=TTL_BLOCKED_BOTS)
 

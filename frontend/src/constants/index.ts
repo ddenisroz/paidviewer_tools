@@ -1,7 +1,7 @@
 /**
  * Константы для frontend приложения (TypeScript)
  */
-import { getApiBaseUrl, getWebSocketBaseUrl, getTtsServiceUrl } from '../utils/urlUtils';
+import { getApiBaseUrl, getTtsServiceUrl, getWebSocketBaseUrl } from '../utils/urlUtils';
 
 export const API_BASE_URL: string = getApiBaseUrl();
 export const WS_BASE_URL: string = getWebSocketBaseUrl();
@@ -93,12 +93,10 @@ export const STORAGE_KEYS = {
   TTS_HEALTH_STATUS: 'tts_health_status',
   THEME: 'theme',
   LANGUAGE: 'language',
-  GUEST_DATA: 'guestData',
 } as const;
 
 export const COOKIES = {
   SESSION_ID: 'session_id',
-  GUEST_DATA: 'guestData',
 } as const;
 
 export const MESSAGES = {
@@ -129,7 +127,6 @@ export const MESSAGES = {
     VERIFYING: 'Проверка...',
     PROCESSING: 'Обработка...',
     NO_DATA: 'Нет данных',
-    GUEST_MODE_RESTORED: 'Гостевой режим восстановлен, но требуется новая верификация',
   },
 } as const;
 
@@ -188,7 +185,6 @@ export const FEATURES = {
   TTS_ENABLED: true,
   MEDIA_REQUESTS: true,
   CHAT_ANALYSIS: true,
-  GUEST_MODE: true,
   ADMIN_PANEL: true,
   DARK_MODE: true,
 } as const;
@@ -207,17 +203,17 @@ export const COLORS = {
 } as const;
 
 export const ICONS = {
-  SUCCESS: '✅',
-  ERROR: '❌',
-  WARNING: '⚠️',
-  INFO: 'ℹ️',
+  SUCCESS: '[OK]',
+  ERROR: '[ERROR]',
+  WARNING: '[WARN]',
+  INFO: '[INFO]',
   LOADING: '⏳',
-  TTS: '🎤',
-  BOT: '🤖',
+  TTS: '[TTS]',
+  BOT: '[BOT]',
   PLATFORM: {
-    [PLATFORMS.TWITCH]: '🟣',
-    [PLATFORMS.VK]: '🔵',
-    [PLATFORMS.YOUTUBE]: '🔴',
+    [PLATFORMS.TWITCH]: '[TW]',
+    [PLATFORMS.VK]: '[VK]',
+    [PLATFORMS.YOUTUBE]: '[YT]',
   },
 } as const;
 

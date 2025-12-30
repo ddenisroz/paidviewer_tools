@@ -1,5 +1,7 @@
 import { useCallback } from 'react';
+
 import { toast } from 'sonner';
+
 import { useDebouncedCallback } from './useDebounce';
 
 export const useAutoSave = <T,>(
@@ -7,7 +9,7 @@ export const useAutoSave = <T,>(
   delay: number = 1000,
   validator: ((payload: T) => string | null) | null = null
 ): { autoSave: (payload: T) => void; clearAutoSave: () => void } => {
-  const [debouncedSave, { cancel }] = useDebouncedCallback(
+  const [debouncedSave, tools] = useDebouncedCallback(
     (payload: T) => {
       if (validator) {
         const validationError = validator(payload);
@@ -18,7 +20,7 @@ export const useAutoSave = <T,>(
       }
       const result = saveFn(payload);
       if (result instanceof Promise) {
-        result.catch((err) => {
+        result.catch((err: Error) => {
           // Optional error handling
           toast.error(String(err?.message || 'Ошибка сохранения'));
         });
@@ -32,8 +34,8 @@ export const useAutoSave = <T,>(
   }, [debouncedSave]);
 
   const clearAutoSave = useCallback(() => {
-    if (cancel) cancel();
-  }, [cancel]);
+    tools.cancel();
+  }, [tools]);
 
   return { autoSave, clearAutoSave };
 };

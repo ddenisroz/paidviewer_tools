@@ -5,18 +5,15 @@ from sqlalchemy.orm import Session
 from core.database import get_db, UserVoiceSettings
 from auth.auth import get_current_user
 from auth.permissions import require_admin
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
 import httpx
-import os
 import logging
-from datetime import datetime
+from core.datetime_utils import utcnow_naive
+from core.config import settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/voices", tags=["voices"])
-
-# Get TTS Service URL from environment
-TTS_SERVICE_URL = os.getenv("TTS_SERVICE_URL", "http://localhost:8001")
 
 
 @router.get("/user/custom")
@@ -27,13 +24,13 @@ async def get_user_custom_voices(
     """Get user's custom voices (user-uploaded voices)"""
     try:
         user_id = current_user.get("user_id")
-        
+
         # Fetch user's custom voices from TTS Service
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
-                f"{TTS_SERVICE_URL}/api/user/{user_id}/voices"
+                f"{settings.tts_service_url}/api/user/{user_id}/voices"
             )
-            
+
             if response.status_code == 200:
                 voices_data = response.json()
                 return {
@@ -47,7 +44,7 @@ async def get_user_custom_voices(
                     "voices": [],
                     "error": "Failed to fetch custom voices"
                 }
-                
+
     except Exception as e:
         logger.error(f"Error fetching custom voices: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -61,13 +58,13 @@ async def get_global_voices(
     """Get all global voices (admin-uploaded voices available to all users)"""
     try:
         user_id = current_user.get("user_id")
-        
+
         # Fetch global voices from TTS Service
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
-                f"{TTS_SERVICE_URL}/api/voices/global"
+                f"{settings.tts_service_url}/api/voices/global"
             )
-            
+
             if response.status_code != 200:
                 logger.error(f"Failed to fetch global voices: {response.status_code}")
                 return {
@@ -75,14 +72,14 @@ async def get_global_voices(
                     "voices": [],
                     "error": "Failed to fetch global voices"
                 }
-            
+
             voices_data = response.json()
-            
+
             # Get user's personal settings for global voices
             user_settings = db.query(UserVoiceSettings).filter(
                 UserVoiceSettings.user_id == user_id
             ).all()
-            
+
             # Create a map of voice_id to user settings
             settings_map = {
                 setting.voice_id: {
@@ -92,7 +89,7 @@ async def get_global_voices(
                 }
                 for setting in user_settings
             }
-            
+
             # Merge user settings with voice data
             for voice in voices_data:
                 voice_id = voice.get("id")
@@ -100,12 +97,12 @@ async def get_global_voices(
                     voice["user_settings"] = settings_map[voice_id]
                 else:
                     voice["user_settings"] = None
-            
+
             return {
                 "success": True,
                 "voices": voices_data
             }
-                
+
     except Exception as e:
         logger.error(f"Error fetching global voices: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -125,26 +122,26 @@ async def update_user_voice_settings(
     """
     try:
         user_id = current_user.get("user_id")
-        
+
         # First, check if this is a global voice or custom voice
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
-                f"{TTS_SERVICE_URL}/api/voices/{voice_id}"
+                f"{settings.tts_service_url}/api/voices/{voice_id}"
             )
-            
+
             if response.status_code != 200:
                 raise HTTPException(status_code=404, detail="Voice not found")
-            
+
             voice_data = response.json()
             is_global = voice_data.get("is_global", False)
-        
+
         if is_global:
             # For global voices, only update user's personal settings in bot_service
             voice_settings = db.query(UserVoiceSettings).filter(
                 UserVoiceSettings.user_id == user_id,
                 UserVoiceSettings.voice_id == voice_id
             ).first()
-            
+
             if voice_settings:
                 # Update existing settings
                 if 'cfg_strength' in settings:
@@ -153,7 +150,7 @@ async def update_user_voice_settings(
                     voice_settings.speed_preset = settings['speed_preset']
                 if 'volume' in settings:
                     voice_settings.volume = settings['volume']
-                voice_settings.updated_at = datetime.utcnow()
+                voice_settings.updated_at = utcnow_naive()
             else:
                 # Create new settings
                 voice_settings = UserVoiceSettings(
@@ -165,12 +162,12 @@ async def update_user_voice_settings(
                     volume=settings.get('volume')
                 )
                 db.add(voice_settings)
-            
+
             db.commit()
             db.refresh(voice_settings)
-            
-            logger.info(f"✅ User {user_id} updated personal settings for global voice {voice_id}")
-            
+
+            logger.info(f"[OK] User {user_id} updated personal settings for global voice {voice_id}")
+
             return {
                 "success": True,
                 "message": "Personal voice settings updated",
@@ -185,12 +182,12 @@ async def update_user_voice_settings(
             # For custom voices, update the voice settings in TTS Service
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.put(
-                    f"{TTS_SERVICE_URL}/api/user/voices/{voice_id}/settings",
+                    f"{settings.tts_service_url}/api/user/voices/{voice_id}/settings",
                     json=settings
                 )
-                
+
                 if response.status_code == 200:
-                    logger.info(f"✅ User {user_id} updated custom voice {voice_id} settings")
+                    logger.info(f"[OK] User {user_id} updated custom voice {voice_id} settings")
                     return {
                         "success": True,
                         "message": "Custom voice settings updated",
@@ -201,7 +198,7 @@ async def update_user_voice_settings(
                         status_code=response.status_code,
                         detail="Failed to update custom voice settings"
                     )
-                    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -219,16 +216,16 @@ async def delete_custom_voice(
     """Delete a user's custom voice"""
     try:
         user_id = current_user.get("user_id")
-        
+
         # Delete from TTS Service
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.delete(
-                f"{TTS_SERVICE_URL}/api/user/voices/{voice_id}",
+                f"{settings.tts_service_url}/api/user/voices/{voice_id}",
                 params={"user_id": user_id}
             )
-            
+
             if response.status_code == 200:
-                logger.info(f"✅ User {user_id} deleted custom voice {voice_id}")
+                logger.info(f"[OK] User {user_id} deleted custom voice {voice_id}")
                 return {
                     "success": True,
                     "message": "Custom voice deleted successfully"
@@ -238,7 +235,7 @@ async def delete_custom_voice(
                     status_code=response.status_code,
                     detail="Failed to delete custom voice"
                 )
-                
+
     except HTTPException:
         raise
     except Exception as e:
@@ -258,10 +255,10 @@ async def admin_get_global_voices(
         # Fetch global voices from TTS Service
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
-                f"{TTS_SERVICE_URL}/api/admin/voices",
+                f"{settings.tts_service_url}/api/admin/voices",
                 params={"voice_type": "global"}
             )
-            
+
             if response.status_code == 200:
                 return {
                     "success": True,
@@ -274,7 +271,7 @@ async def admin_get_global_voices(
                     "voices": [],
                     "error": "Failed to fetch global voices"
                 }
-                
+
     except Exception as e:
         logger.error(f"Error fetching global voices: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -292,12 +289,12 @@ async def admin_update_global_voice(
         # Update voice settings in TTS Service
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.put(
-                f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/settings",
+                f"{settings.tts_service_url}/api/admin/voices/{voice_id}/settings",
                 json=settings
             )
-            
+
             if response.status_code == 200:
-                logger.info(f"✅ Admin updated global voice {voice_id} settings")
+                logger.info(f"[OK] Admin updated global voice {voice_id} settings")
                 return {
                     "success": True,
                     "message": "Global voice settings updated",
@@ -308,7 +305,7 @@ async def admin_update_global_voice(
                     status_code=response.status_code,
                     detail="Failed to update global voice settings"
                 )
-                
+
     except HTTPException:
         raise
     except Exception as e:
@@ -327,17 +324,17 @@ async def admin_delete_global_voice(
         # Delete from TTS Service
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.delete(
-                f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}"
+                f"{settings.tts_service_url}/api/admin/voices/{voice_id}"
             )
-            
+
             if response.status_code == 200:
                 # Also delete all user settings for this voice
                 db.query(UserVoiceSettings).filter(
                     UserVoiceSettings.voice_id == voice_id
                 ).delete()
                 db.commit()
-                
-                logger.info(f"✅ Admin deleted global voice {voice_id}")
+
+                logger.info(f"[OK] Admin deleted global voice {voice_id}")
                 return {
                     "success": True,
                     "message": "Global voice deleted successfully"
@@ -347,7 +344,7 @@ async def admin_delete_global_voice(
                     status_code=response.status_code,
                     detail="Failed to delete global voice"
                 )
-                
+
     except HTTPException:
         raise
     except Exception as e:
@@ -368,12 +365,12 @@ async def admin_rename_global_voice(
         # Rename in TTS Service
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.put(
-                f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/rename",
+                f"{settings.tts_service_url}/api/admin/voices/{voice_id}/rename",
                 json={"new_name": new_name}
             )
-            
+
             if response.status_code == 200:
-                logger.info(f"✅ Admin renamed global voice {voice_id} to '{new_name}'")
+                logger.info(f"[OK] Admin renamed global voice {voice_id} to '{new_name}'")
                 return {
                     "success": True,
                     "message": "Global voice renamed successfully",
@@ -384,7 +381,7 @@ async def admin_rename_global_voice(
                     status_code=response.status_code,
                     detail="Failed to rename global voice"
                 )
-                
+
     except HTTPException:
         raise
     except Exception as e:

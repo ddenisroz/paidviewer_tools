@@ -2,7 +2,6 @@
 """Fix indentation issues in database.py - remove extra spaces from version columns"""
 
 import os
-import re
 
 db_file = os.path.join(os.path.dirname(__file__), '..', 'core', 'database.py')
 
@@ -29,7 +28,6 @@ print("SUCCESS! All indentation fixed.")
 
 # Verify
 try:
-    from core.database import User
     print("✓ Database module imports successfully!")
 except Exception as e:
     print(f"✗ Error: {e}")

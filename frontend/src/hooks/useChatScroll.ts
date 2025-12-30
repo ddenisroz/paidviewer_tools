@@ -1,9 +1,9 @@
-import { useEffect, useRef, useLayoutEffect, RefObject } from 'react';
+import { RefObject, useEffect, useLayoutEffect, useRef } from 'react';
 
 const SCROLL_THRESHOLD = 150;
 
 export const useChatScroll = <T extends HTMLElement>(
-  messages: any[],
+  messages: unknown[],
   containerRef: RefObject<T>,
   isVisible: boolean = true
 ): void => {

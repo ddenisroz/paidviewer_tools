@@ -4,9 +4,10 @@
  */
 
 import { ttsService } from './api/services';
-import type { AxiosResponse } from 'axios';
+
 import type { ApiResponse } from '../types/api';
 import type { TtsVoice } from '../types/tts';
+import type { AxiosResponse } from 'axios';
 
 // Реэкспортируем сервисы для удобства использования
 export { ttsService };
@@ -39,7 +40,7 @@ export const getAdminVoices = async (): Promise<AxiosResponse<ApiResponse<TtsVoi
   return apiClient.get('/api/voices/admin/global');
 };
 
-export const updateVoiceSettings = async (voiceId: number, settings: Record<string, any>): Promise<AxiosResponse<ApiResponse>> => {
+export const updateVoiceSettings = async (voiceId: number, settings: Record<string, unknown>): Promise<AxiosResponse<ApiResponse>> => {
   const { apiClient } = await import('./api/client');
   return apiClient.put(`/api/voices/admin/global/${voiceId}`, settings);
 };
@@ -74,7 +75,7 @@ export const getUsers = async (): Promise<AxiosResponse<ApiResponse>> => {
   return apiClient.get('/api/admin/users/list');
 };
 
-export const updateUserVoiceSettings = async (voiceId: number, userId: number, settings: Record<string, any>): Promise<AxiosResponse<ApiResponse>> => {
+export const updateUserVoiceSettings = async (voiceId: number, userId: number, settings: Record<string, unknown>): Promise<AxiosResponse<ApiResponse>> => {
   const { apiClient } = await import('./api/client');
   return apiClient.put(`/api/voices/user/settings/${voiceId}`, settings);
 };

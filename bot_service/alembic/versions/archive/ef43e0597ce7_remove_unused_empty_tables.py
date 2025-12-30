@@ -8,7 +8,6 @@ Create Date: 2025-10-08 00:57:01.089461
 from typing import Sequence, Union
 
 from alembic import op
-import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
@@ -22,7 +21,7 @@ def upgrade() -> None:
     # Удаляем пустые неиспользуемые таблицы
     empty_tables = [
         'muted_users',
-        'blocked_channels', 
+        'blocked_channels',
         'vk_guest_verifications',
         'channel_points',
         'channel_rewards',
@@ -38,7 +37,7 @@ def upgrade() -> None:
         'psychology_analysis',
         'lootboxes'
     ]
-    
+
     for table in empty_tables:
         op.drop_table(table)
 

@@ -1,7 +1,4 @@
-// src/components/TtsErrorCard.tsx
 import React from 'react';
-import { AlertTriangle } from 'lucide-react';
-import { Button } from './ui/button';
 
 interface TtsErrorCardProps {
     title: string;

@@ -1,16 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { supportService } from '../../../services/api/services/supportService';
-import { MessageCircle, Search, Clock, CheckCircle, XCircle, AlertCircle, Eye, Send, Archive } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+﻿import React, { useEffect, useState } from 'react';
+
+import { AlertCircle, Archive, CheckCircle, Clock, Eye, MessageCircle, Search, Send } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
+import { PageLoader } from '@/components/ui/loader';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from '@/utils/toastManager';
+
+import { supportService } from '../../../services/api/services/supportService';
 import { logger } from '../../../utils/prodLogger';
+
+import type { ApiResponse } from '../../../types';
 
 interface Ticket {
   id: number;
@@ -53,7 +59,8 @@ const SupportTicketsPage: React.FC = () => {
     try {
       setLoading(true);
       const response = await supportService.getAdminTickets({ status: statusFilter });
-      setTickets((response.data as any).tickets || []);
+      const data = response.data as ApiResponse<{ tickets?: Ticket[] }>;
+      setTickets(data.data?.tickets || []);
     } catch (error) {
       logger.error('Error loading tickets:', error);
       toast.error('Ошибка при загрузке тикетов');
@@ -69,7 +76,8 @@ const SupportTicketsPage: React.FC = () => {
   const loadTicketResponses = async (ticketId: number): Promise<void> => {
     try {
       const response = await supportService.getAdminTicket(ticketId);
-      setResponses((response.data as any).responses || []);
+      const data = response.data as ApiResponse<{ responses?: Response[] }>;
+      setResponses(data.data?.responses || []);
     } catch (error) {
       logger.error('Error loading responses:', error);
       toast.error('Ошибка при загрузке ответов');
@@ -83,7 +91,7 @@ const SupportTicketsPage: React.FC = () => {
     try {
       const response = await supportService.sendAdminResponse(selectedTicket.id, newResponse);
 
-      if ((response as any).ok) {
+      if (response && typeof response === 'object' && 'ok' in response && response.ok) {
         toast.success('Ответ отправлен');
         setNewResponse('');
         loadTicketResponses(selectedTicket.id);
@@ -148,7 +156,7 @@ const SupportTicketsPage: React.FC = () => {
   };
 
   const getStatusBadge = (status: string): React.ReactNode => {
-    const statusConfig: Record<string, { color: string; icon: React.ComponentType<any>; text: string }> = {
+    const statusConfig: Record<string, { color: string; icon: React.ComponentType<{ className?: string }>; text: string }> = {
       open: { color: 'bg-blue-500', icon: Clock, text: 'Открыт' },
       in_progress: { color: 'bg-yellow-500', icon: AlertCircle, text: 'В работе' },
       closed: { color: 'bg-green-500', icon: CheckCircle, text: 'Закрыт' }
@@ -229,10 +237,7 @@ const SupportTicketsPage: React.FC = () => {
 
       <div className="space-y-4">
         {loading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-muted-foreground">Загрузка тикетов...</p>
-          </div>
+          <PageLoader message="Загрузка тикетов..." />
         ) : filteredTickets.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center">

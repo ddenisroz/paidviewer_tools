@@ -1,5 +1,7 @@
-import React, { useEffect, useRef, useState, ReactNode } from 'react';
+import React, { ReactNode, useEffect, useRef, useState } from 'react';
+
 import { X } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
 
 interface CustomDialogProps {

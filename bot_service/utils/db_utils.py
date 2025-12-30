@@ -5,16 +5,14 @@ PostgreSQL only
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, desc, asc, func, text
-from datetime import datetime, timedelta
-from contextlib import contextmanager
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
 
 class DatabaseUtils:
     """Утилиты для безопасной работы с PostgreSQL"""
-    
+
     @staticmethod
     def get_param_placeholder(index: int = None) -> str:
         """
@@ -24,7 +22,7 @@ class DatabaseUtils:
         if index is not None:
             return f"${index + 1}"
         return ":param"
-    
+
     @staticmethod
     def build_where_clause(filters: Dict[str, Any]) -> Tuple[str, List[Any]]:
         """
@@ -32,14 +30,14 @@ class DatabaseUtils:
         """
         conditions = []
         params = []
-        
+
         for key, value in filters.items():
             conditions.append(f"{key} = ${len(params) + 1}")
             params.append(value)
-        
+
         where_clause = " AND ".join(conditions) if conditions else "1=1"
         return where_clause, params
-    
+
     @staticmethod
     def execute_safe_query(
         db: Session,
@@ -62,17 +60,17 @@ class DatabaseUtils:
         try:
             if params is None:
                 params = []
-            
+
             result = db.execute(text(query_str), params)
-            
+
             if fetch_one:
                 return result.first()
             return result.fetchall()
-            
+
         except Exception as e:
             logger.error(f"Database query error: {e}")
             raise
-    
+
     @staticmethod
     def get_with_pessimistic_lock(
         db: Session,
@@ -83,12 +81,12 @@ class DatabaseUtils:
         Получает запись с пессимистической блокировкой (FOR UPDATE) - PostgreSQL
         """
         query = db.query(model_class)
-        
+
         for key, value in filters.items():
             query = query.filter(getattr(model_class, key) == value)
-        
+
         return query.with_for_update().first()
-    
+
     @staticmethod
     def json_extract_query(json_column: str, json_path: str, alias: str = None) -> str:
         """

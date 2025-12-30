@@ -1,12 +1,16 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
+import { DollarSign, History } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
-import { History, DollarSign } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
 import { useDropsHistory } from '../../../queries/drops/dropsQueries';
+
 import type { DonationEntry } from '../../../types';
 
 interface DonationHistoryProps {
-    user: any;
+    user: Record<string, unknown>;
     platform: string;
     channelName: string;
 }

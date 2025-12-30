@@ -1,22 +1,40 @@
-import React, { useState, useMemo } from 'react';
-import { Play, SkipForward, Trash2, Plus, Clock, User, ExternalLink } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import React, { useMemo, useState } from 'react';
+
+import { Clock, ExternalLink, Play, Plus, SkipForward, Trash2, User } from 'lucide-react';
+
 import { 
-  useYoutubeQueue, 
   useAddYoutubeVideo, 
+  useClearYoutubeQueue, 
   useDeleteYoutubeVideo, 
+  useMarkYoutubeVideoAsPlayed,
   useSkipYoutubeVideo,
-  useClearYoutubeQueue,
-  useMarkYoutubeVideoAsPlayed
+  useYoutubeQueue
 } from '../queries/youtube/youtubeQueries';
 
+interface YouTubeVideo {
+  id: string | number;
+  title: string;
+  duration?: string;
+  thumbnail_url?: string;
+  requester_name?: string;
+  platform?: string;
+  is_paid?: boolean;
+  points_cost?: number;
+  url?: string;
+}
+
+interface QueueResponse {
+  current_video?: YouTubeVideo;
+  queue?: YouTubeVideo[];
+  is_playing?: boolean;
+}
+
 const YouTubeQueueCarousel: React.FC = () => {
-  const { user } = useAuth();
   const [newVideoUrl, setNewVideoUrl] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
 
-  // ✅ НОВЫЙ КОД: Используем централизованные hooks
-  const { data: queueResponse, isLoading: loading, error: queueError } = useYoutubeQueue({
+  // [OK] НОВЫЙ КОД: Используем централизованные hooks
+  const { data: queueResponse, isLoading: loading } = useYoutubeQueue({
     refetchInterval: 30 * 1000, // Автоматически обновляем каждые 30 секунд
     refetchOnMount: true,
     refetchOnWindowFocus: false,
@@ -24,13 +42,15 @@ const YouTubeQueueCarousel: React.FC = () => {
 
   // Обрабатываем формат ответа от backend
   const queueData = useMemo(() => {
-    if (!queueResponse?.data) return [];
-    const data = queueResponse.data;
+    if (!queueResponse) return [];
+    const responseData = queueResponse as { data?: QueueResponse | YouTubeVideo[] };
+    const data = responseData.data;
+    if (!data) return [];
     // Backend возвращает { queue: [], current_video: {}, is_playing: boolean }
-    if (data.current_video && data.queue) {
-      return [data.current_video, ...data.queue];
-    } else if (Array.isArray(data)) {
+    if (Array.isArray(data)) {
       return data;
+    } else if (data.current_video && data.queue) {
+      return [data.current_video, ...data.queue];
     } else if (data.queue) {
       return data.queue;
     }
@@ -181,7 +201,7 @@ const YouTubeQueueCarousel: React.FC = () => {
           </div>
         ) : (
           <div className="divide-y divide-gray-100">
-            {queue.map((video: any, index: number) => (
+            {queue.map((video: YouTubeVideo, index: number) => (
               <div key={video.id} className="p-4 hover:bg-gray-50 transition-colors">
                 <div className="flex items-start space-x-3">
                   {/* Позиция */}
@@ -233,7 +253,7 @@ const YouTubeQueueCarousel: React.FC = () => {
                       
                       {video.is_paid && video.points_cost && (
                         <span className="px-3 py-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded text-xs font-medium shadow-sm">
-                          💚 {video.points_cost} баллов
+                          {video.points_cost} баллов
                         </span>
                       )}
                     </div>
@@ -253,7 +273,7 @@ const YouTubeQueueCarousel: React.FC = () => {
                     
                     {index === 0 && (
                       <button
-                        onClick={() => markAsPlayed(video.id)}
+                        onClick={() => markAsPlayed(Number(video.id))}
                         className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
                         title="Отметить как проигранное"
                       >
@@ -270,7 +290,7 @@ const YouTubeQueueCarousel: React.FC = () => {
                     </button>
                     
                     <button
-                      onClick={() => removeVideo(video.id)}
+                      onClick={() => removeVideo(Number(video.id))}
                       className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                       title="Удалить из очереди"
                     >
@@ -287,7 +307,7 @@ const YouTubeQueueCarousel: React.FC = () => {
       {/* Подсказка */}
       {queue.length > 0 && (
         <div className="p-3 border-t bg-gray-50 text-xs text-gray-600">
-          💡 Используйте команду <code className="bg-gray-200 px-1 rounded">!sr &lt;YouTube URL&gt;</code> в чате для добавления видео
+          [INFO] Используйте команду <code className="bg-gray-200 px-1 rounded">!sr &lt;YouTube URL&gt;</code> в чате для добавления видео
         </div>
       )}
     </div>

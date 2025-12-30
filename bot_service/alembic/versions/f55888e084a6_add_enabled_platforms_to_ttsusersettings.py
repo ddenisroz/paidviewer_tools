@@ -25,10 +25,10 @@ def upgrade() -> None:
     # op.drop_index('ix_user_tts_usage_id', table_name='user_tts_usage')
     # op.drop_index('ix_user_tts_usage_user_id', table_name='user_tts_usage')
     # op.drop_table('user_tts_usage')
-    
+
     # Добавляем колонку с дефолтным значением для существующих записей
     op.add_column('tts_user_settings', sa.Column('enabled_platforms', sa.JSON(), nullable=False, server_default='["twitch", "vk"]'))
-    
+
     # Добавляем unique constraint если его еще нет (игнорируем если уже есть)
     try:
         op.create_unique_constraint(None, 'users', ['vk_channel_name'])

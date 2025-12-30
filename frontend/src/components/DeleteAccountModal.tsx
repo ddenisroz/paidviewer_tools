@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
-import { X, AlertTriangle } from 'lucide-react';
+﻿import React, { useState } from 'react';
+
+import { AlertTriangle, X } from 'lucide-react';
+
+import { toast } from '@/utils/toastManager';
+
+import { useDeleteAccount } from '../queries/auth/authQueries';
+
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { useDeleteAccount } from '../queries/auth/authQueries';
-import { toast } from 'sonner';
 
 interface DeleteAccountModalProps {
     isOpen: boolean;
@@ -64,7 +68,7 @@ const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({ isOpen, onClose
                 <div className="p-6 space-y-4">
                     <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
                         <p className="text-red-400 font-semibold mb-2">
-                            ⚠️ Это действие необратимо!
+                            [WARN] Это действие необратимо!
                         </p>
                         <p className="text-gray-300 text-sm">
                             Будут удалены:

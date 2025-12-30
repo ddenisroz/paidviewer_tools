@@ -37,62 +37,62 @@ def create_app() -> FastAPI:
     async def lifespan(app: FastAPI):
         """Управление жизненным циклом приложения"""
         # Startup
-        logger.info("🚀 TTS Service starting up...")
+        logger.info("[START] TTS Service starting up...")
         
         try:
             # Инициализация базы данных
             from tts_service.database import init_db
             init_db()
-            logger.info("✅ Database initialized")
+            logger.info("[OK] Database initialized")
             
             # Инициализация TTS движка
             from tts_service.tts_engine import tts_engine_manager
             await tts_engine_manager.initialize()
-            logger.info("✅ TTS Engine initialized")
+            logger.info("[OK] TTS Engine initialized")
             
             # Инициализация файлового менеджера (инициализация происходит в __init__)
             from tts_service.file_manager import file_manager
             # Директории уже созданы в конструкторе FileManager
-            logger.info("✅ File Manager initialized")
+            logger.info("[OK] File Manager initialized")
             
             # Запуск фоновых задач
             from tts_service.background_tasks import background_task_manager
             await background_task_manager.start()
-            logger.info("✅ Background tasks started")
+            logger.info("[OK] Background tasks started")
             
             # Инициализация мониторинга
             from monitoring import tts_monitor
             tts_monitor.start_monitoring(interval=30)
-            logger.info("✅ Monitoring started")
+            logger.info("[OK] Monitoring started")
             
-            logger.info("🎉 TTS Service startup complete!")
+            logger.info("[SUCCESS] TTS Service startup complete!")
             
         except Exception as e:
-            logger.error(f"❌ Error during startup: {e}")
+            logger.error(f"[ERROR] Error during startup: {e}")
             raise
         
         yield
         
         # Shutdown
-        logger.info("🛑 TTS Service shutting down...")
+        logger.info("[SHUTDOWN] TTS Service shutting down...")
         
         try:
             # Остановка фоновых задач
             await background_task_manager.stop()
-            logger.info("✅ Background tasks stopped")
+            logger.info("[OK] Background tasks stopped")
             
             # Остановка TTS движка
             await tts_engine_manager.shutdown()
-            logger.info("✅ TTS Engine stopped")
+            logger.info("[OK] TTS Engine stopped")
             
             # Остановка мониторинга
             tts_monitor.stop_monitoring()
-            logger.info("✅ Monitoring stopped")
+            logger.info("[OK] Monitoring stopped")
             
-            logger.info("🎉 TTS Service shutdown complete!")
+            logger.info("[SUCCESS] TTS Service shutdown complete!")
             
         except Exception as e:
-            logger.error(f"❌ Error during shutdown: {e}")
+            logger.error(f"[ERROR] Error during shutdown: {e}")
 
     # Создаем приложение
     app = FastAPI(

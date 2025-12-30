@@ -1,8 +1,11 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertCircle, RefreshCw, Home } from 'lucide-react';
-import { Button } from '../ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card';
+
+import { AlertCircle, Home, RefreshCw } from 'lucide-react';
+
+import { handleBoundaryError } from '../../utils/errorUtils';
 import { logger } from '../../utils/prodLogger';
+import { Button } from '../ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 
 interface Props {
   children: ReactNode;
@@ -28,24 +31,27 @@ class AppErrorBoundary extends Component<Props, State> {
     };
   }
 
-  static getDerivedStateFromError(error: Error): Partial<State> {
+  static getDerivedStateFromError(_error: Error): Partial<State> {
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    logger.error('🚨 [AppErrorBoundary] Critical application error:', error);
-    logger.error('🚨 [AppErrorBoundary] Error info:', errorInfo);
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    logger.error('[CRITICAL] [AppErrorBoundary] Critical application error:', error);
+    logger.error('[CRITICAL] [AppErrorBoundary] Error info:', errorInfo);
     
     this.setState({
       error,
       errorInfo,
     });
 
+    // Use centralized error handler
+    handleBoundaryError(error, errorInfo);
+
     // Send to error tracking service
     this.reportError(error, errorInfo);
   }
 
-  reportError = async (error: Error, errorInfo: ErrorInfo) => {
+  reportError = async (error: Error, errorInfo: ErrorInfo): Promise<void> => {
     try {
       // Send error to backend for logging
       await fetch('/api/errors/report', {
@@ -64,20 +70,20 @@ class AppErrorBoundary extends Component<Props, State> {
         // Silently fail if error reporting fails
         logger.warn('[AppErrorBoundary] Failed to report error to backend');
       });
-    } catch (e) {
+    } catch {
       // Ignore errors in error reporting
     }
   };
 
-  handleReload = () => {
+  handleReload = (): void => {
     window.location.reload();
   };
 
-  handleGoHome = () => {
+  handleGoHome = (): void => {
     window.location.href = '/';
   };
 
-  render() {
+  render(): ReactNode {
     if (this.state.hasError) {
       const { error, errorInfo } = this.state;
       const isDevelopment = import.meta.env.DEV;

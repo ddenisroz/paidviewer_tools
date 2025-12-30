@@ -8,8 +8,9 @@
  */
 
 import React from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 
 export const SpacingSystemExample: React.FC = () => {
@@ -211,7 +212,7 @@ export const SpacingSystemExample: React.FC = () => {
           <CardContent className="pt-6">
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold text-green-400 mb-2">✅ DO</h3>
+                <h3 className="font-semibold text-green-400 mb-2">[OK] DO</h3>
                 <ul className="space-y-1 text-sm text-gray-300 list-disc list-inside">
                   <li>Use spacing scale consistently (p-1, p-2, p-3, etc.)</li>
                   <li>Use semantic utility classes (card-padding, form-field-gap)</li>
@@ -220,7 +221,7 @@ export const SpacingSystemExample: React.FC = () => {
                 </ul>
               </div>
               <div>
-                <h3 className="font-semibold text-red-400 mb-2">❌ DON'T</h3>
+                <h3 className="font-semibold text-red-400 mb-2">[ERROR] DON'T</h3>
                 <ul className="space-y-1 text-sm text-gray-300 list-disc list-inside">
                   <li>Avoid arbitrary values (p-[17px], m-[23px])</li>
                   <li>Don't mix spacing systems</li>

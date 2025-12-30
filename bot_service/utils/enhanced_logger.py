@@ -24,12 +24,12 @@ def log_api_call(system: str):
         async def wrapper(*args, **kwargs):
             start_time = time.time()
             logger = logging.getLogger(f'{system}_system')
-            
+
             # Логируем входные данные
             logger.info(f"[{system.upper()}] ===== START: {func.__name__} =====")
             logger.info(f"[{system.upper()}] Args: {args}")
             logger.info(f"[{system.upper()}] Kwargs keys: {list(kwargs.keys())}")
-            
+
             try:
                 result = await func(*args, **kwargs)
                 elapsed = time.time() - start_time
@@ -40,7 +40,7 @@ def log_api_call(system: str):
                 logger.error(f"[{system.upper()}] ===== ERROR: {func.__name__} ({elapsed:.3f}s) =====")
                 logger.error(f"[{system.upper()}] Error: {str(e)}", exc_info=True)
                 raise
-                
+
         return wrapper
     return decorator
 
@@ -58,7 +58,7 @@ def log_function_call(logger_name: str):
             except Exception as e:
                 logger.error(f"✗ {func.__name__} failed: {str(e)}")
                 raise
-                
+
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
             logger = logging.getLogger(logger_name)
@@ -70,33 +70,33 @@ def log_function_call(logger_name: str):
             except Exception as e:
                 logger.error(f"✗ {func.__name__} failed: {str(e)}")
                 raise
-        
+
         import asyncio
         if asyncio.iscoroutinefunction(func):
             return async_wrapper
         else:
             return sync_wrapper
-            
+
     return decorator
 
 def log_request(endpoint: str, method: str, data: Any = None, user_id: Any = None):
     """Логирование входящего запроса"""
-    api_logger.info(f"📨 [{method}] {endpoint} | User: {user_id}")
+    api_logger.info(f"[BROADCAST] [{method}] {endpoint} | User: {user_id}")
     if data:
         try:
-            api_logger.debug(f"📦 Data: {json.dumps(data, ensure_ascii=False, indent=2)}")
-        except:
-            api_logger.debug(f"📦 Data: {str(data)}")
+            api_logger.debug(f"[PACKAGE] Data: {json.dumps(data, ensure_ascii=False, indent=2)}")
+        except (TypeError, ValueError):
+            api_logger.debug(f"[PACKAGE] Data: {str(data)}")
 
 def log_response(endpoint: str, status: int, data: Any = None, elapsed: float = None):
     """Логирование ответа"""
-    emoji = "✅" if status < 400 else "❌"
+    emoji = "[OK]" if status < 400 else "[ERROR]"
     time_str = f" ({elapsed:.3f}s)" if elapsed else ""
     api_logger.info(f"{emoji} [{status}] {endpoint}{time_str}")
     if data and status >= 400:
         try:
             api_logger.error(f"Error response: {json.dumps(data, ensure_ascii=False, indent=2)}")
-        except:
+        except (TypeError, ValueError):
             api_logger.error(f"Error response: {str(data)}")
 
 def log_database_query(operation: str, table: str, filters: dict = None):
@@ -107,13 +107,13 @@ def log_database_query(operation: str, table: str, filters: dict = None):
 def log_websocket_event(event_type: str, user_id: Any, data: Any = None):
     """Логирование WebSocket события"""
     ws_logger = logging.getLogger('websocket_system')
-    ws_logger.info(f"🔌 WS Event: {event_type} | User: {user_id} | Data: {data}")
+    ws_logger.info(f"[CONNECT] WS Event: {event_type} | User: {user_id} | Data: {data}")
 
 def log_platform_api_call(platform: str, endpoint: str, status: int = None, error: str = None):
     """Логирование вызова API платформы"""
     platform_logger = logging.getLogger(f'{platform}_system')
     if error:
-        platform_logger.error(f"❌ API Error: {endpoint} | Error: {error}")
+        platform_logger.error(f"[ERROR] API Error: {endpoint} | Error: {error}")
     else:
         platform_logger.info(f"✓ API Call: {endpoint} | Status: {status}")
 
@@ -121,7 +121,7 @@ def get_system_metrics():
     """Получить системные метрики для API"""
     return {
         "uptime": "system_uptime_seconds",
-        "requests_total": "http_requests_total", 
+        "requests_total": "http_requests_total",
         "errors_total": "http_errors_total",
         "active_connections": "websocket_connections_active",
         "tts_requests": "tts_requests_total",

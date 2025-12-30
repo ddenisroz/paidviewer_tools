@@ -1,10 +1,11 @@
 # bot_service/services/points_service.py
 import logging
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, desc, asc, func
+from sqlalchemy import and_, desc, asc, func
 from core.database import ChannelPoints, ChannelReward, PointsTransaction, RewardQueue, get_db
-from datetime import datetime, timedelta
+
+from core.datetime_utils import utcnow_naive
 
 logger = logging.getLogger('bot_service')
 
@@ -12,12 +13,12 @@ class PointsService:
     """
     Сервис для управления баллами канала и наградами
     """
-    
+
     def __init__(self):
         pass
-    
+
     # === УПРАВЛЕНИЕ БАЛЛАМИ ===
-    
+
     def get_user_points(self, user_id: int, viewer_id: str, platform: str, channel_name: str, db: Session) -> int:
         """Получение баллов пользователя"""
         try:
@@ -29,34 +30,34 @@ class PointsService:
                     ChannelPoints.channel_name == channel_name
                 )
             ).first()
-            
+
             return points_record.points if points_record else 0
-            
+
         except Exception as e:
             logger.error(f"Error getting user points: {e}")
             return 0
-    
+
     def add_points(
-        self, 
-        user_id: int, 
-        viewer_id: str, 
-        viewer_name: str, 
-        platform: str, 
-        channel_name: str, 
-        amount: int, 
+        self,
+        user_id: int,
+        viewer_id: str,
+        viewer_name: str,
+        platform: str,
+        channel_name: str,
+        amount: int,
         reason: str = "Manual add",
         db: Session = None
     ) -> bool:
         """Добавление баллов пользователю"""
-        
+
         if db is None:
             db = next(get_db())
             should_close = True
         else:
             should_close = False
-        
+
         try:
-            # ✅ Используем pessimistic locking для защиты от race condition
+            # [OK] Используем pessimistic locking для защиты от race condition
             # Находим или создаем запись баллов с блокировкой
             points_record = db.query(ChannelPoints).filter(
                 and_(
@@ -65,8 +66,8 @@ class PointsService:
                     ChannelPoints.platform == platform,
                     ChannelPoints.channel_name == channel_name
                 )
-            ).with_for_update().first()  # ✅ Lock для атомарности операции
-            
+            ).with_for_update().first()  # [OK] Lock для атомарности операции
+
             if not points_record:
                 points_record = ChannelPoints(
                     user_id=user_id,
@@ -79,13 +80,13 @@ class PointsService:
                     total_spent=0
                 )
                 db.add(points_record)
-            
-            # ✅ Внутри транзакции добавляем баллы (атомарная операция)
+
+            # [OK] Внутри транзакции добавляем баллы (атомарная операция)
             points_record.points += amount
             points_record.total_earned += amount
-            points_record.last_activity = datetime.utcnow()
-            
-            # ✅ Создаем транзакцию для истории
+            points_record.last_activity = utcnow_naive()
+
+            # [OK] Создаем транзакцию для истории
             transaction = PointsTransaction(
                 user_id=user_id,
                 viewer_id=viewer_id,
@@ -96,43 +97,43 @@ class PointsService:
                 amount=amount,
                 reason=reason
             )
-            
+
             db.add(transaction)
-            db.commit()  # ✅ Атомарный commit всех изменений
-            
+            db.commit()  # [OK] Атомарный commit всех изменений
+
             logger.info(f"Added {amount} points to {viewer_name}: {reason}")
             return True
-            
+
         except Exception as e:
-            db.rollback()  # ✅ Rollback при любой ошибке
+            db.rollback()  # [OK] Rollback при любой ошибке
             logger.error(f"Error adding points: {e}", exc_info=True)
             return False
         finally:
             if should_close:
                 db.close()
-    
+
     def deduct_points(
-        self, 
-        user_id: int, 
-        viewer_id: str, 
-        viewer_name: str, 
-        platform: str, 
-        channel_name: str, 
-        amount: int, 
+        self,
+        user_id: int,
+        viewer_id: str,
+        viewer_name: str,
+        platform: str,
+        channel_name: str,
+        amount: int,
         reason: str = "Manual deduct",
         db: Session = None
     ) -> Dict[str, Any]:
         """Списание баллов у пользователя"""
-        
+
         if db is None:
             db = next(get_db())
             should_close = True
         else:
             should_close = False
-        
+
         try:
-            # ✅ Используем pessimistic locking для защиты от race condition
-            # ✅ Lock записи для других транзакций - предотвращает одновременное списание
+            # [OK] Используем pessimistic locking для защиты от race condition
+            # [OK] Lock записи для других транзакций - предотвращает одновременное списание
             points_record = db.query(ChannelPoints).filter(
                 and_(
                     ChannelPoints.user_id == user_id,
@@ -140,21 +141,21 @@ class PointsService:
                     ChannelPoints.platform == platform,
                     ChannelPoints.channel_name == channel_name
                 )
-            ).with_for_update().first()  # ✅ Блокируем запись
-            
+            ).with_for_update().first()  # [OK] Блокируем запись
+
             if not points_record or points_record.points < amount:
                 db.rollback()
                 return {
                     'success': False,
                     'error': f'Недостаточно баллов. Нужно: {amount}, есть: {points_record.points if points_record else 0}'
                 }
-            
-            # ✅ Внутри транзакции списываем баллы (атомарная операция)
+
+            # [OK] Внутри транзакции списываем баллы (атомарная операция)
             points_record.points -= amount
             points_record.total_spent += amount
-            points_record.last_activity = datetime.utcnow()
-            
-            # ✅ Создаем транзакцию для истории
+            points_record.last_activity = utcnow_naive()
+
+            # [OK] Создаем транзакцию для истории
             transaction = PointsTransaction(
                 user_id=user_id,
                 viewer_id=viewer_id,
@@ -165,30 +166,30 @@ class PointsService:
                 amount=-amount,
                 reason=reason
             )
-            
+
             db.add(transaction)
-            db.commit()  # ✅ Атомарный commit всех изменений
-            
+            db.commit()  # [OK] Атомарный commit всех изменений
+
             logger.info(f"Deducted {amount} points from {viewer_name}: {reason}")
             return {'success': True}
-            
+
         except Exception as e:
-            db.rollback()  # ✅ Rollback при любой ошибке
+            db.rollback()  # [OK] Rollback при любой ошибке
             logger.error(f"Error deducting points: {e}", exc_info=True)
             return {'success': False, 'error': 'Ошибка списания баллов'}
         finally:
             if should_close:
                 db.close()
-    
+
     def get_channel_leaderboard(self, user_id: int, channel_name: str, platform: str = None, limit: int = 10, db: Session = None) -> List[Dict[str, Any]]:
         """Получение топа пользователей по баллам"""
-        
+
         if db is None:
             db = next(get_db())
             should_close = True
         else:
             should_close = False
-        
+
         try:
             query = db.query(ChannelPoints).filter(
                 and_(
@@ -196,12 +197,12 @@ class PointsService:
                     ChannelPoints.channel_name == channel_name
                 )
             )
-            
+
             if platform:
                 query = query.filter(ChannelPoints.platform == platform)
-            
+
             top_users = query.order_by(desc(ChannelPoints.points)).limit(limit).all()
-            
+
             result = []
             for i, user in enumerate(top_users):
                 result.append({
@@ -213,30 +214,30 @@ class PointsService:
                     'platform': user.platform,
                     'last_activity': user.last_activity.isoformat() if user.last_activity else None
                 })
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"Error getting leaderboard: {e}")
             return []
         finally:
             if should_close:
                 db.close()
-    
+
     # === УПРАВЛЕНИЕ НАГРАДАМИ ===
-    
+
     def create_reward(
-        self, 
-        user_id: int, 
-        platform: str, 
-        channel_name: str, 
-        title: str, 
-        description: str, 
+        self,
+        user_id: int,
+        platform: str,
+        channel_name: str,
+        title: str,
+        description: str,
         cost: int,
         **kwargs
     ) -> Dict[str, Any]:
         """Создание новой награды"""
-        
+
         db = next(get_db())
         try:
             reward = ChannelReward(
@@ -254,13 +255,13 @@ class PointsService:
                 prompt=kwargs.get('prompt'),
                 reward_type=kwargs.get('reward_type', 'custom')
             )
-            
+
             db.add(reward)
             db.commit()
             db.refresh(reward)
-            
+
             logger.info(f"Created reward: {title} for {cost} points")
-            
+
             return {
                 'success': True,
                 'reward_id': reward.id,
@@ -272,31 +273,31 @@ class PointsService:
                     'is_enabled': reward.is_enabled
                 }
             }
-            
+
         except Exception as e:
             db.rollback()
             logger.error(f"Error creating reward: {e}")
             return {'success': False, 'error': 'Ошибка создания награды'}
         finally:
             db.close()
-    
+
     def get_channel_rewards(self, user_id: int, platform: str = None, db: Session = None) -> List[Dict[str, Any]]:
         """Получение наград канала"""
-        
+
         if db is None:
             db = next(get_db())
             should_close = True
         else:
             should_close = False
-        
+
         try:
             query = db.query(ChannelReward).filter(ChannelReward.user_id == user_id)
-            
+
             if platform:
                 query = query.filter(ChannelReward.platform == platform)
-            
+
             rewards = query.order_by(asc(ChannelReward.cost)).all()
-            
+
             result = []
             for reward in rewards:
                 result.append({
@@ -315,28 +316,28 @@ class PointsService:
                     'reward_type': reward.reward_type,
                     'created_at': reward.created_at.isoformat() if reward.created_at else None
                 })
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"Error getting rewards: {e}")
             return []
         finally:
             if should_close:
                 db.close()
-    
+
     def redeem_reward(
-        self, 
-        user_id: int, 
-        reward_id: int, 
-        viewer_id: str, 
-        viewer_name: str, 
-        platform: str, 
-        channel_name: str, 
+        self,
+        user_id: int,
+        reward_id: int,
+        viewer_id: str,
+        viewer_name: str,
+        platform: str,
+        channel_name: str,
         user_input: str = None
     ) -> Dict[str, Any]:
         """Обмен награды за баллы"""
-        
+
         db = next(get_db())
         try:
             # Получаем награду
@@ -347,19 +348,19 @@ class PointsService:
                     ChannelReward.is_enabled == True
                 )
             ).first()
-            
+
             if not reward:
                 return {'success': False, 'error': 'Награда не найдена или отключена'}
-            
+
             # Проверяем баллы
             points_result = self.deduct_points(
                 user_id, viewer_id, viewer_name, platform, channel_name,
                 reward.cost, f"Reward: {reward.title}", db
             )
-            
+
             if not points_result['success']:
                 return points_result
-            
+
             # Создаем запись в очереди наград
             reward_queue_item = RewardQueue(
                 user_id=user_id,
@@ -372,56 +373,56 @@ class PointsService:
                 points_cost=reward.cost,
                 status='pending'
             )
-            
+
             db.add(reward_queue_item)
             db.commit()
             db.refresh(reward_queue_item)
-            
+
             logger.info(f"{viewer_name} redeemed reward: {reward.title} for {reward.cost} points")
-            
+
             return {
                 'success': True,
                 'message': f'Награда "{reward.title}" обменена за {reward.cost} баллов',
                 'queue_id': reward_queue_item.id
             }
-            
+
         except Exception as e:
             db.rollback()
             logger.error(f"Error redeeming reward: {e}")
             return {'success': False, 'error': 'Ошибка обмена награды'}
         finally:
             db.close()
-    
+
     def get_reward_queue(self, user_id: int, status: str = None, db: Session = None) -> List[Dict[str, Any]]:
         """Получение очереди наград"""
-        
+
         if db is None:
             db = next(get_db())
             should_close = True
         else:
             should_close = False
-        
+
         try:
             query = db.query(RewardQueue).filter(RewardQueue.user_id == user_id)
-            
+
             if status:
                 query = query.filter(RewardQueue.status == status)
-            
-            # ✅ Оптимизация: избегаем N+1 queries - загружаем все rewards за один запрос
+
+            # [OK] Оптимизация: избегаем N+1 queries - загружаем все rewards за один запрос
             queue_items = query.order_by(desc(RewardQueue.created_at)).all()
-            
-            # ✅ Batch loading: получаем все уникальные reward_id и загружаем rewards за один запрос
+
+            # [OK] Batch loading: получаем все уникальные reward_id и загружаем rewards за один запрос
             reward_ids = [item.reward_id for item in queue_items if item.reward_id]
             rewards_dict = {}
             if reward_ids:
                 rewards = db.query(ChannelReward).filter(ChannelReward.id.in_(reward_ids)).all()
                 rewards_dict = {reward.id: reward for reward in rewards}
-            
+
             result = []
             for item in queue_items:
-                # ✅ Reward уже загружен через batch query, нет дополнительных запросов
+                # [OK] Reward уже загружен через batch query, нет дополнительных запросов
                 reward = rewards_dict.get(item.reward_id) if item.reward_id else None
-                
+
                 result.append({
                     'id': item.id,
                     'reward_title': reward.title if reward else 'Unknown Reward',
@@ -436,19 +437,19 @@ class PointsService:
                     'created_at': item.created_at.isoformat() if item.created_at else None,
                     'processed_at': item.processed_at.isoformat() if item.processed_at else None
                 })
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"Error getting reward queue: {e}")
             return []
         finally:
             if should_close:
                 db.close()
-    
+
     def process_reward(self, user_id: int, queue_id: int, action: str, moderator_note: str = None) -> Dict[str, Any]:
         """Обработка награды модератором"""
-        
+
         db = next(get_db())
         try:
             queue_item = db.query(RewardQueue).filter(
@@ -458,10 +459,10 @@ class PointsService:
                     RewardQueue.status == 'pending'
                 )
             ).first()
-            
+
             if not queue_item:
                 return {'success': False, 'error': 'Запрос на награду не найден'}
-            
+
             if action == 'approve':
                 queue_item.status = 'approved'
             elif action == 'reject':
@@ -476,38 +477,38 @@ class PointsService:
                 queue_item.status = 'fulfilled'
             else:
                 return {'success': False, 'error': 'Неверное действие'}
-            
+
             queue_item.moderator_note = moderator_note
-            queue_item.processed_at = datetime.utcnow()
-            
+            queue_item.processed_at = utcnow_naive()
+
             db.commit()
-            
+
             logger.info(f"Processed reward queue item {queue_id}: {action}")
-            
+
             return {
                 'success': True,
                 'message': f'Запрос на награду {action}',
                 'status': queue_item.status
             }
-            
+
         except Exception as e:
             db.rollback()
             logger.error(f"Error processing reward: {e}")
             return {'success': False, 'error': 'Ошибка обработки награды'}
         finally:
             db.close()
-    
+
     # === СТАТИСТИКА ===
-    
+
     def get_channel_stats(self, user_id: int, channel_name: str, db: Session = None) -> Dict[str, Any]:
         """Получение статистики канала"""
-        
+
         if db is None:
             db = next(get_db())
             should_close = True
         else:
             should_close = False
-        
+
         try:
             # Общее количество пользователей
             total_users = db.query(func.count(ChannelPoints.id)).filter(
@@ -516,7 +517,7 @@ class PointsService:
                     ChannelPoints.channel_name == channel_name
                 )
             ).scalar() or 0
-            
+
             # Общее количество баллов в обращении
             total_points = db.query(func.sum(ChannelPoints.points)).filter(
                 and_(
@@ -524,7 +525,7 @@ class PointsService:
                     ChannelPoints.channel_name == channel_name
                 )
             ).scalar() or 0
-            
+
             # Количество активных наград
             active_rewards = db.query(func.count(ChannelReward.id)).filter(
                 and_(
@@ -532,7 +533,7 @@ class PointsService:
                     ChannelReward.is_enabled == True
                 )
             ).scalar() or 0
-            
+
             # Количество ожидающих наград
             pending_rewards = db.query(func.count(RewardQueue.id)).filter(
                 and_(
@@ -540,14 +541,14 @@ class PointsService:
                     RewardQueue.status == 'pending'
                 )
             ).scalar() or 0
-            
+
             return {
                 'total_users': total_users,
                 'total_points': total_points,
                 'active_rewards': active_rewards,
                 'pending_rewards': pending_rewards
             }
-            
+
         except Exception as e:
             logger.error(f"Error getting channel stats: {e}")
             return {
@@ -559,16 +560,16 @@ class PointsService:
         finally:
             if should_close:
                 db.close()
-    
+
     # === УПРАВЛЕНИЕ НАГРАДАМИ (НОВЫЕ МЕТОДЫ) ===
-    
+
     def update_reward(self, user_id: int, reward_id: int, update_data: Dict[str, Any], db: Session = None) -> Dict[str, Any]:
         """Обновление награды"""
         should_close = False
         if db is None:
             db = next(get_db())
             should_close = True
-        
+
         try:
             # Находим награду
             reward = db.query(ChannelReward).filter(
@@ -577,19 +578,19 @@ class PointsService:
                     ChannelReward.user_id == user_id
                 )
             ).first()
-            
+
             if not reward:
                 return {"success": False, "error": "Награда не найдена"}
-            
+
             # Обновляем поля
             for key, value in update_data.items():
                 if hasattr(reward, key) and value is not None:
                     setattr(reward, key, value)
-            
-            reward.updated_at = datetime.utcnow()
+
+            reward.updated_at = utcnow_naive()
             db.commit()
             db.refresh(reward)
-            
+
             logger.info(f"Reward {reward_id} updated successfully")
             return {
                 "success": True,
@@ -601,7 +602,7 @@ class PointsService:
                     "enabled": reward.enabled
                 }
             }
-            
+
         except Exception as e:
             logger.error(f"Error updating reward {reward_id}: {e}")
             db.rollback()
@@ -609,14 +610,14 @@ class PointsService:
         finally:
             if should_close:
                 db.close()
-    
+
     def delete_reward(self, user_id: int, reward_id: int, db: Session = None) -> Dict[str, Any]:
         """Удаление награды"""
         should_close = False
         if db is None:
             db = next(get_db())
             should_close = True
-        
+
         try:
             # Находим награду
             reward = db.query(ChannelReward).filter(
@@ -625,10 +626,10 @@ class PointsService:
                     ChannelReward.user_id == user_id
                 )
             ).first()
-            
+
             if not reward:
                 return {"success": False, "error": "Награда не найдена"}
-            
+
             # Проверяем, нет ли активных запросов на обмен
             pending_requests = db.query(RewardQueue).filter(
                 and_(
@@ -636,20 +637,20 @@ class PointsService:
                     RewardQueue.status == 'pending'
                 )
             ).count()
-            
+
             if pending_requests > 0:
                 return {
-                    "success": False, 
+                    "success": False,
                     "error": f"Невозможно удалить награду: есть {pending_requests} активных запросов"
                 }
-            
+
             # Удаляем награду
             db.delete(reward)
             db.commit()
-            
+
             logger.info(f"Reward {reward_id} deleted successfully")
             return {"success": True, "message": "Награда удалена"}
-            
+
         except Exception as e:
             logger.error(f"Error deleting reward {reward_id}: {e}")
             db.rollback()
@@ -657,14 +658,14 @@ class PointsService:
         finally:
             if should_close:
                 db.close()
-    
+
     def toggle_reward(self, user_id: int, reward_id: int, db: Session = None) -> Dict[str, Any]:
         """Переключение статуса награды (enabled/disabled)"""
         should_close = False
         if db is None:
             db = next(get_db())
             should_close = True
-        
+
         try:
             # Находим награду
             reward = db.query(ChannelReward).filter(
@@ -673,19 +674,19 @@ class PointsService:
                     ChannelReward.user_id == user_id
                 )
             ).first()
-            
+
             if not reward:
                 return {"success": False, "error": "Награда не найдена"}
-            
+
             # Переключаем статус
             reward.enabled = not reward.enabled
-            reward.updated_at = datetime.utcnow()
+            reward.updated_at = utcnow_naive()
             db.commit()
             db.refresh(reward)
-            
+
             status = "включена" if reward.enabled else "отключена"
             logger.info(f"Reward {reward_id} toggled to {reward.enabled}")
-            
+
             return {
                 "success": True,
                 "message": f"Награда {status}",
@@ -695,7 +696,7 @@ class PointsService:
                     "enabled": reward.enabled
                 }
             }
-            
+
         except Exception as e:
             logger.error(f"Error toggling reward {reward_id}: {e}")
             db.rollback()

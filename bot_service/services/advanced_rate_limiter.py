@@ -4,32 +4,31 @@
 Без slowapi для избежания проблем с .env
 """
 import logging
-import time
-from typing import Dict, Any, Optional
-from limits import storage
+from typing import Dict, Any
+from limits import storage, parse
 from limits.strategies import MovingWindowRateLimiter
-from fastapi import Request, HTTPException, status
+from fastapi import Request
 
 logger = logging.getLogger(__name__)
 
 class AdvancedRateLimiter:
     """Продвинутый rate limiter с использованием limits библиотеки"""
-    
+
     def __init__(self):
         # Используем memory storage (в production можно Redis)
         self.storage = storage.MemoryStorage()
         self.strategy = MovingWindowRateLimiter(self.storage)
-        
+
         # Настраиваем разные лимиты для разных действий
         self.limits = {
             "default": "60/minute",
-            "login": "5/15minutes", 
+            "login": "5/15minutes",
             "api": "100/minute",
             "tts": "30/minute",
             "upload": "10/minute"
         }
-        
-        logger.info("🚦 Advanced Rate Limiter initialized with limits library")
+
+        logger.info("[RATE-LIMITER] Advanced Rate Limiter initialized with limits library")
 
     def _get_identifier(self, request: Request = None, user_id: int = None) -> str:
         """Получить идентификатор для rate limiting"""
@@ -48,15 +47,18 @@ class AdvancedRateLimiter:
         """
         try:
             limit_str = self.limits.get(action, self.limits["default"])
-            
+
+            # Парсим строку лимита в объект RateLimitItem
+            rate_limit_item = parse(limit_str)
+
             # Проверяем лимит
-            if self.strategy.hit(limit_str, identifier):
+            if self.strategy.hit(rate_limit_item, identifier):
                 logger.debug(f"Rate limit OK for {identifier}, action '{action}'")
                 return True
             else:
                 logger.warning(f"Rate limit exceeded for {identifier}, action '{action}'")
                 return False
-                
+
         except Exception as e:
             logger.error(f"Rate limit check failed: {e}")
             return True  # В случае ошибки разрешаем
@@ -65,16 +67,19 @@ class AdvancedRateLimiter:
         """Получить количество оставшихся запросов"""
         try:
             limit_str = self.limits.get(action, self.limits["default"])
-            
+
+            # Парсим строку лимита в объект RateLimitItem
+            rate_limit_item = parse(limit_str)
+
             # Получаем текущее количество запросов
-            current = self.strategy.get_window_stats(limit_str, identifier)
+            current = self.strategy.get_window_stats(rate_limit_item, identifier)
             if current:
                 # Парсим лимит (например, "60/minute" -> 60)
                 limit_num = int(limit_str.split('/')[0])
-                remaining = max(0, limit_num - current.hits)
+                remaining = max(0, limit_num - current[1])  # current is tuple (reset_time, hits)
                 return remaining
             return 0
-            
+
         except Exception as e:
             logger.error(f"Failed to get remaining requests: {e}")
             return 0

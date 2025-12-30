@@ -1,22 +1,27 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
+
+import { CheckCircle2, Clock, Edit, Gift, Loader2, MessageCircle, Plus, Power, PowerOff, Settings, Trash2, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Gift, Plus, Edit, Trash2, Loader2, Power, PowerOff, Settings, AlertCircle, CheckCircle2, XCircle, Clock, MessageCircle } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { useIntegrations } from '../context/IntegrationsContext';
-import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
-import { Card, CardContent } from '@/components/ui/card';
+
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from 'sonner';
-import pointsApi from '../services/pointsApi';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from '@/utils/toastManager';
+
+import { API_BASE_URL } from '../constants';
 import { PLATFORM_COLORS } from '../constants/uiConstants';
-import { logger } from '../utils/prodLogger';
+import { useAuth } from '../context/AuthContext';
+import { useIntegrations } from '../context/IntegrationsContext';
+import pointsApi from '../services/pointsApi';
 import PageWrapper from '../shared/components/PageWrapper';
+import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
+import { logger } from '../utils/prodLogger';
+
 import type { PlatformReward, RewardDemand } from '../types/points';
 
 interface RewardFormData {
@@ -63,20 +68,21 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRef
         try {
             if (platform === 'vk' && reward.is_enabled) {
                 try {
-                    logger.log(`🔄 [DELETE] Attempting to disable VK reward ${reward.id} before deletion`);
+                    logger.log(`[REFRESH] [DELETE] Attempting to disable VK reward ${reward.id} before deletion`);
                     await pointsApi.toggleReward(platform, String(reward.id), false);
                     await new Promise(resolve => setTimeout(resolve, 800));
-                } catch (toggleErr: any) {
-                    logger.warn('Toggle before delete failed (backend will handle it):', toggleErr.message);
+                } catch (toggleErr) {
+                    logger.warn('Toggle before delete failed (backend will handle it):', toggleErr);
                 }
             }
 
             await pointsApi.deleteReward(platform, String(reward.id));
             toast.success('Награда удалена');
             onRefresh();
-        } catch (err: any) {
+        } catch (err) {
             logger.error('Error deleting reward:', err);
-            toast.error(err.message || 'Ошибка удаления награды');
+            const errorMessage = err instanceof Error ? err.message : 'Ошибка удаления награды';
+            toast.error(errorMessage);
         } finally {
             setDeleting(false);
         }
@@ -91,7 +97,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRef
         try {
             await pointsApi.toggleReward(platform, String(reward.id), newState);
             await onRefresh();
-        } catch (err: any) {
+        } catch (err: unknown) {
             logger.error('Error toggling reward:', err);
         } finally {
             setToggling(false);
@@ -234,7 +240,7 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
 
         setSaving(true);
         try {
-            let rewardData: any = {
+            const baseData = {
                 title: formData.title,
                 description: formData.description,
                 cost: parseInt(String(formData.cost)),
@@ -242,6 +248,8 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
                 platform: platform,
                 channel_name: ''
             };
+
+            let rewardData: Record<string, unknown> = { ...baseData };
 
             if (platform === 'vk') {
                 rewardData = {
@@ -273,7 +281,7 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
             }
             
             onSuccess();
-        } catch (err: any) {
+        } catch (err: unknown) {
             logger.error('Error saving reward:', err);
         } finally {
             setSaving(false);
@@ -478,6 +486,19 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
     );
 };
 
+// Типы для API ответов
+interface RewardsResponse {
+    rewards?: PlatformReward[];
+}
+
+interface DemandsResponse {
+    demands?: RewardDemand[] | {
+        items?: RewardDemand[];
+        demands?: RewardDemand[];
+        [key: string]: unknown;
+    };
+}
+
 const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
     const [redemptions, setRedemptions] = useState<RewardDemand[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
@@ -490,27 +511,28 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
         try {
             setLoading(true);
             if (platform === 'vk') {
-                const rewardsData = await pointsApi.getRewards('vk');
+                const rewardsData = await pointsApi.getRewards('vk') as RewardsResponse;
                 const map = new Map<string, PlatformReward>();
-                if ((rewardsData as any).rewards) {
-                    (rewardsData as any).rewards.forEach((reward: PlatformReward) => {
+                if (rewardsData.rewards) {
+                    rewardsData.rewards.forEach((reward: PlatformReward) => {
                         map.set(String(reward.id), reward);
                     });
                 }
                 setRewardsMap(map);
 
-                const data = await pointsApi.getVKDemands();
+                const data = await pointsApi.getVKDemands() as DemandsResponse;
                 
                 let demands: RewardDemand[] = [];
-                if (Array.isArray((data as any).demands)) {
-                    demands = (data as any).demands;
-                } else if ((data as any).demands && typeof (data as any).demands === 'object') {
-                    if ((data as any).demands.items && Array.isArray((data as any).demands.items)) {
-                        demands = (data as any).demands.items;
-                    } else if ((data as any).demands.demands && Array.isArray((data as any).demands.demands)) {
-                        demands = (data as any).demands.demands;
+                if (Array.isArray(data.demands)) {
+                    demands = data.demands;
+                } else if (data.demands && typeof data.demands === 'object') {
+                    const demandsObj = data.demands as { items?: RewardDemand[]; demands?: RewardDemand[] };
+                    if (demandsObj.items && Array.isArray(demandsObj.items)) {
+                        demands = demandsObj.items;
+                    } else if (demandsObj.demands && Array.isArray(demandsObj.demands)) {
+                        demands = demandsObj.demands;
                     } else {
-                        const values = Object.values((data as any).demands);
+                        const values = Object.values(data.demands);
                         if (values.length === 1 && Array.isArray(values[0])) {
                             demands = values[0] as RewardDemand[];
                         } else {
@@ -523,7 +545,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
             } else {
                 setRedemptions([]);
             }
-        } catch (err: any) {
+        } catch (err) {
             logger.error('Error loading redemptions:', err);
             toast.error('Не удалось загрузить очередь запросов');
             setRedemptions([]);
@@ -547,7 +569,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                 next.delete(redemptionId);
                 return next;
             });
-        } catch (err: any) {
+        } catch (err: unknown) {
             logger.error('Error accepting redemption:', err);
             toast.error('Ошибка принятия награды');
         } finally {
@@ -570,7 +592,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                 next.delete(redemptionId);
                 return next;
             });
-        } catch (err: any) {
+        } catch (err: unknown) {
             logger.error('Error rejecting redemption:', err);
             toast.error('Ошибка отклонения награды');
         } finally {
@@ -592,7 +614,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
             toast.success(`Принято наград: ${ids.length}`);
             setRedemptions(prev => prev.filter(d => !ids.includes(d.id)));
             setSelectedItems(new Set());
-        } catch (err: any) {
+        } catch (err: unknown) {
             logger.error('Error bulk accepting:', err);
             toast.error('Ошибка массового принятия');
         } finally {
@@ -614,7 +636,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
             toast.success(`Отклонено наград: ${ids.length}`);
             setRedemptions(prev => prev.filter(d => !ids.includes(d.id)));
             setSelectedItems(new Set());
-        } catch (err: any) {
+        } catch (err: unknown) {
             logger.error('Error bulk rejecting:', err);
             toast.error('Ошибка массового отклонения');
         } finally {
@@ -763,19 +785,23 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                         let message = '';
                         if (Array.isArray(demand.message_parts) && demand.message_parts.length > 0) {
                             message = demand.message_parts.map(part => {
+                                if (typeof part === 'string') return part;
                                 if (typeof part === 'object' && part !== null) {
-                                    if ((part as any).text && (part as any).text.content) return (part as any).text.content;
-                                    if ((part as any).mention && (part as any).mention.nick) return `@${(part as any).mention.nick}`;
-                                    if ((part as any).link && (part as any).link.content) return (part as any).link.content;
-                                    if ((part as any).smile && (part as any).smile.name) return (part as any).smile.name;
-                                    return (part as any).text || (part as any).content || (part as any).message || JSON.stringify(part);
+                                    const p = part as { text?: { content: string }; mention?: { nick: string }; link?: { content: string }; smile?: { name: string }; content?: string };
+                                    if (p.text?.content) return p.text.content;
+                                    if (p.mention?.nick) return `@${p.mention.nick}`;
+                                    if (p.link?.content) return p.link.content;
+                                    if (p.smile?.name) return p.smile.name;
+                                    if (p.content) return p.content;
+                                    return JSON.stringify(part);
                                 }
                                 return String(part);
                             }).join(' ').trim();
                         } else if (typeof demand.message === 'string') {
                             message = demand.message;
                         } else if (demand.message && typeof demand.message === 'object') {
-                            message = (demand.message as any).text || (demand.message as any).content || JSON.stringify(demand.message);
+                            const msg = demand.message as { text?: string; content?: string };
+                            message = msg.text || msg.content || JSON.stringify(demand.message);
                         }
                         
                         const isSelected = selectedItems.has(demand.id);
@@ -936,21 +962,22 @@ const PointsManagementPage: React.FC = () => {
     const loadRewards = async (): Promise<void> => {
         try {
             setLoading(true);
-            const data = await pointsApi.getRewards(selectedPlatform);
+            const data = await pointsApi.getRewards(selectedPlatform) as RewardsResponse;
             
-            const sortedRewards = ((data as any).rewards || []).sort((a: PlatformReward, b: PlatformReward) => {
+            const sortedRewards = (data.rewards || []).sort((a: PlatformReward, b: PlatformReward) => {
                 if (a.is_enabled === b.is_enabled) return 0;
                 return a.is_enabled ? -1 : 1;
             });
             
             setRewards(sortedRewards);
-        } catch (err: any) {
+        } catch (err) {
             logger.error('Error loading rewards:', err);
-            const errorMessage = err.message || 'Неизвестная ошибка';
+            const apiError = err as { message?: string; status?: number };
+            const errorMessage = apiError.message || 'Неизвестная ошибка';
             
-            if (err.status === 404) {
+            if (apiError.status === 404) {
                 toast.error('Платформа не подключена. Авторизуйтесь через настройки', { duration: 5000 });
-            } else if (err.status === 403 || errorMessage.includes('партнёров и аффилейтов') || errorMessage.includes('partner or affiliate')) {
+            } else if (apiError.status === 403 || errorMessage.includes('партнёров и аффилейтов') || errorMessage.includes('partner or affiliate')) {
                 toast.error('Награды Twitch доступны только для партнёров и аффилейтов', { duration: 5000 });
             } else {
                 toast.error(errorMessage, { duration: 5000 });

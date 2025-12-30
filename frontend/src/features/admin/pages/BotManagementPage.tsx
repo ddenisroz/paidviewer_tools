@@ -1,40 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+﻿import React, { useEffect, useState } from 'react';
+
 import { 
-    Bot, 
-    RefreshCw,
+    Bot,
     CheckCircle,
-    Square,
-    AlertCircle,
-    Clock
+    RefreshCw,
+    Square
 } from 'lucide-react';
-import { toast } from 'sonner';
-import { adminService } from '../../../services/api/services/adminService';
-import { useTts } from '../../../context/TtsContext';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { PageLoader } from '@/components/ui/loader';
+import { toast } from '@/utils/toastManager';
+
 import { TTS_SERVICE_URL } from '../../../constants';
+import { useTts } from '../../../context/TtsContext';
+import { adminService } from '../../../services/api/services/adminService';
 import { logger } from '../../../utils/prodLogger';
+import {
+  type BotData,
+  getBotServiceDescription,
+  getBotServiceStatus,
+  parseBotsResponse,
+  parseTtsResponse,
+  type TtsStatus
+} from '../utils/botManagementHelpers';
 
-interface BotData {
-    name: string;
-    platform: string;
-    status: 'running' | 'stopped' | 'error';
-    connected: boolean;
-    connected_channels: number;
-    is_ready?: boolean;
-    is_running?: boolean;
-}
-
-interface TtsStatus {
-    status?: string;
-    healthy?: boolean;
-    available?: boolean;
-    error?: string;
-    url?: string;
-}
-
-type BotStatus = 'running' | 'stopped' | 'error';
 type RestartingState = Record<string, boolean>;
 
 const BotManagementPage: React.FC = () => {
@@ -42,41 +33,13 @@ const BotManagementPage: React.FC = () => {
     const [ttsStatus, setTtsStatus] = useState<TtsStatus | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [restarting, setRestarting] = useState<RestartingState>({});
-    const { engineStatus, isCheckingHealth } = useTts();
-    const ttsIsHealthy = engineStatus.loaded;
-    const ttsIsChecking = isCheckingHealth;
+    const { engineStatus: _engineStatus } = useTts();
 
     const loadBotsStatus = async (): Promise<void> => {
         try {
             setLoading(true);
             const response = await adminService.getBotsStatus();
-            const botsData = (response.data as any)?.bots || {};
-            const botsArray: BotData[] = [];
-            
-            if (botsData.twitch) {
-                botsArray.push({
-                    name: 'twitch_bot',
-                    platform: 'twitch',
-                    status: botsData.twitch.connected && botsData.twitch.is_ready ? 'running' : 
-                           botsData.twitch.connected ? 'error' : 'stopped',
-                    connected: botsData.twitch.connected,
-                    connected_channels: botsData.twitch.channels || 0,
-                    is_ready: botsData.twitch.is_ready || false
-                });
-            }
-            
-            if (botsData.vk) {
-                botsArray.push({
-                    name: 'vk_live_bot',
-                    platform: 'vk_live',
-                    status: botsData.vk.connected && botsData.vk.is_running ? 'running' : 
-                           botsData.vk.connected ? 'error' : 'stopped',
-                    connected: botsData.vk.connected,
-                    connected_channels: botsData.vk.channels || 0,
-                    is_running: botsData.vk.is_running || false
-                });
-            }
-            
+            const botsArray = parseBotsResponse(response.data as Parameters<typeof parseBotsResponse>[0]);
             setBots(botsArray);
         } catch (error) {
             logger.error('Error loading bots status:', error);
@@ -90,27 +53,16 @@ const BotManagementPage: React.FC = () => {
     const loadTtsStatus = async (): Promise<void> => {
         try {
             const response = await adminService.getTtsStatus();
-            const ttsService = (response.data as any)?.tts_service || {};
-            
-            let isHealthy = ttsService.healthy;
-            if (isHealthy === undefined) {
-                const status = (ttsService.status || '').toLowerCase();
-                isHealthy = ttsService.available === true && 
-                           (status === 'healthy' || status === 'ok' || status === 'up');
-            }
-            
-            setTtsStatus({
-                ...ttsService,
-                healthy: isHealthy === true,
-                status: ttsService.status || (isHealthy ? 'healthy' : 'offline')
-            });
-        } catch (error: any) {
+            const ttsData = parseTtsResponse(response.data as Parameters<typeof parseTtsResponse>[0]);
+            setTtsStatus(ttsData);
+        } catch (error: unknown) {
             logger.error('Error loading TTS status:', error);
+            const err = error as { response?: { data?: { detail?: string } }; message?: string };
             setTtsStatus({ 
                 status: 'error', 
                 healthy: false, 
                 available: false,
-                error: error.response?.data?.detail || error.message || 'Failed to check TTS status',
+                error: err.response?.data?.detail || err.message || 'Failed to check TTS status',
                 url: TTS_SERVICE_URL
             });
         }
@@ -143,20 +95,10 @@ const BotManagementPage: React.FC = () => {
         }
     };
 
-    const getBotServiceStatus = (): BotStatus => {
-        if (bots.length === 0) return 'stopped';
-        
-        const hasRunningBot = bots.some(bot => bot.status === 'running');
-        const hasErrorBot = bots.some(bot => bot.status === 'error');
-        
-        if (hasRunningBot) return 'running';
-        if (hasErrorBot) return 'error';
-        return 'stopped';
-    };
+    const currentBotStatus = getBotServiceStatus(bots);
 
     const getBotServiceStatusBadge = (): React.ReactNode => {
-        const status = getBotServiceStatus();
-        switch (status) {
+        switch (currentBotStatus) {
             case 'running':
                 return <Badge variant="outline" className="text-green-600 border-green-600">Работает</Badge>;
             case 'error':
@@ -164,24 +106,6 @@ const BotManagementPage: React.FC = () => {
             default:
                 return <Badge variant="outline" className="text-gray-600 border-gray-600">Остановлен</Badge>;
         }
-    };
-
-    const getBotServiceDescription = (): string => {
-        if (bots.length === 0) {
-            return 'Загрузка статуса...';
-        }
-        
-        const twitchBot = bots.find(bot => bot.platform === 'twitch');
-        const vkBot = bots.find(bot => bot.platform === 'vk_live');
-        
-        const twitchStatus = twitchBot ? (twitchBot.status === 'running' ? 'работает' : 
-                                          twitchBot.status === 'error' ? 'ошибка' : 'остановлен') : 'не найден';
-        const vkStatus = vkBot ? (vkBot.status === 'running' ? 'работает' : 
-                                  vkBot.status === 'error' ? 'ошибка' : 'остановлен') : 'не найден';
-        const twitchChannels = twitchBot ? twitchBot.connected_channels || 0 : 0;
-        const vkChannels = vkBot ? vkBot.connected_channels || 0 : 0;
-        
-        return `Twitch: ${twitchStatus} (${twitchChannels} каналов) • VK Live: ${vkStatus} (${vkChannels} каналов)`;
     };
 
     useEffect(() => {
@@ -197,10 +121,7 @@ const BotManagementPage: React.FC = () => {
     if (loading) {
         return (
             <div className="container mx-auto p-6">
-                <div className="flex items-center justify-center h-64">
-                    <RefreshCw className="h-8 w-8 animate-spin text-purple-500" />
-                    <span className="ml-2 text-lg">Загрузка статуса ботов...</span>
-                </div>
+                <PageLoader message="Загрузка статуса ботов..." />
             </div>
         );
     }
@@ -232,9 +153,9 @@ const BotManagementPage: React.FC = () => {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-4">
                                 <div className="flex-shrink-0">
-                                    {getBotServiceStatus() === 'running' ? (
+                                    {currentBotStatus === 'running' ? (
                                         <CheckCircle className="w-5 h-5 text-green-500" />
-                                    ) : getBotServiceStatus() === 'error' ? (
+                                    ) : currentBotStatus === 'error' ? (
                                         <Square className="w-5 h-5 text-red-500" />
                                     ) : (
                                         <Square className="w-5 h-5 text-gray-500" />
@@ -246,7 +167,7 @@ const BotManagementPage: React.FC = () => {
                                         {getBotServiceStatusBadge()}
                                     </h3>
                                     <p className="text-sm text-slate-400">
-                                        {getBotServiceDescription()}
+                                        {getBotServiceDescription(bots)}
                                     </p>
                                 </div>
                             </div>
@@ -257,7 +178,7 @@ const BotManagementPage: React.FC = () => {
                                     variant="outline"
                                     onClick={restartBotService}
                                     disabled={restarting['bot_service']}
-                                    className={getBotServiceStatus() === 'running' 
+                                    className={currentBotStatus === 'running' 
                                         ? "border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
                                         : "border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
                                     }

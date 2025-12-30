@@ -12,6 +12,18 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true, // This will fail if the port is in use, rather than trying another one
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/ws': {
+        target: 'ws://localhost:8000',
+        ws: true,
+        changeOrigin: true,
+      },
+    },
   },
   resolve: {
     alias: {

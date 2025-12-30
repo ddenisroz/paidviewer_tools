@@ -24,7 +24,7 @@ class StandardResponse:
         }
     }
     """
-    
+
     @staticmethod
     def success(
         data: Optional[Any] = None,
@@ -51,18 +51,18 @@ class StandardResponse:
         content = {
             "success": True
         }
-        
+
         if data is not None:
             content["data"] = data
-            
+
         if message:
             content["message"] = message
-            
+
         return JSONResponse(
             status_code=status_code,
             content=content
         )
-    
+
     @staticmethod
     def error(
         message: str,
@@ -94,10 +94,10 @@ class StandardResponse:
             "code": code,
             "message": message
         }
-        
+
         if details:
             error_obj["details"] = details
-            
+
         return JSONResponse(
             status_code=status_code,
             content={
@@ -105,7 +105,7 @@ class StandardResponse:
                 "error": error_obj
             }
         )
-    
+
     @staticmethod
     def created(
         data: Any,
@@ -133,13 +133,13 @@ class StandardResponse:
         response_data = data
         if resource_id is not None and isinstance(data, dict):
             response_data = {**data, "id": resource_id}
-            
+
         return StandardResponse.success(
             data=response_data,
             message=message or "Resource created successfully",
             status_code=status.HTTP_201_CREATED
         )
-    
+
     @staticmethod
     def no_content(message: Optional[str] = None) -> JSONResponse:
         """
@@ -158,12 +158,12 @@ class StandardResponse:
         content = {"success": True}
         if message:
             content["message"] = message
-            
+
         return JSONResponse(
             status_code=status.HTTP_204_NO_CONTENT,
             content=content
         )
-    
+
     @staticmethod
     def bad_request(
         message: str,
@@ -186,7 +186,7 @@ class StandardResponse:
             status_code=status.HTTP_400_BAD_REQUEST,
             details=details
         )
-    
+
     @staticmethod
     def unauthorized(
         message: str = "Необходима авторизация",
@@ -206,7 +206,7 @@ class StandardResponse:
             code=code,
             status_code=status.HTTP_401_UNAUTHORIZED
         )
-    
+
     @staticmethod
     def forbidden(
         message: str = "Доступ запрещён",
@@ -226,7 +226,7 @@ class StandardResponse:
             code=code,
             status_code=status.HTTP_403_FORBIDDEN
         )
-    
+
     @staticmethod
     def not_found(
         message: str = "Ресурс не найден",
@@ -250,7 +250,7 @@ class StandardResponse:
             status_code=status.HTTP_404_NOT_FOUND,
             details=details
         )
-    
+
     @staticmethod
     def conflict(
         message: str,
@@ -273,7 +273,7 @@ class StandardResponse:
             status_code=status.HTTP_409_CONFLICT,
             details=details
         )
-    
+
     @staticmethod
     def too_many_requests(
         message: str = "Слишком много запросов",
@@ -299,10 +299,10 @@ class StandardResponse:
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             details=details
         )
-        
+
         if retry_after:
             response.headers["Retry-After"] = str(retry_after)
-            
+
         return response
 
 
@@ -314,23 +314,23 @@ class ErrorCodes:
     Централизованные коды ошибок для всего приложения
     Используй эти константы вместо хардкода строк
     """
-    
+
     # Auth
     UNAUTHORIZED = "UNAUTHORIZED"
     TOKEN_EXPIRED = "TOKEN_EXPIRED"
     INVALID_CREDENTIALS = "INVALID_CREDENTIALS"
-    
+
     # TTS
     TTS_NOT_AVAILABLE = "TTS_NOT_AVAILABLE"
     TTS_NOT_WHITELISTED = "TTS_NOT_WHITELISTED"
     TTS_ENABLE_FAILED = "TTS_ENABLE_FAILED"
     TTS_VOICE_NOT_FOUND = "TTS_VOICE_NOT_FOUND"
-    
+
     # Commands
     COMMAND_NOT_FOUND = "COMMAND_NOT_FOUND"
     COMMAND_LIMIT_EXCEEDED = "COMMAND_LIMIT_EXCEEDED"
     INVALID_COMMAND_NAME = "INVALID_COMMAND_NAME"
-    
+
     # General
     BAD_REQUEST = "BAD_REQUEST"
     NOT_FOUND = "NOT_FOUND"
